@@ -103,6 +103,18 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_ensure_parent_exists(path)</span></code><a class="headerlink" href="#ensure-parent-exists-path" title="Link to this heading"></a></h3>
 <p>Ensure the parent directory for <code class="docutils literal notranslate"><span class="pre">path</span></code> exists.</p>
 </section>
+<section id="load-previous-manifest-path">
+<h3><code class="docutils literal notranslate"><span class="pre">load_previous_manifest(path)</span></code><a class="headerlink" href="#load-previous-manifest-path" title="Link to this heading"></a></h3>
+<p>Load JSONL manifest entries indexed by work ID and normalised URL.</p>
+</section>
+<section id="load-manifest-url-index-path">
+<h3><code class="docutils literal notranslate"><span class="pre">load_manifest_url_index(path)</span></code><a class="headerlink" href="#load-manifest-url-index-path" title="Link to this heading"></a></h3>
+<p>Return a mapping of normalised URLs to manifest metadata from SQLite.</p>
+</section>
+<section id="build-manifest-entry-artifact-resolver-url-outcome-html-paths">
+<h3><code class="docutils literal notranslate"><span class="pre">build_manifest_entry(artifact,</span> <span class="pre">resolver,</span> <span class="pre">url,</span> <span class="pre">outcome,</span> <span class="pre">html_paths)</span></code><a class="headerlink" href="#build-manifest-entry-artifact-resolver-url-outcome-html-paths" title="Link to this heading"></a></h3>
+<p>Create a manifest entry summarising a download attempt.</p>
+</section>
 <section id="log-attempt-self-record">
 <h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#log-attempt-self-record" title="Link to this heading"></a></h3>
 <p>Record a resolver attempt.</p>
@@ -282,6 +294,76 @@ timestamp: Optional override for the timestamp column.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id28" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="id29">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id29" title="Link to this heading"></a></h3>
+<p>Accept attempt telemetry for interface parity without persisting it.</p>
+<p>Args:
+record: Resolver attempt metadata emitted by the download pipeline.
+timestamp: Optional ISO-8601 timestamp used when callers override the capture time.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id30">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id30" title="Link to this heading"></a></h3>
+<p>Receive manifest updates while keeping in-memory summary-only semantics.</p>
+<p>Args:
+entry: Manifest entry describing the document artifact that was processed.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id31">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id31" title="Link to this heading"></a></h3>
+<p>Capture the latest run summary prior to shutdown.</p>
+</section>
+<section id="id32">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id32" title="Link to this heading"></a></h3>
+<p>Write the captured summary to disk exactly once.</p>
+</section>
+<section id="id33">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id33" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id34">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id34" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id35">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id35" title="Link to this heading"></a></h3>
+<p>Persist a resolver attempt event for downstream document analytics.</p>
+<p>Args:
+record: Structured attempt data captured during document resolution.
+timestamp: Optional ISO-8601 timestamp overriding the event capture time.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id36">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id36" title="Link to this heading"></a></h3>
+<p>Record manifest outcomes for the processed document artifact.</p>
+<p>Args:
+entry: Manifest entry describing the document state after processing.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id37">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id37" title="Link to this heading"></a></h3>
+<p>Store the aggregated run summary in the summaries table.</p>
+<p>Args:
+summary: Aggregated counters and timing metadata for the run.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id38">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id38" title="Link to this heading"></a></h3>
+<p>Commit outstanding changes and dispose of the SQLite connection.</p>
+</section>
+<section id="id39">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id39" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id40">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id40" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
@@ -299,7 +381,8 @@ url: Final URL from which the artifact was fetched.
 path: Local filesystem path where the artifact is stored.
 classification: Classifier label describing the download outcome.
 content_type: MIME type or equivalent classification when available.
-reason: Diagnostic reason for failure or classification notes.
+reason: Diagnostic reason code (see :class:<code class="docutils literal notranslate"><span class="pre">ReasonCode</span></code>).
+reason_detail: Optional human-readable diagnostic detail.
 html_paths: Any extracted HTML content paths stored alongside the PDF.
 sha256: Optional SHA256 digest of the stored artifact.
 content_length: Content size in bytes when reported by the server.
@@ -377,6 +460,14 @@ True</p>
 <section id="lastattemptcsvsink">
 <h3><code class="docutils literal notranslate"><span class="pre">LastAttemptCsvSink</span></code><a class="headerlink" href="#lastattemptcsvsink" title="Link to this heading"></a></h3>
 <p>Write a CSV snapshot containing the most recent manifest entry per work.</p>
+</section>
+<section id="summarysink">
+<h3><code class="docutils literal notranslate"><span class="pre">SummarySink</span></code><a class="headerlink" href="#summarysink" title="Link to this heading"></a></h3>
+<p>Persist the final metrics summary for a run as JSON.</p>
+</section>
+<section id="sqlitesink">
+<h3><code class="docutils literal notranslate"><span class="pre">SqliteSink</span></code><a class="headerlink" href="#sqlitesink" title="Link to this heading"></a></h3>
+<p>Persist attempts, manifests, and summary records to a SQLite database.</p>
 </section>
 </section>
 </section>

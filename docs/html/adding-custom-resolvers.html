@@ -87,14 +87,14 @@ steps required to implement, register, and validate a new resolver.</p>
 <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolver_my_provider.py</span></code>) or extend
 <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolvers.py</span></code>. Implement the public surface
 expected by <code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code> using the shared types exposed from the
-<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers</span></code> module:</p>
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline</span></code> module:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">RegisteredResolver</span><span class="p">,</span>
     <span class="n">ResolverConfig</span><span class="p">,</span>
     <span class="n">ResolverResult</span><span class="p">,</span>
@@ -152,7 +152,7 @@ expected by <code class="docutils literal notranslate"><span class="pre">Resolve
 <p>Key requirements:</p>
 <ul class="simple">
 <li><p>Subclass <code class="docutils literal notranslate"><span class="pre">RegisteredResolver</span></code> and implement <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">is_enabled</span></code>, and
-<code class="docutils literal notranslate"><span class="pre">iter_urls</span></code> as defined in <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.Resolver</span></code>.</p></li>
+<code class="docutils literal notranslate"><span class="pre">iter_urls</span></code> as defined in <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.Resolver</span></code>.</p></li>
 <li><p>Surface errors by yielding <code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code> events instead of raising
 exceptions.</p></li>
 <li><p>Use <code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> for outbound HTTP to benefit from retry policies
@@ -161,7 +161,7 @@ and structured logging.</p></li>
 <p>For JSON APIs the recommended base class is <code class="docutils literal notranslate"><span class="pre">ApiResolverBase</span></code>, which wraps
 <code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> and emits structured error events automatically. Subclass
 it to reduce boilerplate:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApiResolverBase</span><span class="p">,</span> <span class="n">ResolverResult</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApiResolverBase</span><span class="p">,</span> <span class="n">ResolverResult</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">MyApiResolver</span><span class="p">(</span><span class="n">ApiResolverBase</span><span class="p">):</span>
@@ -195,7 +195,7 @@ longer implement this logic.</p>
 during start-up so the <code class="docutils literal notranslate"><span class="pre">RegisteredResolver</span></code> mixin can register it. To include
 the resolver in the default ordering, add it to <code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code> inside
 <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolvers.py</span></code>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolvers</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload</span><span class="w"> </span><span class="kn">import</span> <span class="n">pipeline</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">default_resolvers</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Resolver</span><span class="p">]:</span>

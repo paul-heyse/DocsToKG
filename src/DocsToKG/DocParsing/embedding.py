@@ -234,6 +234,7 @@ Dependencies:
 from __future__ import annotations
 
 import argparse
+import atexit
 import hashlib
 import json
 import math
@@ -269,10 +270,10 @@ from DocsToKG.DocParsing.core import (
     derive_doc_id_and_vectors_path,
     detect_data_root,
     expand_path,
+    compute_stable_shard,
     get_logger,
     init_hf_env,
     iter_chunks,
-    jsonl_append_iter,
     jsonl_load,
     load_manifest_index,
     log_event,
@@ -322,6 +323,7 @@ __all__ = (
     "splade_encode",
     "tokens",
     "write_vectors",
+    "close_all_qwen",
 )
 
 
@@ -351,6 +353,34 @@ except Exception as exc:  # pragma: no cover - exercised via tests with stubs
 
 
 _QWEN_LLM_CACHE: Dict[Tuple[str, str, int, float, str | None], LLM] = {}
+
+
+def _shutdown_llm_instance(llm) -> None:
+    """Best-effort shutdown for a cached Qwen LLM instance."""
+
+    try:
+        engine = getattr(llm, "llm_engine", None) or getattr(llm, "engine", None)
+        if engine and hasattr(engine, "shutdown"):
+            engine.shutdown()
+    except Exception:  # pragma: no cover - defensive cleanup
+        pass
+    try:
+        if hasattr(llm, "shutdown"):
+            llm.shutdown()  # type: ignore[call-arg]
+    except Exception:  # pragma: no cover - defensive cleanup
+        pass
+
+
+def close_all_qwen() -> None:
+    """Release all cached Qwen LLM instances."""
+
+    for key, llm in list(_QWEN_LLM_CACHE.items()):
+        _shutdown_llm_instance(llm)
+        _QWEN_LLM_CACHE.pop(key, None)
+    _QWEN_LLM_CACHE.clear()
+
+
+atexit.register(close_all_qwen)
 
 
 def _qwen_cache_key(cfg: QwenCfg) -> Tuple[str, str, int, float, str | None]:
@@ -892,17 +922,18 @@ class SPLADEValidator:
         except (TypeError, ValueError):
             threshold = SPLADE_SPARSITY_WARN_THRESHOLD_PCT
         if pct > threshold:
+            zero_count = len(zero_chunks)
             logger.warning(
                 "SPLADE sparsity warning (threshold %.1f%%): %s / %s (%.1f%%) chunks have zero non-zero elements.",
                 threshold,
-                len(self.zero_nnz_chunks),
+                zero_count,
                 total,
                 pct,
             )
             logger.warning(
                 "Affected UUIDs (first %s of %s): %s",
                 top_n,
-                len(zero_chunks),
+                zero_count,
                 zero_chunks[:top_n],
             )
 
@@ -926,8 +957,9 @@ def _qwen_embed_direct(
     _ensure_qwen_dependencies()
 
     effective_batch = batch_size or cfg.batch_size
+    use_cache = bool(getattr(cfg, "cache_enabled", True))
     cache_key = _qwen_cache_key(cfg)
-    llm = _QWEN_LLM_CACHE.get(cache_key)
+    llm = _QWEN_LLM_CACHE.get(cache_key) if use_cache else None
     if llm is None:
         llm = LLM(
             model=str(cfg.model_dir),  # local path
@@ -938,14 +970,19 @@ def _qwen_embed_direct(
             quantization=cfg.quantization,  # None or 'awq' (if a matching AWQ checkpoint exists)
             download_dir=str(HF_HOME),  # belt & suspenders: keep any aux files in your cache
         )
-        _QWEN_LLM_CACHE[cache_key] = llm
+        if use_cache:
+            _QWEN_LLM_CACHE[cache_key] = llm
     pool = PoolingParams(normalize=True, dimensions=int(cfg.dim))
     out: List[List[float]] = []
-    for i in range(0, len(texts), effective_batch):
-        batch = texts[i : i + effective_batch]
-        res = llm.embed(batch, pooling_params=pool)
-        for r in res:
-            out.append([float(x) for x in r.outputs.embedding])
+    try:
+        for i in range(0, len(texts), effective_batch):
+            batch = texts[i : i + effective_batch]
+            res = llm.embed(batch, pooling_params=pool)
+            for r in res:
+                out.append([float(x) for x in r.outputs.embedding])
+    finally:
+        if not use_cache:
+            _shutdown_llm_instance(llm)
     return out
 
 
@@ -1139,6 +1176,52 @@ def iter_chunk_files(directory: Path) -> Iterator[Path]:
     yield from iter_chunks(directory)
 
 
+class VectorWriter:
+    """Abstract base class for vector writers."""
+
+    path: Path
+
+    def write_rows(self, rows: Sequence[dict]) -> None:  # pragma: no cover - interface
+        raise NotImplementedError
+
+
+class JsonlVectorWriter(VectorWriter):
+    """Context manager that writes vector rows to JSONL atomically."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._context = None
+        self._handle = None
+
+    def __enter__(self) -> "JsonlVectorWriter":
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._context = atomic_write(self.path)
+        self._handle = self._context.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        if self._context is None:
+            return False
+        return self._context.__exit__(exc_type, exc, tb)
+
+    def write_rows(self, rows: Sequence[dict]) -> None:
+        if self._handle is None:
+            raise RuntimeError("JsonlVectorWriter not initialised; call __enter__ first.")
+        for row in rows:
+            self._handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def create_vector_writer(path: Path, fmt: str) -> JsonlVectorWriter:
+    """Factory returning the appropriate vector writer for ``fmt``."""
+
+    fmt_normalized = fmt.lower()
+    if fmt_normalized == "jsonl":
+        return JsonlVectorWriter(path)
+    if fmt_normalized == "parquet":
+        raise NotImplementedError("Parquet vector output is not yet implemented; use --format jsonl.")
+    raise ValueError(f"Unsupported vector format: {fmt}")
+
+
 def process_chunk_file_vectors(
     chunk_file: Path,
     out_path: Path,
@@ -1179,7 +1262,7 @@ def process_chunk_file_vectors(
     nnz_all: List[int] = []
     norms_all: List[float] = []
 
-    with atomic_write(resolved_out_path) as handle:
+    with create_vector_writer(resolved_out_path, str(getattr(args, "vector_format", "jsonl"))) as writer:
         for rows in iter_rows_in_batches(chunk_file, batch_size):
             if not rows:
                 continue
@@ -1211,7 +1294,7 @@ def process_chunk_file_vectors(
 
             # Write vectors for this batch immediately
             count, nnz, norms = write_vectors(
-                handle,
+                writer,
                 uuids,
                 texts,
                 splade_results,
@@ -1242,7 +1325,7 @@ def process_chunk_file_vectors(
 
 
 def write_vectors(
-    destination,
+    writer: VectorWriter,
     uuids: Sequence[str],
     texts: Sequence[str],
     splade_results: Sequence[Tuple[Sequence[str], Sequence[float]]],
@@ -1258,7 +1341,7 @@ def write_vectors(
     """Write validated vector rows to disk with schema enforcement.
 
     Args:
-        path_or_handle: Destination JSONL path or file handle for vector rows.
+        writer: Vector writer responsible for persisting rows.
         uuids: Sequence of chunk UUIDs aligned with the other inputs.
         texts: Chunk text bodies.
         splade_results: SPLADE token and weight pairs per chunk.
@@ -1285,10 +1368,7 @@ def write_vectors(
     splade_nnz: List[int] = []
     qwen_norms: List[float] = []
 
-    dest_is_handle = hasattr(destination, "write")
-    if not dest_is_handle and isinstance(destination, Path):
-        destination.parent.mkdir(parents=True, exist_ok=True)
-    output_ref = output_path or (destination if isinstance(destination, Path) else None)
+    output_ref = output_path or getattr(writer, "path", None)
     payloads: List[dict] = []
     for uuid_value, text, splade_pair, qwen_vector, row in zip(
         uuids, texts, splade_results, qwen_results, rows
@@ -1391,7 +1471,7 @@ def write_vectors(
 
         payloads.append(vector_row.model_dump(by_alias=True))
 
-    jsonl_append_iter(destination, payloads, atomic=not dest_is_handle)
+    writer.write_rows(payloads)
 
     return len(uuids), splade_nnz, qwen_norms
 
@@ -1479,8 +1559,33 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
         help="Logging verbosity for console output (default: %(default)s).",
     )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable Qwen LLM caching between batches (debug).",
+    )
+    parser.add_argument(
+        "--shard-count",
+        type=int,
+        default=1,
+        help="Total number of shards for distributed runs (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--shard-index",
+        type=int,
+        default=0,
+        help="Zero-based shard index to process (default: %(default)s).",
+    )
     parser.add_argument("--chunks-dir", type=Path, default=DEFAULT_CHUNKS_DIR)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_VECTORS_DIR)
+    parser.add_argument(
+        "--format",
+        dest="vector_format",
+        type=lambda value: str(value).lower(),
+        default="jsonl",
+        choices=["jsonl", "parquet"],
+        help="Vector output format written to --out-dir (default: %(default)s).",
+    )
     parser.add_argument("--bm25-k1", type=float, default=1.5)
     parser.add_argument("--bm25-b", type=float, default=0.75)
     parser.add_argument("--batch-size-splade", type=int, default=32)
@@ -1627,6 +1732,31 @@ def main(args: argparse.Namespace | None = None) -> int:
     args = namespace
     offline_mode = bool(getattr(args, "offline", False))
 
+    try:
+        shard_count = int(getattr(args, "shard_count", 1))
+        shard_index = int(getattr(args, "shard_index", 0))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("--shard-count and --shard-index must be integers") from exc
+    if shard_count < 1:
+        raise ValueError("--shard-count must be >= 1")
+    if not 0 <= shard_index < shard_count:
+        raise ValueError("--shard-index must be between 0 and shard-count-1")
+    args.shard_count = shard_count
+    args.shard_index = shard_index
+
+    vector_format = str(getattr(args, "vector_format", "jsonl")).lower()
+    if vector_format not in {"jsonl", "parquet"}:
+        raise ValueError("--format must be one of: jsonl, parquet")
+    if vector_format != "jsonl":
+        log_event(
+            logger,
+            "error",
+            "Vector format not implemented",
+            vector_format=vector_format,
+        )
+        raise NotImplementedError("Parquet vector output is not yet implemented; use --format jsonl.")
+    args.vector_format = vector_format
+
     global HF_HOME, MODEL_ROOT, QWEN_DIR, SPLADE_DIR
     HF_HOME, MODEL_ROOT = init_hf_env()
     QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
@@ -1761,6 +1891,10 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "qwen_model_dir": str(qwen_model_dir),
                 "offline": offline_mode,
                 "requested_files_parallel": requested_parallel,
+                "shard_count": args.shard_count,
+                "shard_index": args.shard_index,
+                "vector_format": args.vector_format,
+                "qwen_cache_enabled": not bool(getattr(args, "no_cache", False)),
                 "sparsity_warn_threshold_pct": getattr(
                     args,
                     "sparsity_warn_threshold_pct",
@@ -1778,6 +1912,38 @@ def main(args: argparse.Namespace | None = None) -> int:
             extra={"extra_fields": {"chunks_dir": str(chunks_dir)}},
         )
         return 0
+
+    if args.shard_count > 1:
+        total_candidates = len(files)
+        selected_files = [
+            path
+            for path in files
+            if compute_stable_shard(path.relative_to(chunks_dir).as_posix(), args.shard_count)
+            == args.shard_index
+        ]
+        logger.info(
+            "Applying shard filter",
+            extra={
+                "extra_fields": {
+                    "shard_index": args.shard_index,
+                    "shard_count": args.shard_count,
+                    "selected_files": len(selected_files),
+                    "total_files": total_candidates,
+                }
+            },
+        )
+        files = selected_files
+        if not files:
+            logger.warning(
+                "Shard contains no chunk files",
+                extra={
+                    "extra_fields": {
+                        "shard_index": args.shard_index,
+                        "shard_count": args.shard_count,
+                    }
+                },
+            )
+            return 0
 
     incompatible_chunks: List[Path] = []
     for chunk_file in files:
@@ -1824,6 +1990,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         batch_size=int(args.batch_size_qwen),
         quantization=args.qwen_quant,
         dim=int(args.qwen_dim),
+        cache_enabled=not bool(getattr(args, "no_cache", False)),
     )
 
     stats = process_pass_a(files, logger)
@@ -1957,6 +2124,21 @@ def main(args: argparse.Namespace | None = None) -> int:
                         output_path=out_path,
                         vector_count=count,
                     )
+                    avg_nnz_file = statistics.mean(nnz) if nnz else 0.0
+                    avg_norm_file = statistics.mean(norms) if norms else 0.0
+                    logger.info(
+                        "Embedding file written",
+                        extra={
+                            "extra_fields": {
+                                "doc_id": doc_id,
+                                "vectors": count,
+                                "splade_avg_nnz": round(avg_nnz_file, 3),
+                                "qwen_avg_norm": round(avg_norm_file, 4),
+                                "duration_s": round(duration, 3),
+                                "output_file": out_path.name,
+                            }
+                        },
+                    )
                     bar.update(1)
         else:
             for entry in tqdm(file_entries, desc="Pass B: Encoding vectors", unit="file"):
@@ -1999,6 +2181,21 @@ def main(args: argparse.Namespace | None = None) -> int:
                     input_hash=input_hash,
                     output_path=out_path,
                     vector_count=count,
+                )
+                avg_nnz_file = statistics.mean(nnz) if nnz else 0.0
+                avg_norm_file = statistics.mean(norms) if norms else 0.0
+                logger.info(
+                    "Embedding file written",
+                    extra={
+                        "extra_fields": {
+                            "doc_id": doc_id,
+                            "vectors": count,
+                            "splade_avg_nnz": round(avg_nnz_file, 3),
+                            "qwen_avg_norm": round(avg_norm_file, 4),
+                            "duration_s": round(duration, 3),
+                            "output_file": out_path.name,
+                        }
+                    },
                 )
     finally:
         args.qwen_queue = None

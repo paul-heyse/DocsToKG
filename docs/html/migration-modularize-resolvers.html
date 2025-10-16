@@ -79,7 +79,7 @@
   <section id="migration-guide-unified-content-download-resolvers">
 <h1>1. Migration Guide: Unified Content Download Resolvers<a class="headerlink" href="#migration-guide-unified-content-download-resolvers" title="Link to this heading"></a></h1>
 <p>The resolver subsystem has been recomposed into a single module,
-<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers</span></code>. This guide explains how to migrate code
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline</span></code>. This guide explains how to migrate code
 that previously relied on the intermediate submodules (<code class="docutils literal notranslate"><span class="pre">.types</span></code>, <code class="docutils literal notranslate"><span class="pre">.pipeline</span></code>,
 <code class="docutils literal notranslate"><span class="pre">.providers</span></code>, <code class="docutils literal notranslate"><span class="pre">.headers</span></code>, <code class="docutils literal notranslate"><span class="pre">.cache</span></code>).</p>
 <section id="update-import-paths">
@@ -91,17 +91,17 @@ that previously relied on the intermediate submodules (<code class="docutils lit
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.types</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline.types</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.pipeline</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline.pipeline</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.providers</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline.providers</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.headers</span> <span class="pre">import</span> <span class="pre">headers_cache_key</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">headers_cache_key</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline.headers</span> <span class="pre">import</span> <span class="pre">headers_cache_key</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline</span> <span class="pre">import</span> <span class="pre">headers_cache_key</span></code></p></td>
 </tr>
 </tbody>
 </table>
@@ -115,7 +115,7 @@ ensure compatibility with the unified module.</p>
 </section>
 <section id="registering-custom-resolvers">
 <h2>2. Registering Custom Resolvers<a class="headerlink" href="#registering-custom-resolvers" title="Link to this heading"></a></h2>
-<p>Subclass <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.RegisteredResolver</span></code> and make sure
+<p>Subclass <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.RegisteredResolver</span></code> and make sure
 the subclass is imported during start-up so it registers with the resolver
 registry. To take part in the default order, append instances to
 <code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code> inside <code class="docutils literal notranslate"><span class="pre">resolvers.py</span></code> or extend the returned list within

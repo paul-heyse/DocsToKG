@@ -38,6 +38,9 @@ doctags = _doctags
 chunking = _chunking
 embedding = _embedding
 
+# Track which shims have emitted deprecation warnings to avoid duplicates.
+_SHIM_WARNED: set[str] = set()
+
 # Legacy alias retained for backwards compatibility
 pipelines = _doctags
 
@@ -54,6 +57,16 @@ html_main = _doctags.html_main
 
 def _populate_forwarding_module(module: types.ModuleType, target, *, doc_hint: str) -> None:
     """Populate ``module`` so that it forwards attributes to ``target``."""
+
+    alias = module.__name__
+    if alias not in _SHIM_WARNED:
+        target_hint = doc_hint.split("→")[-1].strip()
+        warnings.warn(
+            f"{alias} is deprecated; import DocsToKG.DocParsing.{target_hint} instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        _SHIM_WARNED.add(alias)
 
     names: Iterable[str]
     if hasattr(target, "__all__"):
@@ -119,7 +132,10 @@ def _populate_pdf_pipeline_module(module: types.ModuleType) -> None:
     module.wait_for_vllm = backend.wait_for_vllm
     module.stop_vllm = backend.stop_vllm
     module.validate_served_models = backend.validate_served_models
-    module.manifest_append = backend.manifest_append
+    module.manifest_append = _core.manifest_append
+    module.manifest_log_success = _core.manifest_log_success
+    module.manifest_log_failure = _core.manifest_log_failure
+    module.manifest_log_skip = _core.manifest_log_skip
     module.list_pdfs = backend.list_pdfs
 
     def parse_args(argv: object | None = None):
@@ -176,6 +192,9 @@ def _populate_pdf_pipeline_module(module: types.ModuleType) -> None:
         "stop_vllm",
         "validate_served_models",
         "manifest_append",
+        "manifest_log_failure",
+        "manifest_log_skip",
+        "manifest_log_success",
         "list_pdfs",
         "parse_args",
         "main",

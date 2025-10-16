@@ -602,6 +602,7 @@ from DocsToKG.ContentDownload.cli import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
     DEFAULT_TAIL_CHECK_BYTES,
+    DownloadOptions,
     WorkArtifact,
     _build_download_outcome,
     download_candidate,
@@ -2970,14 +2971,7 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
     )
     pipeline = ResolverPipeline([StubResolver()], config, fake_download, logger, metrics)
 
-    result = process_one_work(
-        work,
-        requests.Session(),
-        artifact.pdf_dir,
-        artifact.html_dir,
-        pipeline,
-        logger,
-        metrics,
+    options = DownloadOptions(
         dry_run=False,
         list_only=False,
         extract_html_text=False,
@@ -2987,6 +2981,16 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
         sniff_bytes=DEFAULT_SNIFF_BYTES,
         min_pdf_bytes=DEFAULT_MIN_PDF_BYTES,
         tail_check_bytes=DEFAULT_TAIL_CHECK_BYTES,
+    )
+    result = process_one_work(
+        work,
+        requests.Session(),
+        artifact.pdf_dir,
+        artifact.html_dir,
+        pipeline,
+        logger,
+        metrics,
+        options=options,
     )
 
     logger.close()
@@ -3009,6 +3013,177 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
     assert attempts[0]["sha256"] == "deadbeef"
     assert manifests[0]["path"].endswith("resolver.pdf")
     assert Path(manifests[0]["path"]).exists()
+
+
+# --- test_domain_bytes_budget ---
+
+
+def test_domain_bytes_budget_skips_over_limit(tmp_path: Path) -> None:
+    work_base = {
+        "title": "Edge Case",
+        "publication_year": 2024,
+        "ids": {"doi": "10.1/test"},
+        "best_oa_location": {},
+        "primary_location": {},
+        "locations": [],
+        "open_access": {"oa_url": None},
+    }
+
+    def make_work(identifier: str) -> Dict[str, Any]:
+        payload = dict(work_base)
+        payload["id"] = identifier
+        return payload
+
+    artifact = _make_artifact(tmp_path)
+    logger_path = tmp_path / "domain_budget.jsonl"
+    logger = JsonlSink(logger_path)
+    metrics = ResolverMetrics()
+
+    class StubResolver:
+        name = "stub"
+
+        def is_enabled(self, config: ResolverConfig, artifact: WorkArtifact) -> bool:
+            return True
+
+        def iter_urls(
+            self,
+            session: requests.Session,
+            config: ResolverConfig,
+            artifact: WorkArtifact,
+        ) -> Iterable[ResolverResult]:
+            yield ResolverResult(url="https://resolver.example/paper.pdf")
+
+    download_calls: List[str] = []
+
+    def fake_download(*args: Any, **kwargs: Any) -> DownloadOutcome:
+        download_calls.append(args[2])
+        pdf_path = artifact.pdf_dir / f"{len(download_calls)}.pdf"
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        return DownloadOutcome(
+            classification="pdf",
+            path=str(pdf_path),
+            http_status=200,
+            content_type="application/pdf",
+            elapsed_ms=5.0,
+            sha256="deadbeef",
+            content_length=6,
+        )
+
+    config = ResolverConfig(
+        resolver_order=["stub"],
+        resolver_toggles={"stub": True},
+        enable_head_precheck=False,
+        domain_bytes_budget={"resolver.example": 5},
+    )
+    pipeline = ResolverPipeline([StubResolver()], config, fake_download, logger, metrics)
+
+    options = DownloadOptions(
+        dry_run=False,
+        list_only=False,
+        extract_html_text=False,
+        previous_lookup={},
+        resume_completed=set(),
+        max_bytes=None,
+        sniff_bytes=DEFAULT_SNIFF_BYTES,
+        min_pdf_bytes=DEFAULT_MIN_PDF_BYTES,
+        tail_check_bytes=DEFAULT_TAIL_CHECK_BYTES,
+    )
+
+    session = requests.Session()
+    try:
+        first_result = process_one_work(
+            make_work("https://openalex.org/WEDGE-1"),
+            session,
+            artifact.pdf_dir,
+            artifact.html_dir,
+            pipeline,
+            logger,
+            metrics,
+            options=options,
+        )
+
+        second_result = process_one_work(
+            make_work("https://openalex.org/WEDGE-2"),
+            session,
+            artifact.pdf_dir,
+            artifact.html_dir,
+            pipeline,
+            logger,
+            metrics,
+            options=options,
+        )
+    finally:
+        session.close()
+
+    logger.close()
+
+    assert first_result["saved"] is True
+    assert second_result["saved"] is False
+    assert len(download_calls) == 1
+
+    records = [json.loads(line) for line in logger_path.read_text(encoding="utf-8").splitlines()]
+    manifest_records = [entry for entry in records if entry["record_type"] == "manifest"]
+    reason_map = {entry["work_id"]: entry.get("reason") for entry in manifest_records}
+    assert reason_map.get("WEDGE-2") == ReasonCode.DOMAIN_BYTES_BUDGET.value
+
+
+def test_retry_after_updates_breakers(tmp_path: Path) -> None:
+    logger = JsonlSink(tmp_path / "breaker.jsonl")
+    metrics = ResolverMetrics()
+
+    class StubResolver:
+        name = "stub"
+
+        def is_enabled(self, config: ResolverConfig, artifact: WorkArtifact) -> bool:
+            return True
+
+        def iter_urls(
+            self,
+            session: requests.Session,
+            config: ResolverConfig,
+            artifact: WorkArtifact,
+        ) -> Iterable[ResolverResult]:
+            yield ResolverResult(url="https://resolver.example/paper.pdf")
+
+    config = ResolverConfig(
+        resolver_order=["stub"],
+        resolver_toggles={"stub": True},
+        enable_head_precheck=False,
+        resolver_circuit_breakers={"stub": {"failure_threshold": 1, "cooldown_seconds": 1.0}},
+        domain_token_buckets={
+            "resolver.example": {
+                "rate_per_second": 10.0,
+                "capacity": 10.0,
+                "breaker_threshold": 1,
+                "breaker_cooldown": 1.0,
+            }
+        },
+    )
+    pipeline = ResolverPipeline([StubResolver()], config, lambda *args, **kwargs: None, logger, metrics)
+
+    outcome = DownloadOutcome(
+        classification=Classification.HTTP_ERROR,
+        path=None,
+        http_status=500,
+        content_type="application/pdf",
+        elapsed_ms=10.0,
+        reason=ReasonCode.HTTP_STATUS,
+        reason_detail="500",
+        retry_after=7.5,
+    )
+
+    pipeline._update_breakers("stub", "resolver.example", outcome)
+
+    resolver_breaker = pipeline._resolver_breakers["stub"]
+    assert resolver_breaker.allow() is False
+    assert resolver_breaker.cooldown_remaining() >= 7.0
+
+    host_breaker = pipeline._ensure_host_breaker("resolver.example")
+    assert host_breaker.allow() is False
+    assert host_breaker.cooldown_remaining() >= 7.0
+
+    logger.close()
 
 
 # --- test_edge_cases.py ---

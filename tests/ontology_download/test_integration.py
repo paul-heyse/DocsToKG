@@ -74,6 +74,7 @@ import json
 import logging
 import shutil
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -114,13 +115,24 @@ def patched_dirs(monkeypatch, tmp_path):
             path.mkdir(parents=True, exist_ok=True)
             return path
 
-        def finalize_version(self, ontology_id: str, version: str, base_dir: Path) -> None:
+        def finalize_version(
+            self,
+            ontology_id: str,
+            version: str,
+            base_dir: Path,
+            *,
+            artifact_path: Optional[Path] = None,
+            artifact_sha256: Optional[str] = None,
+        ) -> None:
             pass
 
         def set_latest_version(
             self, ontology_id: str, path: Path
         ) -> None:  # pragma: no cover - not used
             pass
+
+        def mirror_cas_artifact(self, algorithm: str, digest: str, source: Path) -> Path:
+            return source
 
     stub_storage = _StubStorage()
     monkeypatch.setattr(settings_mod, "STORAGE", stub_storage, raising=False)

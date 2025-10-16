@@ -30,6 +30,18 @@ Return the current time as an ISO 8601 UTC timestamp.
 
 Ensure the parent directory for ``path`` exists.
 
+### `load_previous_manifest(path)`
+
+Load JSONL manifest entries indexed by work ID and normalised URL.
+
+### `load_manifest_url_index(path)`
+
+Return a mapping of normalised URLs to manifest metadata from SQLite.
+
+### `build_manifest_entry(artifact, resolver, url, outcome, html_paths)`
+
+Create a manifest entry summarising a download attempt.
+
 ### `log_attempt(self, record)`
 
 Record a resolver attempt.
@@ -225,6 +237,86 @@ Flush collected manifest rows to the CSV file.
 
 *No documentation available.*
 
+### `log_attempt(self, record)`
+
+Accept attempt telemetry for interface parity without persisting it.
+
+Args:
+record: Resolver attempt metadata emitted by the download pipeline.
+timestamp: Optional ISO-8601 timestamp used when callers override the capture time.
+
+Returns:
+None
+
+### `log_manifest(self, entry)`
+
+Receive manifest updates while keeping in-memory summary-only semantics.
+
+Args:
+entry: Manifest entry describing the document artifact that was processed.
+
+Returns:
+None
+
+### `log_summary(self, summary)`
+
+Capture the latest run summary prior to shutdown.
+
+### `close(self)`
+
+Write the captured summary to disk exactly once.
+
+### `__enter__(self)`
+
+*No documentation available.*
+
+### `__exit__(self, exc_type, exc, tb)`
+
+*No documentation available.*
+
+### `log_attempt(self, record)`
+
+Persist a resolver attempt event for downstream document analytics.
+
+Args:
+record: Structured attempt data captured during document resolution.
+timestamp: Optional ISO-8601 timestamp overriding the event capture time.
+
+Returns:
+None
+
+### `log_manifest(self, entry)`
+
+Record manifest outcomes for the processed document artifact.
+
+Args:
+entry: Manifest entry describing the document state after processing.
+
+Returns:
+None
+
+### `log_summary(self, summary)`
+
+Store the aggregated run summary in the summaries table.
+
+Args:
+summary: Aggregated counters and timing metadata for the run.
+
+Returns:
+None
+
+### `close(self)`
+
+Commit outstanding changes and dispose of the SQLite connection.
+
+### `__enter__(self)`
+
+*No documentation available.*
+
+### `__exit__(self, exc_type, exc, tb)`
+
+*No documentation available.*
+
 ## 3. Classes
 
 ### `ManifestEntry`
@@ -242,7 +334,8 @@ url: Final URL from which the artifact was fetched.
 path: Local filesystem path where the artifact is stored.
 classification: Classifier label describing the download outcome.
 content_type: MIME type or equivalent classification when available.
-reason: Diagnostic reason for failure or classification notes.
+reason: Diagnostic reason code (see :class:`ReasonCode`).
+reason_detail: Optional human-readable diagnostic detail.
 html_paths: Any extracted HTML content paths stored alongside the PDF.
 sha256: Optional SHA256 digest of the stored artifact.
 content_length: Content size in bytes when reported by the server.
@@ -312,3 +405,11 @@ Maintain a JSON index mapping work IDs to their latest PDF artefacts.
 ### `LastAttemptCsvSink`
 
 Write a CSV snapshot containing the most recent manifest entry per work.
+
+### `SummarySink`
+
+Persist the final metrics summary for a run as JSON.
+
+### `SqliteSink`
+
+Persist attempts, manifests, and summary records to a SQLite database.

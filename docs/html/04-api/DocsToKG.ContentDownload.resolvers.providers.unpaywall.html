@@ -78,7 +78,7 @@
              
   <section id="module-unpaywall">
 <h1>1. Module: unpaywall<a class="headerlink" href="#module-unpaywall" title="Link to this heading"></a></h1>
-<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">UnpaywallResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers</span></code>.</p>
+<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">UnpaywallResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.providers</span></code>.</p>
 <p>Unpaywall Resolver Provider</p>
 <p>This module interfaces with the Unpaywall API to discover open-access PDFs for
 scholarly works that expose DOI metadata.</p>
@@ -89,7 +89,7 @@ scholarly works that expose DOI metadata.</p>
 <li><p>Deduplication of candidate URLs across best and alternate OA locations.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.providers import UnpaywallResolver</p>
+from DocsToKG.ContentDownload.pipeline.providers import UnpaywallResolver</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = UnpaywallResolver()
 results = list(resolver.iter_urls(session, config, artifact))
 </pre></div>

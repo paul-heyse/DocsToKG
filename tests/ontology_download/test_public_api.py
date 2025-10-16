@@ -23,6 +23,7 @@ EXPECTED_PUBLIC_API = (
     "ValidatorSubprocessError",
     "ResolverCandidate",
     "ResolvedConfig",
+    "ExpectedChecksum",
     "ConfigError",
     "ConfigurationError",
     "DefaultsConfig",

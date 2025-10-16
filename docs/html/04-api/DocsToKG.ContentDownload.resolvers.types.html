@@ -78,7 +78,7 @@
              
   <section id="module-types">
 <h1>1. Module: types<a class="headerlink" href="#module-types" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.types</span></code>.</p>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.types</span></code>.</p>
 <p>Resolver Type Declarations</p>
 <p>This module collects dataclasses, type aliases, and protocols that formalise
 the interfaces between resolver providers, the pipeline engine, and downstream
@@ -92,7 +92,7 @@ full API surface.</p>
 <li><p>Lightweight metrics collector for resolver attempt statistics.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.types import Resolver, ResolverConfig</p>
+from DocsToKG.ContentDownload.pipeline.types import Resolver, ResolverConfig</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>class ExampleResolver:
     name = &quot;example&quot;
 

@@ -78,7 +78,7 @@
              
   <section id="module-crossref">
 <h1>1. Module: crossref<a class="headerlink" href="#module-crossref" title="Link to this heading"></a></h1>
-<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">CrossrefResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers</span></code>.</p>
+<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">CrossrefResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.providers</span></code>.</p>
 <p>Crossref Resolver Provider</p>
 <p>This module integrates with the Crossref metadata API to surface direct and
 publisher-hosted PDF links for scholarly works. It uses polite rate limiting,
@@ -91,7 +91,7 @@ service guidelines.</p>
 <li><p>Deduplication of returned URLs to minimise redundant download attempts.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.providers import CrossrefResolver</p>
+from DocsToKG.ContentDownload.pipeline.providers import CrossrefResolver</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = CrossrefResolver()
 results = list(resolver.iter_urls(session, config, artifact))
 </pre></div>

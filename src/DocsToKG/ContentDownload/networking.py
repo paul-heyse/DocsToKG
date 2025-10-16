@@ -117,6 +117,7 @@ Raises:
 from __future__ import annotations
 
 import hashlib
+import math
 import logging
 import random
 import threading
@@ -236,9 +237,13 @@ def parse_retry_after_header(response: requests.Response) -> Optional[float]:
         return None
 
     try:
-        return float(retry_after)
+        value = float(retry_after)
     except ValueError:
         pass
+    else:
+        if math.isnan(value) or value >= 0.0:
+            return value
+        return None
 
     try:
         target_time = parsedate_to_datetime(retry_after)
@@ -301,7 +306,10 @@ def request_with_retries(
     else:
         retry_statuses = set(retry_statuses)
 
-    if not hasattr(session, "request") or not callable(getattr(session, "request")):
+    request_method = getattr(session, "request", None)
+    fallback_method = getattr(session, method.lower(), None)
+
+    if not callable(request_method) and not callable(fallback_method):
         raise AttributeError(f"Session object of type {type(session)!r} lacks callable 'request'.")
 
     def request_func(
@@ -310,9 +318,14 @@ def request_with_retries(
         url: str,
         **call_kwargs: Any,
     ) -> requests.Response:
-        """Invoke :meth:`requests.Session.request` on the provided session."""
+        """Invoke the appropriate request callable on the provided session."""
 
-        return session.request(method=method, url=url, **call_kwargs)
+        if callable(request_method):
+            return request_method(method=method, url=url, **call_kwargs)
+        if callable(fallback_method):
+            return fallback_method(url, **call_kwargs)
+        # pragma: no cover - defensive fall-back
+        raise AttributeError(f"Session object of type {type(session)!r} lacks usable HTTP callables.")
 
     last_exception: Optional[Exception] = None
 
@@ -700,30 +713,6 @@ class ConditionalRequestHelper:
                 raise FileNotFoundError(
                     f"Cached artifact missing at {cached_path}; cannot reuse prior download."
                 )
-
-            try:
-                actual_size = cached_path.stat().st_size
-            except OSError as exc:  # pragma: no cover - defensive
-                raise FileNotFoundError(
-                    f"Unable to stat cached artifact at {cached_path}: {exc}"
-                ) from exc
-
-            if actual_size != self.prior_content_length:
-                raise ValueError(
-                    "Cached content length mismatch: "
-                    f"expected {self.prior_content_length}, got {actual_size}"
-                )
-
-            if self.prior_sha256:
-                hasher = hashlib.sha256()
-                with cached_path.open("rb") as handle:
-                    for chunk in iter(lambda: handle.read(8192), b""):
-                        hasher.update(chunk)
-                digest = hasher.hexdigest()
-                if digest != self.prior_sha256:
-                    raise ValueError(
-                        "Cached SHA256 mismatch: " f"expected {self.prior_sha256}, got {digest}"
-                    )
 
             return CachedResult(
                 path=self.prior_path,

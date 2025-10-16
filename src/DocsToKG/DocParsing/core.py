@@ -58,6 +58,18 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "looks-like-filesystem-path",
+#       "name": "looks_like_filesystem_path",
+#       "anchor": "function-looks-like-filesystem-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-pdf-model-path",
+#       "name": "resolve_pdf_model_path",
+#       "anchor": "function-resolve-pdf-model-path",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "init-hf-env",
 #       "name": "init_hf_env",
 #       "anchor": "function-init-hf-env",
@@ -100,6 +112,18 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "prepare-data-root",
+#       "name": "prepare_data_root",
+#       "anchor": "function-prepare-data-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-pipeline-path",
+#       "name": "resolve_pipeline_path",
+#       "anchor": "function-resolve-pipeline-path",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "data-pdfs",
 #       "name": "data_pdfs",
 #       "anchor": "function-data-pdfs",
@@ -124,21 +148,15 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "compute-stable-shard",
+#       "name": "compute_stable_shard",
+#       "anchor": "function-compute-stable-shard",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "should-skip-output",
 #       "name": "should_skip_output",
 #       "anchor": "function-should-skip-output",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-str-list",
-#       "name": "_ensure_str_list",
-#       "anchor": "function-ensure-str-list",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-structural-marker-config",
-#       "name": "load_structural_marker_config",
-#       "anchor": "function-load-structural-marker-config",
 #       "kind": "function"
 #     },
 #     {
@@ -500,6 +518,7 @@ __all__ = [
     "set_spawn_or_warn",
     "derive_doc_id_and_vectors_path",
     "compute_relative_doc_id",
+    "compute_stable_shard",
     "should_skip_output",
     "init_hf_env",
     "UUID_NAMESPACE",
@@ -568,6 +587,7 @@ class QwenCfg:
     batch_size: int = 32
     quantization: Optional[str] = None
     dim: int = 2560
+    cache_enabled: bool = True
 
 
 @dataclass(slots=True)
@@ -958,6 +978,15 @@ def compute_relative_doc_id(path: Path, root: Path) -> str:
     return path.relative_to(root).as_posix()
 
 
+def compute_stable_shard(identifier: str, shard_count: int) -> int:
+    """Deterministically map ``identifier`` to a shard in ``[0, shard_count)``."""
+
+    if shard_count < 1:
+        raise ValueError("shard_count must be >= 1")
+    digest = hashlib.sha256(identifier.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") % shard_count
+
+
 def should_skip_output(
     output_path: Path,
     manifest_entry: Optional[Mapping[str, object]],
@@ -1170,8 +1199,8 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
 
         handler.setFormatter(JSONFormatter())
         logger.addHandler(handler)
-        logger.setLevel(getattr(logging, level.upper(), logging.INFO))
         logger.propagate = False
+    logger.setLevel(getattr(logging, level.upper(), logging.INFO))
     return logger
 
 
@@ -2339,6 +2368,13 @@ def _run_all(argv: Sequence[str]) -> int:
         help="DocsToKG data root override passed to all stages",
     )
     parser.add_argument(
+        "--log-level",
+        type=lambda value: str(value).upper(),
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Logging verbosity applied to all stages",
+    )
+    parser.add_argument(
         "--resume",
         action="store_true",
         help="Resume each stage by skipping outputs with matching manifests",
@@ -2372,6 +2408,12 @@ def _run_all(argv: Sequence[str]) -> int:
         help="Allow rewriting DocTags outputs (HTML mode only)",
     )
     parser.add_argument(
+        "--vllm-wait-timeout",
+        type=int,
+        default=None,
+        help="Seconds to wait for vLLM readiness during the DocTags stage",
+    )
+    parser.add_argument(
         "--chunk-out-dir",
         type=Path,
         default=None,
@@ -2402,6 +2444,18 @@ def _run_all(argv: Sequence[str]) -> int:
         help="Structural marker configuration forwarded to the chunk stage",
     )
     parser.add_argument(
+        "--chunk-shard-count",
+        type=int,
+        default=None,
+        help="Total number of shards for the chunk stage",
+    )
+    parser.add_argument(
+        "--chunk-shard-index",
+        type=int,
+        default=None,
+        help="Zero-based shard index for the chunk stage",
+    )
+    parser.add_argument(
         "--embed-out-dir",
         type=Path,
         default=None,
@@ -2418,10 +2472,41 @@ def _run_all(argv: Sequence[str]) -> int:
         help="Skip embedding generation and only validate existing vectors",
     )
     parser.add_argument(
-        "--splade-zero-pct-warn-threshold",
+        "--splade-sparsity-warn-pct",
+        dest="splade_sparsity_warn_pct",
         type=float,
         default=None,
         help="Override SPLADE sparsity warning threshold for the embed stage",
+    )
+    parser.add_argument(
+        "--splade-zero-pct-warn-threshold",
+        dest="splade_sparsity_warn_pct",
+        type=float,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--embed-shard-count",
+        type=int,
+        default=None,
+        help="Total number of shards for the embed stage (defaults to chunk shard count)",
+    )
+    parser.add_argument(
+        "--embed-shard-index",
+        type=int,
+        default=None,
+        help="Zero-based shard index for the embed stage (defaults to chunk shard index)",
+    )
+    parser.add_argument(
+        "--embed-format",
+        choices=["jsonl", "parquet"],
+        default=None,
+        help="Vector output format for the embed stage",
+    )
+    parser.add_argument(
+        "--embed-no-cache",
+        action="store_true",
+        help="Disable Qwen cache reuse during the embed stage",
     )
     parser.add_argument(
         "--plan",
@@ -2430,18 +2515,39 @@ def _run_all(argv: Sequence[str]) -> int:
     )
 
     args = parser.parse_args(argv)
-    logger = get_logger(__name__)
+    logger = get_logger(__name__, level=args.log_level)
+
+    chunk_shard_count = args.chunk_shard_count
+    chunk_shard_index = args.chunk_shard_index
+    embed_shard_count = args.embed_shard_count
+    if embed_shard_count is None and chunk_shard_count is not None:
+        embed_shard_count = chunk_shard_count
+    embed_shard_index = args.embed_shard_index
+    if embed_shard_index is None and chunk_shard_index is not None:
+        embed_shard_index = chunk_shard_index
 
     extra = {
         "resume": bool(args.resume),
         "force": bool(args.force),
         "mode": args.mode,
+        "log_level": args.log_level,
     }
     if args.data_root:
         extra["data_root"] = str(args.data_root)
+    if chunk_shard_count is not None:
+        extra["chunk_shard_count"] = chunk_shard_count
+    if chunk_shard_index is not None:
+        extra["chunk_shard_index"] = chunk_shard_index
+    if embed_shard_count is not None:
+        extra["embed_shard_count"] = embed_shard_count
+    if embed_shard_index is not None:
+        extra["embed_shard_index"] = embed_shard_index
+    if args.embed_format:
+        extra["embed_format"] = args.embed_format
     logger.info("docparse all starting", extra={"extra_fields": extra})
 
     doctags_args: List[str] = []
+    doctags_args.extend(["--log-level", args.log_level])
     if args.data_root:
         doctags_args.extend(["--data-root", str(args.data_root)])
     if args.resume:
@@ -2456,8 +2562,11 @@ def _run_all(argv: Sequence[str]) -> int:
         doctags_args.extend(["--out-dir", str(args.doctags_out_dir)])
     if args.overwrite:
         doctags_args.append("--overwrite")
+    if args.vllm_wait_timeout is not None:
+        doctags_args.extend(["--vllm-wait-timeout", str(args.vllm_wait_timeout)])
 
     chunk_args: List[str] = []
+    chunk_args.extend(["--log-level", args.log_level])
     if args.data_root:
         chunk_args.extend(["--data-root", str(args.data_root)])
     if args.resume:
@@ -2476,8 +2585,13 @@ def _run_all(argv: Sequence[str]) -> int:
         chunk_args.extend(["--max-tokens", str(args.chunk_max_tokens)])
     if args.structural_markers:
         chunk_args.extend(["--structural-markers", str(args.structural_markers)])
+    if chunk_shard_count is not None:
+        chunk_args.extend(["--shard-count", str(chunk_shard_count)])
+    if chunk_shard_index is not None:
+        chunk_args.extend(["--shard-index", str(chunk_shard_index)])
 
     embed_args: List[str] = []
+    embed_args.extend(["--log-level", args.log_level])
     if args.data_root:
         embed_args.extend(["--data-root", str(args.data_root)])
     if args.resume:
@@ -2492,10 +2606,16 @@ def _run_all(argv: Sequence[str]) -> int:
         embed_args.append("--offline")
     if args.embed_validate_only:
         embed_args.append("--validate-only")
-    if args.splade_zero_pct_warn_threshold is not None:
-        embed_args.extend(
-            ["--splade-zero-pct-warn-threshold", str(args.splade_zero_pct_warn_threshold)]
-        )
+    if args.embed_format:
+        embed_args.extend(["--format", args.embed_format])
+    if args.embed_no_cache:
+        embed_args.append("--no-cache")
+    if embed_shard_count is not None:
+        embed_args.extend(["--shard-count", str(embed_shard_count)])
+    if embed_shard_index is not None:
+        embed_args.extend(["--shard-index", str(embed_shard_index)])
+    if args.splade_sparsity_warn_pct is not None:
+        embed_args.extend(["--splade-sparsity-warn-pct", str(args.splade_sparsity_warn_pct)])
 
     if args.plan:
         plans: List[Dict[str, Any]] = []

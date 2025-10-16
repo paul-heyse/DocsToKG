@@ -5,12 +5,6 @@
 #   "purpose": "CLI entry points for DocsToKG.DocParsing.chunking workflows",
 #   "sections": [
 #     {
-#       "id": "dedupe-preserve-order",
-#       "name": "_dedupe_preserve_order",
-#       "anchor": "function-dedupe-preserve-order",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "resolve-serializer-provider",
 #       "name": "_resolve_serializer_provider",
 #       "anchor": "function-resolve-serializer-provider",
@@ -147,6 +141,7 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import List, Optional, Sequence, Tuple
 
 # Third-party imports
@@ -183,6 +178,7 @@ from DocsToKG.DocParsing.core import (
     atomic_write,
     compute_content_hash,
     compute_relative_doc_id,
+    compute_stable_shard,
     data_chunks,
     data_doctags,
     detect_data_root,
@@ -287,6 +283,21 @@ MANIFEST_STAGE = "chunks"
 
 
 _LOGGER = get_logger(__name__)
+
+try:  # Import-time sanity check for the default provider
+    _DEFAULT_PROVIDER_CLASS = _resolve_serializer_provider(DEFAULT_SERIALIZER_PROVIDER)
+except Exception as exc:  # pragma: no cover - exercised in misconfigured environments
+    _DEFAULT_PROVIDER_CLASS = None
+    _LOGGER.warning(
+        "Default serializer provider unavailable",
+        extra={
+            "extra_fields": {
+                "serializer_provider": DEFAULT_SERIALIZER_PROVIDER,
+                "error": str(exc),
+                "sample_provider": "DocsToKG.DocParsing.formats:RichSerializerProvider",
+            }
+        },
+    )
 
 
 # --- Public Functions ---
@@ -904,6 +915,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Logging verbosity for console output (default: %(default)s).",
     )
     parser.add_argument(
+        "--shard-count",
+        type=int,
+        default=1,
+        help="Total number of shards for distributed runs (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--shard-index",
+        type=int,
+        default=0,
+        help="Zero-based shard index to process (default: %(default)s).",
+    )
+    parser.add_argument(
         "--tokenizer-model",
         type=str,
         default=DEFAULT_TOKENIZER,
@@ -975,7 +998,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return build_parser().parse_args(argv)
 
 
-def main(args: argparse.Namespace | None = None) -> int:
+def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = None) -> int:
     """CLI driver that chunks DocTags files and enforces minimum token thresholds.
 
     Args:
@@ -989,8 +1012,8 @@ def main(args: argparse.Namespace | None = None) -> int:
     parser = build_parser()
     if args is None:
         namespace = parser.parse_args()
-    elif isinstance(args, argparse.Namespace):
-        namespace = args
+    elif isinstance(args, (argparse.Namespace, SimpleNamespace)):
+        namespace = argparse.Namespace(**vars(args))
     else:
         namespace = parser.parse_args(args)
 
@@ -1056,6 +1079,18 @@ def main(args: argparse.Namespace | None = None) -> int:
         "Serializer provider selected",
         serializer_provider=args.serializer_provider,
     )
+
+    try:
+        shard_count = int(getattr(args, "shard_count", 1))
+        shard_index = int(getattr(args, "shard_index", 0))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("--shard-count and --shard-index must be integers") from exc
+    if shard_count < 1:
+        raise ValueError("--shard-count must be >= 1")
+    if not 0 <= shard_index < shard_count:
+        raise ValueError("--shard-index must be between 0 and shard-count-1")
+    args.shard_count = shard_count
+    args.shard_index = shard_index
 
     data_root_override = args.data_root
     data_root_overridden = data_root_override is not None
@@ -1128,6 +1163,8 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "custom_caption_markers": custom_caption_markers,
                 "workers": int(getattr(args, "workers", 1)),
                 "serializer_provider": args.serializer_provider,
+                "shard_count": args.shard_count,
+                "shard_index": args.shard_index,
             }
         },
     )
@@ -1135,6 +1172,39 @@ def main(args: argparse.Namespace | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     files = list(iter_doctags(in_dir))
+    if args.shard_count > 1:
+        total_candidates = len(files)
+        selected_files = [
+            path
+            for path in files
+            if compute_stable_shard(
+                compute_relative_doc_id(path, in_dir), args.shard_count
+            )
+            == args.shard_index
+        ]
+        logger.info(
+            "Applying shard filter",
+            extra={
+                "extra_fields": {
+                    "shard_index": args.shard_index,
+                    "shard_count": args.shard_count,
+                    "selected_files": len(selected_files),
+                    "total_files": total_candidates,
+                }
+            },
+        )
+        files = selected_files
+        if not files:
+            logger.warning(
+                "Shard contains no DocTags files",
+                extra={
+                    "extra_fields": {
+                        "shard_index": args.shard_index,
+                        "shard_count": args.shard_count,
+                    }
+                },
+            )
+            return 0
     if not files:
         logger.warning(
             "No .doctags files found",
@@ -1185,6 +1255,17 @@ def main(args: argparse.Namespace | None = None) -> int:
         )
 
     worker_count = max(1, int(getattr(args, "workers", 1)))
+    if worker_count > 1 and str(args.serializer_provider) != DEFAULT_SERIALIZER_PROVIDER:
+        logger.warning(
+            "Falling back to single worker because serializer provider may be stateful",
+            extra={
+                "extra_fields": {
+                    "requested_workers": int(getattr(args, "workers", 1)),
+                    "serializer_provider": str(args.serializer_provider),
+                }
+            },
+        )
+        worker_count = 1
 
     tasks: List[ChunkTask] = []
     for path in files:
@@ -1258,6 +1339,8 @@ def main(args: argparse.Namespace | None = None) -> int:
                     "doc_stem": result.doc_stem,
                     "chunks": result.chunk_count,
                     "output_file": result.output_path.name,
+                    "duration_s": duration,
+                    "parse_engine": result.parse_engine,
                 }
             },
         )

@@ -94,6 +94,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+import shutil
 from typing import Dict, List, Optional
 
 import pytest
@@ -215,8 +216,19 @@ def _run_fetch(
     monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
 
     class _StubStorage:
-        def finalize_version(self, ontology_id: str, version: str, base_dir: Path) -> None:
+        def finalize_version(
+            self,
+            ontology_id: str,
+            version: str,
+            base_dir: Path,
+            *,
+            artifact_path: Optional[Path] = None,
+            artifact_sha256: Optional[str] = None,
+        ) -> None:
             pass
+
+        def mirror_cas_artifact(self, algorithm: str, digest: str, source: Path) -> Path:
+            return source
 
         def ensure_local_version(self, ontology_id: str, version: str) -> Path:
             path = ontology_dir / ontology_id / version
@@ -714,13 +726,24 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
 
     class _StubStorage:
-        def finalize_version(self, ontology_id: str, version: str, base_dir: Path) -> None:
+        def finalize_version(
+            self,
+            ontology_id: str,
+            version: str,
+            base_dir: Path,
+            *,
+            artifact_path: Optional[Path] = None,
+            artifact_sha256: Optional[str] = None,
+        ) -> None:
             pass
 
         def ensure_local_version(self, ontology_id: str, version: str) -> Path:
             path = ontology_dir / ontology_id / version
             path.mkdir(parents=True, exist_ok=True)
             return path
+
+        def mirror_cas_artifact(self, algorithm: str, digest: str, source: Path) -> Path:
+            return source
 
     stub_storage = _StubStorage()
     monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
@@ -830,13 +853,24 @@ def test_fetch_records_expected_checksum_and_index(
     monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
 
     class _StubStorage:
-        def finalize_version(self, ontology_id: str, version: str, base_dir: Path) -> None:
+        def finalize_version(
+            self,
+            ontology_id: str,
+            version: str,
+            base_dir: Path,
+            *,
+            artifact_path: Optional[Path] = None,
+            artifact_sha256: Optional[str] = None,
+        ) -> None:
             pass
 
         def ensure_local_version(self, ontology_id: str, version: str) -> Path:
             path = ontology_dir / ontology_id / version
             path.mkdir(parents=True, exist_ok=True)
             return path
+
+        def mirror_cas_artifact(self, algorithm: str, digest: str, source: Path) -> Path:
+            return source
 
     stub_storage = _StubStorage()
     monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
@@ -885,15 +919,130 @@ def test_fetch_records_expected_checksum_and_index(
 
     manifest = json.loads(results[0].manifest_path.read_text())
     attempt = manifest["resolver_attempts"][0]
-    assert attempt["expected_checksum"] == f"sha256:{expected_digest}"
+    assert attempt["expected_checksum"] == {
+        "algorithm": "sha256",
+        "value": expected_digest,
+    }
+    assert manifest["expected_checksum"] == {
+        "algorithm": "sha256",
+        "value": expected_digest,
+    }
 
     index_path = ontology_dir / spec.id / "index.json"
     index_payload = json.loads(index_path.read_text())
     assert isinstance(index_payload, list) and index_payload
     first_entry = index_payload[0]
     assert first_entry["sha256"] == expected_digest
-    assert first_entry["expected_checksum"] == f"sha256:{expected_digest}"
+    assert first_entry["expected_checksum"] == {
+        "algorithm": "sha256",
+        "value": expected_digest,
+    }
     assert first_entry["size"] == len(payload)
+
+
+def test_fetch_mirrors_cas_when_enabled(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    payload = b"ontology"
+    digest = hashlib.sha256(payload).hexdigest()
+
+    plan = FetchPlan(
+        url="https://example.org/hp.owl",
+        headers={},
+        filename_hint="hp.owl",
+        version="2024-04-01",
+        license="CC0-1.0",
+        media_type="application/rdf+xml",
+        service="direct",
+    )
+
+    class DirectResolver:
+        def plan(self, spec, config, logger):
+            return plan
+
+    original_direct = RESOLVERS.get("direct")
+    RESOLVERS["direct"] = DirectResolver()
+
+    defaults = DefaultsConfig(prefer_source=["direct"], enable_cas_mirror=True)
+    config = ResolvedConfig(defaults=defaults, specs=[])
+    spec = core.FetchSpec(id="hp", resolver="direct", extras={}, target_formats=["owl"])
+
+    cache_dir = tmp_path / "cache"
+    ontology_dir = tmp_path / "ontologies"
+    cas_dir = tmp_path / "cas"
+    overrides = {"CACHE_DIR": cache_dir, "LOCAL_ONTOLOGY_DIR": ontology_dir}
+    for attr, value in overrides.items():
+        monkeypatch.setattr(storage_mod, attr, value, raising=False)
+        monkeypatch.setattr(pipeline_mod, attr, value, raising=False)
+        monkeypatch.setattr(core, attr, value, raising=False)
+    monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
+
+    class _StubStorage:
+        def finalize_version(
+            self,
+            ontology_id: str,
+            version: str,
+            base_dir: Path,
+            *,
+            artifact_path: Optional[Path] = None,
+            artifact_sha256: Optional[str] = None,
+        ) -> None:
+            pass
+
+        def ensure_local_version(self, ontology_id: str, version: str) -> Path:
+            path = ontology_dir / ontology_id / version
+            path.mkdir(parents=True, exist_ok=True)
+            return path
+
+        def mirror_cas_artifact(self, algorithm: str, checksum: str, source: Path) -> Path:
+            cas_path = cas_dir / f"by-{algorithm.lower()}" / checksum[:2] / f"{checksum}{source.suffix}"
+            cas_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, cas_path)
+            return cas_path
+
+    stub_storage = _StubStorage()
+    monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
+    monkeypatch.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
+    monkeypatch.setattr(core, "STORAGE", stub_storage, raising=False)
+
+    def _fake_download_stream(**kwargs):
+        destination: Path = kwargs["destination"]
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(payload)
+        return DownloadResult(
+            path=destination,
+            status="fresh",
+            sha256=digest,
+            etag=None,
+            last_modified=None,
+            content_type="application/rdf+xml",
+            content_length=len(payload),
+        )
+
+    monkeypatch.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
+    monkeypatch.setattr(core, "download_stream", _fake_download_stream, raising=False)
+    monkeypatch.setattr(pipeline_mod, "run_validators", lambda requests, logger: {}, raising=False)
+    monkeypatch.setattr(core, "run_validators", lambda requests, logger: {}, raising=False)
+    monkeypatch.setattr(
+        pipeline_mod, "validate_url_security", lambda url, config=None: url, raising=False
+    )
+    monkeypatch.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
+
+    try:
+        results = core.fetch_all([spec], config=config, force=True)
+    finally:
+        if original_direct is not None:
+            RESOLVERS["direct"] = original_direct
+        else:
+            RESOLVERS.pop("direct", None)
+
+    manifest_data = json.loads(results[0].manifest_path.read_text())
+    cas_artifacts = [path for path in manifest_data["artifacts"] if path.endswith(".owl") and "by-" in path]
+    assert cas_artifacts, "expected CAS artifact entry"
+
+    index_path = ontology_dir / spec.id / "index.json"
+    index_payload = json.loads(index_path.read_text())
+    assert index_payload[0]["cas_path"].endswith(f"{digest}.owl")
 
 
 def test_resolve_expected_checksum_fetches_url(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -936,7 +1085,10 @@ def test_resolve_expected_checksum_fetches_url(monkeypatch: pytest.MonkeyPatch) 
         logger=logging.getLogger("checksum-test"),
     )
 
-    assert checksum == f"sha256:{expected_digest}"
+    assert checksum is not None
+    assert checksum.algorithm == "sha256"
+    assert checksum.value == expected_digest
+    assert checksum.to_known_hash() == f"sha256:{expected_digest}"
 
 
 def test_manifest_fingerprint_ignores_target_format_order(

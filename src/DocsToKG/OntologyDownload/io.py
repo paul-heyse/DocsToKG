@@ -23,7 +23,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path, PurePosixPath
-from typing import Callable, Dict, List, Optional, Set, Tuple, TypeVar
+from typing import Callable, Dict, Iterator, List, Optional, Set, Tuple, TypeVar
 from urllib.parse import ParseResult, urlparse, urlunparse
 
 import pooch
@@ -587,7 +587,7 @@ class SessionPool:
         *,
         service: Optional[str],
         host: Optional[str],
-    ) -> Tuple[requests.Session]:
+    ) -> Iterator[requests.Session]:
         """Yield a session associated with ``service``/``host`` and return it to the pool."""
 
         key = self._normalize(service, host)
@@ -1171,17 +1171,16 @@ class StreamingDownloader(pooch.HTTPDownloader):
         if resume_position:
             request_headers["Range"] = f"bytes={resume_position}-"
         attempt = 0
-        session = requests.Session()
         self.head_content_type = None
         self.head_content_length = None
         self.response_content_type = None
         self.response_content_length = None
-        head_content_type, head_content_length = self._preliminary_head_check(url, session)
-        self.head_content_type = head_content_type
-        self.head_content_length = head_content_length
-        if head_content_type:
-            self._validate_media_type(head_content_type, self.expected_media_type, url)
-        try:
+        with SESSION_POOL.lease(service=self.service, host=self.origin_host) as session:
+            head_content_type, head_content_length = self._preliminary_head_check(url, session)
+            self.head_content_type = head_content_type
+            self.head_content_length = head_content_length
+            if head_content_type:
+                self._validate_media_type(head_content_type, self.expected_media_type, url)
             while True:
                 attempt += 1
                 try:
@@ -1354,10 +1353,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         },
                     )
                     time.sleep(sleep_time)
-            part_path.replace(Path(output_file))
-            destination_part_path.unlink(missing_ok=True)
-        finally:
-            session.close()
+        part_path.replace(Path(output_file))
+        destination_part_path.unlink(missing_ok=True)
 
 
 def download_stream(
@@ -1561,6 +1558,8 @@ __all__ = [
     "SharedTokenBucket",
     "RateLimiterRegistry",
     "REGISTRY",
+    "SessionPool",
+    "SESSION_POOL",
     "get_bucket",
     "apply_retry_after",
     "reset",

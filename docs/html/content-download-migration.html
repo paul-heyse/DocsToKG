@@ -84,11 +84,11 @@ change set.</p>
 <section id="removed-compatibility-shims">
 <h2>1. Removed Compatibility Shims<a class="headerlink" href="#removed-compatibility-shims" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.time</span></code> and
-<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.requests</span></code> were deleted. Import these
+<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.time</span></code> and
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.requests</span></code> were deleted. Import these
 modules directly from the standard library / requests package.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.request_with_retries</span></code> proxy was removed.
-Use <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.network</span> <span class="pre">import</span> <span class="pre">request_with_retries</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.request_with_retries</span></code> proxy was removed.
+Use <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.networking</span> <span class="pre">import</span> <span class="pre">request_with_retries</span></code>.</p></li>
 <li><p>Deprecated module aliases (<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.results</span></code>, <code class="docutils literal notranslate"><span class="pre">.similarity</span></code>,
 <code class="docutils literal notranslate"><span class="pre">.retrieval</span></code>, <code class="docutils literal notranslate"><span class="pre">.operations</span></code>, <code class="docutils literal notranslate"><span class="pre">.schema</span></code>) are no longer available; import the
 consolidated modules (<code class="docutils literal notranslate"><span class="pre">ranking</span></code>, <code class="docutils literal notranslate"><span class="pre">vectorstore</span></code>, <code class="docutils literal notranslate"><span class="pre">service</span></code>, <code class="docutils literal notranslate"><span class="pre">storage</span></code>)

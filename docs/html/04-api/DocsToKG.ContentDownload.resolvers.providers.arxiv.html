@@ -78,7 +78,7 @@
              
   <section id="module-arxiv">
 <h1>1. Module: arxiv<a class="headerlink" href="#module-arxiv" title="Link to this heading"></a></h1>
-<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">ArxivResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers</span></code>.</p>
+<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">ArxivResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.providers</span></code>.</p>
 <p>arXiv Resolver Provider</p>
 <p>This module implements a lightweight resolver that converts arXiv identifiers
 into direct PDF download URLs. It participates in the modular content download
@@ -90,7 +90,7 @@ pipeline when arXiv metadata is available for a work.</p>
 <li><p>Records skip events when metadata is incomplete.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.providers import ArxivResolver</p>
+from DocsToKG.ContentDownload.pipeline.providers import ArxivResolver</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = ArxivResolver()
 list(resolver.iter_urls(session, config, artifact))
 </pre></div>

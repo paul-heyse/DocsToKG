@@ -113,6 +113,12 @@ python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 1 --topic "onc
 python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 3 --topic "oncology" --year-start 2020 --year-end 2024
 ```
 
+Additional operational flags:
+
+- ``--max-concurrent-per-host 2`` keeps simultaneous downloads per domain polite.
+- ``--domain-bytes-budget example.com=500MB`` guards against single-host bandwidth drain.
+- ``--log-rotate 250MB`` rotates JSONL attempt logs during long-running crawls.
+
 **Concurrency recommendations:**
 
 - Start with ``--workers=3`` for production workloads.

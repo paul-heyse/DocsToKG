@@ -78,7 +78,7 @@
              
   <section id="module-init">
 <h1>1. Module: <strong>init</strong><a class="headerlink" href="#module-init" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.__init__</span></code>.</p>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.__init__</span></code>.</p>
 <p>Resolver Package Facade</p>
 <p>This module exposes the public interface for resolver pipeline utilities and
 provider implementations used by the modular content download architecture. It
@@ -92,7 +92,7 @@ callers towards explicit submodules.</p>
 <li><p>Backward-compatible aliases for deprecated imports (<code class="docutils literal notranslate"><span class="pre">time</span></code> and <code class="docutils literal notranslate"><span class="pre">requests</span></code>).</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers import ResolverPipeline, default_resolvers</p>
+from DocsToKG.ContentDownload.pipeline import ResolverPipeline, default_resolvers</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline = ResolverPipeline(
     resolvers=default_resolvers(),
     config=ResolverConfig(),

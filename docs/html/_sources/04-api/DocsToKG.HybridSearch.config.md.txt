@@ -117,6 +117,9 @@ rebuild_delete_threshold: Pending delete count before forcing full rebuild
 force_64bit_ids: Force FAISS to use 64-bit IDs even when 32-bit would suffice
 interleaved_layout: Enable GPU interleaved layout optimisations when supported
 flat_use_fp16: Use float16 compute for flat indexes when available
+enable_replication: Allow replication to additional GPUs when configured
+enable_reserve_memory: Enable GPU memory reservation based on expected_ntotal
+use_pinned_memory: Use pinned host buffers for large add/search batches
 persist_mode: Persistence policy ("cpu_bytes" default, disable for GPU-only runtime)
 ivf_train_factor: Controls IVF training sample size per nlist shard
 
@@ -164,6 +167,7 @@ splade_top_k: Number of SPLADE candidates to retrieve (50 default)
 dense_top_k: Number of dense vector candidates to retrieve (50 default)
 dense_overfetch_factor: Multiplier applied to oversampled dense requests (1.5 default)
 dense_oversample: Query-time oversample multiplier for dense retrieval (2.0 default)
+dense_score_floor: Minimum similarity score required for dense results before fusion (0.0 default)
 bm25_scoring: "compat" for legacy dot-product, "true" for Okapi BM25
 bm25_k1: Okapi BM25 k1 parameter (used when bm25_scoring == "true")
 bm25_b: Okapi BM25 b parameter (used when bm25_scoring == "true")

@@ -32,7 +32,8 @@ Dependencies:
 - redis: Caching and session management
 
 Usage:
-    from docstokg.hybrid_search import HybridSearchService, HybridSearchConfig
+    from DocsToKG.HybridSearch import HybridSearchService
+    from DocsToKG.HybridSearch.config import HybridSearchConfig
 
     # Configure search service
     config = HybridSearchConfig()

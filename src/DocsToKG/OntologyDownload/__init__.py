@@ -85,6 +85,7 @@ from .api import (
     validate_robot,
     validate_url_security,
 )
+from .planning import ExpectedChecksum
 
 # --- Globals ---
 
@@ -103,6 +104,7 @@ __all__ = [
     "ValidatorSubprocessError",
     "ResolverCandidate",
     "ResolvedConfig",
+    "ExpectedChecksum",
     "ConfigError",
     "ConfigurationError",
     "DefaultsConfig",
@@ -172,6 +174,7 @@ PUBLIC_API_MANIFEST = {
     "ValidationResult": "class",
     "ResolverCandidate": "class",
     "ResolvedConfig": "class",
+    "ExpectedChecksum": "class",
     "ConfigError": "class",
     "ConfigurationError": "class",
     "DefaultsConfig": "class",

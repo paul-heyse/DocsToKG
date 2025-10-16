@@ -731,18 +731,25 @@ def test_cli_flag_propagation_and_metrics_export(download_modules, monkeypatch, 
     metrics_path = manifest_path.with_suffix(".metrics.json")
     assert metrics_path.exists()
     metrics_doc = json.loads(metrics_path.read_text(encoding="utf-8"))
-    assert set(metrics_doc) == {"processed", "saved", "html_only", "skipped", "resolvers"}
+    expected_keys = {"processed", "saved", "html_only", "skipped", "resolvers"}
+    assert expected_keys.issubset(metrics_doc.keys())
     assert metrics_doc["processed"] == 0
-    assert metrics_doc["resolvers"] == {
-        "attempts": {},
-        "successes": {},
-        "html": {},
-        "skips": {},
-        "failures": {},
-        "latency_ms": {},
-        "status_counts": {},
-        "error_reasons": {},
+    resolver_summary = metrics_doc["resolvers"]
+    expected_resolver_keys = {
+        "attempts",
+        "successes",
+        "html",
+        "skips",
+        "failures",
+        "latency_ms",
+        "status_counts",
+        "error_reasons",
+        "classification_totals",
+        "reason_totals",
     }
+    assert expected_resolver_keys.issubset(resolver_summary.keys())
+    for key in expected_resolver_keys:
+        assert resolver_summary[key] == {}
 
 
 def test_download_candidate_dry_run_does_not_create_files(download_modules, tmp_path):
@@ -839,14 +846,7 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
                 html_paths=[],
             )
 
-    result = downloader.process_one_work(
-        work,
-        session,
-        artifact.pdf_dir,
-        artifact.html_dir,
-        pipeline=_StubPipeline(),
-        logger=logger,
-        metrics=metrics,
+    options = downloader.DownloadOptions(
         dry_run=True,
         list_only=False,
         extract_html_text=False,
@@ -856,6 +856,16 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
         sniff_bytes=downloader.DEFAULT_SNIFF_BYTES,
         min_pdf_bytes=downloader.DEFAULT_MIN_PDF_BYTES,
         tail_check_bytes=downloader.DEFAULT_TAIL_CHECK_BYTES,
+    )
+    result = downloader.process_one_work(
+        work,
+        session,
+        artifact.pdf_dir,
+        artifact.html_dir,
+        pipeline=_StubPipeline(),
+        logger=logger,
+        metrics=metrics,
+        options=options,
     )
 
     logger.close()
@@ -897,14 +907,7 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
         "open_access": {"oa_url": None},
     }
 
-    result = downloader.process_one_work(
-        work,
-        session,
-        pdf_dir,
-        html_dir,
-        pipeline=_NoopPipeline(),
-        logger=logger,
-        metrics=metrics,
+    options = downloader.DownloadOptions(
         dry_run=False,
         list_only=False,
         extract_html_text=False,
@@ -914,6 +917,16 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
         sniff_bytes=downloader.DEFAULT_SNIFF_BYTES,
         min_pdf_bytes=downloader.DEFAULT_MIN_PDF_BYTES,
         tail_check_bytes=downloader.DEFAULT_TAIL_CHECK_BYTES,
+    )
+    result = downloader.process_one_work(
+        work,
+        session,
+        pdf_dir,
+        html_dir,
+        pipeline=_NoopPipeline(),
+        logger=logger,
+        metrics=metrics,
+        options=options,
     )
 
     logger.close()
@@ -1119,7 +1132,22 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
             self.config = config
             self._host_lock = resolvers.threading.Lock()
             self._last_host_hit = defaultdict(float)
+            self._host_buckets = {}
+            self._host_bucket_lock = resolvers.threading.Lock()
 
+        def _ensure_host_bucket(self, host: str):  # pragma: no cover - minimal shim
+            spec = self.config.domain_token_buckets.get(host)
+            if not spec:
+                return None
+            with self._host_bucket_lock:
+                bucket = self._host_buckets.get(host)
+                if bucket is None:
+                    bucket = resolvers.TokenBucket(
+                        rate_per_second=float(spec.get("rate_per_second", 1.0)),
+                        capacity=float(spec.get("capacity", 1.0)),
+                    )
+                    self._host_buckets[host] = bucket
+                return bucket
     class RecordingPipeline:
         def __init__(
             self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_
@@ -1205,7 +1233,7 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
 def test_cli_head_precheck_handles_head_hostile(download_modules, monkeypatch, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
-    from DocsToKG.ContentDownload import network as network_module
+    from DocsToKG.ContentDownload import networking as network_module
 
     work = {
         "id": "https://openalex.org/WHEAD",

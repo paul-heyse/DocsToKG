@@ -16,6 +16,30 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "read-resolver-config",
+#       "name": "read_resolver_config",
+#       "anchor": "function-read-resolver-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "seed-resolver-toggle-defaults",
+#       "name": "_seed_resolver_toggle_defaults",
+#       "anchor": "function-seed-resolver-toggle-defaults",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-config-overrides",
+#       "name": "apply_config_overrides",
+#       "anchor": "function-apply-config-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-resolver-config",
+#       "name": "load_resolver_config",
+#       "anchor": "function-load-resolver-config",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "attemptrecord",
 #       "name": "AttemptRecord",
 #       "anchor": "class-attemptrecord",
@@ -277,7 +301,7 @@ from collections import Counter, defaultdict
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from pathlib import Path
-from threading import Lock
+from threading import Lock, BoundedSemaphore
 from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
@@ -433,6 +457,37 @@ class ResolverResult:
         return self.url is None
 
 
+def _normalise_domain_bytes_budget(data: Mapping[str, Any]) -> Dict[str, int]:
+    """Normalize domain byte budgets to lower-case host keys and integer byte limits."""
+
+    if data is None:
+        return {}
+    if not isinstance(data, Mapping):  # pragma: no cover - defensive guard
+        raise ValueError("domain_bytes_budget must be a mapping of host -> bytes")
+
+    normalized: Dict[str, int] = {}
+    for host, value in data.items():
+        host_key = str(host).strip().lower()
+        if not host_key:
+            continue
+        try:
+            limit = int(value)
+        except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
+            raise ValueError(
+                ("domain_bytes_budget['{name}'] must be an integer, got {value!r}").format(
+                    name=host, value=value
+                )
+            ) from exc
+        if limit <= 0:
+            raise ValueError(
+                ("domain_bytes_budget['{name}'] must be positive, got {value}").format(
+                    name=host, value=value
+                )
+            )
+        normalized[host_key] = limit
+    return normalized
+
+
 @dataclass
 class ResolverConfig:
     """Runtime configuration options applied across resolvers.
@@ -456,8 +511,10 @@ class ResolverConfig:
         host_accept_overrides: Mapping of hostname to Accept header override.
         mailto: Contact email appended to polite headers and user agent string.
         max_concurrent_resolvers: Upper bound on concurrent resolver threads per work.
+        max_concurrent_per_host: Upper bound on simultaneous downloads per hostname.
         enable_global_url_dedup: Enable global URL deduplication across works when True.
         domain_token_buckets: Mapping of hostname to token bucket parameters.
+        domain_bytes_budget: Mapping of hostname to maximum bytes permitted this run.
         resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
 
     Notes:
@@ -465,7 +522,8 @@ class ResolverConfig:
         to filter obvious HTML responses. ``resolver_head_precheck`` allows
         per-resolver overrides when specific providers reject HEAD _requests.
         ``max_concurrent_resolvers`` bounds the number of resolver threads used
-        per work while still respecting configured rate limits.
+        per work while still respecting configured rate limits. ``max_concurrent_per_host``
+        limits simultaneous downloads hitting the same hostname across workers.
 
     Examples:
         >>> config = ResolverConfig()
@@ -494,8 +552,10 @@ class ResolverConfig:
     host_accept_overrides: Dict[str, str] = field(default_factory=dict)
     mailto: Optional[str] = None
     max_concurrent_resolvers: int = 1
+    max_concurrent_per_host: int = 3
     enable_global_url_dedup: bool = False
     domain_token_buckets: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    domain_bytes_budget: Dict[str, int] = field(default_factory=dict)
     resolver_circuit_breakers: Dict[str, Dict[str, float]] = field(default_factory=dict)
     # Heuristic knobs (defaults preserve current CLI behaviour)
     sniff_bytes: int = 64 * 1024
@@ -551,6 +611,11 @@ class ResolverConfig:
                 stacklevel=2,
             )
 
+        if self.max_concurrent_per_host < 0:
+            raise ValueError(
+                f"max_concurrent_per_host must be >= 0, got {self.max_concurrent_per_host}"
+            )
+
         if self.timeout <= 0:
             raise ValueError(f"timeout must be positive, got {self.timeout}")
         for resolver_name, timeout_val in self.resolver_timeouts.items():
@@ -580,6 +645,9 @@ class ResolverConfig:
             normalized_domain_limits[host.lower()] = interval
         if normalized_domain_limits:
             self.domain_min_interval_s = normalized_domain_limits
+
+        if self.domain_bytes_budget:
+            self.domain_bytes_budget = _normalise_domain_bytes_budget(self.domain_bytes_budget)
 
         if self.max_attempts_per_work < 1:
             raise ValueError(
@@ -724,9 +792,14 @@ def apply_config_overrides(
         "host_accept_overrides",
         "domain_token_buckets",
         "resolver_circuit_breakers",
+        "max_concurrent_per_host",
+        "domain_bytes_budget",
     ):
         if field_name in data and data[field_name] is not None:
-            setattr(config, field_name, data[field_name])
+            if field_name == "domain_bytes_budget":
+                setattr(config, field_name, _normalise_domain_bytes_budget(data[field_name]))
+            else:
+                setattr(config, field_name, data[field_name])
 
     if "resolver_rate_limits" in data:
         raise ValueError(
@@ -773,6 +846,8 @@ def load_resolver_config(
         config.timeout = args.resolver_timeout
     if hasattr(args, "concurrent_resolvers") and args.concurrent_resolvers is not None:
         config.max_concurrent_resolvers = args.concurrent_resolvers
+    if hasattr(args, "max_concurrent_per_host") and args.max_concurrent_per_host is not None:
+        config.max_concurrent_per_host = args.max_concurrent_per_host
 
     if resolver_order_override:
         ordered: List[str] = []
@@ -800,6 +875,11 @@ def load_resolver_config(
         for domain, interval in args.domain_min_interval:
             domain_limits[domain] = interval
         config.domain_min_interval_s = domain_limits
+    if getattr(args, "domain_bytes_budget", None):
+        budget_map = dict(config.domain_bytes_budget)
+        for domain, limit in args.domain_bytes_budget:
+            budget_map[domain] = limit
+        config.domain_bytes_budget = _normalise_domain_bytes_budget(budget_map)
 
     headers = dict(config.polite_headers)
     existing_mailto = headers.get("mailto")
@@ -848,6 +928,7 @@ class AttemptRecord:
         sha256: SHA-256 digest of downloaded content, when available.
         content_length: Size of the downloaded content in bytes.
         dry_run: Flag indicating whether the attempt occurred in dry-run mode.
+        retry_after: Optional cooldown seconds suggested by the upstream service.
 
     Examples:
         >>> AttemptRecord(
@@ -870,19 +951,35 @@ class AttemptRecord:
     http_status: Optional[int]
     content_type: Optional[str]
     elapsed_ms: Optional[float]
-    reason: Optional[ReasonCode] = None
+    reason: Optional[str] = None
     reason_detail: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     sha256: Optional[str] = None
     content_length: Optional[int] = None
     dry_run: bool = False
     resolver_wall_time_ms: Optional[float] = None
+    retry_after: Optional[float] = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.status, Classification):
-            self.status = Classification.from_wire(self.status)
-        if self.reason is not None and not isinstance(self.reason, ReasonCode):
-            self.reason = ReasonCode.from_wire(self.reason)
+            converted = Classification.from_wire(self.status)
+            if (
+                isinstance(self.status, str)
+                and converted is Classification.UNKNOWN
+                and self.status.lower() not in {cls.value for cls in Classification}
+            ):
+                self.status = self.status
+            else:
+                self.status = converted
+        if isinstance(self.reason, ReasonCode):
+            self.reason = self.reason.value.replace("_", "-")
+        elif self.reason is not None:
+            normalized = str(self.reason).replace("-", "_")
+            candidate = ReasonCode.from_wire(normalized)
+            if candidate is not ReasonCode.UNKNOWN or normalized == ReasonCode.UNKNOWN.value:
+                self.reason = candidate.value.replace("_", "-")
+            else:
+                self.reason = str(self.reason)
 
 
 @dataclass
@@ -902,6 +999,7 @@ class DownloadOutcome:
         etag: HTTP ETag header value when provided.
         last_modified: HTTP Last-Modified timestamp.
         extracted_text_path: Optional path to extracted text artefacts.
+        retry_after: Optional cooldown value derived from HTTP ``Retry-After`` headers.
 
     Examples:
         >>> DownloadOutcome(classification="pdf", path="pdfs/sample.pdf", http_status=200,
@@ -913,13 +1011,15 @@ class DownloadOutcome:
     http_status: Optional[int] = None
     content_type: Optional[str] = None
     elapsed_ms: Optional[float] = None
-    reason: Optional[ReasonCode] = None
+    reason: Optional[str] = None
     reason_detail: Optional[str] = None
     sha256: Optional[str] = None
     content_length: Optional[int] = None
     etag: Optional[str] = None
     last_modified: Optional[str] = None
     extracted_text_path: Optional[str] = None
+    retry_after: Optional[float] = None
+    error: Optional[str] = None
 
     @property
     def is_pdf(self) -> bool:
@@ -937,8 +1037,13 @@ class DownloadOutcome:
     def __post_init__(self) -> None:
         if not isinstance(self.classification, Classification):
             self.classification = Classification.from_wire(self.classification)
-        if self.reason is not None and not isinstance(self.reason, ReasonCode):
-            self.reason = ReasonCode.from_wire(self.reason)
+        if isinstance(self.reason, ReasonCode):
+            return
+        if self.reason is not None:
+            normalized = str(self.reason).replace("-", "_")
+            candidate = ReasonCode.from_wire(normalized)
+            if candidate is not ReasonCode.UNKNOWN or normalized == ReasonCode.UNKNOWN.value:
+                self.reason = candidate
 
 
 @dataclass
@@ -964,12 +1069,12 @@ class PipelineResult:
     outcome: Optional[DownloadOutcome] = None
     html_paths: List[str] = field(default_factory=list)
     failed_urls: List[str] = field(default_factory=list)
-    reason: Optional[ReasonCode] = None
+    reason: Optional[str] = None
     reason_detail: Optional[str] = None
 
     def __post_init__(self) -> None:
-        if self.reason is not None and not isinstance(self.reason, ReasonCode):
-            self.reason = ReasonCode.from_wire(self.reason)
+        if isinstance(self.reason, ReasonCode):
+            self.reason = self.reason.value.replace("_", "-")
 
 
 class Resolver(Protocol):
@@ -1066,7 +1171,12 @@ class ResolverMetrics:
             if reason_code is None and outcome.classification not in PDF_LIKE:
                 reason_code = ReasonCode.from_wire(classification_key)
             if reason_code:
-                self.error_reasons[resolver_name][reason_code.value] += 1
+                key = (
+                    reason_code.value
+                    if isinstance(reason_code, ReasonCode)
+                    else str(reason_code)
+                )
+                self.error_reasons[resolver_name][key] += 1
 
     def record_skip(self, resolver_name: str, reason: str) -> None:
         """Record a skip event for a resolver with a reason tag.
@@ -1140,6 +1250,7 @@ class ResolverMetrics:
                     "min_ms": ordered[0],
                     "p50_ms": _percentile(ordered, 50.0),
                     "p95_ms": _percentile(ordered, 95.0),
+                    "p99_ms": _percentile(ordered, 99.0),
                     "max_ms": ordered[-1],
                 }
 
@@ -1148,6 +1259,10 @@ class ResolverMetrics:
                 for resolver, counter in self.status_counts.items()
                 if counter
             }
+            classification_totals: Dict[str, int] = defaultdict(int)
+            for counter in self.status_counts.values():
+                for status, count in counter.items():
+                    classification_totals[status] += count
             reason_summary = {
                 resolver: [
                     {"reason": reason, "count": count} for reason, count in counter.most_common(5)
@@ -1155,6 +1270,10 @@ class ResolverMetrics:
                 for resolver, counter in self.error_reasons.items()
                 if counter
             }
+            reason_totals: Dict[str, int] = defaultdict(int)
+            for counter in self.error_reasons.values():
+                for reason, count in counter.items():
+                    reason_totals[reason] += count
 
             return {
                 "attempts": dict(self.attempts),
@@ -1165,6 +1284,8 @@ class ResolverMetrics:
                 "latency_ms": latency_summary,
                 "status_counts": status_summary,
                 "error_reasons": reason_summary,
+                "classification_totals": dict(classification_totals),
+                "reason_totals": dict(reason_totals),
             }
 
 
@@ -2644,10 +2765,18 @@ class PmcResolver(RegisteredResolver):
                 root = ET.fromstring(resp.text)
             except ET.ParseError as exc:
                 LOGGER.debug("PMC OA XML parse error for %s: %s", pmcid, exc)
+                for href in re.findall(r'href=["\']([^"\']+)["\']', resp.text or ""):
+                    candidate = href.strip()
+                    if candidate.lower().endswith(".pdf"):
+                        pdf_links_emitted = True
+                        yield ResolverResult(
+                            url=_absolute_url(oa_url, candidate),
+                            metadata={"pmcid": pmcid, "source": "oa"},
+                        )
             else:
                 for link in root.iter():
                     tag = link.tag.rsplit("}", 1)[-1].lower()
-                    if tag != "link":
+                    if tag not in {"link", "a"}:
                         continue
                     href = (
                         link.attrib.get("href")
@@ -2664,7 +2793,12 @@ class PmcResolver(RegisteredResolver):
                             url=_absolute_url(oa_url, href),
                             metadata={"pmcid": pmcid, "source": "oa"},
                         )
-            if not pdf_links_emitted:
+            if pdf_links_emitted:
+                yield ResolverResult(
+                    url=fallback_url,
+                    metadata={"pmcid": pmcid, "source": "pdf-fallback"},
+                )
+            else:
                 yield ResolverResult(
                     url=fallback_url,
                     metadata={"pmcid": pmcid, "source": "pdf-fallback"},
@@ -3203,6 +3337,8 @@ class _RunState:
         "html_paths",
         "failed_urls",
         "attempt_counter",
+        "last_reason",
+        "last_reason_detail",
     )
 
     def __init__(self, dry_run: bool) -> None:
@@ -3220,6 +3356,8 @@ class _RunState:
         self.html_paths: List[str] = []
         self.failed_urls: List[str] = []
         self.attempt_counter = 0
+        self.last_reason: Optional[ReasonCode] = None
+        self.last_reason_detail: Optional[str] = None
 
 
 class ResolverPipeline:
@@ -3283,6 +3421,10 @@ class ResolverPipeline:
         self._host_bucket_lock = threading.Lock()
         self._host_breakers: Dict[str, CircuitBreaker] = {}
         self._host_breaker_lock = threading.Lock()
+        self._host_semaphores: Dict[str, BoundedSemaphore] = {}
+        self._host_semaphore_lock = threading.Lock()
+        self._domain_bytes_consumed: Dict[str, int] = defaultdict(int)
+        self._domain_bytes_lock = threading.Lock()
         self._resolver_breakers: Dict[str, CircuitBreaker] = {}
         for name, spec in self.config.resolver_circuit_breakers.items():
             threshold = int(spec.get("failure_threshold", 5))
@@ -3397,6 +3539,83 @@ class ResolverPipeline:
                 self._host_buckets[host] = bucket
             return bucket
 
+    def _resolve_budget_host_key(self, host: str) -> Optional[str]:
+        if not host:
+            return None
+        host_key = host.lower()
+        if host_key in self.config.domain_bytes_budget:
+            return host_key
+        if host_key.startswith("www."):
+            bare = host_key[4:]
+            if bare in self.config.domain_bytes_budget:
+                return bare
+        return None
+
+    def _domain_budget_remaining(self, host_key: str) -> Optional[int]:
+        budget = self.config.domain_bytes_budget.get(host_key)
+        if budget is None:
+            return None
+        with self._domain_bytes_lock:
+            consumed = self._domain_bytes_consumed.get(host_key, 0)
+        return budget - consumed
+
+    def _estimate_outcome_bytes(self, outcome: DownloadOutcome) -> Optional[int]:
+        length = outcome.content_length
+        bytes_value: Optional[int]
+        if isinstance(length, str):
+            try:
+                bytes_value = int(length)
+            except ValueError:
+                bytes_value = None
+        elif isinstance(length, int):
+            bytes_value = length
+        elif length is not None:
+            try:
+                bytes_value = int(length)
+            except (TypeError, ValueError):
+                bytes_value = None
+        else:
+            bytes_value = None
+        if bytes_value is not None and bytes_value > 0:
+            return bytes_value
+        path = outcome.path
+        if not path:
+            return None
+        try:
+            return max(int(Path(path).stat().st_size), 0)
+        except (OSError, ValueError):
+            return None
+
+    def _record_domain_bytes(self, host_key: str, outcome: DownloadOutcome) -> None:
+        if host_key not in self.config.domain_bytes_budget:
+            return
+        bytes_used = self._estimate_outcome_bytes(outcome)
+        if bytes_used is None or bytes_used <= 0:
+            return
+        with self._domain_bytes_lock:
+            consumed = self._domain_bytes_consumed.get(host_key, 0)
+            self._domain_bytes_consumed[host_key] = consumed + bytes_used
+
+    def _acquire_host_slot(self, host: str) -> Optional[Callable[[], None]]:
+        limit = self.config.max_concurrent_per_host
+        if limit <= 0:
+            return None
+        host_key = host.lower()
+        with self._host_semaphore_lock:
+            semaphore = self._host_semaphores.get(host_key)
+            if semaphore is None:
+                semaphore = BoundedSemaphore(limit)
+                self._host_semaphores[host_key] = semaphore
+        semaphore.acquire()
+
+        def _release() -> None:
+            try:
+                semaphore.release()
+            except ValueError:  # pragma: no cover - defensive
+                pass
+
+        return _release
+
     def _get_existing_host_breaker(self, host: str) -> Optional[CircuitBreaker]:
         with self._host_breaker_lock:
             return self._host_breakers.get(host)
@@ -3441,7 +3660,7 @@ class ResolverPipeline:
             if outcome.classification in success_classes:
                 breaker.record_success()
             else:
-                breaker.record_failure()
+                breaker.record_failure(retry_after=outcome.retry_after)
 
         if not host:
             return
@@ -3453,7 +3672,7 @@ class ResolverPipeline:
 
         if should_record_failure:
             breaker = self._ensure_host_breaker(host_key)
-            breaker.record_failure()
+            breaker.record_failure(retry_after=outcome.retry_after)
             return
 
         if outcome.classification in PDF_LIKE or outcome.classification is Classification.HTML:
@@ -3591,6 +3810,8 @@ class ResolverPipeline:
             success=False,
             html_paths=list(state.html_paths),
             failed_urls=list(state.failed_urls),
+            reason=state.last_reason,
+            reason_detail=state.last_reason_detail,
         )
 
     def _run_concurrent(
@@ -3858,18 +4079,20 @@ class ResolverPipeline:
         """
 
         if result.is_event:
+            reason_text = result.event_reason or result.event
+            status_value: Any = result.event or Classification.SKIPPED
             self._emit_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
                     resolver_order=order_index,
                     url=None,
-                    status=Classification.SKIPPED,
+                    status=status_value,
                     http_status=result.http_status,
                     content_type=None,
                     elapsed_ms=None,
-                    reason=ReasonCode.from_wire(result.event_reason or result.event),
-                    reason_detail=result.event_reason or result.event,
+                    reason=reason_text,
+                    reason_detail=reason_text,
                     metadata=result.metadata,
                     dry_run=state.dry_run,
                     resolver_wall_time_ms=resolver_wall_time_ms,
@@ -3986,108 +4209,150 @@ class ResolverPipeline:
                 return None
             head_precheck_passed = True
 
-        state.attempt_counter += 1
-        host_value = urlsplit(url).netloc.lower()
-        if host_value:
-            allowed, remaining = self._host_breaker_allows(host_value)
-            if not allowed:
-                self._emit_attempt(
-                    AttemptRecord(
-                        work_id=artifact.work_id,
-                        resolver_name=resolver_name,
-                        resolver_order=order_index,
-                        url=url,
-                        status=Classification.SKIPPED,
-                        http_status=None,
-                        content_type=None,
-                        elapsed_ms=None,
-                        reason=ReasonCode.DOMAIN_BREAKER_OPEN,
-                        reason_detail=f"cooldown-{remaining:.1f}s",
-                        metadata=result.metadata,
-                        dry_run=state.dry_run,
-                        resolver_wall_time_ms=resolver_wall_time_ms,
+        release_host_slot: Optional[Callable[[], None]] = None
+        budget_key: Optional[str] = None
+        try:
+            state.attempt_counter += 1
+            host_value = urlsplit(url).netloc.lower()
+            if host_value:
+                budget_key = self._resolve_budget_host_key(host_value)
+                if budget_key is not None:
+                    remaining_budget = self._domain_budget_remaining(budget_key)
+                    if remaining_budget is not None and remaining_budget <= 0:
+                        self._emit_attempt(
+                            AttemptRecord(
+                                work_id=artifact.work_id,
+                                resolver_name=resolver_name,
+                                resolver_order=order_index,
+                                url=url,
+                                status=Classification.SKIPPED,
+                                http_status=None,
+                                content_type=None,
+                                elapsed_ms=None,
+                                reason=ReasonCode.DOMAIN_BYTES_BUDGET,
+                                reason_detail="domain-bytes-budget",
+                                metadata=result.metadata,
+                                dry_run=state.dry_run,
+                                resolver_wall_time_ms=resolver_wall_time_ms,
+                            )
+                        )
+                        self.metrics.record_skip(resolver_name, "domain-bytes-budget")
+                        state.last_reason = ReasonCode.DOMAIN_BYTES_BUDGET
+                        state.last_reason_detail = "domain-bytes-budget"
+                        if url not in state.failed_urls:
+                            state.failed_urls.append(url)
+                        return None
+                allowed, remaining = self._host_breaker_allows(host_value)
+                if not allowed:
+                    detail = f"cooldown-{remaining:.1f}s"
+                    self._emit_attempt(
+                        AttemptRecord(
+                            work_id=artifact.work_id,
+                            resolver_name=resolver_name,
+                            resolver_order=order_index,
+                            url=url,
+                            status=Classification.SKIPPED,
+                            http_status=None,
+                            content_type=None,
+                            elapsed_ms=None,
+                            reason=ReasonCode.DOMAIN_BREAKER_OPEN,
+                            reason_detail=detail,
+                            metadata=result.metadata,
+                            dry_run=state.dry_run,
+                            resolver_wall_time_ms=resolver_wall_time_ms,
+                        )
                     )
+                    self.metrics.record_skip(resolver_name, "domain-breaker-open")
+                    state.last_reason = ReasonCode.DOMAIN_BREAKER_OPEN
+                    state.last_reason_detail = detail
+                    return None
+                release_host_slot = self._acquire_host_slot(host_value)
+            self._respect_domain_limit(url)
+            kwargs: Dict[str, Any] = {}
+            if self._download_accepts_head_flag:
+                kwargs["head_precheck_passed"] = head_precheck_passed
+
+            if self._download_accepts_context:
+                outcome = self.download_func(
+                    session,
+                    artifact,
+                    url,
+                    result.referer,
+                    self.config.get_timeout(resolver_name),
+                    download_context,
+                    **kwargs,
                 )
-                self.metrics.record_skip(resolver_name, "domain-breaker-open")
-                return None
-        self._respect_domain_limit(url)
-        kwargs: Dict[str, Any] = {}
-        if self._download_accepts_head_flag:
-            kwargs["head_precheck_passed"] = head_precheck_passed
+            else:
+                outcome = self.download_func(
+                    session,
+                    artifact,
+                    url,
+                    result.referer,
+                    self.config.get_timeout(resolver_name),
+                    **kwargs,
+                )
 
-        if self._download_accepts_context:
-            outcome = self.download_func(
-                session,
-                artifact,
-                url,
-                result.referer,
-                self.config.get_timeout(resolver_name),
-                download_context,
-                **kwargs,
+            self._emit_attempt(
+                AttemptRecord(
+                    work_id=artifact.work_id,
+                    resolver_name=resolver_name,
+                    resolver_order=order_index,
+                    url=url,
+                    status=outcome.classification,
+                    http_status=outcome.http_status,
+                    content_type=outcome.content_type,
+                    elapsed_ms=outcome.elapsed_ms,
+                    reason=outcome.reason,
+                    reason_detail=outcome.reason_detail,
+                    metadata=result.metadata,
+                    sha256=outcome.sha256,
+                    content_length=outcome.content_length,
+                    dry_run=state.dry_run,
+                    resolver_wall_time_ms=resolver_wall_time_ms,
+                    retry_after=outcome.retry_after,
+                )
             )
-        else:
-            outcome = self.download_func(
-                session,
-                artifact,
-                url,
-                result.referer,
-                self.config.get_timeout(resolver_name),
-                **kwargs,
-            )
+            self.metrics.record_attempt(resolver_name, outcome)
+            self._update_breakers(resolver_name, host_value, outcome)
+            if budget_key is not None:
+                self._record_domain_bytes(budget_key, outcome)
 
-        self._emit_attempt(
-            AttemptRecord(
-                work_id=artifact.work_id,
-                resolver_name=resolver_name,
-                resolver_order=order_index,
-                url=url,
-                status=outcome.classification,
-                http_status=outcome.http_status,
-                content_type=outcome.content_type,
-                elapsed_ms=outcome.elapsed_ms,
-                reason=outcome.reason,
-                reason_detail=outcome.reason_detail,
-                metadata=result.metadata,
-                sha256=outcome.sha256,
-                content_length=outcome.content_length,
-                dry_run=state.dry_run,
-                resolver_wall_time_ms=resolver_wall_time_ms,
-            )
-        )
-        self.metrics.record_attempt(resolver_name, outcome)
-        self._update_breakers(resolver_name, host_value, outcome)
+            classification = outcome.classification
+            if classification is Classification.HTML and outcome.path:
+                state.html_paths.append(outcome.path)
 
-        classification = outcome.classification
-        if classification is Classification.HTML and outcome.path:
-            state.html_paths.append(outcome.path)
+            if classification not in PDF_LIKE and url:
+                if url not in state.failed_urls:
+                    state.failed_urls.append(url)
+                if url not in artifact.failed_pdf_urls:
+                    artifact.failed_pdf_urls.append(url)
 
-        if classification not in PDF_LIKE and url:
-            if url not in state.failed_urls:
-                state.failed_urls.append(url)
-            if url not in artifact.failed_pdf_urls:
-                artifact.failed_pdf_urls.append(url)
+            if classification in PDF_LIKE:
+                return PipelineResult(
+                    success=True,
+                    resolver_name=resolver_name,
+                    url=url,
+                    outcome=outcome,
+                    html_paths=list(state.html_paths),
+                    failed_urls=list(state.failed_urls),
+                )
 
-        if classification in PDF_LIKE:
-            return PipelineResult(
-                success=True,
-                resolver_name=resolver_name,
-                url=url,
-                outcome=outcome,
-                html_paths=list(state.html_paths),
-                failed_urls=list(state.failed_urls),
-            )
+            state.last_reason = outcome.reason
+            state.last_reason_detail = outcome.reason_detail
+            if state.attempt_counter >= self.config.max_attempts_per_work:
+                return PipelineResult(
+                    success=False,
+                    resolver_name=resolver_name,
+                    url=url,
+                    outcome=outcome,
+                    html_paths=list(state.html_paths),
+                    failed_urls=list(state.failed_urls),
+                    reason=ReasonCode.MAX_ATTEMPTS_REACHED,
+                    reason_detail="max-attempts-reached",
+                )
 
-        if state.attempt_counter >= self.config.max_attempts_per_work:
-            return PipelineResult(
-                success=False,
-                resolver_name=resolver_name,
-                url=url,
-                outcome=outcome,
-                html_paths=list(state.html_paths),
-                failed_urls=list(state.failed_urls),
-                reason=ReasonCode.MAX_ATTEMPTS_REACHED,
-                reason_detail="max-attempts-reached",
-            )
-
-        self._jitter_sleep()
-        return None
+            self._jitter_sleep()
+            return None
+        finally:
+            if release_host_slot:
+                release_host_slot()

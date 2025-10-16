@@ -56,8 +56,10 @@ CSV_HEADER: List[str] = [
     "elapsed_ms",
     "resolver_wall_time_ms",
     "reason",
+    "reason_detail",
     "sha256",
     "content_length",
+    "retry_after",
     "dry_run",
     "metadata",
 ]
@@ -105,8 +107,10 @@ def export_attempts_jsonl_to_csv(input_path: Path, output_path: Path) -> None:
                     "elapsed_ms": row.get("elapsed_ms"),
                     "resolver_wall_time_ms": row.get("resolver_wall_time_ms"),
                     "reason": row.get("reason"),
+                    "reason_detail": row.get("reason_detail"),
                     "sha256": row.get("sha256"),
                     "content_length": row.get("content_length"),
+                    "retry_after": row.get("retry_after"),
                     "dry_run": row.get("dry_run"),
                     "metadata": metadata or "",
                 }

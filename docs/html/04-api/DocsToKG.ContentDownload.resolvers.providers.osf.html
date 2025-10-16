@@ -78,7 +78,7 @@
              
   <section id="module-osf">
 <h1>1. Module: osf<a class="headerlink" href="#module-osf" title="Link to this heading"></a></h1>
-<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">OsfResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers</span></code>.</p>
+<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">OsfResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.providers</span></code>.</p>
 <p>OSF Resolver Provider</p>
 <p>This module queries the Open Science Framework (OSF) API to retrieve download
 links for preprints and other research artefacts hosted on the platform.</p>
@@ -89,7 +89,7 @@ links for preprints and other research artefacts hosted on the platform.</p>
 <li><p>Deduplication of URLs to avoid redundant download attempts.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.providers import OsfResolver</p>
+from DocsToKG.ContentDownload.pipeline.providers import OsfResolver</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = OsfResolver()
 results = list(resolver.iter_urls(session, config, artifact))
 </pre></div>

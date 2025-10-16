@@ -78,12 +78,375 @@
              
   <section id="module-settings">
 <h1>1. Module: settings<a class="headerlink" href="#module-settings" title="Link to this heading"></a></h1>
-<p>The configuration models previously exposed from
-<code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.settings</span></code> live inside the consolidated
-<code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.ontology_download</span></code> module. Refer to the
-<em>Configuration and settings</em> section there for <code class="docutils literal notranslate"><span class="pre">ConfigError</span></code>,
-<code class="docutils literal notranslate"><span class="pre">DefaultsConfig</span></code>, <code class="docutils literal notranslate"><span class="pre">DownloadConfiguration</span></code>, logging utilities, and helpers for
-loading YAML sources.</p>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.settings</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Configuration, optional dependency, and storage utilities for ontology downloads.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="ensure-python-version">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_python_version()</span></code><a class="headerlink" href="#ensure-python-version" title="Link to this heading"></a></h3>
+<p>Ensure the interpreter meets the minimum supported Python version.</p>
+</section>
+<section id="coerce-sequence-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_sequence(value)</span></code><a class="headerlink" href="#coerce-sequence-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="parse-rate-limit-to-rps-limit-str">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_rate_limit_to_rps(limit_str)</span></code><a class="headerlink" href="#parse-rate-limit-to-rps-limit-str" title="Link to this heading"></a></h3>
+<p>Convert a rate limit expression into requests-per-second.</p>
+</section>
+<section id="get-env-overrides">
+<h3><code class="docutils literal notranslate"><span class="pre">get_env_overrides()</span></code><a class="headerlink" href="#get-env-overrides" title="Link to this heading"></a></h3>
+<p>Return environment-derived overrides as stringified key/value pairs.</p>
+</section>
+<section id="apply-env-overrides-defaults">
+<h3><code class="docutils literal notranslate"><span class="pre">_apply_env_overrides(defaults)</span></code><a class="headerlink" href="#apply-env-overrides-defaults" title="Link to this heading"></a></h3>
+<p>Mutate <code class="docutils literal notranslate"><span class="pre">defaults</span></code> in-place using values from :class:<code class="docutils literal notranslate"><span class="pre">EnvironmentOverrides</span></code>.</p>
+</section>
+<section id="build-resolved-config-raw-config">
+<h3><code class="docutils literal notranslate"><span class="pre">build_resolved_config(raw_config)</span></code><a class="headerlink" href="#build-resolved-config-raw-config" title="Link to this heading"></a></h3>
+<p>Materialise a :class:<code class="docutils literal notranslate"><span class="pre">ResolvedConfig</span></code> from a raw mapping loaded from disk.</p>
+</section>
+<section id="validate-schema-raw-config">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_schema(raw,</span> <span class="pre">config)</span></code><a class="headerlink" href="#validate-schema-raw-config" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="load-raw-yaml-config-path">
+<h3><code class="docutils literal notranslate"><span class="pre">load_raw_yaml(config_path)</span></code><a class="headerlink" href="#load-raw-yaml-config-path" title="Link to this heading"></a></h3>
+<p>Read a YAML configuration file and return its top-level mapping.</p>
+</section>
+<section id="load-config-config-path">
+<h3><code class="docutils literal notranslate"><span class="pre">load_config(config_path)</span></code><a class="headerlink" href="#load-config-config-path" title="Link to this heading"></a></h3>
+<p>Load, validate, and resolve configuration suitable for execution.</p>
+</section>
+<section id="validate-config-config-path">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_config(config_path)</span></code><a class="headerlink" href="#validate-config-config-path" title="Link to this heading"></a></h3>
+<p>Load a configuration solely for validation feedback.</p>
+</section>
+<section id="create-stub-module-name-attrs">
+<h3><code class="docutils literal notranslate"><span class="pre">_create_stub_module(name,</span> <span class="pre">attrs)</span></code><a class="headerlink" href="#create-stub-module-name-attrs" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="create-stub-bnode-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_create_stub_bnode(value)</span></code><a class="headerlink" href="#create-stub-bnode-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="create-stub-literal-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_create_stub_literal(value)</span></code><a class="headerlink" href="#create-stub-literal-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="create-stub-uri-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_create_stub_uri(value)</span></code><a class="headerlink" href="#create-stub-uri-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="import-module-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_import_module(name)</span></code><a class="headerlink" href="#import-module-name" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="create-pystow-stub-root">
+<h3><code class="docutils literal notranslate"><span class="pre">_create_pystow_stub(root)</span></code><a class="headerlink" href="#create-pystow-stub-root" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="create-rdflib-stub">
+<h3><code class="docutils literal notranslate"><span class="pre">_create_rdflib_stub()</span></code><a class="headerlink" href="#create-rdflib-stub" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="create-pronto-stub">
+<h3><code class="docutils literal notranslate"><span class="pre">_create_pronto_stub()</span></code><a class="headerlink" href="#create-pronto-stub" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="create-owlready-stub">
+<h3><code class="docutils literal notranslate"><span class="pre">_create_owlready_stub()</span></code><a class="headerlink" href="#create-owlready-stub" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="get-pystow">
+<h3><code class="docutils literal notranslate"><span class="pre">get_pystow()</span></code><a class="headerlink" href="#get-pystow" title="Link to this heading"></a></h3>
+<p>Return the <code class="docutils literal notranslate"><span class="pre">pystow</span></code> module, supplying a stub when unavailable.</p>
+</section>
+<section id="get-rdflib">
+<h3><code class="docutils literal notranslate"><span class="pre">get_rdflib()</span></code><a class="headerlink" href="#get-rdflib" title="Link to this heading"></a></h3>
+<p>Return the <code class="docutils literal notranslate"><span class="pre">rdflib</span></code> module, supplying a stub when unavailable.</p>
+</section>
+<section id="get-pronto">
+<h3><code class="docutils literal notranslate"><span class="pre">get_pronto()</span></code><a class="headerlink" href="#get-pronto" title="Link to this heading"></a></h3>
+<p>Return the <code class="docutils literal notranslate"><span class="pre">pronto</span></code> module, supplying a stub when unavailable.</p>
+</section>
+<section id="get-owlready2">
+<h3><code class="docutils literal notranslate"><span class="pre">get_owlready2()</span></code><a class="headerlink" href="#get-owlready2" title="Link to this heading"></a></h3>
+<p>Return the <code class="docutils literal notranslate"><span class="pre">owlready2</span></code> module, supplying a stub when unavailable.</p>
+</section>
+<section id="safe-identifiers-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">_safe_identifiers(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#safe-identifiers-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Return identifiers sanitised for filesystem usage.</p>
+</section>
+<section id="directory-size-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_directory_size(path)</span></code><a class="headerlink" href="#directory-size-path" title="Link to this heading"></a></h3>
+<p>Return the total size in bytes for files rooted at <em>path</em>.</p>
+</section>
+<section id="get-storage-backend">
+<h3><code class="docutils literal notranslate"><span class="pre">get_storage_backend()</span></code><a class="headerlink" href="#get-storage-backend" title="Link to this heading"></a></h3>
+<p>Instantiate the storage backend based on environment configuration.</p>
+</section>
+<section id="validate-level-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_level(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-level-cls-value" title="Link to this heading"></a></h3>
+<p>Normalise logging levels and ensure they match the supported set.</p>
+</section>
+<section id="validate-rate-limits-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_rate_limits(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-rate-limits-cls-value" title="Link to this heading"></a></h3>
+<p>Ensure per-resolver rate limits follow the supported syntax.</p>
+</section>
+<section id="validate-allowed-ports-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_allowed_ports(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-allowed-ports-cls-value" title="Link to this heading"></a></h3>
+<p>Normalise and validate the optional port allowlist from configuration.</p>
+<p>Args:
+value: Collection of port numbers supplied in the settings payload.</p>
+<p>Returns:
+Sanitised list of ports preserving input order when provided, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<p>Raises:
+ValueError: If any port is not an integer or falls outside the TCP range 1-65535.</p>
+</section>
+<section id="rate-limit-per-second-self">
+<h3><code class="docutils literal notranslate"><span class="pre">rate_limit_per_second(self)</span></code><a class="headerlink" href="#rate-limit-per-second-self" title="Link to this heading"></a></h3>
+<p>Return the configured per-host rate limit in requests per second.</p>
+</section>
+<section id="parse-service-rate-limit-self-service">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_service_rate_limit(self,</span> <span class="pre">service)</span></code><a class="headerlink" href="#parse-service-rate-limit-self-service" title="Link to this heading"></a></h3>
+<p>Return service-specific rate limits expressed as requests per second.</p>
+</section>
+<section id="allowed-port-set-self">
+<h3><code class="docutils literal notranslate"><span class="pre">allowed_port_set(self)</span></code><a class="headerlink" href="#allowed-port-set-self" title="Link to this heading"></a></h3>
+<p>Return the union of default ports and user-configured allowances.</p>
+</section>
+<section id="normalized-allowed-hosts-self">
+<h3><code class="docutils literal notranslate"><span class="pre">normalized_allowed_hosts(self)</span></code><a class="headerlink" href="#normalized-allowed-hosts-self" title="Link to this heading"></a></h3>
+<p>Split allowed host list into exact domains, wildcard suffixes, and per-host port allowances.</p>
+</section>
+<section id="polite-http-headers-self">
+<h3><code class="docutils literal notranslate"><span class="pre">polite_http_headers(self)</span></code><a class="headerlink" href="#polite-http-headers-self" title="Link to this heading"></a></h3>
+<p>Compute polite HTTP headers for outbound resolver requests.</p>
+</section>
+<section id="validate-prefer-source-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_prefer_source(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-prefer-source-cls-value" title="Link to this heading"></a></h3>
+<p>Ensure preferred resolvers belong to the supported resolver set.</p>
+</section>
+<section id="from-defaults-cls">
+<h3><code class="docutils literal notranslate"><span class="pre">from_defaults(cls)</span></code><a class="headerlink" href="#from-defaults-cls" title="Link to this heading"></a></h3>
+<p>Construct a resolved configuration populated with default values only.</p>
+</section>
+<section id="getitem-self-key">
+<h3><code class="docutils literal notranslate"><span class="pre">__getitem__(self,</span> <span class="pre">key)</span></code><a class="headerlink" href="#getitem-self-key" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="bind-self-prefix-namespace">
+<h3><code class="docutils literal notranslate"><span class="pre">bind(self,</span> <span class="pre">prefix,</span> <span class="pre">namespace)</span></code><a class="headerlink" href="#bind-self-prefix-namespace" title="Link to this heading"></a></h3>
+<p>Register a namespace binding in the lightweight stub manager.</p>
+</section>
+<section id="namespaces-self">
+<h3><code class="docutils literal notranslate"><span class="pre">namespaces(self)</span></code><a class="headerlink" href="#namespaces-self" title="Link to this heading"></a></h3>
+<p>Yield currently registered <code class="docutils literal notranslate"><span class="pre">(prefix,</span> <span class="pre">namespace)</span></code> pairs.</p>
+</section>
+<section id="parse-self-source-format">
+<h3><code class="docutils literal notranslate"><span class="pre">parse(self,</span> <span class="pre">source,</span> <span class="pre">format)</span></code><a class="headerlink" href="#parse-self-source-format" title="Link to this heading"></a></h3>
+<p>Parse a Turtle-like text file into an in-memory triple list.</p>
+</section>
+<section id="serialize-self-destination-format">
+<h3><code class="docutils literal notranslate"><span class="pre">serialize(self,</span> <span class="pre">destination,</span> <span class="pre">format)</span></code><a class="headerlink" href="#serialize-self-destination-format" title="Link to this heading"></a></h3>
+<p>Serialise parsed triples to the supplied destination.</p>
+</section>
+<section id="add-self-triple">
+<h3><code class="docutils literal notranslate"><span class="pre">add(self,</span> <span class="pre">triple)</span></code><a class="headerlink" href="#add-self-triple" title="Link to this heading"></a></h3>
+<p>Append a triple to the stub graph, mirroring rdflib behaviour.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">bind(self,</span> <span class="pre">prefix,</span> <span class="pre">namespace)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Register a namespace binding within the stub graph.</p>
+</section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">namespaces(self)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Yield namespace bindings previously registered via :meth:<code class="docutils literal notranslate"><span class="pre">bind</span></code>.</p>
+</section>
+<section id="len-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__len__(self)</span></code><a class="headerlink" href="#len-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="iter-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__iter__(self)</span></code><a class="headerlink" href="#iter-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="join">
+<h3><code class="docutils literal notranslate"><span class="pre">join()</span></code><a class="headerlink" href="#join" title="Link to this heading"></a></h3>
+<p>Mimic :func:<code class="docutils literal notranslate"><span class="pre">pystow.join</span></code> by joining segments onto the stub root.</p>
+</section>
+<section id="get-ontology-iri">
+<h3><code class="docutils literal notranslate"><span class="pre">get_ontology(iri)</span></code><a class="headerlink" href="#get-ontology-iri" title="Link to this heading"></a></h3>
+<p>Return a stub ontology instance for the provided IRI.</p>
+</section>
+<section id="prepare-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">prepare_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#prepare-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Return a workspace for the given ontology/version combination.</p>
+</section>
+<section id="ensure-local-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#ensure-local-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Ensure a local directory exists for the requested ontology version.</p>
+</section>
+<section id="available-versions-self-ontology-id">
+<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#available-versions-self-ontology-id" title="Link to this heading"></a></h3>
+<p>Return sorted version identifiers available for <em>ontology_id</em>.</p>
+</section>
+<section id="available-ontologies-self">
+<h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#available-ontologies-self" title="Link to this heading"></a></h3>
+<p>Return sorted ontology identifiers known to the backend.</p>
+</section>
+<section id="finalize-version-self-ontology-id-version-local-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#finalize-version-self-ontology-id-version-local-dir" title="Link to this heading"></a></h3>
+<p>Persist processed artefacts for <em>ontology_id</em>/<em>version</em>.</p>
+</section>
+<section id="version-path-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">version_path(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#version-path-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Return the canonical path for <em>ontology_id</em>/<em>version</em>.</p>
+</section>
+<section id="delete-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#delete-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Delete stored data for <em>ontology_id</em>/<em>version</em>, returning bytes reclaimed.</p>
+</section>
+<section id="set-latest-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">set_latest_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#set-latest-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Record the latest processed version for <em>ontology_id</em>.</p>
+</section>
+<section id="version-dir-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">_version_dir(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#version-dir-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">prepare_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>Create a workspace for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code> with required subdirs.</p>
+</section>
+<section id="id4">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<p>Ensure the version directory exists and return its path.</p>
+</section>
+<section id="id5">
+<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<p>List version identifiers currently stored for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>.</p>
+</section>
+<section id="id6">
+<h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<p>List ontology identifiers known to the local backend.</p>
+</section>
+<section id="id7">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
+<p>Hook for subclasses; local backend writes occur in-place already.</p>
+</section>
+<section id="id8">
+<h3><code class="docutils literal notranslate"><span class="pre">version_path(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
+<p>Return the filesystem path holding <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code> data.</p>
+</section>
+<section id="id9">
+<h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
+<p>Remove stored data for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code> and return bytes reclaimed.</p>
+</section>
+<section id="id10">
+<h3><code class="docutils literal notranslate"><span class="pre">set_latest_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
+<p>Update symbolic links/markers to highlight the latest processed version.</p>
+</section>
+<section id="remote-version-path-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">_remote_version_path(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#remote-version-path-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Return the remote storage path for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code>.</p>
+</section>
+<section id="id11">
+<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
+<p>Combine local and remote version identifiers for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>.</p>
+</section>
+<section id="id12">
+<h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<p>Return the union of ontology ids present locally and in remote storage.</p>
+</section>
+<section id="id13">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
+<p>Mirror processed artefacts to remote storage after local completion.</p>
+</section>
+<section id="id14">
+<h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
+<p>Remove local and remote artefacts for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code>.</p>
+</section>
+<section id="terms-self">
+<h3><code class="docutils literal notranslate"><span class="pre">terms(self)</span></code><a class="headerlink" href="#terms-self" title="Link to this heading"></a></h3>
+<p>Return a deterministic collection of ontology term identifiers.</p>
+</section>
+<section id="dump-self-destination-format">
+<h3><code class="docutils literal notranslate"><span class="pre">dump(self,</span> <span class="pre">destination,</span> <span class="pre">format)</span></code><a class="headerlink" href="#dump-self-destination-format" title="Link to this heading"></a></h3>
+<p>Write minimal ontology contents to <code class="docutils literal notranslate"><span class="pre">destination</span></code> for tests.</p>
+</section>
+<section id="load-self">
+<h3><code class="docutils literal notranslate"><span class="pre">load(self)</span></code><a class="headerlink" href="#load-self" title="Link to this heading"></a></h3>
+<p>Provide fluent API parity with owlready2 ontologies.</p>
+</section>
+<section id="classes-self">
+<h3><code class="docutils literal notranslate"><span class="pre">classes(self)</span></code><a class="headerlink" href="#classes-self" title="Link to this heading"></a></h3>
+<p>Return example ontology classes for tests and fallbacks.</p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="loggingconfiguration">
+<h3><code class="docutils literal notranslate"><span class="pre">LoggingConfiguration</span></code><a class="headerlink" href="#loggingconfiguration" title="Link to this heading"></a></h3>
+<p>Logging-related configuration for ontology downloads.</p>
+</section>
+<section id="validationconfig">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidationConfig</span></code><a class="headerlink" href="#validationconfig" title="Link to this heading"></a></h3>
+<p>Settings controlling ontology validation throughput and limits.</p>
+</section>
+<section id="downloadconfiguration">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadConfiguration</span></code><a class="headerlink" href="#downloadconfiguration" title="Link to this heading"></a></h3>
+<p>HTTP download, retry, and politeness settings for resolvers.</p>
+</section>
+<section id="defaultsconfig">
+<h3><code class="docutils literal notranslate"><span class="pre">DefaultsConfig</span></code><a class="headerlink" href="#defaultsconfig" title="Link to this heading"></a></h3>
+<p>Composite configuration applied when no per-spec overrides exist.</p>
+</section>
+<section id="resolvedconfig">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolvedConfig</span></code><a class="headerlink" href="#resolvedconfig" title="Link to this heading"></a></h3>
+<p>Materialised configuration combining defaults and fetch specifications.</p>
+</section>
+<section id="environmentoverrides">
+<h3><code class="docutils literal notranslate"><span class="pre">EnvironmentOverrides</span></code><a class="headerlink" href="#environmentoverrides" title="Link to this heading"></a></h3>
+<p>Pydantic settings model exposing environment-derived overrides.</p>
+</section>
+<section id="stubnamespace">
+<h3><code class="docutils literal notranslate"><span class="pre">_StubNamespace</span></code><a class="headerlink" href="#stubnamespace" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="stubnamespacemanager">
+<h3><code class="docutils literal notranslate"><span class="pre">_StubNamespaceManager</span></code><a class="headerlink" href="#stubnamespacemanager" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="stubgraph">
+<h3><code class="docutils literal notranslate"><span class="pre">_StubGraph</span></code><a class="headerlink" href="#stubgraph" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="storagebackend">
+<h3><code class="docutils literal notranslate"><span class="pre">StorageBackend</span></code><a class="headerlink" href="#storagebackend" title="Link to this heading"></a></h3>
+<p>Protocol describing storage operations required by the pipeline.</p>
+</section>
+<section id="localstoragebackend">
+<h3><code class="docutils literal notranslate"><span class="pre">LocalStorageBackend</span></code><a class="headerlink" href="#localstoragebackend" title="Link to this heading"></a></h3>
+<p>Storage backend that keeps artefacts on the local filesystem.</p>
+</section>
+<section id="fsspecstoragebackend">
+<h3><code class="docutils literal notranslate"><span class="pre">FsspecStorageBackend</span></code><a class="headerlink" href="#fsspecstoragebackend" title="Link to this heading"></a></h3>
+<p>Hybrid backend that mirrors artefacts to an fsspec location.</p>
+</section>
+<section id="stubontology">
+<h3><code class="docutils literal notranslate"><span class="pre">_StubOntology</span></code><a class="headerlink" href="#stubontology" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id15">
+<h3><code class="docutils literal notranslate"><span class="pre">_StubOntology</span></code><a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+</section>
 </section>
 
 

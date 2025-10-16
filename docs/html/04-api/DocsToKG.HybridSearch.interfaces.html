@@ -168,9 +168,9 @@ Mapping containing statistics relevant to the implementation.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">config(self)</span></code><a class="headerlink" href="#config-self" title="Link to this heading"></a></h3>
 <p>Immutable configuration backing the dense store.</p>
 </section>
-<section id="gpu-resources-self">
-<h3><code class="docutils literal notranslate"><span class="pre">gpu_resources(self)</span></code><a class="headerlink" href="#gpu-resources-self" title="Link to this heading"></a></h3>
-<p>Return GPU resources when available, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<section id="adapter-stats-self">
+<h3><code class="docutils literal notranslate"><span class="pre">adapter_stats(self)</span></code><a class="headerlink" href="#adapter-stats-self" title="Link to this heading"></a></h3>
+<p>Return runtime adapter statistics (device, nprobe, replication state).</p>
 </section>
 <section id="add-self-vectors-vector-ids">
 <h3><code class="docutils literal notranslate"><span class="pre">add(self,</span> <span class="pre">vectors,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#add-self-vectors-vector-ids" title="Link to this heading"></a></h3>
@@ -195,6 +195,10 @@ Mapping containing statistics relevant to the implementation.</p>
 <section id="search-batch-self-queries-top-k">
 <h3><code class="docutils literal notranslate"><span class="pre">search_batch(self,</span> <span class="pre">queries,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#search-batch-self-queries-top-k" title="Link to this heading"></a></h3>
 <p>Optional alias for batched search.</p>
+</section>
+<section id="range-search-self-query-min-score">
+<h3><code class="docutils literal notranslate"><span class="pre">range_search(self,</span> <span class="pre">query,</span> <span class="pre">min_score)</span></code><a class="headerlink" href="#range-search-self-query-min-score" title="Link to this heading"></a></h3>
+<p>Return all vectors scoring above <code class="docutils literal notranslate"><span class="pre">min_score</span></code> for <code class="docutils literal notranslate"><span class="pre">query</span></code>.</p>
 </section>
 <section id="serialize-self">
 <h3><code class="docutils literal notranslate"><span class="pre">serialize(self)</span></code><a class="headerlink" href="#serialize-self" title="Link to this heading"></a></h3>
@@ -238,7 +242,7 @@ None</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>from DocsToKG.HybridSearch.storage import OpenSearchSimulator
+<div><p>from DocsToKG.HybridSearch.store import OpenSearchSimulator
 simulator: LexicalIndex = OpenSearchSimulator()
 simulator.bulk_upsert([])  # doctest: +SKIP</p>
 </div></blockquote>

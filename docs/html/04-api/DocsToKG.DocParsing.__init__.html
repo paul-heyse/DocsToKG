@@ -81,7 +81,57 @@
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.__init__</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>High-level facade exposing CLI entry points for DocsToKG DocParsing.</p>
+<p>High-level facade exposing consolidated DocParsing modules and compatibility shims.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="populate-forwarding-module-module-target">
+<h3><code class="docutils literal notranslate"><span class="pre">_populate_forwarding_module(module,</span> <span class="pre">target)</span></code><a class="headerlink" href="#populate-forwarding-module-module-target" title="Link to this heading"></a></h3>
+<p>Populate <code class="docutils literal notranslate"><span class="pre">module</span></code> so that it forwards attributes to <code class="docutils literal notranslate"><span class="pre">target</span></code>.</p>
+</section>
+<section id="populate-cli-module-module">
+<h3><code class="docutils literal notranslate"><span class="pre">_populate_cli_module(module)</span></code><a class="headerlink" href="#populate-cli-module-module" title="Link to this heading"></a></h3>
+<p>Populate the legacy <code class="docutils literal notranslate"><span class="pre">cli</span></code> module shim.</p>
+</section>
+<section id="populate-pdf-pipeline-module-module">
+<h3><code class="docutils literal notranslate"><span class="pre">_populate_pdf_pipeline_module(module)</span></code><a class="headerlink" href="#populate-pdf-pipeline-module-module" title="Link to this heading"></a></h3>
+<p>Populate the legacy <code class="docutils literal notranslate"><span class="pre">pdf_pipeline</span></code> module shim with a deprecation warning.</p>
+</section>
+<section id="getattr-attr">
+<h3><code class="docutils literal notranslate"><span class="pre">__getattr__(attr)</span></code><a class="headerlink" href="#getattr-attr" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="parse-args-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_args(argv)</span></code><a class="headerlink" href="#parse-args-argv" title="Link to this heading"></a></h3>
+<p>Legacy CLI argument parser for backwards-compatible imports.</p>
+</section>
+<section id="main-args">
+<h3><code class="docutils literal notranslate"><span class="pre">main(args)</span></code><a class="headerlink" href="#main-args" title="Link to this heading"></a></h3>
+<p>Legacy entry point delegating to :mod:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.doctags</span></code>.</p>
+</section>
+<section id="create-module-self-spec">
+<h3><code class="docutils literal notranslate"><span class="pre">create_module(self,</span> <span class="pre">spec)</span></code><a class="headerlink" href="#create-module-self-spec" title="Link to this heading"></a></h3>
+<p>Create a new module instance that will be populated by the shim.</p>
+</section>
+<section id="exec-module-self-module">
+<h3><code class="docutils literal notranslate"><span class="pre">exec_module(self,</span> <span class="pre">module)</span></code><a class="headerlink" href="#exec-module-self-module" title="Link to this heading"></a></h3>
+<p>Execute the shim builder to populate <code class="docutils literal notranslate"><span class="pre">module</span></code>.</p>
+</section>
+<section id="find-spec-self-fullname-path-target">
+<h3><code class="docutils literal notranslate"><span class="pre">find_spec(self,</span> <span class="pre">fullname,</span> <span class="pre">path,</span> <span class="pre">target)</span></code><a class="headerlink" href="#find-spec-self-fullname-path-target" title="Link to this heading"></a></h3>
+<p>Return a module spec when <code class="docutils literal notranslate"><span class="pre">fullname</span></code> matches a supported shim.</p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="docparsingshimloader">
+<h3><code class="docutils literal notranslate"><span class="pre">_DocParsingShimLoader</span></code><a class="headerlink" href="#docparsingshimloader" title="Link to this heading"></a></h3>
+<p>Loader that populates deprecated DocParsing modules on demand.</p>
+</section>
+<section id="docparsingshimfinder">
+<h3><code class="docutils literal notranslate"><span class="pre">_DocParsingShimFinder</span></code><a class="headerlink" href="#docparsingshimfinder" title="Link to this heading"></a></h3>
+<p>Meta-path finder that serves the compatibility shims defined above.</p>
+</section>
 </section>
 </section>
 

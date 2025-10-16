@@ -78,7 +78,7 @@
              
   <section id="module-figshare">
 <h1>1. Module: figshare<a class="headerlink" href="#module-figshare" title="Link to this heading"></a></h1>
-<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">FigshareResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers</span></code>.</p>
+<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">FigshareResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.providers</span></code>.</p>
 <p>Figshare Resolver Provider</p>
 <p>This module integrates with the Figshare API to locate repository-hosted PDFs
 associated with DOI-indexed research outputs.</p>
@@ -89,7 +89,7 @@ associated with DOI-indexed research outputs.</p>
 <li><p>Extensive logging for malformed payloads and API errors.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.providers import FigshareResolver</p>
+from DocsToKG.ContentDownload.pipeline.providers import FigshareResolver</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = FigshareResolver()
 results = list(resolver.iter_urls(session, config, artifact))
 </pre></div>

@@ -36,6 +36,8 @@ across the toolchain.
     classification.
   * Conversion metadata (parse engine, content hashes, warnings) flows into the
     manifest for provenance tracking.
+  * `--vllm-wait-timeout` lets operators accommodate slow model cold starts
+    before marking the DocTags stage unhealthy.
 
 ### 2. Chunking & Coalescence
 
@@ -46,8 +48,13 @@ across the toolchain.
     across sections when soft-boundary thresholds permit.
   * Chunk rows embed `ProvenanceMetadata` (parse engine, Docling version, image
     flags) to preserve the source context of every span.
+  * Declarative extensions let operators load YAML/JSON structural markers and
+    swap serializer providers (`--structural-markers`, `--serializer-provider`)
+    without touching the chunking logic.
   * Document identifiers mirror the relative path within the input directory so
     nested hierarchies never collide on basename alone.
+  * Supports deterministic sharding via `--shard-count` / `--shard-index` so
+    large corpora can be processed across machines without external tooling.
 
 ### 3. Embedding Generation
 
@@ -58,6 +65,9 @@ across the toolchain.
     statistics.
   * Extensive validation guards Qwen vector dimensions, SPLADE sparsity, and
     schema compatibility.
+  * Vector writers are pluggable (`--format`), and caching controls (`--no-cache`)
+    make it easy to debug embedding behaviour without reusing long-lived vLLM
+    instances.
 
 ## Configuration
 
@@ -69,12 +79,19 @@ include:
 | `--data-root` | All | Override the detected `Data/` directory. Defaults to `DOCSTOKG_DATA_ROOT` or ancestor discovery. |
 | `--resume` | All | Skip inputs whose outputs exist with matching content hash. |
 | `--force` | All | Reprocess all inputs regardless of manifest state. |
+| `--log-level` | All | Adjust structured log verbosity (`DEBUG`, `INFO`, etc.). |
 | `--workers` | DocTags | Parallel PDF worker count (spawn start method enforced). |
+| `--vllm-wait-timeout` | DocTags | Seconds to wait for the auxiliary vLLM server before aborting. |
 | `--min-tokens` / `--max-tokens` | Chunker | Token window boundaries for chunk coalescence. |
 | `--tokenizer-model` | Chunker | HuggingFace tokenizer aligning chunk lengths with the dense embedder. |
-| `--validate-only` | Embedder | Validate existing vectors in an output directory and exit. |
+| `--structural-markers` | Chunker | Load additional heading/caption prefixes from YAML or JSON configuration files. |
+| `--serializer-provider` | Chunker | Swap in a custom Docling serializer via an import path (`module:Class`). |
+| `--shard-count` / `--shard-index` | Chunker, Embedder | Deterministically partition inputs for distributed processing. |
+| `--validate-only` | Chunker, Embedder | Validate existing chunk or vector JSONL outputs and exit without writing. |
 | `--qwen-dim` | Embedder | Expected Qwen output dimension (use with multi-resolution models). |
 | `--batch-size-*` | Embedder | Independent batch sizing for SPLADE and Qwen passes. |
+| `--format` | Embedder | Vector output format (`jsonl` today; `parquet` in progress). |
+| `--no-cache` | Embedder | Disable Qwen LLM reuse between batches (helpful for debugging). |
 
 ### Environment Variables
 
@@ -101,6 +118,26 @@ precedence order:
 
 The resolved path is logged at startup so operators can confirm the
 expected model directory before conversion begins.
+
+### Serializer Providers
+
+The chunker loads its Markdown-aware serializer via the `--serializer-provider`
+flag. Providers are referenced using the import path syntax
+`module_path:ClassName` (for example,
+`DocsToKG.DocParsing.formats:RichSerializerProvider`, which is the default).
+
+To provide a custom implementation:
+
+1. Subclass :class:`docling_core.transforms.chunker.hierarchical_chunker.ChunkingSerializerProvider`.
+2. Implement :meth:`get_serializer(self, doc: DoclingDocument) -> ChunkingDocSerializer`
+   and return a serializer that understands your domain-specific markup.
+3. Package the provider on `PYTHONPATH` and point `--serializer-provider` at
+   the fully-qualified import path.
+
+If a provider cannot be imported, the chunker now logs a warning with a sample
+path so operators can quickly diagnose missing packages. Custom providers should
+remain stateless—when a non-default provider is configured, the chunker falls
+back to a single worker to avoid sharing mutable state across processes.
 
 ## Schema Versioning Strategy
 

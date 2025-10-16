@@ -151,7 +151,7 @@ import os
 import shutil
 import threading
 import time
-from collections import defaultdict
+import re
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -201,6 +201,7 @@ from DocsToKG.ContentDownload.networking import (
     ModifiedResult,
     create_session,
     head_precheck,
+    parse_retry_after_header,
     request_with_retries,
 )
 from DocsToKG.ContentDownload.telemetry import (
@@ -212,6 +213,7 @@ from DocsToKG.ContentDownload.telemetry import (
     ManifestEntry,
     ManifestIndexSink,
     MultiSink,
+    RotatingJsonlSink,
     SqliteSink,
     SummarySink,
     build_manifest_entry,
@@ -237,6 +239,13 @@ from DocsToKG.ContentDownload.core import (
 DEFAULT_SNIFF_BYTES = 64 * 1024
 DEFAULT_MIN_PDF_BYTES = 1024
 DEFAULT_TAIL_CHECK_BYTES = 2048
+_SIZE_SUFFIXES = {
+    "b": 1,
+    "kb": 1024,
+    "mb": 1024**2,
+    "gb": 1024**3,
+    "tb": 1024**4,
+}
 
 __all__ = (
     "AttemptSink",
@@ -267,6 +276,7 @@ __all__ = (
     "read_resolver_config",
     "resolve_topic_id_if_needed",
     "slugify",
+    "DownloadOptions",
 )
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
@@ -318,6 +328,23 @@ class WorkArtifact:
         self.namespaces: Dict[str, Path] = {"pdf": self.pdf_dir, "html": self.html_dir}
 
 
+@dataclass
+class DownloadOptions:
+    """Stable collection of per-run download settings applied to each work item."""
+
+    dry_run: bool
+    list_only: bool
+    extract_html_text: bool
+    previous_lookup: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    resume_completed: Set[str] = field(default_factory=set)
+    max_bytes: Optional[int] = None
+    sniff_bytes: int = DEFAULT_SNIFF_BYTES
+    min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
+    tail_check_bytes: int = DEFAULT_TAIL_CHECK_BYTES
+    robots_checker: Optional["RobotsCache"] = None
+    content_addressed: bool = False
+
+
 class DownloadState(Enum):
     """State machine for streaming downloads."""
 
@@ -343,6 +370,7 @@ def _build_download_outcome(
     head_precheck_passed: bool = False,
     min_pdf_bytes: int = 1024,
     tail_check_bytes: int = 2048,
+    retry_after: Optional[float] = None,
 ) -> DownloadOutcome:
     if isinstance(classification, Classification):
         classification_code = classification
@@ -354,6 +382,9 @@ def _build_download_outcome(
     if flagged_unknown and classification_code is Classification.PDF:
         reason_code = ReasonCode.PDF_SNIFF_UNKNOWN
         reason_detail = "pdf-sniff-unknown"
+
+    if reason_code is None and classification_code in PDF_LIKE:
+        reason_code = ReasonCode.CONDITIONAL_NOT_MODIFIED
 
     path_str = str(dest_path) if dest_path else None
 
@@ -383,6 +414,7 @@ def _build_download_outcome(
                 etag=etag,
                 last_modified=last_modified,
                 extracted_text_path=extracted_text_path,
+                retry_after=retry_after,
             )
 
         if tail_contains_html(tail_bytes):
@@ -401,6 +433,7 @@ def _build_download_outcome(
                 etag=etag,
                 last_modified=last_modified,
                 extracted_text_path=extracted_text_path,
+                retry_after=retry_after,
             )
 
         if not has_pdf_eof(dest_path, window_bytes=tail_check_bytes):
@@ -419,6 +452,7 @@ def _build_download_outcome(
                 etag=etag,
                 last_modified=last_modified,
                 extracted_text_path=extracted_text_path,
+                retry_after=retry_after,
             )
 
     return DownloadOutcome(
@@ -434,7 +468,107 @@ def _build_download_outcome(
         etag=etag,
         last_modified=last_modified,
         extracted_text_path=extracted_text_path,
+        retry_after=retry_after,
     )
+
+
+def _validate_cached_artifact(result: CachedResult) -> bool:
+    """Return ``True`` when cached artefact metadata matches on-disk state."""
+
+    if not result.path:
+        LOGGER.warning(
+            "Cached artifact missing path; cannot validate cache entry.",
+            extra={"reason": "cached-path-missing"},
+        )
+        return False
+
+    cached_path = Path(result.path)
+    if not cached_path.exists():
+        LOGGER.warning(
+            "Cached artifact missing at %s; cannot reuse prior download.",
+            cached_path,
+            extra={"reason": "cached-missing", "path": result.path},
+        )
+        return False
+
+    try:
+        actual_size = cached_path.stat().st_size
+    except OSError as exc:
+        LOGGER.warning(
+            "Unable to stat cached artifact at %s: %s",
+            cached_path,
+            exc,
+            extra={"reason": "cached-stat-failed", "path": result.path},
+        )
+        return False
+    if result.content_length is not None and actual_size != result.content_length:
+        LOGGER.warning(
+            "Cached content length mismatch: expected %s got %s",
+            result.content_length,
+            actual_size,
+            extra={
+                "reason": "cached-length-mismatch",
+                "expected": result.content_length,
+                "actual": actual_size,
+                "path": result.path,
+            },
+        )
+        return False
+
+    if result.sha256:
+        try:
+            hasher = hashlib.sha256()
+            with cached_path.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(8192), b""):
+                    hasher.update(chunk)
+            digest = hasher.hexdigest()
+        except OSError as exc:
+            LOGGER.warning(
+                "Unable to read cached artifact at %s: %s",
+                cached_path,
+                exc,
+                extra={"reason": "cached-read-failed", "path": result.path},
+            )
+            return False
+        if digest != result.sha256:
+            LOGGER.warning(
+                "Cached SHA256 mismatch: expected %s got %s",
+                result.sha256,
+                digest,
+                extra={
+                    "reason": "cached-digest-mismatch",
+                    "expected": result.sha256,
+                    "actual": digest,
+                    "path": result.path,
+                },
+            )
+            return False
+
+    return True
+
+
+def _parse_size(value: str) -> int:
+    """Parse human-friendly size strings (e.g., ``10MB``) into bytes."""
+
+    text = (value or "").strip().lower().replace(",", "").replace("_", "")
+    if not text:
+        raise argparse.ArgumentTypeError("size value cannot be empty")
+    match = re.fullmatch(r"(?P<amount>\d+(?:\.\d+)?)(?P<suffix>[kmgt]?b)?", text)
+    if not match:
+        raise argparse.ArgumentTypeError(f"invalid size specification: {value!r}")
+    amount_text = match.group("amount")
+    suffix = match.group("suffix") or "b"
+    try:
+        amount = float(amount_text)
+    except ValueError as exc:  # pragma: no cover - defensive guard
+        raise argparse.ArgumentTypeError(f"invalid numeric amount in {value!r}") from exc
+    factor = _SIZE_SUFFIXES.get(suffix, None)
+    if factor is None:
+        raise argparse.ArgumentTypeError(f"unsupported size suffix {suffix!r}")
+    bytes_value = int(amount * factor)
+    if bytes_value <= 0:
+        raise argparse.ArgumentTypeError("size value must be positive")
+    return bytes_value
 
 
 def _parse_domain_interval(value: str) -> Tuple[str, float]:
@@ -465,6 +599,19 @@ def _parse_domain_interval(value: str) -> Tuple[str, float]:
     if seconds < 0:
         raise argparse.ArgumentTypeError(f"interval for domain '{domain}' must be non-negative")
     return domain, seconds
+
+
+def _parse_domain_bytes_budget(value: str) -> Tuple[str, int]:
+    """Parse ``DOMAIN=BYTES`` CLI arguments for domain byte budgets."""
+
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("domain bytes budget must use the format domain=size")
+    domain, raw = value.split("=", 1)
+    domain = domain.strip().lower()
+    if not domain:
+        raise argparse.ArgumentTypeError("domain component cannot be empty")
+    limit = _parse_size(raw)
+    return domain, limit
 
 
 class RobotsCache:
@@ -870,6 +1017,7 @@ def download_candidate(
     start = time.monotonic()
     try:
         while True:
+            retry_after_hint: Optional[float] = None
             headers = dict(base_headers)
             if attempt_conditional:
                 headers.update(cond_helper.build_headers())
@@ -885,6 +1033,9 @@ def download_candidate(
                 headers=headers,
             ) as response:
                 elapsed_ms = (time.monotonic() - start) * 1000.0
+                status_code = response.status_code or 0
+                if status_code >= 400:
+                    retry_after_hint = parse_retry_after_header(response)
                 if response.status_code == 304:
                     if not attempt_conditional:
                         LOGGER.warning(
@@ -904,6 +1055,7 @@ def download_candidate(
                             etag=None,
                             last_modified=None,
                             extracted_text_path=None,
+                            retry_after=retry_after_hint,
                         )
 
                     try:
@@ -927,6 +1079,21 @@ def download_candidate(
 
                     if not isinstance(cached, CachedResult):  # pragma: no cover - defensive
                         raise TypeError("Expected CachedResult for 304 response")
+                    if not _validate_cached_artifact(cached):
+                        if not logged_conditional_downgrade:
+                            LOGGER.warning(
+                                "Conditional cache invalid for %s; refetching without conditional headers.",
+                                url,
+                                extra={
+                                    "reason": "conditional-cache-invalid",
+                                    "url": url,
+                                    "work_id": artifact.work_id,
+                                },
+                            )
+                            logged_conditional_downgrade = True
+                        attempt_conditional = False
+                        cond_helper = ConditionalRequestHelper()
+                        continue
                     return DownloadOutcome(
                         classification=Classification.CACHED,
                         path=cached.path,
@@ -940,6 +1107,7 @@ def download_candidate(
                         etag=cached.etag,
                         last_modified=cached.last_modified,
                         extracted_text_path=None,
+                        retry_after=retry_after_hint,
                     )
 
                 if response.status_code != 200:
@@ -949,13 +1117,14 @@ def download_candidate(
                         http_status=response.status_code,
                         content_type=response.headers.get("Content-Type") or content_type_hint,
                         elapsed_ms=elapsed_ms,
-                        reason=ReasonCode.HTTP_STATUS,
-                        reason_detail=f"status-{response.status_code}",
+                        reason=None,
+                        reason_detail=None,
                         sha256=None,
                         content_length=None,
                         etag=None,
                         last_modified=None,
                         extracted_text_path=None,
+                        retry_after=retry_after_hint,
                     )
 
                 modified_result: ModifiedResult = cond_helper.interpret_response(response)
@@ -1007,6 +1176,7 @@ def download_candidate(
                         etag=modified_result.etag,
                         last_modified=modified_result.last_modified,
                         extracted_text_path=None,
+                        retry_after=retry_after_hint,
                     )
                 sniff_buffer = bytearray()
                 detected: Classification = Classification.UNKNOWN
@@ -1110,6 +1280,7 @@ def download_candidate(
                                     etag=modified_result.etag,
                                     last_modified=modified_result.last_modified,
                                     extracted_text_path=None,
+                                    retry_after=retry_after_hint,
                                 )
 
                     if detected is Classification.UNKNOWN:
@@ -1121,6 +1292,7 @@ def download_candidate(
                             elapsed_ms=elapsed_ms,
                             reason=ReasonCode.UNKNOWN,
                             reason_detail="classifier-unknown",
+                            retry_after=retry_after_hint,
                         )
                 finally:
                     if handle is not None:
@@ -1144,6 +1316,7 @@ def download_candidate(
                     head_precheck_passed=head_precheck_passed,
                     min_pdf_bytes=min_pdf_bytes,
                     tail_check_bytes=tail_window_bytes,
+                    retry_after=retry_after_hint,
                 )
 
             sha256: Optional[str] = None
@@ -1203,6 +1376,7 @@ def download_candidate(
                 head_precheck_passed=head_precheck_passed,
                 min_pdf_bytes=min_pdf_bytes,
                 tail_check_bytes=tail_window_bytes,
+                retry_after=retry_after_hint,
             )
     except requests.RequestException as exc:
         elapsed_ms = (time.monotonic() - start) * 1000.0
@@ -1257,17 +1431,7 @@ def process_one_work(
     logger: AttemptSink,
     metrics: ResolverMetrics,
     *,
-    dry_run: bool,
-    list_only: bool,
-    extract_html_text: bool,
-    previous_lookup: Dict[str, Dict[str, Any]],
-    resume_completed: Set[str],
-    max_bytes: Optional[int],
-    sniff_bytes: int,
-    min_pdf_bytes: int,
-    tail_check_bytes: int,
-    robots_checker: Optional[RobotsCache] = None,
-    content_addressed: bool = False,
+    options: DownloadOptions,
 ) -> Dict[str, Any]:
     """Process a single OpenAlex work through the resolver pipeline.
 
@@ -1279,17 +1443,7 @@ def process_one_work(
         pipeline: Resolver pipeline orchestrating downstream resolvers.
         logger: Structured attempt logger capturing manifest records.
         metrics: Resolver metrics collector.
-        dry_run: When True, simulate downloads without writing files.
-        list_only: When True, record candidate URLs without fetching content.
-        extract_html_text: Whether to extract plaintext from HTML artefacts.
-        previous_lookup: Mapping of work_id/URL to prior manifest entries.
-        resume_completed: Set of work IDs already processed in resume mode.
-        max_bytes: Optional size limit per download in bytes.
-        sniff_bytes: Number of leading bytes to buffer for payload inference.
-        min_pdf_bytes: Minimum PDF size accepted when HEAD prechecks fail.
-        tail_check_bytes: Tail window size used to detect embedded HTML payloads.
-        robots_checker: Cache enforcing robots.txt policies when enabled.
-        content_addressed: Whether to store PDFs under content-addressed paths.
+        options: :class:`DownloadOptions` describing download behaviour for the work.
 
     Returns:
         Dictionary summarizing the outcome (saved/html_only/skipped flags).
@@ -1300,6 +1454,17 @@ def process_one_work(
         Exception: Bubbling from resolver pipeline internals when not handled.
     """
     artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
+    dry_run = options.dry_run
+    list_only = options.list_only
+    extract_html_text = options.extract_html_text
+    previous_lookup = options.previous_lookup
+    resume_completed = options.resume_completed
+    max_bytes = options.max_bytes
+    sniff_bytes = options.sniff_bytes
+    min_pdf_bytes = options.min_pdf_bytes
+    tail_check_bytes = options.tail_check_bytes
+    robots_checker = options.robots_checker
+    content_addressed = options.content_addressed
 
     result = {
         "work_id": artifact.work_id,
@@ -1462,6 +1627,11 @@ def process_one_work(
 
     reason_code = pipeline_result.reason
     reason_detail = pipeline_result.reason_detail
+    if isinstance(reason_code, str):
+        normalized = reason_code.replace("-", "_")
+        candidate = ReasonCode.from_wire(normalized)
+        if candidate is not ReasonCode.UNKNOWN or normalized == ReasonCode.UNKNOWN.value:
+            reason_code = candidate
     if pipeline_result.outcome and pipeline_result.outcome.reason and not reason_code:
         reason_code = pipeline_result.outcome.reason
     if pipeline_result.outcome and pipeline_result.outcome.reason_detail and not reason_detail:
@@ -1500,6 +1670,7 @@ def process_one_work(
             sha256=outcome.sha256,
             content_length=outcome.content_length,
             dry_run=dry_run,
+            retry_after=outcome.retry_after,
         )
     )
 
@@ -1601,6 +1772,13 @@ def main() -> None:
         metavar="KIND=VALUE",
         help="Stop after reaching a budget (e.g., requests=1000, bytes=5GB). Option may repeat.",
     )
+    parser.add_argument(
+        "--log-rotate",
+        type=_parse_size,
+        default=None,
+        metavar="SIZE",
+        help="Rotate JSONL logs after SIZE bytes (e.g., 250MB).",
+    )
 
     classifier_group = parser.add_argument_group("Classifier settings")
     classifier_group.add_argument(
@@ -1678,6 +1856,12 @@ def main() -> None:
         help="Maximum resolver threads per work item (default: 1).",
     )
     resolver_group.add_argument(
+        "--max-concurrent-per-host",
+        type=int,
+        default=None,
+        help="Maximum concurrent downloads per host (default: 3). Set to 0 to disable.",
+    )
+    resolver_group.add_argument(
         "--global-url-dedup",
         dest="global_url_dedup",
         action="store_true",
@@ -1698,6 +1882,18 @@ def main() -> None:
         metavar="DOMAIN=SECONDS",
         help=(
             "Enforce a minimum interval between requests to a domain. "
+            "Repeat the option to configure multiple domains."
+        ),
+    )
+    resolver_group.add_argument(
+        "--domain-bytes-budget",
+        dest="domain_bytes_budget",
+        type=_parse_domain_bytes_budget,
+        action="append",
+        default=[],
+        metavar="DOMAIN=SIZE",
+        help=(
+            "Cap total bytes downloaded per domain (e.g., example.org=500MB). "
             "Repeat the option to configure multiple domains."
         ),
     )
@@ -1766,6 +1962,8 @@ def main() -> None:
         parser.error("--workers must be >= 1")
     if args.concurrent_resolvers is not None and args.concurrent_resolvers < 1:
         parser.error("--concurrent-resolvers must be >= 1")
+    if args.max_concurrent_per_host is not None and args.max_concurrent_per_host < 0:
+        parser.error("--max-concurrent-per-host must be >= 0")
     if not args.topic and not args.topic_id:
         parser.error("Provide --topic or --topic-id.")
     if args.max_bytes is not None and args.max_bytes <= 0:
@@ -1888,7 +2086,12 @@ def main() -> None:
 
     with contextlib.ExitStack() as stack:
         sinks: List[AttemptSink] = []
-        jsonl_sink = stack.enter_context(JsonlSink(manifest_path))
+        if args.log_rotate:
+            jsonl_sink = stack.enter_context(
+                RotatingJsonlSink(manifest_path, max_bytes=args.log_rotate)
+            )
+        else:
+            jsonl_sink = stack.enter_context(JsonlSink(manifest_path))
         sinks.append(jsonl_sink)
         index_path = manifest_path.with_suffix(".index.json")
         index_sink = stack.enter_context(ManifestIndexSink(index_path))
@@ -1911,6 +2114,19 @@ def main() -> None:
             attempt_logger = MultiSink(sinks)
 
         resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
+        download_options = DownloadOptions(
+            dry_run=args.dry_run,
+            list_only=args.list_only,
+            extract_html_text=args.extract_html_text,
+            previous_lookup=resume_lookup,
+            resume_completed=resume_completed,
+            max_bytes=args.max_bytes,
+            sniff_bytes=args.sniff_bytes,
+            min_pdf_bytes=args.min_pdf_bytes,
+            tail_check_bytes=args.tail_check_bytes,
+            robots_checker=robots_checker,
+            content_addressed=args.content_addressed,
+        )
         metrics = ResolverMetrics()
         pipeline = ResolverPipeline(
             resolvers=resolver_instances,
@@ -1981,17 +2197,7 @@ def main() -> None:
                             pipeline,
                             attempt_logger,
                             metrics,
-                            dry_run=args.dry_run,
-                            list_only=args.list_only,
-                            extract_html_text=args.extract_html_text,
-                            previous_lookup=resume_lookup,
-                            resume_completed=resume_completed,
-                            max_bytes=args.max_bytes,
-                            sniff_bytes=args.sniff_bytes,
-                            min_pdf_bytes=args.min_pdf_bytes,
-                            tail_check_bytes=args.tail_check_bytes,
-                            robots_checker=robots_checker,
-                            content_addressed=args.content_addressed,
+                            options=download_options,
                         )
                         _record_result(result)
                         if not stop_due_to_budget and _should_stop():
@@ -2023,17 +2229,7 @@ def main() -> None:
                                     pipeline,
                                     attempt_logger,
                                     metrics,
-                                    dry_run=args.dry_run,
-                                    list_only=args.list_only,
-                                    extract_html_text=args.extract_html_text,
-                                    previous_lookup=resume_lookup,
-                                    resume_completed=resume_completed,
-                                    max_bytes=args.max_bytes,
-                                    sniff_bytes=args.sniff_bytes,
-                                    min_pdf_bytes=args.min_pdf_bytes,
-                                    tail_check_bytes=args.tail_check_bytes,
-                                    robots_checker=robots_checker,
-                                    content_addressed=args.content_addressed,
+                                    options=download_options,
                                 )
                             finally:
                                 if hasattr(session, "close"):
@@ -2080,14 +2276,8 @@ def main() -> None:
                     },
                 )
             summary = metrics.summary()
-            reason_totals: Dict[str, int] = defaultdict(int)
-            for items in summary.get("error_reasons", {}).values():
-                for entry in items:
-                    reason_totals[entry["reason"]] += entry["count"]
-            classification_totals: Dict[str, int] = defaultdict(int)
-            for counts in summary.get("status_counts", {}).values():
-                for status, count in counts.items():
-                    classification_totals[status] += count
+            reason_totals = summary.get("reason_totals", {})
+            classification_totals = summary.get("classification_totals", {})
             summary_record = {
                 "processed": processed,
                 "saved": saved,

@@ -96,7 +96,7 @@ limit:</p>
 <p>The example above allows up to three resolvers to run simultaneously while
 respecting Unpaywall and Crossref rate limits.</p>
 <p>At the CLI level the downloader exposes matching controls:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.cli<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--concurrent-resolvers<span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--head-precheck<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--accept<span class="w"> </span><span class="s2">&quot;application/pdf,text/html;q=0.9&quot;</span>
@@ -128,7 +128,7 @@ reason. Operators can enable the feature either in configuration files:</p>
 </pre></div>
 </div>
 <p>or ad-hoc via the CLI:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.cli<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--topic<span class="w"> </span><span class="s2">&quot;knowledge graphs&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--year-start<span class="w"> </span><span class="m">2020</span><span class="w"> </span>--year-end<span class="w"> </span><span class="m">2023</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--global-url-dedup
@@ -149,7 +149,7 @@ seconds per domain:</p>
 </div>
 <p>CLI runs can supply the same information with repeated
 <code class="docutils literal notranslate"><span class="pre">--domain-min-interval</span></code> flags. Domains are matched case-insensitively:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.cli<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--domain-min-interval<span class="w"> </span>example.org<span class="o">=</span><span class="m">0</span>.5<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--domain-min-interval<span class="w"> </span>publisher.edu<span class="o">=</span><span class="m">1</span>.5
 </pre></div>
@@ -177,7 +177,7 @@ for publishers that append trailers after the EOF marker.</p>
 <p>Long-running harvests benefit from isolated output folders and richer manifest
 artifacts. The downloader exposes a <code class="docutils literal notranslate"><span class="pre">--staging</span></code> flag that creates a timestamped
 run directory containing all artifacts for that invocation:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.cli<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--topic<span class="w"> </span><span class="s2">&quot;graph embeddings&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--year-start<span class="w"> </span><span class="m">2022</span><span class="w"> </span>--year-end<span class="w"> </span><span class="m">2024</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--out<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
@@ -202,7 +202,7 @@ python<span class="w"> </span>tools/manifest_to_csv.py<span class="w"> </span>ru
 and writes an attempts CSV mirror. Run <code class="docutils literal notranslate"><span class="pre">tools/manifest_to_csv.py</span></code> to produce a
 <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> file that captures the latest manifest record per work for
 rapid auditing:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.cli<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--topic<span class="w"> </span><span class="s2">&quot;graph embeddings&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--year-start<span class="w"> </span><span class="m">2022</span><span class="w"> </span>--year-end<span class="w"> </span><span class="m">2024</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--out<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>

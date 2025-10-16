@@ -1,0 +1,628 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: init &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: <strong>init</strong></li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.DocParsing.formats.__init__.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-init">
+<h1>1. Module: <strong>init</strong><a class="headerlink" href="#module-init" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.formats.__init__</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>DocParsing Formats</p>
+<p>This module defines Pydantic models, validation helpers, and Docling serializer
+providers used throughout the DocParsing pipeline. By gathering schema
+definitions alongside the Markdown-aware serializers, downstream stages can
+import one module for all data contract needs.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Strict schemas for chunk JSONL rows and embedding vector rows</p></li>
+<li><p>Optional dependency stubs for environments without Pydantic installed</p></li>
+<li><p>Convenience validators for schema versions and provenance metadata</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.DocParsing import formats</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>validated = formats.validate_chunk_row(raw_row)
+provider = formats.RichSerializerProvider()
+</pre></div>
+</div>
+<p>Dependencies:</p>
+<ul class="simple">
+<li><p>pydantic (optional): Offers model validation when available; graceful fallbacks
+raise informative errors otherwise.</p></li>
+<li><p>docling_core: Supplies serializer base classes consumed by DocsToKG.</p></li>
+</ul>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="missing-pydantic-message">
+<h3><code class="docutils literal notranslate"><span class="pre">_missing_pydantic_message()</span></code><a class="headerlink" href="#missing-pydantic-message" title="Link to this heading"></a></h3>
+<p>Return a consistent optional dependency warning message.</p>
+</section>
+<section id="validate-chunk-row-row">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_chunk_row(row)</span></code><a class="headerlink" href="#validate-chunk-row-row" title="Link to this heading"></a></h3>
+<p>Validate and parse a chunk JSONL row.</p>
+<p>Args:
+row: Raw dictionary from JSONL.</p>
+<p>Returns:
+Validated :class:<code class="docutils literal notranslate"><span class="pre">ChunkRow</span></code> instance.</p>
+<p>Raises:
+ValueError: If the row fails schema validation.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>chunk = validate_chunk_row({
+…     “doc_id”: “doc”,
+…     “source_path”: “path”,
+…     “chunk_id”: 0,
+…     “source_chunk_idxs”: [0],
+…     “num_tokens”: 10,
+…     “text”: “hello”,
+… })
+chunk.schema_version
+‘docparse/1.1.0’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="validate-vector-row-row">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_vector_row(row)</span></code><a class="headerlink" href="#validate-vector-row-row" title="Link to this heading"></a></h3>
+<p>Validate and parse a vector JSONL row.</p>
+<p>Args:
+row: Raw dictionary from JSONL.</p>
+<p>Returns:
+Validated :class:<code class="docutils literal notranslate"><span class="pre">VectorRow</span></code> instance.</p>
+<p>Raises:
+ValueError: If the row fails schema validation.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>vector = validate_vector_row({
+…     “UUID”: “uuid”,
+…     “BM25”: {“terms”: [], “weights”: [], “avgdl”: 1.0, “N”: 1},
+…     “SPLADEv3”: {“tokens”: [], “weights”: []},
+…     “Qwen3-4B”: {“model_id”: “model”, “vector”: [0.1], “dimension”: 1},
+… })
+vector.UUID
+‘uuid’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="get-docling-version">
+<h3><code class="docutils literal notranslate"><span class="pre">get_docling_version()</span></code><a class="headerlink" href="#get-docling-version" title="Link to this heading"></a></h3>
+<p>Detect installed Docling package version.</p>
+<p>Args:
+None: This helper does not accept arguments.</p>
+<p>Returns:
+Version string or <code class="docutils literal notranslate"><span class="pre">&quot;unknown&quot;</span></code> when docling is not installed.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>isinstance(get_docling_version(), str)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+<p>Raises:
+None: This helper does not raise exceptions.</p>
+</section>
+<section id="validate-schema-version-version-compatible-versions">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_schema_version(version,</span> <span class="pre">compatible_versions)</span></code><a class="headerlink" href="#validate-schema-version-version-compatible-versions" title="Link to this heading"></a></h3>
+<p>Ensure a schema version string is recognised.</p>
+<p>Args:
+version: Schema version string from a JSONL row.
+compatible_versions: List of accepted version identifiers.
+kind: Human-readable label describing the schema type.
+source: Optional context describing where the version originated.</p>
+<p>Returns:
+The validated schema version.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>validate_schema_version(“docparse/1.1.0”, COMPATIBLE_CHUNK_VERSIONS)
+‘docparse/1.1.0’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+<p>Raises:
+ValueError: If the schema version is missing or unsupported.</p>
+</section>
+<section id="validate-parse-engine-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_parse_engine(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-parse-engine-cls-value" title="Link to this heading"></a></h3>
+<p>Ensure the parse engine identifier references a supported parser.</p>
+<p>Args:
+value: Candidate parse engine label provided in the payload.</p>
+<p>Returns:
+Validated parse engine string.</p>
+<p>Raises:
+ValueError: If the parser name is not recognised.</p>
+</section>
+<section id="validate-schema-version-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_schema_version(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-schema-version-cls-value" title="Link to this heading"></a></h3>
+<p>Ensure chunk rows declare a supported schema identifier.</p>
+<p>Args:
+value: Schema version string provided by the chunk payload.</p>
+<p>Returns:
+Validated schema version string.</p>
+<p>Raises:
+ValueError: If the supplied schema version is not compatible.</p>
+</section>
+<section id="validate-num-tokens-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_num_tokens(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-num-tokens-cls-value" title="Link to this heading"></a></h3>
+<p>Ensure token counts fall within the supported range.</p>
+<p>Args:
+value: Token count supplied in the payload.</p>
+<p>Returns:
+Validated token count.</p>
+<p>Raises:
+ValueError: If the token count is non-positive or exceeds bounds.</p>
+</section>
+<section id="validate-page-nos-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_page_nos(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-page-nos-cls-value" title="Link to this heading"></a></h3>
+<p>Normalise and validate page numbering information.</p>
+<p>Args:
+value: Sequence of 1-based page identifiers.</p>
+<p>Returns:
+Sorted, de-duplicated list of page numbers.</p>
+<p>Raises:
+ValueError: If any page number is non-positive.</p>
+</section>
+<section id="validate-parallel-lists-self">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_parallel_lists(self)</span></code><a class="headerlink" href="#validate-parallel-lists-self" title="Link to this heading"></a></h3>
+<p>Verify that token and weight collections are aligned.</p>
+<p>Args:
+self: Instance whose term and weight lists require validation.</p>
+<p>Returns:
+The validated BM25 vector instance.</p>
+<p>Raises:
+ValueError: If the vector and weight lengths differ.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_parallel_lists(self)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Ensure token and weight arrays stay in lock-step.</p>
+<p>Args:
+self: Instance whose tokens and weights are being validated.</p>
+<p>Returns:
+The validated SPLADE vector instance.</p>
+<p>Raises:
+ValueError: If list lengths differ or weights are negative.</p>
+</section>
+<section id="validate-vector-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_vector(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-vector-cls-value" title="Link to this heading"></a></h3>
+<p>Ensure the dense vector contains values to embed.</p>
+<p>Args:
+value: Collection of embedding coefficients.</p>
+<p>Returns:
+The validated embedding vector.</p>
+<p>Raises:
+ValueError: If the supplied vector is empty.</p>
+</section>
+<section id="validate-dimension-self">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_dimension(self)</span></code><a class="headerlink" href="#validate-dimension-self" title="Link to this heading"></a></h3>
+<p>Confirm the vector length matches the declared dimension.</p>
+<p>Args:
+self: Instance whose vector dimensionality is being verified.</p>
+<p>Returns:
+The validated dense vector instance.</p>
+<p>Raises:
+ValueError: If the actual length differs from <code class="docutils literal notranslate"><span class="pre">dimension</span></code>.</p>
+</section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_schema_version(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Ensure vector rows declare a supported schema identifier.</p>
+<p>Args:
+value: Schema version string provided by the vector payload.</p>
+<p>Returns:
+Validated schema version string.</p>
+<p>Raises:
+ValueError: If the supplied schema version is not compatible.</p>
+</section>
+<section id="serialize-self">
+<h3><code class="docutils literal notranslate"><span class="pre">serialize(self)</span></code><a class="headerlink" href="#serialize-self" title="Link to this heading"></a></h3>
+<p>Render picture metadata into Markdown-friendly text.</p>
+<p>Args:
+item: Picture element extracted from the Docling document.
+doc_serializer: Serializer orchestrating the chunking pipeline.
+doc: Source document providing contextual accessors.
+**_: Additional keyword arguments ignored by this implementation.</p>
+<p>Returns:
+Serialization result containing Markdown-ready text and spans.</p>
+</section>
+<section id="build-picture-serializer-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_build_picture_serializer(self)</span></code><a class="headerlink" href="#build-picture-serializer-self" title="Link to this heading"></a></h3>
+<p>Construct the picture serializer enriched with annotations.</p>
+</section>
+<section id="build-table-serializer-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_build_table_serializer(self)</span></code><a class="headerlink" href="#build-table-serializer-self" title="Link to this heading"></a></h3>
+<p>Construct the Markdown table serializer.</p>
+</section>
+<section id="get-serializer-self-doc">
+<h3><code class="docutils literal notranslate"><span class="pre">get_serializer(self,</span> <span class="pre">doc)</span></code><a class="headerlink" href="#get-serializer-self-doc" title="Link to this heading"></a></h3>
+<p>Return a chunking serializer configured for <code class="docutils literal notranslate"><span class="pre">doc</span></code>.</p>
+<p>Args:
+doc: Docling document whose metadata informs serializer selection.</p>
+<p>Returns:
+ChunkingDocSerializer: Serializer capable of producing DocTags with
+caption and annotation metadata.</p>
+</section>
+<section id="field">
+<h3><code class="docutils literal notranslate"><span class="pre">Field()</span></code><a class="headerlink" href="#field" title="Link to this heading"></a></h3>
+<p>Return default values in place of real Pydantic field descriptors.</p>
+<p>Args:
+*args: Positional arguments supplied to mimic :func:<code class="docutils literal notranslate"><span class="pre">pydantic.Field</span></code>.
+**kwargs: Keyword arguments mirroring :func:<code class="docutils literal notranslate"><span class="pre">pydantic.Field</span></code> parameters.</p>
+<p>Returns:
+The provided default value or <code class="docutils literal notranslate"><span class="pre">None</span></code> when unspecified.</p>
+</section>
+<section id="field-validator">
+<h3><code class="docutils literal notranslate"><span class="pre">field_validator()</span></code><a class="headerlink" href="#field-validator" title="Link to this heading"></a></h3>
+<p>Provide a decorator shim compatible with Pydantic field validators.</p>
+<p>Args:
+*_args: Positional decorator arguments (ignored in stub mode).
+**_kwargs: Keyword decorator arguments (ignored in stub mode).</p>
+<p>Returns:
+Callable[[Callable[…, Any]], Callable[…, Any]]: Decorator passthrough.</p>
+</section>
+<section id="model-validator">
+<h3><code class="docutils literal notranslate"><span class="pre">model_validator()</span></code><a class="headerlink" href="#model-validator" title="Link to this heading"></a></h3>
+<p>Provide a decorator shim compatible with model-level validators.</p>
+<p>Args:
+*_args: Positional decorator arguments (ignored in stub mode).
+**_kwargs: Keyword decorator arguments (ignored in stub mode).</p>
+<p>Returns:
+Callable[[Callable[…, Any]], Callable[…, Any]]: Decorator passthrough.</p>
+</section>
+<section id="configdict">
+<h3><code class="docutils literal notranslate"><span class="pre">ConfigDict()</span></code><a class="headerlink" href="#configdict" title="Link to this heading"></a></h3>
+<p>Return a dictionary mimicking Pydantic’s <code class="docutils literal notranslate"><span class="pre">ConfigDict</span></code> helper.</p>
+<p>Args:
+**kwargs: Configuration keyword arguments.</p>
+<p>Returns:
+Dictionary containing the supplied configuration data.</p>
+</section>
+<section id="maybe-add-conf-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_maybe_add_conf(value)</span></code><a class="headerlink" href="#maybe-add-conf-value" title="Link to this heading"></a></h3>
+<p>Collect numeric confidence scores when they can be coerced to float.</p>
+</section>
+<section id="model-dump-self">
+<h3><code class="docutils literal notranslate"><span class="pre">model_dump(self)</span></code><a class="headerlink" href="#model-dump-self" title="Link to this heading"></a></h3>
+<p>Mirror :meth:<code class="docutils literal notranslate"><span class="pre">pydantic.BaseModel.model_dump</span></code> error semantics.</p>
+<p>Args:
+*args: Positional arguments passed through from callers.
+**kwargs: Keyword arguments passed through from callers.</p>
+<p>Returns:
+Never returns; the method always raises to signal missing dependency.</p>
+<p>Raises:
+RuntimeError: Always raised to indicate Pydantic is unavailable.</p>
+</section>
+<section id="decorator-func">
+<h3><code class="docutils literal notranslate"><span class="pre">decorator(func)</span></code><a class="headerlink" href="#decorator-func" title="Link to this heading"></a></h3>
+<p>Return the wrapped function unchanged when validation is stubbed.</p>
+<p>Args:
+func: Function being decorated.</p>
+<p>Returns:
+The original function without modification.</p>
+</section>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">decorator(func)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>Return the wrapped function unchanged when validation is stubbed.</p>
+<p>Args:
+func: Function being decorated.</p>
+<p>Returns:
+The original function without modification.</p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="provenancemetadata">
+<h3><code class="docutils literal notranslate"><span class="pre">ProvenanceMetadata</span></code><a class="headerlink" href="#provenancemetadata" title="Link to this heading"></a></h3>
+<p>Stores provenance metadata extracted during chunk parsing.</p>
+<p>Attributes:
+parse_engine: Parser identifier such as <code class="docutils literal notranslate"><span class="pre">&quot;docling-html&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;docling-vlm&quot;</span></code>.
+docling_version: Installed Docling package version string.
+has_image_captions: Flag indicating whether caption text accompanies the chunk.
+has_image_classification: Flag indicating whether image classification labels exist.
+num_images: Count of images referenced by the chunk.
+image_confidence: Optional confidence score associated with image annotations.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>ProvenanceMetadata(parse_engine=”docling-html”, docling_version=”1.2.3”)
+ProvenanceMetadata(parse_engine=’docling-html’, docling_version=’1.2.3’, has_image_captions=False, has_image_classification=False, num_images=0)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="chunkrow">
+<h3><code class="docutils literal notranslate"><span class="pre">ChunkRow</span></code><a class="headerlink" href="#chunkrow" title="Link to this heading"></a></h3>
+<p>Schema for chunk JSONL rows describing processed document segments.</p>
+<p>Attributes:
+doc_id: Document identifier shared across chunk rows.
+source_path: Path to the originating DocTags file.
+chunk_id: Sequential chunk index within the document.
+source_chunk_idxs: Original chunk indices prior to coalescence.
+num_tokens: Token count for the chunk’s text body.
+text: Extracted text for the chunk.
+doc_items_refs: References to downstream document item metadata.
+page_nos: List of 1-based page numbers touched by the chunk.
+schema_version: Version identifier for the chunk schema.
+provenance: Optional provenance metadata describing parsing context.
+uuid: Optional stable identifier for the chunk.
+has_image_captions: Optional duplicate of provenance flag for convenience.
+has_image_classification: Optional duplicate of provenance flag for convenience.
+num_images: Optional duplicate of provenance image count for convenience.
+image_confidence: Optional duplicate of provenance image confidence for convenience.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>chunk = ChunkRow(
+…     doc_id=”doc-123”,
+…     source_path=”/tmp/doc-123.doctags.json”,
+…     chunk_id=0,
+…     source_chunk_idxs=[0],
+…     num_tokens=42,
+…     text=”Sample chunk text.”,
+… )
+chunk.doc_id
+‘doc-123’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="bm25vector">
+<h3><code class="docutils literal notranslate"><span class="pre">BM25Vector</span></code><a class="headerlink" href="#bm25vector" title="Link to this heading"></a></h3>
+<p>Encapsulates BM25 sparse vector statistics for a chunk.</p>
+<p>Attributes:
+terms: Token vocabulary used in the sparse representation.
+weights: BM25 weight assigned to each token.
+k1: Tunable BM25 parameter controlling term frequency saturation.
+b: Tunable BM25 parameter controlling length normalisation.
+avgdl: Average document length across the source corpus.
+N: Total document count in the source corpus.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>BM25Vector(terms=[“doc”], weights=[1.2], avgdl=100.0, N=10)
+BM25Vector(terms=[‘doc’], weights=[1.2], k1=1.5, b=0.75, avgdl=100.0, N=10)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="spladevector">
+<h3><code class="docutils literal notranslate"><span class="pre">SPLADEVector</span></code><a class="headerlink" href="#spladevector" title="Link to this heading"></a></h3>
+<p>Represents a SPLADE-v3 sparse activation vector.</p>
+<p>Attributes:
+model_id: Identifier of the SPLADE model that produced the vector.
+tokens: Token vocabulary included in the activation map.
+weights: Normalised activation weight for each token.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>SPLADEVector(tokens=[“term”], weights=[0.5])
+SPLADEVector(model_id=’naver/splade-v3’, tokens=[‘term’], weights=[0.5])</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="densevector">
+<h3><code class="docutils literal notranslate"><span class="pre">DenseVector</span></code><a class="headerlink" href="#densevector" title="Link to this heading"></a></h3>
+<p>Stores dense embedding output from a neural encoder.</p>
+<p>Attributes:
+model_id: Identifier for the originating embedding model.
+vector: Vector of numeric embedding values.
+dimension: Expected dimensionality for the vector, if known.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>DenseVector(model_id=”encoder”, vector=[0.1, 0.2], dimension=2)
+DenseVector(model_id=’encoder’, vector=[0.1, 0.2], dimension=2)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="vectorrow">
+<h3><code class="docutils literal notranslate"><span class="pre">VectorRow</span></code><a class="headerlink" href="#vectorrow" title="Link to this heading"></a></h3>
+<p>Schema for vector JSONL rows storing embedding artefacts.</p>
+<p>Attributes:
+UUID: Stable chunk identifier referenced by vector data.
+BM25: Sparse BM25 representation for lexical retrieval.
+SPLADEv3: SPLADE sparse activations supporting neural lexical search.
+Qwen3_4B: Dense embedding produced by the Qwen3-4B encoder.
+model_metadata: Additional metadata describing embedding provenance.
+schema_version: Version identifier for the vector schema.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>vector = VectorRow(
+…     UUID=”chunk-1”,
+…     BM25={“terms”: [“doc”], “weights”: [1.0], “avgdl”: 10.0, “N”: 2},
+…     SPLADEv3={“tokens”: [“doc”], “weights”: [0.1]},
+…     Qwen3_4B={“model_id”: “encoder”, “vector”: [0.1], “dimension”: 1},
+… )
+vector.BM25.avgdl
+10.0</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="captionplusannotationpictureserializer">
+<h3><code class="docutils literal notranslate"><span class="pre">CaptionPlusAnnotationPictureSerializer</span></code><a class="headerlink" href="#captionplusannotationpictureserializer" title="Link to this heading"></a></h3>
+<p>Serialize picture items with captions and rich annotation metadata.</p>
+<p>Attributes:
+image_placeholder: Fallback marker inserted when an image lacks metadata.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>serializer = CaptionPlusAnnotationPictureSerializer()
+isinstance(serializer, CaptionPlusAnnotationPictureSerializer)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="richserializerprovider">
+<h3><code class="docutils literal notranslate"><span class="pre">RichSerializerProvider</span></code><a class="headerlink" href="#richserializerprovider" title="Link to this heading"></a></h3>
+<p>Provide a serializer that augments tables and pictures with Markdown.</p>
+<p>Attributes:
+markdown_params: Default Markdown parameters passed to serializers.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>provider = RichSerializerProvider()
+isinstance(provider.get_serializer(DoclingDocument()), ChunkingDocSerializer)  # doctest: +SKIP
+True  # doctest: +SKIP</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="pydanticstubbase">
+<h3><code class="docutils literal notranslate"><span class="pre">_PydanticStubBase</span></code><a class="headerlink" href="#pydanticstubbase" title="Link to this heading"></a></h3>
+<p>Minimal stub that raises an actionable error on instantiation.</p>
+<p>Attributes:
+None: This stub purposely exposes no attributes to mimic the BaseModel API.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>_PydanticStubBase()  # doctest: +IGNORE_EXCEPTION_DETAIL
+Traceback (most recent call last):
+…
+RuntimeError: Optional dependency ‘pydantic’ is required …</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="basemodel">
+<h3><code class="docutils literal notranslate"><span class="pre">BaseModel</span></code><a class="headerlink" href="#basemodel" title="Link to this heading"></a></h3>
+<p>Fallback BaseModel that raises informative errors when used.</p>
+<p>Attributes:
+model_config: Dictionary mirroring the <code class="docutils literal notranslate"><span class="pre">model_config</span></code> contract from Pydantic.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>BaseModel()  # doctest: +IGNORE_EXCEPTION_DETAIL
+Traceback (most recent call last):
+…
+RuntimeError: Optional dependency ‘pydantic’ is required …</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

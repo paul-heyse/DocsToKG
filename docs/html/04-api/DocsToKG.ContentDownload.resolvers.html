@@ -78,7 +78,7 @@
              
   <section id="module-resolvers">
 <h1>1. Module: resolvers<a class="headerlink" href="#module-resolvers" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers</span></code>.</p>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Content Download Resolver Orchestration</p>
@@ -98,10 +98,10 @@ behaviour.</p>
 <ul class="simple">
 <li><p>requests: Outbound HTTP traffic and session management.</p></li>
 <li><p>BeautifulSoup: Optional HTML parsing for resolver implementations.</p></li>
-<li><p>DocsToKG.ContentDownload.network: Shared retry and session helpers.</p></li>
+<li><p>DocsToKG.ContentDownload.networking: Shared retry and session helpers.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload import resolvers</p>
+from DocsToKG.ContentDownload import pipeline</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>config = resolvers.ResolverConfig()
 active_resolvers = resolvers.default_resolvers()
 pipeline = resolvers.ResolverPipeline(

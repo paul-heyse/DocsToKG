@@ -361,6 +361,10 @@ class DefaultsConfig(BaseModel):
     logging: LoggingConfiguration = Field(default_factory=LoggingConfiguration)
     continue_on_error: bool = Field(default=True)
     resolver_fallback_enabled: bool = Field(default=True)
+    enable_cas_mirror: bool = Field(
+        default=False,
+        description="Mirror original artefacts under by-<hash>/<digest> for de-duplication",
+    )
 
     @field_validator("prefer_source")
     @classmethod
@@ -908,6 +912,9 @@ class StorageBackend(Protocol):
     def set_latest_version(self, ontology_id: str, version: str) -> None:
         """Record the latest processed version for *ontology_id*."""
 
+    def mirror_cas_artifact(self, algorithm: str, digest: str, source: Path) -> Path:
+        """Mirror ``source`` into a content-addressable cache and return its path."""
+
 
 def _safe_identifiers(ontology_id: str, version: str) -> Tuple[str, str]:
     """Return identifiers sanitised for filesystem usage."""
@@ -1017,6 +1024,20 @@ class LocalStorageBackend:
             if marker.exists():
                 marker.unlink()
 
+    def mirror_cas_artifact(self, algorithm: str, digest: str, source: Path) -> Path:
+        """Copy ``source`` into the content-addressable cache."""
+
+        algo = algorithm.lower() or "sha256"
+        cas_root = self.root / f"by-{algo}"
+        prefix = digest[:2] if len(digest) >= 2 else digest or "00"
+        cas_dir = cas_root / prefix
+        cas_dir.mkdir(parents=True, exist_ok=True)
+        suffix = source.suffix if source.suffix else ""
+        cas_path = cas_dir / f"{digest}{suffix}"
+        if not cas_path.exists():
+            shutil.copy2(source, cas_path)
+        return cas_path
+
 
 class FsspecStorageBackend(LocalStorageBackend):
     """Hybrid backend that mirrors artefacts to an fsspec location."""
@@ -1097,6 +1118,19 @@ class FsspecStorageBackend(LocalStorageBackend):
                 reclaimed += int(size)
         self.fs.rm(str(remote_dir), recursive=True)
         return reclaimed
+
+    def mirror_cas_artifact(self, algorithm: str, digest: str, source: Path) -> Path:
+        """Mirror CAS artefact locally and to remote storage."""
+
+        local_path = super().mirror_cas_artifact(algorithm, digest, source)
+        algo = algorithm.lower() or "sha256"
+        prefix = digest[:2] if len(digest) >= 2 else digest or "00"
+        remote_dir = self.base_path / f"by-{algo}" / prefix
+        remote_filename = PurePosixPath(f"{digest}{source.suffix if source.suffix else ''}")
+        remote_path = remote_dir / remote_filename
+        self.fs.makedirs(str(remote_path.parent), exist_ok=True)
+        self.fs.put_file(str(local_path), str(remote_path))
+        return local_path
 
 
 def get_storage_backend() -> StorageBackend:

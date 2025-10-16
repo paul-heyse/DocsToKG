@@ -270,16 +270,25 @@ def test_cli_plan_json_output(monkeypatch, stub_logger, capsys):
     monkeypatch.setattr(
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
+    captured_lock: Dict[str, str] = {}
+
+    def _fake_lockfile(plans, path):
+        captured_lock["path"] = str(path)
+        return path
+
+    monkeypatch.setattr(cli, "_write_lockfile", _fake_lockfile)
 
     exit_code = cli.cli_main(["plan", "hp", "--json"])
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload[0]["id"] == "hp"
     assert payload[0]["url"].startswith("https://example.org/")
+    assert captured_lock["path"].endswith("ontologies.lock.json")
 
 
 def test_cli_plan_since_passed_to_plan_all(monkeypatch, stub_logger):
     captured_since = None
+    captured_lock: Dict[str, str] = {}
 
     def _plan_all(specs, *, config=None, since=None):
         nonlocal captured_since
@@ -291,6 +300,11 @@ def test_cli_plan_since_passed_to_plan_all(monkeypatch, stub_logger):
     monkeypatch.setattr(
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
+    monkeypatch.setattr(
+        cli,
+        "_write_lockfile",
+        lambda plans, path: captured_lock.setdefault("path", str(path)) or path,
+    )
 
     exit_code = cli.cli_main(["plan", "hp", "--since", "2024-05-01"])
     assert exit_code == 0
@@ -301,6 +315,11 @@ def test_cli_plan_since_passed_to_plan_all(monkeypatch, stub_logger):
 
 def test_cli_plan_concurrency_override(monkeypatch, stub_logger):
     captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_write_lockfile",
+        lambda plans, path: path,
+    )
 
     def _plan_all(specs, *, config=None, since=None):
         captured["plans"] = config.defaults.http.concurrent_plans
@@ -340,6 +359,12 @@ def test_cli_plan_diff_outputs(monkeypatch, stub_logger, tmp_path, capsys):
     monkeypatch.setattr(
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
+    captured_lock: Dict[str, str] = {}
+    monkeypatch.setattr(
+        cli,
+        "_write_lockfile",
+        lambda plans, path: captured_lock.setdefault("path", str(path)) or path,
+    )
 
     exit_code = cli.cli_main(["plan-diff", "hp", "--baseline", str(baseline_path), "--json"])
     assert exit_code == 0
@@ -347,12 +372,59 @@ def test_cli_plan_diff_outputs(monkeypatch, stub_logger, tmp_path, capsys):
     assert payload["added"] == []
     assert payload["removed"] == []
     assert payload["modified"][0]["id"] == "hp"
+    assert payload["lockfile"].endswith("ontologies.lock.json")
 
     capsys.readouterr()  # clear
     exit_code = cli.cli_main(["plan-diff", "hp", "--baseline", str(baseline_path)])
     assert exit_code == 0
     output = capsys.readouterr().out
     assert "+ hp" in output or "~ hp" in output
+
+
+def test_resolve_specs_from_args_lockfile(monkeypatch, tmp_path):
+    lock_path = tmp_path / "ontologies.lock.json"
+    expected_digest = "a" * 64
+    lock_payload = {
+        "schema_version": "1.0",
+        "entries": [
+            {
+                "id": "hp",
+                "resolver": "obo",
+                "url": "https://example.org/hp.owl",
+                "version": "2024-03-01",
+                "license": "CC-BY",
+                "media_type": "application/rdf+xml",
+                "service": "obo",
+                "headers": {"Accept": "application/rdf+xml"},
+                "expected_checksum": {"algorithm": "sha256", "value": expected_digest},
+                "target_formats": ["owl"],
+            }
+        ],
+    }
+    lock_path.write_text(json.dumps(lock_payload))
+
+    args = SimpleNamespace(
+        target_formats=None,
+        spec=None,
+        ids=[],
+        lock=lock_path,
+        log_level="INFO",
+        resolver=None,
+        concurrent_plans=None,
+        concurrent_downloads=None,
+        allowed_hosts=None,
+    )
+    config, specs = cli._resolve_specs_from_args(args, _default_config())
+    assert config.defaults.resolver_fallback_enabled is False
+    assert config.defaults.prefer_source == ["direct"]
+    assert len(specs) == 1
+    spec = specs[0]
+    assert spec.resolver == "direct"
+    assert spec.extras["url"] == "https://example.org/hp.owl"
+    checksum = spec.extras["checksum"]
+    assert checksum["algorithm"] == "sha256"
+    assert checksum["value"] == expected_digest
+    assert spec.target_formats == ("owl",)
 
 
 def test_cli_plan_diff_updates_baseline(monkeypatch, stub_logger, tmp_path, capsys):
@@ -364,6 +436,7 @@ def test_cli_plan_diff_updates_baseline(monkeypatch, stub_logger, tmp_path, caps
     monkeypatch.setattr(
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
+    monkeypatch.setattr(cli, "_write_lockfile", lambda plans, path: path)
 
     exit_code = cli.cli_main(
         ["plan-diff", "hp", "--baseline", str(baseline_path), "--update-baseline"]
@@ -699,6 +772,7 @@ def test_handle_plan_diff_uses_manifest_baseline(monkeypatch):
         concurrent_downloads=None,
         allowed_hosts=None,
     )
+    monkeypatch.setattr(cli, "_write_lockfile", lambda plans, path: path)
 
     spec = FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
     monkeypatch.setattr(
@@ -728,3 +802,4 @@ def test_handle_plan_diff_uses_manifest_baseline(monkeypatch):
     diff = cli._handle_plan_diff(args, _default_config())
     assert diff["baseline"] == "manifests"
     assert diff["modified"], "expected modified entries when manifests differ"
+    assert diff["lockfile"].endswith("ontologies.lock.json")

@@ -944,7 +944,7 @@ import DocsToKG.ContentDownload.pipeline as pipeline_module
 import DocsToKG.ContentDownload.pipeline as providers_module
 import DocsToKG.ContentDownload.pipeline as resolvers
 from DocsToKG.ContentDownload import cli as downloader
-from DocsToKG.ContentDownload.core import classify_payload
+from DocsToKG.ContentDownload.core import Classification, classify_payload
 from DocsToKG.ContentDownload.cli import (
     WorkArtifact,
     ensure_dir,
@@ -1548,21 +1548,23 @@ def build_artifact(tmp_path: Path) -> WorkArtifact:
 def test_classify_payload_detects_pdf_and_html():
     html = b"<html><body>Hello</body></html>"
     pdf = b"%PDF-sample"
-    assert classify_payload(html, "text/html", "https://example.com") == "html"
-    assert classify_payload(pdf, "application/pdf", "https://example.com/doc.pdf") == "pdf"
+    assert classify_payload(html, "text/html", "https://example.com") is Classification.HTML
+    assert classify_payload(pdf, "application/pdf", "https://example.com/doc.pdf") is Classification.PDF
 
 
 def test_classify_payload_octet_stream_requires_sniff() -> None:
     data = b"binary data with no signature"
     assert (
-        classify_payload(data, "application/octet-stream", "https://example.com/file.pdf") is None
+        classify_payload(data, "application/octet-stream", "https://example.com/file.pdf")
+        is Classification.UNKNOWN
     )
 
 
 def test_classify_payload_octet_stream_with_pdf_signature() -> None:
     data = b"%PDF-1.7"
     assert (
-        classify_payload(data, "application/octet-stream", "https://example.com/file.pdf") == "pdf"
+        classify_payload(data, "application/octet-stream", "https://example.com/file.pdf")
+        is Classification.PDF
     )
 
 
@@ -1794,6 +1796,9 @@ def test_cli_integration_happy_path(monkeypatch, tmp_path):
 
         def mount(self, *args, **kwargs):
             return None
+
+        def get(self, url, **kwargs):  # pragma: no cover - simple stub
+            return SimpleNamespace(json=lambda: {})
 
     monkeypatch.setattr(module, "build_query", lambda args: None)
     monkeypatch.setattr(module, "iterate_openalex", fake_iterate)
@@ -2315,8 +2320,8 @@ def test_pipeline_downloads_with_context_argument(tmp_path):
     pipeline = ResolverPipeline([resolver], config, download_with_context, logger, metrics)
     pipeline.run(DummySession({}), artifact, context={"dry_run": False})
 
-    assert context_received["value"] == {"dry_run": False}
-    assert logger.records[-1].status == "http_error"
+    assert context_received["value"]["dry_run"] is False
+    assert logger.records[-1].status is Classification.HTTP_ERROR
 
 
 # --- test_resolver_pipeline.py ---
@@ -3060,7 +3065,7 @@ def test_crossref_resolver_skip_without_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
     session = Mock()
-    session.get = Mock()
+    session.request = Mock()
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
@@ -3159,7 +3164,7 @@ def test_crossref_resolver_session_errors(monkeypatch, tmp_path, exception, reas
         mock_request,
     )
     session = Mock()
-    session.get = Mock()
+    session.request = Mock()
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
@@ -3181,7 +3186,7 @@ def test_crossref_resolver_session_http_error(monkeypatch, tmp_path) -> None:
         mock_request,
     )
     session = Mock()
-    session.get = Mock()
+    session.request = Mock()
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
@@ -3203,7 +3208,7 @@ def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
         mock_request,
     )
     session = Mock()
-    session.get = Mock()
+    session.request = Mock()
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
@@ -3849,8 +3854,8 @@ def test_unpaywall_resolver_session_errors(monkeypatch, tmp_path, exception, rea
     config = ResolverConfig()
     config.unpaywall_email = "user@example.org"
 
-    session = Mock()
-    session.get = Mock(side_effect=exception)
+    session = Mock(spec=requests.Session)
+    session.request = Mock(side_effect=exception)
 
     result = next(UnpaywallResolver().iter_urls(session, config, artifact))
 
@@ -3865,8 +3870,8 @@ def test_unpaywall_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
     config.unpaywall_email = "user@example.org"
 
-    session = Mock()
-    session.get = Mock(return_value=_StubResponse(json_data=ValueError("bad"), text="oops"))
+    session = Mock(spec=requests.Session)
+    session.request = Mock(return_value=_StubResponse(json_data=ValueError("bad"), text="oops"))
 
     result = next(UnpaywallResolver().iter_urls(session, config, artifact))
 
@@ -3901,12 +3906,12 @@ def test_unpaywall_resolver_session_success(monkeypatch, tmp_path) -> None:
         "oa_locations": [],
     }
 
-    session = Mock()
-    session.get = Mock(return_value=_StubResponse(json_data=payload))
+    session = Mock(spec=requests.Session)
+    session.request = Mock(return_value=_StubResponse(json_data=payload))
 
     results = list(UnpaywallResolver().iter_urls(session, config, artifact))
 
-    session.get.assert_called_once()
+    session.request.assert_called_once()
     assert results[0].url == "https://unpaywall.example/best.pdf"
 
 

@@ -81,17 +81,17 @@
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.errors</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Shared exception hierarchy for the ontology downloader.</p>
+<p>Shared exception hierarchy for DocsToKG ontology downloads.</p>
 </section>
 <section id="classes">
 <h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="userconfigerror">
-<h3><code class="docutils literal notranslate"><span class="pre">UserConfigError</span></code><a class="headerlink" href="#userconfigerror" title="Link to this heading"></a></h3>
-<p>Raised when CLI arguments or YAML configuration inputs are invalid.</p>
-</section>
 <section id="ontologydownloaderror">
 <h3><code class="docutils literal notranslate"><span class="pre">OntologyDownloadError</span></code><a class="headerlink" href="#ontologydownloaderror" title="Link to this heading"></a></h3>
-<p>Base class for runtime failures during ontology planning or download.</p>
+<p>Base exception for ontology planning, download, or validation failures.</p>
+</section>
+<section id="configurationerror">
+<h3><code class="docutils literal notranslate"><span class="pre">ConfigurationError</span></code><a class="headerlink" href="#configurationerror" title="Link to this heading"></a></h3>
+<p>Raised when configuration inputs or manifests are invalid.</p>
 </section>
 <section id="resolvererror">
 <h3><code class="docutils literal notranslate"><span class="pre">ResolverError</span></code><a class="headerlink" href="#resolvererror" title="Link to this heading"></a></h3>
@@ -99,7 +99,7 @@
 </section>
 <section id="validationerror">
 <h3><code class="docutils literal notranslate"><span class="pre">ValidationError</span></code><a class="headerlink" href="#validationerror" title="Link to this heading"></a></h3>
-<p>Raised when ontology validation encounters unrecoverable problems.</p>
+<p>Raised when ontology validation encounters unrecoverable issues.</p>
 </section>
 <section id="policyerror">
 <h3><code class="docutils literal notranslate"><span class="pre">PolicyError</span></code><a class="headerlink" href="#policyerror" title="Link to this heading"></a></h3>
@@ -108,6 +108,10 @@
 <section id="downloadfailure">
 <h3><code class="docutils literal notranslate"><span class="pre">DownloadFailure</span></code><a class="headerlink" href="#downloadfailure" title="Link to this heading"></a></h3>
 <p>Raised when an HTTP download attempt fails.</p>
+</section>
+<section id="userconfigerror">
+<h3><code class="docutils literal notranslate"><span class="pre">UserConfigError</span></code><a class="headerlink" href="#userconfigerror" title="Link to this heading"></a></h3>
+<p>Raised when CLI arguments or YAML configuration inputs are invalid.</p>
 </section>
 </section>
 </section>

@@ -78,7 +78,7 @@
              
   <section id="module-pmc">
 <h1>1. Module: pmc<a class="headerlink" href="#module-pmc" title="Link to this heading"></a></h1>
-<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">PmcResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers</span></code>.</p>
+<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">PmcResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.providers</span></code>.</p>
 <p>PubMed Central Resolver Provider</p>
 <p>This module integrates with PubMed Central (PMC) utilities to resolve open
 access PDFs using DOI, PMID, or PMCID identifiers.</p>
@@ -89,7 +89,7 @@ access PDFs using DOI, PMID, or PMCID identifiers.</p>
 <li><p>Deduplication of PMCIDs and robust error reporting via resolver events.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.providers import PmcResolver</p>
+from DocsToKG.ContentDownload.pipeline.providers import PmcResolver</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = PmcResolver()
 results = list(resolver.iter_urls(session, config, artifact))
 </pre></div>

@@ -78,7 +78,7 @@
              
   <section id="module-pipeline">
 <h1>1. Module: pipeline<a class="headerlink" href="#module-pipeline" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.pipeline</span></code>.</p>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.pipeline</span></code>.</p>
 <p>Resolver Pipeline Execution Engine</p>
 <p>This module coordinates the execution of resolver providers that discover
 downloadable artefacts for scholarly works. It encapsulates sequential and
@@ -91,7 +91,7 @@ for logging and metrics collection.</p>
 <li><p>State tracking for seen URLs, global deduplication, HTML fallbacks, and failure metrics.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline</p>
+from DocsToKG.ContentDownload.pipeline.pipeline import ResolverPipeline</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline = ResolverPipeline(
     resolvers=[],
     config=ResolverConfig(),
@@ -105,7 +105,7 @@ from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline</p>
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="request-with-retries-session-method-url">
 <h3><code class="docutils literal notranslate"><span class="pre">request_with_retries(session,</span> <span class="pre">method,</span> <span class="pre">url)</span></code><a class="headerlink" href="#request-with-retries-session-method-url" title="Link to this heading"></a></h3>
-<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network.request_with_retries</span></code>.</p>
+<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.networking.request_with_retries</span></code>.</p>
 <p>The indirection keeps this module compatible with unit tests that monkeypatch
 either the pipeline-level attribute or the underlying HTTP helper while also
 deferring imports to avoid circular dependencies during runtime initialisation.</p>

@@ -1,0 +1,875 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: core &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: core</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.DocParsing.core.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-core">
+<h1>1. Module: core<a class="headerlink" href="#module-core" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.core</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>DocParsing Core Utilities</p>
+<p>This module centralises lightweight helpers that power multiple DocParsing
+pipeline stages. Utilities span path discovery, atomic file writes, JSONL
+parsing, manifest bookkeeping, CLI glue, and structured logging so that
+chunking, embedding, and conversion scripts can share consistent behaviour
+without an additional dependency layer.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Resolve DocsToKG data directories with environment and ancestor discovery</p></li>
+<li><p>Stream JSONL inputs and outputs with validation and error tolerance</p></li>
+<li><p>Emit structured JSON logs suited for machine ingestion and dashboards</p></li>
+<li><p>Manage pipeline manifests, batching helpers, and advisory file locks</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.DocParsing import core</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>chunks_dir = core.data_chunks()
+with core.atomic_write(chunks_dir / &quot;example.jsonl&quot;) as handle:
+    handle.write(&quot;{}&quot;)
+</pre></div>
+</div>
+<p>Dependencies:</p>
+<ul class="simple">
+<li><p>json, pathlib, logging: Provide standard I/O and diagnostics primitives.</p></li>
+<li><p>typing: Supply type hints consumed by Sphinx documentation tooling and API generators.</p></li>
+<li><p>pydantic (optional): Some helpers integrate with schema validation routines.</p></li>
+</ul>
+<p>All helpers are safe to import in multiprocessing contexts and avoid heavy
+third-party dependencies beyond the standard library.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="expand-path-path">
+<h3><code class="docutils literal notranslate"><span class="pre">expand_path(path)</span></code><a class="headerlink" href="#expand-path-path" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">path</span></code> expanded to an absolute :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
+<p>Args:
+path: Candidate filesystem path supplied as string or :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
+<p>Returns:
+Absolute path with user home components resolved.</p>
+</section>
+<section id="resolve-hf-home">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_hf_home()</span></code><a class="headerlink" href="#resolve-hf-home" title="Link to this heading"></a></h3>
+<p>Resolve the HuggingFace cache directory respecting <code class="docutils literal notranslate"><span class="pre">HF_HOME</span></code>.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Path: Absolute path to the HuggingFace cache directory.</p>
+</section>
+<section id="resolve-model-root-hf-home">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_model_root(hf_home)</span></code><a class="headerlink" href="#resolve-model-root-hf-home" title="Link to this heading"></a></h3>
+<p>Resolve the DocsToKG model root honoring <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_MODEL_ROOT</span></code>.</p>
+<p>Args:
+hf_home: Optional HuggingFace cache directory to treat as the base path.</p>
+<p>Returns:
+Path: Absolute directory where DocsToKG models should be stored.</p>
+</section>
+<section id="looks-like-filesystem-path-candidate">
+<h3><code class="docutils literal notranslate"><span class="pre">looks_like_filesystem_path(candidate)</span></code><a class="headerlink" href="#looks-like-filesystem-path-candidate" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">candidate</span></code> appears to reference a local path.</p>
+</section>
+<section id="resolve-pdf-model-path-cli-value">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_pdf_model_path(cli_value)</span></code><a class="headerlink" href="#resolve-pdf-model-path-cli-value" title="Link to this heading"></a></h3>
+<p>Determine PDF model path using CLI and environment precedence.</p>
+</section>
+<section id="init-hf-env-hf-home-model-root">
+<h3><code class="docutils literal notranslate"><span class="pre">init_hf_env(hf_home,</span> <span class="pre">model_root)</span></code><a class="headerlink" href="#init-hf-env-hf-home-model-root" title="Link to this heading"></a></h3>
+<p>Initialise Hugging Face and transformer cache environment variables.</p>
+<p>Args:
+hf_home: Optional explicit HF cache directory.
+model_root: Optional DocsToKG model root override.</p>
+<p>Returns:
+Tuple of <code class="docutils literal notranslate"><span class="pre">(hf_home,</span> <span class="pre">model_root)</span></code> paths after normalisation.</p>
+</section>
+<section id="detect-data-root-start">
+<h3><code class="docutils literal notranslate"><span class="pre">detect_data_root(start)</span></code><a class="headerlink" href="#detect-data-root-start" title="Link to this heading"></a></h3>
+<p>Locate the DocsToKG Data directory via env var or ancestor scan.</p>
+<p>Checks the <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_DATA_ROOT</span></code> environment variable first. If not set,
+scans ancestor directories for a <code class="docutils literal notranslate"><span class="pre">Data</span></code> folder containing expected
+subdirectories (<code class="docutils literal notranslate"><span class="pre">PDFs</span></code>, <code class="docutils literal notranslate"><span class="pre">HTML</span></code>, <code class="docutils literal notranslate"><span class="pre">DocTagsFiles</span></code>, or
+<code class="docutils literal notranslate"><span class="pre">ChunkedDocTagFiles</span></code>).</p>
+<p>Args:
+start: Starting directory for the ancestor scan. Defaults to the
+current working directory when <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<p>Returns:
+Absolute path to the resolved <code class="docutils literal notranslate"><span class="pre">Data</span></code> directory. When
+<code class="docutils literal notranslate"><span class="pre">DOCSTOKG_DATA_ROOT</span></code> is set but the directory does not yet exist,
+it is created automatically.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>os.environ[“DOCSTOKG_DATA_ROOT”] = “/tmp/data”
+(Path(“/tmp/data”)).mkdir(parents=True, exist_ok=True)
+detect_data_root()
+PosixPath(‘/tmp/data’)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>os.environ.pop(“DOCSTOKG_DATA_ROOT”)
+detect_data_root(Path(“/workspace/DocsToKG/src”))
+PosixPath(‘/workspace/DocsToKG/Data’)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="ensure-dir-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_ensure_dir(path)</span></code><a class="headerlink" href="#ensure-dir-path" title="Link to this heading"></a></h3>
+<p>Create <code class="docutils literal notranslate"><span class="pre">path</span></code> if needed and return its absolute form.</p>
+<p>Args:
+path: Directory to create when missing.</p>
+<p>Returns:
+Absolute path to the created directory.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>_ensure_dir(Path(“./tmp_dir”))
+PosixPath(‘tmp_dir’)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="data-doctags-root">
+<h3><code class="docutils literal notranslate"><span class="pre">data_doctags(root)</span></code><a class="headerlink" href="#data-doctags-root" title="Link to this heading"></a></h3>
+<p>Return the DocTags directory and ensure it exists.</p>
+<p>Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.</p>
+<p>Returns:
+Absolute path to the DocTags directory.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>isinstance(data_doctags(), Path)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="data-chunks-root">
+<h3><code class="docutils literal notranslate"><span class="pre">data_chunks(root)</span></code><a class="headerlink" href="#data-chunks-root" title="Link to this heading"></a></h3>
+<p>Return the chunk directory and ensure it exists.</p>
+<p>Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.</p>
+<p>Returns:
+Absolute path to the chunk directory.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>isinstance(data_chunks(), Path)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="data-vectors-root">
+<h3><code class="docutils literal notranslate"><span class="pre">data_vectors(root)</span></code><a class="headerlink" href="#data-vectors-root" title="Link to this heading"></a></h3>
+<p>Return the vectors directory and ensure it exists.</p>
+<p>Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.</p>
+<p>Returns:
+Absolute path to the vectors directory.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>isinstance(data_vectors(), Path)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="data-manifests-root">
+<h3><code class="docutils literal notranslate"><span class="pre">data_manifests(root)</span></code><a class="headerlink" href="#data-manifests-root" title="Link to this heading"></a></h3>
+<p>Return the manifests directory and ensure it exists.</p>
+<p>Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.</p>
+<p>Returns:
+Absolute path to the manifests directory.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>isinstance(data_manifests(), Path)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="prepare-data-root-data-root-arg-default-root">
+<h3><code class="docutils literal notranslate"><span class="pre">prepare_data_root(data_root_arg,</span> <span class="pre">default_root)</span></code><a class="headerlink" href="#prepare-data-root-data-root-arg-default-root" title="Link to this heading"></a></h3>
+<p>Resolve and prepare the DocsToKG data root for a pipeline invocation.</p>
+</section>
+<section id="resolve-pipeline-path">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_pipeline_path()</span></code><a class="headerlink" href="#resolve-pipeline-path" title="Link to this heading"></a></h3>
+<p>Derive a pipeline directory path respecting data-root overrides.</p>
+</section>
+<section id="data-pdfs-root">
+<h3><code class="docutils literal notranslate"><span class="pre">data_pdfs(root)</span></code><a class="headerlink" href="#data-pdfs-root" title="Link to this heading"></a></h3>
+<p>Return the PDFs directory and ensure it exists.</p>
+<p>Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.</p>
+<p>Returns:
+Absolute path to the PDFs directory.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>isinstance(data_pdfs(), Path)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="data-html-root">
+<h3><code class="docutils literal notranslate"><span class="pre">data_html(root)</span></code><a class="headerlink" href="#data-html-root" title="Link to this heading"></a></h3>
+<p>Return the HTML directory and ensure it exists.</p>
+<p>Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.</p>
+<p>Returns:
+Absolute path to the HTML directory.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>isinstance(data_html(), Path)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="derive-doc-id-and-vectors-path-chunk-file-chunks-root-vectors-root">
+<h3><code class="docutils literal notranslate"><span class="pre">derive_doc_id_and_vectors_path(chunk_file,</span> <span class="pre">chunks_root,</span> <span class="pre">vectors_root)</span></code><a class="headerlink" href="#derive-doc-id-and-vectors-path-chunk-file-chunks-root-vectors-root" title="Link to this heading"></a></h3>
+<p>Return manifest doc identifier and vectors output path for <code class="docutils literal notranslate"><span class="pre">chunk_file</span></code>.</p>
+<p>Args:
+chunk_file: Path to the chunk JSONL artefact.
+chunks_root: Root directory containing chunk artefacts.
+vectors_root: Root directory where vector outputs should be written.</p>
+<p>Returns:
+Tuple containing the manifest <code class="docutils literal notranslate"><span class="pre">doc_id</span></code> and the full vectors output path.</p>
+</section>
+<section id="compute-relative-doc-id-path-root">
+<h3><code class="docutils literal notranslate"><span class="pre">compute_relative_doc_id(path,</span> <span class="pre">root)</span></code><a class="headerlink" href="#compute-relative-doc-id-path-root" title="Link to this heading"></a></h3>
+<p>Return POSIX-style relative identifier for a document path.</p>
+<p>Args:
+path: Absolute path to the document on disk.
+root: Root directory that anchors relative identifiers.</p>
+<p>Returns:
+str: POSIX-style relative path suitable for manifest IDs.</p>
+</section>
+<section id="compute-stable-shard-identifier-shard-count">
+<h3><code class="docutils literal notranslate"><span class="pre">compute_stable_shard(identifier,</span> <span class="pre">shard_count)</span></code><a class="headerlink" href="#compute-stable-shard-identifier-shard-count" title="Link to this heading"></a></h3>
+<p>Deterministically map <code class="docutils literal notranslate"><span class="pre">identifier</span></code> to a shard in <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">shard_count)</span></code>.</p>
+</section>
+<section id="should-skip-output-output-path-manifest-entry-input-hash-resume-force">
+<h3><code class="docutils literal notranslate"><span class="pre">should_skip_output(output_path,</span> <span class="pre">manifest_entry,</span> <span class="pre">input_hash,</span> <span class="pre">resume,</span> <span class="pre">force)</span></code><a class="headerlink" href="#should-skip-output-output-path-manifest-entry-input-hash-resume-force" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resume/skip conditions indicate work can be skipped.</p>
+</section>
+<section id="stringify-path-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_stringify_path(value)</span></code><a class="headerlink" href="#stringify-path-value" title="Link to this heading"></a></h3>
+<p>Return a string representation for path-like values used in manifests.</p>
+</section>
+<section id="manifest-log-skip">
+<h3><code class="docutils literal notranslate"><span class="pre">manifest_log_skip()</span></code><a class="headerlink" href="#manifest-log-skip" title="Link to this heading"></a></h3>
+<p>Record a manifest entry indicating the pipeline skipped work.</p>
+<p>Args:
+stage: Logical pipeline phase originating the log entry.
+doc_id: Identifier of the document being processed.
+input_path: Source artefact that would have been processed.
+input_hash: Content hash associated with <code class="docutils literal notranslate"><span class="pre">input_path</span></code>.
+output_path: Destination artefact that remained unchanged.
+duration_s: Elapsed seconds for the short-circuited step.
+schema_version: Manifest schema version for downstream readers.
+hash_alg: Hash algorithm used to compute <code class="docutils literal notranslate"><span class="pre">input_hash</span></code>.
+**extra: Additional metadata to merge into the manifest row.</p>
+</section>
+<section id="manifest-log-success">
+<h3><code class="docutils literal notranslate"><span class="pre">manifest_log_success()</span></code><a class="headerlink" href="#manifest-log-success" title="Link to this heading"></a></h3>
+<p>Record a manifest entry marking successful pipeline output.</p>
+<p>Args:
+stage: Logical pipeline phase originating the log entry.
+doc_id: Identifier of the document being processed.
+duration_s: Elapsed seconds for the successful step.
+schema_version: Manifest schema version for downstream readers.
+input_path: Source artefact that produced <code class="docutils literal notranslate"><span class="pre">output_path</span></code>.
+input_hash: Content hash associated with <code class="docutils literal notranslate"><span class="pre">input_path</span></code>.
+output_path: Destination artefact written by the pipeline.
+hash_alg: Hash algorithm used to compute <code class="docutils literal notranslate"><span class="pre">input_hash</span></code>.
+**extra: Additional metadata to merge into the manifest row.</p>
+</section>
+<section id="manifest-log-failure">
+<h3><code class="docutils literal notranslate"><span class="pre">manifest_log_failure()</span></code><a class="headerlink" href="#manifest-log-failure" title="Link to this heading"></a></h3>
+<p>Record a manifest entry describing a failed pipeline attempt.</p>
+<p>Args:
+stage: Logical pipeline phase originating the log entry.
+doc_id: Identifier of the document being processed.
+duration_s: Elapsed seconds before the failure occurred.
+schema_version: Manifest schema version for downstream readers.
+input_path: Source artefact that triggered the failure.
+input_hash: Content hash associated with <code class="docutils literal notranslate"><span class="pre">input_path</span></code>.
+output_path: Destination artefact that may be incomplete.
+error: Human-readable description of the failure condition.
+hash_alg: Hash algorithm used to compute <code class="docutils literal notranslate"><span class="pre">input_hash</span></code>.
+**extra: Additional metadata to merge into the manifest row.</p>
+</section>
+<section id="get-logger-name-level">
+<h3><code class="docutils literal notranslate"><span class="pre">get_logger(name,</span> <span class="pre">level)</span></code><a class="headerlink" href="#get-logger-name-level" title="Link to this heading"></a></h3>
+<p>Get a structured JSON logger configured for console output.</p>
+<p>Args:
+name: Name of the logger to create or retrieve.
+level: Logging level (case insensitive). Defaults to <code class="docutils literal notranslate"><span class="pre">&quot;INFO&quot;</span></code>.</p>
+<p>Returns:
+Configured :class:<code class="docutils literal notranslate"><span class="pre">logging.Logger</span></code> instance.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>logger = get_logger(“docparse”)
+logger.level == logging.INFO
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="log-event-logger-level-message">
+<h3><code class="docutils literal notranslate"><span class="pre">log_event(logger,</span> <span class="pre">level,</span> <span class="pre">message)</span></code><a class="headerlink" href="#log-event-logger-level-message" title="Link to this heading"></a></h3>
+<p>Emit a structured log record using the <code class="docutils literal notranslate"><span class="pre">extra_fields</span></code> convention.</p>
+</section>
+<section id="find-free-port-start-span">
+<h3><code class="docutils literal notranslate"><span class="pre">find_free_port(start,</span> <span class="pre">span)</span></code><a class="headerlink" href="#find-free-port-start-span" title="Link to this heading"></a></h3>
+<p>Locate an available TCP port on localhost within a range.</p>
+<p>Args:
+start: Starting port for the scan. Defaults to <code class="docutils literal notranslate"><span class="pre">8000</span></code>.
+span: Number of sequential ports to check. Defaults to <code class="docutils literal notranslate"><span class="pre">32</span></code>.</p>
+<p>Returns:
+The first free port number. Falls back to an OS-assigned ephemeral port
+if the requested range is exhausted.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>port = find_free_port(8500, 1)
+isinstance(port, int)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="atomic-write-path">
+<h3><code class="docutils literal notranslate"><span class="pre">atomic_write(path)</span></code><a class="headerlink" href="#atomic-write-path" title="Link to this heading"></a></h3>
+<p>Write to a temporary file and atomically replace the destination.</p>
+<p>Args:
+path: Target path to write.</p>
+<p>Returns:
+Context manager yielding a writable text handle.</p>
+<p>Yields:
+Writable text file handle. Caller must write data before context exit.</p>
+<p>Raises:
+Any exception raised while writing or replacing the file is propagated
+after the temporary file is cleaned up.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>target = Path(“/tmp/example.txt”)
+with atomic_write(target) as handle:
+…     _ = handle.write(“hello”)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="iter-doctags-directory">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_doctags(directory)</span></code><a class="headerlink" href="#iter-doctags-directory" title="Link to this heading"></a></h3>
+<p>Yield DocTags files within <code class="docutils literal notranslate"><span class="pre">directory</span></code> and subdirectories.</p>
+<p>Args:
+directory: Root directory to scan for DocTags artifacts.</p>
+<p>Returns:
+Iterator over absolute <code class="docutils literal notranslate"><span class="pre">Path</span></code> objects.</p>
+<p>Yields:
+Absolute paths to discovered <code class="docutils literal notranslate"><span class="pre">.doctags</span></code> or <code class="docutils literal notranslate"><span class="pre">.doctag</span></code> files sorted
+lexicographically.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>next(iter_doctags(Path(“.”)), None) is None
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="iter-chunks-directory">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_chunks(directory)</span></code><a class="headerlink" href="#iter-chunks-directory" title="Link to this heading"></a></h3>
+<p>Yield chunk JSONL files from <code class="docutils literal notranslate"><span class="pre">directory</span></code> and all descendants.</p>
+<p>Args:
+directory: Directory containing chunk artifacts.</p>
+<p>Returns:
+Iterator over absolute <code class="docutils literal notranslate"><span class="pre">Path</span></code> objects.</p>
+<p>Yields:
+Absolute paths to files matching <code class="docutils literal notranslate"><span class="pre">*.chunks.jsonl</span></code> sorted
+lexicographically.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>next(iter_chunks(Path(“.”)), None) is None
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="jsonl-load-path-skip-invalid-max-errors">
+<h3><code class="docutils literal notranslate"><span class="pre">jsonl_load(path,</span> <span class="pre">skip_invalid,</span> <span class="pre">max_errors)</span></code><a class="headerlink" href="#jsonl-load-path-skip-invalid-max-errors" title="Link to this heading"></a></h3>
+<p>Load a JSONL file into memory with optional error tolerance.</p>
+<p>Args:
+path: JSON Lines file to read.
+skip_invalid: When <code class="docutils literal notranslate"><span class="pre">True</span></code>, invalid lines are skipped up to
+<code class="docutils literal notranslate"><span class="pre">max_errors</span></code> occurrences instead of raising immediately.
+max_errors: Maximum number of errors to tolerate when
+<code class="docutils literal notranslate"><span class="pre">skip_invalid</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p>Returns:
+List of parsed dictionaries.</p>
+<p>Raises:
+ValueError: If a malformed JSON line is encountered and <code class="docutils literal notranslate"><span class="pre">skip_invalid</span></code>
+is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>tmp = Path(“/tmp/example.jsonl”)
+_ = tmp.write_text(‘{“a”: 1}
+‘, encoding=”utf-8”)
+jsonl_load(tmp)
+[{‘a’: 1}]</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="jsonl-save-path-rows-validate">
+<h3><code class="docutils literal notranslate"><span class="pre">jsonl_save(path,</span> <span class="pre">rows,</span> <span class="pre">validate)</span></code><a class="headerlink" href="#jsonl-save-path-rows-validate" title="Link to this heading"></a></h3>
+<p>Persist dictionaries to a JSONL file atomically.</p>
+<p>Args:
+path: Destination JSONL file.
+rows: Sequence of dictionaries to serialize.
+validate: Optional callback invoked per row before serialization.</p>
+<p>Returns:
+None: This function performs I/O side effects only.</p>
+<p>Raises:
+ValueError: If <code class="docutils literal notranslate"><span class="pre">validate</span></code> raises an exception for any row.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>tmp = Path(“/tmp/example.jsonl”)
+jsonl_save(tmp, [{“a”: 1}])
+tmp.read_text(encoding=”utf-8”).strip()
+‘{“a”: 1}’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="jsonl-append-iter-target-rows">
+<h3><code class="docutils literal notranslate"><span class="pre">jsonl_append_iter(target,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#jsonl-append-iter-target-rows" title="Link to this heading"></a></h3>
+<p>Append JSON-serialisable rows to a JSONL file.</p>
+<p>Args:
+target: Destination path or writable handle for the JSONL file.
+rows: Iterable of JSON-serialisable mappings.
+atomic: When True, writes occur via :func:<code class="docutils literal notranslate"><span class="pre">atomic_write</span></code> (ignored when
+<code class="docutils literal notranslate"><span class="pre">target</span></code> is already an open handle).</p>
+<p>Returns:
+The number of rows written.</p>
+</section>
+<section id="manifest-filename-stage">
+<h3><code class="docutils literal notranslate"><span class="pre">_manifest_filename(stage)</span></code><a class="headerlink" href="#manifest-filename-stage" title="Link to this heading"></a></h3>
+<p>Return manifest filename for a given stage.</p>
+</section>
+<section id="manifest-append-stage-doc-id-status">
+<h3><code class="docutils literal notranslate"><span class="pre">manifest_append(stage,</span> <span class="pre">doc_id,</span> <span class="pre">status)</span></code><a class="headerlink" href="#manifest-append-stage-doc-id-status" title="Link to this heading"></a></h3>
+<p>Append a structured entry to the processing manifest.</p>
+<p>Args:
+stage: Pipeline stage emitting the entry.
+doc_id: Identifier of the document being processed.
+status: Outcome status (<code class="docutils literal notranslate"><span class="pre">success</span></code>, <code class="docutils literal notranslate"><span class="pre">failure</span></code>, or <code class="docutils literal notranslate"><span class="pre">skip</span></code>).
+duration_s: Optional duration in seconds.
+warnings: Optional list of warning labels.
+error: Optional error description.
+schema_version: Schema identifier recorded for the output.
+**metadata: Arbitrary additional fields to include.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<p>Raises:
+ValueError: If <code class="docutils literal notranslate"><span class="pre">status</span></code> is not recognised.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>manifest_append(“chunk”, “doc1”, “success”)
+(data_manifests() / “docparse.chunk.manifest.jsonl”).exists()
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="resolve-hash-algorithm-default">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_hash_algorithm(default)</span></code><a class="headerlink" href="#resolve-hash-algorithm-default" title="Link to this heading"></a></h3>
+<p>Return the active content hash algorithm, honoring env overrides.</p>
+<p>Args:
+default: Fallback algorithm name to use when no override is present.</p>
+<p>Returns:
+Hash algorithm identifier resolved from <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_HASH_ALG</span></code> or <code class="docutils literal notranslate"><span class="pre">default</span></code>.</p>
+</section>
+<section id="compute-content-hash-path-algorithm">
+<h3><code class="docutils literal notranslate"><span class="pre">compute_content_hash(path,</span> <span class="pre">algorithm)</span></code><a class="headerlink" href="#compute-content-hash-path-algorithm" title="Link to this heading"></a></h3>
+<p>Compute a content hash for <code class="docutils literal notranslate"><span class="pre">path</span></code> using the requested algorithm.</p>
+<p>Args:
+path: File whose contents should be hashed.
+algorithm: Hash algorithm name supported by :mod:<code class="docutils literal notranslate"><span class="pre">hashlib</span></code>.</p>
+<p>Notes:
+The <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_HASH_ALG</span></code> environment variable overrides <code class="docutils literal notranslate"><span class="pre">algorithm</span></code>
+when set, enabling fleet-wide hash changes without code edits.</p>
+<p>Returns:
+Hex digest string.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>tmp = Path(“/tmp/hash.txt”)
+_ = tmp.write_text(“hello”, encoding=”utf-8”)
+compute_content_hash(tmp) == hashlib.sha1(b”hello”).hexdigest()
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="load-manifest-index-stage-root">
+<h3><code class="docutils literal notranslate"><span class="pre">load_manifest_index(stage,</span> <span class="pre">root)</span></code><a class="headerlink" href="#load-manifest-index-stage-root" title="Link to this heading"></a></h3>
+<p>Load the latest manifest entries for a specific pipeline stage.</p>
+<p>Args:
+stage: Manifest stage identifier to filter entries by.
+root: Optional DocsToKG data root used to resolve the manifest path.</p>
+<p>Returns:
+Mapping of <code class="docutils literal notranslate"><span class="pre">doc_id</span></code> to the most recent manifest entry for that stage.</p>
+<p>Raises:
+None: Manifest rows that fail to parse are skipped to keep processing resilient.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>index = load_manifest_index(“embeddings”)  # doctest: +SKIP
+isinstance(index, dict)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="acquire-lock-path-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">acquire_lock(path,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#acquire-lock-path-timeout" title="Link to this heading"></a></h3>
+<p>Acquire an advisory lock using <code class="docutils literal notranslate"><span class="pre">.lock</span></code> sentinel files.</p>
+<p>Args:
+path: Target file path whose lock should be acquired.
+timeout: Maximum time in seconds to wait for the lock.</p>
+<p>Returns:
+Iterator yielding a boolean when the lock is acquired.</p>
+<p>Yields:
+<code class="docutils literal notranslate"><span class="pre">True</span></code> once the lock is acquired.</p>
+<p>Raises:
+TimeoutError: If the lock cannot be obtained within <code class="docutils literal notranslate"><span class="pre">timeout</span></code>.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>target = Path(“/tmp/lock.txt”)
+with acquire_lock(target):
+…     pass</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="pid-is-running-pid">
+<h3><code class="docutils literal notranslate"><span class="pre">_pid_is_running(pid)</span></code><a class="headerlink" href="#pid-is-running-pid" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> if a process with the given PID appears to be alive.</p>
+</section>
+<section id="set-spawn-or-warn-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">set_spawn_or_warn(logger)</span></code><a class="headerlink" href="#set-spawn-or-warn-logger" title="Link to this heading"></a></h3>
+<p>Ensure the multiprocessing start method is set to <code class="docutils literal notranslate"><span class="pre">spawn</span></code>.</p>
+<p>Args:
+logger: Optional logger that receives diagnostic messages about the start
+method configuration.</p>
+<p>Returns:
+None: The function mutates global multiprocessing state and logs warnings.</p>
+<p>This helper attempts to set the start method to <code class="docutils literal notranslate"><span class="pre">spawn</span></code> with <code class="docutils literal notranslate"><span class="pre">force=True</span></code>.
+If a <code class="docutils literal notranslate"><span class="pre">RuntimeError</span></code> occurs (meaning the method was already set), it checks
+if the current method is <code class="docutils literal notranslate"><span class="pre">spawn</span></code>. If not, it emits a warning about the
+potential CUDA safety risk, logging the current method so callers understand
+the degraded safety state.</p>
+</section>
+<section id="run-chunk-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_chunk(argv)</span></code><a class="headerlink" href="#run-chunk-argv" title="Link to this heading"></a></h3>
+<p>Execute the Docling chunker subcommand.</p>
+</section>
+<section id="run-embed-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_embed(argv)</span></code><a class="headerlink" href="#run-embed-argv" title="Link to this heading"></a></h3>
+<p>Execute the embedding pipeline subcommand.</p>
+</section>
+<section id="build-doctags-parser-prog">
+<h3><code class="docutils literal notranslate"><span class="pre">_build_doctags_parser(prog)</span></code><a class="headerlink" href="#build-doctags-parser-prog" title="Link to this heading"></a></h3>
+<p>Create an :mod:<code class="docutils literal notranslate"><span class="pre">argparse</span></code> parser configured for DocTags conversion.</p>
+</section>
+<section id="scan-pdf-html-input-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_scan_pdf_html(input_dir)</span></code><a class="headerlink" href="#scan-pdf-html-input-dir" title="Link to this heading"></a></h3>
+<p>Return booleans indicating whether PDFs or HTML files exist beneath <code class="docutils literal notranslate"><span class="pre">input_dir</span></code>.</p>
+</section>
+<section id="directory-contains-suffixes-directory-suffixes">
+<h3><code class="docutils literal notranslate"><span class="pre">_directory_contains_suffixes(directory,</span> <span class="pre">suffixes)</span></code><a class="headerlink" href="#directory-contains-suffixes-directory-suffixes" title="Link to this heading"></a></h3>
+<p>Return True when <code class="docutils literal notranslate"><span class="pre">directory</span></code> contains at least one file ending with <code class="docutils literal notranslate"><span class="pre">suffixes</span></code>.</p>
+</section>
+<section id="detect-mode-input-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_detect_mode(input_dir)</span></code><a class="headerlink" href="#detect-mode-input-dir" title="Link to this heading"></a></h3>
+<p>Infer conversion mode based on the contents of <code class="docutils literal notranslate"><span class="pre">input_dir</span></code>.</p>
+</section>
+<section id="merge-args-parser-overrides">
+<h3><code class="docutils literal notranslate"><span class="pre">_merge_args(parser,</span> <span class="pre">overrides)</span></code><a class="headerlink" href="#merge-args-parser-overrides" title="Link to this heading"></a></h3>
+<p>Merge override values into the default parser namespace.</p>
+</section>
+<section id="run-doctags-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_doctags(argv)</span></code><a class="headerlink" href="#run-doctags-argv" title="Link to this heading"></a></h3>
+<p>Execute the DocTags conversion subcommand.</p>
+</section>
+<section id="preview-list-items-limit">
+<h3><code class="docutils literal notranslate"><span class="pre">_preview_list(items,</span> <span class="pre">limit)</span></code><a class="headerlink" href="#preview-list-items-limit" title="Link to this heading"></a></h3>
+<p>Return a truncated preview list with remainder hint.</p>
+</section>
+<section id="plan-doctags-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_plan_doctags(argv)</span></code><a class="headerlink" href="#plan-doctags-argv" title="Link to this heading"></a></h3>
+<p>Compute which DocTags inputs would be processed.</p>
+</section>
+<section id="plan-chunk-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_plan_chunk(argv)</span></code><a class="headerlink" href="#plan-chunk-argv" title="Link to this heading"></a></h3>
+<p>Compute which DocTags files the chunk stage would touch.</p>
+</section>
+<section id="plan-embed-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_plan_embed(argv)</span></code><a class="headerlink" href="#plan-embed-argv" title="Link to this heading"></a></h3>
+<p>Compute which chunk files the embed stage would process or validate.</p>
+</section>
+<section id="display-plan-plans">
+<h3><code class="docutils literal notranslate"><span class="pre">_display_plan(plans)</span></code><a class="headerlink" href="#display-plan-plans" title="Link to this heading"></a></h3>
+<p>Pretty-print plan summaries to stdout.</p>
+</section>
+<section id="run-all-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_all(argv)</span></code><a class="headerlink" href="#run-all-argv" title="Link to this heading"></a></h3>
+<p>Execute DocTags conversion, chunking, and embedding sequentially.</p>
+</section>
+<section id="main-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>
+<p>Dispatch to one of the DocParsing subcommands.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">run_all(argv)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Public wrapper for the <code class="docutils literal notranslate"><span class="pre">all</span></code> subcommand.</p>
+</section>
+<section id="chunk-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">chunk(argv)</span></code><a class="headerlink" href="#chunk-argv" title="Link to this heading"></a></h3>
+<p>Public wrapper for the <code class="docutils literal notranslate"><span class="pre">chunk</span></code> subcommand.</p>
+</section>
+<section id="embed-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">embed(argv)</span></code><a class="headerlink" href="#embed-argv" title="Link to this heading"></a></h3>
+<p>Public wrapper for the <code class="docutils literal notranslate"><span class="pre">embed</span></code> subcommand.</p>
+</section>
+<section id="doctags-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">doctags(argv)</span></code><a class="headerlink" href="#doctags-argv" title="Link to this heading"></a></h3>
+<p>Public wrapper for the <code class="docutils literal notranslate"><span class="pre">doctags</span></code> subcommand.</p>
+</section>
+<section id="iter-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__iter__(self)</span></code><a class="headerlink" href="#iter-self" title="Link to this heading"></a></h3>
+<p>Yield successive lists containing up to <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> elements.</p>
+<p>Args:
+None: Iteration consumes the iterable supplied to :class:<code class="docutils literal notranslate"><span class="pre">Batcher</span></code>.</p>
+<p>Returns:
+Iterator over lists where each list contains up to <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> items.</p>
+</section>
+<section id="format-self-record">
+<h3><code class="docutils literal notranslate"><span class="pre">format(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#format-self-record" title="Link to this heading"></a></h3>
+<p>Render a log record as a JSON string.</p>
+<p>Args:
+record: Logging record produced by the DocParsing pipeline.</p>
+<p>Returns:
+JSON-formatted string containing canonical log fields and optional extras.</p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="bm25stats">
+<h3><code class="docutils literal notranslate"><span class="pre">BM25Stats</span></code><a class="headerlink" href="#bm25stats" title="Link to this heading"></a></h3>
+<p>Corpus-level statistics required for BM25 weighting.</p>
+</section>
+<section id="spladecfg">
+<h3><code class="docutils literal notranslate"><span class="pre">SpladeCfg</span></code><a class="headerlink" href="#spladecfg" title="Link to this heading"></a></h3>
+<p>Runtime configuration for SPLADE sparse encoding.</p>
+</section>
+<section id="qwencfg">
+<h3><code class="docutils literal notranslate"><span class="pre">QwenCfg</span></code><a class="headerlink" href="#qwencfg" title="Link to this heading"></a></h3>
+<p>Configuration for generating dense embeddings with Qwen via vLLM.</p>
+</section>
+<section id="chunkworkerconfig">
+<h3><code class="docutils literal notranslate"><span class="pre">ChunkWorkerConfig</span></code><a class="headerlink" href="#chunkworkerconfig" title="Link to this heading"></a></h3>
+<p>Lightweight configuration shared across chunker worker processes.</p>
+</section>
+<section id="chunktask">
+<h3><code class="docutils literal notranslate"><span class="pre">ChunkTask</span></code><a class="headerlink" href="#chunktask" title="Link to this heading"></a></h3>
+<p>Work unit describing a single DocTags file to chunk.</p>
+</section>
+<section id="chunkresult">
+<h3><code class="docutils literal notranslate"><span class="pre">ChunkResult</span></code><a class="headerlink" href="#chunkresult" title="Link to this heading"></a></h3>
+<p>Result envelope emitted by chunker workers.</p>
+</section>
+<section id="batcher">
+<h3><code class="docutils literal notranslate"><span class="pre">Batcher</span></code><a class="headerlink" href="#batcher" title="Link to this heading"></a></h3>
+<p>Yield fixed-size batches from an iterable.</p>
+<p>Args:
+iterable: Source iterable providing items to batch.
+batch_size: Maximum number of elements per yielded batch.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>list(Batcher([1, 2, 3, 4, 5], 2))
+[[1, 2], [3, 4], [5]]</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="command">
+<h3><code class="docutils literal notranslate"><span class="pre">_Command</span></code><a class="headerlink" href="#command" title="Link to this heading"></a></h3>
+<p>Callable wrapper storing handler metadata for subcommands.</p>
+</section>
+<section id="jsonformatter">
+<h3><code class="docutils literal notranslate"><span class="pre">JSONFormatter</span></code><a class="headerlink" href="#jsonformatter" title="Link to this heading"></a></h3>
+<p>Emit structured JSON log messages for DocParsing utilities.</p>
+<p>Attributes:
+default_time_format: Timestamp template applied to log records.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>formatter = JSONFormatter()
+hasattr(formatter, “format”)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

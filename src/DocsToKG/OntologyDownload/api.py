@@ -252,6 +252,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import hashlib as _hashlib
 import importlib.util
 import json
@@ -260,11 +261,12 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections import OrderedDict
 from datetime import datetime, timezone
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
 import requests
 import yaml
@@ -721,6 +723,8 @@ rich ASCII tables summarise resolver fallback chains and validator results.
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
 
 DEFAULT_PLAN_BASELINE = CACHE_DIR / "plans" / "baseline.json"
+DEFAULT_LOCKFILE_PATH = Path("ontologies.lock.json")
+LOCKFILE_SCHEMA_VERSION = "1.0"
 
 PLAN_DIFF_FIELDS = (
     "url",
@@ -889,6 +893,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--allowed-hosts",
         help="Comma-separated list of additional hosts permitted for this run",
     )
+    pull.add_argument(
+        "--lock",
+        type=Path,
+        help="Path to ontologies.lock.json to pin downloads to exact planned inputs",
+    )
 
     plan_cmd = subparsers.add_parser(
         "plan",
@@ -923,6 +932,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Comma-separated list of additional hosts permitted for this run",
     )
     plan_cmd.add_argument("--json", action="store_true", help="Emit plan details as JSON")
+    plan_cmd.add_argument(
+        "--lock-output",
+        type=Path,
+        default=DEFAULT_LOCKFILE_PATH,
+        help=f"Write lockfile (default: {DEFAULT_LOCKFILE_PATH})",
+    )
+    plan_cmd.add_argument(
+        "--no-lock",
+        action="store_true",
+        help="Skip writing the ontologies.lock.json file",
+    )
 
     plan_diff = subparsers.add_parser(
         "plan-diff",
@@ -973,6 +993,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Comma-separated list of additional hosts permitted for this run",
     )
     plan_diff.add_argument("--json", action="store_true", help="Emit plan diff as JSON")
+    plan_diff.add_argument(
+        "--lock-output",
+        type=Path,
+        default=DEFAULT_LOCKFILE_PATH,
+        help=f"Write lockfile (default: {DEFAULT_LOCKFILE_PATH})",
+    )
+    plan_diff.add_argument(
+        "--no-lock",
+        action="store_true",
+        help="Skip writing the ontologies.lock.json file",
+    )
 
     plugins_cmd = subparsers.add_parser(
         "plugins",
@@ -1081,6 +1112,7 @@ EXAMPLE_SOURCES_YAML = """# Example configuration for ontology downloader\ndefau
     level: "INFO"
     max_log_size_mb: 100
     retention_days: 30
+  enable_cas_mirror: false
 
 ontologies:
   - id: hp
@@ -1344,6 +1376,8 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
         "headers": plan.plan.headers,
         "candidates": candidates,
     }
+    if plan.spec.target_formats:
+        payload["target_formats"] = list(plan.spec.target_formats)
 
     metadata = getattr(plan, "metadata", {}) or {}
     last_modified = metadata.get("last_modified")
@@ -1356,7 +1390,158 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
         payload["content_length"] = int(size_hint)
     if metadata.get("etag"):
         payload["etag"] = metadata["etag"]
+    expected_checksum = metadata.get("expected_checksum")
+    if isinstance(expected_checksum, dict):
+        payload["expected_checksum"] = expected_checksum
     return payload
+
+
+def _write_json_atomic(path: Path, payload: object) -> Path:
+    """Atomically persist ``payload`` as JSON to ``path``."""
+
+    resolved = path.expanduser()
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=str(resolved.parent), delete=False
+    ) as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.flush()
+        try:
+            os.fsync(handle.fileno())
+        except (AttributeError, OSError):
+            pass
+        temp_name = handle.name
+    Path(temp_name).replace(resolved)
+    return resolved
+
+
+def _write_lockfile(plans: Sequence[PlannedFetch], path: Path) -> Path:
+    """Write lockfile capturing planned resolver outputs."""
+
+    payload = {
+        "schema_version": LOCKFILE_SCHEMA_VERSION,
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "entries": [_plan_to_dict(plan) for plan in plans],
+    }
+    written_path = _write_json_atomic(path, payload)
+    logging.getLogger("DocsToKG.OntologyDownload").info(
+        "lockfile written",
+        extra={
+            "stage": "plan",
+            "lock_path": str(written_path),
+            "entries": len(plans),
+        },
+    )
+    return written_path
+
+
+def _load_lockfile_payload(path: Path) -> Dict[str, object]:
+    """Return the parsed lockfile payload."""
+
+    resolved = path.expanduser()
+    try:
+        payload = json.loads(resolved.read_text())
+    except FileNotFoundError as exc:
+        raise ConfigError(f"Lock file not found: {resolved}") from exc
+    except json.JSONDecodeError as exc:
+        raise ConfigError(f"Lock file {resolved} is not valid JSON") from exc
+    if not isinstance(payload, dict):
+        raise ConfigError("Lock file must contain a JSON object")
+    entries = payload.get("entries")
+    if not isinstance(entries, list):
+        raise ConfigError("Lock file missing 'entries' array")
+    schema_version = payload.get("schema_version")
+    if schema_version and schema_version != LOCKFILE_SCHEMA_VERSION:
+        logging.getLogger("DocsToKG.OntologyDownload").warning(
+            "lockfile schema mismatch",
+            extra={
+                "stage": "plan",
+                "expected": LOCKFILE_SCHEMA_VERSION,
+                "found": schema_version,
+                "lock_path": str(resolved),
+            },
+        )
+    return payload
+
+
+def _spec_from_lock_entry(entry: Dict[str, object], defaults: DefaultsConfig) -> FetchSpec:
+    """Convert a lockfile entry back into a fetch specification."""
+
+    if not isinstance(entry, dict):
+        raise ConfigError("Lock file entry must be an object")
+    ontology_id = entry.get("id")
+    if not isinstance(ontology_id, str) or not ontology_id:
+        raise ConfigError("Lock file entry missing 'id'")
+    url = entry.get("url")
+    if not isinstance(url, str) or not url:
+        raise ConfigError(f"Lock file entry for '{ontology_id}' is missing 'url'")
+
+    extras: Dict[str, object] = {"url": url}
+    headers = entry.get("headers")
+    if isinstance(headers, Mapping):
+        extras["headers"] = {str(key): str(value) for key, value in headers.items()}
+    media_type = entry.get("media_type")
+    if isinstance(media_type, str):
+        extras["media_type"] = media_type
+    service = entry.get("service")
+    if isinstance(service, str):
+        extras["service"] = service
+    version = entry.get("version")
+    if isinstance(version, str):
+        extras["version"] = version
+    license_value = entry.get("license")
+    if isinstance(license_value, str):
+        extras["license"] = license_value
+    expected_checksum = entry.get("expected_checksum")
+    if isinstance(expected_checksum, Mapping):
+        algorithm = expected_checksum.get("algorithm")
+        value = expected_checksum.get("value")
+        if isinstance(algorithm, str) and isinstance(value, str):
+            extras["checksum"] = {"algorithm": algorithm, "value": value}
+    origin_resolver = entry.get("resolver")
+    if isinstance(origin_resolver, str):
+        extras.setdefault("origin_resolver", origin_resolver)
+
+    target_formats_raw = entry.get("target_formats")
+    if isinstance(target_formats_raw, str):
+        target_formats = [target_formats_raw]
+    elif isinstance(target_formats_raw, Sequence):
+        target_formats = [str(item) for item in target_formats_raw]
+    else:
+        target_formats = list(defaults.normalize_to)
+    if not target_formats:
+        target_formats = list(defaults.normalize_to)
+
+    return FetchSpec(
+        id=ontology_id,
+        resolver="direct",
+        extras=extras,
+        target_formats=tuple(target_formats),
+    )
+
+
+def _specs_from_lock_payload(
+    payload: Dict[str, object],
+    *,
+    defaults: DefaultsConfig,
+    requested_ids: Sequence[str],
+) -> List[FetchSpec]:
+    """Build fetch specifications from lockfile payload."""
+
+    entries = payload.get("entries") or []
+    selected: List[Dict[str, object]]
+    if requested_ids:
+        requested = set(requested_ids)
+        indexed = {entry.get("id"): entry for entry in entries if isinstance(entry, dict)}
+        missing = sorted(requested - set(indexed))
+        if missing:
+            raise ConfigError(
+                f"Lock file does not contain entries for: {', '.join(missing)}"
+            )
+        selected = [indexed[oid] for oid in requested_ids]
+    else:
+        selected = [entry for entry in entries if isinstance(entry, dict)]
+    return [_spec_from_lock_entry(entry, defaults) for entry in selected]
 
 
 def _resolve_version_metadata(
@@ -1514,7 +1699,7 @@ def _resolve_specs_from_args(
 
     target_formats = _parse_target_formats(getattr(args, "target_formats", None))
     config_path: Optional[Path] = getattr(args, "spec", None)
-    ids: Sequence[str] = getattr(args, "ids", [])
+    ids: List[str] = list(getattr(args, "ids", []))
     if config_path is None and not ids:
         default_config = CONFIG_DIR / "sources.yaml"
         if default_config.exists():
@@ -1527,6 +1712,29 @@ def _resolve_specs_from_args(
 
     config.defaults.logging.level = getattr(args, "log_level", config.defaults.logging.level)
     _apply_cli_overrides(config, args)
+
+    lock_path: Optional[Path] = getattr(args, "lock", None)
+    if lock_path is not None:
+        lock_payload = _load_lockfile_payload(lock_path)
+        specs = _specs_from_lock_payload(
+            lock_payload,
+            defaults=config.defaults,
+            requested_ids=ids,
+        )
+        if not specs and not allow_empty:
+            raise ConfigError(f"No matching entries found in lock file {lock_path}")
+        config.defaults.resolver_fallback_enabled = False
+        config.defaults.prefer_source = ["direct"]
+        config.specs = specs
+        logging.getLogger("DocsToKG.OntologyDownload").info(
+            "using lockfile",
+            extra={
+                "stage": "plan",
+                "lock_path": str(lock_path.expanduser()),
+                "entries": len(specs),
+            },
+        )
+        return config, specs
 
     if ids:
         resolver_name = getattr(args, "resolver", None) or config.defaults.prefer_source[0]
@@ -1570,6 +1778,9 @@ def _handle_plan(args, base_config: Optional[ResolvedConfig]) -> List[PlannedFet
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config)
     plans = plan_all(specs, config=config, since=since)
+    if not getattr(args, "no_lock", False):
+        lock_path = getattr(args, "lock_output", DEFAULT_LOCKFILE_PATH)
+        _write_lockfile(plans, lock_path)
     return plans
 
 
@@ -1600,6 +1811,10 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
     config, specs = _resolve_specs_from_args(args, base_config, allow_empty=True)
     plans = plan_all(specs, config=config, since=since)
     current_payload = [_plan_to_dict(plan) for plan in plans]
+    lock_written: Optional[str] = None
+    if not getattr(args, "no_lock", False):
+        lock_path = getattr(args, "lock_output", DEFAULT_LOCKFILE_PATH)
+        lock_written = str(_write_lockfile(plans, lock_path))
 
     if use_manifest:
         baseline_payload = []
@@ -1628,6 +1843,8 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
         diff["baseline_updated"] = True
     else:
         diff["baseline_updated"] = False
+    if lock_written:
+        diff["lockfile"] = lock_written
     return diff
 
 

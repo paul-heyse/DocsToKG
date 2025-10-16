@@ -373,7 +373,7 @@ def test_figshare_resolver_network_error(tmp_path):
     ]
 
     assert events[0].event == "error"
-    assert events[0].event_reason == "request-error"
+    assert events[0].event_reason == "connection-error"
     assert "boom" in events[0].metadata["error"]
 
 

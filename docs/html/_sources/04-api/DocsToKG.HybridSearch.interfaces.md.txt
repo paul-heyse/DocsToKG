@@ -107,9 +107,9 @@ Return the CUDA device identifier used by the index.
 
 Immutable configuration backing the dense store.
 
-### `gpu_resources(self)`
+### `adapter_stats(self)`
 
-Return GPU resources when available, otherwise ``None``.
+Return runtime adapter statistics (device, nprobe, replication state).
 
 ### `add(self, vectors, vector_ids)`
 
@@ -134,6 +134,10 @@ Search for nearest neighbours of multiple queries.
 ### `search_batch(self, queries, top_k)`
 
 Optional alias for batched search.
+
+### `range_search(self, query, min_score)`
+
+Return all vectors scoring above ``min_score`` for ``query``.
 
 ### `serialize(self)`
 
@@ -176,7 +180,7 @@ Attributes:
 None
 
 Examples:
->>> from DocsToKG.HybridSearch.storage import OpenSearchSimulator
+>>> from DocsToKG.HybridSearch.store import OpenSearchSimulator
 >>> simulator: LexicalIndex = OpenSearchSimulator()
 >>> simulator.bulk_upsert([])  # doctest: +SKIP
 

@@ -92,6 +92,7 @@ from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
     ManifestEntry,
     ManifestIndexSink,
     MultiSink,
+    RotatingJsonlSink,
 )
 from scripts.export_attempts_csv import export_attempts_jsonl_to_csv  # noqa: E402
 from tools.manifest_to_csv import convert_manifest_to_csv  # noqa: E402
@@ -152,6 +153,32 @@ def test_multi_sink_synchronizes_timestamps(tmp_path: Path) -> None:
         rows = list(csv.DictReader(handle))
     assert len(rows) == 1
     assert json_payload["timestamp"] == rows[0]["timestamp"]
+
+
+def test_rotating_jsonl_sink_rotates(tmp_path: Path) -> None:
+    log_path = tmp_path / "attempts.jsonl"
+    sink = RotatingJsonlSink(log_path, max_bytes=200)
+    record = AttemptRecord(
+        work_id="W-rotate",
+        resolver_name="unpaywall",
+        resolver_order=1,
+        url="https://example.org/rotate",
+        status="pdf",
+        http_status=200,
+        content_type="application/pdf",
+        elapsed_ms=10.0,
+        metadata={},
+        sha256="deadbeef",
+        content_length=512,
+        dry_run=False,
+    )
+    for _ in range(10):
+        sink.log_attempt(record)
+    sink.close()
+
+    rotated_path = log_path.with_name("attempts.jsonl.0000")
+    assert log_path.exists()
+    assert rotated_path.exists()
 
 
 def test_csv_sink_close_closes_file(tmp_path: Path) -> None:

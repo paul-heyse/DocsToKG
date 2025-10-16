@@ -112,6 +112,7 @@ class ReasonCode(Enum):
     MAX_ATTEMPTS_REACHED = "max_attempts_reached"
     RESOLVER_BREAKER_OPEN = "resolver_breaker_open"
     DOMAIN_BREAKER_OPEN = "domain_breaker_open"
+    DOMAIN_BYTES_BUDGET = "domain_bytes_budget"
 
     @classmethod
     def from_wire(cls, value: Union[str, "ReasonCode", None]) -> "ReasonCode":
@@ -135,7 +136,7 @@ class ReasonCode(Enum):
 
 
 def classify_payload(head_bytes: bytes, content_type: Optional[str], url: str) -> Classification:
-    """Classify a payload as ``Classification.PDF``/``Classification.HTML`` or ``UNKNOWN``."""
+    """Classify a payload as ``Classification.PDF``/``Classification.HTML`` or ``Classification.UNKNOWN``."""
 
     ctype = (content_type or "").lower()
     stripped = head_bytes.lstrip() if head_bytes else b""

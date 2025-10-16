@@ -232,12 +232,19 @@ class JsonlSink:
                 "content_type": record.content_type,
                 "elapsed_ms": record.elapsed_ms,
                 "resolver_wall_time_ms": record.resolver_wall_time_ms,
-                "reason": record.reason.value if record.reason else None,
+                "reason": (
+                    record.reason.value
+                    if isinstance(record.reason, ReasonCode)
+                    else record.reason
+                    if record.reason is not None
+                    else None
+                ),
                 "reason_detail": getattr(record, "reason_detail", None),
                 "metadata": record.metadata,
                 "sha256": record.sha256,
                 "content_length": record.content_length,
                 "dry_run": record.dry_run,
+                "retry_after": record.retry_after,
             }
         )
 
@@ -295,6 +302,65 @@ class JsonlSink:
         self.close()
 
 
+class RotatingJsonlSink(JsonlSink):
+    """JSONL sink that rotates the log file once it exceeds a configured size."""
+
+    def __init__(self, path: Path, *, max_bytes: int) -> None:
+        if max_bytes <= 0:
+            raise ValueError("max_bytes must be positive for RotatingJsonlSink")
+        self._max_bytes = int(max_bytes)
+        self._sequence = 0
+        super().__init__(path)
+        self._sequence = self._initial_sequence()
+
+    def _initial_sequence(self) -> int:
+        base_name = self._path.name
+        prefix_len = len(base_name) + 1
+        highest = 0
+        for candidate in self._path.parent.glob(f"{base_name}.*"):
+            suffix = candidate.name[prefix_len:]
+            if suffix.isdigit():
+                highest = max(highest, int(suffix) + 1)
+        return highest
+
+    def _rotate(self) -> None:
+        self._file.flush()
+        self._file.close()
+        while True:
+            rotated_name = f"{self._path.name}.{self._sequence:04d}"
+            rotated_path = self._path.with_name(rotated_name)
+            self._sequence += 1
+            if rotated_path.exists():
+                continue
+            self._path.rename(rotated_path)
+            break
+        self._file = self._path.open("a", encoding="utf-8")
+
+    def _should_rotate(self, pending_bytes: int) -> bool:
+        try:
+            current_size = self._file.tell()
+        except (OSError, ValueError):  # pragma: no cover - defensive
+            try:
+                current_size = self._path.stat().st_size
+            except OSError:
+                current_size = 0
+        return current_size + pending_bytes > self._max_bytes
+
+    def _write(self, payload: Dict[str, Any]) -> None:
+        payload.setdefault("timestamp", _utc_timestamp())
+        line = json.dumps(payload, sort_keys=True) + "\n"
+        encoded = line.encode("utf-8")
+        with self._lock:
+            try:
+                if self._path.exists() and self._path.stat().st_size >= self._max_bytes:
+                    self._rotate()
+            except OSError:  # pragma: no cover - defensive
+                pass
+            if self._should_rotate(len(encoded)):
+                self._rotate()
+            self._file.write(line)
+            self._file.flush()
+
 class CsvSink:
     """Lightweight sink that mirrors attempt records into a CSV for spreadsheet review."""
 
@@ -313,6 +379,7 @@ class CsvSink:
         "reason_detail",
         "sha256",
         "content_length",
+        "retry_after",
         "dry_run",
         "metadata",
     ]
@@ -349,10 +416,17 @@ class CsvSink:
             "content_type": record.content_type,
             "elapsed_ms": record.elapsed_ms,
             "resolver_wall_time_ms": record.resolver_wall_time_ms,
-            "reason": record.reason.value if record.reason else None,
+            "reason": (
+                record.reason.value
+                if isinstance(record.reason, ReasonCode)
+                else record.reason
+                if record.reason is not None
+                else None
+            ),
             "reason_detail": getattr(record, "reason_detail", None) or "",
             "sha256": record.sha256,
             "content_length": record.content_length,
+            "retry_after": record.retry_after,
             "dry_run": record.dry_run,
             "metadata": json.dumps(record.metadata, sort_keys=True) if record.metadata else "",
         }
@@ -659,7 +733,8 @@ class SqliteSink:
                 metadata TEXT,
                 sha256 TEXT,
                 content_length INTEGER,
-                dry_run INTEGER
+                dry_run INTEGER,
+                retry_after REAL
             )
             """
         )
@@ -692,6 +767,8 @@ class SqliteSink:
         attempt_columns = {row[1] for row in self._conn.execute("PRAGMA table_info(attempts)")}
         if "reason_detail" not in attempt_columns:
             self._conn.execute("ALTER TABLE attempts ADD COLUMN reason_detail TEXT")
+        if "retry_after" not in attempt_columns:
+            self._conn.execute("ALTER TABLE attempts ADD COLUMN retry_after REAL")
         manifest_columns = {row[1] for row in self._conn.execute("PRAGMA table_info(manifests)")}
         if "reason_detail" not in manifest_columns:
             self._conn.execute("ALTER TABLE manifests ADD COLUMN reason_detail TEXT")
@@ -738,8 +815,9 @@ class SqliteSink:
                     metadata,
                     sha256,
                     content_length,
-                    dry_run
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    dry_run,
+                    retry_after
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     ts,
@@ -756,12 +834,19 @@ class SqliteSink:
                     record.content_type,
                     record.elapsed_ms,
                     record.resolver_wall_time_ms,
-                    record.reason.value if record.reason else None,
+                    (
+                        record.reason.value
+                        if isinstance(record.reason, ReasonCode)
+                        else record.reason
+                        if record.reason is not None
+                        else None
+                    ),
                     getattr(record, "reason_detail", None),
                     metadata_json,
                     record.sha256,
                     record.content_length,
                     1 if record.dry_run else 0,
+                    record.retry_after,
                 ),
             )
             self._conn.commit()
@@ -867,22 +952,39 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
 
     per_work: Dict[str, Dict[str, Any]] = {}
     completed: Set[str] = set()
-    if not path or not path.exists():
+    if not path:
         return per_work, completed
 
-    with path.open("r", encoding="utf-8") as handle:
-        for raw in handle:
-            line = raw.strip()
-            if not line:
-                continue
-            data = json.loads(line)
-            record_type = data.get("record_type")
-            if record_type is None:
-                raise ValueError(
-                    "Legacy manifest entries without record_type are no longer supported."
-                )
-            if record_type != "manifest":
-                continue
+    prefix = f"{path.name}."
+    rotated: List[Tuple[int, Path]] = []
+    for candidate in path.parent.glob(f"{path.name}.*"):
+        if not candidate.is_file():
+            continue
+        suffix = candidate.name[len(prefix) :]
+        if suffix.isdigit():
+            rotated.append((int(suffix), candidate))
+    rotated.sort()
+    ordered_files = [candidate for _, candidate in rotated]
+    if path.exists():
+        ordered_files.append(path)
+
+    if not ordered_files:
+        return per_work, completed
+
+    for file_path in ordered_files:
+        with file_path.open("r", encoding="utf-8") as handle:
+            for raw in handle:
+                line = raw.strip()
+                if not line:
+                    continue
+                data = json.loads(line)
+                record_type = data.get("record_type")
+                if record_type is None:
+                    raise ValueError(
+                        "Legacy manifest entries without record_type are no longer supported."
+                    )
+                if record_type != "manifest":
+                    continue
 
             schema_version_raw = data.get("schema_version")
             if schema_version_raw is None:
@@ -1061,6 +1163,7 @@ __all__ = [
     "ManifestEntry",
     "MANIFEST_SCHEMA_VERSION",
     "JsonlSink",
+    "RotatingJsonlSink",
     "CsvSink",
     "MultiSink",
     "ManifestIndexSink",

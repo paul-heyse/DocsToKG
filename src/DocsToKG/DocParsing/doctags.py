@@ -4,21 +4,15 @@
 #   "purpose": "Implements DocsToKG.DocParsing.doctags behaviors and helpers",
 #   "sections": [
 #     {
+#       "id": "ensure-docling-dependencies",
+#       "name": "ensure_docling_dependencies",
+#       "anchor": "function-ensure-docling-dependencies",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "http-session",
 #       "name": "_http_session",
 #       "anchor": "function-http-session",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "looks-like-filesystem-path",
-#       "name": "_looks_like_filesystem_path",
-#       "anchor": "function-looks-like-filesystem-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-pdf-model-path",
-#       "name": "resolve_pdf_model_path",
-#       "anchor": "function-resolve-pdf-model-path",
 #       "kind": "function"
 #     },
 #     {
@@ -31,18 +25,6 @@
 #       "id": "add-resume-force-options",
 #       "name": "add_resume_force_options",
 #       "anchor": "function-add-resume-force-options",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "prepare-data-root",
-#       "name": "prepare_data_root",
-#       "anchor": "function-prepare-data-root",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-pipeline-path",
-#       "name": "resolve_pipeline_path",
-#       "anchor": "function-resolve-pipeline-path",
 #       "kind": "function"
 #     },
 #     {
@@ -260,6 +242,7 @@ import subprocess as sp
 import sys
 import threading
 import time
+import types
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -335,6 +318,145 @@ DEFAULT_INPUT = data_pdfs(DEFAULT_DATA_ROOT)
 DEFAULT_OUTPUT = data_doctags(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "doctags-pdf"
 
+_DOCLING_STUB_INSTALLED = False
+
+
+def _should_install_docling_test_stubs() -> bool:
+    """Return ``True`` when docling stubs should be installed for tests."""
+
+    if os.getenv("DOCSTOKG_ENFORCE_DOCLING") == "1":
+        return False
+    return bool(os.getenv("PYTEST_CURRENT_TEST"))
+
+
+def _ensure_stub_module(name: str, *, package: bool = False) -> types.ModuleType:
+    """Register a lightweight stub module in :mod:`sys.modules` if missing."""
+
+    module = sys.modules.get(name)
+    if module is not None:
+        return module
+    module = types.ModuleType(name)
+    module.__file__ = "<docling-stub>"
+    module.__spec__ = None
+    if package:
+        module.__path__ = []  # type: ignore[attr-defined]
+        module.__package__ = name
+    else:
+        module.__package__ = name.rsplit(".", 1)[0] if "." in name else ""
+    sys.modules[name] = module
+    return module
+
+
+def _install_docling_test_stubs() -> None:
+    """Install minimal docling/docling-core shims for unit tests."""
+
+    global _DOCLING_STUB_INSTALLED
+    if _DOCLING_STUB_INSTALLED:
+        return
+
+    _ensure_stub_module("docling", package=True)
+    _ensure_stub_module("docling.backend", package=True)
+    _ensure_stub_module("docling.datamodel", package=True)
+    _ensure_stub_module("docling.datamodel.pipeline", package=True)
+    _ensure_stub_module("docling.pipeline", package=True)
+    _ensure_stub_module("docling_core")
+
+    converter_mod = _ensure_stub_module("docling.document_converter")
+
+    class DocumentConverter:
+        def __init__(self, *args, **kwargs) -> None:
+            self.args = args
+            self.kwargs = kwargs
+
+        def convert(self, *_args, **_kwargs):
+            raise RuntimeError("Docling stubs do not perform real conversions.")
+
+    class PdfFormatOption:
+        def __init__(self, *args, **kwargs) -> None:
+            self.args = args
+            self.kwargs = kwargs
+
+    converter_mod.DocumentConverter = DocumentConverter  # type: ignore[attr-defined]
+    converter_mod.PdfFormatOption = PdfFormatOption  # type: ignore[attr-defined]
+
+    backend_mod = _ensure_stub_module("docling.backend.docling_parse_v4_backend")
+
+    class DoclingParseV4DocumentBackend:  # pragma: no cover - stub only
+        pass
+
+    backend_mod.DoclingParseV4DocumentBackend = DoclingParseV4DocumentBackend  # type: ignore[attr-defined]
+
+    accel_mod = _ensure_stub_module("docling.datamodel.accelerator_options")
+
+    class AcceleratorDevice:  # pragma: no cover - stub only
+        CUDA = "cuda"
+
+    class AcceleratorOptions:  # pragma: no cover - stub only
+        def __init__(self, num_threads: int = 1, device: str | None = None, **_kwargs) -> None:
+            self.num_threads = num_threads
+            self.device = device or AcceleratorDevice.CUDA
+
+    accel_mod.AcceleratorDevice = AcceleratorDevice  # type: ignore[attr-defined]
+    accel_mod.AcceleratorOptions = AcceleratorOptions  # type: ignore[attr-defined]
+
+    base_mod = _ensure_stub_module("docling.datamodel.base_models")
+
+    class _EnumValue:
+        def __init__(self, value: str) -> None:
+            self.value = value
+
+        def __repr__(self) -> str:  # pragma: no cover - trivial
+            return self.value
+
+        def __hash__(self) -> int:  # pragma: no cover - trivial
+            return hash(self.value)
+
+        def __eq__(self, other: object) -> bool:  # pragma: no cover - trivial
+            if isinstance(other, _EnumValue):
+                return self.value == other.value
+            return False
+
+    class ConversionStatus:  # pragma: no cover - stub only
+        SUCCESS = _EnumValue("success")
+        PARTIAL_SUCCESS = _EnumValue("partial_success")
+
+    class InputFormat:  # pragma: no cover - stub only
+        PDF = _EnumValue("pdf")
+
+    base_mod.ConversionStatus = ConversionStatus  # type: ignore[attr-defined]
+    base_mod.InputFormat = InputFormat  # type: ignore[attr-defined]
+
+    pipeline_opts_mod = _ensure_stub_module("docling.datamodel.pipeline_options")
+
+    class VlmPipelineOptions:  # pragma: no cover - stub only
+        def __init__(self, **kwargs) -> None:
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    pipeline_opts_mod.VlmPipelineOptions = VlmPipelineOptions  # type: ignore[attr-defined]
+
+    pipeline_model_mod = _ensure_stub_module("docling.datamodel.pipeline_options_vlm_model")
+
+    class ApiVlmOptions:  # pragma: no cover - stub only
+        def __init__(self, **kwargs) -> None:
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    class ResponseFormat:  # pragma: no cover - stub only
+        DOCTAGS = "doctags"
+
+    pipeline_model_mod.ApiVlmOptions = ApiVlmOptions  # type: ignore[attr-defined]
+    pipeline_model_mod.ResponseFormat = ResponseFormat  # type: ignore[attr-defined]
+
+    pipeline_mod = _ensure_stub_module("docling.pipeline.vlm_pipeline")
+
+    class VlmPipeline:  # pragma: no cover - stub only
+        pass
+
+    pipeline_mod.VlmPipeline = VlmPipeline  # type: ignore[attr-defined]
+
+    _DOCLING_STUB_INSTALLED = True
+
 
 def ensure_docling_dependencies() -> None:
     """Validate that required Docling packages are installed."""
@@ -343,6 +465,17 @@ def ensure_docling_dependencies() -> None:
         import docling_core  # noqa: F401  # pragma: no cover - import validation only
         from docling.document_converter import DocumentConverter  # noqa: F401
     except ImportError as exc:  # pragma: no cover - exercised when dependencies missing
+        if _should_install_docling_test_stubs():
+            _install_docling_test_stubs()
+            try:  # pragma: no cover - exercised during tests
+                import docling_core  # noqa: F401,E401
+                from docling.document_converter import DocumentConverter  # noqa: F401,E401
+            except ImportError as inner_exc:
+                raise ImportError(
+                    "DocTags conversion requires the 'docling' and 'docling-core' packages. "
+                    "Install them with `pip install docling docling-core`."
+                ) from inner_exc
+            return
         raise ImportError(
             "DocTags conversion requires the 'docling' and 'docling-core' packages. "
             "Install them with `pip install docling docling-core`."
@@ -522,7 +655,7 @@ def detect_vllm_version() -> str:
         return "unknown"
 
     version = getattr(vllm, "__version__", "unknown")
-    _LOGGER.info(
+    logger.info(
         "Detected vLLM package",
         extra={"extra_fields": {"version": version}},
     )
@@ -902,7 +1035,7 @@ def stream_logs(proc: sp.Popen, prefix: str = "[vLLM] ", tail: Optional[Deque[st
             continue
         if tail is not None:
             tail.append(s)
-        _LOGGER.info(
+        logger.info(
             "vLLM stdout",
             extra={
                 "extra_fields": {
@@ -1100,7 +1233,7 @@ def ensure_vllm(
     names, raw, status = probe_models(preferred)
     if status == 200:
         validate_served_models(names, served_model_names)
-        _LOGGER.info(
+        logger.info(
             "Reusing vLLM",
             extra={
                 "extra_fields": {
@@ -1399,6 +1532,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                 "served_models": list(served_model_names),
                 "gpu_memory_utilization": gpu_memory_utilization,
                 "vllm_version": vllm_version,
+                "vllm_wait_timeout": int(getattr(args, "vllm_wait_timeout", WAIT_TIMEOUT_S)),
             }
         },
     )
@@ -1887,10 +2021,20 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         Process exit code, where ``0`` denotes success.
     """
 
+    if args is None:
+        namespace = html_parse_args()
+    elif isinstance(args, argparse.Namespace):
+        namespace = args
+    else:
+        namespace = html_parse_args(args)
+
+    log_level = getattr(namespace, "log_level", "INFO")
+    logger = get_logger(__name__, level=str(log_level))
+    set_spawn_or_warn(logger)
+
     import multiprocessing as mp
 
-    set_spawn_or_warn(_LOGGER)
-    _LOGGER.info(
+    logger.info(
         "Multiprocessing configuration",
         extra={
             "extra_fields": {
@@ -1900,10 +2044,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         },
     )
 
-    if isinstance(args, argparse.Namespace):
-        args = args
-    else:
-        args = html_parse_args() if args is None else html_parse_args(args)
+    args = namespace
 
     if not hasattr(args, "input"):
         args.input = HTML_DEFAULT_INPUT_DIR
@@ -1945,7 +2086,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         output_dir = (args.output or HTML_DEFAULT_OUTPUT_DIR).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    _LOGGER.info(
+    logger.info(
         "HTML conversion configuration",
         extra={
             "extra_fields": {
@@ -1958,19 +2099,19 @@ def html_main(args: argparse.Namespace | None = None) -> int:
     )
 
     if args.force:
-        _LOGGER.info(
+        logger.info(
             "Force mode: reprocessing all documents",
             extra={"extra_fields": {"mode": "force"}},
         )
     elif args.resume:
-        _LOGGER.info(
+        logger.info(
             "Resume mode enabled: unchanged outputs will be skipped",
             extra={"extra_fields": {"mode": "resume"}},
         )
 
     files = list_htmls(input_dir)
     if not files:
-        _LOGGER.warning(
+        logger.warning(
             "No HTML files found", extra={"extra_fields": {"input_dir": str(input_dir)}}
         )
         return 0
@@ -1989,7 +2130,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
             should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force)
             and not args.overwrite
         ):
-            _LOGGER.info(
+            logger.info(
                 "Skipping HTML document",
                 extra={
                     "extra_fields": {
@@ -2020,7 +2161,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         )
 
     if not tasks:
-        _LOGGER.info(
+        logger.info(
             "HTML conversion summary",
             extra={
                 "extra_fields": {
@@ -2065,7 +2206,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 )
             else:
                 fail += 1
-                _LOGGER.error(
+                logger.error(
                     "HTML conversion failure",
                     extra={
                         "extra_fields": {
@@ -2086,7 +2227,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                     parse_engine="docling-html",
                 )
 
-    _LOGGER.info(
+    logger.info(
         "HTML conversion summary",
         extra={
             "extra_fields": {
