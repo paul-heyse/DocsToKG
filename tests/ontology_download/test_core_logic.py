@@ -13,11 +13,16 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import core
-from DocsToKG.OntologyDownload.config import ConfigError, DefaultsConfig, ResolvedConfig
-from DocsToKG.OntologyDownload.download import DownloadFailure, DownloadResult
+from DocsToKG.OntologyDownload import (
+    ConfigError,
+    DefaultsConfig,
+    DownloadFailure,
+    DownloadResult,
+    ResolvedConfig,
+    ValidationResult,
+)
+from DocsToKG.OntologyDownload import ontology_download as core
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
-from DocsToKG.OntologyDownload.validators import ValidationResult
 
 
 @pytest.fixture(autouse=True)

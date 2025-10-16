@@ -23,8 +23,11 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload.config import LoggingConfiguration
-from DocsToKG.OntologyDownload.logging_config import mask_sensitive_data, setup_logging
+from DocsToKG.OntologyDownload import (
+    LoggingConfiguration,
+    mask_sensitive_data,
+    setup_logging,
+)
 
 
 def test_mask_sensitive_data_masks_tokens():
