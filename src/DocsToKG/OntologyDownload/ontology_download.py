@@ -870,8 +870,27 @@ from .net import (
     validate_url_security,
 )
 from .pipeline import merge_defaults
+from .validation_core import (
+    ValidationRequest,
+    ValidationResult,
+    ValidationTimeout,
+    ValidatorSubprocessError,
+    _run_worker_cli,
+    main as validation_main,
+    normalize_streaming,
+    run_validators,
+    validate_arelle,
+    validate_owlready2,
+    validate_pronto,
+    validate_rdflib,
+    validate_robot,
+)
 
 
+def main() -> None:
+    """CLI entry point delegating to the validation core module."""
+
+    validation_main()
 
 
 class JSONFormatter(logging.Formatter):
@@ -1886,9 +1905,138 @@ class LocalStorageBackend:
             local_dir: Directory containing the ready-to-serve ontology.
 
         Returns:
+            Path to the local directory for the ontology version.
+        """
+
+        _ = (ontology_id, version, local_dir)  # pragma: no cover - intentional no-op
+
+    def version_path(self, ontology_id: str, version: str) -> Path:
+        """Return the local storage directory for the requested version.
+
+        Args:
+            ontology_id: Identifier being queried.
+            version: Version string whose storage path is needed.
+
+        Returns:
+            Path pointing to the stored ontology version.
+        """
+
+        return self._version_dir(ontology_id, version)
+
+    def delete_version(self, ontology_id: str, version: str) -> int:
+        """Delete a stored ontology version returning reclaimed bytes.
+        base = self._version_dir(ontology_id, version)
+        base.mkdir(parents=True, exist_ok=True)
+        return base
+
+    def available_versions(self, ontology_id: str) -> List[str]:
+        """Return sorted versions already present for an ontology.
+
+        Args:
+            ontology_id: Identifier whose stored versions should be listed.
+
+        Returns:
+            Sorted list of version strings found under the storage root.
+        """
+
+        safe_id, _ = _safe_identifiers(ontology_id, "unused")
+        base = self.root / safe_id
+        if not base.exists():
+            return []
+        versions = [entry.name for entry in base.iterdir() if entry.is_dir()]
+        return sorted(versions)
+
+    def available_ontologies(self) -> List[str]:
+        """Return ontology identifiers discovered under ``root``.
+
+        Args:
+            ontology_id: Identifier whose stored version should be removed.
+            version: Version string targeted for deletion.
+
+        Returns:
+            Number of bytes reclaimed by removing the version directory.
+
+        Raises:
+            OSError: Propagated if filesystem deletion fails.
+        """
+
+        path = self._version_dir(ontology_id, version)
+        if not path.exists():
+            return 0
+        reclaimed = _directory_size(path)
+        shutil.rmtree(path)
+        return reclaimed
+
+    def set_latest_version(self, ontology_id: str, version: str) -> None:
+        """Update symlink and marker file indicating the latest version.
+
+        Args:
+            ontology_id: Identifier whose latest marker should be updated.
+            version: Version string to record as the latest processed build.
+            Sorted list of ontology identifiers available locally.
+        """
+
+        if not self.root.exists():
+            return []
+        return sorted([entry.name for entry in self.root.iterdir() if entry.is_dir()])
+
+    def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
+        """Finalize a local version directory (no-op for purely local storage).
+
+        Args:
+            ontology_id: Identifier that finished processing.
+            version: Version string associated with the processed ontology.
+            local_dir: Directory containing the ready-to-serve ontology.
+
+        Returns:
             None.
         """
 
+        safe_id, _ = _safe_identifiers(ontology_id, "unused")
+        base = self.root / safe_id
+        base.mkdir(parents=True, exist_ok=True)
+        link = base / "latest"
+        marker = base / "latest.txt"
+        target = Path(version)
+
+        try:
+            if link.exists() or link.is_symlink():
+                link.unlink()
+            link.symlink_to(target, target_is_directory=True)
+        except OSError:
+            if marker.exists():
+                marker.unlink()
+            marker.write_text(version)
+        else:
+            if marker.exists():
+                marker.unlink()
+
+
+class FsspecStorageBackend(LocalStorageBackend):
+    """Hybrid storage backend that mirrors artifacts to an fsspec location.
+
+    Attributes:
+        fs: ``fsspec`` filesystem instance used for remote operations.
+        base_path: Root path within the remote filesystem where artefacts live.
+
+    Examples:
+        >>> backend = FsspecStorageBackend("memory://ontologies")  # doctest: +SKIP
+        >>> backend.available_ontologies()  # doctest: +SKIP
+        []
+    """
+
+    def __init__(self, url: str) -> None:
+        """Create a hybrid storage backend backed by an fsspec URL.
+
+        Args:
+            url: Remote ``fsspec`` URL (for example ``s3://bucket/prefix``).
+
+        Raises:
+            ConfigError: If :mod:`fsspec` is not installed or the URL is invalid.
+
+        Returns:
+            None
+        """
         _ = (ontology_id, version, local_dir)  # pragma: no cover - intentional no-op
 
     def version_path(self, ontology_id: str, version: str) -> Path:
@@ -2795,489 +2943,178 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
         """Parse the ontology with rdflib to populate the graph object."""
         graph.parse(request.file_path.as_posix())
 
-    try:
-        _log_validation_memory(logger, "rdflib", "before")
-        _run_with_timeout(_parse, timeout)
-        _log_validation_memory(logger, "rdflib", "after")
-        triple_count = len(graph)
-        payload = {"ok": True, "triples": triple_count}
-        output_files: List[str] = []
-        normalization_mode = "in-memory"
-
-        if "ttl" in request.config.defaults.normalize_to:
-            request.normalized_dir.mkdir(parents=True, exist_ok=True)
-            stem = request.file_path.stem
-            normalized_ttl = request.normalized_dir / f"{stem}.ttl"
-            threshold_bytes = (
-                request.config.defaults.validation.streaming_normalization_threshold_mb
-                * 1024
-                * 1024
+        if fsspec is None:  # pragma: no cover - exercised when dependency missing
+            raise ConfigError(
+                "fsspec required for remote storage. Install it via 'pip install fsspec'."
             )
-            file_size = request.file_path.stat().st_size
-            streaming_hash: Optional[str] = None
-            normalized_sha: Optional[str] = None
-            if file_size >= threshold_bytes:
-                normalization_mode = "streaming"
-                try:
-                    streaming_hash = normalize_streaming(
-                        request.file_path,
-                        output_path=normalized_ttl,
-                        graph=graph,
-                    )
-                    normalized_sha = streaming_hash
-                except Exception as exc:  # pylint: disable=broad-except
-                    logger.warning(
-                        "streaming normalization failed, falling back to in-memory",
-                        extra={
-                            "stage": "validate",
-                            "validator": "rdflib",
-                            "error": str(exc),
-                        },
-                    )
-                    normalization_mode = "in-memory"
-                    streaming_hash = None
+        fs, path = fsspec.core.url_to_fs(url)  # type: ignore[attr-defined]
+        self.fs = fs
+        self.base_path = PurePosixPath(path)
+        super().__init__(LOCAL_ONTOLOGY_DIR)
 
-            if normalized_sha is None:
-                try:
-                    canonical_ttl = _canonicalize_turtle(graph)
-                except AttributeError:
-                    graph.serialize(destination=normalized_ttl, format="turtle")
-                    canonical_ttl = normalized_ttl.read_text(encoding="utf-8")
-                else:
-                    normalized_ttl.write_text(canonical_ttl, encoding="utf-8")
-                normalized_sha = hashlib.sha256(canonical_ttl.encode("utf-8")).hexdigest()
+    def _remote_version_path(self, ontology_id: str, version: str) -> PurePosixPath:
+        """Return the remote filesystem path for the specified ontology version.
 
-            payload["normalized_sha256"] = normalized_sha
-            payload["normalization_mode"] = normalization_mode
-            output_files.append(str(normalized_ttl))
-            if streaming_hash is not None:
-                payload["streaming_nt_sha256"] = streaming_hash
-        if (
-            "ttl" in request.config.defaults.normalize_to
-            and payload.get("streaming_nt_sha256") is None
-        ):
-            try:
-                payload["streaming_nt_sha256"] = normalize_streaming(
-                    request.file_path,
-                    graph=graph,
-                )
-            except Exception as exc:  # pragma: no cover - defensive fallback
-                logger.warning(
-                    "failed to compute streaming normalization hash",
-                    extra={
-                        "stage": "validate",
-                        "validator": "rdflib",
-                        "error": str(exc),
-                    },
-                )
+        Args:
+            ontology_id: Identifier whose remote storage path is required.
+            version: Version string associated with the ontology release.
 
-        _write_validation_json(request.validation_dir / "rdflib_parse.json", payload)
-        return ValidationResult(ok=True, details=payload, output_files=output_files)
-    except ValidationTimeout:
-        message = f"Parser timeout after {timeout}s"
-        payload = {"ok": False, "error": message}
-    except MemoryError as exc:
-        payload = {"ok": False, "error": "rdflib memory limit exceeded"}
-        logger.warning(
-            "rdflib memory error",
-            extra={"stage": "validate", "validator": "rdflib", "error": str(exc)},
-        )
-    except Exception as exc:  # pylint: disable=broad-except
-        payload = {"ok": False, "error": str(exc)}
-    _write_validation_json(request.validation_dir / "rdflib_parse.json", payload)
-    logger.warning(
-        "rdflib validation failed",
-        extra={"stage": "validate", "validator": "rdflib", "error": payload.get("error")},
-    )
-    return ValidationResult(ok=False, details=payload, output_files=[])
+        Returns:
+            Posix-style path referencing the remote storage location.
+        """
 
+        safe_id, safe_version = _safe_identifiers(ontology_id, version)
+        return (self.base_path / safe_id / safe_version).with_suffix("")
 
-def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
-    """Execute Pronto validation in an isolated subprocess and emit OBO Graphs when requested.
+    def available_versions(self, ontology_id: str) -> List[str]:
+        """Return versions aggregated from local cache and remote storage.
 
-    Args:
-        request: Validation request describing ontology inputs and output directories.
-        logger: Structured logger for recording warnings and failures.
+        Args:
+            ontology_id: Identifier whose version catalogue is required.
 
-    Returns:
-        ValidationResult with parsed ontology statistics, subprocess output,
-        and any generated artifacts.
+        Returns:
+            Sorted list combining local and remote version identifiers.
+        """
 
-    Raises:
-        ValidationTimeout: Propagated when Pronto takes longer than allowed.
-    """
-
-    try:
-        timeout = request.config.defaults.validation.parser_timeout_sec
-        payload: Dict[str, object] = {"file_path": str(request.file_path)}
-        normalized_path: Optional[Path] = None
-        if "obographs" in request.config.defaults.normalize_to:
-            request.normalized_dir.mkdir(parents=True, exist_ok=True)
-            normalized_path = request.normalized_dir / (request.file_path.stem + ".json")
-            payload["normalized_path"] = str(normalized_path)
-
-        _log_validation_memory(logger, "pronto", "before")
-        result_payload = _run_validator_subprocess("pronto", payload, timeout=timeout)
-        _log_validation_memory(logger, "pronto", "after")
-        result_payload.setdefault("ok", True)
-        output_files: List[str] = []
-        if normalized_path and result_payload.get("normalized_written"):
-            output_files.append(str(normalized_path))
-        _write_validation_json(request.validation_dir / "pronto_parse.json", result_payload)
-        return ValidationResult(
-            ok=bool(result_payload.get("ok")),
-            details=result_payload,
-            output_files=output_files,
-        )
-    except ValidationTimeout:
-        payload = {"ok": False, "error": f"Parser timeout after {timeout}s"}
-    except ValidatorSubprocessError as exc:
-        payload = {"ok": False, "error": str(exc)}
-    except Exception as exc:  # pragma: no cover - defensive catch
-        payload = {"ok": False, "error": str(exc)}
-    _write_validation_json(request.validation_dir / "pronto_parse.json", payload)
-    logger.warning(
-        "pronto validation failed",
-        extra={"stage": "validate", "validator": "pronto", "error": payload.get("error")},
-    )
-    return ValidationResult(ok=False, details=payload, output_files=[])
-
-
-def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
-    """Inspect ontologies with Owlready2 in a subprocess to count entities and catch parsing errors.
-
-    Args:
-        request: Validation request referencing the ontology to parse.
-        logger: Logger for reporting failures or memory warnings.
-
-    Returns:
-        ValidationResult summarizing entity counts or failure details.
-
-    Raises:
-        None
-    """
-    try:
-        size_mb = request.file_path.stat().st_size / (1024**2)
-        limit = request.config.defaults.validation.skip_reasoning_if_size_mb
-        if size_mb > limit:
-            reason = f"Skipping reasoning for large file (> {limit} MB)"
-            payload = {"ok": True, "skipped": True, "reason": reason}
-            _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
-            logger.info(
-                "owlready2 reasoning skipped",
-                extra={
-                    "stage": "validate",
-                    "validator": "owlready2",
-                    "file_size_mb": round(size_mb, 2),
-                    "limit_mb": limit,
-                },
-            )
-            return ValidationResult(ok=True, details=payload, output_files=[])
-        timeout = request.config.defaults.validation.parser_timeout_sec
-        payload = {"file_path": str(request.file_path)}
-        _log_validation_memory(logger, "owlready2", "before")
-        result_payload = _run_validator_subprocess("owlready2", payload, timeout=timeout)
-        _log_validation_memory(logger, "owlready2", "after")
-        result_payload.setdefault("ok", True)
-        _write_validation_json(request.validation_dir / "owlready2_parse.json", result_payload)
-        return ValidationResult(
-            ok=bool(result_payload.get("ok")), details=result_payload, output_files=[]
-        )
-    except ValidationTimeout:
-        message = f"Parser timeout after {request.config.defaults.validation.parser_timeout_sec}s"
-        payload = {"ok": False, "error": message}
-    except ValidatorSubprocessError as exc:
-        payload = {"ok": False, "error": str(exc)}
-    except Exception as exc:  # pragma: no cover - defensive catch
-        payload = {"ok": False, "error": str(exc)}
-    _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
-    logger.warning(
-        "owlready2 validation failed",
-        extra={"stage": "validate", "validator": "owlready2", "error": payload.get("error")},
-    )
-    return ValidationResult(ok=False, details=payload, output_files=[])
-
-
-def validate_robot(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
-    """Run ROBOT CLI validation and conversion workflows when available.
-
-    Args:
-        request: Validation request detailing ontology paths and output locations.
-        logger: Logger adapter for reporting warnings and CLI errors.
-
-    Returns:
-        ValidationResult describing generated outputs or encountered issues.
-
-    Raises:
-        None
-    """
-    robot_path = shutil.which("robot")
-    result_payload: Dict[str, object]
-    output_files: List[str] = []
-    if not robot_path:
-        result_payload = {"ok": True, "skipped": True, "reason": "robot binary not found"}
-        _write_validation_json(request.validation_dir / "robot_report.json", result_payload)
-        logger.info(
-            "robot not installed; skipping",
-            extra={"stage": "validate", "validator": "robot", "skip": True},
-        )
-        return ValidationResult(ok=True, details=result_payload, output_files=[])
-
-    normalized_path = request.normalized_dir / (request.file_path.stem + ".ttl")
-    request.normalized_dir.mkdir(parents=True, exist_ok=True)
-    report_path = request.validation_dir / "robot_report.tsv"
-    try:
-        _log_validation_memory(logger, "robot", "before")
-        convert_cmd = [
-            robot_path,
-            "convert",
-            "-i",
-            str(request.file_path),
-            "-o",
-            str(normalized_path),
-        ]
-        report_cmd = [robot_path, "report", "-i", str(request.file_path), "-o", str(report_path)]
-        subprocess.run(convert_cmd, check=True, capture_output=True)
-        subprocess.run(report_cmd, check=True, capture_output=True)
-        _log_validation_memory(logger, "robot", "after")
-        output_files = [str(normalized_path), str(report_path)]
-        result_payload = {"ok": True, "outputs": output_files}
-        _write_validation_json(request.validation_dir / "robot_report.json", result_payload)
-        return ValidationResult(ok=True, details=result_payload, output_files=output_files)
-    except subprocess.CalledProcessError as exc:
-        result_payload = {"ok": False, "error": exc.stderr.decode("utf-8", errors="ignore")}
-    except MemoryError as exc:
-        result_payload = {"ok": False, "error": "robot memory limit exceeded"}
-        _write_validation_json(request.validation_dir / "robot_report.json", result_payload)
-        logger.warning(
-            "robot memory error",
-            extra={"stage": "validate", "validator": "robot", "error": str(exc)},
-        )
-        return ValidationResult(ok=False, details=result_payload, output_files=output_files)
-    except Exception as exc:  # pylint: disable=broad-except
-        result_payload = {"ok": False, "error": str(exc)}
-    _write_validation_json(request.validation_dir / "robot_report.json", result_payload)
-    logger.warning(
-        "robot validation failed",
-        extra={"stage": "validate", "validator": "robot", "error": result_payload.get("error")},
-    )
-    return ValidationResult(ok=False, details=result_payload, output_files=output_files)
-
-
-def validate_arelle(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
-    """Validate XBRL ontologies with Arelle CLI if installed.
-
-    Args:
-        request: Validation request referencing the ontology under test.
-        logger: Logger used to communicate validation progress and failures.
-
-    Returns:
-        ValidationResult indicating whether the validation completed and
-        referencing any produced log files.
-
-    Raises:
-        None
-    """
-    try:
-        from arelle import Cntlr  # type: ignore
-
-        entrypoint, artifacts = _prepare_xbrl_package(request, logger)
-        controller = Cntlr.Cntlr(
-            logFile=str(request.validation_dir / "arelle.log"), logToBuffer=True
-        )
-        _log_validation_memory(logger, "arelle", "before")
-        controller.run(["--file", str(entrypoint)])
-        _log_validation_memory(logger, "arelle", "after")
-        payload = {
-            "ok": True,
-            "log": str(request.validation_dir / "arelle.log"),
-            "entrypoint": str(entrypoint),
-        }
-        if artifacts:
-            payload["artifacts"] = artifacts
-        _write_validation_json(request.validation_dir / "arelle_validation.json", payload)
-        outputs = [payload["log"], *(artifacts or [])]
-        return ValidationResult(ok=True, details=payload, output_files=outputs)
-    except ValueError as exc:
-        payload = {"ok": False, "error": str(exc)}
-        _write_validation_json(request.validation_dir / "arelle_validation.json", payload)
-        logger.warning(
-            "arelle package validation failed",
-            extra={"stage": "validate", "validator": "arelle", "error": str(exc)},
-        )
-        return ValidationResult(ok=False, details=payload, output_files=[])
-    except Exception as exc:  # pylint: disable=broad-except
-        payload = {"ok": False, "error": str(exc)}
-        _write_validation_json(request.validation_dir / "arelle_validation.json", payload)
-        logger.warning(
-            "arelle validation failed",
-            extra={"stage": "validate", "validator": "arelle", "error": payload.get("error")},
-        )
-        return ValidationResult(ok=False, details=payload, output_files=[])
-
-
-VALIDATORS = {
-    "rdflib": validate_rdflib,
-    "pronto": validate_pronto,
-    "owlready2": validate_owlready2,
-    "robot": validate_robot,
-    "arelle": validate_arelle,
-}
-
-
-def _load_validator_plugins(logger: Optional[logging.Logger] = None) -> None:
-    """Discover validator plugins registered via entry points."""
-
-    logger = logger or logging.getLogger(__name__)
-    try:
-        entry_points = metadata.entry_points()
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning(
-            "validator plugin discovery failed",
-            extra={"stage": "init", "error": str(exc)},
-        )
-        return
-
-    for entry in entry_points.select(group="docstokg.ontofetch.validator"):
+        local_versions = super().available_versions(ontology_id)
+        safe_id, _ = _safe_identifiers(ontology_id, "unused")
+        remote_dir = self.base_path / safe_id
         try:
-            handler = entry.load()
-            if not callable(handler):
-                raise TypeError("validator plugin must be callable")
-            VALIDATORS[entry.name] = handler
-            logger.info(
-                "validator plugin registered",
-                extra={"stage": "init", "validator": entry.name},
-            )
-        except Exception as exc:  # pragma: no cover - plugin faults
-            logger.warning(
-                "validator plugin failed",
-                extra={"stage": "init", "validator": entry.name, "error": str(exc)},
-            )
+            entries = self.fs.ls(str(remote_dir), detail=False)
+        except FileNotFoundError:
+            entries = []
+        remote_versions = [
+            PurePosixPath(entry).name for entry in entries if entry and not entry.endswith(".tmp")
+        ]
+        return sorted({*local_versions, *remote_versions})
 
+    def available_ontologies(self) -> List[str]:
+        """Return ontology identifiers available locally or remotely.
 
-_load_validator_plugins()
+        Args:
+            None.
 
+        Returns:
+            Sorted set union of local and remote ontology identifiers.
+        """
 
-def _run_validator_task(
-    validator: Callable[[ValidationRequest, logging.Logger], ValidationResult],
-    request: ValidationRequest,
-    logger: logging.Logger,
-) -> ValidationResult:
-    """Execute a single validator with exception guards."""
+        local_ids = super().available_ontologies()
+        try:
+            entries = self.fs.ls(str(self.base_path), detail=False)
+        except FileNotFoundError:
+            entries = []
+        remote_ids = [
+            PurePosixPath(entry).name for entry in entries if entry and not entry.endswith(".tmp")
+        ]
+        return sorted({*local_ids, *remote_ids})
 
-    try:
-        return validator(request, logger)
-    except Exception as exc:  # pylint: disable=broad-except
-        payload = {"ok": False, "error": str(exc)}
-        _write_validation_json(request.validation_dir / f"{request.name}_parse.json", payload)
-        logger.error(
-            "validator crashed",
-            extra={
-                "stage": "validate",
-                "validator": request.name,
-                "error": payload.get("error"),
-            },
-        )
-        return ValidationResult(ok=False, details=payload, output_files=[])
+    def ensure_local_version(self, ontology_id: str, version: str) -> Path:
+        """Mirror a remote ontology version into the local cache when absent.
 
+        Args:
+            ontology_id: Identifier whose version should exist locally.
+            version: Version string to ensure within the local cache.
 
-def run_validators(
-    requests: Iterable[ValidationRequest], logger: logging.Logger
-) -> Dict[str, ValidationResult]:
-    """Execute registered validators and aggregate their results.
+        Returns:
+            Path to the local directory containing the requested version.
+        """
 
-    Args:
-        requests: Iterable of validation requests that specify validators to run.
-        logger: Logger adapter shared across validation executions.
+        base = super().ensure_local_version(ontology_id, version)
+        manifest_path = base / "manifest.json"
+        if manifest_path.exists():
+            return base
 
-    Returns:
-        Mapping from validator name to the corresponding ValidationResult.
-    """
+        remote_dir = self._remote_version_path(ontology_id, version)
+        if not self.fs.exists(str(remote_dir)):
+            return base
 
-    request_list = list(requests)
-    if not request_list:
-        return {}
+        try:
+            remote_files = self.fs.find(str(remote_dir))
+        except FileNotFoundError:
+            remote_files = []
+        for remote_file in remote_files:
+            remote_path = PurePosixPath(remote_file)
+            relative = remote_path.relative_to(remote_dir)
+            local_path = base / Path(str(relative))
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            self.fs.get_file(str(remote_path), str(local_path))
+        return base
 
-    def _determine_max_workers() -> int:
-        for request in request_list:
-            validation_config = getattr(request.config.defaults, "validation", None)
-            if validation_config is not None and hasattr(
-                validation_config, "max_concurrent_validators"
-            ):
-                value = int(validation_config.max_concurrent_validators)
-                return max(1, min(8, value))
-        return 2
+    def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
+        """Upload the finalized local directory to the remote store.
 
-    max_workers = _determine_max_workers()
-    results: Dict[str, ValidationResult] = {}
-    futures: Dict[Any, ValidationRequest] = {}
+        Args:
+            ontology_id: Identifier of the ontology that has completed processing.
+            version: Version string associated with the finalised ontology.
+            local_dir: Directory containing the validated ontology payload.
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for request in request_list:
-            validator = VALIDATORS.get(request.name)
-            if not validator:
+        Returns:
+            None.
+        """
+
+        remote_dir = self._remote_version_path(ontology_id, version)
+        for path in local_dir.rglob("*"):
+            if not path.is_file():
                 continue
-            future = executor.submit(_run_validator_task, validator, request, logger)
-            futures[future] = request
+            relative = path.relative_to(local_dir)
+            remote_path = remote_dir / PurePosixPath(str(relative).replace("\\", "/"))
+            self.fs.makedirs(str(remote_path.parent), exist_ok=True)
+            self.fs.put_file(str(path), str(remote_path))
 
-        for future in as_completed(futures):
-            request = futures[future]
+    def delete_version(self, ontology_id: str, version: str) -> int:
+        """Delete both local and remote copies of a stored version.
+
+        Args:
+            ontology_id: Identifier whose stored version should be deleted.
+            version: Version string targeted for deletion.
+
+        Returns:
+            Total bytes reclaimed across local and remote storage.
+
+        Raises:
+            OSError: Propagated if remote deletion fails irrecoverably.
+        """
+
+        reclaimed = super().delete_version(ontology_id, version)
+        remote_dir = self._remote_version_path(ontology_id, version)
+        if not self.fs.exists(str(remote_dir)):
+            return reclaimed
+
+        try:
+            remote_files = self.fs.find(str(remote_dir))
+        except FileNotFoundError:
+            remote_files = []
+        for remote_file in remote_files:
             try:
-                results[request.name] = future.result()
-            except Exception as exc:  # pragma: no cover - defensive guard
-                payload = {"ok": False, "error": str(exc)}
-                _write_validation_json(
-                    request.validation_dir / f"{request.name}_parse.json", payload
-                )
-                logger.error(
-                    "validator crashed",
-                    extra={
-                        "stage": "validate",
-                        "validator": request.name,
-                        "error": payload.get("error"),
-                    },
-                )
-                results[request.name] = ValidationResult(ok=False, details=payload, output_files=[])
-
-    return results
+                info = self.fs.info(remote_file)
+            except FileNotFoundError:
+                continue
+            size = info.get("size") if isinstance(info, dict) else None
+            if isinstance(size, (int, float)):
+                reclaimed += int(size)
+        self.fs.rm(str(remote_dir), recursive=True)
+        return reclaimed
 
 
-def _run_worker_cli(name: str, stdin_payload: str) -> None:
-    """Execute a validator worker handler and emit JSON to stdout."""
-
-    handler = _WORKER_DISPATCH.get(name)
-    if handler is None:
-        raise SystemExit(f"Unknown validator worker '{name}'")
-    payload = json.loads(stdin_payload or "{}")
-    result = handler(payload)
-    sys.stdout.write(json.dumps(result))
-
-
-def main() -> None:
-    """Entry point for module execution providing validator worker dispatch.
+def get_storage_backend() -> StorageBackend:
+    """Instantiate the storage backend based on environment configuration.
 
     Args:
         None.
 
     Returns:
-        None.
+        Storage backend instance selected according to ``ONTOFETCH_STORAGE_URL``.
     """
 
-    parser = argparse.ArgumentParser(description="Ontology validator worker runner")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    worker_parser = subparsers.add_parser("worker", help="Run a validator worker")
-    worker_parser.add_argument("name", choices=sorted(_WORKER_DISPATCH))
-    args = parser.parse_args()
-
-    if args.command == "worker":
-        payload = sys.stdin.read()
-        _run_worker_cli(args.name, payload)
-    else:  # pragma: no cover - argparse enforces choices
-        parser.error("Unknown command")
+    storage_url = os.getenv("ONTOFETCH_STORAGE_URL")
+    if storage_url:
+        return FsspecStorageBackend(storage_url)
+    return LocalStorageBackend(LOCAL_ONTOLOGY_DIR)
 
 
-if __name__ == "__main__":  # pragma: no cover - exercised via subprocess dispatch
-    main()
+STORAGE: StorageBackend = get_storage_backend()
+
+
 # --- Download pipeline ---
 
 from DocsToKG.OntologyDownload import resolvers as _ontology_resolvers
@@ -5011,7 +4848,16 @@ __all__ = [
     # Validation
     "ValidationRequest",
     "ValidationResult",
+    "ValidationTimeout",
+    "ValidatorSubprocessError",
     "run_validators",
+    "normalize_streaming",
+    "validate_rdflib",
+    "validate_pronto",
+    "validate_owlready2",
+    "validate_robot",
+    "validate_arelle",
+    "main",
     # Pipeline
     "merge_defaults",
     "FetchSpec",
