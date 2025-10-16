@@ -504,6 +504,9 @@ dependencies = [
     "zipp>=3.23.0",
 ]
 
+[project.scripts]
+docstokg-hybrid-validation = "DocsToKG.HybridSearch.validation:main"
+
 [tool.black]
 line-length = 100
 

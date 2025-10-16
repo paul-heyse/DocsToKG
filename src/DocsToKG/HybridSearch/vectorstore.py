@@ -1,4 +1,4 @@
-"""Unified FAISS vector store and similarity utilities."""
+"""Unified FAISS vector store, GPU similarity utilities, and state helpers."""
 
 from __future__ import annotations
 
@@ -17,6 +17,18 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from .storage import ChunkRegistry
 
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    "FaissSearchResult",
+    "FaissVectorStore",
+    "FaissIndexManager",
+    "cosine_against_corpus_gpu",
+    "max_inner_product",
+    "normalize_rows",
+    "pairwise_inner_products",
+    "restore_state",
+    "serialize_state",
+]
 
 try:  # pragma: no cover - exercised via integration tests
     import faiss  # type: ignore
@@ -147,6 +159,19 @@ class FaissVectorStore:
             DenseIndexConfig: Active dense index configuration.
         """
         return self._config
+
+    @property
+    def dim(self) -> int:
+        """Return the dimensionality of vectors stored in the FAISS index.
+
+        Args:
+            None
+
+        Returns:
+            int: Dimensionality of embeddings managed by the index.
+        """
+
+        return self._dim
 
     @property
     def gpu_resources(self) -> "faiss.StandardGpuResources | None":

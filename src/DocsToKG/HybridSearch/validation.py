@@ -4,23 +4,24 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
+import shutil
 import statistics
+import subprocess
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Sequence
 
-import numpy as np
-
 import faiss  # type: ignore
+import numpy as np
 
 from .config import HybridSearchConfigManager
 from .features import FeatureGenerator
 from .ingest import ChunkIngestionPipeline
 from .observability import Observability
-from .operations import restore_state as ops_restore_state
-from .operations import serialize_state as ops_serialize_state
 from .service import HybridSearchService
 from .storage import ChunkRegistry, OpenSearchSimulator
 from .types import (
@@ -32,6 +33,8 @@ from .types import (
     ValidationSummary,
 )
 from .vectorstore import FaissIndexManager, pairwise_inner_products
+from .vectorstore import restore_state as vectorstore_restore_state
+from .vectorstore import serialize_state as vectorstore_serialize_state
 
 
 def load_dataset(path: Path) -> List[Mapping[str, object]]:
@@ -101,6 +104,62 @@ DEFAULT_SCALE_THRESHOLDS: Dict[str, float] = {
 
 BASIC_DENSE_SELF_HIT_THRESHOLD = 0.99
 BASIC_SPARSE_RELEVANCE_THRESHOLD = 0.90
+
+
+def run_pytest_suites(mode: str, extra_args: Sequence[str]) -> int:
+    """Execute hybrid search pytest suites for the requested ``mode``."""
+
+    if mode == "synthetic":
+        pytest_args: list[str] = []
+    elif mode == "real":
+        pytest_args = ["--real-vectors", "-m", "real_vectors and not scale_vectors"]
+    elif mode == "scale":
+        pytest_args = ["--real-vectors", "--scale-vectors", "-m", "scale_vectors"]
+    else:
+        pytest_args = ["--real-vectors", "--scale-vectors"]
+
+    command = [sys.executable, "-m", "pytest", *pytest_args, *extra_args]
+    return subprocess.call(command)
+
+
+def run_real_vector_ci(output_dir: Path, extra_args: Sequence[str]) -> int:
+    """Execute the real-vector CI regression suite and persist validation artifacts."""
+
+    resolved = output_dir.expanduser().resolve()
+    if resolved.exists():
+        shutil.rmtree(resolved)
+    resolved.mkdir(parents=True, exist_ok=True)
+    os.environ["REAL_VECTOR_REPORT_DIR"] = str(resolved)
+
+    commands = [
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "--real-vectors",
+            "tests/test_hybrid_search_real_vectors.py",
+        ],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "--real-vectors",
+            "--scale-vectors",
+            "tests/test_hybrid_search_scale.py",
+        ],
+    ]
+
+    for base_command in commands:
+        result = subprocess.call([*base_command, *extra_args])
+        if result != 0:
+            print(
+                f"Real-vector regression suite failed. Check artifacts in {resolved}",
+                file=sys.stderr,
+            )
+            return result
+
+    print(f"Real-vector validation artifacts stored in {resolved}")
+    return 0
 
 
 class HybridSearchValidator:
@@ -1128,7 +1187,9 @@ class HybridSearchValidator:
                 details={"error": "no queries available"},
             )
 
-        snapshot = ops_serialize_state(self._ingestion.faiss_index, self._registry)
+        snapshot = vectorstore_serialize_state(
+            self._ingestion.faiss_index, self._registry
+        )
 
         baseline_results: List[List[tuple[str, float]]] = []
         for _, query_payload in sampled_pairs:
@@ -1138,7 +1199,7 @@ class HybridSearchValidator:
                 [(result.doc_id, round(result.score, 6)) for result in response.results[:15]]
             )
 
-        ops_restore_state(self._ingestion.faiss_index, snapshot)
+        vectorstore_restore_state(self._ingestion.faiss_index, snapshot)
 
         mismatches = 0
         for (_, query_payload), expected in zip(sampled_pairs, baseline_results):
@@ -1481,7 +1542,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         default="Data/HybridScaleFixture/dataset.jsonl",
         help="Path to JSONL dataset (defaults to the scale fixture at Data/HybridScaleFixture/dataset.jsonl).",
     )
-    parser.add_argument("--config", required=True, help="Path to hybrid search config JSON")
+    parser.add_argument("--config", help="Path to hybrid search config JSON")
     parser.add_argument("--output", default=None, help="Optional output directory for reports")
     parser.add_argument(
         "--mode",
@@ -1501,9 +1562,43 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         default=120,
         help="Maximum queries to sample for scale validations",
     )
+    parser.add_argument(
+        "--run-tests",
+        choices=("synthetic", "real", "scale", "all"),
+        help="Execute hybrid search pytest suites instead of validation sweeps.",
+    )
+    parser.add_argument(
+        "--run-real-ci",
+        action="store_true",
+        help="Run the real-vector CI regression suite and persist validation artifacts.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("artifacts/real_vectors"),
+        help="Directory for real-vector regression artifacts (used with --run-real-ci).",
+    )
+    parser.add_argument(
+        "--pytest-args",
+        nargs=argparse.REMAINDER,
+        help="Additional arguments forwarded to pytest when executing test suites.",
+    )
     args = parser.parse_args(argv)
 
+    extra_pytest_args: list[str] = list(args.pytest_args or [])
+    if extra_pytest_args and not (args.run_tests or args.run_real_ci):
+        parser.error("--pytest-args can only be used with --run-tests or --run-real-ci")
+
+    if args.run_real_ci:
+        raise SystemExit(run_real_vector_ci(args.output_dir, extra_pytest_args))
+
+    if args.run_tests:
+        raise SystemExit(run_pytest_suites(args.run_tests, extra_pytest_args))
+
     dataset = load_dataset(Path(args.dataset))
+    if args.config is None:
+        parser.error("--config is required when running validation sweeps")
+
     manager = HybridSearchConfigManager(Path(args.config))
     config = manager.get()
     embedding_dim = infer_embedding_dim(dataset)
