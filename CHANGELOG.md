@@ -4,6 +4,10 @@ All notable changes to DocsToKG are documented in this file.
 
 ## [Unreleased]
 
+_No unreleased changes._
+
+## [0.2.0] - 2025-02-15
+
 ### Breaking Changes
 - Removed the legacy ``DocsToKG.ContentDownload.resolvers.time`` / ``requests``
   exports and the cached ``_fetch_*`` helper functions; import ``time``,
@@ -19,6 +23,13 @@ All notable changes to DocsToKG are documented in this file.
   dependency, network, and manifest diagnostics.
 - Documentation examples showing how to register custom resolver and validator
   plugins via ``docstokg.ontofetch`` entry points.
+
+### Changed
+- Validator configuration docs now highlight the ``max_concurrent_validators``
+  limit and the operations runbook covers tuning streaming thresholds and
+  validator concurrency for large datasets.
+- Migration guide elaborates on removing legacy module aliases and explains how
+  to apply ``_migrate_manifest_inplace`` for future schema upgrades.
 
 ### Changed
 - Validator configuration docs now highlight the ``max_concurrent_validators``
