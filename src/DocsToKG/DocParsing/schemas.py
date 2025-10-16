@@ -296,40 +296,26 @@ class ChunkRow(BaseModel):
         default=CHUNK_SCHEMA_VERSION, description="Schema version identifier"
     )
     has_image_captions: Optional[bool] = Field(
-        None,
+        default=None,
         description=(
             "Convenience flag mirroring provenance.has_image_captions for quick filtering"
         ),
     )
     has_image_classification: Optional[bool] = Field(
-        None,
+        default=None,
         description=(
             "Convenience flag mirroring provenance.has_image_classification for quick filtering"
         ),
     )
     num_images: Optional[int] = Field(
-        None,
+        default=None,
+        ge=0,
         description="Convenience count mirroring provenance.num_images",
     )
     provenance: Optional["ProvenanceMetadata"] = Field(
         None, description="Optional provenance metadata"
     )
     uuid: Optional[str] = Field(None, description="Optional UUID for chunk")
-    has_image_captions: Optional[bool] = Field(
-        default=None,
-        description=(
-            "Convenience flag mirroring provenance.has_image_captions for quick filtering"
-        ),
-    )
-    has_image_classification: Optional[bool] = Field(
-        default=None,
-        description=("Convenience flag mirroring provenance.has_image_classification"),
-    )
-    num_images: Optional[int] = Field(
-        default=None,
-        ge=0,
-        description=("Convenience image count copied from provenance metadata"),
-    )
 
     @field_validator("schema_version")
     @classmethod

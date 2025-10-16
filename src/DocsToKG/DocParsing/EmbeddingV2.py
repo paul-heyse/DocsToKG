@@ -52,6 +52,7 @@ from DocsToKG.DocParsing._common import (
     data_vectors,
     detect_data_root,
     get_logger,
+    iter_chunks,
     jsonl_load,
     jsonl_save,
     load_manifest_index,
@@ -94,6 +95,22 @@ except Exception as exc:  # pragma: no cover - exercised via tests with stubs
     LLM = None  # type: ignore[assignment]
     PoolingParams = None  # type: ignore[assignment]
     _VLLM_IMPORT_ERROR = exc
+
+
+_QWEN_LLM_CACHE: Dict[Tuple[str, str, int, float, str | None], LLM] = {}
+
+
+def _qwen_cache_key(cfg: QwenCfg) -> Tuple[str, str, int, float, str | None]:
+    """Return cache key tuple for Qwen LLM instances."""
+
+    quant = cfg.quantization if cfg.quantization else None
+    return (
+        str(cfg.model_dir),
+        cfg.dtype,
+        int(cfg.tp),
+        float(cfg.gpu_mem_util),
+        quant,
+    )
 
 # ---- Cache / model path resolution ----
 
@@ -258,18 +275,6 @@ def _ensure_qwen_dependencies() -> None:
 # ---- simple tokenizer for BM25 ----
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)?")
-
-
-def iter_chunk_files(d: Path) -> List[Path]:
-    """Enumerate chunked DocTags JSONL files in a directory.
-
-    Args:
-        d: Directory containing `*.chunks.jsonl` files.
-
-    Returns:
-        Sorted list of chunk file paths.
-    """
-    return sorted(d.glob("*.chunks.jsonl"))
 
 
 def ensure_uuid(rows: List[dict]) -> bool:
@@ -735,15 +740,19 @@ def qwen_embed(
     _ensure_qwen_dependencies()
 
     effective_batch = batch_size or cfg.batch_size
-    llm = LLM(
-        model=str(cfg.model_dir),  # local path
-        task="embed",
-        dtype=cfg.dtype,
-        tensor_parallel_size=cfg.tp,
-        gpu_memory_utilization=cfg.gpu_mem_util,
-        quantization=cfg.quantization,  # None or 'awq' (if a matching AWQ checkpoint exists)
-        download_dir=str(HF_HOME),  # belt & suspenders: keep any aux files in your cache
-    )
+    cache_key = _qwen_cache_key(cfg)
+    llm = _QWEN_LLM_CACHE.get(cache_key)
+    if llm is None:
+        llm = LLM(
+            model=str(cfg.model_dir),  # local path
+            task="embed",
+            dtype=cfg.dtype,
+            tensor_parallel_size=cfg.tp,
+            gpu_memory_utilization=cfg.gpu_mem_util,
+            quantization=cfg.quantization,  # None or 'awq' (if a matching AWQ checkpoint exists)
+            download_dir=str(HF_HOME),  # belt & suspenders: keep any aux files in your cache
+        )
+        _QWEN_LLM_CACHE[cache_key] = llm
     pool = PoolingParams(normalize=True)
     out: List[List[float]] = []
     for i in range(0, len(texts), effective_batch):
@@ -825,8 +834,6 @@ def process_chunk_file_vectors(
         return 0, [], []
     ensure_chunk_schema(rows, chunk_file)
 
-    uuids = [row["uuid"] for row in rows]
-    texts = [row.get("text", "") for row in rows]
     uuids: List[str] = []
     texts: List[str] = []
     for row in rows:
@@ -858,7 +865,7 @@ def process_chunk_file_vectors(
     )
 
     logger.info(
-        "Vectors written",
+        "Embeddings written",
         extra={
             "extra_fields": {
                 "chunk_file": str(chunk_file.name),
@@ -1237,7 +1244,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         },
     )
 
-    files = iter_chunk_files(chunks_dir)
+    files = list(iter_chunks(chunks_dir))
     if not files:
         logger.warning(
             "No chunk files found",
