@@ -4,39 +4,204 @@
 #   "module": "DocsToKG.DocParsing.EmbeddingV2",
 #   "purpose": "Embedding pipelines for DocParsing",
 #   "sections": [
-#     {"id": "_qwen_cache_key", "name": "_qwen_cache_key", "anchor": "function-_qwen_cache_key", "kind": "function"},
-#     {"id": "_resolve_qwen_dir", "name": "_resolve_qwen_dir", "anchor": "function-_resolve_qwen_dir", "kind": "function"},
-#     {"id": "_resolve_splade_dir", "name": "_resolve_splade_dir", "anchor": "function-_resolve_splade_dir", "kind": "function"},
-#     {"id": "_expand_optional", "name": "_expand_optional", "anchor": "function-_expand_optional", "kind": "function"},
-#     {"id": "_resolve_cli_path", "name": "_resolve_cli_path", "anchor": "function-_resolve_cli_path", "kind": "function"},
-#     {"id": "_missing_splade_dependency_message", "name": "_missing_splade_dependency_message", "anchor": "function-_missing_splade_dependency_message", "kind": "function"},
-#     {"id": "_missing_qwen_dependency_message", "name": "_missing_qwen_dependency_message", "anchor": "function-_missing_qwen_dependency_message", "kind": "function"},
-#     {"id": "_ensure_splade_dependencies", "name": "_ensure_splade_dependencies", "anchor": "function-_ensure_splade_dependencies", "kind": "function"},
-#     {"id": "_ensure_qwen_dependencies", "name": "_ensure_qwen_dependencies", "anchor": "function-_ensure_qwen_dependencies", "kind": "function"},
-#     {"id": "ensure_uuid", "name": "ensure_uuid", "anchor": "function-ensure_uuid", "kind": "function"},
-#     {"id": "ensure_chunk_schema", "name": "ensure_chunk_schema", "anchor": "function-ensure_chunk_schema", "kind": "function"},
-#     {"id": "tokens", "name": "tokens", "anchor": "function-tokens", "kind": "function"},
-#     {"id": "BM25Stats", "name": "BM25Stats", "anchor": "class-BM25Stats", "kind": "class"},
-#     {"id": "BM25StatsAccumulator", "name": "BM25StatsAccumulator", "anchor": "class-BM25StatsAccumulator", "kind": "class"},
-#     {"id": "print_bm25_summary", "name": "print_bm25_summary", "anchor": "function-print_bm25_summary", "kind": "function"},
-#     {"id": "bm25_vector", "name": "bm25_vector", "anchor": "function-bm25_vector", "kind": "function"},
-#     {"id": "SpladeCfg", "name": "SpladeCfg", "anchor": "class-SpladeCfg", "kind": "class"},
-#     {"id": "splade_encode", "name": "splade_encode", "anchor": "function-splade_encode", "kind": "function"},
-#     {"id": "_detect_splade_backend", "name": "_detect_splade_backend", "anchor": "function-_detect_splade_backend", "kind": "function"},
-#     {"id": "_get_splade_encoder", "name": "_get_splade_encoder", "anchor": "function-_get_splade_encoder", "kind": "function"},
-#     {"id": "_get_splade_backend_used", "name": "_get_splade_backend_used", "anchor": "function-_get_splade_backend_used", "kind": "function"},
-#     {"id": "SPLADEValidator", "name": "SPLADEValidator", "anchor": "class-SPLADEValidator", "kind": "class"},
-#     {"id": "QwenCfg", "name": "QwenCfg", "anchor": "class-QwenCfg", "kind": "class"},
-#     {"id": "qwen_embed", "name": "qwen_embed", "anchor": "function-qwen_embed", "kind": "function"},
-#     {"id": "process_pass_a", "name": "process_pass_a", "anchor": "function-process_pass_a", "kind": "function"},
-#     {"id": "iter_rows_in_batches", "name": "iter_rows_in_batches", "anchor": "function-iter_rows_in_batches", "kind": "function"},
-#     {"id": "iter_chunk_files", "name": "iter_chunk_files", "anchor": "function-iter_chunk_files", "kind": "function"},
-#     {"id": "process_chunk_file_vectors", "name": "process_chunk_file_vectors", "anchor": "function-process_chunk_file_vectors", "kind": "function"},
-#     {"id": "write_vectors", "name": "write_vectors", "anchor": "function-write_vectors", "kind": "function"},
-#     {"id": "_validate_vectors_for_chunks", "name": "_validate_vectors_for_chunks", "anchor": "function-_validate_vectors_for_chunks", "kind": "function"},
-#     {"id": "build_parser", "name": "build_parser", "anchor": "function-build_parser", "kind": "function"},
-#     {"id": "parse_args", "name": "parse_args", "anchor": "function-parse_args", "kind": "function"},
-#     {"id": "main", "name": "main", "anchor": "function-main", "kind": "function"}
+#     {
+#       "id": "qwen-cache-key",
+#       "name": "_qwen_cache_key",
+#       "anchor": "function-qwen-cache-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-qwen-dir",
+#       "name": "_resolve_qwen_dir",
+#       "anchor": "function-resolve-qwen-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-splade-dir",
+#       "name": "_resolve_splade_dir",
+#       "anchor": "function-resolve-splade-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "expand-optional",
+#       "name": "_expand_optional",
+#       "anchor": "function-expand-optional",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-cli-path",
+#       "name": "_resolve_cli_path",
+#       "anchor": "function-resolve-cli-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "missing-splade-dependency-message",
+#       "name": "_missing_splade_dependency_message",
+#       "anchor": "function-missing-splade-dependency-message",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "missing-qwen-dependency-message",
+#       "name": "_missing_qwen_dependency_message",
+#       "anchor": "function-missing-qwen-dependency-message",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-splade-dependencies",
+#       "name": "_ensure_splade_dependencies",
+#       "anchor": "function-ensure-splade-dependencies",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-qwen-dependencies",
+#       "name": "_ensure_qwen_dependencies",
+#       "anchor": "function-ensure-qwen-dependencies",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-uuid",
+#       "name": "ensure_uuid",
+#       "anchor": "function-ensure-uuid",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-chunk-schema",
+#       "name": "ensure_chunk_schema",
+#       "anchor": "function-ensure-chunk-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "tokens",
+#       "name": "tokens",
+#       "anchor": "function-tokens",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bm25stats",
+#       "name": "BM25Stats",
+#       "anchor": "class-bm25stats",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bm25statsaccumulator",
+#       "name": "BM25StatsAccumulator",
+#       "anchor": "class-bm25statsaccumulator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "print-bm25-summary",
+#       "name": "print_bm25_summary",
+#       "anchor": "function-print-bm25-summary",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bm25-vector",
+#       "name": "bm25_vector",
+#       "anchor": "function-bm25-vector",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "spladecfg",
+#       "name": "SpladeCfg",
+#       "anchor": "class-spladecfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "splade-encode",
+#       "name": "splade_encode",
+#       "anchor": "function-splade-encode",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-splade-backend",
+#       "name": "_detect_splade_backend",
+#       "anchor": "function-detect-splade-backend",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-splade-encoder",
+#       "name": "_get_splade_encoder",
+#       "anchor": "function-get-splade-encoder",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-splade-backend-used",
+#       "name": "_get_splade_backend_used",
+#       "anchor": "function-get-splade-backend-used",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "spladevalidator",
+#       "name": "SPLADEValidator",
+#       "anchor": "class-spladevalidator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "qwencfg",
+#       "name": "QwenCfg",
+#       "anchor": "class-qwencfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "qwen-embed",
+#       "name": "qwen_embed",
+#       "anchor": "function-qwen-embed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process-pass-a",
+#       "name": "process_pass_a",
+#       "anchor": "function-process-pass-a",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-rows-in-batches",
+#       "name": "iter_rows_in_batches",
+#       "anchor": "function-iter-rows-in-batches",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-chunk-files",
+#       "name": "iter_chunk_files",
+#       "anchor": "function-iter-chunk-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process-chunk-file-vectors",
+#       "name": "process_chunk_file_vectors",
+#       "anchor": "function-process-chunk-file-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-vectors",
+#       "name": "write_vectors",
+#       "anchor": "function-write-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-vectors-for-chunks",
+#       "name": "_validate_vectors_for_chunks",
+#       "anchor": "function-validate-vectors-for-chunks",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-parser",
+#       "name": "build_parser",
+#       "anchor": "function-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-args",
+#       "name": "parse_args",
+#       "anchor": "function-parse-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

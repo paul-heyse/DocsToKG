@@ -3,41 +3,216 @@
 #   "module": "DocsToKG.DocParsing.pipelines",
 #   "purpose": "Implements DocsToKG.DocParsing.pipelines behaviors and helpers",
 #   "sections": [
-#     {"id": "_looks_like_filesystem_path", "name": "_looks_like_filesystem_path", "anchor": "function-_looks_like_filesystem_path", "kind": "function"},
-#     {"id": "resolve_pdf_model_path", "name": "resolve_pdf_model_path", "anchor": "function-resolve_pdf_model_path", "kind": "function"},
-#     {"id": "add_data_root_option", "name": "add_data_root_option", "anchor": "function-add_data_root_option", "kind": "function"},
-#     {"id": "add_resume_force_options", "name": "add_resume_force_options", "anchor": "function-add_resume_force_options", "kind": "function"},
-#     {"id": "prepare_data_root", "name": "prepare_data_root", "anchor": "function-prepare_data_root", "kind": "function"},
-#     {"id": "resolve_pipeline_path", "name": "resolve_pipeline_path", "anchor": "function-resolve_pipeline_path", "kind": "function"},
-#     {"id": "_dedupe_preserve_order", "name": "_dedupe_preserve_order", "anchor": "function-_dedupe_preserve_order", "kind": "function"},
-#     {"id": "_normalize_served_model_names", "name": "_normalize_served_model_names", "anchor": "function-_normalize_served_model_names", "kind": "function"},
-#     {"id": "detect_vllm_version", "name": "detect_vllm_version", "anchor": "function-detect_vllm_version", "kind": "function"},
-#     {"id": "validate_served_models", "name": "validate_served_models", "anchor": "function-validate_served_models", "kind": "function"},
-#     {"id": "pdf_build_parser", "name": "pdf_build_parser", "anchor": "function-pdf_build_parser", "kind": "function"},
-#     {"id": "pdf_parse_args", "name": "pdf_parse_args", "anchor": "function-pdf_parse_args", "kind": "function"},
-#     {"id": "PdfTask", "name": "PdfTask", "anchor": "class-PdfTask", "kind": "class"},
-#     {"id": "PdfConversionResult", "name": "PdfConversionResult", "anchor": "class-PdfConversionResult", "kind": "class"},
-#     {"id": "_safe_float", "name": "_safe_float", "anchor": "function-_safe_float", "kind": "function"},
-#     {"id": "normalize_conversion_result", "name": "normalize_conversion_result", "anchor": "function-normalize_conversion_result", "kind": "function"},
-#     {"id": "port_is_free", "name": "port_is_free", "anchor": "function-port_is_free", "kind": "function"},
-#     {"id": "probe_models", "name": "probe_models", "anchor": "function-probe_models", "kind": "function"},
-#     {"id": "probe_metrics", "name": "probe_metrics", "anchor": "function-probe_metrics", "kind": "function"},
-#     {"id": "stream_logs", "name": "stream_logs", "anchor": "function-stream_logs", "kind": "function"},
-#     {"id": "start_vllm", "name": "start_vllm", "anchor": "function-start_vllm", "kind": "function"},
-#     {"id": "wait_for_vllm", "name": "wait_for_vllm", "anchor": "function-wait_for_vllm", "kind": "function"},
-#     {"id": "stop_vllm", "name": "stop_vllm", "anchor": "function-stop_vllm", "kind": "function"},
-#     {"id": "ensure_vllm", "name": "ensure_vllm", "anchor": "function-ensure_vllm", "kind": "function"},
-#     {"id": "list_pdfs", "name": "list_pdfs", "anchor": "function-list_pdfs", "kind": "function"},
-#     {"id": "pdf_convert_one", "name": "pdf_convert_one", "anchor": "function-pdf_convert_one", "kind": "function"},
-#     {"id": "pdf_main", "name": "pdf_main", "anchor": "function-pdf_main", "kind": "function"},
-#     {"id": "html_build_parser", "name": "html_build_parser", "anchor": "function-html_build_parser", "kind": "function"},
-#     {"id": "html_parse_args", "name": "html_parse_args", "anchor": "function-html_parse_args", "kind": "function"},
-#     {"id": "HtmlTask", "name": "HtmlTask", "anchor": "class-HtmlTask", "kind": "class"},
-#     {"id": "HtmlConversionResult", "name": "HtmlConversionResult", "anchor": "class-HtmlConversionResult", "kind": "class"},
-#     {"id": "_get_converter", "name": "_get_converter", "anchor": "function-_get_converter", "kind": "function"},
-#     {"id": "list_htmls", "name": "list_htmls", "anchor": "function-list_htmls", "kind": "function"},
-#     {"id": "html_convert_one", "name": "html_convert_one", "anchor": "function-html_convert_one", "kind": "function"},
-#     {"id": "html_main", "name": "html_main", "anchor": "function-html_main", "kind": "function"}
+#     {
+#       "id": "looks-like-filesystem-path",
+#       "name": "_looks_like_filesystem_path",
+#       "anchor": "function-looks-like-filesystem-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-pdf-model-path",
+#       "name": "resolve_pdf_model_path",
+#       "anchor": "function-resolve-pdf-model-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "add-data-root-option",
+#       "name": "add_data_root_option",
+#       "anchor": "function-add-data-root-option",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "add-resume-force-options",
+#       "name": "add_resume_force_options",
+#       "anchor": "function-add-resume-force-options",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prepare-data-root",
+#       "name": "prepare_data_root",
+#       "anchor": "function-prepare-data-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-pipeline-path",
+#       "name": "resolve_pipeline_path",
+#       "anchor": "function-resolve-pipeline-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dedupe-preserve-order",
+#       "name": "_dedupe_preserve_order",
+#       "anchor": "function-dedupe-preserve-order",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-served-model-names",
+#       "name": "_normalize_served_model_names",
+#       "anchor": "function-normalize-served-model-names",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-vllm-version",
+#       "name": "detect_vllm_version",
+#       "anchor": "function-detect-vllm-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-served-models",
+#       "name": "validate_served_models",
+#       "anchor": "function-validate-served-models",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf-build-parser",
+#       "name": "pdf_build_parser",
+#       "anchor": "function-pdf-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf-parse-args",
+#       "name": "pdf_parse_args",
+#       "anchor": "function-pdf-parse-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdftask",
+#       "name": "PdfTask",
+#       "anchor": "class-pdftask",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "pdfconversionresult",
+#       "name": "PdfConversionResult",
+#       "anchor": "class-pdfconversionresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "safe-float",
+#       "name": "_safe_float",
+#       "anchor": "function-safe-float",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-conversion-result",
+#       "name": "normalize_conversion_result",
+#       "anchor": "function-normalize-conversion-result",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "port-is-free",
+#       "name": "port_is_free",
+#       "anchor": "function-port-is-free",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "probe-models",
+#       "name": "probe_models",
+#       "anchor": "function-probe-models",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "probe-metrics",
+#       "name": "probe_metrics",
+#       "anchor": "function-probe-metrics",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stream-logs",
+#       "name": "stream_logs",
+#       "anchor": "function-stream-logs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "start-vllm",
+#       "name": "start_vllm",
+#       "anchor": "function-start-vllm",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "wait-for-vllm",
+#       "name": "wait_for_vllm",
+#       "anchor": "function-wait-for-vllm",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stop-vllm",
+#       "name": "stop_vllm",
+#       "anchor": "function-stop-vllm",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-vllm",
+#       "name": "ensure_vllm",
+#       "anchor": "function-ensure-vllm",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list-pdfs",
+#       "name": "list_pdfs",
+#       "anchor": "function-list-pdfs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf-convert-one",
+#       "name": "pdf_convert_one",
+#       "anchor": "function-pdf-convert-one",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf-main",
+#       "name": "pdf_main",
+#       "anchor": "function-pdf-main",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html-build-parser",
+#       "name": "html_build_parser",
+#       "anchor": "function-html-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html-parse-args",
+#       "name": "html_parse_args",
+#       "anchor": "function-html-parse-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "htmltask",
+#       "name": "HtmlTask",
+#       "anchor": "class-htmltask",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "htmlconversionresult",
+#       "name": "HtmlConversionResult",
+#       "anchor": "class-htmlconversionresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-converter",
+#       "name": "_get_converter",
+#       "anchor": "function-get-converter",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list-htmls",
+#       "name": "list_htmls",
+#       "anchor": "function-list-htmls",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html-convert-one",
+#       "name": "html_convert_one",
+#       "anchor": "function-html-convert-one",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html-main",
+#       "name": "html_main",
+#       "anchor": "function-html-main",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

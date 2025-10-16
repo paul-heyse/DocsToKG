@@ -31,10 +31,14 @@ class FaissRouter:
 
     @property
     def per_namespace(self) -> bool:
+        """Return ``True`` when a dedicated store is provisioned per namespace."""
+
         return self._per_namespace
 
     @property
     def default_store(self) -> DenseVectorStore:
+        """Return the default store used when namespaces are disabled."""
+
         return self._default_store
 
     def get(self, namespace: Optional[str]) -> DenseVectorStore:

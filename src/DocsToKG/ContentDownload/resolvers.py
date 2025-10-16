@@ -3,43 +3,228 @@
 #   "module": "DocsToKG.ContentDownload.resolvers",
 #   "purpose": "Resolver definitions and pipeline orchestration",
 #   "sections": [
-#     {"id": "ResolverResult", "name": "ResolverResult", "anchor": "class-ResolverResult", "kind": "class"},
-#     {"id": "ResolverConfig", "name": "ResolverConfig", "anchor": "class-ResolverConfig", "kind": "class"},
-#     {"id": "AttemptRecord", "name": "AttemptRecord", "anchor": "class-AttemptRecord", "kind": "class"},
-#     {"id": "DownloadOutcome", "name": "DownloadOutcome", "anchor": "class-DownloadOutcome", "kind": "class"},
-#     {"id": "PipelineResult", "name": "PipelineResult", "anchor": "class-PipelineResult", "kind": "class"},
-#     {"id": "Resolver", "name": "Resolver", "anchor": "class-Resolver", "kind": "class"},
-#     {"id": "ResolverMetrics", "name": "ResolverMetrics", "anchor": "class-ResolverMetrics", "kind": "class"},
-#     {"id": "_fetch_semantic_scholar_data", "name": "_fetch_semantic_scholar_data", "anchor": "function-_fetch_semantic_scholar_data", "kind": "function"},
-#     {"id": "_fetch_unpaywall_data", "name": "_fetch_unpaywall_data", "anchor": "function-_fetch_unpaywall_data", "kind": "function"},
-#     {"id": "ResolverRegistry", "name": "ResolverRegistry", "anchor": "class-ResolverRegistry", "kind": "class"},
-#     {"id": "RegisteredResolver", "name": "RegisteredResolver", "anchor": "class-RegisteredResolver", "kind": "class"},
-#     {"id": "ApiResolverBase", "name": "ApiResolverBase", "anchor": "class-ApiResolverBase", "kind": "class"},
-#     {"id": "_absolute_url", "name": "_absolute_url", "anchor": "function-_absolute_url", "kind": "function"},
-#     {"id": "_collect_candidate_urls", "name": "_collect_candidate_urls", "anchor": "function-_collect_candidate_urls", "kind": "function"},
-#     {"id": "find_pdf_via_meta", "name": "find_pdf_via_meta", "anchor": "function-find_pdf_via_meta", "kind": "function"},
-#     {"id": "find_pdf_via_link", "name": "find_pdf_via_link", "anchor": "function-find_pdf_via_link", "kind": "function"},
-#     {"id": "find_pdf_via_anchor", "name": "find_pdf_via_anchor", "anchor": "function-find_pdf_via_anchor", "kind": "function"},
-#     {"id": "default_resolvers", "name": "default_resolvers", "anchor": "function-default_resolvers", "kind": "function"},
-#     {"id": "ArxivResolver", "name": "ArxivResolver", "anchor": "class-ArxivResolver", "kind": "class"},
-#     {"id": "CoreResolver", "name": "CoreResolver", "anchor": "class-CoreResolver", "kind": "class"},
-#     {"id": "CrossrefResolver", "name": "CrossrefResolver", "anchor": "class-CrossrefResolver", "kind": "class"},
-#     {"id": "DoajResolver", "name": "DoajResolver", "anchor": "class-DoajResolver", "kind": "class"},
-#     {"id": "EuropePmcResolver", "name": "EuropePmcResolver", "anchor": "class-EuropePmcResolver", "kind": "class"},
-#     {"id": "FigshareResolver", "name": "FigshareResolver", "anchor": "class-FigshareResolver", "kind": "class"},
-#     {"id": "HalResolver", "name": "HalResolver", "anchor": "class-HalResolver", "kind": "class"},
-#     {"id": "LandingPageResolver", "name": "LandingPageResolver", "anchor": "class-LandingPageResolver", "kind": "class"},
-#     {"id": "OpenAireResolver", "name": "OpenAireResolver", "anchor": "class-OpenAireResolver", "kind": "class"},
-#     {"id": "OpenAlexResolver", "name": "OpenAlexResolver", "anchor": "class-OpenAlexResolver", "kind": "class"},
-#     {"id": "OsfResolver", "name": "OsfResolver", "anchor": "class-OsfResolver", "kind": "class"},
-#     {"id": "PmcResolver", "name": "PmcResolver", "anchor": "class-PmcResolver", "kind": "class"},
-#     {"id": "SemanticScholarResolver", "name": "SemanticScholarResolver", "anchor": "class-SemanticScholarResolver", "kind": "class"},
-#     {"id": "UnpaywallResolver", "name": "UnpaywallResolver", "anchor": "class-UnpaywallResolver", "kind": "class"},
-#     {"id": "WaybackResolver", "name": "WaybackResolver", "anchor": "class-WaybackResolver", "kind": "class"},
-#     {"id": "ZenodoResolver", "name": "ZenodoResolver", "anchor": "class-ZenodoResolver", "kind": "class"},
-#     {"id": "_callable_accepts_argument", "name": "_callable_accepts_argument", "anchor": "function-_callable_accepts_argument", "kind": "function"},
-#     {"id": "_RunState", "name": "_RunState", "anchor": "class-_RunState", "kind": "class"},
-#     {"id": "ResolverPipeline", "name": "ResolverPipeline", "anchor": "class-ResolverPipeline", "kind": "class"}
+#     {
+#       "id": "resolverresult",
+#       "name": "ResolverResult",
+#       "anchor": "class-resolverresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolverconfig",
+#       "name": "ResolverConfig",
+#       "anchor": "class-resolverconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "attemptrecord",
+#       "name": "AttemptRecord",
+#       "anchor": "class-attemptrecord",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadoutcome",
+#       "name": "DownloadOutcome",
+#       "anchor": "class-downloadoutcome",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "pipelineresult",
+#       "name": "PipelineResult",
+#       "anchor": "class-pipelineresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolver",
+#       "name": "Resolver",
+#       "anchor": "class-resolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolvermetrics",
+#       "name": "ResolverMetrics",
+#       "anchor": "class-resolvermetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "fetch-semantic-scholar-data",
+#       "name": "_fetch_semantic_scholar_data",
+#       "anchor": "function-fetch-semantic-scholar-data",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-unpaywall-data",
+#       "name": "_fetch_unpaywall_data",
+#       "anchor": "function-fetch-unpaywall-data",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolverregistry",
+#       "name": "ResolverRegistry",
+#       "anchor": "class-resolverregistry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "registeredresolver",
+#       "name": "RegisteredResolver",
+#       "anchor": "class-registeredresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "apiresolverbase",
+#       "name": "ApiResolverBase",
+#       "anchor": "class-apiresolverbase",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "absolute-url",
+#       "name": "_absolute_url",
+#       "anchor": "function-absolute-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-candidate-urls",
+#       "name": "_collect_candidate_urls",
+#       "anchor": "function-collect-candidate-urls",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-meta",
+#       "name": "find_pdf_via_meta",
+#       "anchor": "function-find-pdf-via-meta",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-link",
+#       "name": "find_pdf_via_link",
+#       "anchor": "function-find-pdf-via-link",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-anchor",
+#       "name": "find_pdf_via_anchor",
+#       "anchor": "function-find-pdf-via-anchor",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "default-resolvers",
+#       "name": "default_resolvers",
+#       "anchor": "function-default-resolvers",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "arxivresolver",
+#       "name": "ArxivResolver",
+#       "anchor": "class-arxivresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "coreresolver",
+#       "name": "CoreResolver",
+#       "anchor": "class-coreresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "crossrefresolver",
+#       "name": "CrossrefResolver",
+#       "anchor": "class-crossrefresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doajresolver",
+#       "name": "DoajResolver",
+#       "anchor": "class-doajresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "europepmcresolver",
+#       "name": "EuropePmcResolver",
+#       "anchor": "class-europepmcresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "figshareresolver",
+#       "name": "FigshareResolver",
+#       "anchor": "class-figshareresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "halresolver",
+#       "name": "HalResolver",
+#       "anchor": "class-halresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "landingpageresolver",
+#       "name": "LandingPageResolver",
+#       "anchor": "class-landingpageresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "openaireresolver",
+#       "name": "OpenAireResolver",
+#       "anchor": "class-openaireresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "openalexresolver",
+#       "name": "OpenAlexResolver",
+#       "anchor": "class-openalexresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "osfresolver",
+#       "name": "OsfResolver",
+#       "anchor": "class-osfresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "pmcresolver",
+#       "name": "PmcResolver",
+#       "anchor": "class-pmcresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "semanticscholarresolver",
+#       "name": "SemanticScholarResolver",
+#       "anchor": "class-semanticscholarresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "unpaywallresolver",
+#       "name": "UnpaywallResolver",
+#       "anchor": "class-unpaywallresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "waybackresolver",
+#       "name": "WaybackResolver",
+#       "anchor": "class-waybackresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "zenodoresolver",
+#       "name": "ZenodoResolver",
+#       "anchor": "class-zenodoresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "callable-accepts-argument",
+#       "name": "_callable_accepts_argument",
+#       "anchor": "function-callable-accepts-argument",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "runstate",
+#       "name": "_RunState",
+#       "anchor": "class-runstate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolverpipeline",
+#       "name": "ResolverPipeline",
+#       "anchor": "class-resolverpipeline",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

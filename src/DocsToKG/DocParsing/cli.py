@@ -22,6 +22,18 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "scan-pdf-html",
+#       "name": "_scan_pdf_html",
+#       "anchor": "function-scan-pdf-html",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "directory-contains-suffixes",
+#       "name": "_directory_contains_suffixes",
+#       "anchor": "function-directory-contains-suffixes",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "detect-mode",
 #       "name": "_detect_mode",
 #       "anchor": "function-detect-mode",

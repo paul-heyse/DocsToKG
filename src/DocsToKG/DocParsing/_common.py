@@ -22,6 +22,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "init-hf-env",
+#       "name": "init_hf_env",
+#       "anchor": "function-init-hf-env",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "detect-data-root",
 #       "name": "detect_data_root",
 #       "anchor": "function-detect-data-root",
@@ -73,6 +79,42 @@
 #       "id": "derive-doc-id-and-vectors-path",
 #       "name": "derive_doc_id_and_vectors_path",
 #       "anchor": "function-derive-doc-id-and-vectors-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-relative-doc-id",
+#       "name": "compute_relative_doc_id",
+#       "anchor": "function-compute-relative-doc-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "should-skip-output",
+#       "name": "should_skip_output",
+#       "anchor": "function-should-skip-output",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stringify-path",
+#       "name": "_stringify_path",
+#       "anchor": "function-stringify-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-skip",
+#       "name": "manifest_log_skip",
+#       "anchor": "function-manifest-log-skip",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-success",
+#       "name": "manifest_log_success",
+#       "anchor": "function-manifest-log-success",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-failure",
+#       "name": "manifest_log_failure",
+#       "anchor": "function-manifest-log-failure",
 #       "kind": "function"
 #     },
 #     {
@@ -584,6 +626,19 @@ def manifest_log_skip(
     hash_alg: Optional[str] = None,
     **extra: object,
 ) -> None:
+    """Record a manifest entry indicating the pipeline skipped work.
+
+    Args:
+        stage: Logical pipeline phase originating the log entry.
+        doc_id: Identifier of the document being processed.
+        input_path: Source artefact that would have been processed.
+        input_hash: Content hash associated with ``input_path``.
+        output_path: Destination artefact that remained unchanged.
+        duration_s: Elapsed seconds for the short-circuited step.
+        schema_version: Manifest schema version for downstream readers.
+        hash_alg: Hash algorithm used to compute ``input_hash``.
+        **extra: Additional metadata to merge into the manifest row.
+    """
     payload: Dict[str, object] = {
         "stage": stage,
         "doc_id": doc_id,
@@ -611,6 +666,19 @@ def manifest_log_success(
     hash_alg: Optional[str] = None,
     **extra: object,
 ) -> None:
+    """Record a manifest entry marking successful pipeline output.
+
+    Args:
+        stage: Logical pipeline phase originating the log entry.
+        doc_id: Identifier of the document being processed.
+        duration_s: Elapsed seconds for the successful step.
+        schema_version: Manifest schema version for downstream readers.
+        input_path: Source artefact that produced ``output_path``.
+        input_hash: Content hash associated with ``input_path``.
+        output_path: Destination artefact written by the pipeline.
+        hash_alg: Hash algorithm used to compute ``input_hash``.
+        **extra: Additional metadata to merge into the manifest row.
+    """
     payload: Dict[str, object] = {
         "stage": stage,
         "doc_id": doc_id,
@@ -639,6 +707,20 @@ def manifest_log_failure(
     hash_alg: Optional[str] = None,
     **extra: object,
 ) -> None:
+    """Record a manifest entry describing a failed pipeline attempt.
+
+    Args:
+        stage: Logical pipeline phase originating the log entry.
+        doc_id: Identifier of the document being processed.
+        duration_s: Elapsed seconds before the failure occurred.
+        schema_version: Manifest schema version for downstream readers.
+        input_path: Source artefact that triggered the failure.
+        input_hash: Content hash associated with ``input_path``.
+        output_path: Destination artefact that may be incomplete.
+        error: Human-readable description of the failure condition.
+        hash_alg: Hash algorithm used to compute ``input_hash``.
+        **extra: Additional metadata to merge into the manifest row.
+    """
     payload: Dict[str, object] = {
         "stage": stage,
         "doc_id": doc_id,

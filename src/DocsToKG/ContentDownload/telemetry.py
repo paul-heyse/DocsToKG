@@ -196,6 +196,12 @@ class JsonlSink:
             self._file.flush()
 
     def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+        """Append an attempt record to the JSONL log.
+
+        Args:
+            record: Attempt metadata captured during resolver execution.
+            timestamp: Optional ISO-8601 timestamp overriding the current time.
+        """
         ts = timestamp or _utc_timestamp()
         self._write(
             {
@@ -219,6 +225,11 @@ class JsonlSink:
         )
 
     def log_manifest(self, entry: ManifestEntry) -> None:
+        """Append a manifest record representing a persisted document.
+
+        Args:
+            entry: Manifest entry produced once a resolver finalises output.
+        """
         self._write(
             {
                 "record_type": "manifest",
@@ -243,10 +254,17 @@ class JsonlSink:
         )
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Append a run-level summary describing aggregate metrics.
+
+        Args:
+            summary: Mapping containing summary counters and metadata.
+        """
         payload = {"record_type": "summary", "timestamp": _utc_timestamp(), **summary}
         self._write(payload)
 
     def close(self) -> None:
+        """Flush buffered data and close the underlying JSONL file handle."""
+
         with self._lock:
             if not self._file.closed:
                 self._file.close()
@@ -289,6 +307,12 @@ class CsvSink:
             self._writer.writeheader()
 
     def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+        """Append an attempt record to the CSV log.
+
+        Args:
+            record: Attempt metadata captured during resolver execution.
+            timestamp: Optional override for the timestamp column.
+        """
         ts = timestamp or _utc_timestamp()
         row = {
             "timestamp": ts,
@@ -312,12 +336,18 @@ class CsvSink:
             self._file.flush()
 
     def log_manifest(self, entry: ManifestEntry) -> None:  # pragma: no cover
+        """Ignore manifest writes for CSV sinks (interface compatibility)."""
+
         return None
 
     def log_summary(self, summary: Dict[str, Any]) -> None:  # pragma: no cover
+        """Ignore summary writes for CSV sinks (interface compatibility)."""
+
         return None
 
     def close(self) -> None:
+        """Flush buffered data and close the CSV file handle."""
+
         with self._lock:
             if not self._file.closed:
                 self._file.close()
@@ -336,19 +366,27 @@ class MultiSink:
         self._sinks = list(sinks)
 
     def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+        """Fan out an attempt record to each sink in the composite."""
+
         ts = timestamp or _utc_timestamp()
         for sink in self._sinks:
             sink.log_attempt(record, timestamp=ts)
 
     def log_manifest(self, entry: ManifestEntry) -> None:
+        """Fan out manifest records to every sink in the collection."""
+
         for sink in self._sinks:
             sink.log_manifest(entry)
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Fan out summary payloads to every sink in the collection."""
+
         for sink in self._sinks:
             sink.log_summary(summary)
 
     def close(self) -> None:
+        """Close sinks while capturing the first raised exception."""
+
         errors: List[BaseException] = []
         for sink in self._sinks:
             try:

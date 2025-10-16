@@ -2,7 +2,110 @@
 # {
 #   "module": "DocsToKG.OntologyDownload.config",
 #   "purpose": "Configuration models and helpers for the ontology downloader",
-#   "sections": []
+#   "sections": [
+#     {
+#       "id": "configerror",
+#       "name": "ConfigError",
+#       "anchor": "class-configerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ensure-python-version",
+#       "name": "ensure_python_version",
+#       "anchor": "function-ensure-python-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-sequence",
+#       "name": "_coerce_sequence",
+#       "anchor": "function-coerce-sequence",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-rate-limit-to-rps",
+#       "name": "parse_rate_limit_to_rps",
+#       "anchor": "function-parse-rate-limit-to-rps",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "loggingconfiguration",
+#       "name": "LoggingConfiguration",
+#       "anchor": "class-loggingconfiguration",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationconfig",
+#       "name": "ValidationConfig",
+#       "anchor": "class-validationconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadconfiguration",
+#       "name": "DownloadConfiguration",
+#       "anchor": "class-downloadconfiguration",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "defaultsconfig",
+#       "name": "DefaultsConfig",
+#       "anchor": "class-defaultsconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolvedconfig",
+#       "name": "ResolvedConfig",
+#       "anchor": "class-resolvedconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "environmentoverrides",
+#       "name": "EnvironmentOverrides",
+#       "anchor": "class-environmentoverrides",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-env-overrides",
+#       "name": "get_env_overrides",
+#       "anchor": "function-get-env-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-env-overrides",
+#       "name": "_apply_env_overrides",
+#       "anchor": "function-apply-env-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-resolved-config",
+#       "name": "build_resolved_config",
+#       "anchor": "function-build-resolved-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-schema",
+#       "name": "_validate_schema",
+#       "anchor": "function-validate-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-raw-yaml",
+#       "name": "load_raw_yaml",
+#       "anchor": "function-load-raw-yaml",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-config",
+#       "name": "load_config",
+#       "anchor": "function-load-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-config",
+#       "name": "validate_config",
+#       "anchor": "function-validate-config",
+#       "kind": "function"
+#     }
+#   ]
 # }
 # === /NAVMAP ===
 
@@ -83,6 +186,8 @@ def parse_rate_limit_to_rps(limit_str: str) -> Optional[float]:
 
 
 class LoggingConfiguration(BaseModel):
+    """Logging-related configuration for ontology downloads."""
+
     level: str = Field(default="INFO", description="Logging level (DEBUG, INFO, WARNING, ERROR)")
     max_log_size_mb: int = Field(default=100, gt=0, description="Maximum size of rotated log files")
     retention_days: int = Field(default=30, ge=1, description="Retention period for log files")
@@ -90,6 +195,8 @@ class LoggingConfiguration(BaseModel):
     @field_validator("level")
     @classmethod
     def validate_level(cls, value: str) -> str:
+        """Normalise logging levels and ensure they match the supported set."""
+
         valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR"}
         upper = value.upper()
         if upper not in valid_levels:
@@ -100,6 +207,8 @@ class LoggingConfiguration(BaseModel):
 
 
 class ValidationConfig(BaseModel):
+    """Settings controlling ontology validation throughput and limits."""
+
     parser_timeout_sec: int = Field(default=60, gt=0, le=3600)
     max_memory_mb: int = Field(default=2048, gt=0)
     skip_reasoning_if_size_mb: int = Field(default=500, gt=0)
@@ -110,6 +219,8 @@ class ValidationConfig(BaseModel):
 
 
 class DownloadConfiguration(BaseModel):
+    """HTTP download, retry, and politeness settings for resolvers."""
+
     max_retries: int = Field(default=5, ge=0, le=20)
     timeout_sec: int = Field(default=30, gt=0, le=300)
     download_timeout_sec: int = Field(default=300, gt=0, le=3600)
@@ -140,6 +251,8 @@ class DownloadConfiguration(BaseModel):
     @field_validator("rate_limits")
     @classmethod
     def validate_rate_limits(cls, value: Dict[str, str]) -> Dict[str, str]:
+        """Ensure per-resolver rate limits follow the supported syntax."""
+
         for service, limit in value.items():
             if not _RATE_LIMIT_PATTERN.match(limit):
                 raise ValueError(
@@ -149,18 +262,24 @@ class DownloadConfiguration(BaseModel):
         return value
 
     def rate_limit_per_second(self) -> float:
+        """Return the configured per-host rate limit in requests per second."""
+
         parsed = parse_rate_limit_to_rps(self.per_host_rate_limit)
         if parsed is None:
             raise ValueError(f"Invalid rate limit format: {self.per_host_rate_limit}")
         return parsed
 
     def parse_service_rate_limit(self, service: str) -> Optional[float]:
+        """Return service-specific rate limits expressed as requests per second."""
+
         limit_str = self.rate_limits.get(service)
         if limit_str is None:
             return None
         return parse_rate_limit_to_rps(limit_str)
 
     def normalized_allowed_hosts(self) -> Optional[Tuple[Set[str], Set[str]]]:
+        """Split allowed host list into exact domains and wildcard suffixes."""
+
         if not self.allowed_hosts:
             return None
 
@@ -202,6 +321,8 @@ class DownloadConfiguration(BaseModel):
         request_id: Optional[str] = None,
         timestamp: Optional[datetime] = None,
     ) -> Dict[str, str]:
+        """Compute polite HTTP headers for outbound resolver requests."""
+
         headers: Dict[str, str] = {
             str(key): str(value)
             for key, value in (self.polite_headers or {}).items()
@@ -241,6 +362,8 @@ _VALID_RESOLVERS = {
 
 
 class DefaultsConfig(BaseModel):
+    """Composite configuration applied when no per-spec overrides exist."""
+
     accept_licenses: List[str] = Field(
         default_factory=lambda: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"]
     )
@@ -255,6 +378,8 @@ class DefaultsConfig(BaseModel):
     @field_validator("prefer_source")
     @classmethod
     def validate_prefer_source(cls, value: List[str]) -> List[str]:
+        """Ensure preferred resolvers belong to the supported resolver set."""
+
         unknown = [resolver for resolver in value if resolver not in _VALID_RESOLVERS]
         if unknown:
             raise ValueError(
@@ -269,11 +394,15 @@ class DefaultsConfig(BaseModel):
 
 
 class ResolvedConfig(BaseModel):
+    """Materialised configuration combining defaults and fetch specifications."""
+
     defaults: DefaultsConfig
     specs: List["FetchSpec"] = Field(default_factory=list)
 
     @classmethod
     def from_defaults(cls) -> "ResolvedConfig":
+        """Construct a resolved configuration populated with default values only."""
+
         return cls(defaults=DefaultsConfig(), specs=[])
 
     model_config = {
@@ -283,6 +412,8 @@ class ResolvedConfig(BaseModel):
 
 
 class EnvironmentOverrides(BaseSettings):
+    """Pydantic settings model exposing environment-derived overrides."""
+
     max_retries: Optional[int] = Field(default=None, alias="ONTOFETCH_MAX_RETRIES")
     timeout_sec: Optional[int] = Field(default=None, alias="ONTOFETCH_TIMEOUT_SEC")
     download_timeout_sec: Optional[int] = Field(
@@ -296,6 +427,8 @@ class EnvironmentOverrides(BaseSettings):
 
 
 def get_env_overrides() -> Dict[str, str]:
+    """Return environment-derived overrides as stringified key/value pairs."""
+
     env = EnvironmentOverrides()
     return {
         key: str(value) for key, value in env.model_dump(by_alias=False, exclude_none=True).items()
@@ -303,6 +436,8 @@ def get_env_overrides() -> Dict[str, str]:
 
 
 def _apply_env_overrides(defaults: DefaultsConfig) -> None:
+    """Mutate ``defaults`` in-place using values from :class:`EnvironmentOverrides`."""
+
     env = EnvironmentOverrides()
     logger = logging.getLogger("DocsToKG.OntologyDownload")
 

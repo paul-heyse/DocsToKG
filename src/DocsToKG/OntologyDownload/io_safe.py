@@ -2,7 +2,26 @@
 # {
 #   "module": "DocsToKG.OntologyDownload.io_safe",
 #   "purpose": "IO safety helpers for the ontology downloader",
-#   "sections": []
+#   "sections": [
+#     {
+#       "id": "sanitize-filename",
+#       "name": "sanitize_filename",
+#       "anchor": "function-sanitize-filename",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-correlation-id",
+#       "name": "generate_correlation_id",
+#       "anchor": "function-generate-correlation-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "mask-sensitive-data",
+#       "name": "mask_sensitive_data",
+#       "anchor": "function-mask-sensitive-data",
+#       "kind": "function"
+#     }
+#   ]
 # }
 # === /NAVMAP ===
 

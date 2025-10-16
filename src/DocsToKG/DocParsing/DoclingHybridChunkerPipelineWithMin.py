@@ -5,9 +5,27 @@
 #   "purpose": "CLI entry points for DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin workflows",
 #   "sections": [
 #     {
-#       "id": "compute-relative-doc-id",
-#       "name": "compute_relative_doc_id",
-#       "anchor": "function-compute-relative-doc-id",
+#       "id": "dedupe-preserve-order",
+#       "name": "_dedupe_preserve_order",
+#       "anchor": "function-dedupe-preserve-order",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-str-list",
+#       "name": "_ensure_str_list",
+#       "anchor": "function-ensure-str-list",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-structural-marker-config",
+#       "name": "_load_structural_marker_config",
+#       "anchor": "function-load-structural-marker-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-chunk-files",
+#       "name": "_validate_chunk_files",
+#       "anchor": "function-validate-chunk-files",
 #       "kind": "function"
 #     },
 #     {
@@ -39,6 +57,36 @@
 #       "name": "Rec",
 #       "anchor": "class-rec",
 #       "kind": "class"
+#     },
+#     {
+#       "id": "chunkworkerconfig",
+#       "name": "ChunkWorkerConfig",
+#       "anchor": "class-chunkworkerconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunktask",
+#       "name": "ChunkTask",
+#       "anchor": "class-chunktask",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkresult",
+#       "name": "ChunkResult",
+#       "anchor": "class-chunkresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunk-worker-initializer",
+#       "name": "_chunk_worker_initializer",
+#       "anchor": "function-chunk-worker-initializer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process-chunk-task",
+#       "name": "_process_chunk_task",
+#       "anchor": "function-process-chunk-task",
+#       "kind": "function"
 #     },
 #     {
 #       "id": "merge-rec",
@@ -436,9 +484,21 @@ class Rec:
 
 @dataclass(slots=True)
 class ChunkWorkerConfig:
+    """Configuration shared across worker processes performing chunking.
+
+    Attributes:
+        tokenizer_model: HuggingFace identifier used for tokenisation.
+        min_tokens: Minimum tokens per chunk before spillover occurs.
+        max_tokens: Hard ceiling on chunk size accepted by embedding models.
+        soft_barrier_margin: Buffer applied when soft-limiting chunk size.
+        heading_markers: Strings that designate heading boundaries.
+        caption_markers: Strings that mark caption boundaries.
+        docling_version: Docling version used to produce metadata.
+    """
+
     tokenizer_model: str
-    min_tokens: int
-    max_tokens: int
+   min_tokens: int
+   max_tokens: int
     soft_barrier_margin: int
     heading_markers: Tuple[str, ...]
     caption_markers: Tuple[str, ...]
@@ -447,8 +507,19 @@ class ChunkWorkerConfig:
 
 @dataclass(slots=True)
 class ChunkTask:
+    """Work item describing a single document chunking request.
+
+    Attributes:
+        doc_path: Source document that must be chunked.
+        output_path: Destination path for generated chunk JSONL.
+        doc_id: Unique identifier assigned to the document.
+        doc_stem: Filesystem-friendly stem used for derived artefacts.
+        input_hash: Content hash captured during ingestion.
+        parse_engine: Docling engine used to produce structured content.
+    """
+
     doc_path: Path
-    output_path: Path
+   output_path: Path
     doc_id: str
     doc_stem: str
     input_hash: str
@@ -457,8 +528,23 @@ class ChunkTask:
 
 @dataclass(slots=True)
 class ChunkResult:
+    """Result returned by chunking workers to the orchestrator.
+
+    Attributes:
+        doc_id: Unique identifier assigned to the document.
+        doc_stem: Filesystem-friendly stem used for derived artefacts.
+        status: Worker outcome (``success``, ``skip``, or ``failure``).
+        duration_s: Processing duration measured in seconds.
+        input_path: Source document path.
+        output_path: Chunk JSONL destination.
+        input_hash: Content hash associated with the document.
+        chunk_count: Number of chunks produced.
+        parse_engine: Docling engine used to produce structured content.
+        error: Optional failure description supplied on error.
+    """
+
     doc_id: str
-    doc_stem: str
+   doc_stem: str
     status: str
     duration_s: float
     input_path: Path
@@ -1129,6 +1215,11 @@ def main(args: argparse.Namespace | None = None) -> int:
         return 0
 
     def handle_result(result: ChunkResult) -> None:
+        """Persist manifest information and raise on worker failure.
+
+        Args:
+            result: Structured outcome emitted by the chunking worker.
+        """
         duration = round(result.duration_s, 3)
         if result.status != "success":
             manifest_log_failure(

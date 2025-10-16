@@ -16,6 +16,12 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "gaugesample",
+#       "name": "GaugeSample",
+#       "anchor": "class-gaugesample",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "metricscollector",
 #       "name": "MetricsCollector",
 #       "anchor": "class-metricscollector",

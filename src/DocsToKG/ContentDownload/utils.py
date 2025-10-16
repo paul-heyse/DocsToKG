@@ -26,6 +26,30 @@
 #       "name": "dedupe",
 #       "anchor": "function-dedupe",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-pmid",
+#       "name": "normalize_pmid",
+#       "anchor": "function-normalize-pmid",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-arxiv",
+#       "name": "normalize_arxiv",
+#       "anchor": "function-normalize-arxiv",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "slugify",
+#       "name": "slugify",
+#       "anchor": "function-slugify",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-url",
+#       "name": "normalize_url",
+#       "anchor": "function-normalize-url",
+#       "kind": "function"
 #     }
 #   ]
 # }

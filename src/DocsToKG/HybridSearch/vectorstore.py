@@ -46,6 +46,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "cosine-topk-blockwise",
+#       "name": "cosine_topk_blockwise",
+#       "anchor": "function-cosine-topk-blockwise",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "serialize-state",
 #       "name": "serialize_state",
 #       "anchor": "function-serialize-state",
@@ -56,6 +62,12 @@
 #       "name": "restore_state",
 #       "anchor": "function-restore-state",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "managedfaissadapter",
+#       "name": "ManagedFaissAdapter",
+#       "anchor": "class-managedfaissadapter",
+#       "kind": "class"
 #     }
 #   ]
 # }
@@ -1377,15 +1389,48 @@ class ManagedFaissAdapter(DenseVectorStore):
         self._inner = inner
 
     def search(self, query: np.ndarray, top_k: int) -> List[FaissSearchResult]:
+        """Delegate single-query search to the managed store.
+
+        Args:
+            query: Query embedding to search against the index.
+            top_k: Number of nearest neighbours to return.
+
+        Returns:
+            Ranked FAISS search results.
+        """
         return self._inner.search(query, top_k)
 
     def search_many(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
+        """Execute vector search for multiple queries in a batch.
+
+        Args:
+            queries: Matrix of query embeddings.
+            top_k: Number of nearest neighbours per query.
+
+        Returns:
+            Per-query lists of FAISS search results.
+        """
         return self._inner.search_many(queries, top_k)
 
     def search_batch(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
+        """Alias for :meth:`search_many` retaining legacy naming.
+
+        Args:
+            queries: Matrix of query embeddings.
+            top_k: Number of nearest neighbours per query.
+
+        Returns:
+            Per-query lists of FAISS search results.
+        """
         return self._inner.search_batch(queries, top_k)
 
     def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
+        """Insert vectors and identifiers into the managed index.
+
+        Args:
+            vectors: Embedding vectors to index.
+            vector_ids: Identifiers associated with ``vectors``.
+        """
         self._inner.add(vectors, vector_ids)
 
     def add_batch(
@@ -1395,31 +1440,57 @@ class ManagedFaissAdapter(DenseVectorStore):
         *,
         batch_size: int = 65_536,
     ) -> None:
+        """Insert vectors using batching heuristics from the inner store.
+
+        Args:
+            vectors: Embedding vectors to index.
+            vector_ids: Identifiers associated with ``vectors``.
+            batch_size: Chunk size forwarded to the underlying store.
+        """
         self._inner.add_batch(vectors, vector_ids, batch_size=batch_size)
 
     def remove(self, vector_ids: Sequence[str]) -> None:
+        """Remove vectors corresponding to ``vector_ids`` from the index."""
+
         self._inner.remove(vector_ids)
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
+        """Configure identifier resolver on the inner store.
+
+        Args:
+            resolver: Callable mapping FAISS ids to external identifiers.
+        """
         self._inner.set_id_resolver(resolver)
 
     def needs_training(self) -> bool:
+        """Return ``True`` when the underlying index requires training."""
+
         return self._inner.needs_training()
 
     def train(self, vectors: Sequence[np.ndarray]) -> None:
+        """Train the managed index using ``vectors``."""
+
         self._inner.train(vectors)
 
     @property
     def device(self) -> int:
+        """Return the CUDA device identifier for the managed index."""
+
         return self._inner.device
 
     @property
     def gpu_resources(self):
+        """Return GPU resources backing the managed index."""
+
         return self._inner.gpu_resources
 
     @property
     def ntotal(self) -> int:
+        """Return the number of vectors stored in the managed index."""
+
         return self._inner.ntotal
 
     def rebuild_if_needed(self) -> bool:
+        """Trigger inner index rebuild when required by FAISS heuristics."""
+
         return self._inner.rebuild_if_needed()

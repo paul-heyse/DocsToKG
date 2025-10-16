@@ -3,18 +3,78 @@
 #   "module": "DocsToKG.OntologyDownload.resolvers",
 #   "purpose": "Implements DocsToKG.OntologyDownload.resolvers behaviors and helpers",
 #   "sections": [
-#     {"id": "normalize_license_to_spdx", "name": "normalize_license_to_spdx", "anchor": "function-normalize_license_to_spdx", "kind": "function"},
-#     {"id": "_get_service_bucket", "name": "_get_service_bucket", "anchor": "function-_get_service_bucket", "kind": "function"},
-#     {"id": "FetchPlan", "name": "FetchPlan", "anchor": "class-FetchPlan", "kind": "class"},
-#     {"id": "BaseResolver", "name": "BaseResolver", "anchor": "class-BaseResolver", "kind": "class"},
-#     {"id": "OBOResolver", "name": "OBOResolver", "anchor": "class-OBOResolver", "kind": "class"},
-#     {"id": "OLSResolver", "name": "OLSResolver", "anchor": "class-OLSResolver", "kind": "class"},
-#     {"id": "BioPortalResolver", "name": "BioPortalResolver", "anchor": "class-BioPortalResolver", "kind": "class"},
-#     {"id": "LOVResolver", "name": "LOVResolver", "anchor": "class-LOVResolver", "kind": "class"},
-#     {"id": "SKOSResolver", "name": "SKOSResolver", "anchor": "class-SKOSResolver", "kind": "class"},
-#     {"id": "XBRLResolver", "name": "XBRLResolver", "anchor": "class-XBRLResolver", "kind": "class"},
-#     {"id": "OntobeeResolver", "name": "OntobeeResolver", "anchor": "class-OntobeeResolver", "kind": "class"},
-#     {"id": "_load_resolver_plugins", "name": "_load_resolver_plugins", "anchor": "function-_load_resolver_plugins", "kind": "function"}
+#     {
+#       "id": "normalize-license-to-spdx",
+#       "name": "normalize_license_to_spdx",
+#       "anchor": "function-normalize-license-to-spdx",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-service-bucket",
+#       "name": "_get_service_bucket",
+#       "anchor": "function-get-service-bucket",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetchplan",
+#       "name": "FetchPlan",
+#       "anchor": "class-fetchplan",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "baseresolver",
+#       "name": "BaseResolver",
+#       "anchor": "class-baseresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "oboresolver",
+#       "name": "OBOResolver",
+#       "anchor": "class-oboresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "olsresolver",
+#       "name": "OLSResolver",
+#       "anchor": "class-olsresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bioportalresolver",
+#       "name": "BioPortalResolver",
+#       "anchor": "class-bioportalresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "lovresolver",
+#       "name": "LOVResolver",
+#       "anchor": "class-lovresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "skosresolver",
+#       "name": "SKOSResolver",
+#       "anchor": "class-skosresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "directresolver",
+#       "name": "DirectResolver",
+#       "anchor": "class-directresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "xbrlresolver",
+#       "name": "XBRLResolver",
+#       "anchor": "class-xbrlresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ontobeeresolver",
+#       "name": "OntobeeResolver",
+#       "anchor": "class-ontobeeresolver",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

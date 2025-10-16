@@ -577,6 +577,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 import sys
 import threading
@@ -687,6 +688,41 @@ if HAS_REQUESTS and HAS_PYALEX:
             assert method.upper() == "GET"
             return self._response
 
+    class _PdfStreamResponse:
+        def __init__(self, chunks: Iterable[bytes]) -> None:
+            self.status_code = 200
+            self.headers = {"Content-Type": "application/pdf"}
+            self._chunks = list(chunks)
+
+        def __enter__(self) -> "_PdfStreamResponse":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            self.close()
+
+        def iter_content(self, chunk_size: int):
+            yield from self._chunks
+
+        def close(self) -> None:  # pragma: no cover - nothing persistent to release
+            return
+
+    class _SequentialSession:
+        def __init__(self, responses: Iterable[Any]) -> None:
+            self._responses = iter(responses)
+            self.calls: List[Tuple[str, str]] = []
+
+        def head(self, url: str, **kwargs: Any) -> _DummyHead:
+            return _DummyHead()
+
+        def request(self, method: str, url: str, **kwargs: Any):
+            method_upper = method.upper()
+            assert method_upper == "GET"
+            self.calls.append((method_upper, url))
+            try:
+                return next(self._responses)
+            except StopIteration as exc:  # pragma: no cover - defensive
+                raise AssertionError(f"Unexpected extra request for {method_upper} {url}") from exc
+
     def _make_artifact(tmp_path: Path) -> WorkArtifact:
         pdf_dir = tmp_path / "pdfs"
         html_dir = tmp_path / "html"
@@ -711,13 +747,17 @@ if HAS_REQUESTS and HAS_PYALEX:
 
     def test_download_candidate_returns_cached(tmp_path: Path) -> None:
         artifact = _make_artifact(tmp_path)
-        previous_path = str(artifact.pdf_dir / "conditional.pdf")
+        cached_bytes = b"%PDF-1.4\n%%EOF\n"
+        previous_path = artifact.pdf_dir / "conditional.pdf"
+        previous_path.parent.mkdir(parents=True, exist_ok=True)
+        previous_path.write_bytes(cached_bytes)
+        previous_path_str = str(previous_path)
         previous = {
             "etag": '"etag"',
             "last_modified": "Mon, 01 Jan 2024 00:00:00 GMT",
-            "path": previous_path,
-            "sha256": "abc",
-            "content_length": 123,
+            "path": previous_path_str,
+            "sha256": hashlib.sha256(cached_bytes).hexdigest(),
+            "content_length": len(cached_bytes),
         }
         response = _DummyResponse(
             304,
@@ -734,10 +774,94 @@ if HAS_REQUESTS and HAS_PYALEX:
         )
 
         assert outcome.classification is Classification.CACHED
-        assert outcome.path == previous_path
-        assert outcome.sha256 == "abc"
+        assert outcome.path == previous_path_str
+        assert outcome.sha256 == previous["sha256"]
         assert outcome.last_modified == previous["last_modified"]
-        assert not (artifact.pdf_dir / "conditional.pdf").exists()
+        assert Path(previous_path_str).exists()
+
+    def test_download_candidate_refetches_missing_cached_artifact(tmp_path: Path, caplog) -> None:
+        artifact = _make_artifact(tmp_path)
+        url = "https://example.org/missing.pdf"
+        previous_path = artifact.pdf_dir / "conditional.pdf"
+        previous_path.parent.mkdir(parents=True, exist_ok=True)
+        previous = {
+            "etag": '"etag"',
+            "last_modified": "Mon, 01 Jan 2024 00:00:00 GMT",
+            "path": str(previous_path),
+            "sha256": "abc",
+            "content_length": 123,
+        }
+        session = _SequentialSession(
+            [
+                _DummyResponse(304, {"Content-Type": "application/pdf"}),
+                _PdfStreamResponse([b"%PDF-1.4\n", b"%%EOF\n"]),
+            ]
+        )
+
+        caplog.set_level(logging.WARNING)
+        outcome = download_candidate(
+            session,
+            artifact,
+            url,
+            referer=None,
+            timeout=5.0,
+            context={"previous": {url: previous}},
+        )
+
+        assert outcome.classification is Classification.PDF
+        assert outcome.http_status == 200
+        assert outcome.path is not None
+        assert Path(outcome.path).exists()
+        downgrade_logs = [
+            record for record in caplog.records if getattr(record, "reason", "") == "conditional-cache-invalid"
+        ]
+        assert len(downgrade_logs) == 1
+        assert len(session.calls) == 2
+
+    def test_download_candidate_refetches_when_cached_digest_mismatch(
+        tmp_path: Path, caplog
+    ) -> None:
+        artifact = _make_artifact(tmp_path)
+        url = "https://example.org/mismatch.pdf"
+        previous_path = artifact.pdf_dir / "conditional.pdf"
+        previous_path.parent.mkdir(parents=True, exist_ok=True)
+        old_data = b"not a real pdf payload"
+        previous_path.write_bytes(old_data)
+        previous = {
+            "etag": '"etag"',
+            "last_modified": "Mon, 01 Jan 2024 00:00:00 GMT",
+            "path": str(previous_path),
+            "sha256": "deadbeef",
+            "content_length": len(old_data),
+        }
+        new_chunks = [b"%PDF-1.5\n", b"%%EOF\n"]
+        session = _SequentialSession(
+            [
+                _DummyResponse(304, {"Content-Type": "application/pdf"}),
+                _PdfStreamResponse(new_chunks),
+            ]
+        )
+
+        caplog.set_level(logging.WARNING)
+        outcome = download_candidate(
+            session,
+            artifact,
+            url,
+            referer=None,
+            timeout=5.0,
+            context={"previous": {url: previous}},
+        )
+
+        assert outcome.classification is Classification.PDF
+        assert outcome.http_status == 200
+        assert outcome.path is not None
+        assert Path(outcome.path).exists()
+        assert Path(outcome.path).read_bytes() == b"".join(new_chunks)
+        downgrade_logs = [
+            record for record in caplog.records if getattr(record, "reason", "") == "conditional-cache-invalid"
+        ]
+        assert len(downgrade_logs) == 1
+        assert len(session.calls) == 2
 
     def test_download_candidate_handles_incomplete_resume_metadata(tmp_path: Path, caplog) -> None:
         artifact = _make_artifact(tmp_path)

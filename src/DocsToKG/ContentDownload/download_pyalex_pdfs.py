@@ -4,38 +4,150 @@
 #   "module": "DocsToKG.ContentDownload.download_pyalex_pdfs",
 #   "purpose": "OpenAlex PDF download CLI and supporting utilities",
 #   "sections": [
-#     {"id": "_utc_timestamp", "name": "_utc_timestamp", "anchor": "function-_utc_timestamp", "kind": "function"},
-#     {"id": "_has_pdf_eof", "name": "_has_pdf_eof", "anchor": "function-_has_pdf_eof", "kind": "function"},
-#     {"id": "slugify", "name": "slugify", "anchor": "function-slugify", "kind": "function"},
-#     {"id": "ensure_dir", "name": "ensure_dir", "anchor": "function-ensure_dir", "kind": "function"},
-#     {"id": "_parse_domain_interval", "name": "_parse_domain_interval", "anchor": "function-_parse_domain_interval", "kind": "function"},
-#     {"id": "_make_session", "name": "_make_session", "anchor": "function-_make_session", "kind": "function"},
-#     {"id": "JsonlSink", "name": "JsonlSink", "anchor": "class-JsonlSink", "kind": "class"},
-#     {"id": "CsvSink", "name": "CsvSink", "anchor": "class-CsvSink", "kind": "class"},
-#     {"id": "MultiSink", "name": "MultiSink", "anchor": "class-MultiSink", "kind": "class"},
-#     {"id": "load_previous_manifest", "name": "load_previous_manifest", "anchor": "function-load_previous_manifest", "kind": "function"},
-#     {"id": "build_manifest_entry", "name": "build_manifest_entry", "anchor": "function-build_manifest_entry", "kind": "function"},
-#     {"id": "classify_payload", "name": "classify_payload", "anchor": "function-classify_payload", "kind": "function"},
-#     {"id": "_extract_filename_from_disposition", "name": "_extract_filename_from_disposition", "anchor": "function-_extract_filename_from_disposition", "kind": "function"},
-#     {"id": "_infer_suffix", "name": "_infer_suffix", "anchor": "function-_infer_suffix", "kind": "function"},
-#     {"id": "_update_tail_buffer", "name": "_update_tail_buffer", "anchor": "function-_update_tail_buffer", "kind": "function"},
-#     {"id": "WorkArtifact", "name": "WorkArtifact", "anchor": "class-WorkArtifact", "kind": "class"},
-#     {"id": "DownloadState", "name": "DownloadState", "anchor": "class-DownloadState", "kind": "class"},
-#     {"id": "_build_download_outcome", "name": "_build_download_outcome", "anchor": "function-_build_download_outcome", "kind": "function"},
-#     {"id": "_normalize_pmid", "name": "_normalize_pmid", "anchor": "function-_normalize_pmid", "kind": "function"},
-#     {"id": "_normalize_arxiv", "name": "_normalize_arxiv", "anchor": "function-_normalize_arxiv", "kind": "function"},
-#     {"id": "_collect_location_urls", "name": "_collect_location_urls", "anchor": "function-_collect_location_urls", "kind": "function"},
-#     {"id": "build_query", "name": "build_query", "anchor": "function-build_query", "kind": "function"},
-#     {"id": "resolve_topic_id_if_needed", "name": "resolve_topic_id_if_needed", "anchor": "function-resolve_topic_id_if_needed", "kind": "function"},
-#     {"id": "create_artifact", "name": "create_artifact", "anchor": "function-create_artifact", "kind": "function"},
-#     {"id": "download_candidate", "name": "download_candidate", "anchor": "function-download_candidate", "kind": "function"},
-#     {"id": "read_resolver_config", "name": "read_resolver_config", "anchor": "function-read_resolver_config", "kind": "function"},
-#     {"id": "_seed_resolver_toggle_defaults", "name": "_seed_resolver_toggle_defaults", "anchor": "function-_seed_resolver_toggle_defaults", "kind": "function"},
-#     {"id": "apply_config_overrides", "name": "apply_config_overrides", "anchor": "function-apply_config_overrides", "kind": "function"},
-#     {"id": "load_resolver_config", "name": "load_resolver_config", "anchor": "function-load_resolver_config", "kind": "function"},
-#     {"id": "iterate_openalex", "name": "iterate_openalex", "anchor": "function-iterate_openalex", "kind": "function"},
-#     {"id": "process_one_work", "name": "process_one_work", "anchor": "function-process_one_work", "kind": "function"},
-#     {"id": "main", "name": "main", "anchor": "function-main", "kind": "function"}
+#     {
+#       "id": "utc-timestamp",
+#       "name": "_utc_timestamp",
+#       "anchor": "function-utc-timestamp",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "has-pdf-eof",
+#       "name": "_has_pdf_eof",
+#       "anchor": "function-has-pdf-eof",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "update-tail-buffer",
+#       "name": "_update_tail_buffer",
+#       "anchor": "function-update-tail-buffer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-dir",
+#       "name": "ensure_dir",
+#       "anchor": "function-ensure-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "workartifact",
+#       "name": "WorkArtifact",
+#       "anchor": "class-workartifact",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadstate",
+#       "name": "DownloadState",
+#       "anchor": "class-downloadstate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-download-outcome",
+#       "name": "_build_download_outcome",
+#       "anchor": "function-build-download-outcome",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-domain-interval",
+#       "name": "_parse_domain_interval",
+#       "anchor": "function-parse-domain-interval",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make-session",
+#       "name": "_make_session",
+#       "anchor": "function-make-session",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-previous-manifest",
+#       "name": "load_previous_manifest",
+#       "anchor": "function-load-previous-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-manifest-entry",
+#       "name": "build_manifest_entry",
+#       "anchor": "function-build-manifest-entry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-location-urls",
+#       "name": "_collect_location_urls",
+#       "anchor": "function-collect-location-urls",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-query",
+#       "name": "build_query",
+#       "anchor": "function-build-query",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lookup-topic-id",
+#       "name": "_lookup_topic_id",
+#       "anchor": "function-lookup-topic-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-topic-id-if-needed",
+#       "name": "resolve_topic_id_if_needed",
+#       "anchor": "function-resolve-topic-id-if-needed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-artifact",
+#       "name": "create_artifact",
+#       "anchor": "function-create-artifact",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "download-candidate",
+#       "name": "download_candidate",
+#       "anchor": "function-download-candidate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-resolver-config",
+#       "name": "read_resolver_config",
+#       "anchor": "function-read-resolver-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "seed-resolver-toggle-defaults",
+#       "name": "_seed_resolver_toggle_defaults",
+#       "anchor": "function-seed-resolver-toggle-defaults",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-config-overrides",
+#       "name": "apply_config_overrides",
+#       "anchor": "function-apply-config-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-resolver-config",
+#       "name": "load_resolver_config",
+#       "anchor": "function-load-resolver-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iterate-openalex",
+#       "name": "iterate_openalex",
+#       "anchor": "function-iterate-openalex",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process-one-work",
+#       "name": "process_one_work",
+#       "anchor": "function-process-one-work",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -800,14 +912,16 @@ def download_candidate(
     )
     content_type_hint = ""
     attempt_conditional = True
+    logged_conditional_downgrade = False
 
-    while True:
-        headers = dict(base_headers)
-        if attempt_conditional:
-            headers.update(cond_helper.build_headers())
+    start = time.monotonic()
+    try:
+        while True:
+            headers = dict(base_headers)
+            if attempt_conditional:
+                headers.update(cond_helper.build_headers())
 
-        start = time.monotonic()
-        try:
+            start = time.monotonic()
             with request_with_retries(
                 session,
                 "GET",
@@ -842,11 +956,18 @@ def download_candidate(
                     try:
                         cached = cond_helper.interpret_response(response)
                     except (FileNotFoundError, ValueError) as exc:
-                        LOGGER.warning(
-                            "Conditional cache invalid for %s: %s. Refetching without conditional headers.",
-                            url,
-                            exc,
-                        )
+                        if not logged_conditional_downgrade:
+                            LOGGER.warning(
+                                "Conditional cache invalid for %s: %s. Refetching without conditional headers.",
+                                url,
+                                exc,
+                                extra={
+                                    "reason": "conditional-cache-invalid",
+                                    "url": url,
+                                    "work_id": artifact.work_id,
+                                },
+                            )
+                            logged_conditional_downgrade = True
                         attempt_conditional = False
                         cond_helper = ConditionalRequestHelper()
                         continue
@@ -927,7 +1048,7 @@ def download_candidate(
                         last_modified=modified_result.last_modified,
                         extracted_text_path=None,
                     )
-                    sniff_buffer = bytearray()
+                sniff_buffer = bytearray()
                 detected: Optional[Classification] = None
                 flagged_unknown = False
                 dest_path: Optional[Path] = None
@@ -960,7 +1081,9 @@ def download_candidate(
                                 suffix = _infer_suffix(
                                     url, content_type, disposition, detected, default_suffix
                                 )
-                                dest_dir = artifact.html_dir if detected == Classification.HTML else artifact.pdf_dir
+                                dest_dir = (
+                                    artifact.html_dir if detected == Classification.HTML else artifact.pdf_dir
+                                )
                                 dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
                                 ensure_dir(dest_path.parent)
                                 part_path = dest_path.with_suffix(dest_path.suffix + ".part")
@@ -1030,9 +1153,9 @@ def download_candidate(
                             content_type=content_type,
                             elapsed_ms=elapsed_ms,
                         )
-            finally:
-                if handle is not None:
-                    handle.close()
+                finally:
+                    if handle is not None:
+                        handle.close()
 
             if dry_run:
                 return _build_download_outcome(

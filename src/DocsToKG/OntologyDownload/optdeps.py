@@ -63,9 +63,13 @@ class _StubNamespaceManager:
         self._bindings: Dict[str, str] = {}
 
     def bind(self, prefix: str, namespace: str) -> None:
+        """Register a namespace binding in the lightweight stub manager."""
+
         self._bindings[prefix] = namespace
 
     def namespaces(self) -> Iterable[tuple[str, str]]:
+        """Yield currently registered ``(prefix, namespace)`` pairs."""
+
         return self._bindings.items()
 
 
