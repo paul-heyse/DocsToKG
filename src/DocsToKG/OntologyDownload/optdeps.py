@@ -118,6 +118,13 @@ class _StubGraph:
         destination.write(b"# Stub TTL output\n")
         return destination
 
+    def add(self, triple: Iterable[Any]) -> None:
+        items = list(triple)
+        if len(items) != 3:
+            raise ValueError("rdflib.Graph.add expects a triple")
+        subject, predicate, obj = (str(part) for part in items)
+        self._triples.append((subject, predicate, obj))
+
     def bind(self, prefix: str, namespace: str) -> None:
         self.namespace_manager.bind(prefix, namespace)
 

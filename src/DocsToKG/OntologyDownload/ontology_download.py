@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib as _hashlib
+
 from .config import (
     ConfigError,
     DefaultsConfig,
@@ -71,6 +73,8 @@ from .validation_core import (
     validate_robot,
     main as validation_main,
 )
+
+hashlib = _hashlib
 
 DefaultsConfiguration = DefaultsConfig
 LoggingConfig = LoggingConfiguration
@@ -149,4 +153,5 @@ __all__ = [
     "get_owlready2",
     "get_manifest_schema",
     "mask_sensitive_data",
+    "hashlib",
 ]
