@@ -118,37 +118,37 @@
 
 ### 4.1 Introduce ApiResolverBase Class
 
-- [ ] 4.1.1 Define `ApiResolverBase` class inheriting from `RegisteredResolver` in resolvers module
-- [ ] 4.1.2 Implement `_request_json(session, method, url, *, config, timeout=None, params=None, json=None, headers=None)` method
-- [ ] 4.1.3 Wrap `request_with_retries` call in try-except for `requests.Timeout` returning error event
-- [ ] 4.1.4 Handle `requests.ConnectionError` returning event with reason "connection-error"
-- [ ] 4.1.5 Handle `requests.RequestException` returning event with reason "request-error"
-- [ ] 4.1.6 Check response status code equals 200, otherwise return error event with http_status
-- [ ] 4.1.7 Parse response JSON with try-except for `ValueError`, returning json-error event on failure
-- [ ] 4.1.8 Return tuple of (parsed_data, None) on success or (None, error_event) on any failure
-- [ ] 4.1.9 Include content preview in json-error metadata (first 200 characters of response.text)
+- [x] 4.1.1 Define `ApiResolverBase` class inheriting from `RegisteredResolver` in resolvers module
+- [x] 4.1.2 Implement `_request_json(session, method, url, *, config, timeout=None, params=None, json=None, headers=None)` method
+- [x] 4.1.3 Wrap `request_with_retries` call in try-except for `requests.Timeout` returning error event
+- [x] 4.1.4 Handle `requests.ConnectionError` returning event with reason "connection-error"
+- [x] 4.1.5 Handle `requests.RequestException` returning event with reason "request-error"
+- [x] 4.1.6 Check response status code equals 200, otherwise return error event with http_status
+- [x] 4.1.7 Parse response JSON with try-except for `ValueError`, returning json-error event on failure
+- [x] 4.1.8 Return tuple of (parsed_data, None) on success or (None, error_event) on any failure
+- [x] 4.1.9 Include content preview in json-error metadata (first 200 characters of response.text)
 
 ### 4.2 Refactor Resolvers to Use ApiResolverBase
 
-- [ ] 4.2.1 Change `DoajResolver` to inherit from `ApiResolverBase` instead of `RegisteredResolver`
-- [ ] 4.2.2 Replace DOAJ resolver's manual HTTP and error handling with `_request_json()` call
-- [ ] 4.2.3 Simplify `DoajResolver.iter_urls()` to focus on data extraction from parsed JSON
-- [ ] 4.2.4 Refactor `ZenodoResolver` to use `ApiResolverBase._request_json()`
-- [ ] 4.2.5 Refactor `EuropePmcResolver` to use `ApiResolverBase._request_json()`
-- [ ] 4.2.6 Refactor `HalResolver` to use `ApiResolverBase._request_json()`
-- [ ] 4.2.7 Refactor `OsfResolver` to use `ApiResolverBase._request_json()`
-- [ ] 4.2.8 Verify each refactored resolver maintains identical URL extraction logic
-- [ ] 4.2.9 Measure line count reduction across refactored resolvers (target: 100-200 lines)
+- [x] 4.2.1 Change `DoajResolver` to inherit from `ApiResolverBase` instead of `RegisteredResolver`
+- [x] 4.2.2 Replace DOAJ resolver's manual HTTP and error handling with `_request_json()` call
+- [x] 4.2.3 Simplify `DoajResolver.iter_urls()` to focus on data extraction from parsed JSON
+- [x] 4.2.4 Refactor `ZenodoResolver` to use `ApiResolverBase._request_json()`
+- [x] 4.2.5 Refactor `EuropePmcResolver` to use `ApiResolverBase._request_json()`
+- [x] 4.2.6 Refactor `HalResolver` to use `ApiResolverBase._request_json()`
+- [x] 4.2.7 Refactor `OsfResolver` to use `ApiResolverBase._request_json()`
+- [x] 4.2.8 Verify each refactored resolver maintains identical URL extraction logic
+- [x] 4.2.9 Measure line count reduction across refactored resolvers (target: 100-200 lines)
 
 ### 4.3 Extract HTML Scraping Helpers
 
-- [ ] 4.3.1 Create `find_pdf_via_meta(soup, base_url)` function extracting citation_pdf_url meta tag
-- [ ] 4.3.2 Create `find_pdf_via_link(soup, base_url)` function finding alternate link with PDF type
-- [ ] 4.3.3 Create `find_pdf_via_anchor(soup, base_url)` function finding anchors with .pdf hrefs or "pdf" text
-- [ ] 4.3.4 Ensure each helper returns absolute URL using existing `_absolute_url()` utility or None
-- [ ] 4.3.5 Refactor `LandingPageResolver.iter_urls()` to call helpers in sequence
-- [ ] 4.3.6 Yield `ResolverResult` with metadata indicating which pattern matched
-- [ ] 4.3.7 Add unit tests for each helper with sample HTML fragments
+- [x] 4.3.1 Create `find_pdf_via_meta(soup, base_url)` function extracting citation_pdf_url meta tag
+- [x] 4.3.2 Create `find_pdf_via_link(soup, base_url)` function finding alternate link with PDF type
+- [x] 4.3.3 Create `find_pdf_via_anchor(soup, base_url)` function finding anchors with .pdf hrefs or "pdf" text
+- [x] 4.3.4 Ensure each helper returns absolute URL using existing `_absolute_url()` utility or None
+- [x] 4.3.5 Refactor `LandingPageResolver.iter_urls()` to call helpers in sequence
+- [x] 4.3.6 Yield `ResolverResult` with metadata indicating which pattern matched
+- [x] 4.3.7 Add unit tests for each helper with sample HTML fragments
 
 ### 4.4 Refactor Logging to AttemptSink Protocol
 
@@ -247,8 +247,8 @@
 - [ ] 7.1.1 Add test for consolidated context management lifecycle
 - [ ] 7.1.2 Add test for CSV close() idempotency
 - [ ] 7.1.3 Add tests for unified head_precheck with various status codes
-- [ ] 7.1.4 Add test for ApiResolverBase error handling paths
-- [ ] 7.1.5 Add tests for HTML scraping helper functions
+- [x] 7.1.4 Add test for ApiResolverBase error handling paths
+- [x] 7.1.5 Add tests for HTML scraping helper functions
 - [ ] 7.1.6 Add test for conditional request pre-validation
 - [ ] 7.1.7 Add test for PDF classification with octet-stream
 - [ ] 7.1.8 Add test for corruption detection with head_precheck_passed flag

@@ -10,7 +10,7 @@ from argparse import Namespace
 from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 from unittest.mock import Mock, patch
 
 import pytest
@@ -26,6 +26,7 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     load_resolver_config,
 )
 from DocsToKG.ContentDownload.resolvers import (
+    ApiResolverBase,
     ArxivResolver,
     AttemptRecord,
     CoreResolver,
@@ -48,12 +49,19 @@ from DocsToKG.ContentDownload.resolvers import (
     WaybackResolver,
     ZenodoResolver,
     clear_resolver_caches,
+    find_pdf_via_anchor,
+    find_pdf_via_link,
+    find_pdf_via_meta,
 )
 
 try:  # pragma: no cover - optional dependency for some environments
     import requests  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover
     requests = pytest.importorskip("requests")  # type: ignore
+
+# BeautifulSoup is optional in some environments; skip helper tests when absent.
+_bs4 = pytest.importorskip("bs4")
+from bs4 import BeautifulSoup  # type: ignore  # noqa: E402
 
 # ---- test_resolver_caching.py -----------------------------
 pytest.importorskip("requests")
@@ -66,6 +74,156 @@ def clear_cache_between_tests():
     yield
     clear_resolver_caches()
 
+
+class DummyApiResolver(ApiResolverBase, register=False):
+    name = "dummy_api"
+
+    def is_enabled(self, config: ResolverConfig, artifact: Any) -> bool:  # pragma: no cover - helper
+        return True
+
+    def iter_urls(
+        self,
+        session: Any,
+        config: ResolverConfig,
+        artifact: Any,
+    ) -> Iterable[ResolverResult]:  # pragma: no cover - helper
+        return []
+
+
+def test_api_resolver_base_error_handling(monkeypatch: Any) -> None:
+    resolver = DummyApiResolver()
+    config = ResolverConfig()
+    config.polite_headers = {"User-Agent": "Tester"}
+    session = Mock(spec=requests.Session)
+    timeout_value = config.get_timeout(resolver.name)
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(side_effect=requests.Timeout("boom")),
+    )
+    data, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/timeout",
+        config=config,
+    )
+    assert data is None
+    assert error is not None
+    assert error.event_reason == "timeout"
+    assert error.metadata["timeout"] == timeout_value
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(side_effect=requests.ConnectionError("offline")),
+    )
+    _, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/connection",
+        config=config,
+    )
+    assert error is not None
+    assert error.event_reason == "connection-error"
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(side_effect=requests.RequestException("bad request")),
+    )
+    _, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/request",
+        config=config,
+    )
+    assert error is not None
+    assert error.event_reason == "request-error"
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(return_value=_StubResponse(status_code=502, json_data={})),
+    )
+    _, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/http",
+        config=config,
+    )
+    assert error is not None
+    assert error.event_reason == "http-error"
+    assert error.http_status == 502
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(
+            return_value=_StubResponse(
+                json_data=ValueError("bad json"),
+                text="not json",  # provides preview
+            )
+        ),
+    )
+    _, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/json",
+        config=config,
+    )
+    assert error is not None
+    assert error.event_reason == "json-error"
+    assert "content_preview" in error.metadata
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(return_value=_StubResponse(json_data={"ok": True})),
+    )
+    data, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/success",
+        config=config,
+    )
+    assert error is None
+    assert data == {"ok": True}
+
+
+def test_landing_page_helpers_extract_expected_urls() -> None:
+    base = "https://example.org/articles/view"
+
+    soup_meta = BeautifulSoup(
+        "<html><head><meta name='citation_pdf_url' content='../files/paper.pdf'></head></html>",
+        "html.parser",
+    )
+    assert find_pdf_via_meta(soup_meta, base) == "https://example.org/files/paper.pdf"
+
+    soup_meta_missing = BeautifulSoup("<html></html>", "html.parser")
+    assert find_pdf_via_meta(soup_meta_missing, base) is None
+
+    soup_link = BeautifulSoup(
+        """
+        <html><head>
+            <link rel='alternate' type='application/pdf' href='assets/download.pdf'>
+        </head></html>
+        """,
+        "html.parser",
+    )
+    assert find_pdf_via_link(soup_link, base) == "https://example.org/assets/download.pdf"
+
+    soup_link_missing = BeautifulSoup(
+        "<html><head><link rel='stylesheet' href='style.css'></head></html>",
+        "html.parser",
+    )
+    assert find_pdf_via_link(soup_link_missing, base) is None
+
+    soup_anchor = BeautifulSoup(
+        "<html><body><a href='pdfs/final.pdf'>Download</a></body></html>",
+        "html.parser",
+    )
+    assert find_pdf_via_anchor(soup_anchor, base) == "https://example.org/pdfs/final.pdf"
+
+    soup_anchor_text = BeautifulSoup(
+        "<html><body><a href='pdf?id=123'>View PDF</a></body></html>",
+        "html.parser",
+    )
+    assert find_pdf_via_anchor(soup_anchor_text, base) is None
 
 # ---- test_resolver_caching.py -----------------------------
 def test_resolvers_use_shared_retry_helper(monkeypatch):

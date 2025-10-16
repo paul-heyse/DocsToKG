@@ -48,6 +48,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
     Protocol,
     Sequence,
@@ -651,6 +652,127 @@ class RegisteredResolver:
             ResolverRegistry.register(cls)  # type: ignore[arg-type]
 
 
+class ApiResolverBase(RegisteredResolver, register=False):
+    """Shared helper for resolvers interacting with JSON-based HTTP APIs."""
+
+    def _request_json(
+        self,
+        session: _requests.Session,
+        method: str,
+        url: str,
+        *,
+        config: ResolverConfig,
+        timeout: Optional[float] = None,
+        params: Optional[Mapping[str, Any]] = None,
+        json: Optional[Any] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        **kwargs: Any,
+    ) -> Tuple[Optional[Any], Optional[ResolverResult]]:
+        timeout_value = timeout if timeout is not None else config.get_timeout(self.name)
+        request_headers: Dict[str, str] = dict(config.polite_headers)
+        if headers:
+            request_headers.update(headers)
+
+        kwargs.setdefault("allow_redirects", True)
+
+        try:
+            response = request_with_retries(
+                session,
+                method,
+                url,
+                params=params,
+                json=json,
+                headers=request_headers,
+                timeout=timeout_value,
+                **kwargs,
+            )
+        except _requests.Timeout as exc:
+            return (
+                None,
+                ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="timeout",
+                    metadata={
+                        "url": url,
+                        "timeout": timeout_value,
+                        "error": str(exc),
+                    },
+                ),
+            )
+        except _requests.ConnectionError as exc:
+            return (
+                None,
+                ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="connection-error",
+                    metadata={"url": url, "error": str(exc)},
+                ),
+            )
+        except _requests.RequestException as exc:
+            return (
+                None,
+                ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="request-error",
+                    metadata={"url": url, "error": str(exc)},
+                ),
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            LOGGER.exception("Unexpected error issuing %s request to %s", method, url)
+            return (
+                None,
+                ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="unexpected-error",
+                    metadata={
+                        "url": url,
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                    },
+                ),
+            )
+
+        try:
+            if response.status_code != 200:
+                return (
+                    None,
+                    ResolverResult(
+                        url=None,
+                        event="error",
+                        event_reason="http-error",
+                        http_status=response.status_code,
+                        metadata={
+                            "url": url,
+                            "error_detail": f"{self.name} API returned {response.status_code}",
+                        },
+                    ),
+                )
+            data = response.json()
+        except ValueError as json_err:
+            preview = response.text[:200] if hasattr(response, "text") else ""
+            return (
+                None,
+                ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="json-error",
+                    metadata={
+                        "url": url,
+                        "error_detail": str(json_err),
+                        "content_preview": preview,
+                    },
+                ),
+            )
+        finally:
+            response.close()
+
+        return data, None
+
+
 # ---------------------------------------------------------------------------
 # Helper utilities reused across providers
 
@@ -675,6 +797,46 @@ def _collect_candidate_urls(node: object, results: List[str]) -> None:
             _collect_candidate_urls(item, results)
     elif isinstance(node, str) and node.lower().startswith("http"):
         results.append(node)
+
+
+def find_pdf_via_meta(soup: "BeautifulSoup", base_url: str) -> Optional[str]:
+    """Return PDF URL declared via ``citation_pdf_url`` meta tags."""
+
+    tag = soup.find("meta", attrs={"name": "citation_pdf_url"})
+    if tag is None:
+        return None
+    href = (tag.get("content") or "").strip()
+    if not href:
+        return None
+    return _absolute_url(base_url, href)
+
+
+def find_pdf_via_link(soup: "BeautifulSoup", base_url: str) -> Optional[str]:
+    """Return PDF URL referenced via ``<link rel="alternate" type="application/pdf">``."""
+
+    for link in soup.find_all("link"):
+        rel = " ".join(link.get("rel") or []).lower()
+        typ = (link.get("type") or "").lower()
+        href = (link.get("href") or "").strip()
+        if "alternate" in rel and "application/pdf" in typ and href:
+            return _absolute_url(base_url, href)
+    return None
+
+
+def find_pdf_via_anchor(soup: "BeautifulSoup", base_url: str) -> Optional[str]:
+    """Return PDF URL inferred from anchor elements mentioning PDFs."""
+
+    for anchor in soup.find_all("a"):
+        href = (anchor.get("href") or "").strip()
+        if not href:
+            continue
+        text = (anchor.get_text() or "").strip().lower()
+        href_lower = href.lower()
+        if href_lower.endswith(".pdf") or "pdf" in text:
+            candidate = _absolute_url(base_url, href)
+            if candidate.lower().endswith(".pdf"):
+                return candidate
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -995,7 +1157,7 @@ class CrossrefResolver(RegisteredResolver):
                     break
 
 
-class DoajResolver(RegisteredResolver):
+class DoajResolver(ApiResolverBase):
     """Resolve Open Access links using the DOAJ API.
 
     Attributes:
@@ -1040,70 +1202,19 @@ class DoajResolver(RegisteredResolver):
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
-        headers = dict(config.polite_headers)
+        extra_headers: Dict[str, str] = {}
         if config.doaj_api_key:
-            headers["X-API-KEY"] = config.doaj_api_key
-        try:
-            resp = request_with_retries(
-                session,
-                "get",
-                "https://doaj.org/api/v2/search/articles/",
-                params={"pageSize": 3, "q": f'doi:"{doi}"'},
-                headers=headers,
-                timeout=config.get_timeout(self.name),
-            )
-        except _requests.Timeout as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="timeout",
-                metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
-            )
-            return
-        except _requests.ConnectionError as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="connection-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except _requests.RequestException as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="request-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.exception("Unexpected error in DOAJ resolver")
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="unexpected-error",
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
-            )
-            return
-        if resp.status_code != 200:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=resp.status_code,
-                metadata={"error_detail": f"DOAJ API returned {resp.status_code}"},
-            )
-            return
-        try:
-            data = resp.json()
-        except ValueError as json_err:
-            preview = resp.text[:200] if hasattr(resp, "text") else ""
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-                metadata={"error_detail": str(json_err), "content_preview": preview},
-            )
+            extra_headers["X-API-KEY"] = config.doaj_api_key
+        data, error = self._request_json(
+            session,
+            "GET",
+            "https://doaj.org/api/v2/search/articles/",
+            config=config,
+            params={"pageSize": 3, "q": f'doi:"{doi}"'},
+            headers=extra_headers,
+        )
+        if error:
+            yield error
             return
         candidates = []
         for result in data.get("results", []) or []:
@@ -1118,7 +1229,7 @@ class DoajResolver(RegisteredResolver):
             yield ResolverResult(url=url, metadata={"source": "doaj"})
 
 
-class EuropePmcResolver(RegisteredResolver):
+class EuropePmcResolver(ApiResolverBase):
     """Resolve Open Access links via the Europe PMC REST API.
 
     Attributes:
@@ -1163,53 +1274,15 @@ class EuropePmcResolver(RegisteredResolver):
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
-        try:
-            resp = request_with_retries(
-                session,
-                "get",
-                "https://www.ebi.ac.uk/europepmc/webservices/rest/search",
-                params={"query": f'DOI:"{doi}"', "format": "json", "pageSize": 3},
-                timeout=config.get_timeout(self.name),
-                headers=config.polite_headers,
-            )
-        except _requests.Timeout as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="timeout",
-                metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
-            )
-            return
-        except _requests.RequestException as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="request-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.exception("Unexpected error in Europe PMC resolver")
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="unexpected-error",
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
-            )
-            return
-        if resp.status_code != 200:
-            LOGGER.warning("Europe PMC API returned %s for DOI %s", resp.status_code, doi)
-            return
-        try:
-            data = resp.json()
-        except ValueError as json_err:
-            preview = resp.text[:200] if hasattr(resp, "text") else ""
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-                metadata={"error_detail": str(json_err), "content_preview": preview},
-            )
+        data, error = self._request_json(
+            session,
+            "GET",
+            "https://www.ebi.ac.uk/europepmc/webservices/rest/search",
+            config=config,
+            params={"query": f'DOI:"{doi}"', "format": "json", "pageSize": 3},
+        )
+        if error:
+            yield error
             return
         candidates: List[str] = []
         for result in (data.get("resultList", {}) or {}).get("result", []) or []:
@@ -1373,7 +1446,7 @@ class FigshareResolver(RegisteredResolver):
                     )
 
 
-class HalResolver(RegisteredResolver):
+class HalResolver(ApiResolverBase):
     """Resolve publications from the HAL open archive.
 
     Attributes:
@@ -1418,67 +1491,15 @@ class HalResolver(RegisteredResolver):
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
-        try:
-            resp = request_with_retries(
-                session,
-                "get",
-                "https://api.archives-ouvertes.fr/search/",
-                params={"q": f"doiId_s:{doi}", "fl": "fileMain_s,file_s"},
-                headers=config.polite_headers,
-                timeout=config.get_timeout(self.name),
-            )
-        except _requests.Timeout as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="timeout",
-                metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
-            )
-            return
-        except _requests.ConnectionError as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="connection-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except _requests.RequestException as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="request-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.exception("Unexpected error in HAL resolver")
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="unexpected-error",
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
-            )
-            return
-        if resp.status_code != 200:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=resp.status_code,
-                metadata={"error_detail": f"HAL API returned {resp.status_code}"},
-            )
-            return
-        try:
-            data = resp.json()
-        except ValueError as json_err:
-            preview = resp.text[:200] if hasattr(resp, "text") else ""
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-                metadata={"error_detail": str(json_err), "content_preview": preview},
-            )
+        data, error = self._request_json(
+            session,
+            "GET",
+            "https://api.archives-ouvertes.fr/search/",
+            config=config,
+            params={"q": f"doiId_s:{doi}", "fl": "fileMain_s,file_s"},
+        )
+        if error:
+            yield error
             return
         docs = (data.get("response") or {}).get("docs") or []
         urls: List[str] = []
@@ -1607,36 +1628,19 @@ class LandingPageResolver(RegisteredResolver):
                 continue
 
             soup = BeautifulSoup(resp.text, "lxml")
-            meta = soup.find("meta", attrs={"name": "citation_pdf_url"})
-            if meta and meta.get("content"):
-                url = _absolute_url(landing, meta["content"].strip())
-                yield ResolverResult(url=url, referer=landing, metadata={"pattern": "meta"})
-                continue
-
-            for link in soup.find_all("link"):
-                rel = " ".join(link.get("rel") or []).lower()
-                typ = (link.get("type") or "").lower()
-                href = link.get("href") or ""
-                if "alternate" in rel and "application/pdf" in typ and href:
-                    url = _absolute_url(landing, href.strip())
-                    yield ResolverResult(url=url, referer=landing, metadata={"pattern": "link"})
+            for pattern, finder in (
+                ("meta", find_pdf_via_meta),
+                ("link", find_pdf_via_link),
+                ("anchor", find_pdf_via_anchor),
+            ):
+                candidate = finder(soup, landing)
+                if candidate:
+                    yield ResolverResult(
+                        url=candidate,
+                        referer=landing,
+                        metadata={"pattern": pattern},
+                    )
                     break
-
-            for anchor in soup.find_all("a"):
-                href = (anchor.get("href") or "").strip()
-                if not href:
-                    continue
-                text = (anchor.get_text() or "").strip().lower()
-                href_lower = href.lower()
-                if href_lower.endswith(".pdf") or "pdf" in text:
-                    candidate = _absolute_url(landing, href)
-                    if candidate.lower().endswith(".pdf"):
-                        yield ResolverResult(
-                            url=candidate,
-                            referer=landing,
-                            metadata={"pattern": "anchor"},
-                        )
-                        break
 
 
 class OpenAireResolver(RegisteredResolver):
@@ -1820,7 +1824,7 @@ class OpenAlexResolver(RegisteredResolver):
             yield ResolverResult(url=url, metadata={"source": "openalex_metadata"})
 
 
-class OsfResolver(RegisteredResolver):
+class OsfResolver(ApiResolverBase):
     """Resolve artefacts hosted on the Open Science Framework.
 
     Attributes:
@@ -1865,67 +1869,15 @@ class OsfResolver(RegisteredResolver):
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
-        try:
-            resp = request_with_retries(
-                session,
-                "get",
-                "https://api.osf.io/v2/preprints/",
-                params={"filter[doi]": doi},
-                headers=config.polite_headers,
-                timeout=config.get_timeout(self.name),
-            )
-        except _requests.Timeout as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="timeout",
-                metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
-            )
-            return
-        except _requests.ConnectionError as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="connection-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except _requests.RequestException as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="request-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.exception("Unexpected error in OSF resolver")
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="unexpected-error",
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
-            )
-            return
-        if resp.status_code != 200:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=resp.status_code,
-                metadata={"error_detail": f"OSF API returned {resp.status_code}"},
-            )
-            return
-        try:
-            data = resp.json()
-        except ValueError as json_err:
-            preview = resp.text[:200] if hasattr(resp, "text") else ""
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-                metadata={"error_detail": str(json_err), "content_preview": preview},
-            )
+        data, error = self._request_json(
+            session,
+            "GET",
+            "https://api.osf.io/v2/preprints/",
+            config=config,
+            params={"filter[doi]": doi},
+        )
+        if error:
+            yield error
             return
         urls: List[str] = []
         for item in data.get("data", []) or []:
@@ -2250,6 +2202,28 @@ class SemanticScholarResolver(RegisteredResolver):
             yield ResolverResult(
                 url=None,
                 event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
+            )
+            return
+
+        try:
+            if response.status_code != 200:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="http-error",
+                    http_status=response.status_code,
+                    metadata={
+                        "error_detail": f"Semantic Scholar HTTPError: {response.status_code}",
+                    },
+                )
+                return
+            data = response.json()
+        except ValueError as json_err:
+            yield ResolverResult(
+                url=None,
+                event="error",
                 event_reason="json-error",
                 metadata={"error_detail": str(json_err)},
             )
@@ -2534,7 +2508,7 @@ class WaybackResolver(RegisteredResolver):
                 yield ResolverResult(url=closest["url"], metadata=metadata)
 
 
-class ZenodoResolver(RegisteredResolver):
+class ZenodoResolver(ApiResolverBase):
     """Resolve Zenodo records into downloadable open-access PDF URLs.
 
     Attributes:
@@ -2580,66 +2554,15 @@ class ZenodoResolver(RegisteredResolver):
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
 
-        try:
-            response = request_with_retries(
-                session,
-                "get",
-                "https://zenodo.org/api/records/",
-                params={"q": f'doi:"{doi}"', "size": 3, "sort": "mostrecent"},
-                timeout=config.get_timeout(self.name),
-                headers=config.polite_headers,
-            )
-        except _requests.Timeout as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="timeout",
-                metadata={
-                    "timeout": config.get_timeout(self.name),
-                    "error": str(exc),
-                },
-            )
-            return
-        except _requests.RequestException as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="request-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.exception("Unexpected error contacting Zenodo API")
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="unexpected-error",
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
-            )
-            return
-
-        if response.status_code != 200:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=response.status_code,
-                metadata={
-                    "error_detail": f"Zenodo API returned {response.status_code}",
-                },
-            )
-            return
-
-        try:
-            data = response.json()
-        except ValueError as json_err:
-            preview = response.text[:200] if hasattr(response, "text") else ""
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-                metadata={"error_detail": str(json_err), "content_preview": preview},
-            )
+        data, error = self._request_json(
+            session,
+            "GET",
+            "https://zenodo.org/api/records/",
+            config=config,
+            params={"q": f'doi:"{doi}"', "size": 3, "sort": "mostrecent"},
+        )
+        if error:
+            yield error
             return
 
         hits = data.get("hits", {})
@@ -3460,6 +3383,7 @@ __all__ = [
     "ResolverPipeline",
     "ResolverRegistry",
     "RegisteredResolver",
+    "ApiResolverBase",
     "ResolverResult",
     "DEFAULT_RESOLVER_ORDER",
     "DEFAULT_RESOLVER_TOGGLES",
@@ -3481,4 +3405,7 @@ __all__ = [
     "UnpaywallResolver",
     "WaybackResolver",
     "ZenodoResolver",
+    "find_pdf_via_meta",
+    "find_pdf_via_link",
+    "find_pdf_via_anchor",
 ]
