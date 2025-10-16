@@ -106,12 +106,6 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "infer-version-timestamp",
-#       "name": "_infer_version_timestamp",
-#       "anchor": "function-infer-version-timestamp",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "resolve-version-metadata",
 #       "name": "_resolve_version_metadata",
 #       "anchor": "function-resolve-version-metadata",
@@ -136,6 +130,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "load-latest-manifest",
+#       "name": "_load_latest_manifest",
+#       "anchor": "function-load-latest-manifest",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "resolve-specs-from-args",
 #       "name": "_resolve_specs_from_args",
 #       "anchor": "function-resolve-specs-from-args",
@@ -157,6 +157,12 @@
 #       "id": "handle-plan-diff",
 #       "name": "_handle_plan_diff",
 #       "anchor": "function-handle-plan-diff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-plugins",
+#       "name": "_handle_plugins",
+#       "anchor": "function-handle-plugins",
 #       "kind": "function"
 #     },
 #     {
@@ -935,38 +941,6 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
         payload["etag"] = metadata["etag"]
     return payload
 
-
-def _infer_version_timestamp(version: str) -> Optional[datetime]:
-    """Attempt to derive a datetime from a version string.
-
-    Args:
-        version: Version identifier emitted by upstream resolvers.
-
-    Returns:
-        Datetime derived from the version string, or ``None`` when no format matches.
-    """
-
-    candidates = [
-        version,
-        version.replace("_", "-"),
-        version.replace("/", "-"),
-        version.replace("_", ""),
-    ]
-    for candidate in candidates:
-        parsed = parse_version_timestamp(candidate)
-        if parsed is not None:
-            return parsed
-    formats = ["%Y%m%dT%H%M%S", "%Y-%m-%d-%H-%M-%S"]
-    for candidate in candidates:
-        for fmt in formats:
-            try:
-                parsed = datetime.strptime(candidate, fmt)
-            except ValueError:
-                continue
-            return parsed.replace(tzinfo=timezone.utc)
-    return None
-
-
 def _resolve_version_metadata(
     ontology_id: str, version: str
 ) -> Tuple[Path, Optional[datetime], int]:
@@ -1285,8 +1259,8 @@ def _handle_prune(args, logger) -> Dict[str, object]:
                             "freed_bytes": reclaimed_bytes,
                         },
                     )
-        if not args.dry_run and retained:
-            STORAGE.set_latest_version(ontology_id, retained[0]["path"])
+    if not args.dry_run and retained:
+        STORAGE.set_latest_version(ontology_id, retained[0]["version"])
         total_reclaimed += reclaimed
         if args.dry_run:
             total_deleted += len(to_remove)

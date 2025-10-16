@@ -2,34 +2,22 @@
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import random
-import re
 import shutil
-import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Set, TypeVar
 
 import pooch
 import psutil
 import requests
-
-try:  # pragma: no cover - POSIX only
-    import fcntl  # type: ignore
-except ImportError:  # pragma: no cover - Windows fallback
-    fcntl = None  # type: ignore
-
-try:  # pragma: no cover - Windows only
-    import msvcrt  # type: ignore
-except ImportError:  # pragma: no cover - POSIX fallback
-    msvcrt = None  # type: ignore
-
 from urllib.parse import urlparse
 
+from . import ratelimit
 from .config import DownloadConfiguration
 from .errors import DownloadFailure, OntologyDownloadError, PolicyError
 from .io_safe import sanitize_filename, sha256_file, validate_url_security
@@ -38,6 +26,8 @@ if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checkers onl
     from .pipeline import validate_manifest_dict
 
 T = TypeVar("T")
+
+TokenBucket = ratelimit.TokenBucket
 
 
 def retry_with_backoff(
@@ -125,176 +115,29 @@ class DownloadResult:
     content_length: Optional[int]
 
 
-class TokenBucket:
-    """Token bucket used to enforce per-host and per-service rate limits.
-
-    Each unique combination of host and logical service identifier receives
-    its own bucket so resolvers can honour provider-specific throttling
-    guidance without starving other endpoints.
-
-    Attributes:
-        rate: Token replenishment rate per second.
-        capacity: Maximum number of tokens the bucket may hold.
-        tokens: Current token balance available for consumption.
-        timestamp: Monotonic timestamp of the last refill.
-        lock: Threading lock protecting bucket state.
-
-    Examples:
-        >>> bucket = TokenBucket(rate_per_sec=2.0, capacity=4.0)
-        >>> bucket.consume(1.0)  # consumes immediately
-        >>> isinstance(bucket.tokens, float)
-        True
-    """
-
-    def __init__(self, rate_per_sec: float, capacity: Optional[float] = None) -> None:
-        self.rate = rate_per_sec
-        self.capacity = capacity or rate_per_sec
-        self.tokens = self.capacity
-        self.timestamp = time.monotonic()
-        self.lock = threading.Lock()
-
-    def consume(self, tokens: float = 1.0) -> None:
-        """Consume tokens from the bucket, sleeping until capacity is available.
-
-        Args:
-            tokens: Number of tokens required for the current download request.
-
-        Returns:
-            None
-        """
-        while True:
-            with self.lock:
-                now = time.monotonic()
-                delta = now - self.timestamp
-                self.timestamp = now
-                self.tokens = min(self.capacity, self.tokens + delta * self.rate)
-                if self.tokens >= tokens:
-                    self.tokens -= tokens
-                    return
-                needed = tokens - self.tokens
-            time.sleep(max(needed / self.rate, 0.0))
-
-
-class SharedTokenBucket(TokenBucket):
-    """Token bucket backed by a filesystem state file for multi-process usage."""
-
-    def __init__(
-        self,
-        *,
-        rate_per_sec: float,
-        capacity: float,
-        state_path: Path,
-    ) -> None:
-        super().__init__(rate_per_sec=rate_per_sec, capacity=capacity)
-        self.state_path = state_path
-        self.state_path.parent.mkdir(parents=True, exist_ok=True)
-
-    def _acquire_file_lock(self, handle) -> None:
-        if fcntl is not None:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)  # type: ignore[attr-defined]
-        elif msvcrt is not None:
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)  # type: ignore[attr-defined]
-
-    def _release_file_lock(self, handle) -> None:
-        if fcntl is not None:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)  # type: ignore[attr-defined]
-        elif msvcrt is not None:
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)  # type: ignore[attr-defined]
-
-    @staticmethod
-    def _deserialize_state(
-        raw: bytes, *, default_tokens: float, timestamp: float
-    ) -> Dict[str, float]:
-        try:
-            data = json.loads(raw.decode("utf-8") or "{}")
-            tokens_value = float(data.get("tokens", default_tokens))
-            timestamp_value = float(data.get("timestamp", timestamp))
-        except (ValueError, TypeError, json.JSONDecodeError):
-            tokens_value = default_tokens
-            timestamp_value = timestamp
-        return {
-            "tokens": max(0.0, min(tokens_value, default_tokens)),
-            "timestamp": timestamp_value,
-        }
-
-    @staticmethod
-    def _write_state(handle, state: Dict[str, float]) -> None:
-        handle.seek(0)
-        handle.truncate()
-        payload = json.dumps(
-            {"tokens": state["tokens"], "timestamp": state["timestamp"]},
-            separators=(",", ":"),
-        ).encode("utf-8")
-        handle.write(payload)
-        handle.flush()
-        try:
-            os.fsync(handle.fileno())
-        except OSError:  # pragma: no cover - fsync availability varies
-            pass
-
-    def _try_consume(self, tokens: float) -> Optional[float]:
-        now = time.monotonic()
-        with self.state_path.open("a+b") as handle:
-            locked = False
-            if fcntl is not None or msvcrt is not None:
-                self._acquire_file_lock(handle)
-                locked = True
-            try:
-                handle.seek(0, os.SEEK_END)
-                if handle.tell() == 0:
-                    state = {"tokens": self.capacity, "timestamp": now}
-                else:
-                    handle.seek(0)
-                    state = self._deserialize_state(
-                        handle.read(),
-                        default_tokens=self.capacity,
-                        timestamp=now,
-                    )
-                available = min(
-                    self.capacity,
-                    state["tokens"] + max(0.0, now - state["timestamp"]) * self.rate,
-                )
-                if available >= tokens:
-                    state = {"tokens": available - tokens, "timestamp": now}
-                    self._write_state(handle, state)
-                    return None
-                state = {"tokens": available, "timestamp": now}
-                self._write_state(handle, state)
-                return tokens - available
-            finally:
-                if locked:
-                    self._release_file_lock(handle)
-
-    def consume(self, tokens: float = 1.0) -> None:  # type: ignore[override]
-        """Consume ``tokens`` from the shared bucket, waiting when insufficient."""
-
-        while True:
-            with self.lock:
-                needed = self._try_consume(tokens)
-            if needed is None:
-                return
-            time.sleep(max(needed / self.rate, 0.0))
-
-
-_TOKEN_BUCKETS: Dict[str, TokenBucket] = {}
-
-
-def _shared_bucket_path(http_config: DownloadConfiguration, key: str) -> Optional[Path]:
-    """Return the filesystem path for the shared token bucket state."""
-
-    root = getattr(http_config, "shared_rate_limit_dir", None)
-    if not root:
-        return None
-    base = Path(root).expanduser()
-    token = re.sub(r"[^A-Za-z0-9._-]", "_", key).strip("._")
-    if not token:
-        token = "bucket"
-    return base / f"{token}.json"
-
-
 _RETRYABLE_HTTP_STATUSES = {403, 408, 425, 429, 500, 502, 503, 504}
+
+
+def _parse_retry_after(value: Optional[str]) -> Optional[float]:
+    if not value:
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    try:
+        seconds = float(candidate)
+    except ValueError:
+        try:
+            retry_time = parsedate_to_datetime(candidate)
+        except (TypeError, ValueError, IndexError):
+            return None
+        if retry_time is None:
+            return None
+        if retry_time.tzinfo is None:
+            retry_time = retry_time.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        seconds = (retry_time - now).total_seconds()
+    return max(seconds, 0.0)
 
 
 def _is_retryable_status(status_code: Optional[int]) -> bool:
@@ -370,6 +213,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
         previous_manifest: Optional[Dict[str, object]],
         logger: logging.Logger,
         expected_media_type: Optional[str] = None,
+        service: Optional[str] = None,
+        origin_host: Optional[str] = None,
     ) -> None:
         super().__init__(headers={}, progressbar=False, timeout=http_config.timeout_sec)
         self.destination = destination
@@ -385,6 +230,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self.head_content_length: Optional[int] = None
         self.response_content_type: Optional[str] = None
         self.response_content_length: Optional[int] = None
+        self.service = service
+        self.origin_host = origin_host
 
     def _preliminary_head_check(
         self, url: str, session: requests.Session
@@ -619,6 +466,29 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                 self.response_content_length = None
                             part_path.unlink(missing_ok=True)
                             return
+                        if response.status_code in {429, 503}:
+                            retry_after_header = response.headers.get("Retry-After")
+                            retry_after_delay = _parse_retry_after(retry_after_header)
+                            if retry_after_delay is not None:
+                                self.logger.warning(
+                                    "download retry-after",
+                                    extra={
+                                        "stage": "download",
+                                        "status_code": response.status_code,
+                                        "retry_after_sec": round(retry_after_delay, 2),
+                                        "service": self.service,
+                                        "host": self.origin_host,
+                                    },
+                                )
+                                ratelimit.apply_retry_after(
+                                    http_config=self.http_config,
+                                    service=self.service,
+                                    host=self.origin_host,
+                                    delay=retry_after_delay,
+                                )
+                                attempt = max(attempt - 1, 0)
+                                time.sleep(retry_after_delay)
+                                continue
                         if response.status_code == 206:
                             self.status = "updated"
                         response.raise_for_status()
@@ -743,55 +613,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
             session.close()
 
 
-def _get_bucket(
-    host: str, http_config: DownloadConfiguration, service: Optional[str] = None
-) -> TokenBucket:
-    """Return a token bucket keyed by host and optional service name.
-
-    Args:
-        host: Hostname extracted from the download URL.
-        http_config: Download configuration providing base rate limits.
-        service: Logical service identifier enabling per-service overrides.
-
-    Returns:
-        TokenBucket instance shared across downloads for throttling, seeded
-        with either per-host defaults or service-specific overrides.
-    """
-    key = f"{service}:{host}" if service else host
-    bucket = _TOKEN_BUCKETS.get(key)
-    rate = http_config.rate_limit_per_second()
-    if service:
-        service_rate = http_config.parse_service_rate_limit(service)
-        if service_rate:
-            rate = service_rate
-    capacity = max(rate, 1.0)
-    shared_path = _shared_bucket_path(http_config, key)
-
-    if isinstance(bucket, SharedTokenBucket):
-        if (
-            shared_path is None
-            or bucket.state_path != shared_path
-            or bucket.rate != rate
-            or bucket.capacity != capacity
-        ):
-            bucket = None
-    elif bucket is not None:
-        if shared_path is not None or bucket.rate != rate or bucket.capacity != capacity:
-            bucket = None
-
-    if bucket is None:
-        if shared_path is not None:
-            bucket = SharedTokenBucket(
-                rate_per_sec=rate,
-                capacity=capacity,
-                state_path=shared_path,
-            )
-        else:
-            bucket = TokenBucket(rate_per_sec=rate, capacity=capacity)
-        _TOKEN_BUCKETS[key] = bucket
-    return bucket
-
-
 def download_stream(
     *,
     url: str,
@@ -826,7 +647,8 @@ def download_stream(
     """
     secure_url = validate_url_security(url, http_config)
     parsed = urlparse(secure_url)
-    bucket = _get_bucket(parsed.hostname or "default", http_config, service)
+    host = parsed.hostname
+    bucket = ratelimit.get_bucket(http_config=http_config, host=host, service=service)
     bucket.consume()
 
     start_time = time.monotonic()
@@ -838,6 +660,8 @@ def download_stream(
         previous_manifest=previous_manifest,
         logger=logger,
         expected_media_type=expected_media_type,
+        service=service,
+        origin_host=host,
     )
 
     def _resolved_content_metadata() -> tuple[Optional[str], Optional[int]]:

@@ -504,6 +504,14 @@ class HybridSearchService:
         queries = np.asarray([query_features.embedding], dtype=np.float32)
 
         def run_dense_search(current_k: int) -> list[FaissSearchResult]:
+            """Query FAISS for dense document candidates at the requested depth.
+
+            Args:
+                current_k: Number of vector matches to request from the dense index.
+
+            Returns:
+                Dense similarity matches ordered by score for the current document search.
+            """
             batch_hits_local = store.search_batch(queries, current_k)
             self._observability.metrics.observe(
                 "faiss_search_batch_size", float(len(batch_hits_local)), channel="dense"

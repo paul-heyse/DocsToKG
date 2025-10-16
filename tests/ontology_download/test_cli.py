@@ -417,16 +417,16 @@ def test_cli_prune_updates_latest_marker(monkeypatch, stub_logger):
 
     monkeypatch.setattr(cli.STORAGE, "delete_version", lambda *_: 0)
 
-    latest_calls: list[tuple[str, Path]] = []
+    latest_calls: list[tuple[str, str]] = []
 
-    def _record_latest(ontology_id: str, path: Path) -> None:
-        latest_calls.append((ontology_id, path))
+    def _record_latest(ontology_id: str, version: str) -> None:
+        latest_calls.append((ontology_id, version))
 
     monkeypatch.setattr(cli.STORAGE, "set_latest_version", _record_latest)
 
     exit_code = cli.main(["prune", "--keep", "1"])
     assert exit_code == 0
-    assert latest_calls == [("hp", Path("/tmp/hp/2024"))]
+    assert latest_calls == [("hp", "2024")]
 
 
 def test_cli_plan_serializes_enriched_metadata(monkeypatch, stub_logger, capsys):
@@ -620,4 +620,3 @@ def test_handle_plan_diff_uses_manifest_baseline(monkeypatch):
     diff = cli._handle_plan_diff(args, _default_config())
     assert diff["baseline"] == "manifests"
     assert diff["modified"], "expected modified entries when manifests differ"
-

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import csv
 import json
+import sqlite3
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -560,6 +561,280 @@ class LastAttemptCsvSink:
         self.close()
 
 
+class SummarySink:
+    """Persist the final metrics summary for a run as JSON."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._summary: Optional[Dict[str, Any]] = None
+        self._lock = threading.Lock()
+        self._closed = False
+
+    def log_attempt(
+        self, record: "AttemptRecord", *, timestamp: Optional[str] = None
+    ) -> None:  # pragma: no cover - no-op
+        """Accept attempt telemetry for interface parity without persisting it.
+
+        Args:
+            record: Resolver attempt metadata emitted by the download pipeline.
+            timestamp: Optional ISO-8601 timestamp used when callers override the capture time.
+
+        Returns:
+            None
+        """
+        return None
+
+    def log_manifest(self, entry: ManifestEntry) -> None:  # pragma: no cover - no-op
+        """Receive manifest updates while keeping in-memory summary-only semantics.
+
+        Args:
+            entry: Manifest entry describing the document artifact that was processed.
+
+        Returns:
+            None
+        """
+        return None
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Capture the latest run summary prior to shutdown."""
+
+        with self._lock:
+            self._summary = dict(summary)
+
+    def close(self) -> None:
+        """Write the captured summary to disk exactly once."""
+
+        with self._lock:
+            if self._closed:
+                return
+            payload = dict(self._summary or {})
+            self._closed = True
+        _ensure_parent_exists(self._path)
+        self._path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+    def __enter__(self) -> "SummarySink":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+
+class SqliteSink:
+    """Persist attempts, manifests, and summary records to a SQLite database."""
+
+    def __init__(self, path: Path) -> None:
+        _ensure_parent_exists(path)
+        self._conn = sqlite3.connect(path, check_same_thread=False)
+        self._conn.execute("PRAGMA journal_mode=WAL;")
+        self._conn.execute("PRAGMA synchronous=NORMAL;")
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                work_id TEXT,
+                resolver_name TEXT,
+                resolver_order INTEGER,
+                url TEXT,
+                status TEXT,
+                http_status INTEGER,
+                content_type TEXT,
+                elapsed_ms REAL,
+                resolver_wall_time_ms REAL,
+                reason TEXT,
+                metadata TEXT,
+                sha256 TEXT,
+                content_length INTEGER,
+                dry_run INTEGER
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS manifests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                schema_version INTEGER,
+                work_id TEXT,
+                title TEXT,
+                publication_year INTEGER,
+                resolver TEXT,
+                url TEXT,
+                path TEXT,
+                classification TEXT,
+                content_type TEXT,
+                reason TEXT,
+                html_paths TEXT,
+                sha256 TEXT,
+                content_length INTEGER,
+                etag TEXT,
+                last_modified TEXT,
+                extracted_text_path TEXT,
+                dry_run INTEGER
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS summaries (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                timestamp TEXT,
+                payload TEXT
+            )
+            """
+        )
+        self._lock = threading.Lock()
+        self._closed = False
+
+    def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+        """Persist a resolver attempt event for downstream document analytics.
+
+        Args:
+            record: Structured attempt data captured during document resolution.
+            timestamp: Optional ISO-8601 timestamp overriding the event capture time.
+
+        Returns:
+            None
+        """
+        ts = timestamp or _utc_timestamp()
+        metadata_json = (
+            json.dumps(record.metadata, sort_keys=True) if record.metadata else None
+        )
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO attempts (
+                    timestamp,
+                    work_id,
+                    resolver_name,
+                    resolver_order,
+                    url,
+                    status,
+                    http_status,
+                    content_type,
+                    elapsed_ms,
+                    resolver_wall_time_ms,
+                    reason,
+                    metadata,
+                    sha256,
+                    content_length,
+                    dry_run
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    ts,
+                    record.work_id,
+                    record.resolver_name,
+                    record.resolver_order,
+                    record.url,
+                    str(record.status),
+                    record.http_status,
+                    record.content_type,
+                    record.elapsed_ms,
+                    record.resolver_wall_time_ms,
+                    record.reason,
+                    metadata_json,
+                    record.sha256,
+                    record.content_length,
+                    1 if record.dry_run else 0,
+                ),
+            )
+            self._conn.commit()
+
+    def log_manifest(self, entry: ManifestEntry) -> None:
+        """Record manifest outcomes for the processed document artifact.
+
+        Args:
+            entry: Manifest entry describing the document state after processing.
+
+        Returns:
+            None
+        """
+        html_paths_json = json.dumps(entry.html_paths, sort_keys=True) if entry.html_paths else None
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO manifests (
+                    timestamp,
+                    schema_version,
+                    work_id,
+                    title,
+                    publication_year,
+                    resolver,
+                    url,
+                    path,
+                    classification,
+                    content_type,
+                    reason,
+                    html_paths,
+                    sha256,
+                    content_length,
+                    etag,
+                    last_modified,
+                    extracted_text_path,
+                    dry_run
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    entry.timestamp,
+                    entry.schema_version,
+                    entry.work_id,
+                    entry.title,
+                    entry.publication_year,
+                    entry.resolver,
+                    entry.url,
+                    entry.path,
+                    entry.classification,
+                    entry.content_type,
+                    entry.reason,
+                    html_paths_json,
+                    entry.sha256,
+                    entry.content_length,
+                    entry.etag,
+                    entry.last_modified,
+                    entry.extracted_text_path,
+                    1 if entry.dry_run else 0,
+                ),
+            )
+            self._conn.commit()
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Store the aggregated run summary in the summaries table.
+
+        Args:
+            summary: Aggregated counters and timing metadata for the run.
+
+        Returns:
+            None
+        """
+        payload = json.dumps(summary, indent=2, sort_keys=True)
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO summaries (id, timestamp, payload)
+                VALUES (1, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET timestamp=excluded.timestamp, payload=excluded.payload
+                """,
+                (_utc_timestamp(), payload),
+            )
+            self._conn.commit()
+
+    def close(self) -> None:
+        """Commit outstanding changes and dispose of the SQLite connection."""
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            self._conn.commit()
+            self._conn.close()
+
+    def __enter__(self) -> "SqliteSink":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+
 def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
     """Load JSONL manifest entries indexed by work ID and normalised URL."""
 
@@ -690,6 +965,8 @@ __all__ = [
     "MultiSink",
     "ManifestIndexSink",
     "LastAttemptCsvSink",
+    "SummarySink",
+    "SqliteSink",
     "build_manifest_entry",
     "load_previous_manifest",
 ]

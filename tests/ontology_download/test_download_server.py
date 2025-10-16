@@ -274,9 +274,9 @@ def http_server():
 
 
 def _reset_token_buckets():
-    download._TOKEN_BUCKETS.clear()
+    net_mod._TOKEN_BUCKETS.clear()
     yield
-    download._TOKEN_BUCKETS.clear()
+    net_mod._TOKEN_BUCKETS.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -331,21 +331,24 @@ def _allow_local_addresses(monkeypatch):
                 error.response = SimpleNamespace(status_code=self.status_code)
                 raise error
 
-    class _LocalSession:
-        def __init__(self):
-            self.headers: Dict[str, str] = {}
+        class _LocalSession:
+            def __init__(self):
+                self.headers: Dict[str, str] = {}
 
-        def head(self, url, *, headers=None, timeout=None, allow_redirects=None):  # noqa: D401
-            merged = {**self.headers, **(headers or {})}
-            response = _LocalResponse(url, "HEAD", merged, timeout)
-            response.__exit__(None, None, None)  # close immediately
-            return response
+            def close(self) -> None:
+                return None
 
-        def get(self, url, *, headers=None, stream=None, timeout=None, allow_redirects=None):
-            merged = {**self.headers, **(headers or {})}
-            return _LocalResponse(url, "GET", merged, timeout)
+            def head(self, url, *, headers=None, timeout=None, allow_redirects=None):  # noqa: D401
+                merged = {**self.headers, **(headers or {})}
+                response = _LocalResponse(url, "HEAD", merged, timeout)
+                response.__exit__(None, None, None)  # close immediately
+                return response
 
-    monkeypatch.setattr(download.requests, "Session", _LocalSession)
+            def get(self, url, *, headers=None, stream=None, timeout=None, allow_redirects=None):
+                merged = {**self.headers, **(headers or {})}
+                return _LocalResponse(url, "GET", merged, timeout)
+
+        monkeypatch.setattr(net_mod.requests, "Session", _LocalSession, raising=False)
 
 
 def _download_to_tmp(
@@ -442,7 +445,7 @@ def test_cache_hit_uses_304(http_server, tmp_path):
     manifest = {
         "etag": state.cache_etag,
         "last_modified": "Mon, 01 Jan 2024 00:00:00 GMT",
-        "sha256": download.sha256_file(destination),
+        "sha256": io_safe_mod.sha256_file(destination),
     }
     destination.write_bytes(b"cached")
     _, cached = _download_to_tmp(f"{base_url}/cache", tmp_path, previous_manifest=manifest)
@@ -474,7 +477,7 @@ def test_etag_flip_updates_etag(http_server, tmp_path):
     first_dest, first_result = _download_to_tmp(f"{base_url}/etag-flip", tmp_path)
     manifest = {
         "etag": first_result.etag,
-        "sha256": download.sha256_file(first_dest),
+        "sha256": io_safe_mod.sha256_file(first_dest),
     }
     second_dest, second_result = _download_to_tmp(
         f"{base_url}/etag-flip", tmp_path, previous_manifest=manifest

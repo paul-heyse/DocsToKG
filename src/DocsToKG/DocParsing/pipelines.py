@@ -246,7 +246,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import functools
 import os
+import random
 import shutil
 import socket
 import subprocess as sp
@@ -260,7 +262,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Deque, Iterable, List, Optional, Tuple
 
 import requests
+from requests.adapters import HTTPAdapter
 from tqdm import tqdm
+from urllib3.util.retry import Retry
 
 from DocsToKG.DocParsing._common import (
     acquire_lock,
@@ -278,6 +282,7 @@ from DocsToKG.DocParsing._common import (
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
+    log_event,
     resolve_hf_home,
     resolve_model_root,
     set_spawn_or_warn,
@@ -291,6 +296,9 @@ except Exception:  # pragma: no cover - guard for stripped-down runtime
     Version = None  # type: ignore[assignment]
 
 _LOGGER = get_logger(__name__)
+
+_REQUEST_SESSION: requests.Session | None = None
+DEFAULT_HTTP_TIMEOUT: Tuple[float, float] = (5.0, 30.0)
 
 # --- Globals ---
 
@@ -335,6 +343,25 @@ os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("DOCLING_CUDA_USE_FLASH_ATTENTION2", "1")
 
 ARTIFACTS = os.environ.get("DOCLING_ARTIFACTS_PATH", "")
+
+
+def _http_session() -> requests.Session:
+    """Return a shared ``requests.Session`` configured with retries."""
+
+    global _REQUEST_SESSION
+    if _REQUEST_SESSION is None:
+        session = requests.Session()
+        retry = Retry(
+            total=5,
+            backoff_factor=0.5,
+            status_forcelist=(429, 502, 503, 504),
+            allowed_methods=("GET", "POST"),
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        _REQUEST_SESSION = session
+    return _REQUEST_SESSION
 
 
 # --- Model Path Utilities ---

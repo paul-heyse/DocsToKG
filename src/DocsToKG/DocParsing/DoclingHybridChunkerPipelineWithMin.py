@@ -147,6 +147,7 @@ Tokenizer Alignment:
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -182,6 +183,9 @@ from DocsToKG.DocParsing._common import (
     ChunkResult,
     ChunkTask,
     ChunkWorkerConfig,
+    DEFAULT_CAPTION_MARKERS,
+    DEFAULT_HEADING_MARKERS,
+    DEFAULT_SERIALIZER_PROVIDER,
     acquire_lock,
     atomic_write,
     compute_content_hash,
@@ -191,10 +195,13 @@ from DocsToKG.DocParsing._common import (
     detect_data_root,
     get_logger,
     iter_doctags,
+    load_structural_marker_config,
     load_manifest_index,
+    log_event,
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
+    set_spawn_or_warn,
     should_skip_output,
 )
 from DocsToKG.DocParsing.pipelines import (
@@ -210,16 +217,8 @@ from DocsToKG.DocParsing.schemas import (
     get_docling_version,
     validate_chunk_row,
 )
-from DocsToKG.DocParsing.serializers import RichSerializerProvider
 
 SOFT_BARRIER_MARGIN = 64
-DEFAULT_HEADING_MARKERS: Tuple[str, ...] = ("#",)
-DEFAULT_CAPTION_MARKERS: Tuple[str, ...] = (
-    "Figure caption:",
-    "Table:",
-    "Picture description:",
-    "<!-- image -->",
-)
 
 
 def _dedupe_preserve_order(markers: Sequence[str]) -> Tuple[str, ...]:
@@ -234,54 +233,25 @@ def _dedupe_preserve_order(markers: Sequence[str]) -> Tuple[str, ...]:
     return tuple(ordered)
 
 
-def _ensure_str_list(value: object, label: str) -> List[str]:
-    """Normalize configuration values into a list of non-empty strings."""
+def _resolve_serializer_provider(spec: str):
+    """Return the serializer provider class referenced by ``spec``."""
 
-    if value is None:
-        return []
-    if isinstance(value, str):
-        value = [value]
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        raise ValueError(f"Expected a list of strings for '{label}'")
-    return [item for item in value if item]
-
-
-def _load_structural_marker_config(path: Path) -> Tuple[List[str], List[str]]:
-    """Load custom heading and caption markers from a YAML or JSON file."""
-
-    raw = path.read_text(encoding="utf-8")
-    suffix = path.suffix.lower()
-    data: object
-    if suffix in {".yaml", ".yml"}:
-        try:
-            import yaml
-        except ImportError as exc:  # pragma: no cover - optional dependency
-            raise RuntimeError(
-                "Loading YAML heading markers requires the 'PyYAML' package"
-            ) from exc
-        data = yaml.safe_load(raw) or {}
-    else:
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            try:
-                import yaml
-            except ImportError as exc:  # pragma: no cover - optional dependency
-                raise ValueError(
-                    f"Unable to parse heading markers file {path}: not valid JSON."
-                ) from exc
-            data = yaml.safe_load(raw) or {}
-
-    if isinstance(data, list):
-        headings = _ensure_str_list(data, "headings")
-        captions: List[str] = []
-    elif isinstance(data, dict):
-        headings = _ensure_str_list(data.get("headings"), "headings")
-        captions = _ensure_str_list(data.get("captions"), "captions")
-    else:
-        raise ValueError(f"Unsupported heading markers format in {path}: expected list or mapping.")
-
-    return headings, captions
+    if ":" not in spec:
+        raise ValueError(
+            "Serializer provider must be specified as 'module:Class', received %r" % (spec,)
+        )
+    module_name, class_name = spec.split(":", 1)
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError as exc:
+        raise ImportError(f"Unable to import serializer provider module '{module_name}'") from exc
+    try:
+        provider_cls = getattr(module, class_name)
+    except AttributeError as exc:
+        raise ImportError(
+            f"Serializer provider '{class_name}' not found in module '{module_name}'"
+        ) from exc
+    return provider_cls
 
 
 def _validate_chunk_files(files: Sequence[Path], logger) -> tuple[int, int]:
@@ -499,10 +469,16 @@ def _chunk_worker_initializer(cfg: ChunkWorkerConfig) -> None:
     _CHUNK_WORKER_CONFIG = cfg
     hf = AutoTokenizer.from_pretrained(cfg.tokenizer_model, use_fast=True)
     tokenizer = HuggingFaceTokenizer(tokenizer=hf, max_tokens=cfg.max_tokens)
+    provider_spec = cfg.serializer_provider_spec
+    try:
+        provider_cls = _resolve_serializer_provider(provider_spec)
+        provider = provider_cls()
+    except Exception as exc:  # pragma: no cover - configuration error
+        raise RuntimeError(f"Failed to load serializer provider '{provider_spec}': {exc}") from exc
     chunker = HybridChunker(
         tokenizer=tokenizer,
         merge_peers=True,
-        serializer_provider=RichSerializerProvider(),
+        serializer_provider=provider,
     )
     _CHUNK_WORKER_TOKENIZER = tokenizer
     _CHUNK_WORKER_CHUNKER = chunker
@@ -956,6 +932,24 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--serializer-provider",
+        type=str,
+        default=DEFAULT_SERIALIZER_PROVIDER,
+        help=(
+            "Serializer provider in 'module:Class' format used to build DocTags. "
+            f"Default: {DEFAULT_SERIALIZER_PROVIDER}."
+        ),
+    )
+    parser.add_argument(
+        "--serializer-provider",
+        type=str,
+        default=DEFAULT_SERIALIZER_PROVIDER,
+        help=(
+            "Import path (module:Class) for the serializer provider used to build Docling chunkers "
+            f"(default: {DEFAULT_SERIALIZER_PROVIDER})."
+        ),
+    )
+    parser.add_argument(
         "--heading-markers",
         dest="structural_markers",
         type=Path,
@@ -1009,7 +1003,66 @@ def main(args: argparse.Namespace | None = None) -> int:
     """
 
     logger = get_logger(__name__)
+    set_spawn_or_warn(logger)
     args = args if args is not None else build_parser().parse_args()
+
+    if args.min_tokens < 0 or args.max_tokens < 0:
+        log_event(
+            logger,
+            "error",
+            "Token thresholds must be non-negative",
+            min_tokens=args.min_tokens,
+            max_tokens=args.max_tokens,
+        )
+        raise ValueError("--min-tokens and --max-tokens must be non-negative")
+    if args.min_tokens > args.max_tokens:
+        log_event(
+            logger,
+            "error",
+            "Invalid token range",
+            min_tokens=args.min_tokens,
+            max_tokens=args.max_tokens,
+        )
+        raise ValueError("--min-tokens must be less than or equal to --max-tokens")
+    if args.soft_barrier_margin < 0:
+        log_event(
+            logger,
+            "error",
+            "Soft barrier margin must be non-negative",
+            soft_barrier_margin=args.soft_barrier_margin,
+        )
+        raise ValueError("--soft-barrier-margin must be >= 0")
+
+    serializer_spec = getattr(args, "serializer_provider", DEFAULT_SERIALIZER_PROVIDER)
+    try:
+        _resolve_serializer_provider(serializer_spec)
+    except Exception as exc:
+        log_event(
+            logger,
+            "error",
+            "Serializer provider import failed",
+            serializer_provider=serializer_spec,
+            error=str(exc),
+        )
+        raise ValueError(f"Invalid serializer provider '{serializer_spec}': {exc}") from exc
+
+    try:
+        min_tokens = int(args.min_tokens)
+        max_tokens = int(args.max_tokens)
+        soft_margin = int(args.soft_barrier_margin)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Token thresholds must be integers") from exc
+
+    args.min_tokens = min_tokens
+    args.max_tokens = max_tokens
+    args.soft_barrier_margin = soft_margin
+    args.serializer_provider = serializer_spec
+    log_event(
+        logger,
+        "info",
+        "Serializer provider selected",
+        serializer_provider=args.serializer_provider,
+    )
 
     data_root_override = args.data_root
     data_root_overridden = data_root_override is not None
@@ -1052,8 +1105,14 @@ def main(args: argparse.Namespace | None = None) -> int:
     if markers_override is not None:
         markers_path = markers_override.expanduser().resolve()
         if not markers_path.exists():
+            log_event(
+                logger,
+                "error",
+                "Structural marker configuration not found",
+                structural_markers=str(markers_path),
+            )
             raise FileNotFoundError(f"Heading markers file not found: {markers_path}")
-        extra_headings, extra_captions = _load_structural_marker_config(markers_path)
+        extra_headings, extra_captions = load_structural_marker_config(markers_path)
         custom_heading_markers = extra_headings
         custom_caption_markers = extra_captions
         if extra_headings:
@@ -1075,6 +1134,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "custom_heading_markers": custom_heading_markers,
                 "custom_caption_markers": custom_caption_markers,
                 "workers": int(getattr(args, "workers", 1)),
+                "serializer_provider": args.serializer_provider,
             }
         },
     )
@@ -1120,6 +1180,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         heading_markers=heading_markers,
         caption_markers=caption_markers,
         docling_version=docling_version,
+        serializer_provider_spec=str(args.serializer_provider),
     )
 
     if "bert" in tokenizer_model.lower():

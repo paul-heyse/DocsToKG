@@ -83,6 +83,7 @@ pytest.importorskip("pydantic_settings")
 import DocsToKG.OntologyDownload.pipeline as pipeline_mod
 from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig, resolvers
 from DocsToKG.OntologyDownload import ontology_download as core
+from DocsToKG.OntologyDownload import io_safe as io_safe_mod
 from DocsToKG.OntologyDownload import storage as storage_mod
 
 
@@ -168,6 +169,18 @@ def stubbed_validators(monkeypatch):
     monkeypatch.setattr(core, "run_validators", _runner, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _allow_download_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Permit test resolvers to use example.org without URL policy failures."""
+
+    monkeypatch.setattr(
+        pipeline_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
+    )
+    monkeypatch.setattr(
+        core, "validate_url_security", lambda url, http_config=None: url, raising=False
+    )
+
+
 # --- Test Cases ---
 
 
@@ -189,7 +202,7 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         destination = kwargs["destination"]
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(headers["__fixture__"], destination)
-        sha256 = core.sha256_file(destination)
+        sha256 = io_safe_mod.sha256_file(destination)
         content_length = destination.stat().st_size
         return core.DownloadResult(
             path=destination,
@@ -211,7 +224,10 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
             core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"]),
             core.FetchSpec(id="bfo", resolver="ols", extras={}, target_formats=["owl"]),
         ],
-        config=ResolvedConfig(defaults=DefaultsConfig(prefer_source=["obo", "ols"]), specs=[]),
+        config=ResolvedConfig(
+            defaults=DefaultsConfig(prefer_source=["obo", "ols"], resolver_fallback_enabled=False),
+            specs=[],
+        ),
         force=True,
     )
     assert len(results) == 2
@@ -220,7 +236,7 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         assert manifest["id"] == result.spec.id
         assert manifest["validation"]
         local_file = result.local_path
-        assert manifest["sha256"] == core.sha256_file(local_file)
+        assert manifest["sha256"] == io_safe_mod.sha256_file(local_file)
         assert manifest["normalized_sha256"]
         assert len(manifest["fingerprint"]) == 64
         assert manifest["content_type"] == "application/rdf+xml"

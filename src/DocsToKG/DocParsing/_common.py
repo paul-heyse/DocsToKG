@@ -382,6 +382,7 @@ __all__ = [
     "ChunkResult",
     "DEFAULT_HEADING_MARKERS",
     "DEFAULT_CAPTION_MARKERS",
+    "DEFAULT_SERIALIZER_PROVIDER",
     "load_structural_marker_config",
 ]
 
@@ -390,11 +391,12 @@ __all__ = [
 UUID_NAMESPACE = uuid.UUID("00000000-0000-0000-0000-000000000000")
 DEFAULT_HEADING_MARKERS: Tuple[str, ...] = ("#",)
 DEFAULT_CAPTION_MARKERS: Tuple[str, ...] = (
-    "Table caption:",
     "Figure caption:",
+    "Table:",
     "Picture description:",
     "<!-- image -->",
 )
+DEFAULT_SERIALIZER_PROVIDER = "DocsToKG.DocParsing.serializers:RichSerializerProvider"
 
 
 @dataclass(slots=True)
@@ -443,6 +445,7 @@ class ChunkWorkerConfig:
     heading_markers: Tuple[str, ...]
     caption_markers: Tuple[str, ...]
     docling_version: str
+    serializer_provider_spec: str = DEFAULT_SERIALIZER_PROVIDER
 
 
 @dataclass(slots=True)

@@ -5,12 +5,6 @@
 #   "purpose": "OpenAlex PDF download CLI and supporting utilities",
 #   "sections": [
 #     {
-#       "id": "utc-timestamp",
-#       "name": "_utc_timestamp",
-#       "anchor": "function-utc-timestamp",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "has-pdf-eof",
 #       "name": "_has_pdf_eof",
 #       "anchor": "function-has-pdf-eof",
@@ -59,18 +53,6 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "load-previous-manifest",
-#       "name": "load_previous_manifest",
-#       "anchor": "function-load-previous-manifest",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "build-manifest-entry",
-#       "name": "build_manifest_entry",
-#       "anchor": "function-build-manifest-entry",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "collect-location-urls",
 #       "name": "_collect_location_urls",
 #       "anchor": "function-collect-location-urls",
@@ -104,30 +86,6 @@
 #       "id": "download-candidate",
 #       "name": "download_candidate",
 #       "anchor": "function-download-candidate",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "read-resolver-config",
-#       "name": "read_resolver_config",
-#       "anchor": "function-read-resolver-config",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "seed-resolver-toggle-defaults",
-#       "name": "_seed_resolver_toggle_defaults",
-#       "anchor": "function-seed-resolver-toggle-defaults",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "apply-config-overrides",
-#       "name": "apply_config_overrides",
-#       "anchor": "function-apply-config-overrides",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-resolver-config",
-#       "name": "load_resolver_config",
-#       "anchor": "function-load-resolver-config",
 #       "kind": "function"
 #     },
 #     {
@@ -195,6 +153,7 @@ import json
 import logging
 import os
 import time
+import threading
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -215,6 +174,8 @@ from typing import (
 import requests
 from pyalex import Topics, Works
 from pyalex import config as oa_config
+from urllib.parse import urlparse
+from urllib.robotparser import RobotFileParser
 
 from DocsToKG.ContentDownload import resolvers
 from DocsToKG.ContentDownload.classifications import PDF_LIKE, Classification
@@ -246,11 +207,14 @@ from DocsToKG.ContentDownload.telemetry import (
     ManifestIndexSink,
     load_previous_manifest,
     MultiSink,
+    SummarySink,
+    SqliteSink,
 )
 from DocsToKG.ContentDownload.utils import (
     dedupe,
     normalize_doi,
     normalize_pmcid,
+    normalize_url,
     slugify,
 )
 from DocsToKG.ContentDownload.utils import (
@@ -531,6 +495,102 @@ def _parse_domain_interval(value: str) -> Tuple[str, float]:
     return domain, seconds
 
 
+class RobotsCache:
+    """Cache robots.txt policies per host and evaluate allowed URLs."""
+
+    def __init__(self, user_agent: str) -> None:
+        self._user_agent = user_agent
+        self._parsers: Dict[str, RobotFileParser] = {}
+        self._lock = threading.Lock()
+
+    def is_allowed(self, session: requests.Session, url: str, timeout: float) -> bool:
+        """Return ``False`` when robots.txt forbids fetching ``url``."""
+
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            return True
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        with self._lock:
+            parser = self._parsers.get(origin)
+        if parser is None:
+            parser = self._fetch(session, origin, timeout)
+            with self._lock:
+                self._parsers[origin] = parser
+
+        path = parsed.path or "/"
+        if parsed.params:
+            path = f"{path};{parsed.params}"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        try:
+            return parser.can_fetch(self._user_agent, path or "/")
+        except Exception:
+            return True
+
+    def _fetch(self, session: requests.Session, origin: str, timeout: float) -> RobotFileParser:
+        """Fetch and parse the robots.txt policy for ``origin``."""
+
+        robots_url = origin.rstrip("/") + "/robots.txt"
+        parser = RobotFileParser()
+        parser.set_url(robots_url)
+        try:
+            with request_with_retries(
+                session,
+                "GET",
+                robots_url,
+                timeout=min(timeout, 5.0),
+                allow_redirects=True,
+                max_retries=1,
+            ) as response:
+                if response.status_code and response.status_code >= 400:
+                    parser.parse([])
+                else:
+                    body = response.text or ""
+                    parser.parse(body.splitlines())
+        except Exception:
+            parser.parse([])
+        return parser
+
+
+def _parse_budget(value: str) -> Tuple[str, int]:
+    """Parse ``requests=N`` or ``bytes=N`` budget specifications."""
+
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("budget must use the format kind=value")
+    kind, raw_amount = value.split("=", 1)
+    key = kind.strip().lower()
+    if key not in {"requests", "bytes"}:
+        raise argparse.ArgumentTypeError("budget kind must be 'requests' or 'bytes'")
+    amount_text = raw_amount.strip().lower().replace(",", "").replace("_", "")
+    multiplier = 1
+    if amount_text.endswith("kb"):
+        multiplier = 1024
+        amount_text = amount_text[:-2]
+    elif amount_text.endswith("mb"):
+        multiplier = 1024 ** 2
+        amount_text = amount_text[:-2]
+    elif amount_text.endswith("gb"):
+        multiplier = 1024 ** 3
+        amount_text = amount_text[:-2]
+    elif amount_text.endswith("k"):
+        multiplier = 1000
+        amount_text = amount_text[:-1]
+    elif amount_text.endswith("m"):
+        multiplier = 1000 ** 2
+        amount_text = amount_text[:-1]
+    elif amount_text.endswith("g"):
+        multiplier = 1000 ** 3
+        amount_text = amount_text[:-1]
+    try:
+        amount = int(amount_text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid budget value: {raw_amount}") from exc
+    if amount <= 0:
+        raise argparse.ArgumentTypeError("budget value must be positive")
+    return key, amount * multiplier
+
+
+
 def _make_session(
     headers: Dict[str, str],
     *,
@@ -798,13 +858,35 @@ def download_candidate(
     base_headers = dict(headers)
 
     dry_run = bool(context.get("dry_run", False))
+    robots_checker: Optional[RobotsCache] = context.get("robots_checker")
+    if robots_checker is not None:
+        robots_allowed = robots_checker.is_allowed(session, url, timeout)
+        if not robots_allowed:
+            LOGGER.info(
+                "robots-disallowed",
+                extra={
+                    "extra_fields": {
+                        "url": url,
+                        "work_id": artifact.work_id,
+                    }
+                },
+            )
+            return DownloadOutcome(
+                classification=Classification.SKIPPED,
+                path=None,
+                http_status=None,
+                content_type=None,
+                elapsed_ms=0.0,
+                error="robots-disallowed",
+            )
     head_precheck_passed = head_precheck_passed or bool(context.get("head_precheck_passed", False))
     if not head_precheck_passed and not context.get("skip_head_precheck", False):
         head_precheck_passed = head_precheck(session, url, timeout)
         context["head_precheck_passed"] = head_precheck_passed
     extract_html_text = bool(context.get("extract_html_text", False))
     previous_map: Dict[str, Dict[str, Any]] = context.get("previous", {})
-    previous = previous_map.get(url, {})
+    normalized_url = normalize_url(url)
+    previous = previous_map.get(normalized_url, {})
     previous_etag = previous.get("etag")
     previous_last_modified = previous.get("last_modified")
     existing_path = previous.get("path")
@@ -1202,6 +1284,7 @@ def process_one_work(
     sniff_bytes: int,
     min_pdf_bytes: int,
     tail_check_bytes: int,
+    robots_checker: Optional[RobotsCache],
 ) -> Dict[str, Any]:
     """Process a single OpenAlex work through the resolver pipeline.
 
@@ -1222,6 +1305,7 @@ def process_one_work(
         sniff_bytes: Number of leading bytes to buffer for payload inference.
         min_pdf_bytes: Minimum PDF size accepted when HEAD prechecks fail.
         tail_check_bytes: Tail window size used to detect embedded HTML payloads.
+        robots_checker: Cache enforcing robots.txt policies when enabled.
 
     Returns:
         Dictionary summarizing the outcome (saved/html_only/skipped flags).
@@ -1233,13 +1317,14 @@ def process_one_work(
     """
     artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
 
-    result = {"work_id": artifact.work_id, "saved": False, "html_only": False, "skipped": False}
+    result = {"work_id": artifact.work_id, "saved": False, "html_only": False, "skipped": False, "downloaded_bytes": 0}
 
     raw_previous = previous_lookup.get(artifact.work_id, {})
     previous_map: Dict[str, Dict[str, Any]] = {}
-    for url, entry in raw_previous.items():
+    for previous_url, entry in raw_previous.items():
         if not isinstance(entry, dict):
             continue
+        normalized_url = normalize_url(previous_url)
         etag = entry.get("etag")
         last_modified = entry.get("last_modified")
         path = entry.get("path")
@@ -1268,13 +1353,13 @@ def process_one_work(
                     extra={
                         "extra_fields": {
                             "work_id": artifact.work_id,
-                            "url": url,
+                            "url": previous_url,
                             "missing_fields": missing_fields,
                         }
                     },
                 )
                 continue
-        previous_map[url] = {
+        previous_map[normalized_url] = {
             "etag": etag,
             "last_modified": last_modified,
             "path": path,
@@ -1290,6 +1375,7 @@ def process_one_work(
         "sniff_bytes": sniff_bytes,
         "min_pdf_bytes": min_pdf_bytes,
         "tail_check_bytes": tail_check_bytes,
+        "robots_checker": robots_checker,
     }
 
     if artifact.work_id in resume_completed:
@@ -1359,6 +1445,24 @@ def process_one_work(
             result["saved"] = True
         elif pipeline_result.outcome.classification is Classification.HTML:
             result["html_only"] = True
+        length_hint = pipeline_result.outcome.content_length
+        bytes_downloaded = 0
+        if isinstance(length_hint, str):
+            try:
+                bytes_downloaded = int(length_hint)
+            except ValueError:
+                bytes_downloaded = 0
+        elif isinstance(length_hint, int):
+            bytes_downloaded = max(length_hint, 0)
+        elif length_hint is not None:
+            try:
+                bytes_downloaded = int(length_hint)
+            except (TypeError, ValueError):
+                bytes_downloaded = 0
+        if bytes_downloaded <= 0 and pipeline_result.outcome.path:
+            with contextlib.suppress(OSError):
+                bytes_downloaded = int(Path(pipeline_result.outcome.path).stat().st_size)
+        result["downloaded_bytes"] = max(bytes_downloaded, 0)
         return result
 
     reason = pipeline_result.reason or (
@@ -1372,6 +1476,12 @@ def process_one_work(
         elapsed_ms=None,
         error=reason,
     )
+    bytes_hint = outcome.content_length
+    if bytes_hint is not None:
+        try:
+            result["downloaded_bytes"] = max(int(bytes_hint), 0)
+        except (TypeError, ValueError):
+            pass
     logger.log_attempt(
         AttemptRecord(
             work_id=artifact.work_id,
@@ -1469,6 +1579,18 @@ def main() -> None:
         type=int,
         default=None,
         help="Maximum bytes to download per request before aborting (default: unlimited).",
+    )
+    parser.add_argument(
+        "--respect-robots",
+        action="store_true",
+        help="Consult robots.txt once per host before fetching URLs.",
+    )
+    parser.add_argument(
+        "--budget",
+        action="append",
+        default=[],
+        metavar="KIND=VALUE",
+        help="Stop after reaching a budget (e.g., requests=1000, bytes=5GB). Option may repeat.",
     )
 
     classifier_group = parser.add_argument_group("Classifier settings")
@@ -1717,12 +1839,30 @@ def main() -> None:
     if args.log_format == "csv":
         csv_path = csv_path or manifest_path.with_suffix(".csv")
 
+    budget_requests: Optional[int] = None
+    budget_bytes: Optional[int] = None
+    robots_checker: Optional[RobotsCache] = None
+    if args.respect_robots:
+        user_agent = config.polite_headers.get("User-Agent", "DocsToKGDownloader/1.0")
+        robots_checker = RobotsCache(user_agent)
+    for spec in args.budget or []:
+        try:
+            kind, amount = _parse_budget(spec)
+        except argparse.ArgumentTypeError as exc:
+            parser.error(str(exc))
+        if kind == "requests":
+            budget_requests = amount if budget_requests is None else min(budget_requests, amount)
+        else:
+            budget_bytes = amount if budget_bytes is None else min(budget_bytes, amount)
+
     summary: Dict[str, Any] = {}
     summary_record: Dict[str, Any] = {}
     processed = 0
     saved = 0
     html_only = 0
     skipped = 0
+    total_downloaded_bytes = 0
+    stop_due_to_budget = False
 
     with contextlib.ExitStack() as stack:
         sinks: List[AttemptSink] = []
@@ -1734,6 +1874,12 @@ def main() -> None:
         last_attempt_path = manifest_path.with_suffix(".last.csv")
         last_attempt_sink = stack.enter_context(LastAttemptCsvSink(last_attempt_path))
         sinks.append(last_attempt_sink)
+        sqlite_path = manifest_path.with_suffix(".sqlite3")
+        sqlite_sink = stack.enter_context(SqliteSink(sqlite_path))
+        sinks.append(sqlite_sink)
+        summary_path = manifest_path.with_suffix(".summary.json")
+        summary_sink = stack.enter_context(SummarySink(summary_path))
+        sinks.append(summary_sink)
         if csv_path:
             csv_sink = stack.enter_context(CsvSink(csv_path))
             sinks.append(csv_sink)
@@ -1763,8 +1909,8 @@ def main() -> None:
             thread-local.
             """
 
-            pool_connections = max(64, concurrency_product * 4)
-            pool_maxsize = max(128, concurrency_product * 8)
+            pool_connections = min(max(64, concurrency_product * 4), 512)
+            pool_maxsize = min(max(128, concurrency_product * 8), 1024)
             return _make_session(
                 config.polite_headers,
                 pool_connections=pool_connections,
@@ -1774,7 +1920,7 @@ def main() -> None:
         def _record_result(res: Dict[str, Any]) -> None:
             """Update aggregate counters based on a single work result."""
 
-            nonlocal processed, saved, html_only, skipped
+            nonlocal processed, saved, html_only, skipped, total_downloaded_bytes
             processed += 1
             if res.get("saved"):
                 saved += 1
@@ -1782,6 +1928,18 @@ def main() -> None:
                 html_only += 1
             if res.get("skipped"):
                 skipped += 1
+            downloaded = res.get("downloaded_bytes") or 0
+            try:
+                total_downloaded_bytes += int(downloaded)
+            except (TypeError, ValueError):
+                pass
+
+        def _should_stop() -> bool:
+            if budget_requests is not None and processed >= budget_requests:
+                return True
+            if budget_bytes is not None and total_downloaded_bytes >= budget_bytes:
+                return True
+            return False
 
         try:
             if args.workers == 1:
@@ -1790,6 +1948,8 @@ def main() -> None:
                     for work in iterate_openalex(
                         query, per_page=args.per_page, max_results=args.max
                     ):
+                        if stop_due_to_budget:
+                            break
                         result = process_one_work(
                             work,
                             session,
@@ -1807,8 +1967,12 @@ def main() -> None:
                             sniff_bytes=args.sniff_bytes,
                             min_pdf_bytes=args.min_pdf_bytes,
                             tail_check_bytes=args.tail_check_bytes,
+                            robots_checker=robots_checker,
                         )
                         _record_result(result)
+                        if not stop_due_to_budget and _should_stop():
+                            stop_due_to_budget = True
+                            break
                         if args.sleep > 0:
                             time.sleep(args.sleep)
                 finally:
@@ -1844,6 +2008,7 @@ def main() -> None:
                                     sniff_bytes=args.sniff_bytes,
                                     min_pdf_bytes=args.min_pdf_bytes,
                                     tail_check_bytes=args.tail_check_bytes,
+                                    robots_checker=robots_checker,
                                 )
                             finally:
                                 if hasattr(session, "close"):
@@ -1854,25 +2019,55 @@ def main() -> None:
                     for work in iterate_openalex(
                         query, per_page=args.per_page, max_results=args.max
                     ):
+                        if stop_due_to_budget:
+                            break
                         if len(in_flight) >= max_in_flight:
                             done, pending = wait(set(in_flight), return_when=FIRST_COMPLETED)
                             for completed_future in done:
                                 _record_result(completed_future.result())
+                                if not stop_due_to_budget and _should_stop():
+                                    stop_due_to_budget = True
                             in_flight = list(pending)
+                            if stop_due_to_budget:
+                                break
+                        if stop_due_to_budget:
+                            break
                         in_flight.append(_submit(work))
 
                     if in_flight:
                         for future in as_completed(list(in_flight)):
                             _record_result(future.result())
+                            if not stop_due_to_budget and _should_stop():
+                                stop_due_to_budget = True
         except Exception:
             raise
         else:
+            if stop_due_to_budget:
+                LOGGER.info(
+                    "Stopping due to budget exhaustion",
+                    extra={
+                        "extra_fields": {
+                            "budget_requests": budget_requests,
+                            "budget_bytes": budget_bytes,
+                            "processed": processed,
+                            "bytes_downloaded": total_downloaded_bytes,
+                        }
+                    },
+                )
             summary = metrics.summary()
             summary_record = {
                 "processed": processed,
                 "saved": saved,
                 "html_only": html_only,
                 "skipped": skipped,
+                "bytes_downloaded": total_downloaded_bytes,
+                "budget": {
+                    "requests": budget_requests,
+                    "bytes": budget_bytes,
+                    "requests_consumed": processed,
+                    "bytes_consumed": total_downloaded_bytes,
+                    "exhausted": stop_due_to_budget,
+                },
                 "resolvers": summary,
             }
             try:
@@ -1891,6 +2086,9 @@ def main() -> None:
     print(
         f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, skipped {skipped}."
     )
+    print(f"Total bytes downloaded {total_downloaded_bytes}.")
+    if stop_due_to_budget:
+        print("Budget exhausted; halting further work.")
     if args.dry_run:
         print("DRY RUN: no files written, resolver coverage only.")
     print("Resolver summary:")
@@ -1927,6 +2125,14 @@ def main() -> None:
             "saved": saved,
             "html_only": html_only,
             "skipped": skipped,
+            "bytes_downloaded": total_downloaded_bytes,
+            "budget": {
+                "requests": budget_requests,
+                "bytes": budget_bytes,
+                "requests_consumed": processed,
+                "bytes_consumed": total_downloaded_bytes,
+                "exhausted": stop_due_to_budget,
+            },
             "resolvers": summary,
         }
     LOGGER.info("resolver_run_summary %s", json.dumps(summary_record, sort_keys=True))

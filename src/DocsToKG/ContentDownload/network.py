@@ -459,7 +459,7 @@ def _looks_like_pdf(headers: Mapping[str, str]) -> bool:
     content_type = (headers.get("Content-Type") or "").lower()
     content_length = (headers.get("Content-Length") or "").strip()
 
-    if any(t in content_type for t in ("text/html", "application/json", "text/plain")):
+    if any(t in content_type for t in ("text/html", "text/plain")) or "json" in content_type:
         return False
     dispo = (headers.get("Content-Disposition") or "").lower()
     if "filename=" in dispo and ".pdf" in dispo:

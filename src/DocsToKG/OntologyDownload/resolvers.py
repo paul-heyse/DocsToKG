@@ -93,7 +93,6 @@ from __future__ import annotations
 import logging
 from importlib import metadata
 import re
-import threading
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional
 
@@ -121,7 +120,8 @@ except ModuleNotFoundError:  # pragma: no cover - provide actionable error later
 
 from .config import DownloadConfiguration, ResolvedConfig
 from .errors import ResolverError, UserConfigError
-from .net import TokenBucket, retry_with_backoff, validate_url_security
+from .net import retry_with_backoff, validate_url_security
+from .ratelimit import get_bucket
 from .optdeps import get_pystow
 from .plugins import ensure_resolver_plugins
 
@@ -131,8 +131,6 @@ OlsClient = _OlsClient
 pystow = get_pystow()
 
 
-_SERVICE_BUCKETS: Dict[str, TokenBucket] = {}
-_SERVICE_BUCKET_LOCK = threading.Lock()
 # --- Public Functions ---
 
 
@@ -186,23 +184,6 @@ def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
 
 
 # --- Private Helpers ---
-
-
-def _get_service_bucket(service: str, config: ResolvedConfig) -> TokenBucket:
-    """Return a token bucket for resolver API requests respecting rate limits."""
-
-    http_config = config.defaults.http
-    rate = http_config.parse_service_rate_limit(service) or http_config.rate_limit_per_second()
-    rate = max(rate, 0.1)
-    capacity = max(rate, 1.0)
-    with _SERVICE_BUCKET_LOCK:
-        bucket = _SERVICE_BUCKETS.get(service)
-        if bucket is None or bucket.rate != rate or bucket.capacity != capacity:
-            bucket = TokenBucket(rate_per_sec=rate, capacity=capacity)
-            _SERVICE_BUCKETS[service] = bucket
-        return bucket
-
-
 @dataclass(slots=True)
 # --- Public Classes ---
 
@@ -304,7 +285,11 @@ class BaseResolver:
                 },
             )
 
-        bucket = _get_service_bucket(service, config) if service else None
+        bucket = get_bucket(
+            http_config=config.defaults.http,
+            service=service,
+            host=None,
+        ) if service else None
 
         def _invoke():
             if bucket is not None:

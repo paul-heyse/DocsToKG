@@ -46,6 +46,8 @@ for directory in (CONFIG_DIR, CACHE_DIR, LOG_DIR, LOCAL_ONTOLOGY_DIR):
 class StorageBackend(Protocol):
     """Protocol describing storage operations required by the pipeline."""
 
+    root: Path
+
     def prepare_version(self, ontology_id: str, version: str) -> Path:
         """Return a workspace for the given ontology/version combination."""
 
@@ -97,7 +99,7 @@ class LocalStorageBackend:
     """Storage backend that keeps artefacts on the local filesystem."""
 
     def __init__(self, root: Path) -> None:
-        self.root = root
+        self.root: Path = root
 
     def _version_dir(self, ontology_id: str, version: str) -> Path:
         safe_id, safe_version = _safe_identifiers(ontology_id, version)

@@ -125,10 +125,28 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "qwen-embed-direct",
+#       "name": "_qwen_embed_direct",
+#       "anchor": "function-qwen-embed-direct",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "qwen-embed",
 #       "name": "qwen_embed",
 #       "anchor": "function-qwen-embed",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "qwenembeddingqueue",
+#       "name": "QwenEmbeddingQueue",
+#       "anchor": "class-qwenembeddingqueue",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "embeddingprocessingerror",
+#       "name": "EmbeddingProcessingError",
+#       "anchor": "class-embeddingprocessingerror",
+#       "kind": "class"
 #     },
 #     {
 #       "id": "process-pass-a",
@@ -494,6 +512,7 @@ def ensure_uuid(rows: List[dict]) -> bool:
                     text_value = text_raw.decode("utf-8", errors="ignore")
                 else:
                     text_value = str(text_raw) if text_raw is not None else ""
+                text_value = unicodedata.normalize("NFKC", text_value)
                 digest = hashlib.sha1(text_value.encode("utf-8")).hexdigest()[:16]
 
                 name = f"{doc_id}|{src}|{digest}"
@@ -985,6 +1004,15 @@ class QwenEmbeddingQueue:
         if wait:
             self._queue.join()
             self._thread.join()
+
+
+class EmbeddingProcessingError(RuntimeError):
+    """Wrap exceptions raised during per-file embedding with timing metadata."""
+
+    def __init__(self, original: Exception, duration: float) -> None:
+        super().__init__(str(original))
+        self.original = original
+        self.duration = duration
 
 
 def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
@@ -1503,13 +1531,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--sparsity-report-top-n",
         type=int,
         default=10,
-        help="Number of UUIDs to surface when SPLADE sparsity exceeds the warning threshold.",
+        help=(
+            "Number of zero-NNZ SPLADE chunk UUIDs to list when sparsity exceeds the warning threshold "
+            "(default: 10)."
+        ),
     )
     parser.add_argument(
         "--files-parallel",
         type=int,
         default=1,
-        help="Process up to N chunk files concurrently (default: 1).",
+        help="Process up to N chunk files concurrently during embedding (default: 1 for serial runs).",
     )
     add_resume_force_options(
         parser,
@@ -1579,21 +1610,18 @@ def main(args: argparse.Namespace | None = None) -> int:
         args = parser.parse_args(args)
     offline_mode = bool(getattr(args, "offline", False))
 
-    hf_home = resolve_hf_home()
-    model_root = resolve_model_root(hf_home)
-    default_splade_dir = expand_path(_resolve_splade_dir(model_root))
-    default_qwen_dir = expand_path(_resolve_qwen_dir(model_root))
+    global HF_HOME, MODEL_ROOT, QWEN_DIR, SPLADE_DIR
+    HF_HOME, MODEL_ROOT = init_hf_env()
+    QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
+    SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
+    model_root = MODEL_ROOT
+    default_qwen_dir = QWEN_DIR
+    default_splade_dir = SPLADE_DIR
+
     cli_splade = _expand_optional(getattr(args, "splade_model_dir", None))
     cli_qwen = _expand_optional(getattr(args, "qwen_model_dir", None))
     splade_model_dir = cli_splade or default_splade_dir
     qwen_model_dir = cli_qwen or default_qwen_dir
-
-    global HF_HOME, MODEL_ROOT, QWEN_DIR, SPLADE_DIR
-    HF_HOME, MODEL_ROOT = init_hf_env(hf_home, model_root)
-    QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
-    SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
-    default_qwen_dir = QWEN_DIR
-    default_splade_dir = SPLADE_DIR
 
     validate_only = bool(getattr(args, "validate_only", False))
 
@@ -1666,7 +1694,26 @@ def main(args: argparse.Namespace | None = None) -> int:
         resolver=data_vectors,
     ).resolve()
 
-    out_dir.mkdir(parents=True, exist_ok=True)
+    if validate_only:
+        missing_reasons = []
+        if not chunks_dir.exists():
+            missing_reasons.append(f"chunks directory {chunks_dir}")
+        if not out_dir.exists():
+            missing_reasons.append(f"vector directory {out_dir}")
+        if missing_reasons:
+            log_event(
+                logger,
+                "error",
+                "Validate-only mode requires existing inputs and vectors",
+                missing_paths=missing_reasons,
+                tip="Run without --validate-only to generate embeddings before validation.",
+            )
+            raise FileNotFoundError(
+                "Validate-only mode expects existing directories: " + ", ".join(missing_reasons)
+            )
+    else:
+        out_dir.mkdir(parents=True, exist_ok=True)
+
     if validate_only:
         files_checked, rows_validated = _validate_vectors_for_chunks(chunks_dir, out_dir, logger)
         logger.info(
@@ -1684,6 +1731,8 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     args.out_dir = out_dir
 
+    requested_parallel = max(1, int(getattr(args, "files_parallel", 1)))
+
     logger.info(
         "Embedding configuration",
         extra={
@@ -1694,6 +1743,13 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "splade_model_dir": str(splade_model_dir),
                 "qwen_model_dir": str(qwen_model_dir),
                 "offline": offline_mode,
+                "requested_files_parallel": requested_parallel,
+                "sparsity_warn_threshold_pct": getattr(
+                    args,
+                    "sparsity_warn_threshold_pct",
+                    SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+                ),
+                "sparsity_report_top_n": int(getattr(args, "sparsity_report_top_n", 10)),
             }
         },
     )
@@ -1763,7 +1819,8 @@ def main(args: argparse.Namespace | None = None) -> int:
             args,
             "sparsity_warn_threshold_pct",
             SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
-        )
+        ),
+        top_n=max(1, int(getattr(args, "sparsity_report_top_n", 10))),
     )
     tracemalloc.start()
     pass_b_start = time.perf_counter()
@@ -1772,21 +1829,19 @@ def main(args: argparse.Namespace | None = None) -> int:
     qwen_norms_all: List[float] = []
 
     manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
-    file_entries = []
+    file_entries: List[Tuple[Path, Path, str, str]] = []
     skipped_files = 0
     for chunk_file in files:
         doc_id, out_path = derive_doc_id_and_vectors_path(chunk_file, chunks_dir, args.out_dir)
         input_hash = compute_content_hash(chunk_file)
         entry = manifest_index.get(doc_id)
         if should_skip_output(out_path, entry, input_hash, args.resume, args.force):
-            logger.info(
+            log_event(
+                logger,
+                "info",
                 "Skipping chunk file: output exists and input unchanged",
-                extra={
-                    "extra_fields": {
-                        "doc_id": doc_id,
-                        "output_path": str(out_path),
-                    }
-                },
+                doc_id=doc_id,
+                output_path=str(out_path),
             )
             manifest_log_skip(
                 stage=MANIFEST_STAGE,
@@ -1800,18 +1855,120 @@ def main(args: argparse.Namespace | None = None) -> int:
             continue
         file_entries.append((chunk_file, out_path, input_hash, doc_id))
 
-    for chunk_file, out_path, input_hash, doc_id in tqdm(
-        file_entries, desc="Pass B: Encoding vectors", unit="file"
-    ):
-        with acquire_lock(out_path):
+    files_parallel = min(requested_parallel, max(1, len(file_entries)))
+    args.files_parallel = files_parallel
+
+    if files_parallel > 1:
+        log_event(logger, "info", "File-level parallelism enabled", files_parallel=files_parallel)
+
+    qwen_queue: QwenEmbeddingQueue | None = None
+    try:
+        if files_parallel > 1 and file_entries:
+            qwen_queue = QwenEmbeddingQueue(args.qwen_cfg, maxsize=files_parallel * 2)
+            args.qwen_queue = qwen_queue
+        else:
+            args.qwen_queue = None
+
+        def _process_entry(entry: Tuple[Path, Path, str, str]) -> Tuple[int, List[int], List[float], float]:
+            chunk_path, vectors_path, input_hash, doc_id = entry
             start = time.perf_counter()
             try:
-                count, nnz, norms = process_chunk_file_vectors(
-                    chunk_file, out_path, stats, args, validator, logger
-                )
-            except Exception as exc:
+                with acquire_lock(vectors_path):
+                    count, nnz, norms = process_chunk_file_vectors(
+                        chunk_path, vectors_path, stats, args, validator, logger
+                    )
+            except Exception as exc:  # pragma: no cover - propagated to caller
                 duration = time.perf_counter() - start
-                manifest_log_failure(
+                raise EmbeddingProcessingError(exc, duration) from exc
+            duration = time.perf_counter() - start
+            return count, nnz, norms, duration
+
+        if not file_entries:
+            pass
+        elif files_parallel > 1:
+            with ThreadPoolExecutor(max_workers=files_parallel) as executor, tqdm(
+                total=len(file_entries), desc="Pass B: Encoding vectors", unit="file"
+            ) as bar:
+                future_map = {
+                    executor.submit(_process_entry, entry): entry for entry in file_entries
+                }
+                for future in as_completed(future_map):
+                    chunk_file, out_path, input_hash, doc_id = future_map[future]
+                    try:
+                        count, nnz, norms, duration = future.result()
+                    except EmbeddingProcessingError as exc:
+                        manifest_log_failure(
+                            stage=MANIFEST_STAGE,
+                            doc_id=doc_id,
+                            duration_s=round(exc.duration, 3),
+                            schema_version=VECTOR_SCHEMA_VERSION,
+                            input_path=chunk_file,
+                            input_hash=input_hash,
+                            output_path=out_path,
+                            error=str(exc.original),
+                        )
+                        bar.update(1)
+                        raise exc.original from exc
+                    except Exception as exc:
+                        manifest_log_failure(
+                            stage=MANIFEST_STAGE,
+                            doc_id=doc_id,
+                            duration_s=0.0,
+                            schema_version=VECTOR_SCHEMA_VERSION,
+                            input_path=chunk_file,
+                            input_hash=input_hash,
+                            output_path=out_path,
+                            error=str(exc),
+                        )
+                        bar.update(1)
+                        raise
+                    total_vectors += count
+                    splade_nnz_all.extend(nnz)
+                    qwen_norms_all.extend(norms)
+                    manifest_log_success(
+                        stage=MANIFEST_STAGE,
+                        doc_id=doc_id,
+                        duration_s=round(duration, 3),
+                        schema_version=VECTOR_SCHEMA_VERSION,
+                        input_path=chunk_file,
+                        input_hash=input_hash,
+                        output_path=out_path,
+                        vector_count=count,
+                    )
+                    bar.update(1)
+        else:
+            for entry in tqdm(file_entries, desc="Pass B: Encoding vectors", unit="file"):
+                chunk_file, out_path, input_hash, doc_id = entry
+                try:
+                    count, nnz, norms, duration = _process_entry(entry)
+                except EmbeddingProcessingError as exc:
+                    manifest_log_failure(
+                        stage=MANIFEST_STAGE,
+                        doc_id=doc_id,
+                        duration_s=round(exc.duration, 3),
+                        schema_version=VECTOR_SCHEMA_VERSION,
+                        input_path=chunk_file,
+                        input_hash=input_hash,
+                        output_path=out_path,
+                        error=str(exc.original),
+                    )
+                    raise exc.original from exc
+                except Exception as exc:
+                    manifest_log_failure(
+                        stage=MANIFEST_STAGE,
+                        doc_id=doc_id,
+                        duration_s=0.0,
+                        schema_version=VECTOR_SCHEMA_VERSION,
+                        input_path=chunk_file,
+                        input_hash=input_hash,
+                        output_path=out_path,
+                        error=str(exc),
+                    )
+                    raise
+                total_vectors += count
+                splade_nnz_all.extend(nnz)
+                qwen_norms_all.extend(norms)
+                manifest_log_success(
                     stage=MANIFEST_STAGE,
                     doc_id=doc_id,
                     duration_s=round(duration, 3),
@@ -1819,24 +1976,12 @@ def main(args: argparse.Namespace | None = None) -> int:
                     input_path=chunk_file,
                     input_hash=input_hash,
                     output_path=out_path,
-                    error=str(exc),
+                    vector_count=count,
                 )
-                raise
-
-            duration = time.perf_counter() - start
-            total_vectors += count
-            splade_nnz_all.extend(nnz)
-            qwen_norms_all.extend(norms)
-            manifest_log_success(
-                stage=MANIFEST_STAGE,
-                doc_id=doc_id,
-                duration_s=round(duration, 3),
-                schema_version=VECTOR_SCHEMA_VERSION,
-                input_path=chunk_file,
-                input_hash=input_hash,
-                output_path=out_path,
-                vector_count=count,
-            )
+    finally:
+        args.qwen_queue = None
+        if qwen_queue is not None:
+            qwen_queue.shutdown()
 
     _current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
@@ -1866,6 +2011,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "qwen_std_norm": round(std_norm, 4),
                 "pass_b_seconds": round(elapsed_b, 3),
                 "skipped_files": skipped_files,
+                "files_parallel": files_parallel,
                 "splade_attn_backend_used": backend_used,
                 "sparsity_warn_threshold_pct": getattr(
                     args,
@@ -1892,6 +2038,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         qwen_std_norm=std_norm,
         peak_memory_gb=peak / 1024**3,
         skipped_files=skipped_files,
+        files_parallel=files_parallel,
         splade_attn_backend_used=backend_used,
         sparsity_warn_threshold_pct=getattr(
             args,
