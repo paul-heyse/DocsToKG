@@ -173,7 +173,7 @@ within <code class="docutils literal notranslate"><span class="pre">C</span></co
 faiss_index: Vector store whose state should be captured.
 registry: Chunk registry providing vector identifier mappings.</p>
 <p>Returns:
-dict[str, object]: Dictionary containing base64-encoded FAISS bytes and registry ids.</p>
+dict[str, object]: Dictionary containing FAISS bytes, registry ids, and snapshot metadata.</p>
 </section>
 <section id="restore-state-faiss-index-payload">
 <h3><code class="docutils literal notranslate"><span class="pre">restore_state(faiss_index,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#restore-state-faiss-index-payload" title="Link to this heading"></a></h3>
@@ -185,6 +185,10 @@ payload: Mapping with <code class="docutils literal notranslate"><span class="pr
 None</p>
 <p>Raises:
 ValueError: If the payload is missing the FAISS byte stream.</p>
+</section>
+<section id="create-cls-dim-config">
+<h3><code class="docutils literal notranslate"><span class="pre">create(cls,</span> <span class="pre">dim,</span> <span class="pre">config)</span></code><a class="headerlink" href="#create-cls-dim-config" title="Link to this heading"></a></h3>
+<p>Factory helper matching the managed FAISS interface contracts.</p>
 </section>
 <section id="ntotal-self">
 <h3><code class="docutils literal notranslate"><span class="pre">ntotal(self)</span></code><a class="headerlink" href="#ntotal-self" title="Link to this heading"></a></h3>
@@ -281,6 +285,10 @@ force_flush: Force immediate rebuild when tombstones accumulate.</p>
 <p>Returns:
 Number of ids scheduled for removal.</p>
 </section>
+<section id="add-batch-self-vectors-vector-ids">
+<h3><code class="docutils literal notranslate"><span class="pre">add_batch(self,</span> <span class="pre">vectors,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#add-batch-self-vectors-vector-ids" title="Link to this heading"></a></h3>
+<p>Add vectors in batches to minimise host→device churn.</p>
+</section>
 <section id="current-index-ids-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_current_index_ids(self)</span></code><a class="headerlink" href="#current-index-ids-self" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
@@ -292,11 +300,22 @@ Number of ids scheduled for removal.</p>
 <section id="search-self-query-top-k">
 <h3><code class="docutils literal notranslate"><span class="pre">search(self,</span> <span class="pre">query,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#search-self-query-top-k" title="Link to this heading"></a></h3>
 <p>Search the index for the <code class="docutils literal notranslate"><span class="pre">top_k</span></code> nearest neighbours of <code class="docutils literal notranslate"><span class="pre">query</span></code>.</p>
-<p>Args:
-query: Dense query vector with dimensionality <code class="docutils literal notranslate"><span class="pre">self._dim</span></code>.
-top_k: Maximum number of nearest neighbours to return.</p>
-<p>Returns:
-Ranked list of :class:<code class="docutils literal notranslate"><span class="pre">FaissSearchResult</span></code> objects.</p>
+</section>
+<section id="search-many-self-queries-top-k">
+<h3><code class="docutils literal notranslate"><span class="pre">search_many(self,</span> <span class="pre">queries,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#search-many-self-queries-top-k" title="Link to this heading"></a></h3>
+<p>Search the index for multiple queries in a single FAISS call.</p>
+</section>
+<section id="search-batch-self-queries-top-k">
+<h3><code class="docutils literal notranslate"><span class="pre">search_batch(self,</span> <span class="pre">queries,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#search-batch-self-queries-top-k" title="Link to this heading"></a></h3>
+<p>Alias for <code class="docutils literal notranslate"><span class="pre">search_many</span></code> to support explicit batch workloads.</p>
+</section>
+<section id="search-matrix-self-matrix-top-k">
+<h3><code class="docutils literal notranslate"><span class="pre">_search_matrix(self,</span> <span class="pre">matrix,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#search-matrix-self-matrix-top-k" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="resolve-search-results-self-distances-indices">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_search_results(self,</span> <span class="pre">distances,</span> <span class="pre">indices)</span></code><a class="headerlink" href="#resolve-search-results-self-distances-indices" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="serialize-self">
 <h3><code class="docutils literal notranslate"><span class="pre">serialize(self)</span></code><a class="headerlink" href="#serialize-self" title="Link to this heading"></a></h3>
@@ -321,24 +340,21 @@ RuntimeError: If the index has not been initialised.</p>
 <section id="load-cls-path-config-dim">
 <h3><code class="docutils literal notranslate"><span class="pre">load(cls,</span> <span class="pre">path,</span> <span class="pre">config,</span> <span class="pre">dim)</span></code><a class="headerlink" href="#load-cls-path-config-dim" title="Link to this heading"></a></h3>
 <p>Restore a vector store from disk.</p>
-<p>Args:
-path: Filesystem path containing a previously saved index payload.
-config: Dense index configuration to apply to the reloaded store.
-dim: Dimensionality of vectors stored in the index.</p>
-<p>Returns:
-Fresh :class:<code class="docutils literal notranslate"><span class="pre">FaissVectorStore</span></code> instance initialised from <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
-<p>Raises:
-OSError: If <code class="docutils literal notranslate"><span class="pre">path</span></code> cannot be read from disk.</p>
 </section>
 <section id="restore-self-payload">
 <h3><code class="docutils literal notranslate"><span class="pre">restore(self,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#restore-self-payload" title="Link to this heading"></a></h3>
 <p>Load an index from <code class="docutils literal notranslate"><span class="pre">payload</span></code> and promote it to the GPU.</p>
 <p>Args:
-payload: Bytes produced by :meth:<code class="docutils literal notranslate"><span class="pre">serialize</span></code>.</p>
+payload: Bytes produced by :meth:<code class="docutils literal notranslate"><span class="pre">serialize</span></code>.
+meta: Optional snapshot metadata for validation.</p>
 <p>Raises:
 ValueError: If the payload is empty.</p>
 <p>Returns:
 None</p>
+</section>
+<section id="set-nprobe-self-nprobe">
+<h3><code class="docutils literal notranslate"><span class="pre">set_nprobe(self,</span> <span class="pre">nprobe)</span></code><a class="headerlink" href="#set-nprobe-self-nprobe" title="Link to this heading"></a></h3>
+<p>Update the active <code class="docutils literal notranslate"><span class="pre">nprobe</span></code> value and propagate it to the index.</p>
 </section>
 <section id="stats-self">
 <h3><code class="docutils literal notranslate"><span class="pre">stats(self)</span></code><a class="headerlink" href="#stats-self" title="Link to this heading"></a></h3>
@@ -348,6 +364,10 @@ None</p>
 <p>Returns:
 Mapping of human-readable metric names to values (counts or strings).</p>
 </section>
+<section id="snapshot-meta-self">
+<h3><code class="docutils literal notranslate"><span class="pre">snapshot_meta(self)</span></code><a class="headerlink" href="#snapshot-meta-self" title="Link to this heading"></a></h3>
+<p>Return metadata describing the configuration backing the index.</p>
+</section>
 <section id="rebuild-needed-self">
 <h3><code class="docutils literal notranslate"><span class="pre">rebuild_needed(self)</span></code><a class="headerlink" href="#rebuild-needed-self" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when tombstones require a full FAISS rebuild.</p>
@@ -355,6 +375,12 @@ Mapping of human-readable metric names to values (counts or strings).</p>
 None</p>
 <p>Returns:
 bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when a rebuild should be triggered.</p>
+</section>
+<section id="rebuild-if-needed-self">
+<h3><code class="docutils literal notranslate"><span class="pre">rebuild_if_needed(self)</span></code><a class="headerlink" href="#rebuild-if-needed-self" title="Link to this heading"></a></h3>
+<p>Trigger a rebuild when tombstones exceed thresholds.</p>
+<p>Returns:
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> if a rebuild was executed.</p>
 </section>
 <section id="init-gpu-self">
 <h3><code class="docutils literal notranslate"><span class="pre">init_gpu(self)</span></code><a class="headerlink" href="#init-gpu-self" title="Link to this heading"></a></h3>
@@ -427,6 +453,10 @@ linked FAISS build.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_ensure_dim(self,</span> <span class="pre">vector)</span></code><a class="headerlink" href="#ensure-dim-self-vector" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="validate-snapshot-meta-self-meta">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_snapshot_meta(self,</span> <span class="pre">meta)</span></code><a class="headerlink" href="#validate-snapshot-meta-self-meta" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="detect-device-self-index">
 <h3><code class="docutils literal notranslate"><span class="pre">_detect_device(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#detect-device-self-index" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
@@ -434,6 +464,86 @@ linked FAISS build.</p>
 <section id="resolve-device-self-config">
 <h3><code class="docutils literal notranslate"><span class="pre">_resolve_device(self,</span> <span class="pre">config)</span></code><a class="headerlink" href="#resolve-device-self-config" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
+</section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">search(self,</span> <span class="pre">query,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Delegate single-query search to the managed store.</p>
+<p>Args:
+query: Query embedding to search against the index.
+top_k: Number of nearest neighbours to return.</p>
+<p>Returns:
+Ranked FAISS search results.</p>
+</section>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">search_many(self,</span> <span class="pre">queries,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>Execute vector search for multiple queries in a batch.</p>
+<p>Args:
+queries: Matrix of query embeddings.
+top_k: Number of nearest neighbours per query.</p>
+<p>Returns:
+Per-query lists of FAISS search results.</p>
+</section>
+<section id="id4">
+<h3><code class="docutils literal notranslate"><span class="pre">search_batch(self,</span> <span class="pre">queries,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<p>Alias for :meth:<code class="docutils literal notranslate"><span class="pre">search_many</span></code> retaining legacy naming.</p>
+<p>Args:
+queries: Matrix of query embeddings.
+top_k: Number of nearest neighbours per query.</p>
+<p>Returns:
+Per-query lists of FAISS search results.</p>
+</section>
+<section id="id5">
+<h3><code class="docutils literal notranslate"><span class="pre">add(self,</span> <span class="pre">vectors,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<p>Insert vectors and identifiers into the managed index.</p>
+<p>Args:
+vectors: Embedding vectors to index.
+vector_ids: Identifiers associated with <code class="docutils literal notranslate"><span class="pre">vectors</span></code>.</p>
+</section>
+<section id="id6">
+<h3><code class="docutils literal notranslate"><span class="pre">add_batch(self,</span> <span class="pre">vectors,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<p>Insert vectors using batching heuristics from the inner store.</p>
+<p>Args:
+vectors: Embedding vectors to index.
+vector_ids: Identifiers associated with <code class="docutils literal notranslate"><span class="pre">vectors</span></code>.
+batch_size: Chunk size forwarded to the underlying store.</p>
+</section>
+<section id="id7">
+<h3><code class="docutils literal notranslate"><span class="pre">set_nprobe(self,</span> <span class="pre">nprobe)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
+<p>Tune <code class="docutils literal notranslate"><span class="pre">nprobe</span></code> while clamping to a safe range.</p>
+</section>
+<section id="id8">
+<h3><code class="docutils literal notranslate"><span class="pre">remove(self,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
+<p>Remove vectors corresponding to <code class="docutils literal notranslate"><span class="pre">vector_ids</span></code> from the index.</p>
+</section>
+<section id="id9">
+<h3><code class="docutils literal notranslate"><span class="pre">set_id_resolver(self,</span> <span class="pre">resolver)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
+<p>Configure identifier resolver on the inner store.</p>
+<p>Args:
+resolver: Callable mapping FAISS ids to external identifiers.</p>
+</section>
+<section id="id10">
+<h3><code class="docutils literal notranslate"><span class="pre">needs_training(self)</span></code><a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when the underlying index requires training.</p>
+</section>
+<section id="id11">
+<h3><code class="docutils literal notranslate"><span class="pre">train(self,</span> <span class="pre">vectors)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
+<p>Train the managed index using <code class="docutils literal notranslate"><span class="pre">vectors</span></code>.</p>
+</section>
+<section id="id12">
+<h3><code class="docutils literal notranslate"><span class="pre">device(self)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<p>Return the CUDA device identifier for the managed index.</p>
+</section>
+<section id="id13">
+<h3><code class="docutils literal notranslate"><span class="pre">gpu_resources(self)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
+<p>Return GPU resources backing the managed index.</p>
+</section>
+<section id="id14">
+<h3><code class="docutils literal notranslate"><span class="pre">ntotal(self)</span></code><a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
+<p>Return the number of vectors stored in the managed index.</p>
+</section>
+<section id="id15">
+<h3><code class="docutils literal notranslate"><span class="pre">rebuild_if_needed(self)</span></code><a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
+<p>Trigger inner index rebuild when required by FAISS heuristics.</p>
 </section>
 </section>
 <section id="classes">
@@ -480,6 +590,10 @@ results = store.search(np.random.rand(1536), top_k=5)
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
+</section>
+<section id="managedfaissadapter">
+<h3><code class="docutils literal notranslate"><span class="pre">ManagedFaissAdapter</span></code><a class="headerlink" href="#managedfaissadapter" title="Link to this heading"></a></h3>
+<p>Restrictive wrapper exposing only the managed DenseVectorStore surface.</p>
 </section>
 </section>
 </section>

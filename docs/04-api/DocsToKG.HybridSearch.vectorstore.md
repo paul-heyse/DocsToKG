@@ -115,7 +115,7 @@ faiss_index: Vector store whose state should be captured.
 registry: Chunk registry providing vector identifier mappings.
 
 Returns:
-dict[str, object]: Dictionary containing base64-encoded FAISS bytes and registry ids.
+dict[str, object]: Dictionary containing FAISS bytes, registry ids, and snapshot metadata.
 
 ### `restore_state(faiss_index, payload)`
 
@@ -130,6 +130,10 @@ None
 
 Raises:
 ValueError: If the payload is missing the FAISS byte stream.
+
+### `create(cls, dim, config)`
+
+Factory helper matching the managed FAISS interface contracts.
 
 ### `ntotal(self)`
 
@@ -250,6 +254,10 @@ force_flush: Force immediate rebuild when tombstones accumulate.
 Returns:
 Number of ids scheduled for removal.
 
+### `add_batch(self, vectors, vector_ids)`
+
+Add vectors in batches to minimise host→device churn.
+
 ### `_current_index_ids(self)`
 
 *No documentation available.*
@@ -262,12 +270,21 @@ Number of ids scheduled for removal.
 
 Search the index for the ``top_k`` nearest neighbours of ``query``.
 
-Args:
-query: Dense query vector with dimensionality ``self._dim``.
-top_k: Maximum number of nearest neighbours to return.
+### `search_many(self, queries, top_k)`
 
-Returns:
-Ranked list of :class:`FaissSearchResult` objects.
+Search the index for multiple queries in a single FAISS call.
+
+### `search_batch(self, queries, top_k)`
+
+Alias for ``search_many`` to support explicit batch workloads.
+
+### `_search_matrix(self, matrix, top_k)`
+
+*No documentation available.*
+
+### `_resolve_search_results(self, distances, indices)`
+
+*No documentation available.*
 
 ### `serialize(self)`
 
@@ -299,29 +316,23 @@ RuntimeError: If the index has not been initialised.
 
 Restore a vector store from disk.
 
-Args:
-path: Filesystem path containing a previously saved index payload.
-config: Dense index configuration to apply to the reloaded store.
-dim: Dimensionality of vectors stored in the index.
-
-Returns:
-Fresh :class:`FaissVectorStore` instance initialised from ``path``.
-
-Raises:
-OSError: If ``path`` cannot be read from disk.
-
 ### `restore(self, payload)`
 
 Load an index from ``payload`` and promote it to the GPU.
 
 Args:
 payload: Bytes produced by :meth:`serialize`.
+meta: Optional snapshot metadata for validation.
 
 Raises:
 ValueError: If the payload is empty.
 
 Returns:
 None
+
+### `set_nprobe(self, nprobe)`
+
+Update the active ``nprobe`` value and propagate it to the index.
 
 ### `stats(self)`
 
@@ -333,6 +344,10 @@ None
 Returns:
 Mapping of human-readable metric names to values (counts or strings).
 
+### `snapshot_meta(self)`
+
+Return metadata describing the configuration backing the index.
+
 ### `rebuild_needed(self)`
 
 Return ``True`` when tombstones require a full FAISS rebuild.
@@ -342,6 +357,13 @@ None
 
 Returns:
 bool: ``True`` when a rebuild should be triggered.
+
+### `rebuild_if_needed(self)`
+
+Trigger a rebuild when tombstones exceed thresholds.
+
+Returns:
+bool: ``True`` if a rebuild was executed.
 
 ### `init_gpu(self)`
 
@@ -420,6 +442,10 @@ linked FAISS build.
 
 *No documentation available.*
 
+### `_validate_snapshot_meta(self, meta)`
+
+*No documentation available.*
+
 ### `_detect_device(self, index)`
 
 *No documentation available.*
@@ -427,6 +453,95 @@ linked FAISS build.
 ### `_resolve_device(self, config)`
 
 *No documentation available.*
+
+### `search(self, query, top_k)`
+
+Delegate single-query search to the managed store.
+
+Args:
+query: Query embedding to search against the index.
+top_k: Number of nearest neighbours to return.
+
+Returns:
+Ranked FAISS search results.
+
+### `search_many(self, queries, top_k)`
+
+Execute vector search for multiple queries in a batch.
+
+Args:
+queries: Matrix of query embeddings.
+top_k: Number of nearest neighbours per query.
+
+Returns:
+Per-query lists of FAISS search results.
+
+### `search_batch(self, queries, top_k)`
+
+Alias for :meth:`search_many` retaining legacy naming.
+
+Args:
+queries: Matrix of query embeddings.
+top_k: Number of nearest neighbours per query.
+
+Returns:
+Per-query lists of FAISS search results.
+
+### `add(self, vectors, vector_ids)`
+
+Insert vectors and identifiers into the managed index.
+
+Args:
+vectors: Embedding vectors to index.
+vector_ids: Identifiers associated with ``vectors``.
+
+### `add_batch(self, vectors, vector_ids)`
+
+Insert vectors using batching heuristics from the inner store.
+
+Args:
+vectors: Embedding vectors to index.
+vector_ids: Identifiers associated with ``vectors``.
+batch_size: Chunk size forwarded to the underlying store.
+
+### `set_nprobe(self, nprobe)`
+
+Tune ``nprobe`` while clamping to a safe range.
+
+### `remove(self, vector_ids)`
+
+Remove vectors corresponding to ``vector_ids`` from the index.
+
+### `set_id_resolver(self, resolver)`
+
+Configure identifier resolver on the inner store.
+
+Args:
+resolver: Callable mapping FAISS ids to external identifiers.
+
+### `needs_training(self)`
+
+Return ``True`` when the underlying index requires training.
+
+### `train(self, vectors)`
+
+Train the managed index using ``vectors``.
+
+### `device(self)`
+
+Return the CUDA device identifier for the managed index.
+
+### `gpu_resources(self)`
+
+Return GPU resources backing the managed index.
+
+### `ntotal(self)`
+
+Return the number of vectors stored in the managed index.
+
+### `rebuild_if_needed(self)`
+
+Trigger inner index rebuild when required by FAISS heuristics.
 
 ## 3. Classes
 
@@ -465,3 +580,7 @@ Examples:
 >>> results = store.search(np.random.rand(1536), top_k=5)
 >>> [hit.vector_id for hit in results]
 ['chunk-1']
+
+### `ManagedFaissAdapter`
+
+Restrictive wrapper exposing only the managed DenseVectorStore surface.

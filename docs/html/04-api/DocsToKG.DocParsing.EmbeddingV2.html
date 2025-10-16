@@ -161,11 +161,14 @@ Absolute path derived from <code class="docutils literal notranslate"><span clas
 </section>
 <section id="ensure-uuid-rows">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_uuid(rows)</span></code><a class="headerlink" href="#ensure-uuid-rows" title="Link to this heading"></a></h3>
-<p>Populate missing chunk UUIDs in-place.</p>
+<p>Populate missing chunk UUIDs in-place using deterministic UUIDv5 derivation.</p>
 <p>Args:
 rows: Chunk dictionaries that should include a <code class="docutils literal notranslate"><span class="pre">uuid</span></code> key.</p>
 <p>Returns:
-True when at least one UUID was newly assigned; otherwise False.</p>
+True when at least one UUID was newly assigned; otherwise False. UUIDs are
+derived from a namespace, doc ID, source chunk indices, and the first 16 hex
+characters of the chunk text SHA-1 digest. If deterministic generation fails,
+a UUID4 is assigned as a fallback.</p>
 </section>
 <section id="ensure-chunk-schema-rows-source">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_chunk_schema(rows,</span> <span class="pre">source)</span></code><a class="headerlink" href="#ensure-chunk-schema-rows-source" title="Link to this heading"></a></h3>
@@ -314,9 +317,9 @@ and Qwen vector norms.</p>
 <p>Raises:
 ValueError: If vector lengths are inconsistent or fail validation.</p>
 </section>
-<section id="validate-vectors-in-dir-vectors-dir-logger">
-<h3><code class="docutils literal notranslate"><span class="pre">_validate_vectors_in_dir(vectors_dir,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-vectors-in-dir-vectors-dir-logger" title="Link to this heading"></a></h3>
-<p>Validate all *.vectors.jsonl files under a directory tree.</p>
+<section id="validate-vectors-for-chunks-chunks-dir-vectors-dir-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_vectors_for_chunks(chunks_dir,</span> <span class="pre">vectors_dir,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-vectors-for-chunks-chunks-dir-vectors-dir-logger" title="Link to this heading"></a></h3>
+<p>Validate vectors associated with chunk files without recomputing models.</p>
 <p>Returns:
 (files_checked, rows_validated)</p>
 </section>
@@ -391,24 +394,6 @@ None</p>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="bm25stats">
-<h3><code class="docutils literal notranslate"><span class="pre">BM25Stats</span></code><a class="headerlink" href="#bm25stats" title="Link to this heading"></a></h3>
-<p>Corpus-wide statistics required for BM25 weighting.</p>
-<p>Attributes:
-N: Total number of documents (chunks) in the corpus.
-avgdl: Average document length in tokens.
-df: Document frequency per token.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>stats = BM25Stats(N=100, avgdl=120.5, df={“hybrid”: 5})
-stats.df[“hybrid”]
-5</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
 <section id="bm25statsaccumulator">
 <h3><code class="docutils literal notranslate"><span class="pre">BM25StatsAccumulator</span></code><a class="headerlink" href="#bm25statsaccumulator" title="Link to this heading"></a></h3>
 <p>Streaming accumulator for BM25 corpus statistics.</p>
@@ -428,27 +413,6 @@ acc.N
 </div></blockquote>
 </div></blockquote>
 </section>
-<section id="spladecfg">
-<h3><code class="docutils literal notranslate"><span class="pre">SpladeCfg</span></code><a class="headerlink" href="#spladecfg" title="Link to this heading"></a></h3>
-<p>Runtime configuration for SPLADE sparse encoding.</p>
-<p>Attributes:
-model_dir: Path to the SPLADE model directory.
-device: Torch device identifier to run inference on.
-batch_size: Number of texts encoded per batch.
-cache_folder: Directory where transformer weights are cached.
-max_active_dims: Optional cap on active sparse dimensions.
-attn_impl: Preferred attention implementation override.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>cfg = SpladeCfg(batch_size=8, device=”cuda:1”)
-cfg.batch_size
-8</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
 <section id="spladevalidator">
 <h3><code class="docutils literal notranslate"><span class="pre">SPLADEValidator</span></code><a class="headerlink" href="#spladevalidator" title="Link to this heading"></a></h3>
 <p>Track SPLADE sparsity metrics across the corpus.</p>
@@ -463,27 +427,6 @@ nnz_counts: Non-zero counts per processed chunk.</p>
 <div><p>validator = SPLADEValidator()
 validator.total_chunks
 0</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="qwencfg">
-<h3><code class="docutils literal notranslate"><span class="pre">QwenCfg</span></code><a class="headerlink" href="#qwencfg" title="Link to this heading"></a></h3>
-<p>Configuration for generating dense embeddings with Qwen via vLLM.</p>
-<p>Attributes:
-model_dir: Path to the local Qwen model.
-dtype: Torch dtype used during inference.
-tp: Tensor parallelism degree.
-gpu_mem_util: Target GPU memory utilization for vLLM.
-batch_size: Number of texts processed per embedding batch.
-quantization: Optional quantization mode (e.g., <code class="docutils literal notranslate"><span class="pre">awq</span></code>).</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>cfg = QwenCfg(batch_size=64, tp=2)
-cfg.tp
-2</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>

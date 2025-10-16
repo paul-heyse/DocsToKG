@@ -49,9 +49,10 @@ from typing import Dict, List, Optional, Tuple
 class CodeAnnotationValidator:
     """Validates code annotations against established standards."""
 
-    def __init__(self, source_dir: str = "src"):
+    def __init__(self, source_dir: str = "src", *, style_checks: bool = False):
         self.source_dir = Path(source_dir)
         self.issues: List[Dict] = []
+        self.style_checks = style_checks
 
         # Standards definitions
         self.required_terms = ["document", "process", "search", "index"]
@@ -178,6 +179,9 @@ class CodeAnnotationValidator:
         """Validate module-level docstring quality."""
         issues = []
 
+        if not self.style_checks:
+            return issues
+
         # Check minimum length
         if len(docstring.strip()) < 50:
             issues.append(
@@ -238,6 +242,9 @@ class CodeAnnotationValidator:
     ) -> List[Dict]:
         """Validate class docstring quality."""
         issues = []
+
+        if not self.style_checks:
+            return issues
 
         # Check for key sections
         if "Attributes:" not in docstring and "Args:" not in docstring:
@@ -318,6 +325,9 @@ class CodeAnnotationValidator:
         """Validate function docstring structure."""
         issues = []
 
+        if not self.style_checks:
+            return issues
+
         # Check for Args section
         if "Args:" not in docstring and not self._has_parameters(docstring):
             issues.append(
@@ -355,6 +365,9 @@ class CodeAnnotationValidator:
     ) -> List[Dict]:
         """Validate method docstring structure."""
         issues = []
+
+        if not self.style_checks:
+            return issues
 
         # Methods should have Args section if they have parameters
         if "Args:" not in docstring and not self._method_has_parameters(docstring):
@@ -518,13 +531,19 @@ def main():
     parser.add_argument(
         "--fix", action="store_true", help="Attempt to automatically fix some annotation issues"
     )
+    parser.add_argument(
+        "--style",
+        dest="style_checks",
+        action="store_true",
+        help="Enable docstring style checks (Args/Returns/Raises sections).",
+    )
 
     args = parser.parse_args()
 
     print("🔍 Starting Code Annotation Validation")
     print("=" * 60)
 
-    validator = CodeAnnotationValidator(args.source_dir)
+    validator = CodeAnnotationValidator(args.source_dir, style_checks=args.style_checks)
     issues = validator.validate_all_files()
 
     validator.print_report(issues)

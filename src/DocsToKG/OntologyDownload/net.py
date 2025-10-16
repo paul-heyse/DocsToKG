@@ -2,30 +2,37 @@
 
 from __future__ import annotations
 
-import hashlib
-import ipaddress
+import json
 import logging
+import os
 import random
-import socket
+import re
 import shutil
-import tarfile
 import threading
 import time
-import unicodedata
-import zipfile
-import stat
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set, Tuple, TypeVar
+from pathlib import Path
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Set, TypeVar
 
 import pooch
 import psutil
 import requests
 
-from urllib.parse import ParseResult, urlparse, urlunparse
+try:  # pragma: no cover - POSIX only
+    import fcntl  # type: ignore
+except ImportError:  # pragma: no cover - Windows fallback
+    fcntl = None  # type: ignore
 
-from .config import ConfigError, DownloadConfiguration
-from .io_safe import sanitize_filename
+try:  # pragma: no cover - Windows only
+    import msvcrt  # type: ignore
+except ImportError:  # pragma: no cover - POSIX fallback
+    msvcrt = None  # type: ignore
+
+from urllib.parse import urlparse
+
+from .config import DownloadConfiguration
+from .errors import DownloadFailure, OntologyDownloadError, PolicyError
+from .io_safe import sanitize_filename, sha256_file, validate_url_security
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checkers only
     from .pipeline import validate_manifest_dict as _validate_manifest_dict
@@ -67,16 +74,14 @@ def retry_with_backoff(
             sleep(max(delay, 0.0))
 
 
-def _log_download_memory(logger: logging.Logger, event: str) -> None:
-    """Emit debug-level memory usage snapshots when enabled.
-
-    Args:
-        logger: Logger instance controlling verbosity for download telemetry.
-        event: Short label describing the lifecycle point (e.g., ``before``).
-
-    Returns:
-        None
-    """
+def log_memory_usage(
+    logger: logging.Logger,
+    *,
+    stage: str,
+    event: str,
+    validator: Optional[str] = None,
+) -> None:
+    """Emit debug-level memory usage snapshots when enabled."""
     is_enabled = getattr(logger, "isEnabledFor", None)
     if callable(is_enabled):
         enabled = is_enabled(logging.DEBUG)
@@ -86,10 +91,10 @@ def _log_download_memory(logger: logging.Logger, event: str) -> None:
         return
     process = psutil.Process()
     memory_mb = process.memory_info().rss / (1024**2)
-    logger.debug(
-        "memory usage",
-        extra={"stage": "download", "event": event, "memory_mb": round(memory_mb, 2)},
-    )
+    extra: Dict[str, object] = {"stage": stage, "event": event, "memory_mb": round(memory_mb, 2)}
+    if validator:
+        extra["validator"] = validator
+    logger.debug("memory usage", extra=extra)
 
 
 @dataclass(slots=True)
@@ -102,9 +107,11 @@ class DownloadResult:
         sha256: SHA-256 checksum of the downloaded artifact.
         etag: HTTP ETag returned by the upstream server, when available.
         last_modified: Upstream last-modified header value if provided.
+        content_type: Reported MIME type when available (HEAD or GET).
+        content_length: Reported content length when available.
 
     Examples:
-        >>> result = DownloadResult(Path("ontology.owl"), "fresh", "deadbeef", None, None)
+        >>> result = DownloadResult(Path("ontology.owl"), "fresh", "deadbeef", None, None, None, None)
         >>> result.status
         'fresh'
     """
@@ -114,31 +121,8 @@ class DownloadResult:
     sha256: str
     etag: Optional[str]
     last_modified: Optional[str]
-
-
-class DownloadFailure(ConfigError):
-    """Raised when an HTTP download attempt fails.
-
-    Attributes:
-        status_code: Optional HTTP status code returned by the upstream service.
-        retryable: Whether the failure is safe to retry with an alternate resolver.
-
-    Examples:
-        >>> raise DownloadFailure("Unavailable", status_code=503, retryable=True)
-        Traceback (most recent call last):
-        DownloadFailure: Unavailable
-    """
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        status_code: Optional[int] = None,
-        retryable: bool = False,
-    ) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-        self.retryable = retryable
+    content_type: Optional[str]
+    content_length: Optional[int]
 
 
 class TokenBucket:
@@ -191,7 +175,121 @@ class TokenBucket:
             time.sleep(max(needed / self.rate, 0.0))
 
 
+class SharedTokenBucket(TokenBucket):
+    """Token bucket backed by a filesystem state file for multi-process usage."""
+
+    def __init__(
+        self,
+        *,
+        rate_per_sec: float,
+        capacity: float,
+        state_path: Path,
+    ) -> None:
+        super().__init__(rate_per_sec=rate_per_sec, capacity=capacity)
+        self.state_path = state_path
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def _acquire_file_lock(self, handle) -> None:
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)  # type: ignore[attr-defined]
+        elif msvcrt is not None:
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)  # type: ignore[attr-defined]
+
+    def _release_file_lock(self, handle) -> None:
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)  # type: ignore[attr-defined]
+        elif msvcrt is not None:
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)  # type: ignore[attr-defined]
+
+    @staticmethod
+    def _deserialize_state(raw: bytes, *, default_tokens: float, timestamp: float) -> Dict[str, float]:
+        try:
+            data = json.loads(raw.decode("utf-8") or "{}")
+            tokens_value = float(data.get("tokens", default_tokens))
+            timestamp_value = float(data.get("timestamp", timestamp))
+        except (ValueError, TypeError, json.JSONDecodeError):
+            tokens_value = default_tokens
+            timestamp_value = timestamp
+        return {
+            "tokens": max(0.0, min(tokens_value, default_tokens)),
+            "timestamp": timestamp_value,
+        }
+
+    @staticmethod
+    def _write_state(handle, state: Dict[str, float]) -> None:
+        handle.seek(0)
+        handle.truncate()
+        payload = json.dumps(
+            {"tokens": state["tokens"], "timestamp": state["timestamp"]},
+            separators=(",", ":"),
+        ).encode("utf-8")
+        handle.write(payload)
+        handle.flush()
+        try:
+            os.fsync(handle.fileno())
+        except OSError:  # pragma: no cover - fsync availability varies
+            pass
+
+    def _try_consume(self, tokens: float) -> Optional[float]:
+        now = time.monotonic()
+        with self.state_path.open("a+b") as handle:
+            locked = False
+            if fcntl is not None or msvcrt is not None:
+                self._acquire_file_lock(handle)
+                locked = True
+            try:
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    state = {"tokens": self.capacity, "timestamp": now}
+                else:
+                    handle.seek(0)
+                    state = self._deserialize_state(
+                        handle.read(),
+                        default_tokens=self.capacity,
+                        timestamp=now,
+                    )
+                available = min(
+                    self.capacity,
+                    state["tokens"] + max(0.0, now - state["timestamp"]) * self.rate,
+                )
+                if available >= tokens:
+                    state = {"tokens": available - tokens, "timestamp": now}
+                    self._write_state(handle, state)
+                    return None
+                state = {"tokens": available, "timestamp": now}
+                self._write_state(handle, state)
+                return tokens - available
+            finally:
+                if locked:
+                    self._release_file_lock(handle)
+
+    def consume(self, tokens: float = 1.0) -> None:  # type: ignore[override]
+        """Consume ``tokens`` from the shared bucket, waiting when insufficient."""
+
+        while True:
+            with self.lock:
+                needed = self._try_consume(tokens)
+            if needed is None:
+                return
+            time.sleep(max(needed / self.rate, 0.0))
+
+
 _TOKEN_BUCKETS: Dict[str, TokenBucket] = {}
+
+
+def _shared_bucket_path(http_config: DownloadConfiguration, key: str) -> Optional[Path]:
+    """Return the filesystem path for the shared token bucket state."""
+
+    root = getattr(http_config, "shared_rate_limit_dir", None)
+    if not root:
+        return None
+    base = Path(root).expanduser()
+    token = re.sub(r"[^A-Za-z0-9._-]", "_", key).strip("._")
+    if not token:
+        token = "bucket"
+    return base / f"{token}.json"
 
 
 _RETRYABLE_HTTP_STATUSES = {403, 408, 425, 429, 500, 502, 503, 504}
@@ -226,424 +324,6 @@ for canonical, aliases in _RDF_ALIAS_GROUPS.items():
     for alias in aliases:
         RDF_MIME_ALIASES.add(alias)
         RDF_MIME_FORMAT_LABELS[alias] = label
-
-
-def _enforce_idn_safety(host: str) -> None:
-    """Validate internationalized hostnames and reject suspicious patterns.
-
-    Args:
-        host: Hostname component extracted from the download URL.
-
-    Returns:
-        None
-
-    Raises:
-        ConfigError: If the hostname mixes multiple scripts or contains invisible characters.
-    """
-
-    if all(ord(char) < 128 for char in host):
-        return
-
-    scripts = set()
-    for char in host:
-        if ord(char) < 128:
-            if char.isalpha():
-                scripts.add("LATIN")
-            continue
-
-        category = unicodedata.category(char)
-        if category in {"Mn", "Me", "Cf"}:
-            raise ConfigError("Internationalized host contains invisible characters")
-
-        try:
-            name = unicodedata.name(char)
-        except ValueError as exc:
-            raise ConfigError("Internationalized host contains unknown characters") from exc
-
-        for script in ("LATIN", "CYRILLIC", "GREEK"):
-            if script in name:
-                scripts.add(script)
-                break
-
-    if len(scripts) > 1:
-        raise ConfigError("Internationalized host mixes multiple scripts")
-
-
-def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
-    """Reconstruct URL netloc with a normalized hostname.
-
-    Args:
-        parsed: Parsed URL components produced by :func:`urllib.parse.urlparse`.
-        ascii_host: ASCII-normalized hostname (potentially IPv6).
-
-    Returns:
-        String suitable for use as the netloc portion of a URL.
-    """
-
-    auth = ""
-    if parsed.username:
-        auth = parsed.username
-        if parsed.password:
-            auth = f"{auth}:{parsed.password}"
-        auth = f"{auth}@"
-
-    host_component = ascii_host
-    if ":" in host_component and not host_component.startswith("["):
-        host_component = f"[{host_component}]"
-
-    port = f":{parsed.port}" if parsed.port else ""
-    return f"{auth}{host_component}{port}"
-
-
-def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
-    """Validate URLs to avoid SSRF, enforce HTTPS, normalize IDNs, and honor host allowlists.
-
-    Hostnames are converted to punycode before resolution, and both direct IP
-    addresses and DNS results are rejected when they target private or loopback
-    ranges to prevent server-side request forgery.
-
-    Args:
-        url: URL returned by a resolver for ontology download.
-        http_config: Download configuration providing optional host allowlist.
-
-    Returns:
-        HTTPS URL safe for downstream download operations.
-
-    Raises:
-        ConfigError: If the URL violates security requirements or allowlists.
-    """
-
-    parsed = urlparse(url)
-    logger = logging.getLogger("DocsToKG.OntologyDownload")
-    scheme = parsed.scheme.lower()
-    if scheme not in {"http", "https"}:
-        raise ConfigError("Only HTTP(S) URLs are allowed for ontology downloads")
-
-    host = parsed.hostname
-    if not host:
-        raise ConfigError("URL must include hostname")
-
-    try:
-        ipaddress.ip_address(host)
-        is_ip = True
-    except ValueError:
-        is_ip = False
-
-    ascii_host = host.lower()
-    if not is_ip:
-        _enforce_idn_safety(host)
-        try:
-            ascii_host = host.encode("idna").decode("ascii").lower()
-        except UnicodeError as exc:
-            raise ConfigError(f"Invalid internationalized hostname: {host}") from exc
-
-    parsed = parsed._replace(netloc=_rebuild_netloc(parsed, ascii_host))
-
-    allowed = http_config.normalized_allowed_hosts() if http_config else None
-    allow_private = False
-    if allowed:
-        exact, suffixes = allowed
-        if ascii_host in exact or any(
-            ascii_host == suffix or ascii_host.endswith(f".{suffix}") for suffix in suffixes
-        ):
-            allow_private = True
-        else:
-            raise ConfigError(f"Host {host} not in allowlist")
-
-    if scheme == "http":
-        if allow_private:
-            logger.warning(
-                "allowing http url for explicit allowlist host",
-                extra={"stage": "download", "original_url": url},
-            )
-        else:
-            logger.warning(
-                "upgrading http url to https",
-                extra={"stage": "download", "original_url": url},
-            )
-            parsed = parsed._replace(scheme="https")
-            scheme = "https"
-
-    if scheme != "https" and not allow_private:
-        raise ConfigError("Only HTTPS URLs are allowed for ontology downloads")
-
-    if is_ip:
-        address = ipaddress.ip_address(ascii_host)
-        if not allow_private and (
-            address.is_private or address.is_loopback or address.is_reserved or address.is_multicast
-        ):
-            raise ConfigError(f"Refusing to download from private address {host}")
-        return urlunparse(parsed)
-
-    try:
-        infos = socket.getaddrinfo(ascii_host, None)
-    except socket.gaierror as exc:
-        logger.warning(
-            "dns resolution failed",
-            extra={"stage": "download", "hostname": host, "error": str(exc)},
-        )
-        return urlunparse(parsed)
-
-    for info in infos:
-        candidate_ip = ipaddress.ip_address(info[4][0])
-        if not allow_private and (
-            candidate_ip.is_private
-            or candidate_ip.is_loopback
-            or candidate_ip.is_reserved
-            or candidate_ip.is_multicast
-        ):
-            raise ConfigError(f"Refusing to download from private address resolved for {host}")
-
-    return urlunparse(parsed)
-
-
-def sha256_file(path: Path) -> str:
-    """Compute the SHA-256 digest for the provided file.
-
-    Args:
-        path: Path to the file whose digest should be calculated.
-
-    Returns:
-        Hexadecimal SHA-256 checksum string.
-    """
-    hasher = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1 << 20), b""):
-            hasher.update(chunk)
-    return hasher.hexdigest()
-
-
-_MAX_COMPRESSION_RATIO = 10.0
-
-
-def _validate_member_path(member_name: str) -> Path:
-    """Validate archive member paths to prevent traversal attacks.
-
-    Args:
-        member_name: Path declared within the archive.
-
-    Returns:
-        Sanitised relative path safe for extraction on the local filesystem.
-
-    Raises:
-        ConfigError: If the member path is absolute or contains traversal segments.
-    """
-
-    normalized = member_name.replace("\\", "/")
-    relative = PurePosixPath(normalized)
-    if relative.is_absolute():
-        raise ConfigError(f"Unsafe absolute path detected in archive: {member_name}")
-    if not relative.parts:
-        raise ConfigError(f"Empty path detected in archive: {member_name}")
-    if any(part in {"", ".", ".."} for part in relative.parts):
-        raise ConfigError(f"Unsafe path detected in archive: {member_name}")
-    return Path(*relative.parts)
-
-
-def _check_compression_ratio(
-    *,
-    total_uncompressed: int,
-    compressed_size: int,
-    archive: Path,
-    logger: Optional[logging.Logger],
-    archive_type: str,
-) -> None:
-    """Ensure compressed archives do not expand beyond the permitted ratio.
-
-    Args:
-        total_uncompressed: Sum of file sizes within the archive.
-        compressed_size: Archive file size on disk (or sum of compressed entries).
-        archive: Path to the archive on disk.
-        logger: Optional logger for emitting diagnostic messages.
-        archive_type: Human readable label for error messages (ZIP/TAR).
-
-    Raises:
-        ConfigError: If the archive exceeds the allowed expansion ratio.
-    """
-
-    if compressed_size <= 0:
-        return
-    ratio = total_uncompressed / float(compressed_size)
-    if ratio > _MAX_COMPRESSION_RATIO:
-        if logger:
-            logger.error(
-                "archive compression ratio too high",
-                extra={
-                    "stage": "extract",
-                    "archive": str(archive),
-                    "ratio": round(ratio, 2),
-                    "compressed_bytes": compressed_size,
-                    "uncompressed_bytes": total_uncompressed,
-                    "limit": _MAX_COMPRESSION_RATIO,
-                },
-            )
-        raise ConfigError(
-            f"{archive_type} archive {archive} expands to {total_uncompressed} bytes, "
-            f"exceeding {_MAX_COMPRESSION_RATIO}:1 compression ratio"
-        )
-
-
-def extract_zip_safe(
-    zip_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
-) -> List[Path]:
-    """Extract a ZIP archive while preventing traversal and compression bombs.
-
-    Args:
-        zip_path: Path to the ZIP file to extract.
-        destination: Directory where extracted files should be stored.
-        logger: Optional logger for emitting extraction telemetry.
-
-    Returns:
-        List of extracted file paths.
-
-    Raises:
-        ConfigError: If the archive contains unsafe paths, compression bombs, or is missing.
-    """
-
-    if not zip_path.exists():
-        raise ConfigError(f"ZIP archive not found: {zip_path}")
-    destination.mkdir(parents=True, exist_ok=True)
-    extracted: List[Path] = []
-    with zipfile.ZipFile(zip_path) as archive:
-        members = archive.infolist()
-        safe_members: List[tuple[zipfile.ZipInfo, Path]] = []
-        total_uncompressed = 0
-        for member in members:
-            member_path = _validate_member_path(member.filename)
-            mode = (member.external_attr >> 16) & 0xFFFF
-            if stat.S_IFMT(mode) == stat.S_IFLNK:
-                raise ConfigError(f"Unsafe link detected in archive: {member.filename}")
-            if member.is_dir():
-                safe_members.append((member, member_path))
-                continue
-            total_uncompressed += int(member.file_size)
-            safe_members.append((member, member_path))
-        compressed_size = max(
-            zip_path.stat().st_size,
-            sum(int(member.compress_size) for member in members) or 0,
-        )
-        _check_compression_ratio(
-            total_uncompressed=total_uncompressed,
-            compressed_size=compressed_size,
-            archive=zip_path,
-            logger=logger,
-            archive_type="ZIP",
-        )
-        for member, member_path in safe_members:
-            target_path = destination / member_path
-            if member.is_dir():
-                target_path.mkdir(parents=True, exist_ok=True)
-                continue
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            with archive.open(member, "r") as source, target_path.open("wb") as target:
-                shutil.copyfileobj(source, target)
-            extracted.append(target_path)
-    if logger:
-        logger.info(
-            "extracted zip archive",
-            extra={"stage": "extract", "archive": str(zip_path), "files": len(extracted)},
-        )
-    return extracted
-
-
-def extract_tar_safe(
-    tar_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
-) -> List[Path]:
-    """Safely extract tar archives (tar, tar.gz, tar.xz) with traversal and compression checks.
-
-    Args:
-        tar_path: Path to the tar archive (tar, tar.gz, tar.xz).
-        destination: Directory where extracted files should be stored.
-        logger: Optional logger for emitting extraction telemetry.
-
-    Returns:
-        List of extracted file paths.
-
-    Raises:
-        ConfigError: If the archive is missing, unsafe, or exceeds compression limits.
-    """
-
-    if not tar_path.exists():
-        raise ConfigError(f"TAR archive not found: {tar_path}")
-    destination.mkdir(parents=True, exist_ok=True)
-    extracted: List[Path] = []
-    try:
-        with tarfile.open(tar_path, mode="r:*") as archive:
-            members = archive.getmembers()
-            safe_members: List[tuple[tarfile.TarInfo, Path]] = []
-            total_uncompressed = 0
-            for member in members:
-                member_path = _validate_member_path(member.name)
-                if member.isdir():
-                    safe_members.append((member, member_path))
-                    continue
-                if member.islnk() or member.issym():
-                    raise ConfigError(f"Unsafe link detected in archive: {member.name}")
-                if member.isdev():
-                    raise ConfigError(
-                        f"Unsupported special file detected in archive: {member.name}"
-                    )
-                if not member.isfile():
-                    raise ConfigError(f"Unsupported tar member type encountered: {member.name}")
-                total_uncompressed += int(member.size)
-                safe_members.append((member, member_path))
-            compressed_size = tar_path.stat().st_size
-            _check_compression_ratio(
-                total_uncompressed=total_uncompressed,
-                compressed_size=compressed_size,
-                archive=tar_path,
-                logger=logger,
-                archive_type="TAR",
-            )
-            for member, member_path in safe_members:
-                if member.isdir():
-                    (destination / member_path).mkdir(parents=True, exist_ok=True)
-                    continue
-                target_path = destination / member_path
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                extracted_file = archive.extractfile(member)
-                if extracted_file is None:
-                    raise ConfigError(f"Failed to extract member: {member.name}")
-                with extracted_file as source, target_path.open("wb") as target:
-                    shutil.copyfileobj(source, target)
-                extracted.append(target_path)
-    except tarfile.TarError as exc:
-        raise ConfigError(f"Failed to extract tar archive {tar_path}: {exc}") from exc
-    if logger:
-        logger.info(
-            "extracted tar archive",
-            extra={"stage": "extract", "archive": str(tar_path), "files": len(extracted)},
-        )
-    return extracted
-
-
-_TAR_SUFFIXES = (".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2")
-
-
-def extract_archive_safe(
-    archive_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
-) -> List[Path]:
-    """Extract archives by dispatching to the appropriate safe handler.
-
-    Args:
-        archive_path: Path to the archive on disk.
-        destination: Directory where files should be extracted.
-        logger: Optional logger receiving structured extraction telemetry.
-
-    Returns:
-        List of paths extracted from the archive in the order processed.
-
-    Raises:
-        ConfigError: If the archive format is unsupported or extraction fails.
-    """
-
-    lower_name = archive_path.name.lower()
-    if lower_name.endswith(".zip"):
-        return extract_zip_safe(archive_path, destination, logger=logger)
-    if any(lower_name.endswith(suffix) for suffix in _TAR_SUFFIXES):
-        return extract_tar_safe(archive_path, destination, logger=logger)
-    raise ConfigError(f"Unsupported archive format: {archive_path}")
-
 
 class StreamingDownloader(pooch.HTTPDownloader):
     """Custom downloader supporting HEAD validation, conditional requests, resume, and caching.
@@ -698,6 +378,10 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self.response_etag: Optional[str] = None
         self.response_last_modified: Optional[str] = None
         self.expected_media_type = expected_media_type
+        self.head_content_type: Optional[str] = None
+        self.head_content_length: Optional[int] = None
+        self.response_content_type: Optional[str] = None
+        self.response_content_length: Optional[int] = None
 
     def _preliminary_head_check(
         self, url: str, session: requests.Session
@@ -717,7 +401,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
             headers. Each element is ``None`` when the origin omits it.
 
         Raises:
-            ConfigError: If the origin reports a payload larger than the
+            PolicyError: If the origin reports a payload larger than the
                 configured ``max_download_size_gb`` limit.
         """
 
@@ -763,7 +447,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         "url": url,
                     },
                 )
-                raise ConfigError(
+                raise PolicyError(
                     "File size {size} bytes exceeds limit of {limit} GB (detected via HEAD)".format(
                         size=content_length,
                         limit=self.http_config.max_download_size_gb,
@@ -868,7 +552,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
             pooch_logger: Logger instance supplied by pooch (unused).
 
         Raises:
-            ConfigError: If download limits are exceeded or filesystem errors occur.
+            PolicyError: If download limits are exceeded.
+            OntologyDownloadError: If filesystem errors occur.
             requests.HTTPError: Propagated when HTTP status codes indicate failure.
 
         Returns:
@@ -890,45 +575,70 @@ class StreamingDownloader(pooch.HTTPDownloader):
             request_headers["Range"] = f"bytes={resume_position}-"
         attempt = 0
         session = requests.Session()
-        head_content_type, _ = self._preliminary_head_check(url, session)
+        self.head_content_type = None
+        self.head_content_length = None
+        self.response_content_type = None
+        self.response_content_length = None
+        head_content_type, head_content_length = self._preliminary_head_check(url, session)
+        self.head_content_type = head_content_type
+        self.head_content_length = head_content_length
         if head_content_type:
             self._validate_media_type(head_content_type, self.expected_media_type, url)
-        while True:
-            attempt += 1
-            try:
-                with session.get(
-                    url,
-                    headers=request_headers,
-                    stream=True,
-                    timeout=self.http_config.download_timeout_sec,
-                    allow_redirects=True,
-                ) as response:
-                    if response.status_code == 304 and Path(self.destination).exists():
-                        self.status = "cached"
-                        self.response_etag = response.headers.get(
-                            "ETag"
-                        ) or self.previous_manifest.get("etag")
-                        self.response_last_modified = response.headers.get(
-                            "Last-Modified"
-                        ) or self.previous_manifest.get("last_modified")
-                        part_path.unlink(missing_ok=True)
-                        return
-                    if response.status_code == 206:
-                        self.status = "updated"
-                    response.raise_for_status()
-                    self._validate_media_type(
-                        response.headers.get("Content-Type"),
-                        self.expected_media_type,
+        try:
+            while True:
+                attempt += 1
+                try:
+                    with session.get(
                         url,
-                    )
-                    length_header = response.headers.get("Content-Length")
-                    total_bytes: Optional[int] = None
-                    next_progress: Optional[float] = 0.1
-                    if length_header:
-                        try:
-                            total_bytes = int(length_header)
-                        except ValueError:
-                            total_bytes = None
+                        headers=request_headers,
+                        stream=True,
+                        timeout=self.http_config.download_timeout_sec,
+                        allow_redirects=True,
+                    ) as response:
+                        if response.status_code == 304 and Path(self.destination).exists():
+                            self.status = "cached"
+                            self.response_etag = response.headers.get(
+                                "ETag"
+                            ) or self.previous_manifest.get("etag")
+                            self.response_last_modified = response.headers.get(
+                                "Last-Modified"
+                            ) or self.previous_manifest.get("last_modified")
+                            manifest_type = self.previous_manifest.get("content_type")
+                            self.response_content_type = (
+                                manifest_type if isinstance(manifest_type, str) else None
+                            )
+                            manifest_length = self.previous_manifest.get("content_length")
+                            try:
+                                self.response_content_length = (
+                                    int(manifest_length)
+                                    if manifest_length is not None
+                                    else None
+                                )
+                            except (TypeError, ValueError):
+                                self.response_content_length = None
+                            part_path.unlink(missing_ok=True)
+                            return
+                        if response.status_code == 206:
+                            self.status = "updated"
+                        response.raise_for_status()
+                        self._validate_media_type(
+                            response.headers.get("Content-Type"),
+                            self.expected_media_type,
+                            url,
+                        )
+                        self.response_content_type = response.headers.get("Content-Type")
+                        length_header = response.headers.get("Content-Length")
+                        total_bytes: Optional[int] = None
+                        next_progress: Optional[float] = 0.1
+                        parsed_length: Optional[int] = None
+                        if length_header:
+                            try:
+                                parsed_length = int(length_header)
+                            except ValueError:
+                                parsed_length = None
+                        self.response_content_length = parsed_length
+                        if parsed_length is not None:
+                            total_bytes = parsed_length
                         max_bytes = self.http_config.max_download_size_gb * (1024**3)
                         if total_bytes is not None and total_bytes > max_bytes:
                             self.logger.error(
@@ -939,8 +649,9 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                     "limit": max_bytes,
                                 },
                             )
-                            raise ConfigError(
-                                f"File size {total_bytes} exceeds configured limit of {self.http_config.max_download_size_gb} GB"
+                            raise PolicyError(
+                                f"File size {total_bytes} exceeds configured limit of "
+                                f"{self.http_config.max_download_size_gb} GB"
                             )
                         if total_bytes:
                             completed_fraction = resume_position / total_bytes
@@ -948,83 +659,88 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                 next_progress = None
                             else:
                                 next_progress = ((int(completed_fraction * 10)) + 1) / 10
-                    self.response_etag = response.headers.get("ETag")
-                    self.response_last_modified = response.headers.get("Last-Modified")
-                    mode = "ab" if resume_position else "wb"
-                    bytes_downloaded = resume_position
-                    part_path.parent.mkdir(parents=True, exist_ok=True)
-                    try:
-                        with part_path.open(mode) as fh:
-                            for chunk in response.iter_content(chunk_size=1 << 20):
-                                if not chunk:
-                                    continue
-                                fh.write(chunk)
-                                bytes_downloaded += len(chunk)
-                                if total_bytes and next_progress:
-                                    progress = bytes_downloaded / total_bytes
-                                    while next_progress and progress >= next_progress:
-                                        self.logger.info(
-                                            "download progress",
+                        self.response_etag = response.headers.get("ETag")
+                        self.response_last_modified = response.headers.get("Last-Modified")
+                        mode = "ab" if resume_position else "wb"
+                        bytes_downloaded = resume_position
+                        part_path.parent.mkdir(parents=True, exist_ok=True)
+                        try:
+                            with part_path.open(mode) as fh:
+                                for chunk in response.iter_content(chunk_size=1 << 20):
+                                    if not chunk:
+                                        continue
+                                    fh.write(chunk)
+                                    bytes_downloaded += len(chunk)
+                                    if total_bytes and next_progress:
+                                        progress = bytes_downloaded / total_bytes
+                                        while next_progress and progress >= next_progress:
+                                            self.logger.info(
+                                                "download progress",
+                                                extra={
+                                                    "stage": "download",
+                                                    "status": "in-progress",
+                                                    "progress": {
+                                                        "percent": round(min(progress, 1.0) * 100, 1)
+                                                    },
+                                                },
+                                            )
+                                            next_progress += 0.1
+                                            if next_progress > 1:
+                                                next_progress = None
+                                                break
+                                    if (
+                                        bytes_downloaded
+                                        > self.http_config.max_download_size_gb * (1024**3)
+                                    ):
+                                        self.logger.error(
+                                            "download exceeded size limit",
                                             extra={
                                                 "stage": "download",
-                                                "status": "in-progress",
-                                                "progress": {
-                                                    "percent": round(min(progress, 1.0) * 100, 1)
-                                                },
+                                                "size": bytes_downloaded,
+                                                "limit": self.http_config.max_download_size_gb
+                                                * (1024**3),
                                             },
                                         )
-                                        next_progress += 0.1
-                                        if next_progress > 1:
-                                            next_progress = None
-                                            break
-                                if bytes_downloaded > self.http_config.max_download_size_gb * (
-                                    1024**3
-                                ):
-                                    self.logger.error(
-                                        "download exceeded size limit",
-                                        extra={
-                                            "stage": "download",
-                                            "size": bytes_downloaded,
-                                            "limit": self.http_config.max_download_size_gb
-                                            * (1024**3),
-                                        },
-                                    )
-                                    raise ConfigError(
-                                        "Download exceeded maximum configured size while streaming"
-                                    )
-                    except OSError as exc:
-                        part_path.unlink(missing_ok=True)
-                        self.logger.error(
-                            "filesystem error during download",
-                            extra={"stage": "download", "error": str(exc)},
-                        )
-                        if "No space left" in str(exc):
-                            raise ConfigError(
-                                "No space left on device while writing download"
+                                        raise PolicyError(
+                                            "Download exceeded maximum configured size while streaming"
+                                        )
+                        except OSError as exc:
+                            part_path.unlink(missing_ok=True)
+                            self.logger.error(
+                                "filesystem error during download",
+                                extra={"stage": "download", "error": str(exc)},
+                            )
+                            if "No space left" in str(exc):
+                                raise OntologyDownloadError(
+                                    "No space left on device while writing download"
+                                ) from exc
+                            raise OntologyDownloadError(
+                                f"Failed to write download: {exc}"
                             ) from exc
-                        raise ConfigError(f"Failed to write download: {exc}") from exc
-                    break
-            except (
-                requests.ConnectionError,
-                requests.Timeout,
-                requests.HTTPError,
-                requests.exceptions.SSLError,
-            ) as exc:
-                if attempt > self.http_config.max_retries:
-                    raise
-                sleep_time = self.http_config.backoff_factor * (2 ** (attempt - 1))
-                self.logger.warning(
-                    "download retry",
-                    extra={
-                        "stage": "download",
-                        "attempt": attempt,
-                        "sleep_sec": sleep_time,
-                        "error": str(exc),
-                    },
-                )
-                time.sleep(sleep_time)
-        part_path.replace(Path(output_file))
-        destination_part_path.unlink(missing_ok=True)
+                        break
+                except (
+                    requests.ConnectionError,
+                    requests.Timeout,
+                    requests.HTTPError,
+                    requests.exceptions.SSLError,
+                ) as exc:
+                    if attempt > self.http_config.max_retries:
+                        raise
+                    sleep_time = self.http_config.backoff_factor * (2 ** (attempt - 1))
+                    self.logger.warning(
+                        "download retry",
+                        extra={
+                            "stage": "download",
+                            "attempt": attempt,
+                            "sleep_sec": sleep_time,
+                            "error": str(exc),
+                        },
+                    )
+                    time.sleep(sleep_time)
+            part_path.replace(Path(output_file))
+            destination_part_path.unlink(missing_ok=True)
+        finally:
+            session.close()
 
 
 def _get_bucket(
@@ -1043,13 +759,35 @@ def _get_bucket(
     """
     key = f"{service}:{host}" if service else host
     bucket = _TOKEN_BUCKETS.get(key)
+    rate = http_config.rate_limit_per_second()
+    if service:
+        service_rate = http_config.parse_service_rate_limit(service)
+        if service_rate:
+            rate = service_rate
+    capacity = max(rate, 1.0)
+    shared_path = _shared_bucket_path(http_config, key)
+
+    if isinstance(bucket, SharedTokenBucket):
+        if (
+            shared_path is None
+            or bucket.state_path != shared_path
+            or bucket.rate != rate
+            or bucket.capacity != capacity
+        ):
+            bucket = None
+    elif bucket is not None:
+        if shared_path is not None or bucket.rate != rate or bucket.capacity != capacity:
+            bucket = None
+
     if bucket is None:
-        rate = http_config.rate_limit_per_second()
-        if service:
-            service_rate = http_config.parse_service_rate_limit(service)
-            if service_rate:
-                rate = service_rate
-        bucket = TokenBucket(rate_per_sec=rate, capacity=rate)
+        if shared_path is not None:
+            bucket = SharedTokenBucket(
+                rate_per_sec=rate,
+                capacity=capacity,
+                state_path=shared_path,
+            )
+        else:
+            bucket = TokenBucket(rate_per_sec=rate, capacity=capacity)
         _TOKEN_BUCKETS[key] = bucket
     return bucket
 
@@ -1083,7 +821,8 @@ def download_stream(
         DownloadResult describing the final artifact and metadata.
 
     Raises:
-        ConfigError: If validation fails, limits are exceeded, or HTTP errors occur.
+        PolicyError: If policy validation fails or limits are exceeded.
+        OntologyDownloadError: If retryable download mechanisms exhaust or IO fails.
     """
     secure_url = validate_url_security(url, http_config)
     parsed = urlparse(secure_url)
@@ -1091,7 +830,7 @@ def download_stream(
     bucket.consume()
 
     start_time = time.monotonic()
-    _log_download_memory(logger, "before")
+    log_memory_usage(logger, stage="download", event="before")
     downloader = StreamingDownloader(
         destination=destination,
         headers=headers,
@@ -1100,6 +839,28 @@ def download_stream(
         logger=logger,
         expected_media_type=expected_media_type,
     )
+
+    def _resolved_content_metadata() -> tuple[Optional[str], Optional[int]]:
+        content_type = downloader.response_content_type or downloader.head_content_type
+        if content_type is None and previous_manifest:
+            manifest_type = previous_manifest.get("content_type")
+            if isinstance(manifest_type, str):
+                content_type = manifest_type
+
+        content_length = downloader.response_content_length
+        if content_length is None and downloader.head_content_length is not None:
+            content_length = downloader.head_content_length
+        if content_length is None and previous_manifest:
+            manifest_length = previous_manifest.get("content_length")
+            try:
+                content_length = (
+                    int(manifest_length)
+                    if manifest_length is not None
+                    else None
+                )
+            except (TypeError, ValueError):
+                content_length = None
+        return content_type, content_length
     cache_dir.mkdir(parents=True, exist_ok=True)
     safe_name = sanitize_filename(destination.name)
     try:
@@ -1144,7 +905,7 @@ def download_stream(
             "pooch download error",
             extra={"stage": "download", "url": secure_url, "error": str(exc)},
         )
-        raise ConfigError(f"Download failed for {secure_url}: {exc}") from exc
+        raise OntologyDownloadError(f"Download failed for {secure_url}: {exc}") from exc
     if downloader.status == "cached":
         elapsed = (time.monotonic() - start_time) * 1000
         logger.info(
@@ -1155,13 +916,16 @@ def download_stream(
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(cached_path, destination)
         sha256 = sha256_file(destination)
-        _log_download_memory(logger, "after")
+        log_memory_usage(logger, stage="download", event="after")
+        content_type, content_length = _resolved_content_metadata()
         return DownloadResult(
             path=destination,
             status="cached",
             sha256=sha256,
             etag=downloader.response_etag,
             last_modified=downloader.response_last_modified,
+            content_type=content_type,
+            content_length=content_length,
         )
 
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -1201,13 +965,16 @@ def download_stream(
             "sha256": sha256,
         },
     )
-    _log_download_memory(logger, "after")
+    log_memory_usage(logger, stage="download", event="after")
+    content_type, content_length = _resolved_content_metadata()
     return DownloadResult(
         path=destination,
         status=downloader.status,
         sha256=sha256,
         etag=downloader.response_etag,
         last_modified=downloader.response_last_modified,
+        content_type=content_type,
+        content_length=content_length,
     )
 
 
@@ -1220,9 +987,7 @@ __all__ = [
     "RDF_MIME_FORMAT_LABELS",
     "StreamingDownloader",
     "download_stream",
-    "extract_archive_safe",
-    "validate_url_security",
-    "sha256_file",
+    "log_memory_usage",
     "validate_manifest_dict",
 ]
 
@@ -1235,5 +1000,3 @@ def __getattr__(name: str):
 
         return _validate_manifest_dict
     raise AttributeError(name)
-
-

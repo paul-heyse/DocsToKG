@@ -56,6 +56,10 @@ window_bytes: Number of trailing bytes to scan for the EOF marker.
 Returns:
 ``True`` if the file ends with ``%%EOF``; ``False`` otherwise.
 
+### `_update_tail_buffer(buffer, chunk)`
+
+Maintain the trailing ``limit`` bytes of a streamed download.
+
 ### `ensure_dir(path)`
 
 Create a directory if it does not already exist.
@@ -99,6 +103,8 @@ headers (Dict[str, str]): Header dictionary returned by
 project user agent and ``mailto`` contact address. A copy of the
 mapping is applied to the outgoing session so callers can reuse
 mutable dictionaries without side effects.
+pool_connections: Minimum pool size shared across HTTP and HTTPS adapters.
+pool_maxsize: Upper bound for per-host connections retained in the pool.
 
 Returns:
 requests.Session: Session with connection pooling enabled and retries
@@ -167,6 +173,10 @@ args: Parsed command-line arguments.
 
 Returns:
 Configured Works query object ready for iteration.
+
+### `_lookup_topic_id(topic_text)`
+
+Cached helper to resolve an OpenAlex topic identifier.
 
 ### `resolve_topic_id_if_needed(topic_text)`
 
@@ -297,6 +307,10 @@ list_only: When True, record candidate URLs without fetching content.
 extract_html_text: Whether to extract plaintext from HTML artefacts.
 previous_lookup: Mapping of work_id/URL to prior manifest entries.
 resume_completed: Set of work IDs already processed in resume mode.
+max_bytes: Optional size limit per download in bytes.
+sniff_bytes: Number of leading bytes to buffer for payload inference.
+min_pdf_bytes: Minimum PDF size accepted when HEAD prechecks fail.
+tail_check_bytes: Tail window size used to detect embedded HTML payloads.
 
 Returns:
 Dictionary summarizing the outcome (saved/html_only/skipped flags).
@@ -346,7 +360,7 @@ thread-local.
 
 Update aggregate counters based on a single work result.
 
-### `_submit_work(work_item)`
+### `_submit(work_item)`
 
 Submit a work item to the executor for asynchronous processing.
 

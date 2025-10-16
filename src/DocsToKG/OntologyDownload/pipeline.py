@@ -55,16 +55,20 @@ from .config import (
     ensure_python_version,
     _coerce_sequence,
 )
-from .io_safe import generate_correlation_id, mask_sensitive_data, sanitize_filename
+from .io_safe import (
+    extract_archive_safe,
+    generate_correlation_id,
+    mask_sensitive_data,
+    sanitize_filename,
+    sha256_file,
+    validate_url_security,
+)
 from .net import (
     DownloadFailure,
     DownloadResult,
     RDF_MIME_ALIASES,
     RDF_MIME_FORMAT_LABELS,
     download_stream,
-    extract_archive_safe,
-    sha256_file,
-    validate_url_security,
 )
 from .resolvers import RESOLVERS, FetchPlan, normalize_license_to_spdx
 from .storage import CACHE_DIR, LOCAL_ONTOLOGY_DIR, LOG_DIR, STORAGE
@@ -108,6 +112,9 @@ MANIFEST_JSON_SCHEMA: Dict[str, Any] = {
         "fingerprint": {"type": ["string", "null"]},
         "etag": {"type": ["string", "null"]},
         "last_modified": {"type": ["string", "null"]},
+        "content_type": {"type": ["string", "null"]},
+        "content_length": {"type": ["integer", "null"], "minimum": 0},
+        "source_media_type_label": {"type": ["string", "null"]},
         "downloaded_at": {"type": "string", "format": "date-time"},
         "target_formats": {
             "type": "array",
@@ -487,6 +494,9 @@ class Manifest:
         fingerprint: Composite fingerprint combining key provenance values.
         etag: HTTP ETag returned by the upstream server, when provided.
         last_modified: Upstream last-modified timestamp, if supplied.
+        content_type: MIME type reported by upstream servers when available.
+        content_length: Content-Length reported by upstream servers when available.
+        source_media_type_label: Friendly label describing the source media type.
         downloaded_at: UTC timestamp of the completed download.
         target_formats: Desired conversion targets for normalization.
         validation: Mapping of validator names to their results.
@@ -508,6 +518,9 @@ class Manifest:
         ...     fingerprint=None,
         ...     etag=None,
         ...     last_modified=None,
+        ...     content_type=None,
+        ...     content_length=None,
+        ...     source_media_type_label=None,
         ...     downloaded_at="2024-01-01T00:00:00Z",
         ...     target_formats=("owl",),
         ...     validation={},
@@ -531,6 +544,9 @@ class Manifest:
     fingerprint: Optional[str]
     etag: Optional[str]
     last_modified: Optional[str]
+    content_type: Optional[str] = None
+    content_length: Optional[int] = None
+    source_media_type_label: Optional[str] = None
     downloaded_at: str
     target_formats: Sequence[str]
     validation: Dict[str, ValidationResult]
@@ -561,6 +577,9 @@ class Manifest:
             "fingerprint": self.fingerprint,
             "etag": self.etag,
             "last_modified": self.last_modified,
+            "content_type": self.content_type,
+            "content_length": self.content_length,
+            "source_media_type_label": self.source_media_type_label,
             "downloaded_at": self.downloaded_at,
             "target_formats": list(self.target_formats),
             "validation": {name: result.to_dict() for name, result in self.validation.items()},

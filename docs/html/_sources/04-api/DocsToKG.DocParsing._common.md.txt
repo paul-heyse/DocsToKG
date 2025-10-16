@@ -65,6 +65,17 @@ hf_home: Optional HuggingFace cache directory to treat as the base path.
 Returns:
 Path: Absolute directory where DocsToKG models should be stored.
 
+### `init_hf_env(hf_home, model_root)`
+
+Initialise Hugging Face and transformer cache environment variables.
+
+Args:
+hf_home: Optional explicit HF cache directory.
+model_root: Optional DocsToKG model root override.
+
+Returns:
+Tuple of ``(hf_home, model_root)`` paths after normalisation.
+
 ### `detect_data_root(start)`
 
 Locate the DocsToKG Data directory via env var or ancestor scan.
@@ -208,6 +219,71 @@ vectors_root: Root directory where vector outputs should be written.
 
 Returns:
 Tuple containing the manifest ``doc_id`` and the full vectors output path.
+
+### `compute_relative_doc_id(path, root)`
+
+Return POSIX-style relative identifier for a document path.
+
+Args:
+path: Absolute path to the document on disk.
+root: Root directory that anchors relative identifiers.
+
+Returns:
+str: POSIX-style relative path suitable for manifest IDs.
+
+### `should_skip_output(output_path, manifest_entry, input_hash, resume, force)`
+
+Return ``True`` when resume/skip conditions indicate work can be skipped.
+
+### `_stringify_path(value)`
+
+Return a string representation for path-like values used in manifests.
+
+### `manifest_log_skip()`
+
+Record a manifest entry indicating the pipeline skipped work.
+
+Args:
+stage: Logical pipeline phase originating the log entry.
+doc_id: Identifier of the document being processed.
+input_path: Source artefact that would have been processed.
+input_hash: Content hash associated with ``input_path``.
+output_path: Destination artefact that remained unchanged.
+duration_s: Elapsed seconds for the short-circuited step.
+schema_version: Manifest schema version for downstream readers.
+hash_alg: Hash algorithm used to compute ``input_hash``.
+**extra: Additional metadata to merge into the manifest row.
+
+### `manifest_log_success()`
+
+Record a manifest entry marking successful pipeline output.
+
+Args:
+stage: Logical pipeline phase originating the log entry.
+doc_id: Identifier of the document being processed.
+duration_s: Elapsed seconds for the successful step.
+schema_version: Manifest schema version for downstream readers.
+input_path: Source artefact that produced ``output_path``.
+input_hash: Content hash associated with ``input_path``.
+output_path: Destination artefact written by the pipeline.
+hash_alg: Hash algorithm used to compute ``input_hash``.
+**extra: Additional metadata to merge into the manifest row.
+
+### `manifest_log_failure()`
+
+Record a manifest entry describing a failed pipeline attempt.
+
+Args:
+stage: Logical pipeline phase originating the log entry.
+doc_id: Identifier of the document being processed.
+duration_s: Elapsed seconds before the failure occurred.
+schema_version: Manifest schema version for downstream readers.
+input_path: Source artefact that triggered the failure.
+input_hash: Content hash associated with ``input_path``.
+output_path: Destination artefact that may be incomplete.
+error: Human-readable description of the failure condition.
+hash_alg: Hash algorithm used to compute ``input_hash``.
+**extra: Additional metadata to merge into the manifest row.
 
 ### `get_logger(name, level)`
 
@@ -489,6 +565,30 @@ Returns:
 JSON-formatted string containing canonical log fields and optional extras.
 
 ## 3. Classes
+
+### `BM25Stats`
+
+Corpus-level statistics required for BM25 weighting.
+
+### `SpladeCfg`
+
+Runtime configuration for SPLADE sparse encoding.
+
+### `QwenCfg`
+
+Configuration for generating dense embeddings with Qwen via vLLM.
+
+### `ChunkWorkerConfig`
+
+Lightweight configuration shared across chunker worker processes.
+
+### `ChunkTask`
+
+Work unit describing a single DocTags file to chunk.
+
+### `ChunkResult`
+
+Result envelope emitted by chunker workers.
 
 ### `Batcher`
 

@@ -196,6 +196,8 @@ class HybridSearchService:
             self._faiss_router = FaissRouter(per_namespace=False, default_store=faiss_index)
         self._faiss = self._faiss_router.default_store
         self._faiss_router.set_resolver(self._registry.resolve_faiss_id)
+        self._dense_filter_pass_ema: float = 0.75
+        self._dense_filter_ema_alpha: float = 0.20
 
     def search(self, request: HybridSearchRequest) -> HybridSearchResponse:
         """Execute a hybrid retrieval round trip for ``request``.
@@ -468,18 +470,19 @@ class HybridSearchService:
         start = time.perf_counter()
         # Over-fetch relative to the page size (not dense_top_k) to leave headroom for filtering.
         page_size = max(1, request.page_size)
-        overfetch = float(getattr(config.retrieval, "dense_overfetch_factor", 1.5))
-        base = math.ceil(page_size * max(1.0, overfetch))
-        dense_oversample = float(
-            getattr(
-                config.retrieval,
-                "dense_oversample",
-                getattr(config.dense, "oversample", 1.0),
-            )
+        retrieval_cfg = config.retrieval
+        oversample = float(
+            getattr(retrieval_cfg, "dense_oversample", getattr(config.dense, "oversample", 1.0))
         )
-        if dense_oversample > 1.0:
-            base = max(base, math.ceil(page_size * dense_oversample))
-        k = max(int(config.retrieval.dense_top_k), base)
+        oversample = max(1.0, oversample)
+        overfetch = float(getattr(retrieval_cfg, "dense_overfetch_factor", 1.5))
+        overfetch = max(1.0, overfetch)
+        pass_rate = max(1e-3, min(1.0, float(self._dense_filter_pass_ema)))
+        base = math.ceil(page_size * oversample * overfetch)
+        adaptive = math.ceil(page_size / pass_rate * oversample * overfetch)
+        k = max(int(retrieval_cfg.dense_top_k), base, adaptive)
+        k = min(k, 10_000)
+        self._observability.metrics.set_gauge("dense_effective_k", float(k), channel="dense")
         queries = np.asarray([query_features.embedding], dtype=np.float32)
         batch_hits = store.search_batch(queries, k)
         self._observability.metrics.observe(
@@ -498,6 +501,15 @@ class HybridSearchService:
                 "search_channel_latency_p95_ms", p95_dense, channel="dense"
             )
         filtered, payloads = self._filter_dense_hits(hits, filters)
+        observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
+        ema = (
+            self._dense_filter_ema_alpha * observed
+            + (1.0 - self._dense_filter_ema_alpha) * self._dense_filter_pass_ema
+        )
+        self._dense_filter_pass_ema = max(1e-3, min(1.0, ema))
+        self._observability.metrics.set_gauge(
+            "dense_filter_pass_rate", self._dense_filter_pass_ema, channel="dense"
+        )
         self._observability.metrics.increment("search_channel_requests", channel="dense")
         self._observability.metrics.observe(
             "search_channel_candidates", len(filtered), channel="dense"

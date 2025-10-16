@@ -341,13 +341,12 @@ import DocsToKG.OntologyDownload.net as download
 import DocsToKG.OntologyDownload.pipeline as pipeline_mod
 from DocsToKG.OntologyDownload.config import (
     ConfigError,
-    ConfigurationError,
     DefaultsConfig,
     DownloadConfiguration,
     ResolvedConfig,
 )
 from DocsToKG.OntologyDownload.io_safe import sanitize_filename
-from DocsToKG.OntologyDownload.pipeline import FetchSpec
+from DocsToKG.OntologyDownload.pipeline import ConfigurationError, FetchSpec
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
 from DocsToKG.OntologyDownload.storage import CACHE_DIR
 

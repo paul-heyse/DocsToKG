@@ -294,6 +294,7 @@ class ProvenanceMetadata(BaseModel):
         has_image_captions: Flag indicating whether caption text accompanies the chunk.
         has_image_classification: Flag indicating whether image classification labels exist.
         num_images: Count of images referenced by the chunk.
+        image_confidence: Optional confidence score associated with image annotations.
 
     Examples:
         >>> ProvenanceMetadata(parse_engine="docling-html", docling_version="1.2.3")
@@ -309,6 +310,12 @@ class ProvenanceMetadata(BaseModel):
         default=False, description="Whether chunk includes image classifications"
     )
     num_images: int = Field(default=0, ge=0, description="Number of images in chunk")
+    image_confidence: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score associated with image annotations when available",
+    )
 
     @field_validator("parse_engine")
     @classmethod
@@ -348,6 +355,7 @@ class ChunkRow(BaseModel):
         has_image_captions: Optional duplicate of provenance flag for convenience.
         has_image_classification: Optional duplicate of provenance flag for convenience.
         num_images: Optional duplicate of provenance image count for convenience.
+        image_confidence: Optional duplicate of provenance image confidence for convenience.
 
     Examples:
         >>> chunk = ChunkRow(
@@ -391,6 +399,12 @@ class ChunkRow(BaseModel):
         default=None,
         ge=0,
         description="Convenience count mirroring provenance.num_images",
+    )
+    image_confidence: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Optional confidence mirroring provenance.image_confidence",
     )
     provenance: Optional["ProvenanceMetadata"] = Field(
         None, description="Optional provenance metadata"

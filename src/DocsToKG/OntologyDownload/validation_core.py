@@ -22,11 +22,9 @@ from itertools import islice
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Dict, Iterable, Iterator, List, MutableMapping, Optional
 
-import psutil
-
 from .config import ResolvedConfig
-from .io_safe import sanitize_filename
-from .net import extract_archive_safe
+from .io_safe import extract_archive_safe, sanitize_filename
+from .net import log_memory_usage
 from .optdeps import get_owlready2, get_pronto, get_rdflib
 from .plugins import ensure_validator_plugins
 
@@ -114,34 +112,6 @@ class ValidationTimeout(Exception):
         ...
         ValidationTimeout: rdflib exceeded 60s
     """
-
-
-def _log_validation_memory(logger: logging.Logger, validator: str, event: str) -> None:
-    """Emit memory usage diagnostics for a validator when debug logging is enabled.
-
-    Args:
-        logger: Logger responsible for validator telemetry.
-        validator: Name of the validator emitting the event.
-        event: Lifecycle label describing when the measurement is captured.
-    """
-    is_enabled = getattr(logger, "isEnabledFor", None)
-    if callable(is_enabled):
-        enabled = is_enabled(logging.DEBUG)
-    else:  # pragma: no cover - fallback for stub loggers
-        enabled = False
-    if not enabled:
-        return
-    process = psutil.Process()
-    memory_mb = process.memory_info().rss / (1024**2)
-    logger.debug(
-        "memory usage",
-        extra={
-            "stage": "validate",
-            "validator": validator,
-            "event": event,
-            "memory_mb": round(memory_mb, 2),
-        },
-    )
 
 
 def _write_validation_json(path: Path, payload: MutableMapping[str, object]) -> None:
@@ -667,9 +637,9 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
         graph.parse(request.file_path.as_posix())
 
     try:
-        _log_validation_memory(logger, "rdflib", "before")
+        log_memory_usage(logger, stage="validate", event="before", validator="rdflib")
         _run_with_timeout(_parse, timeout)
-        _log_validation_memory(logger, "rdflib", "after")
+        log_memory_usage(logger, stage="validate", event="after", validator="rdflib")
         triple_count = len(graph)
         payload = {"ok": True, "triples": triple_count}
         output_files: List[str] = []
@@ -787,9 +757,9 @@ def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> Valid
             normalized_path = request.normalized_dir / (request.file_path.stem + ".json")
             payload["normalized_path"] = str(normalized_path)
 
-        _log_validation_memory(logger, "pronto", "before")
+        log_memory_usage(logger, stage="validate", event="before", validator="pronto")
         result_payload = _run_validator_subprocess("pronto", payload, timeout=timeout)
-        _log_validation_memory(logger, "pronto", "after")
+        log_memory_usage(logger, stage="validate", event="after", validator="pronto")
         result_payload.setdefault("ok", True)
         output_files: List[str] = []
         if normalized_path and result_payload.get("normalized_written"):
@@ -846,9 +816,9 @@ def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> Va
             return ValidationResult(ok=True, details=payload, output_files=[])
         timeout = request.config.defaults.validation.parser_timeout_sec
         payload = {"file_path": str(request.file_path)}
-        _log_validation_memory(logger, "owlready2", "before")
+        log_memory_usage(logger, stage="validate", event="before", validator="owlready2")
         result_payload = _run_validator_subprocess("owlready2", payload, timeout=timeout)
-        _log_validation_memory(logger, "owlready2", "after")
+        log_memory_usage(logger, stage="validate", event="after", validator="owlready2")
         result_payload.setdefault("ok", True)
         _write_validation_json(request.validation_dir / "owlready2_parse.json", result_payload)
         return ValidationResult(
@@ -898,7 +868,7 @@ def validate_robot(request: ValidationRequest, logger: logging.Logger) -> Valida
     request.normalized_dir.mkdir(parents=True, exist_ok=True)
     report_path = request.validation_dir / "robot_report.tsv"
     try:
-        _log_validation_memory(logger, "robot", "before")
+        log_memory_usage(logger, stage="validate", event="before", validator="robot")
         convert_cmd = [
             robot_path,
             "convert",
@@ -910,7 +880,7 @@ def validate_robot(request: ValidationRequest, logger: logging.Logger) -> Valida
         report_cmd = [robot_path, "report", "-i", str(request.file_path), "-o", str(report_path)]
         subprocess.run(convert_cmd, check=True, capture_output=True)
         subprocess.run(report_cmd, check=True, capture_output=True)
-        _log_validation_memory(logger, "robot", "after")
+        log_memory_usage(logger, stage="validate", event="after", validator="robot")
         output_files = [str(normalized_path), str(report_path)]
         result_payload = {"ok": True, "outputs": output_files}
         _write_validation_json(request.validation_dir / "robot_report.json", result_payload)
@@ -956,9 +926,9 @@ def validate_arelle(request: ValidationRequest, logger: logging.Logger) -> Valid
         controller = Cntlr.Cntlr(
             logFile=str(request.validation_dir / "arelle.log"), logToBuffer=True
         )
-        _log_validation_memory(logger, "arelle", "before")
+        log_memory_usage(logger, stage="validate", event="before", validator="arelle")
         controller.run(["--file", str(entrypoint)])
-        _log_validation_memory(logger, "arelle", "after")
+        log_memory_usage(logger, stage="validate", event="after", validator="arelle")
         payload = {
             "ok": True,
             "log": str(request.validation_dir / "arelle.log"),

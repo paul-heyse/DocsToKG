@@ -51,6 +51,10 @@ doc: Docling document to serialize into DocTags-compatible chunks.
 Returns:
 Chunking serializer configured with Markdown enrichments.
 
+### `_maybe_add_conf(value)`
+
+Collect numeric confidence scores when they can be coerced to float.
+
 ## 3. Classes
 
 ### `CaptionPlusAnnotationPictureSerializer`

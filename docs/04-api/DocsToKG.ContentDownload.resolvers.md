@@ -155,6 +155,10 @@ self: Download outcome to evaluate.
 Returns:
 bool: ``True`` if the outcome corresponds to a PDF download.
 
+### `__post_init__(self)`
+
+*No documentation available.*
+
 ### `is_enabled(self, config, artifact)`
 
 Return ``True`` if this resolver should run for the given artifact.
@@ -776,6 +780,10 @@ resolver_wall_time_ms: Wall-clock time spent in the resolver.
 
 Returns:
 PipelineResult when resolution succeeds, otherwise ``None``.
+
+### `_percentile(sorted_values, percentile)`
+
+*No documentation available.*
 
 ### `submit_next(executor, start_index)`
 

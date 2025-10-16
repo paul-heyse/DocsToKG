@@ -12,6 +12,7 @@ point with subcommands. Invoke it with:
     python -m DocsToKG.DocParsing.cli <command> [options...]
 
 Available commands:
+    - all:       Convert HTML/PDF, chunk, and embed sequentially.
     - chunk:     Run the Docling hybrid chunker.
     - embed:     Generate BM25, SPLADE, and dense vectors for chunks.
     - doctags:   Convert HTML/PDF corpora into DocTags.
@@ -48,6 +49,14 @@ prog: Program name displayed in help output.
 Returns:
 Argument parser instance for the ``doctags`` subcommand.
 
+### `_scan_pdf_html(input_dir)`
+
+Return booleans indicating whether PDFs or HTML files exist beneath ``input_dir``.
+
+### `_directory_contains_suffixes(directory, suffixes)`
+
+Return True when ``directory`` contains at least one file ending with ``suffixes``.
+
 ### `_detect_mode(input_dir)`
 
 Infer conversion mode based on the contents of ``input_dir``.
@@ -59,7 +68,7 @@ Returns:
 ``"pdf"`` when only PDFs are present, ``"html"`` when only HTML files exist.
 
 Raises:
-ValueError: If both formats are present or neither can be detected.
+ValueError: If both formats are present, neither type can be detected, or the directory is missing.
 
 ### `_merge_args(parser, overrides)`
 
@@ -82,6 +91,16 @@ argv: Argument vector provided by the CLI dispatcher.
 Returns:
 Process exit code from the selected DocTags backend.
 
+### `_run_all(argv)`
+
+Execute DocTags conversion, chunking, and embedding sequentially.
+
+Args:
+argv: Argument vector supplied by the CLI dispatcher.
+
+Returns:
+Exit code from the final stage executed. Non-zero codes surface immediately.
+
 ### `main(argv)`
 
 Dispatch to one of the DocParsing subcommands.
@@ -91,6 +110,16 @@ argv: Optional argument vector supplied programmatically.
 
 Returns:
 Process exit code returned by the selected subcommand.
+
+### `run_all(argv)`
+
+Programmatic helper mirroring ``docparse all``.
+
+Args:
+argv: Optional argument vector supplied for orchestration.
+
+Returns:
+Process exit code returned by the pipeline orchestrator.
 
 ### `chunk(argv)`
 

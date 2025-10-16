@@ -88,6 +88,7 @@ point with subcommands. Invoke it with:</p>
 </pre></div>
 </div>
 <p>Available commands:
+- all:       Convert HTML/PDF, chunk, and embed sequentially.
 - chunk:     Run the Docling hybrid chunker.
 - embed:     Generate BM25, SPLADE, and dense vectors for chunks.
 - doctags:   Convert HTML/PDF corpora into DocTags.</p>
@@ -118,6 +119,14 @@ prog: Program name displayed in help output.</p>
 <p>Returns:
 Argument parser instance for the <code class="docutils literal notranslate"><span class="pre">doctags</span></code> subcommand.</p>
 </section>
+<section id="scan-pdf-html-input-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_scan_pdf_html(input_dir)</span></code><a class="headerlink" href="#scan-pdf-html-input-dir" title="Link to this heading"></a></h3>
+<p>Return booleans indicating whether PDFs or HTML files exist beneath <code class="docutils literal notranslate"><span class="pre">input_dir</span></code>.</p>
+</section>
+<section id="directory-contains-suffixes-directory-suffixes">
+<h3><code class="docutils literal notranslate"><span class="pre">_directory_contains_suffixes(directory,</span> <span class="pre">suffixes)</span></code><a class="headerlink" href="#directory-contains-suffixes-directory-suffixes" title="Link to this heading"></a></h3>
+<p>Return True when <code class="docutils literal notranslate"><span class="pre">directory</span></code> contains at least one file ending with <code class="docutils literal notranslate"><span class="pre">suffixes</span></code>.</p>
+</section>
 <section id="detect-mode-input-dir">
 <h3><code class="docutils literal notranslate"><span class="pre">_detect_mode(input_dir)</span></code><a class="headerlink" href="#detect-mode-input-dir" title="Link to this heading"></a></h3>
 <p>Infer conversion mode based on the contents of <code class="docutils literal notranslate"><span class="pre">input_dir</span></code>.</p>
@@ -126,7 +135,7 @@ input_dir: Directory searched for PDF and HTML inputs.</p>
 <p>Returns:
 <code class="docutils literal notranslate"><span class="pre">&quot;pdf&quot;</span></code> when only PDFs are present, <code class="docutils literal notranslate"><span class="pre">&quot;html&quot;</span></code> when only HTML files exist.</p>
 <p>Raises:
-ValueError: If both formats are present or neither can be detected.</p>
+ValueError: If both formats are present, neither type can be detected, or the directory is missing.</p>
 </section>
 <section id="merge-args-parser-overrides">
 <h3><code class="docutils literal notranslate"><span class="pre">_merge_args(parser,</span> <span class="pre">overrides)</span></code><a class="headerlink" href="#merge-args-parser-overrides" title="Link to this heading"></a></h3>
@@ -145,6 +154,14 @@ argv: Argument vector provided by the CLI dispatcher.</p>
 <p>Returns:
 Process exit code from the selected DocTags backend.</p>
 </section>
+<section id="run-all-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_all(argv)</span></code><a class="headerlink" href="#run-all-argv" title="Link to this heading"></a></h3>
+<p>Execute DocTags conversion, chunking, and embedding sequentially.</p>
+<p>Args:
+argv: Argument vector supplied by the CLI dispatcher.</p>
+<p>Returns:
+Exit code from the final stage executed. Non-zero codes surface immediately.</p>
+</section>
 <section id="main-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>
 <p>Dispatch to one of the DocParsing subcommands.</p>
@@ -152,6 +169,14 @@ Process exit code from the selected DocTags backend.</p>
 argv: Optional argument vector supplied programmatically.</p>
 <p>Returns:
 Process exit code returned by the selected subcommand.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">run_all(argv)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Programmatic helper mirroring <code class="docutils literal notranslate"><span class="pre">docparse</span> <span class="pre">all</span></code>.</p>
+<p>Args:
+argv: Optional argument vector supplied for orchestration.</p>
+<p>Returns:
+Process exit code returned by the pipeline orchestrator.</p>
 </section>
 <section id="chunk-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">chunk(argv)</span></code><a class="headerlink" href="#chunk-argv" title="Link to this heading"></a></h3>

@@ -130,6 +130,10 @@ window_bytes: Number of trailing bytes to scan for the EOF marker.</p>
 <p>Returns:
 <code class="docutils literal notranslate"><span class="pre">True</span></code> if the file ends with <code class="docutils literal notranslate"><span class="pre">%%EOF</span></code>; <code class="docutils literal notranslate"><span class="pre">False</span></code> otherwise.</p>
 </section>
+<section id="update-tail-buffer-buffer-chunk">
+<h3><code class="docutils literal notranslate"><span class="pre">_update_tail_buffer(buffer,</span> <span class="pre">chunk)</span></code><a class="headerlink" href="#update-tail-buffer-buffer-chunk" title="Link to this heading"></a></h3>
+<p>Maintain the trailing <code class="docutils literal notranslate"><span class="pre">limit</span></code> bytes of a streamed download.</p>
+</section>
 <section id="ensure-dir-path">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_dir(path)</span></code><a class="headerlink" href="#ensure-dir-path" title="Link to this heading"></a></h3>
 <p>Create a directory if it does not already exist.</p>
@@ -164,7 +168,9 @@ headers (Dict[str, str]): Header dictionary returned by
 :func:<code class="docutils literal notranslate"><span class="pre">load_resolver_config</span></code>. The mapping must already include the
 project user agent and <code class="docutils literal notranslate"><span class="pre">mailto</span></code> contact address. A copy of the
 mapping is applied to the outgoing session so callers can reuse
-mutable dictionaries without side effects.</p>
+mutable dictionaries without side effects.
+pool_connections: Minimum pool size shared across HTTP and HTTPS adapters.
+pool_maxsize: Upper bound for per-host connections retained in the pool.</p>
 <p>Returns:
 requests.Session: Session with connection pooling enabled and retries
 disabled at the adapter level so the application layer governs backoff.</p>
@@ -228,6 +234,10 @@ Dictionary containing <code class="docutils literal notranslate"><span class="pr
 args: Parsed command-line arguments.</p>
 <p>Returns:
 Configured Works query object ready for iteration.</p>
+</section>
+<section id="lookup-topic-id-topic-text">
+<h3><code class="docutils literal notranslate"><span class="pre">_lookup_topic_id(topic_text)</span></code><a class="headerlink" href="#lookup-topic-id-topic-text" title="Link to this heading"></a></h3>
+<p>Cached helper to resolve an OpenAlex topic identifier.</p>
 </section>
 <section id="resolve-topic-id-if-needed-topic-text">
 <h3><code class="docutils literal notranslate"><span class="pre">resolve_topic_id_if_needed(topic_text)</span></code><a class="headerlink" href="#resolve-topic-id-if-needed-topic-text" title="Link to this heading"></a></h3>
@@ -336,7 +346,11 @@ dry_run: When True, simulate downloads without writing files.
 list_only: When True, record candidate URLs without fetching content.
 extract_html_text: Whether to extract plaintext from HTML artefacts.
 previous_lookup: Mapping of work_id/URL to prior manifest entries.
-resume_completed: Set of work IDs already processed in resume mode.</p>
+resume_completed: Set of work IDs already processed in resume mode.
+max_bytes: Optional size limit per download in bytes.
+sniff_bytes: Number of leading bytes to buffer for payload inference.
+min_pdf_bytes: Minimum PDF size accepted when HEAD prechecks fail.
+tail_check_bytes: Tail window size used to detect embedded HTML payloads.</p>
 <p>Returns:
 Dictionary summarizing the outcome (saved/html_only/skipped flags).</p>
 <p>Raises:
@@ -379,8 +393,8 @@ thread-local.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_record_result(res)</span></code><a class="headerlink" href="#record-result-res" title="Link to this heading"></a></h3>
 <p>Update aggregate counters based on a single work result.</p>
 </section>
-<section id="submit-work-work-item">
-<h3><code class="docutils literal notranslate"><span class="pre">_submit_work(work_item)</span></code><a class="headerlink" href="#submit-work-work-item" title="Link to this heading"></a></h3>
+<section id="submit-work-item">
+<h3><code class="docutils literal notranslate"><span class="pre">_submit(work_item)</span></code><a class="headerlink" href="#submit-work-item" title="Link to this heading"></a></h3>
 <p>Submit a work item to the executor for asynchronous processing.</p>
 </section>
 <section id="runner">

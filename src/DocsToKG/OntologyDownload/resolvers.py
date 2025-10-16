@@ -118,8 +118,9 @@ try:  # pragma: no cover - optional dependency guidance
 except ModuleNotFoundError:  # pragma: no cover - provide actionable error later
     BioPortalClient = None  # type: ignore[assignment]
 
-from .config import ConfigError, ResolvedConfig
-from .net import TokenBucket, retry_with_backoff
+from .config import DownloadConfiguration, ResolvedConfig
+from .errors import ResolverError, UserConfigError
+from .net import TokenBucket, retry_with_backoff, validate_url_security
 from .optdeps import get_pystow
 from .plugins import ensure_resolver_plugins
 # --- Globals ---
@@ -278,7 +279,8 @@ class BaseResolver:
             Result returned by the supplied callable.
 
         Raises:
-            ConfigError: When retry limits are exceeded or HTTP errors occur.
+            ResolverError: When retry limits are exceeded or HTTP errors occur.
+            UserConfigError: When upstream services reject credentials.
         """
         max_attempts = max(1, config.defaults.http.max_retries)
         backoff_base = config.defaults.http.backoff_factor
@@ -314,16 +316,16 @@ class BaseResolver:
                 callback=_on_retry,
             )
         except requests.Timeout as exc:
-            raise ConfigError(
+            raise ResolverError(
                 f"{name} API timeout after {config.defaults.http.timeout_sec}s"
             ) from exc
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
             if status in {401, 403}:
-                raise
-            raise ConfigError(f"{name} API error {status}: {exc}") from exc
+                raise UserConfigError(f"{name} API rejected credentials ({status})") from exc
+            raise ResolverError(f"{name} API error {status}: {exc}") from exc
         except requests.ConnectionError as exc:
-            raise ConfigError(f"{name} API connection error: {exc}") from exc
+            raise ResolverError(f"{name} API connection error: {exc}") from exc
 
     def _extract_correlation_id(self, logger: logging.Logger) -> Optional[str]:
         """Return the correlation id from a logger adapter when available.
@@ -385,6 +387,7 @@ class BaseResolver:
         self,
         *,
         url: str,
+        http_config: Optional[DownloadConfiguration] = None,
         headers: Optional[Dict[str, str]] = None,
         filename_hint: Optional[str] = None,
         version: Optional[str] = None,
@@ -406,11 +409,12 @@ class BaseResolver:
             service: Logical service identifier used for rate limiting.
 
         Returns:
-            FetchPlan capturing resolver metadata.
+            FetchPlan capturing resolver metadata with a security-validated URL.
         """
+        secure_url = validate_url_security(url, http_config)
         normalized_license = normalize_license_to_spdx(license)
         return FetchPlan(
-            url=url,
+            url=secure_url,
             headers=headers or {},
             filename_hint=filename_hint,
             version=version,
@@ -446,10 +450,11 @@ class OBOResolver(BaseResolver):
             FetchPlan pointing to the preferred download URL.
 
         Raises:
-            ConfigError: If no download URL can be derived.
+            ResolverError: If no download URL can be derived.
+            UserConfigError: When required Bioregistry helpers are unavailable.
         """
         if get_obo_download is None or get_owl_download is None or get_rdf_download is None:
-            raise ConfigError(
+            raise UserConfigError(
                 "bioregistry is required for the OBO resolver. Install it with: pip install bioregistry"
             )
 
@@ -474,10 +479,11 @@ class OBOResolver(BaseResolver):
                 )
                 return self._build_plan(
                     url=url,
+                    http_config=config.defaults.http,
                     media_type="application/rdf+xml",
                     service="obo",
                 )
-        raise ConfigError(f"No download link found via Bioregistry for {spec.id}")
+        raise ResolverError(f"No download link found via Bioregistry for {spec.id}")
 
 
 class OLSResolver(BaseResolver):
@@ -496,7 +502,7 @@ class OLSResolver(BaseResolver):
     def __init__(self) -> None:
         client_factory = OlsClient
         if client_factory is None:
-            raise ConfigError("ols-client package is required for the OLS resolver")
+            raise UserConfigError("ols-client package is required for the OLS resolver")
         try:
             self.client = client_factory()
         except TypeError:
@@ -520,7 +526,8 @@ class OLSResolver(BaseResolver):
             FetchPlan describing the download URL, headers, and metadata.
 
         Raises:
-            ConfigError: When the API rejects credentials or yields no URLs.
+            UserConfigError: When the API rejects credentials.
+            ResolverError: When no download URLs can be resolved.
         """
         ontology_id = spec.id.lower()
         headers = self._build_polite_headers(config, logger)
@@ -541,7 +548,7 @@ class OLSResolver(BaseResolver):
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
             if status in {401, 403}:
-                raise ConfigError(
+                raise UserConfigError(
                     f"OLS authentication failed with status {status}. Configure API key at {self.credentials_path}"
                 ) from exc
             raise
@@ -581,13 +588,14 @@ class OLSResolver(BaseResolver):
                     license_value = submission.get("license")
                     break
         if not download_url:
-            raise ConfigError(f"Unable to resolve OLS download URL for {ontology_id}")
+            raise ResolverError(f"Unable to resolve OLS download URL for {ontology_id}")
         logger.info(
             "resolved download url",
             extra={"stage": "plan", "resolver": "ols", "ontology_id": spec.id, "url": download_url},
         )
         return self._build_plan(
             url=download_url,
+            http_config=config.defaults.http,
             filename_hint=filename,
             version=version,
             license=license_value,
@@ -610,7 +618,7 @@ class BioPortalResolver(BaseResolver):
 
     def __init__(self) -> None:
         if BioPortalClient is None:
-            raise ConfigError(
+            raise UserConfigError(
                 "ontoportal-client is required for the BioPortal resolver. Install it with: pip install ontoportal-client"
             )
         self.client = BioPortalClient()
@@ -642,7 +650,8 @@ class BioPortalResolver(BaseResolver):
             FetchPlan containing the resolved download URL and headers.
 
         Raises:
-            ConfigError: If authentication fails or no download link is available.
+            UserConfigError: If authentication fails.
+            ResolverError: If no download link is available.
         """
         acronym = spec.extras.get("acronym", spec.id.upper())
         headers = self._build_polite_headers(config, logger)
@@ -659,7 +668,7 @@ class BioPortalResolver(BaseResolver):
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
             if status in {401, 403}:
-                raise ConfigError(
+                raise UserConfigError(
                     f"BioPortal authentication failed with status {status}. Configure API key at {self.api_key_path}"
                 ) from exc
             raise
@@ -689,7 +698,7 @@ class BioPortalResolver(BaseResolver):
             version = getattr(latest_submission, "version", None)
             license_value = license_value or getattr(latest_submission, "license", None)
         if not download_url:
-            raise ConfigError(f"No BioPortal submission with download URL for {acronym}")
+            raise ResolverError(f"No BioPortal submission with download URL for {acronym}")
         headers: Dict[str, str] = {}
         api_key = self._load_api_key()
         if api_key:
@@ -705,6 +714,7 @@ class BioPortalResolver(BaseResolver):
         )
         return self._build_plan(
             url=download_url,
+            http_config=config.defaults.http,
             headers=headers,
             version=version,
             license=license_value,
@@ -764,12 +774,13 @@ class LOVResolver(BaseResolver):
             FetchPlan describing the resolved download URL and metadata.
 
         Raises:
-            ConfigError: If required metadata is missing or the LOV API fails.
+            UserConfigError: If required resolver metadata is missing.
+            ResolverError: If the LOV API does not provide a download URL.
         """
 
         uri = spec.extras.get("uri")
         if not uri:
-            raise ConfigError("LOV resolver requires 'extras.uri'")
+            raise UserConfigError("LOV resolver requires 'extras.uri'")
 
         headers = self._build_polite_headers(config, logger)
         self._apply_headers_to_session(self.session, headers)
@@ -824,7 +835,7 @@ class LOVResolver(BaseResolver):
                     media_type = candidate_type.strip()
 
         if not download_url:
-            raise ConfigError("LOV metadata did not include a download URL")
+            raise ResolverError("LOV metadata did not include a download URL")
 
         logger.info(
             "resolved download url",
@@ -838,6 +849,7 @@ class LOVResolver(BaseResolver):
 
         return self._build_plan(
             url=download_url,
+            http_config=config.defaults.http,
             license=license_value,
             version=version,
             media_type=media_type or "text/turtle",
@@ -869,17 +881,18 @@ class SKOSResolver(BaseResolver):
             FetchPlan with the provided URL and appropriate media type.
 
         Raises:
-            ConfigError: If the specification omits the required URL.
+            UserConfigError: If the specification omits the required URL.
         """
         url = spec.extras.get("url")
         if not url:
-            raise ConfigError("SKOS resolver requires 'extras.url'")
+            raise UserConfigError("SKOS resolver requires 'extras.url'")
         logger.info(
             "resolved download url",
             extra={"stage": "plan", "resolver": "skos", "ontology_id": spec.id, "url": url},
         )
         return self._build_plan(
             url=url,
+            http_config=config.defaults.http,
             media_type="text/turtle",
             service="skos",
         )
@@ -900,33 +913,33 @@ class DirectResolver(BaseResolver):
             FetchPlan referencing the explicit URL.
 
         Raises:
-            ConfigError: If the specification omits the required URL or provides invalid extras.
+            UserConfigError: If the specification omits the required URL or provides invalid extras.
         """
 
         extras = getattr(spec, "extras", {}) or {}
         if not isinstance(extras, dict):
-            raise ConfigError("direct resolver expects spec.extras to be a mapping")
+            raise UserConfigError("direct resolver expects spec.extras to be a mapping")
 
         url = extras.get("url")
         if not isinstance(url, str) or not url.strip():
-            raise ConfigError("direct resolver requires 'extras.url'")
+            raise UserConfigError("direct resolver requires 'extras.url'")
         url = url.strip()
 
         headers = extras.get("headers")
         if headers is not None and not isinstance(headers, dict):
-            raise ConfigError("direct resolver expects 'extras.headers' to be a mapping")
+            raise UserConfigError("direct resolver expects 'extras.headers' to be a mapping")
 
         filename_hint = extras.get("filename_hint")
         if filename_hint is not None and not isinstance(filename_hint, str):
-            raise ConfigError("direct resolver expects 'extras.filename_hint' to be a string")
+            raise UserConfigError("direct resolver expects 'extras.filename_hint' to be a string")
 
         license_hint = extras.get("license")
         if license_hint is not None and not isinstance(license_hint, str):
-            raise ConfigError("direct resolver expects 'extras.license' to be a string")
+            raise UserConfigError("direct resolver expects 'extras.license' to be a string")
 
         version = extras.get("version")
         if version is not None and not isinstance(version, str):
-            raise ConfigError("direct resolver expects 'extras.version' to be a string")
+            raise UserConfigError("direct resolver expects 'extras.version' to be a string")
 
         logger.info(
             "resolved download url",
@@ -939,6 +952,7 @@ class DirectResolver(BaseResolver):
         )
         return self._build_plan(
             url=url,
+            http_config=config.defaults.http,
             headers=headers,
             filename_hint=filename_hint,
             version=version,
@@ -971,17 +985,18 @@ class XBRLResolver(BaseResolver):
             FetchPlan referencing the specified ZIP archive.
 
         Raises:
-            ConfigError: If the specification omits the required URL.
+            UserConfigError: If the specification omits the required URL.
         """
         url = spec.extras.get("url")
         if not url:
-            raise ConfigError("XBRL resolver requires 'extras.url'")
+            raise UserConfigError("XBRL resolver requires 'extras.url'")
         logger.info(
             "resolved download url",
             extra={"stage": "plan", "resolver": "xbrl", "ontology_id": spec.id, "url": url},
         )
         return self._build_plan(
             url=url,
+            http_config=config.defaults.http,
             media_type="application/zip",
             service="xbrl",
         )
@@ -1020,12 +1035,12 @@ class OntobeeResolver(BaseResolver):
             FetchPlan pointing to an Ontobee-hosted download URL.
 
         Raises:
-            ConfigError: If the ontology identifier is invalid.
+            UserConfigError: If the ontology identifier is invalid.
         """
 
         prefix = spec.id.strip()
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]+", prefix):
-            raise ConfigError("Ontobee resolver requires alphanumeric ontology id")
+            raise UserConfigError("Ontobee resolver requires alphanumeric ontology id")
 
         preferred = [fmt.lower() for fmt in (spec.target_formats or []) if isinstance(fmt, str)]
         if not preferred:
@@ -1047,6 +1062,7 @@ class OntobeeResolver(BaseResolver):
                 )
                 return self._build_plan(
                     url=url,
+                    http_config=config.defaults.http,
                     media_type=media_type,
                     service="ontobee",
                 )

@@ -136,6 +136,15 @@ hf_home: Optional HuggingFace cache directory to treat as the base path.</p>
 <p>Returns:
 Path: Absolute directory where DocsToKG models should be stored.</p>
 </section>
+<section id="init-hf-env-hf-home-model-root">
+<h3><code class="docutils literal notranslate"><span class="pre">init_hf_env(hf_home,</span> <span class="pre">model_root)</span></code><a class="headerlink" href="#init-hf-env-hf-home-model-root" title="Link to this heading"></a></h3>
+<p>Initialise Hugging Face and transformer cache environment variables.</p>
+<p>Args:
+hf_home: Optional explicit HF cache directory.
+model_root: Optional DocsToKG model root override.</p>
+<p>Returns:
+Tuple of <code class="docutils literal notranslate"><span class="pre">(hf_home,</span> <span class="pre">model_root)</span></code> paths after normalisation.</p>
+</section>
 <section id="detect-data-root-start">
 <h3><code class="docutils literal notranslate"><span class="pre">detect_data_root(start)</span></code><a class="headerlink" href="#detect-data-root-start" title="Link to this heading"></a></h3>
 <p>Locate the DocsToKG Data directory via env var or ancestor scan.</p>
@@ -305,6 +314,66 @@ chunks_root: Root directory containing chunk artefacts.
 vectors_root: Root directory where vector outputs should be written.</p>
 <p>Returns:
 Tuple containing the manifest <code class="docutils literal notranslate"><span class="pre">doc_id</span></code> and the full vectors output path.</p>
+</section>
+<section id="compute-relative-doc-id-path-root">
+<h3><code class="docutils literal notranslate"><span class="pre">compute_relative_doc_id(path,</span> <span class="pre">root)</span></code><a class="headerlink" href="#compute-relative-doc-id-path-root" title="Link to this heading"></a></h3>
+<p>Return POSIX-style relative identifier for a document path.</p>
+<p>Args:
+path: Absolute path to the document on disk.
+root: Root directory that anchors relative identifiers.</p>
+<p>Returns:
+str: POSIX-style relative path suitable for manifest IDs.</p>
+</section>
+<section id="should-skip-output-output-path-manifest-entry-input-hash-resume-force">
+<h3><code class="docutils literal notranslate"><span class="pre">should_skip_output(output_path,</span> <span class="pre">manifest_entry,</span> <span class="pre">input_hash,</span> <span class="pre">resume,</span> <span class="pre">force)</span></code><a class="headerlink" href="#should-skip-output-output-path-manifest-entry-input-hash-resume-force" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resume/skip conditions indicate work can be skipped.</p>
+</section>
+<section id="stringify-path-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_stringify_path(value)</span></code><a class="headerlink" href="#stringify-path-value" title="Link to this heading"></a></h3>
+<p>Return a string representation for path-like values used in manifests.</p>
+</section>
+<section id="manifest-log-skip">
+<h3><code class="docutils literal notranslate"><span class="pre">manifest_log_skip()</span></code><a class="headerlink" href="#manifest-log-skip" title="Link to this heading"></a></h3>
+<p>Record a manifest entry indicating the pipeline skipped work.</p>
+<p>Args:
+stage: Logical pipeline phase originating the log entry.
+doc_id: Identifier of the document being processed.
+input_path: Source artefact that would have been processed.
+input_hash: Content hash associated with <code class="docutils literal notranslate"><span class="pre">input_path</span></code>.
+output_path: Destination artefact that remained unchanged.
+duration_s: Elapsed seconds for the short-circuited step.
+schema_version: Manifest schema version for downstream readers.
+hash_alg: Hash algorithm used to compute <code class="docutils literal notranslate"><span class="pre">input_hash</span></code>.
+**extra: Additional metadata to merge into the manifest row.</p>
+</section>
+<section id="manifest-log-success">
+<h3><code class="docutils literal notranslate"><span class="pre">manifest_log_success()</span></code><a class="headerlink" href="#manifest-log-success" title="Link to this heading"></a></h3>
+<p>Record a manifest entry marking successful pipeline output.</p>
+<p>Args:
+stage: Logical pipeline phase originating the log entry.
+doc_id: Identifier of the document being processed.
+duration_s: Elapsed seconds for the successful step.
+schema_version: Manifest schema version for downstream readers.
+input_path: Source artefact that produced <code class="docutils literal notranslate"><span class="pre">output_path</span></code>.
+input_hash: Content hash associated with <code class="docutils literal notranslate"><span class="pre">input_path</span></code>.
+output_path: Destination artefact written by the pipeline.
+hash_alg: Hash algorithm used to compute <code class="docutils literal notranslate"><span class="pre">input_hash</span></code>.
+**extra: Additional metadata to merge into the manifest row.</p>
+</section>
+<section id="manifest-log-failure">
+<h3><code class="docutils literal notranslate"><span class="pre">manifest_log_failure()</span></code><a class="headerlink" href="#manifest-log-failure" title="Link to this heading"></a></h3>
+<p>Record a manifest entry describing a failed pipeline attempt.</p>
+<p>Args:
+stage: Logical pipeline phase originating the log entry.
+doc_id: Identifier of the document being processed.
+duration_s: Elapsed seconds before the failure occurred.
+schema_version: Manifest schema version for downstream readers.
+input_path: Source artefact that triggered the failure.
+input_hash: Content hash associated with <code class="docutils literal notranslate"><span class="pre">input_path</span></code>.
+output_path: Destination artefact that may be incomplete.
+error: Human-readable description of the failure condition.
+hash_alg: Hash algorithm used to compute <code class="docutils literal notranslate"><span class="pre">input_hash</span></code>.
+**extra: Additional metadata to merge into the manifest row.</p>
 </section>
 <section id="get-logger-name-level">
 <h3><code class="docutils literal notranslate"><span class="pre">get_logger(name,</span> <span class="pre">level)</span></code><a class="headerlink" href="#get-logger-name-level" title="Link to this heading"></a></h3>
@@ -601,6 +670,30 @@ JSON-formatted string containing canonical log fields and optional extras.</p>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="bm25stats">
+<h3><code class="docutils literal notranslate"><span class="pre">BM25Stats</span></code><a class="headerlink" href="#bm25stats" title="Link to this heading"></a></h3>
+<p>Corpus-level statistics required for BM25 weighting.</p>
+</section>
+<section id="spladecfg">
+<h3><code class="docutils literal notranslate"><span class="pre">SpladeCfg</span></code><a class="headerlink" href="#spladecfg" title="Link to this heading"></a></h3>
+<p>Runtime configuration for SPLADE sparse encoding.</p>
+</section>
+<section id="qwencfg">
+<h3><code class="docutils literal notranslate"><span class="pre">QwenCfg</span></code><a class="headerlink" href="#qwencfg" title="Link to this heading"></a></h3>
+<p>Configuration for generating dense embeddings with Qwen via vLLM.</p>
+</section>
+<section id="chunkworkerconfig">
+<h3><code class="docutils literal notranslate"><span class="pre">ChunkWorkerConfig</span></code><a class="headerlink" href="#chunkworkerconfig" title="Link to this heading"></a></h3>
+<p>Lightweight configuration shared across chunker worker processes.</p>
+</section>
+<section id="chunktask">
+<h3><code class="docutils literal notranslate"><span class="pre">ChunkTask</span></code><a class="headerlink" href="#chunktask" title="Link to this heading"></a></h3>
+<p>Work unit describing a single DocTags file to chunk.</p>
+</section>
+<section id="chunkresult">
+<h3><code class="docutils literal notranslate"><span class="pre">ChunkResult</span></code><a class="headerlink" href="#chunkresult" title="Link to this heading"></a></h3>
+<p>Result envelope emitted by chunker workers.</p>
+</section>
 <section id="batcher">
 <h3><code class="docutils literal notranslate"><span class="pre">Batcher</span></code><a class="headerlink" href="#batcher" title="Link to this heading"></a></h3>
 <p>Yield fixed-size batches from an iterable.</p>

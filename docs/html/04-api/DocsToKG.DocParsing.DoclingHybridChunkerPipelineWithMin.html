@@ -115,14 +115,21 @@ embedding stage.
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="compute-relative-doc-id-path-root">
-<h3><code class="docutils literal notranslate"><span class="pre">compute_relative_doc_id(path,</span> <span class="pre">root)</span></code><a class="headerlink" href="#compute-relative-doc-id-path-root" title="Link to this heading"></a></h3>
-<p>Return POSIX-style relative identifier for a document path.</p>
-<p>Args:
-path: Absolute path to the document on disk.
-root: Root directory that anchors relative identifiers.</p>
-<p>Returns:
-str: POSIX-style relative path suitable for manifest IDs.</p>
+<section id="dedupe-preserve-order-markers">
+<h3><code class="docutils literal notranslate"><span class="pre">_dedupe_preserve_order(markers)</span></code><a class="headerlink" href="#dedupe-preserve-order-markers" title="Link to this heading"></a></h3>
+<p>Return a tuple with duplicates removed while preserving original order.</p>
+</section>
+<section id="ensure-str-list-value-label">
+<h3><code class="docutils literal notranslate"><span class="pre">_ensure_str_list(value,</span> <span class="pre">label)</span></code><a class="headerlink" href="#ensure-str-list-value-label" title="Link to this heading"></a></h3>
+<p>Normalize configuration values into a list of non-empty strings.</p>
+</section>
+<section id="load-structural-marker-config-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_structural_marker_config(path)</span></code><a class="headerlink" href="#load-structural-marker-config-path" title="Link to this heading"></a></h3>
+<p>Load custom heading and caption markers from a YAML or JSON file.</p>
+</section>
+<section id="validate-chunk-files-files-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_chunk_files(files,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-chunk-files-files-logger" title="Link to this heading"></a></h3>
+<p>Validate chunk JSONL rows across supplied files.</p>
 </section>
 <section id="read-utf8-p">
 <h3><code class="docutils literal notranslate"><span class="pre">read_utf8(p)</span></code><a class="headerlink" href="#read-utf8-p" title="Link to this heading"></a></h3>
@@ -153,13 +160,15 @@ None</p>
 </section>
 <section id="summarize-image-metadata-chunk-text">
 <h3><code class="docutils literal notranslate"><span class="pre">summarize_image_metadata(chunk,</span> <span class="pre">text)</span></code><a class="headerlink" href="#summarize-image-metadata-chunk-text" title="Link to this heading"></a></h3>
-<p>Infer image annotation flags and counts from chunk metadata and text.</p>
-<p>Args:
-chunk: Chunk metadata object containing image annotations.
-text: Chunk text used to detect fallback caption cues.</p>
-<p>Returns:
-Tuple of <code class="docutils literal notranslate"><span class="pre">(has_caption,</span> <span class="pre">has_classification,</span> <span class="pre">num_images)</span></code> describing
-inferred image metadata.</p>
+<p>Infer image annotation flags, counts, and confidences from chunk metadata and text.</p>
+</section>
+<section id="chunk-worker-initializer-cfg">
+<h3><code class="docutils literal notranslate"><span class="pre">_chunk_worker_initializer(cfg)</span></code><a class="headerlink" href="#chunk-worker-initializer-cfg" title="Link to this heading"></a></h3>
+<p>Initialise worker-local tokenizer and chunker state for multiprocessing.</p>
+</section>
+<section id="process-chunk-task-task">
+<h3><code class="docutils literal notranslate"><span class="pre">_process_chunk_task(task)</span></code><a class="headerlink" href="#process-chunk-task-task" title="Link to this heading"></a></h3>
+<p>Chunk a single DocTags file inside a worker process.</p>
 </section>
 <section id="merge-rec-a-b-tokenizer">
 <h3><code class="docutils literal notranslate"><span class="pre">merge_rec(a,</span> <span class="pre">b,</span> <span class="pre">tokenizer)</span></code><a class="headerlink" href="#merge-rec-a-b-tokenizer" title="Link to this heading"></a></h3>
@@ -167,15 +176,19 @@ inferred image metadata.</p>
 <p>Args:
 a: First record to merge.
 b: Second record to merge.
-tokenizer: Tokenizer used to recompute token counts for combined text.</p>
+tokenizer: Tokenizer used to recompute token counts for combined text.
+recount: When <code class="docutils literal notranslate"><span class="pre">True</span></code> the merged text is re-tokenized; otherwise token
+counts are summed from inputs.</p>
 <p>Returns:
 New <code class="docutils literal notranslate"><span class="pre">Rec</span></code> instance containing fused text, token counts, and metadata.</p>
 </section>
-<section id="is-structural-boundary-rec">
-<h3><code class="docutils literal notranslate"><span class="pre">is_structural_boundary(rec)</span></code><a class="headerlink" href="#is-structural-boundary-rec" title="Link to this heading"></a></h3>
+<section id="is-structural-boundary-rec-heading-markers-caption-markers">
+<h3><code class="docutils literal notranslate"><span class="pre">is_structural_boundary(rec,</span> <span class="pre">heading_markers,</span> <span class="pre">caption_markers)</span></code><a class="headerlink" href="#is-structural-boundary-rec-heading-markers-caption-markers" title="Link to this heading"></a></h3>
 <p>Detect whether a chunk begins with a structural heading or caption marker.</p>
 <p>Args:
-rec: Chunk record to inspect.</p>
+rec: Chunk record to inspect.
+heading_markers: Optional prefixes treated as section headings.
+caption_markers: Optional prefixes treated as caption markers.</p>
 <p>Returns:
 <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">rec.text</span></code> starts with a heading indicator (<code class="docutils literal notranslate"><span class="pre">#</span></code>) or a
 recognised caption prefix, otherwise <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
@@ -191,14 +204,17 @@ False</p>
 </div></blockquote>
 </div></blockquote>
 </section>
-<section id="coalesce-small-runs-records-tokenizer-min-tokens-max-tokens">
-<h3><code class="docutils literal notranslate"><span class="pre">coalesce_small_runs(records,</span> <span class="pre">tokenizer,</span> <span class="pre">min_tokens,</span> <span class="pre">max_tokens)</span></code><a class="headerlink" href="#coalesce-small-runs-records-tokenizer-min-tokens-max-tokens" title="Link to this heading"></a></h3>
+<section id="coalesce-small-runs-records-tokenizer-min-tokens-max-tokens-soft-barrier-margin-heading-markers-caption-markers">
+<h3><code class="docutils literal notranslate"><span class="pre">coalesce_small_runs(records,</span> <span class="pre">tokenizer,</span> <span class="pre">min_tokens,</span> <span class="pre">max_tokens,</span> <span class="pre">soft_barrier_margin,</span> <span class="pre">heading_markers,</span> <span class="pre">caption_markers)</span></code><a class="headerlink" href="#coalesce-small-runs-records-tokenizer-min-tokens-max-tokens-soft-barrier-margin-heading-markers-caption-markers" title="Link to this heading"></a></h3>
 <p>Merge contiguous short chunks until they satisfy minimum token thresholds.</p>
 <p>Args:
 records: Ordered list of chunk records to normalize.
 tokenizer: Tokenizer used to recompute token counts for merged chunks.
 min_tokens: Target minimum tokens per chunk after coalescing.
-max_tokens: Hard ceiling to avoid producing overly large chunks.</p>
+max_tokens: Hard ceiling to avoid producing overly large chunks.
+soft_barrier_margin: Margin applied when respecting structural boundaries.
+heading_markers: Optional heading prefixes treated as structural boundaries.
+caption_markers: Optional caption prefixes treated as structural boundaries.</p>
 <p>Returns:
 New list of records where small runs are merged while preserving order.</p>
 <p>Note:
@@ -240,6 +256,10 @@ testing or orchestration.</p>
 <p>Returns:
 int: Exit code where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
 </section>
+<section id="maybe-add-conf-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_maybe_add_conf(value)</span></code><a class="headerlink" href="#maybe-add-conf-value" title="Link to this heading"></a></h3>
+<p>Collect numeric confidence scores from metadata sources.</p>
+</section>
 <section id="is-small-idx">
 <h3><code class="docutils literal notranslate"><span class="pre">is_small(idx)</span></code><a class="headerlink" href="#is-small-idx" title="Link to this heading"></a></h3>
 <p>Return True when the chunk at <code class="docutils literal notranslate"><span class="pre">idx</span></code> is below the minimum token threshold.</p>
@@ -247,6 +267,12 @@ int: Exit code where <code class="docutils literal notranslate"><span class="pre
 idx: Index of the chunk under evaluation.</p>
 <p>Returns:
 True if the chunk length is less than <code class="docutils literal notranslate"><span class="pre">min_tokens</span></code>, else False.</p>
+</section>
+<section id="handle-result-result">
+<h3><code class="docutils literal notranslate"><span class="pre">handle_result(result)</span></code><a class="headerlink" href="#handle-result-result" title="Link to this heading"></a></h3>
+<p>Persist manifest information and raise on worker failure.</p>
+<p>Args:
+result: Structured outcome emitted by the chunking worker.</p>
 </section>
 </section>
 <section id="classes">

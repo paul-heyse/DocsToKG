@@ -98,10 +98,10 @@ Args:
 rows: Chunk dictionaries that should include a `uuid` key.
 
 Returns:
-True when at least one UUID was newly assigned; otherwise False. Missing IDs are
-derived from the document ID, ``source_chunk_idxs`` sequence, and the first 16 hex
-characters of the SHA-1 digest of ``text``. A random UUID4 is used only if the
-deterministic derivation cannot be computed.
+True when at least one UUID was newly assigned; otherwise False. UUIDs are
+derived from a namespace, doc ID, source chunk indices, and the first 16 hex
+characters of the chunk text SHA-1 digest. If deterministic generation fails,
+a UUID4 is assigned as a fallback.
 
 ### `ensure_chunk_schema(rows, source)`
 
@@ -283,16 +283,10 @@ ValueError: If vector lengths are inconsistent or fail validation.
 
 ### `_validate_vectors_for_chunks(chunks_dir, vectors_dir, logger)`
 
-Validate vectors for chunk documents without recomputing embeddings.
-
-Args:
-chunks_dir: Directory containing chunk JSONL artefacts.
-vectors_dir: Directory holding vector outputs.
-logger: Structured logger used for progress reporting.
+Validate vectors associated with chunk files without recomputing models.
 
 Returns:
-Tuple ``(files_checked, rows_validated)`` describing validation progress.
-Raises ``FileNotFoundError`` when an expected vectors file is missing.
+(files_checked, rows_validated)
 
 ### `build_parser()`
 
@@ -382,20 +376,6 @@ None
 
 ## 3. Classes
 
-### `BM25Stats`
-
-Corpus-wide statistics required for BM25 weighting.
-
-Attributes:
-N: Total number of documents (chunks) in the corpus.
-avgdl: Average document length in tokens.
-df: Document frequency per token.
-
-Examples:
->>> stats = BM25Stats(N=100, avgdl=120.5, df={"hybrid": 5})
->>> stats.df["hybrid"]
-5
-
 ### `BM25StatsAccumulator`
 
 Streaming accumulator for BM25 corpus statistics.
@@ -411,23 +391,6 @@ Examples:
 >>> acc.N
 1
 
-### `SpladeCfg`
-
-Runtime configuration for SPLADE sparse encoding.
-
-Attributes:
-model_dir: Path to the SPLADE model directory.
-device: Torch device identifier to run inference on.
-batch_size: Number of texts encoded per batch.
-cache_folder: Directory where transformer weights are cached.
-max_active_dims: Optional cap on active sparse dimensions.
-attn_impl: Preferred attention implementation override.
-
-Examples:
->>> cfg = SpladeCfg(batch_size=8, device="cuda:1")
->>> cfg.batch_size
-8
-
 ### `SPLADEValidator`
 
 Track SPLADE sparsity metrics across the corpus.
@@ -441,20 +404,3 @@ Examples:
 >>> validator = SPLADEValidator()
 >>> validator.total_chunks
 0
-
-### `QwenCfg`
-
-Configuration for generating dense embeddings with Qwen via vLLM.
-
-Attributes:
-model_dir: Path to the local Qwen model.
-dtype: Torch dtype used during inference.
-tp: Tensor parallelism degree.
-gpu_mem_util: Target GPU memory utilization for vLLM.
-batch_size: Number of texts processed per embedding batch.
-quantization: Optional quantization mode (e.g., `awq`).
-
-Examples:
->>> cfg = QwenCfg(batch_size=64, tp=2)
->>> cfg.tp
-2

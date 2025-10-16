@@ -734,6 +734,8 @@ def should_skip_output(
 
 
 def _stringify_path(value: Path | str | None) -> str | None:
+    """Return a string representation for path-like values used in manifests."""
+
     if value is None:
         return None
     return str(value)

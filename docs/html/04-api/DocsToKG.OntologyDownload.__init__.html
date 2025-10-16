@@ -81,34 +81,11 @@
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.__init__</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Lazy public facade for the DocsToKG ontology downloader.</p>
-</section>
-<section id="functions">
-<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="load-core">
-<h3><code class="docutils literal notranslate"><span class="pre">_load_core()</span></code><a class="headerlink" href="#load-core" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="getattr-name">
-<h3><code class="docutils literal notranslate"><span class="pre">__getattr__(name)</span></code><a class="headerlink" href="#getattr-name" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="dir">
-<h3><code class="docutils literal notranslate"><span class="pre">__dir__()</span></code><a class="headerlink" href="#dir" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="warn-deprecated-feature">
-<h3><code class="docutils literal notranslate"><span class="pre">_warn_deprecated(feature)</span></code><a class="headerlink" href="#warn-deprecated-feature" title="Link to this heading"></a></h3>
-<p>Emit a deprecation warning once when opt-in flag is enabled.</p>
-</section>
-<section id="list-plugins-kind">
-<h3><code class="docutils literal notranslate"><span class="pre">list_plugins(kind)</span></code><a class="headerlink" href="#list-plugins-kind" title="Link to this heading"></a></h3>
-<p>Return a mapping of registered plugin entry points and their versions.</p>
-</section>
-<section id="about">
-<h3><code class="docutils literal notranslate"><span class="pre">about()</span></code><a class="headerlink" href="#about" title="Link to this heading"></a></h3>
-<p>Return metadata about the ontology downloader environment.</p>
-</section>
+<p>Public API for the DocsToKG ontology downloader and resolver pipeline.</p>
+<p>This facade exposes the primary fetch utilities used by external callers to
+plan resolver fallback chains, download ontologies with hardened validation,
+perform stream normalization, and emit schema-compliant manifests with
+deterministic fingerprints.</p>
 </section>
 </section>
 

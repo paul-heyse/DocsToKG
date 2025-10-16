@@ -62,6 +62,10 @@ RequestValidationError: If ``request`` fails validation checks.
 
 *No documentation available.*
 
+### `_dense_store(self, namespace)`
+
+*No documentation available.*
+
 ### `_slice_from_cursor(self, results, cursor)`
 
 *No documentation available.*
@@ -78,7 +82,7 @@ RequestValidationError: If ``request`` fails validation checks.
 
 *No documentation available.*
 
-### `_execute_dense(self, request, filters, config, query_features, timings)`
+### `_execute_dense(self, request, filters, config, query_features, timings, store)`
 
 *No documentation available.*
 
@@ -142,7 +146,8 @@ Execute BM25, SPLADE, and dense retrieval with fusion.
 Attributes:
 _config_manager: Source of runtime hybrid-search configuration.
 _feature_generator: Component producing BM25/SPLADE/dense features.
-_faiss: GPU-backed FAISS index manager for dense retrieval.
+_faiss: Default FAISS index used for namespaces routed to the shared store.
+_faiss_router: Namespace-aware router managing FAISS stores.
 _opensearch: Lexical index used for BM25 and SPLADE lookups.
 _registry: Chunk registry providing metadata and FAISS id lookups.
 _observability: Telemetry facade for metrics and traces.
@@ -151,7 +156,7 @@ Examples:
 >>> # File-backed config manager (JSON/YAML on disk)
 >>> from pathlib import Path  # doctest: +SKIP
 >>> manager = HybridSearchConfigManager(Path("config.json"))  # doctest: +SKIP
->>> from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator  # doctest: +SKIP
+>>> from DocsToKG.HybridSearch.storage import OpenSearchSimulator  # doctest: +SKIP
 >>> service = HybridSearchService(  # doctest: +SKIP
 ...     config_manager=manager,
 ...     feature_generator=FeatureGenerator(embedding_dim=16),

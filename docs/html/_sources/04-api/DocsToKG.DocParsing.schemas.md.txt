@@ -322,6 +322,7 @@ docling_version: Installed Docling package version string.
 has_image_captions: Flag indicating whether caption text accompanies the chunk.
 has_image_classification: Flag indicating whether image classification labels exist.
 num_images: Count of images referenced by the chunk.
+image_confidence: Optional confidence score associated with image annotations.
 
 Examples:
 >>> ProvenanceMetadata(parse_engine="docling-html", docling_version="1.2.3")
@@ -346,6 +347,7 @@ uuid: Optional stable identifier for the chunk.
 has_image_captions: Optional duplicate of provenance flag for convenience.
 has_image_classification: Optional duplicate of provenance flag for convenience.
 num_images: Optional duplicate of provenance image count for convenience.
+image_confidence: Optional duplicate of provenance image confidence for convenience.
 
 Examples:
 >>> chunk = ChunkRow(

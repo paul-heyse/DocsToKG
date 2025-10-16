@@ -1,3 +1,5 @@
+"""Namespace router utilities for hybrid search vector stores."""
+
 from __future__ import annotations
 
 from threading import RLock

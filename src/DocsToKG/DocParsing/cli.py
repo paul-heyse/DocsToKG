@@ -52,6 +52,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "run-all",
+#       "name": "_run_all",
+#       "anchor": "function-run-all",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "command",
 #       "name": "_Command",
 #       "anchor": "class-command",
@@ -61,6 +67,12 @@
 #       "id": "main",
 #       "name": "main",
 #       "anchor": "function-main",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-all",
+#       "name": "run_all",
+#       "anchor": "function-run-all",
 #       "kind": "function"
 #     },
 #     {
@@ -94,6 +106,7 @@ point with subcommands. Invoke it with:
     python -m DocsToKG.DocParsing.cli <command> [options...]
 
 Available commands:
+    - all:       Convert HTML/PDF, chunk, and embed sequentially.
     - chunk:     Run the Docling hybrid chunker.
     - embed:     Generate BM25, SPLADE, and dense vectors for chunks.
     - doctags:   Convert HTML/PDF corpora into DocTags.
@@ -114,16 +127,6 @@ from DocsToKG.DocParsing._common import (
     detect_data_root,
     get_logger,
 )
-from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
-    build_parser as chunk_build_parser,
-)
-from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
-    main as chunk_pipeline_main,
-)
-from DocsToKG.DocParsing.EmbeddingV2 import build_parser as embed_build_parser
-from DocsToKG.DocParsing.EmbeddingV2 import main as embed_pipeline_main
-
-
 # --- Globals ---
 
 CommandHandler = Callable[[Sequence[str]], int]
@@ -132,12 +135,13 @@ CLI_DESCRIPTION = """\
 Unified DocParsing CLI
 
 Examples:
+  python -m DocsToKG.DocParsing.cli all --resume
   python -m DocsToKG.DocParsing.cli chunk --data-root Data
   python -m DocsToKG.DocParsing.cli embed --resume
   python -m DocsToKG.DocParsing.cli doctags --mode pdf --workers 2
 """
 
-__all__ = ["main", "chunk", "embed", "doctags"]
+__all__ = ["main", "run_all", "chunk", "embed", "doctags"]
 
 
 # --- Chunk Command ---
@@ -151,6 +155,13 @@ def _run_chunk(argv: Sequence[str]) -> int:
     Returns:
         Process exit code produced by the Docling chunker pipeline.
     """
+    from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
+        build_parser as chunk_build_parser,
+    )
+    from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
+        main as chunk_pipeline_main,
+    )
+
     parser = chunk_build_parser()
     parser.prog = "docparse chunk"
     args = parser.parse_args(argv)
@@ -168,6 +179,9 @@ def _run_embed(argv: Sequence[str]) -> int:
     Returns:
         Process exit code produced by the embedding pipeline.
     """
+    from DocsToKG.DocParsing.EmbeddingV2 import build_parser as embed_build_parser
+    from DocsToKG.DocParsing.EmbeddingV2 import main as embed_pipeline_main
+
     parser = embed_build_parser()
     parser.prog = "docparse embed"
     args = parser.parse_args(argv)
@@ -190,6 +204,8 @@ def _build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPa
   docparse doctags --mode pdf --workers 4
   docparse doctags --mode html --overwrite
 """
+    argv = [] if argv is None else list(argv)
+
     parser = argparse.ArgumentParser(
         prog=prog,
         description="Convert HTML or PDF corpora to DocTags using Docling",
@@ -433,6 +449,200 @@ def _run_doctags(argv: Sequence[str]) -> int:
     return pipeline_backend.pdf_main(pdf_args)
 
 
+# --- All-In-One Command ---
+
+def _run_all(argv: Sequence[str]) -> int:
+    """Execute DocTags conversion, chunking, and embedding sequentially.
+
+    Args:
+        argv: Argument vector supplied by the CLI dispatcher.
+
+    Returns:
+        Exit code from the final stage executed. Non-zero codes surface immediately.
+    """
+
+    parser = argparse.ArgumentParser(
+        prog="docparse all",
+        description="Run doctags → chunk → embed sequentially while preserving manifests.",
+    )
+    pipeline_backend.add_data_root_option(parser)
+    pipeline_backend.add_resume_force_options(
+        parser,
+        resume_help="Apply resume semantics to every stage",
+        force_help="Force reprocessing at every stage even if outputs exist",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["auto", "html", "pdf"],
+        default="auto",
+        help="DocTags conversion mode override passed to the doctags stage",
+    )
+    parser.add_argument(
+        "--doctags-in-dir",
+        type=Path,
+        default=None,
+        help="Input directory override for the doctags stage",
+    )
+    parser.add_argument(
+        "--doctags-out-dir",
+        type=Path,
+        default=None,
+        help="Output directory override for generated DocTags files",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Permit overwriting existing DocTags files when running in HTML mode",
+    )
+    parser.add_argument(
+        "--chunk-out-dir",
+        type=Path,
+        default=None,
+        help="Output directory override for chunk JSONL files",
+    )
+    parser.add_argument(
+        "--chunk-workers",
+        type=int,
+        default=None,
+        help="Worker processes for the chunk stage",
+    )
+    parser.add_argument(
+        "--chunk-min-tokens",
+        type=int,
+        default=None,
+        help="Minimum tokens per chunk passed to the chunk stage",
+    )
+    parser.add_argument(
+        "--chunk-max-tokens",
+        type=int,
+        default=None,
+        help="Maximum tokens per chunk passed to the chunk stage",
+    )
+    parser.add_argument(
+        "--structural-markers",
+        type=Path,
+        default=None,
+        help="Structural marker configuration forwarded to the chunk stage",
+    )
+    parser.add_argument(
+        "--embed-out-dir",
+        type=Path,
+        default=None,
+        help="Output directory override for embedding JSONL files",
+    )
+    parser.add_argument(
+        "--embed-offline",
+        action="store_true",
+        help="Run the embedding stage with TRANSFORMERS_OFFLINE=1",
+    )
+    parser.add_argument(
+        "--embed-validate-only",
+        action="store_true",
+        help="Skip embedding generation and only validate existing vectors",
+    )
+    parser.add_argument(
+        "--splade-zero-pct-warn-threshold",
+        type=float,
+        default=None,
+        help="Override SPLADE sparsity warning threshold for the embed stage",
+    )
+
+    args = parser.parse_args(argv)
+    logger = get_logger(__name__)
+
+    extra = {
+        "resume": bool(args.resume),
+        "force": bool(args.force),
+        "mode": args.mode,
+    }
+    if args.data_root:
+        extra["data_root"] = str(args.data_root)
+    logger.info("docparse all starting", extra={"extra_fields": extra})
+
+    doctags_args: List[str] = []
+    if args.data_root:
+        doctags_args.extend(["--data-root", str(args.data_root)])
+    if args.resume:
+        doctags_args.append("--resume")
+    if args.force:
+        doctags_args.append("--force")
+    if args.mode != "auto":
+        doctags_args.extend(["--mode", args.mode])
+    if args.doctags_in_dir:
+        doctags_args.extend(["--in-dir", str(args.doctags_in_dir)])
+    if args.doctags_out_dir:
+        doctags_args.extend(["--out-dir", str(args.doctags_out_dir)])
+    if args.overwrite:
+        doctags_args.append("--overwrite")
+
+    exit_code = _run_doctags(doctags_args)
+    if exit_code != 0:
+        logger.error(
+            "DocTags stage failed",
+            extra={"extra_fields": {"exit_code": exit_code}},
+        )
+        return exit_code
+
+    chunk_args: List[str] = []
+    if args.data_root:
+        chunk_args.extend(["--data-root", str(args.data_root)])
+    if args.resume:
+        chunk_args.append("--resume")
+    if args.force:
+        chunk_args.append("--force")
+    if args.doctags_out_dir:
+        chunk_args.extend(["--in-dir", str(args.doctags_out_dir)])
+    if args.chunk_out_dir:
+        chunk_args.extend(["--out-dir", str(args.chunk_out_dir)])
+    if args.chunk_workers:
+        chunk_args.extend(["--workers", str(args.chunk_workers)])
+    if args.chunk_min_tokens:
+        chunk_args.extend(["--min-tokens", str(args.chunk_min_tokens)])
+    if args.chunk_max_tokens:
+        chunk_args.extend(["--max-tokens", str(args.chunk_max_tokens)])
+    if args.structural_markers:
+        chunk_args.extend(["--structural-markers", str(args.structural_markers)])
+
+    exit_code = _run_chunk(chunk_args)
+    if exit_code != 0:
+        logger.error(
+            "Chunk stage failed",
+            extra={"extra_fields": {"exit_code": exit_code}},
+        )
+        return exit_code
+
+    embed_args: List[str] = []
+    if args.data_root:
+        embed_args.extend(["--data-root", str(args.data_root)])
+    if args.resume:
+        embed_args.append("--resume")
+    if args.force:
+        embed_args.append("--force")
+    if args.chunk_out_dir:
+        embed_args.extend(["--chunks-dir", str(args.chunk_out_dir)])
+    if args.embed_out_dir:
+        embed_args.extend(["--out-dir", str(args.embed_out_dir)])
+    if args.embed_offline:
+        embed_args.append("--offline")
+    if args.embed_validate_only:
+        embed_args.append("--validate-only")
+    if args.splade_zero_pct_warn_threshold is not None:
+        embed_args.extend(
+            ["--splade-zero-pct-warn-threshold", str(args.splade_zero_pct_warn_threshold)]
+        )
+
+    exit_code = _run_embed(embed_args)
+    if exit_code != 0:
+        logger.error(
+            "Embedding stage failed",
+            extra={"extra_fields": {"exit_code": exit_code}},
+        )
+        return exit_code
+
+    logger.info("docparse all completed", extra={"extra_fields": {"status": "success"}})
+    return 0
+
+
 # --- Dispatcher ---
 
 class _Command:
@@ -465,6 +675,7 @@ class _Command:
 
 
 COMMANDS: Dict[str, _Command] = {
+    "all": _Command(_run_all, "Run doctags → chunk → embed sequentially"),
     "chunk": _Command(_run_chunk, "Run the Docling hybrid chunker"),
     "embed": _Command(_run_embed, "Generate BM25/SPLADE/dense vectors"),
     "doctags": _Command(_run_doctags, "Convert HTML/PDF corpora into DocTags"),
@@ -499,6 +710,19 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     command = COMMANDS[parsed.command]
     return command.handler(command_args)
+
+
+def run_all(argv: Sequence[str] | None = None) -> int:
+    """Programmatic helper mirroring ``docparse all``.
+
+    Args:
+        argv: Optional argument vector supplied for orchestration.
+
+    Returns:
+        Process exit code returned by the pipeline orchestrator.
+    """
+
+    return _run_all([] if argv is None else list(argv))
 
 
 def chunk(argv: Sequence[str] | None = None) -> int:

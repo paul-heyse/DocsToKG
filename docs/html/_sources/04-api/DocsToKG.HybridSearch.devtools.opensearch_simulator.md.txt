@@ -253,7 +253,7 @@ None
 
 ### `bm25_score(stored)`
 
-*No documentation available.*
+Compute BM25 score for ``stored`` using cached statistics.
 
 ## 3. Classes
 

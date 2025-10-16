@@ -164,6 +164,10 @@ Mapping containing statistics relevant to the implementation.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">device(self)</span></code><a class="headerlink" href="#device-self" title="Link to this heading"></a></h3>
 <p>Return the CUDA device identifier used by the index.</p>
 </section>
+<section id="config-self">
+<h3><code class="docutils literal notranslate"><span class="pre">config(self)</span></code><a class="headerlink" href="#config-self" title="Link to this heading"></a></h3>
+<p>Immutable configuration backing the dense store.</p>
+</section>
 <section id="gpu-resources-self">
 <h3><code class="docutils literal notranslate"><span class="pre">gpu_resources(self)</span></code><a class="headerlink" href="#gpu-resources-self" title="Link to this heading"></a></h3>
 <p>Return GPU resources when available, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
@@ -172,6 +176,10 @@ Mapping containing statistics relevant to the implementation.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">add(self,</span> <span class="pre">vectors,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#add-self-vectors-vector-ids" title="Link to this heading"></a></h3>
 <p>Insert dense vectors.</p>
 </section>
+<section id="add-batch-self-vectors-vector-ids">
+<h3><code class="docutils literal notranslate"><span class="pre">add_batch(self,</span> <span class="pre">vectors,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#add-batch-self-vectors-vector-ids" title="Link to this heading"></a></h3>
+<p>Insert vectors in batches; defaults mirror FAISS GPU-friendly chunking.</p>
+</section>
 <section id="remove-self-vector-ids">
 <h3><code class="docutils literal notranslate"><span class="pre">remove(self,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#remove-self-vector-ids" title="Link to this heading"></a></h3>
 <p>Delete dense vectors referenced by <code class="docutils literal notranslate"><span class="pre">vector_ids</span></code>.</p>
@@ -179,6 +187,14 @@ Mapping containing statistics relevant to the implementation.</p>
 <section id="search-self-query-top-k">
 <h3><code class="docutils literal notranslate"><span class="pre">search(self,</span> <span class="pre">query,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#search-self-query-top-k" title="Link to this heading"></a></h3>
 <p>Search for nearest neighbours of <code class="docutils literal notranslate"><span class="pre">query</span></code>.</p>
+</section>
+<section id="search-many-self-queries-top-k">
+<h3><code class="docutils literal notranslate"><span class="pre">search_many(self,</span> <span class="pre">queries,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#search-many-self-queries-top-k" title="Link to this heading"></a></h3>
+<p>Search for nearest neighbours of multiple queries.</p>
+</section>
+<section id="search-batch-self-queries-top-k">
+<h3><code class="docutils literal notranslate"><span class="pre">search_batch(self,</span> <span class="pre">queries,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#search-batch-self-queries-top-k" title="Link to this heading"></a></h3>
+<p>Optional alias for batched search.</p>
 </section>
 <section id="serialize-self">
 <h3><code class="docutils literal notranslate"><span class="pre">serialize(self)</span></code><a class="headerlink" href="#serialize-self" title="Link to this heading"></a></h3>
@@ -191,6 +207,22 @@ Mapping containing statistics relevant to the implementation.</p>
 <section id="id1">
 <h3><code class="docutils literal notranslate"><span class="pre">stats(self)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
 <p>Return implementation-defined statistics.</p>
+</section>
+<section id="rebuild-if-needed-self">
+<h3><code class="docutils literal notranslate"><span class="pre">rebuild_if_needed(self)</span></code><a class="headerlink" href="#rebuild-if-needed-self" title="Link to this heading"></a></h3>
+<p>Perform compaction when the store indicates a rebuild is required.</p>
+</section>
+<section id="needs-training-self">
+<h3><code class="docutils literal notranslate"><span class="pre">needs_training(self)</span></code><a class="headerlink" href="#needs-training-self" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when additional training is required.</p>
+</section>
+<section id="train-self-vectors">
+<h3><code class="docutils literal notranslate"><span class="pre">train(self,</span> <span class="pre">vectors)</span></code><a class="headerlink" href="#train-self-vectors" title="Link to this heading"></a></h3>
+<p>Train the index with representative vectors.</p>
+</section>
+<section id="set-id-resolver-self-resolver">
+<h3><code class="docutils literal notranslate"><span class="pre">set_id_resolver(self,</span> <span class="pre">resolver)</span></code><a class="headerlink" href="#set-id-resolver-self-resolver" title="Link to this heading"></a></h3>
+<p>Register a resolver translating FAISS integer IDs to external IDs.</p>
 </section>
 </section>
 <section id="classes">
@@ -206,7 +238,7 @@ None</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator
+<div><p>from DocsToKG.HybridSearch.storage import OpenSearchSimulator
 simulator: LexicalIndex = OpenSearchSimulator()
 simulator.bulk_upsert([])  # doctest: +SKIP</p>
 </div></blockquote>

@@ -79,10 +79,10 @@ from __future__ import annotations
 
 import base64
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING, Callable, List, Optional, Sequence
+from typing import TYPE_CHECKING, Callable, List, Mapping, Optional, Sequence
 
 import numpy as np
 
@@ -369,15 +369,19 @@ class FaissVectorStore(DenseVectorStore):
         count = len(vector_ids)
         with self._observability.trace("faiss_add", count=str(count)):
             self._observability.metrics.increment("faiss_add_vectors", amount=float(count))
+            if len(vectors) != len(vector_ids):
+                raise ValueError("vectors and vector_ids must align")
+            if not vectors:
+                return
+            faiss_ids = np.asarray(
+                [vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64
+            )
+            matrix = np.ascontiguousarray(
+                np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
+            )
+            faiss.normalize_L2(matrix)
             with self._lock:
                 self._flush_pending_deletes(force=False)
-                if len(vectors) != len(vector_ids):
-                    raise ValueError("vectors and vector_ids must align")
-                if not vectors:
-                    return
-                faiss_ids = np.array(
-                    [vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64
-                )
                 if self._supports_remove_ids is None:
                     self._supports_remove_ids = self._probe_remove_support()
                 if self._supports_remove_ids:
@@ -386,10 +390,6 @@ class FaissVectorStore(DenseVectorStore):
                     existing_ids = self._lookup_existing_ids(faiss_ids)
                     if existing_ids.size:
                         self.remove_ids(existing_ids, force_flush=True)
-                matrix = np.ascontiguousarray(
-                    np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
-                )
-                faiss.normalize_L2(matrix)
                 base = self._index.index if hasattr(self._index, "index") else self._index
                 train_target = base
                 if hasattr(faiss, "downcast_index"):
@@ -620,11 +620,17 @@ class FaissVectorStore(DenseVectorStore):
             manager._observability.metrics.increment("faiss_load_calls", amount=1.0)
         return manager
 
-    def restore(self, payload: bytes) -> None:
+    def restore(
+        self,
+        payload: bytes,
+        *,
+        meta: Optional[Mapping[str, object]] = None,
+    ) -> None:
         """Load an index from ``payload`` and promote it to the GPU.
 
         Args:
             payload: Bytes produced by :meth:`serialize`.
+            meta: Optional snapshot metadata for validation.
 
         Raises:
             ValueError: If the payload is empty.
@@ -635,6 +641,8 @@ class FaissVectorStore(DenseVectorStore):
         with self._observability.trace("faiss_restore"):
             if not payload:
                 raise ValueError("Empty FAISS payload")
+            if meta:
+                self._validate_snapshot_meta(meta)
             with self._lock:
                 cpu_index = faiss.deserialize_index(np.frombuffer(payload, dtype=np.uint8))
                 self._index = self._maybe_to_gpu(cpu_index)
@@ -643,6 +651,36 @@ class FaissVectorStore(DenseVectorStore):
                 self._needs_rebuild = False
                 self._set_nprobe()
             self._observability.metrics.increment("faiss_restore_calls", amount=1.0)
+
+    def set_nprobe(
+        self,
+        nprobe: int,
+        *,
+        clamp_min: int = 1,
+        clamp_max: Optional[int] = None,
+    ) -> int:
+        """Update the active ``nprobe`` value and propagate it to the index."""
+
+        if clamp_min <= 0:
+            raise ValueError("clamp_min must be positive")
+        target = max(clamp_min, int(nprobe))
+        if clamp_max is not None:
+            if clamp_max < clamp_min:
+                raise ValueError("clamp_max must be >= clamp_min")
+            target = min(target, int(clamp_max))
+        current = int(getattr(self._config, "nprobe", target))
+        if target == current:
+            return target
+        logger.info(
+            "faiss-nprobe-update",
+            extra={"event": {"previous": current, "current": target, "index": self._config.index_type}},
+        )
+        self._config = replace(self._config, nprobe=target)
+        with self._observability.trace("faiss_set_nprobe", nprobe=str(target)):
+            with self._lock:
+                self._set_nprobe()
+        self._observability.metrics.set_gauge("faiss_nprobe", float(target))
+        return target
 
     def stats(self) -> dict[str, float | str]:
         """Return diagnostic metrics describing the active FAISS index.
@@ -690,6 +728,23 @@ class FaissVectorStore(DenseVectorStore):
         except Exception:  # pragma: no cover - diagnostic only
             logger.debug("Unable to gather complete FAISS stats", exc_info=True)
         return stats
+
+    def snapshot_meta(self) -> dict[str, object]:
+        """Return metadata describing the configuration backing the index."""
+
+        return {
+            "dim": int(self._dim),
+            "index_type": str(self._config.index_type),
+            "nlist": int(getattr(self._config, "nlist", 0)),
+            "pq_m": int(getattr(self._config, "pq_m", 0)),
+            "pq_bits": int(getattr(self._config, "pq_bits", 0)),
+            "nprobe": int(getattr(self._config, "nprobe", 0)),
+            "gpu_indices_32_bit": bool(self._indices_32_bit and not self._force_64bit_ids),
+            "force_64bit_ids": bool(self._force_64bit_ids),
+            "flat_use_fp16": bool(getattr(self._config, "flat_use_fp16", False)),
+            "multi_gpu_mode": str(self._multi_gpu_mode),
+            "device": int(getattr(self._config, "device", 0)),
+        }
 
     def rebuild_needed(self) -> bool:
         """Return ``True`` when tombstones require a full FAISS rebuild.
@@ -1085,6 +1140,29 @@ class FaissVectorStore(DenseVectorStore):
             raise ValueError(f"vector dimension mismatch: expected {self._dim}, got {arr.size}")
         return arr
 
+    def _validate_snapshot_meta(self, meta: Mapping[str, object]) -> None:
+        expected = self.snapshot_meta()
+        mismatches: dict[str, tuple[object, object]] = {}
+        for key, expected_value in expected.items():
+            if key not in meta:
+                continue
+            raw_value = meta[key]
+            try:
+                if isinstance(expected_value, bool):
+                    actual_value = bool(raw_value)
+                elif isinstance(expected_value, int) and not isinstance(expected_value, bool):
+                    actual_value = int(raw_value)
+                elif isinstance(expected_value, float):
+                    actual_value = float(raw_value)
+                else:
+                    actual_value = str(raw_value)
+            except Exception:
+                actual_value = raw_value
+            if actual_value != expected_value:
+                mismatches[key] = (expected_value, actual_value)
+        if mismatches:
+            raise RuntimeError(f"FAISS snapshot meta mismatch: {mismatches}")
+
     def _detect_device(self, index: "faiss.Index") -> Optional[int]:
         try:
             if hasattr(index, "getDevice"):
@@ -1349,13 +1427,14 @@ def serialize_state(faiss_index: FaissVectorStore, registry: "ChunkRegistry") ->
         registry: Chunk registry providing vector identifier mappings.
 
     Returns:
-        dict[str, object]: Dictionary containing base64-encoded FAISS bytes and registry ids.
+        dict[str, object]: Dictionary containing FAISS bytes, registry ids, and snapshot metadata.
     """
     faiss_bytes = faiss_index.serialize()
     encoded = base64.b64encode(faiss_bytes).decode("ascii")
     return {
         "faiss": encoded,
         "vector_ids": registry.vector_ids(),
+        "meta": faiss_index.snapshot_meta(),
     }
 
 
@@ -1375,7 +1454,13 @@ def restore_state(faiss_index: FaissVectorStore, payload: dict[str, object]) -> 
     encoded = payload.get("faiss")
     if not isinstance(encoded, str):
         raise ValueError("Missing FAISS payload")
-    faiss_index.restore(base64.b64decode(encoded.encode("ascii")))
+    meta = payload.get("meta")
+    meta_mapping: Optional[Mapping[str, object]]
+    if isinstance(meta, Mapping):
+        meta_mapping = dict(meta)
+    else:
+        meta_mapping = None
+    faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=meta_mapping)
 
 
 # Backwards compatibility alias for downstream imports.
@@ -1448,6 +1533,17 @@ class ManagedFaissAdapter(DenseVectorStore):
             batch_size: Chunk size forwarded to the underlying store.
         """
         self._inner.add_batch(vectors, vector_ids, batch_size=batch_size)
+
+    def set_nprobe(
+        self,
+        nprobe: int,
+        *,
+        clamp_min: int = 1,
+        clamp_max: Optional[int] = None,
+    ) -> int:
+        """Tune ``nprobe`` while clamping to a safe range."""
+
+        return self._inner.set_nprobe(nprobe, clamp_min=clamp_min, clamp_max=clamp_max)
 
     def remove(self, vector_ids: Sequence[str]) -> None:
         """Remove vectors corresponding to ``vector_ids`` from the index."""

@@ -78,350 +78,115 @@
              
   <section id="module-config">
 <h1>1. Module: config<a class="headerlink" href="#module-config" title="Link to this heading"></a></h1>
-<p>Configuration utilities previously exposed from <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.config</span></code>
-reside in <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.ontology_download</span></code> and are re-exported via the
-package facade.</p>
-<p>This module defines the Pydantic models and helpers that drive manifest schema
-validation, concurrency defaults, rate limit enforcement, and the CLI override
-surface introduced in the ontology download refactor. Configuration can be
-loaded from YAML, augmented with environment overrides, exported as JSON Schema
-for diagnostics, and merged with ad-hoc CLI specifications for planning or
-download commands.</p>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.config</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Configuration models, parsing, and validation helpers.</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="ensure-python-version">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_python_version()</span></code><a class="headerlink" href="#ensure-python-version" title="Link to this heading"></a></h3>
 <p>Ensure the interpreter meets the minimum supported Python version.</p>
-<p>Args:
-None</p>
-<p>Returns:
-None</p>
-<p>Raises:
-SystemExit: If the current interpreter version is below the minimum.</p>
 </section>
 <section id="coerce-sequence-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_coerce_sequence(value)</span></code><a class="headerlink" href="#coerce-sequence-value" title="Link to this heading"></a></h3>
-<p>Normalize configuration entries into a list of strings.</p>
-<p>Args:
-value: Input value that may be <code class="docutils literal notranslate"><span class="pre">None</span></code>, a string, or an iterable of strings.</p>
-<p>Returns:
-List of strings suitable for downstream configuration processing.</p>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="getattr-name">
+<h3><code class="docutils literal notranslate"><span class="pre">__getattr__(name)</span></code><a class="headerlink" href="#getattr-name" title="Link to this heading"></a></h3>
+<p>Lazily expose pipeline exceptions without introducing import cycles.</p>
+</section>
+<section id="parse-rate-limit-to-rps-limit-str">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_rate_limit_to_rps(limit_str)</span></code><a class="headerlink" href="#parse-rate-limit-to-rps-limit-str" title="Link to this heading"></a></h3>
+<p>Convert a rate limit expression into requests-per-second.</p>
 </section>
 <section id="get-env-overrides">
 <h3><code class="docutils literal notranslate"><span class="pre">get_env_overrides()</span></code><a class="headerlink" href="#get-env-overrides" title="Link to this heading"></a></h3>
-<p>Return raw environment override values for backwards compatibility.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Mapping of configuration field name to override value sourced from the environment.</p>
+<p>Return environment-derived overrides as stringified key/value pairs.</p>
 </section>
 <section id="apply-env-overrides-defaults">
 <h3><code class="docutils literal notranslate"><span class="pre">_apply_env_overrides(defaults)</span></code><a class="headerlink" href="#apply-env-overrides-defaults" title="Link to this heading"></a></h3>
-<p>Apply environment variable overrides to default configuration.</p>
-<p>Args:
-defaults: Defaults configuration object that will be mutated in place.</p>
-<p>Returns:
-None</p>
-</section>
-<section id="make-fetch-spec-ontology-id-resolver-extras-target-formats">
-<h3><code class="docutils literal notranslate"><span class="pre">_make_fetch_spec(ontology_id,</span> <span class="pre">resolver,</span> <span class="pre">extras,</span> <span class="pre">target_formats)</span></code><a class="headerlink" href="#make-fetch-spec-ontology-id-resolver-extras-target-formats" title="Link to this heading"></a></h3>
-<p>Instantiate a FetchSpec from raw YAML fields.</p>
-<p>Args:
-ontology_id: Identifier of the ontology being configured.
-resolver: Name of the resolver responsible for fetching content.
-extras: Additional resolver-specific configuration parameters.
-target_formats: Desired output formats for the ontology artefact.</p>
-<p>Returns:
-Fully initialised <code class="docutils literal notranslate"><span class="pre">FetchSpec</span></code> object ready for execution.</p>
-</section>
-<section id="merge-defaults-ontology-spec-defaults">
-<h3><code class="docutils literal notranslate"><span class="pre">merge_defaults(ontology_spec,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#merge-defaults-ontology-spec-defaults" title="Link to this heading"></a></h3>
-<p>Merge an ontology specification with resolved default settings.</p>
-<p>Args:
-ontology_spec: Raw ontology specification mapping loaded from YAML.
-defaults: Optional resolved defaults to merge with the specification.</p>
-<p>Returns:
-FetchSpec instance describing the fully-merged ontology configuration.</p>
-<p>Raises:
-ConfigError: If required fields are missing or invalid in the specification.</p>
+<p>Mutate <code class="docutils literal notranslate"><span class="pre">defaults</span></code> in-place using values from :class:<code class="docutils literal notranslate"><span class="pre">EnvironmentOverrides</span></code>.</p>
 </section>
 <section id="build-resolved-config-raw-config">
 <h3><code class="docutils literal notranslate"><span class="pre">build_resolved_config(raw_config)</span></code><a class="headerlink" href="#build-resolved-config-raw-config" title="Link to this heading"></a></h3>
-<p>Construct fully-resolved configuration from raw YAML contents.</p>
-<p>Args:
-raw_config: Parsed YAML mapping defining defaults and ontologies.</p>
-<p>Returns:
-ResolvedConfig combining defaults and individual fetch specifications.</p>
-<p>Raises:
-ConfigError: If validation fails or required sections are missing.</p>
+<p>Materialise a :class:<code class="docutils literal notranslate"><span class="pre">ResolvedConfig</span></code> from a raw mapping loaded from disk.</p>
 </section>
 <section id="validate-schema-raw-config">
 <h3><code class="docutils literal notranslate"><span class="pre">_validate_schema(raw,</span> <span class="pre">config)</span></code><a class="headerlink" href="#validate-schema-raw-config" title="Link to this heading"></a></h3>
-<p>Perform additional structural validation beyond Pydantic models.</p>
-<p>Args:
-raw: Raw configuration mapping used for structural checks.
-config: Optional resolved configuration for cross-field validation.</p>
-<p>Returns:
-None</p>
-<p>Raises:
-ConfigError: When structural constraints are violated.</p>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="load-raw-yaml-config-path">
 <h3><code class="docutils literal notranslate"><span class="pre">load_raw_yaml(config_path)</span></code><a class="headerlink" href="#load-raw-yaml-config-path" title="Link to this heading"></a></h3>
-<p>Load and parse a YAML configuration file into a mutable mapping.</p>
-<p>Args:
-config_path: Path to the YAML configuration file.</p>
-<p>Returns:
-Mutable mapping representation of the YAML content.</p>
-<p>Raises:
-SystemExit: If the file is not found on disk.
-ConfigError: If the YAML cannot be parsed or is structurally invalid.</p>
+<p>Read a YAML configuration file and return its top-level mapping.</p>
 </section>
 <section id="load-config-config-path">
 <h3><code class="docutils literal notranslate"><span class="pre">load_config(config_path)</span></code><a class="headerlink" href="#load-config-config-path" title="Link to this heading"></a></h3>
-<p>Load configuration from disk without performing additional schema validation.</p>
-<p>Args:
-config_path: Path to the YAML configuration file.</p>
-<p>Returns:
-ResolvedConfig produced from the raw file contents.</p>
-<p>Raises:
-ConfigError: If the configuration cannot be parsed or validated.</p>
+<p>Load, validate, and resolve configuration suitable for execution.</p>
 </section>
 <section id="validate-config-config-path">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_config(config_path)</span></code><a class="headerlink" href="#validate-config-config-path" title="Link to this heading"></a></h3>
-<p>Validate a configuration file and return the resolved settings.</p>
-<p>Args:
-config_path: Path to the YAML configuration file.</p>
-<p>Returns:
-ResolvedConfig object after validation.</p>
-<p>Raises:
-ConfigError: If validation fails.</p>
+<p>Load a configuration solely for validation feedback.</p>
 </section>
 <section id="validate-level-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_level(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-level-cls-value" title="Link to this heading"></a></h3>
-<p>Validate logging level values.</p>
-<p>Args:
-value: Logging level provided in configuration.</p>
-<p>Returns:
-Uppercase logging level string accepted by :mod:<code class="docutils literal notranslate"><span class="pre">logging</span></code>.</p>
-<p>Raises:
-ValueError: If the supplied level is not among the supported options.</p>
+<p>Normalise logging levels and ensure they match the supported set.</p>
 </section>
 <section id="validate-rate-limits-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_rate_limits(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-rate-limits-cls-value" title="Link to this heading"></a></h3>
-<p>Ensure rate limit strings follow the expected pattern.</p>
-<p>Args:
-value: Mapping of service name to rate limit expression.</p>
-<p>Returns:
-Validated mapping preserving the original values.</p>
-<p>Raises:
-ValueError: If any rate limit fails to match the accepted pattern.</p>
+<p>Ensure per-resolver rate limits follow the supported syntax.</p>
 </section>
 <section id="rate-limit-per-second-self">
 <h3><code class="docutils literal notranslate"><span class="pre">rate_limit_per_second(self)</span></code><a class="headerlink" href="#rate-limit-per-second-self" title="Link to this heading"></a></h3>
-<p>Convert <code class="docutils literal notranslate"><span class="pre">per_host_rate_limit</span></code> to a requests-per-second value.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Floating-point requests-per-second value derived from configuration.</p>
-<p>Raises:
-ValueError: If the configured rate limit string is invalid.</p>
+<p>Return the configured per-host rate limit in requests per second.</p>
 </section>
 <section id="parse-service-rate-limit-self-service">
 <h3><code class="docutils literal notranslate"><span class="pre">parse_service_rate_limit(self,</span> <span class="pre">service)</span></code><a class="headerlink" href="#parse-service-rate-limit-self-service" title="Link to this heading"></a></h3>
-<p>Parse a per-service rate limit to requests per second.</p>
-<p>Args:
-service: Logical service name to look up.</p>
-<p>Returns:
-Requests-per-second value when configured, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
-<p>Raises:
-None.</p>
+<p>Return service-specific rate limits expressed as requests per second.</p>
 </section>
 <section id="normalized-allowed-hosts-self">
 <h3><code class="docutils literal notranslate"><span class="pre">normalized_allowed_hosts(self)</span></code><a class="headerlink" href="#normalized-allowed-hosts-self" title="Link to this heading"></a></h3>
-<p>Return allowlist entries normalized to lowercase punycode labels.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Tuple of (exact hostnames, wildcard suffixes) when entries exist,
-otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code> if no valid allowlist entries are configured.</p>
-<p>Raises:
-ValueError: If any configured hostname cannot be converted to punycode.</p>
+<p>Split allowed host list into exact domains and wildcard suffixes.</p>
 </section>
 <section id="polite-http-headers-self">
 <h3><code class="docutils literal notranslate"><span class="pre">polite_http_headers(self)</span></code><a class="headerlink" href="#polite-http-headers-self" title="Link to this heading"></a></h3>
-<p>Return polite HTTP headers suitable for resolver API calls.</p>
-<p>The headers include a deterministic <code class="docutils literal notranslate"><span class="pre">User-Agent</span></code> string, propagate a
-<code class="docutils literal notranslate"><span class="pre">From</span></code> contact address when configured, and synthesize an <code class="docutils literal notranslate"><span class="pre">X-Request-ID</span></code>
-correlated with the current fetch so API providers can trace requests.</p>
-<p>Args:
-correlation_id: Identifier attached to the current batch for log correlation.
-request_id: Optional override for <code class="docutils literal notranslate"><span class="pre">X-Request-ID</span></code> header; auto-generated when <code class="docutils literal notranslate"><span class="pre">None</span></code>.
-timestamp: Optional timestamp used when constructing the request identifier.</p>
-<p>Returns:
-Mapping of header names to polite values complying with provider guidelines.</p>
+<p>Compute polite HTTP headers for outbound resolver requests.</p>
 </section>
 <section id="validate-prefer-source-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_prefer_source(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-prefer-source-cls-value" title="Link to this heading"></a></h3>
-<p>Allow custom resolver identifiers while warning about unknown entries.</p>
-<p>Args:
-value: Ordered list of resolver identifiers supplied by configuration.</p>
-<p>Returns:
-Sanitised resolver list preserving the original order.</p>
-<p>Raises:
-ValueError: If any resolver name is not recognized.</p>
+<p>Ensure preferred resolvers belong to the supported resolver set.</p>
 </section>
 <section id="from-defaults-cls">
 <h3><code class="docutils literal notranslate"><span class="pre">from_defaults(cls)</span></code><a class="headerlink" href="#from-defaults-cls" title="Link to this heading"></a></h3>
-<p>Create an empty resolved configuration with library defaults.</p>
-<p>Args:
-None</p>
-<p>Returns:
-ResolvedConfig populated with default settings and no fetch specs.</p>
+<p>Construct a resolved configuration populated with default values only.</p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="configerror">
-<h3><code class="docutils literal notranslate"><span class="pre">ConfigError</span></code><a class="headerlink" href="#configerror" title="Link to this heading"></a></h3>
-<p>Raised when ontology configuration files are invalid or inconsistent.</p>
-<p>Attributes:
-message: Human-readable explanation of the configuration flaw.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>try:
-…     raise ConfigError(“missing id”)
-… except ConfigError as exc:
-…     assert “missing id” in str(exc)</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="loggingconfiguration">
 <h3><code class="docutils literal notranslate"><span class="pre">LoggingConfiguration</span></code><a class="headerlink" href="#loggingconfiguration" title="Link to this heading"></a></h3>
-<p>Structured logging options for ontology download operations.</p>
-<p>Attributes:
-level: Logging level for downloader telemetry (DEBUG, INFO, etc.).
-max_log_size_mb: Maximum size of log files before rotation occurs.
-retention_days: Number of days log files are retained on disk.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>config = LoggingConfiguration(level=”debug”)
-config.level
-‘DEBUG’</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+<p>Logging-related configuration for ontology downloads.</p>
 </section>
 <section id="validationconfig">
 <h3><code class="docutils literal notranslate"><span class="pre">ValidationConfig</span></code><a class="headerlink" href="#validationconfig" title="Link to this heading"></a></h3>
-<p>Validation limits governing parser execution.</p>
-<p>Attributes:
-parser_timeout_sec: Maximum runtime allowed for ontology parsing.
-max_memory_mb: Memory ceiling allocated to validation routines.
-skip_reasoning_if_size_mb: Threshold above which reasoning is skipped.
-streaming_normalization_threshold_mb: File size threshold for streaming normalization.
-max_concurrent_validators: Bounded thread pool size for validator execution (1-8).</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>ValidationConfig(parser_timeout_sec=120).parser_timeout_sec
-120</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+<p>Settings controlling ontology validation throughput and limits.</p>
 </section>
 <section id="downloadconfiguration">
 <h3><code class="docutils literal notranslate"><span class="pre">DownloadConfiguration</span></code><a class="headerlink" href="#downloadconfiguration" title="Link to this heading"></a></h3>
-<p>HTTP download, throttling, and polite header settings for resolvers.</p>
-<p>Attributes:
-max_retries: Maximum retry attempts for failed download requests.
-timeout_sec: Base timeout applied to metadata requests.
-download_timeout_sec: Timeout applied to streaming download operations.
-backoff_factor: Exponential backoff multiplier between retry attempts.
-per_host_rate_limit: Token bucket rate limit string for host throttling.
-max_download_size_gb: Maximum permitted download size in gigabytes.
-concurrent_downloads: Allowed number of simultaneous downloads.
-validate_media_type: Whether to enforce Content-Type validation.
-rate_limits: Optional per-service rate limit overrides.
-allowed_hosts: Optional allowlist restricting download hostnames.
-polite_headers: Default polite HTTP headers applied to resolver API calls.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>cfg = DownloadConfiguration(per_host_rate_limit=”10/second”)
-round(cfg.rate_limit_per_second(), 2)
-10.0</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+<p>HTTP download, retry, and politeness settings for resolvers.</p>
 </section>
 <section id="defaultsconfig">
 <h3><code class="docutils literal notranslate"><span class="pre">DefaultsConfig</span></code><a class="headerlink" href="#defaultsconfig" title="Link to this heading"></a></h3>
-<p>Collection of default settings for ontology fetch specifications.</p>
-<p>Attributes:
-accept_licenses: Licenses accepted by default during downloads.
-normalize_to: Preferred formats for normalized ontology output.
-prefer_source: Ordered list of resolver priorities.
-http: Download configuration defaults.
-validation: Validation configuration defaults.
-logging: Logging configuration defaults.
-continue_on_error: Whether processing continues after failures.
-resolver_fallback_enabled: Whether automatic resolver fallback is enabled.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>defaults = DefaultsConfig()
-“obo” in defaults.prefer_source
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+<p>Composite configuration applied when no per-spec overrides exist.</p>
 </section>
 <section id="resolvedconfig">
 <h3><code class="docutils literal notranslate"><span class="pre">ResolvedConfig</span></code><a class="headerlink" href="#resolvedconfig" title="Link to this heading"></a></h3>
-<p>Container for merged configuration defaults and fetch specifications.</p>
-<p>Attributes:
-defaults: Default configuration applied to all ontology fetch specs.
-specs: List of individual fetch specifications after merging defaults.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>config = ResolvedConfig.from_defaults()
-isinstance(config.defaults, DefaultsConfig)
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+<p>Materialised configuration combining defaults and fetch specifications.</p>
 </section>
 <section id="environmentoverrides">
 <h3><code class="docutils literal notranslate"><span class="pre">EnvironmentOverrides</span></code><a class="headerlink" href="#environmentoverrides" title="Link to this heading"></a></h3>
-<p>Environment variable overrides for ontology downloader defaults.</p>
-<p>Attributes:
-max_retries: Override for retry count via <code class="docutils literal notranslate"><span class="pre">ONTOFETCH_MAX_RETRIES</span></code>.
-timeout_sec: Override for metadata timeout via <code class="docutils literal notranslate"><span class="pre">ONTOFETCH_TIMEOUT_SEC</span></code>.
-download_timeout_sec: Override for streaming timeout.
-per_host_rate_limit: Override for per-host rate limit string.
-backoff_factor: Override for exponential backoff multiplier.
-log_level: Override for logging level.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>overrides = EnvironmentOverrides()
-overrides.model_config[‘env_prefix’]
-‘ONTOFETCH_’</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+<p>Pydantic settings model exposing environment-derived overrides.</p>
 </section>
 </section>
 </section>

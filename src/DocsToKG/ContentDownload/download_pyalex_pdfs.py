@@ -245,8 +245,11 @@ from DocsToKG.ContentDownload.telemetry import (
     AttemptSink,
     CsvSink,
     JsonlSink,
+    LastAttemptCsvSink,
     ManifestEntry,
+    ManifestIndexSink,
     MultiSink,
+    MANIFEST_SCHEMA_VERSION,
 )
 
 ResolverPipeline = resolvers.ResolverPipeline
@@ -258,13 +261,23 @@ default_resolvers = resolvers.default_resolvers
 
 # --- Globals ---
 
+DEFAULT_SNIFF_BYTES = 64 * 1024
+DEFAULT_MIN_PDF_BYTES = 1024
+DEFAULT_TAIL_CHECK_BYTES = 2048
+
 __all__ = (
     "AttemptSink",
     "CsvSink",
+    "DEFAULT_MIN_PDF_BYTES",
+    "DEFAULT_SNIFF_BYTES",
+    "DEFAULT_TAIL_CHECK_BYTES",
     "DownloadState",
     "JsonlSink",
+    "LastAttemptCsvSink",
     "ManifestEntry",
+    "ManifestIndexSink",
     "MultiSink",
+    "MANIFEST_SCHEMA_VERSION",
     "WorkArtifact",
     "apply_config_overrides",
     "build_manifest_entry",
@@ -600,6 +613,21 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
                 )
             if record_type != "manifest":
                 continue
+            schema_version_raw = data.get("schema_version")
+            if schema_version_raw is None:
+                raise ValueError("Manifest entries must include a schema_version field.")
+            try:
+                schema_version = int(schema_version_raw)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"Manifest entry schema_version must be an integer, got {schema_version_raw!r}"
+                ) from exc
+            if schema_version > MANIFEST_SCHEMA_VERSION:
+                raise ValueError(
+                    f"Manifest schema_version {schema_version} is newer than supported "
+                    f"{MANIFEST_SCHEMA_VERSION}. Upgrade the DocsToKG downloader."
+                )
+            data["schema_version"] = schema_version
             work_id = data.get("work_id")
             url = data.get("url")
             if not work_id or not url:
@@ -652,6 +680,7 @@ def build_manifest_entry(
     timestamp = _utc_timestamp()
     classification = outcome.classification.value if outcome else Classification.MISS.value
     return ManifestEntry(
+        schema_version=MANIFEST_SCHEMA_VERSION,
         timestamp=timestamp,
         work_id=artifact.work_id,
         title=artifact.title,
@@ -875,9 +904,9 @@ def download_candidate(
         TypeError: If conditional response parsing returns unexpected objects.
     """
     context = context or {}
-    sniff_limit = max(int(context.get("sniff_bytes", 64 * 1024)), 0)
-    min_pdf_bytes = max(int(context.get("min_pdf_bytes", 1024)), 0)
-    tail_window_bytes = max(int(context.get("tail_check_bytes", 2048)), 0)
+    sniff_limit = max(int(context.get("sniff_bytes", DEFAULT_SNIFF_BYTES)), 0)
+    min_pdf_bytes = max(int(context.get("min_pdf_bytes", DEFAULT_MIN_PDF_BYTES)), 0)
+    tail_window_bytes = max(int(context.get("tail_check_bytes", DEFAULT_TAIL_CHECK_BYTES)), 0)
     max_bytes_raw = context.get("max_bytes")
     max_bytes: Optional[int]
     try:
@@ -1478,6 +1507,9 @@ def process_one_work(
     previous_lookup: Dict[str, Dict[str, Any]],
     resume_completed: Set[str],
     max_bytes: Optional[int],
+    sniff_bytes: int,
+    min_pdf_bytes: int,
+    tail_check_bytes: int,
 ) -> Dict[str, Any]:
     """Process a single OpenAlex work through the resolver pipeline.
 
@@ -1491,10 +1523,13 @@ def process_one_work(
         metrics: Resolver metrics collector.
         dry_run: When True, simulate downloads without writing files.
         list_only: When True, record candidate URLs without fetching content.
-            extract_html_text: Whether to extract plaintext from HTML artefacts.
-            previous_lookup: Mapping of work_id/URL to prior manifest entries.
-            resume_completed: Set of work IDs already processed in resume mode.
-            max_bytes: Optional size limit per download in bytes.
+        extract_html_text: Whether to extract plaintext from HTML artefacts.
+        previous_lookup: Mapping of work_id/URL to prior manifest entries.
+        resume_completed: Set of work IDs already processed in resume mode.
+        max_bytes: Optional size limit per download in bytes.
+        sniff_bytes: Number of leading bytes to buffer for payload inference.
+        min_pdf_bytes: Minimum PDF size accepted when HEAD prechecks fail.
+        tail_check_bytes: Tail window size used to detect embedded HTML payloads.
 
     Returns:
         Dictionary summarizing the outcome (saved/html_only/skipped flags).
@@ -1560,6 +1595,9 @@ def process_one_work(
         "previous": previous_map,
         "list_only": list_only,
         "max_bytes": max_bytes,
+        "sniff_bytes": sniff_bytes,
+        "min_pdf_bytes": min_pdf_bytes,
+        "tail_check_bytes": tail_check_bytes,
     }
 
     if artifact.work_id in resume_completed:
@@ -1740,6 +1778,26 @@ def main() -> None:
         help="Maximum bytes to download per request before aborting (default: unlimited).",
     )
 
+    classifier_group = parser.add_argument_group("Classifier settings")
+    classifier_group.add_argument(
+        "--sniff-bytes",
+        type=int,
+        default=DEFAULT_SNIFF_BYTES,
+        help=f"Bytes to buffer before inferring payload type (default: {DEFAULT_SNIFF_BYTES}).",
+    )
+    classifier_group.add_argument(
+        "--min-pdf-bytes",
+        type=int,
+        default=DEFAULT_MIN_PDF_BYTES,
+        help=f"Minimum PDF size required when HEAD precheck fails (default: {DEFAULT_MIN_PDF_BYTES}).",
+    )
+    classifier_group.add_argument(
+        "--tail-check-bytes",
+        type=int,
+        default=DEFAULT_TAIL_CHECK_BYTES,
+        help=f"Tail window size used to detect embedded HTML (default: {DEFAULT_TAIL_CHECK_BYTES}).",
+    )
+
     resolver_group = parser.add_argument_group("Resolver settings")
     resolver_group.add_argument(
         "--resolver-config", type=str, default=None, help="Path to resolver config (YAML/JSON)."
@@ -1888,6 +1946,10 @@ def main() -> None:
         parser.error("Provide --topic or --topic-id.")
     if args.max_bytes is not None and args.max_bytes <= 0:
         parser.error("--max-bytes must be a positive integer")
+    for field_name in ("sniff_bytes", "min_pdf_bytes", "tail_check_bytes"):
+        value = getattr(args, field_name, None)
+        if value is not None and value < 0:
+            parser.error(f"--{field_name.replace('_', '-')} must be non-negative")
 
     if args.mailto:
         oa_config.email = args.mailto
@@ -1970,12 +2032,23 @@ def main() -> None:
     skipped = 0
 
     with contextlib.ExitStack() as stack:
+        sinks: List[AttemptSink] = []
         jsonl_sink = stack.enter_context(JsonlSink(manifest_path))
+        sinks.append(jsonl_sink)
+        index_path = manifest_path.with_suffix(".index.json")
+        index_sink = stack.enter_context(ManifestIndexSink(index_path))
+        sinks.append(index_sink)
+        last_attempt_path = manifest_path.with_suffix(".last.csv")
+        last_attempt_sink = stack.enter_context(LastAttemptCsvSink(last_attempt_path))
+        sinks.append(last_attempt_sink)
         if csv_path:
             csv_sink = stack.enter_context(CsvSink(csv_path))
-            attempt_logger = MultiSink([jsonl_sink, csv_sink])
+            sinks.append(csv_sink)
+        attempt_logger: AttemptSink
+        if len(sinks) == 1:
+            attempt_logger = sinks[0]
         else:
-            attempt_logger = jsonl_sink
+            attempt_logger = MultiSink(sinks)
 
         resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
         metrics = ResolverMetrics()
@@ -2038,6 +2111,9 @@ def main() -> None:
                             previous_lookup=resume_lookup,
                             resume_completed=resume_completed,
                             max_bytes=args.max_bytes,
+                            sniff_bytes=args.sniff_bytes,
+                            min_pdf_bytes=args.min_pdf_bytes,
+                            tail_check_bytes=args.tail_check_bytes,
                         )
                         _record_result(result)
                         if args.sleep > 0:
@@ -2072,6 +2148,9 @@ def main() -> None:
                                     previous_lookup=resume_lookup,
                                     resume_completed=resume_completed,
                                     max_bytes=args.max_bytes,
+                                    sniff_bytes=args.sniff_bytes,
+                                    min_pdf_bytes=args.min_pdf_bytes,
+                                    tail_check_bytes=args.tail_check_bytes,
                                 )
                             finally:
                                 if hasattr(session, "close"):

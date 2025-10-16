@@ -59,24 +59,6 @@
 #       "kind": "class"
 #     },
 #     {
-#       "id": "chunkworkerconfig",
-#       "name": "ChunkWorkerConfig",
-#       "anchor": "class-chunkworkerconfig",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "chunktask",
-#       "name": "ChunkTask",
-#       "anchor": "class-chunktask",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "chunkresult",
-#       "name": "ChunkResult",
-#       "anchor": "class-chunkresult",
-#       "kind": "class"
-#     },
-#     {
 #       "id": "chunk-worker-initializer",
 #       "name": "_chunk_worker_initializer",
 #       "anchor": "function-chunk-worker-initializer",
@@ -198,6 +180,9 @@ __all__ = (
 )
 
 from DocsToKG.DocParsing._common import (
+    ChunkResult,
+    ChunkTask,
+    ChunkWorkerConfig,
     acquire_lock,
     atomic_write,
     compute_content_hash,
@@ -252,6 +237,8 @@ def _dedupe_preserve_order(markers: Sequence[str]) -> Tuple[str, ...]:
 
 
 def _ensure_str_list(value: object, label: str) -> List[str]:
+    """Normalize configuration values into a list of non-empty strings."""
+
     if value is None:
         return []
     if isinstance(value, str):
@@ -403,26 +390,28 @@ def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
     return refs, sorted(pages)
 
 
-def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, int]:
-    """Infer image annotation flags and counts from chunk metadata and text.
-
-    Args:
-        chunk: Chunk metadata object containing image annotations.
-        text: Chunk text used to detect fallback caption cues.
-
-    Returns:
-        Tuple of ``(has_caption, has_classification, num_images)`` describing
-        inferred image metadata.
-    """
+def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, int, Optional[float]]:
+    """Infer image annotation flags, counts, and confidences from chunk metadata and text."""
 
     has_caption = False
     has_classification = False
     num_images = 0
+    confidence: Optional[float] = None
+    confidence_candidates: List[float] = []
 
     try:
         doc_items = getattr(chunk.meta, "doc_items", []) or []
     except Exception:  # pragma: no cover - defensive catch
         doc_items = []
+
+    def _maybe_add_conf(value: object) -> None:
+        """Collect numeric confidence scores from metadata sources."""
+        try:
+            if value is None:
+                return
+            confidence_candidates.append(float(value))
+        except (TypeError, ValueError):
+            return
 
     for doc_item in doc_items:
         picture = getattr(doc_item, "doc_item", doc_item)
@@ -430,6 +419,16 @@ def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, i
         if isinstance(flags, dict):
             has_caption = has_caption or bool(flags.get("has_image_captions"))
             has_classification = has_classification or bool(flags.get("has_image_classification"))
+            _maybe_add_conf(flags.get("image_confidence"))
+        annotations = getattr(picture, "annotations", []) or getattr(doc_item, "annotations", []) or []
+        for ann in annotations:
+            _maybe_add_conf(getattr(ann, "confidence", None))
+            _maybe_add_conf(getattr(ann, "score", None))
+            predicted = getattr(ann, "predicted_classes", None)
+            if predicted:
+                for cls in predicted:
+                    _maybe_add_conf(getattr(cls, "confidence", None))
+                    _maybe_add_conf(getattr(cls, "probability", None))
         if getattr(picture, "__class__", type(None)).__name__.lower().startswith("picture"):
             num_images += 1
 
@@ -440,16 +439,17 @@ def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, i
     has_caption = has_caption or text_has_caption
     has_classification = has_classification or text_has_classification
 
+    if confidence_candidates:
+        confidence = max(confidence_candidates)
+
     if num_images == 0:
         num_images = (
-            text.count("<!-- image -->")
-            + text.count("Figure caption:")
-            + text.count("Picture description:")
+            text.count("<!-- image -->") + text.count("Figure caption:") + text.count("Picture description:")
         )
     if num_images == 0 and (has_caption or has_classification):
         num_images = 1
 
-    return has_caption, has_classification, num_images
+    return has_caption, has_classification, num_images, confidence
 
 
 # --- Public Classes ---
@@ -480,79 +480,7 @@ class Rec:
     has_image_captions: bool = False
     has_image_classification: bool = False
     num_images: int = 0
-
-
-@dataclass(slots=True)
-class ChunkWorkerConfig:
-    """Configuration shared across worker processes performing chunking.
-
-    Attributes:
-        tokenizer_model: HuggingFace identifier used for tokenisation.
-        min_tokens: Minimum tokens per chunk before spillover occurs.
-        max_tokens: Hard ceiling on chunk size accepted by embedding models.
-        soft_barrier_margin: Buffer applied when soft-limiting chunk size.
-        heading_markers: Strings that designate heading boundaries.
-        caption_markers: Strings that mark caption boundaries.
-        docling_version: Docling version used to produce metadata.
-    """
-
-    tokenizer_model: str
-    min_tokens: int
-    max_tokens: int
-    soft_barrier_margin: int
-    heading_markers: Tuple[str, ...]
-    caption_markers: Tuple[str, ...]
-    docling_version: str
-
-
-@dataclass(slots=True)
-class ChunkTask:
-    """Work item describing a single document chunking request.
-
-    Attributes:
-        doc_path: Source document that must be chunked.
-        output_path: Destination path for generated chunk JSONL.
-        doc_id: Unique identifier assigned to the document.
-        doc_stem: Filesystem-friendly stem used for derived artefacts.
-        input_hash: Content hash captured during ingestion.
-        parse_engine: Docling engine used to produce structured content.
-    """
-
-    doc_path: Path
-    output_path: Path
-    doc_id: str
-    doc_stem: str
-    input_hash: str
-    parse_engine: str
-
-
-@dataclass(slots=True)
-class ChunkResult:
-    """Result returned by chunking workers to the orchestrator.
-
-    Attributes:
-        doc_id: Unique identifier assigned to the document.
-        doc_stem: Filesystem-friendly stem used for derived artefacts.
-        status: Worker outcome (``success``, ``skip``, or ``failure``).
-        duration_s: Processing duration measured in seconds.
-        input_path: Source document path.
-        output_path: Chunk JSONL destination.
-        input_hash: Content hash associated with the document.
-        chunk_count: Number of chunks produced.
-        parse_engine: Docling engine used to produce structured content.
-        error: Optional failure description supplied on error.
-    """
-
-    doc_id: str
-    doc_stem: str
-    status: str
-    duration_s: float
-    input_path: Path
-    output_path: Path
-    input_hash: str
-    chunk_count: int
-    parse_engine: str
-    error: Optional[str] = None
+    image_confidence: Optional[float] = None
 
 
 _CHUNK_WORKER_CONFIG: Optional[ChunkWorkerConfig] = None
@@ -561,6 +489,8 @@ _CHUNK_WORKER_CHUNKER: Optional[HybridChunker] = None
 
 
 def _chunk_worker_initializer(cfg: ChunkWorkerConfig) -> None:
+    """Initialise worker-local tokenizer and chunker state for multiprocessing."""
+
     global _CHUNK_WORKER_CONFIG, _CHUNK_WORKER_TOKENIZER, _CHUNK_WORKER_CHUNKER
     _CHUNK_WORKER_CONFIG = cfg
     hf = AutoTokenizer.from_pretrained(cfg.tokenizer_model, use_fast=True)
@@ -575,6 +505,8 @@ def _chunk_worker_initializer(cfg: ChunkWorkerConfig) -> None:
 
 
 def _process_chunk_task(task: ChunkTask) -> ChunkResult:
+    """Chunk a single DocTags file inside a worker process."""
+
     if _CHUNK_WORKER_CONFIG is None or _CHUNK_WORKER_TOKENIZER is None or _CHUNK_WORKER_CHUNKER is None:
         raise RuntimeError("Chunk worker not initialised")
 
@@ -593,7 +525,9 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             text = chunker.contextualize(ch)
             n_tok = tokenizer.count_tokens(text=text)
             refs, pages = extract_refs_and_pages(ch)
-            has_caption, has_classification, num_images = summarize_image_metadata(ch, text)
+            has_caption, has_classification, num_images, image_confidence = summarize_image_metadata(
+                ch, text
+            )
             recs.append(
                 Rec(
                     text=text,
@@ -604,6 +538,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
                     has_image_captions=has_caption,
                     has_image_classification=has_classification,
                     num_images=num_images,
+                    image_confidence=image_confidence,
                 )
             )
 
@@ -627,6 +562,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
                         has_image_captions=r.has_image_captions,
                         has_image_classification=r.has_image_classification,
                         num_images=r.num_images,
+                        image_confidence=r.image_confidence,
                     )
                     row = ChunkRow(
                         doc_id=task.doc_id,
@@ -641,9 +577,11 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
                         has_image_captions=r.has_image_captions,
                         has_image_classification=r.has_image_classification,
                         num_images=r.num_images,
+                        image_confidence=r.image_confidence,
                         provenance=provenance,
                     )
                     payload = row.model_dump(mode="json", exclude_none=True)
+                    validate_chunk_row(payload)
                     handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
         duration = time.perf_counter() - start
@@ -695,6 +633,8 @@ def merge_rec(
     n_tok = tokenizer.count_tokens(text=text) if recount else a.n_tok + b.n_tok
     refs = a.refs + [r for r in b.refs if r not in a.refs]
     pages = sorted(set(a.pages).union(b.pages))
+    confidences = [conf for conf in (a.image_confidence, b.image_confidence) if conf is not None]
+    combined_confidence = max(confidences) if confidences else None
     return Rec(
         text=text,
         n_tok=n_tok,
@@ -704,6 +644,7 @@ def merge_rec(
         has_image_captions=a.has_image_captions or b.has_image_captions,
         has_image_classification=a.has_image_classification or b.has_image_classification,
         num_images=a.num_images + b.num_images,
+        image_confidence=combined_confidence,
     )
 
 
@@ -991,13 +932,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Token margin applied when respecting structural boundaries (default: 64).",
     )
     parser.add_argument(
-        "--heading-markers",
+        "--structural-markers",
         type=Path,
         default=None,
         help=(
             "Optional YAML/JSON file listing additional heading prefixes "
             "(and optionally caption prefixes) to treat as structural boundaries."
         ),
+    )
+    parser.add_argument(
+        "--heading-markers",
+        dest="structural_markers",
+        type=Path,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--workers",
@@ -1086,8 +1033,9 @@ def main(args: argparse.Namespace | None = None) -> int:
     caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS
     custom_heading_markers: List[str] = []
     custom_caption_markers: List[str] = []
-    if getattr(args, "heading_markers", None) is not None:
-        markers_path = args.heading_markers.expanduser().resolve()
+    markers_override = getattr(args, "structural_markers", None)
+    if markers_override is not None:
+        markers_path = markers_override.expanduser().resolve()
         if not markers_path.exists():
             raise FileNotFoundError(f"Heading markers file not found: {markers_path}")
         extra_headings, extra_captions = _load_structural_marker_config(markers_path)
@@ -1101,7 +1049,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             caption_markers = _dedupe_preserve_order(
                 (*caption_markers, *tuple(extra_captions))
             )
-        args.heading_markers = markers_path
+        args.structural_markers = markers_path
 
     logger.info(
         "Chunking configuration",

@@ -20,6 +20,7 @@ from __future__ import annotations
 import csv
 import json
 import threading
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,12 +29,16 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.resolvers import AttemptRecord
 
+from DocsToKG.ContentDownload.classifications import Classification, PDF_LIKE
 
+
+MANIFEST_SCHEMA_VERSION = 2
 @dataclass
 class ManifestEntry:
     """Structured manifest entry describing a resolved artifact.
 
     Attributes:
+        schema_version: Integer identifying the manifest schema revision.
         timestamp: ISO-8601 timestamp describing when the artifact was stored.
         work_id: Primary identifier (e.g., OpenAlex work ID) for the artifact.
         title: Human-readable work title.
@@ -54,6 +59,7 @@ class ManifestEntry:
 
     Examples:
         >>> entry = ManifestEntry(
+        ...     schema_version=2,
         ...     timestamp="2025-01-01T00:00:00Z",
         ...     work_id="W123",
         ...     title="Example",
@@ -69,6 +75,7 @@ class ManifestEntry:
         'W123'
     """
 
+    schema_version: int
     timestamp: str
     work_id: str
     title: str
@@ -233,6 +240,7 @@ class JsonlSink:
         self._write(
             {
                 "record_type": "manifest",
+                "schema_version": entry.schema_version,
                 "timestamp": entry.timestamp,
                 "work_id": entry.work_id,
                 "title": entry.title,
@@ -406,10 +414,156 @@ class MultiSink:
             return None
 
 
+class ManifestIndexSink:
+    """Maintain a JSON index mapping work IDs to their latest PDF artefacts."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._index: Dict[str, Dict[str, Optional[str]]] = {}
+        self._lock = threading.Lock()
+        self._closed = False
+
+    def log_attempt(
+        self, record: "AttemptRecord", *, timestamp: Optional[str] = None
+    ) -> None:  # pragma: no cover - intentional no-op
+        """No-op to satisfy the telemetry sink interface."""
+
+        return None
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:  # pragma: no cover - no-op
+        """No-op because the manifest index only reacts to manifests."""
+
+        return None
+
+    def log_manifest(self, entry: ManifestEntry) -> None:
+        """Index the latest manifest metadata for ``entry.work_id``."""
+
+        classification = Classification.from_wire(entry.classification)
+        path_value = entry.path
+        path_str = str(path_value) if path_value else None
+        pdf_path: Optional[str] = None
+        sha256: Optional[str] = None
+        if classification in PDF_LIKE and path_str:
+            pdf_path = path_str
+            sha256 = entry.sha256
+        payload = {
+            "classification": classification.value,
+            "pdf_path": pdf_path,
+            "sha256": sha256,
+        }
+        with self._lock:
+            self._index[entry.work_id] = payload
+
+    def close(self) -> None:
+        """Write the collected manifest index to disk once."""
+
+        with self._lock:
+            if self._closed:
+                return
+            ordered = dict(sorted(self._index.items(), key=lambda item: item[0]))
+            self._closed = True
+        _ensure_parent_exists(self._path)
+        self._path.write_text(json.dumps(ordered, indent=2), encoding="utf-8")
+
+    def __enter__(self) -> "ManifestIndexSink":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+
+class LastAttemptCsvSink:
+    """Write a CSV snapshot containing the most recent manifest entry per work."""
+
+    HEADER = [
+        "work_id",
+        "title",
+        "publication_year",
+        "resolver",
+        "url",
+        "classification",
+        "path",
+        "sha256",
+        "content_length",
+        "etag",
+        "last_modified",
+    ]
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._records: "OrderedDict[str, Dict[str, str]]" = OrderedDict()
+        self._lock = threading.Lock()
+        self._closed = False
+
+    def log_attempt(
+        self, record: "AttemptRecord", *, timestamp: Optional[str] = None
+    ) -> None:  # pragma: no cover - intentional no-op
+        """No-op to satisfy the telemetry sink interface."""
+
+        return None
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:  # pragma: no cover - no-op
+        """No-op because the CSV sink only records manifest events."""
+
+        return None
+
+    def _normalise(self, value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, (str, int)):
+            return str(value)
+        return str(value)
+
+    def log_manifest(self, entry: ManifestEntry) -> None:
+        """Store the most recent manifest attributes for ``entry.work_id``."""
+
+        classification = Classification.from_wire(entry.classification)
+        data = {
+            "work_id": entry.work_id,
+            "title": self._normalise(entry.title),
+            "publication_year": self._normalise(entry.publication_year),
+            "resolver": self._normalise(entry.resolver),
+            "url": self._normalise(entry.url),
+            "classification": classification.value,
+            "path": self._normalise(entry.path),
+            "sha256": self._normalise(entry.sha256),
+            "content_length": self._normalise(entry.content_length),
+            "etag": self._normalise(entry.etag),
+            "last_modified": self._normalise(entry.last_modified),
+        }
+        with self._lock:
+            self._records[entry.work_id] = data
+            self._records.move_to_end(entry.work_id)
+
+    def close(self) -> None:
+        """Flush collected manifest rows to the CSV file."""
+
+        with self._lock:
+            if self._closed:
+                return
+            rows = list(self._records.values())
+            self._closed = True
+        _ensure_parent_exists(self._path)
+        with self._path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=self.HEADER)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+
+    def __enter__(self) -> "LastAttemptCsvSink":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+
 __all__ = [
     "AttemptSink",
     "ManifestEntry",
+    "MANIFEST_SCHEMA_VERSION",
     "JsonlSink",
     "CsvSink",
     "MultiSink",
+    "ManifestIndexSink",
+    "LastAttemptCsvSink",
 ]

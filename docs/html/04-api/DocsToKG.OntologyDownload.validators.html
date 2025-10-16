@@ -78,12 +78,12 @@
              
   <section id="module-validators">
 <h1>1. Module: validators<a class="headerlink" href="#module-validators" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.validators</span></code>.</p>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.validation_core</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>The standalone module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.validators</span></code> has been retired. The
-validation pipeline now lives in <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.ontology_download</span></code> and
-is exposed through the consolidated <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload</span></code> facade.</p>
+validation pipeline now lives in <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.validation_core</span></code> and is
+re-exported through the consolidated <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload</span></code> facade.</p>
 <p>This module implements the post-download workflow that verifies ontologies,
 normalizes output, and collects structured telemetry for DocsToKG. Validators
 support streaming normalization for large ontologies, deterministic hashing for
@@ -92,7 +92,9 @@ rdflib, Pronto, Owlready2, ROBOT, and Arelle.</p>
 <section id="plugin-registration-example">
 <h3>Plugin registration example<a class="headerlink" href="#plugin-registration-example" title="Link to this heading"></a></h3>
 <p>To add bespoke validation steps, publish an entry point under
-<code class="docutils literal notranslate"><span class="pre">docstokg.ontofetch.validator</span></code>. A minimal plugin might look like:</p>
+<code class="docutils literal notranslate"><span class="pre">docstokg.ontofetch.validator</span></code>. The discovery helper in
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.plugins</span></code> surfaces the registration at import time.
+A minimal plugin might look like:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.OntologyDownload</span><span class="w"> </span><span class="kn">import</span> <span class="n">ValidationResult</span>

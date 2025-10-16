@@ -261,7 +261,6 @@ from .ontology_download import (
     PlannedFetch,
     ResolvedConfig,
     ValidationRequest,
-    _directory_size,
     fetch_all,
     get_manifest_schema,
     infer_version_timestamp,
@@ -276,6 +275,7 @@ from .ontology_download import (
     validate_config,
     validate_manifest_dict,
 )
+from .storage import _directory_size
 # --- Globals ---
 
 __all__ = (

@@ -78,10 +78,557 @@
              
   <section id="module-pipeline">
 <h1>1. Module: pipeline<a class="headerlink" href="#module-pipeline" title="Link to this heading"></a></h1>
-<p>The ontology download pipeline is now documented under
-<code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.ontology_download</span></code>. See the <em>Download pipeline</em>
-section for <code class="docutils literal notranslate"><span class="pre">FetchSpec</span></code>, <code class="docutils literal notranslate"><span class="pre">FetchResult</span></code>, planning helpers, manifest schema
-validation, and batch fetch routines.</p>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.pipeline</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Download planning and orchestration helpers for ontology fetching.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="compress-old-log-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_compress_old_log(path)</span></code><a class="headerlink" href="#compress-old-log-path" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="cleanup-logs-log-dir-retention-days">
+<h3><code class="docutils literal notranslate"><span class="pre">_cleanup_logs(log_dir,</span> <span class="pre">retention_days)</span></code><a class="headerlink" href="#cleanup-logs-log-dir-retention-days" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="setup-logging">
+<h3><code class="docutils literal notranslate"><span class="pre">setup_logging()</span></code><a class="headerlink" href="#setup-logging" title="Link to this heading"></a></h3>
+<p>Configure ontology downloader logging with rotation and JSON sidecars.</p>
+<p>Args:
+level: Logging level name applied to the root ontology logger.
+retention_days: Number of days to retain historical log files.
+max_log_size_mb: Threshold triggering log rotation for JSONL outputs.
+log_dir: Optional directory override for persisted logs.</p>
+<p>Returns:
+Configured logger instance ready for use by the pipeline.</p>
+</section>
+<section id="get-manifest-schema">
+<h3><code class="docutils literal notranslate"><span class="pre">get_manifest_schema()</span></code><a class="headerlink" href="#get-manifest-schema" title="Link to this heading"></a></h3>
+<p>Return a deep copy of the manifest JSON Schema definition.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Dictionary describing the manifest JSON Schema.</p>
+</section>
+<section id="validate-manifest-dict-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_manifest_dict(payload)</span></code><a class="headerlink" href="#validate-manifest-dict-payload" title="Link to this heading"></a></h3>
+<p>Validate manifest payload against the JSON Schema definition.</p>
+<p>Args:
+payload: Manifest dictionary loaded from JSON.
+source: Optional filesystem path for contextual error reporting.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+ConfigurationError: If validation fails.</p>
+</section>
+<section id="make-fetch-spec-raw-spec-defaults">
+<h3><code class="docutils literal notranslate"><span class="pre">_make_fetch_spec(raw_spec,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#make-fetch-spec-raw-spec-defaults" title="Link to this heading"></a></h3>
+<p>Create a fetch specification from raw configuration and defaults.</p>
+</section>
+<section id="merge-defaults-raw-spec-defaults">
+<h3><code class="docutils literal notranslate"><span class="pre">merge_defaults(raw_spec,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#merge-defaults-raw-spec-defaults" title="Link to this heading"></a></h3>
+<p>Merge user-provided specification with defaults to create a fetch spec.</p>
+</section>
+<section id="parse-http-datetime-value">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_http_datetime(value)</span></code><a class="headerlink" href="#parse-http-datetime-value" title="Link to this heading"></a></h3>
+<p>Parse HTTP <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code> style timestamps into UTC datetimes.</p>
+<p>Args:
+value: Timestamp string from HTTP headers such as <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code>.</p>
+<p>Returns:
+Optional[datetime]: Normalized UTC datetime when parsing succeeds.</p>
+<p>Raises:
+None: Parsing failures are converted into a <code class="docutils literal notranslate"><span class="pre">None</span></code> return value.</p>
+</section>
+<section id="parse-iso-datetime-value">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_iso_datetime(value)</span></code><a class="headerlink" href="#parse-iso-datetime-value" title="Link to this heading"></a></h3>
+<p>Parse ISO-8601 timestamps into timezone-aware UTC datetimes.</p>
+<p>Args:
+value: ISO-8601 formatted timestamp string.</p>
+<p>Returns:
+Optional[datetime]: Normalized UTC datetime when parsing succeeds.</p>
+<p>Raises:
+None: Invalid values return <code class="docutils literal notranslate"><span class="pre">None</span></code> instead of raising.</p>
+</section>
+<section id="parse-version-timestamp-value">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_version_timestamp(value)</span></code><a class="headerlink" href="#parse-version-timestamp-value" title="Link to this heading"></a></h3>
+<p>Parse version strings or manifest timestamps into UTC datetimes.</p>
+<p>Args:
+value: Version identifier or timestamp string to normalize.</p>
+<p>Returns:
+Optional[datetime]: Parsed UTC datetime when the input matches supported formats.</p>
+<p>Raises:
+None: All parsing failures result in <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</section>
+<section id="infer-version-timestamp-value">
+<h3><code class="docutils literal notranslate"><span class="pre">infer_version_timestamp(value)</span></code><a class="headerlink" href="#infer-version-timestamp-value" title="Link to this heading"></a></h3>
+<p>Infer a timestamp from resolver version identifiers.</p>
+<p>Args:
+value: Resolver version string containing date-like fragments.</p>
+<p>Returns:
+Optional[datetime]: Parsed UTC datetime when the value contains recoverable dates.</p>
+<p>Raises:
+None: Returns <code class="docutils literal notranslate"><span class="pre">None</span></code> instead of raising on unparseable inputs.</p>
+</section>
+<section id="coerce-datetime-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_datetime(value)</span></code><a class="headerlink" href="#coerce-datetime-value" title="Link to this heading"></a></h3>
+<p>Return timezone-aware datetime parsed from HTTP or ISO timestamp.</p>
+</section>
+<section id="normalize-timestamp-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_timestamp(value)</span></code><a class="headerlink" href="#normalize-timestamp-value" title="Link to this heading"></a></h3>
+<p>Return canonical ISO8601 string for HTTP timestamp headers.</p>
+</section>
+<section id="populate-plan-metadata-planned-config-adapter">
+<h3><code class="docutils literal notranslate"><span class="pre">_populate_plan_metadata(planned,</span> <span class="pre">config,</span> <span class="pre">adapter)</span></code><a class="headerlink" href="#populate-plan-metadata-planned-config-adapter" title="Link to this heading"></a></h3>
+<p>Augment planned fetch with HTTP metadata when available.</p>
+</section>
+<section id="migrate-manifest-inplace-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">_migrate_manifest_inplace(payload)</span></code><a class="headerlink" href="#migrate-manifest-inplace-payload" title="Link to this heading"></a></h3>
+<p>Upgrade manifests created with older schema versions in place.</p>
+</section>
+<section id="read-manifest-manifest-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_read_manifest(manifest_path)</span></code><a class="headerlink" href="#read-manifest-manifest-path" title="Link to this heading"></a></h3>
+<p>Return previously recorded manifest data if a valid JSON file exists.</p>
+<p>Args:
+manifest_path: Filesystem path where the manifest is stored.</p>
+<p>Returns:
+Parsed manifest dictionary when available and valid, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</section>
+<section id="validate-manifest-manifest">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_manifest(manifest)</span></code><a class="headerlink" href="#validate-manifest-manifest" title="Link to this heading"></a></h3>
+<p>Check that a manifest instance satisfies structural and type requirements.</p>
+<p>Args:
+manifest: Manifest produced after a download completes.</p>
+<p>Raises:
+ConfigurationError: If required fields are missing or contain invalid types.</p>
+</section>
+<section id="parse-last-modified-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_parse_last_modified(value)</span></code><a class="headerlink" href="#parse-last-modified-value" title="Link to this heading"></a></h3>
+<p>Return a timezone-aware datetime parsed from HTTP date headers.</p>
+</section>
+<section id="fetch-last-modified-plan-config-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">_fetch_last_modified(plan,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#fetch-last-modified-plan-config-logger" title="Link to this heading"></a></h3>
+<p>Probe the upstream plan URL for a Last-Modified header.</p>
+</section>
+<section id="write-manifest-manifest-path-manifest">
+<h3><code class="docutils literal notranslate"><span class="pre">_write_manifest(manifest_path,</span> <span class="pre">manifest)</span></code><a class="headerlink" href="#write-manifest-manifest-path-manifest" title="Link to this heading"></a></h3>
+<p>Persist a validated manifest to disk as JSON.</p>
+<p>Args:
+manifest_path: Destination path for the manifest file.
+manifest: Manifest describing the downloaded ontology artifact.</p>
+</section>
+<section id="build-destination-spec-plan-config">
+<h3><code class="docutils literal notranslate"><span class="pre">_build_destination(spec,</span> <span class="pre">plan,</span> <span class="pre">config)</span></code><a class="headerlink" href="#build-destination-spec-plan-config" title="Link to this heading"></a></h3>
+<p>Determine the output directory and filename for a download.</p>
+<p>Args:
+spec: Fetch specification identifying the ontology.
+plan: Resolver plan containing URL metadata and optional hints.
+config: Resolved configuration with storage layout parameters.</p>
+<p>Returns:
+Tuple containing the target file path, resolved version, and base directory.</p>
+</section>
+<section id="ensure-license-allowed-plan-config-spec">
+<h3><code class="docutils literal notranslate"><span class="pre">_ensure_license_allowed(plan,</span> <span class="pre">config,</span> <span class="pre">spec)</span></code><a class="headerlink" href="#ensure-license-allowed-plan-config-spec" title="Link to this heading"></a></h3>
+<p>Confirm the ontology license is present in the configured allow list.</p>
+<p>Args:
+plan: Resolver plan returned for the ontology.
+config: Resolved configuration containing accepted licenses.
+spec: Fetch specification for contextual error reporting.</p>
+<p>Raises:
+ConfigurationError: If the plan’s license is not permitted.</p>
+</section>
+<section id="resolver-candidates-spec-config">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolver_candidates(spec,</span> <span class="pre">config)</span></code><a class="headerlink" href="#resolver-candidates-spec-config" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="resolve-plan-with-fallback-spec-config-adapter">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_plan_with_fallback(spec,</span> <span class="pre">config,</span> <span class="pre">adapter)</span></code><a class="headerlink" href="#resolve-plan-with-fallback-spec-config-adapter" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="fetch-one-spec">
+<h3><code class="docutils literal notranslate"><span class="pre">fetch_one(spec)</span></code><a class="headerlink" href="#fetch-one-spec" title="Link to this heading"></a></h3>
+<p>Fetch, validate, and persist a single ontology described by <em>spec</em>.</p>
+<p>Args:
+spec: Ontology fetch specification describing sources and formats.
+config: Optional resolved configuration overriding global defaults.
+correlation_id: Correlation identifier for structured logging.
+logger: Optional logger to reuse instead of configuring a new one.
+force: When <code class="docutils literal notranslate"><span class="pre">True</span></code>, bypass local cache checks and redownload artifacts.</p>
+<p>Returns:
+FetchResult: Structured result containing manifest metadata and resolver attempts.</p>
+<p>Raises:
+ResolverError: If all resolver candidates fail to retrieve the ontology.</p>
+</section>
+<section id="plan-one-spec">
+<h3><code class="docutils literal notranslate"><span class="pre">plan_one(spec)</span></code><a class="headerlink" href="#plan-one-spec" title="Link to this heading"></a></h3>
+<p>Return a resolver plan for a single ontology without performing downloads.</p>
+<p>Args:
+spec: Fetch specification describing the ontology to plan.
+config: Optional resolved configuration providing defaults and limits.
+correlation_id: Correlation identifier reused for logging context.
+logger: Logger instance used to emit resolver telemetry.</p>
+<p>Returns:
+PlannedFetch containing the normalized spec, resolver name, and plan.</p>
+<p>Raises:
+ResolverError: If all resolvers fail to produce a plan for <code class="docutils literal notranslate"><span class="pre">spec</span></code>.
+ConfigurationError: If licence checks reject the planned ontology.</p>
+</section>
+<section id="plan-all-specs">
+<h3><code class="docutils literal notranslate"><span class="pre">plan_all(specs)</span></code><a class="headerlink" href="#plan-all-specs" title="Link to this heading"></a></h3>
+<p>Return resolver plans for a collection of ontologies.</p>
+<p>Args:
+specs: Iterable of fetch specifications to resolve.
+config: Optional resolved configuration reused across plans.
+logger: Logger instance used for annotation-aware logging.
+since: Optional cutoff date; plans older than this timestamp are filtered out.</p>
+<p>Returns:
+List of PlannedFetch entries describing each ontology plan.</p>
+<p>Raises:
+ResolverError: Propagated when fallback planning fails for any spec.
+ConfigurationError: When licence enforcement rejects a planned ontology.</p>
+</section>
+<section id="fetch-all-specs">
+<h3><code class="docutils literal notranslate"><span class="pre">fetch_all(specs)</span></code><a class="headerlink" href="#fetch-all-specs" title="Link to this heading"></a></h3>
+<p>Fetch a sequence of ontologies sequentially.</p>
+<p>Args:
+specs: Iterable of fetch specifications to process.
+config: Optional resolved configuration shared across downloads.
+logger: Logger used to emit progress and error events.
+force: When True, skip manifest reuse and download everything again.</p>
+<p>Returns:
+List of FetchResult entries corresponding to completed downloads.</p>
+<p>Raises:
+OntologyDownloadError: Propagated when downloads fail and the pipeline
+is configured to stop on error.</p>
+</section>
+<section id="safe-lock-component-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_safe_lock_component(value)</span></code><a class="headerlink" href="#safe-lock-component-value" title="Link to this heading"></a></h3>
+<p>Return a filesystem-safe token for lock filenames.</p>
+</section>
+<section id="version-lock-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">_version_lock(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#version-lock-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Acquire an inter-process lock for a specific ontology version.</p>
+</section>
+<section id="format-self-record">
+<h3><code class="docutils literal notranslate"><span class="pre">format(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#format-self-record" title="Link to this heading"></a></h3>
+<p>Render <code class="docutils literal notranslate"><span class="pre">record</span></code> as a JSON string with DocsToKG-specific fields.</p>
+</section>
+<section id="to-dict-self">
+<h3><code class="docutils literal notranslate"><span class="pre">to_dict(self)</span></code><a class="headerlink" href="#to-dict-self" title="Link to this heading"></a></h3>
+<p>Return a JSON-serializable dictionary for the manifest.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Dictionary representing the manifest payload.</p>
+</section>
+<section id="to-json-self">
+<h3><code class="docutils literal notranslate"><span class="pre">to_json(self)</span></code><a class="headerlink" href="#to-json-self" title="Link to this heading"></a></h3>
+<p>Serialize the manifest to a stable, human-readable JSON string.</p>
+<p>Args:
+None</p>
+<p>Returns:
+JSON document encoding the manifest metadata.</p>
+</section>
+<section id="plan-self-spec-config-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#plan-self-spec-config-logger" title="Link to this heading"></a></h3>
+<p>Return a FetchPlan describing how to obtain the ontology.</p>
+<p>Args:
+spec: Ontology fetch specification under consideration.
+config: Fully resolved configuration containing defaults.
+logger: Logger adapter scoped to the current fetch request.</p>
+<p>Returns:
+Concrete plan containing download URL, headers, and metadata.</p>
+</section>
+<section id="add-candidate-candidate">
+<h3><code class="docutils literal notranslate"><span class="pre">_add_candidate(candidate)</span></code><a class="headerlink" href="#add-candidate-candidate" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="add-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_add(name)</span></code><a class="headerlink" href="#add-name" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="execute-candidate">
+<h3><code class="docutils literal notranslate"><span class="pre">_execute_candidate()</span></code><a class="headerlink" href="#execute-candidate" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="jsonformatter">
+<h3><code class="docutils literal notranslate"><span class="pre">JSONFormatter</span></code><a class="headerlink" href="#jsonformatter" title="Link to this heading"></a></h3>
+<p>Formatter emitting JSON structured logs.</p>
+</section>
+<section id="ontologydownloaderror">
+<h3><code class="docutils literal notranslate"><span class="pre">OntologyDownloadError</span></code><a class="headerlink" href="#ontologydownloaderror" title="Link to this heading"></a></h3>
+<p>Base exception for ontology download failures.</p>
+<p>Args:
+message: Description of the failure encountered.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>raise OntologyDownloadError(“unexpected error”)
+Traceback (most recent call last):
+…
+OntologyDownloadError: unexpected error</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="resolvererror">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolverError</span></code><a class="headerlink" href="#resolvererror" title="Link to this heading"></a></h3>
+<p>Raised when resolver planning fails.</p>
+<p>Args:
+message: Description of the resolver failure.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>raise ResolverError(“resolver unavailable”)
+Traceback (most recent call last):
+…
+ResolverError: resolver unavailable</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="validationerror">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidationError</span></code><a class="headerlink" href="#validationerror" title="Link to this heading"></a></h3>
+<p>Raised when validation encounters unrecoverable issues.</p>
+<p>Args:
+message: Human-readable description of the validation failure.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>raise ValidationError(“robot validator crashed”)
+Traceback (most recent call last):
+…
+ValidationError: robot validator crashed</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="configurationerror">
+<h3><code class="docutils literal notranslate"><span class="pre">ConfigurationError</span></code><a class="headerlink" href="#configurationerror" title="Link to this heading"></a></h3>
+<p>Raised when configuration or manifest validation fails.</p>
+<p>Args:
+message: Details about the configuration inconsistency.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>raise ConfigurationError(“manifest missing sha256”)
+Traceback (most recent call last):
+…
+ConfigurationError: manifest missing sha256</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="fetchspec">
+<h3><code class="docutils literal notranslate"><span class="pre">FetchSpec</span></code><a class="headerlink" href="#fetchspec" title="Link to this heading"></a></h3>
+<p>Specification describing a single ontology download.</p>
+<p>Attributes:
+id: Stable identifier for the ontology to fetch.
+resolver: Name of the resolver strategy used to locate resources.
+extras: Resolver-specific configuration overrides.
+target_formats: Normalized ontology formats that should be produced.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>spec = FetchSpec(id=”CHEBI”, resolver=”obo”, extras={}, target_formats=(“owl”,))
+spec.resolver
+‘obo’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="fetchresult">
+<h3><code class="docutils literal notranslate"><span class="pre">FetchResult</span></code><a class="headerlink" href="#fetchresult" title="Link to this heading"></a></h3>
+<p>Outcome of a single ontology fetch operation.</p>
+<p>Attributes:
+spec: Fetch specification that initiated the download.
+local_path: Path to the downloaded ontology document.
+status: Final download status (e.g., <code class="docutils literal notranslate"><span class="pre">success</span></code>, <code class="docutils literal notranslate"><span class="pre">skipped</span></code>).
+sha256: SHA-256 digest of the downloaded file.
+manifest_path: Path to the generated manifest JSON file.
+artifacts: Ancillary files produced during extraction or validation.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>from pathlib import Path
+spec = FetchSpec(id=”CHEBI”, resolver=”obo”, extras={}, target_formats=(“owl”,))
+result = FetchResult(
+…     spec=spec,
+…     local_path=Path(“CHEBI.owl”),
+…     status=”success”,
+…     sha256=”deadbeef”,
+…     manifest_path=Path(“manifest.json”),
+…     artifacts=(),
+… )
+result.status
+‘success’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="manifest">
+<h3><code class="docutils literal notranslate"><span class="pre">Manifest</span></code><a class="headerlink" href="#manifest" title="Link to this heading"></a></h3>
+<p>Provenance information for a downloaded ontology artifact.</p>
+<p>Attributes:
+schema_version: Manifest schema version identifier.
+id: Ontology identifier recorded in the manifest.
+resolver: Resolver used to retrieve the ontology.
+url: Final URL from which the ontology was fetched.
+filename: Local filename of the downloaded artifact.
+version: Resolver-reported ontology version, if available.
+license: License identifier associated with the ontology.
+status: Result status reported by the downloader.
+sha256: Hash of the downloaded artifact for integrity checking.
+normalized_sha256: Hash of the canonical normalized TTL output.
+fingerprint: Composite fingerprint combining key provenance values.
+etag: HTTP ETag returned by the upstream server, when provided.
+last_modified: Upstream last-modified timestamp, if supplied.
+downloaded_at: UTC timestamp of the completed download.
+target_formats: Desired conversion targets for normalization.
+validation: Mapping of validator names to their results.
+artifacts: Additional file paths generated during processing.
+resolver_attempts: Ordered record of resolver attempts during download.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>manifest = Manifest(
+…     schema_version=”1.0”,
+…     id=”CHEBI”,
+…     resolver=”obo”,
+…     url=”https://example.org/chebi.owl”,
+…     filename=”chebi.owl”,
+…     version=None,
+…     license=”CC-BY”,
+…     status=”success”,
+…     sha256=”deadbeef”,
+…     normalized_sha256=None,
+…     fingerprint=None,
+…     etag=None,
+…     last_modified=None,
+…     downloaded_at=”2024-01-01T00:00:00Z”,
+…     target_formats=(“owl”,),
+…     validation={},
+…     artifacts=(),
+…     resolver_attempts=(),
+… )
+manifest.resolver
+‘obo’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="resolver">
+<h3><code class="docutils literal notranslate"><span class="pre">Resolver</span></code><a class="headerlink" href="#resolver" title="Link to this heading"></a></h3>
+<p>Protocol describing resolver planning behaviour.</p>
+<p>Attributes:
+None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>import logging
+spec = FetchSpec(id=”CHEBI”, resolver=”dummy”, extras={}, target_formats=(“owl”,))
+class DummyResolver:
+…     def plan(self, spec, config, logger):
+…         return FetchPlan(
+…             url=”https://example.org/chebi.owl”,
+…             headers={},
+…             filename_hint=”chebi.owl”,
+…             version=”v1”,
+…             license=”CC-BY”,
+…             media_type=”application/rdf+xml”,
+…         )
+…
+plan = DummyResolver().plan(spec, ResolvedConfig.from_defaults(), logging.getLogger(“test”))
+plan.url
+‘https://example.org/chebi.owl’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="resolvercandidate">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolverCandidate</span></code><a class="headerlink" href="#resolvercandidate" title="Link to this heading"></a></h3>
+<p>Resolver plan captured for download-time fallback.</p>
+<p>Attributes:
+resolver: Name of the resolver that produced the plan.
+plan: Concrete :class:<code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code> describing how to fetch the ontology.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>candidate = ResolverCandidate(
+…     resolver=”obo”,
+…     plan=FetchPlan(
+…         url=”https://example.org/hp.owl”,
+…         headers={},
+…         filename_hint=None,
+…         version=”2024-01-01”,
+…         license=”CC-BY”,
+…         media_type=”application/rdf+xml”,
+…         service=”obo”,
+…     ),
+… )
+candidate.resolver
+‘obo’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="plannedfetch">
+<h3><code class="docutils literal notranslate"><span class="pre">PlannedFetch</span></code><a class="headerlink" href="#plannedfetch" title="Link to this heading"></a></h3>
+<p>Plan describing how an ontology would be fetched without side effects.</p>
+<p>Attributes:
+spec: Original fetch specification provided by the caller.
+resolver: Name of the resolver selected to satisfy the plan.
+plan: Concrete :class:<code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code> generated by the resolver.
+candidates: Ordered list of resolver candidates available for fallback.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>fetch_plan = PlannedFetch(
+…     spec=FetchSpec(id=”hp”, resolver=”obo”, extras={}, target_formats=(“owl”,)),
+…     resolver=”obo”,
+…     plan=FetchPlan(
+…         url=”https://example.org/hp.owl”,
+…         headers={},
+…         filename_hint=”hp.owl”,
+…         version=”2024-01-01”,
+…         license=”CC-BY-4.0”,
+…         media_type=”application/rdf+xml”,
+…     ),
+…     candidates=(
+…         ResolverCandidate(
+…             resolver=”obo”,
+…             plan=FetchPlan(
+…                 url=”https://example.org/hp.owl”,
+…                 headers={},
+…                 filename_hint=”hp.owl”,
+…                 version=”2024-01-01”,
+…                 license=”CC-BY-4.0”,
+…                 media_type=”application/rdf+xml”,
+…             ),
+…         ),
+…     ),
+… )
+fetch_plan.resolver
+‘obo’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
 </section>
 
 

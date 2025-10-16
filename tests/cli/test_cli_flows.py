@@ -147,11 +147,10 @@ from types import SimpleNamespace
 from typing import Any, Dict, List
 
 import pytest
-from tools.manifest_to_csv import convert_manifest_to_csv
-from tools.manifest_to_index import convert_manifest_to_index
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload import resolvers
 from DocsToKG.ContentDownload.classifications import Classification
+from DocsToKG.ContentDownload.telemetry import MANIFEST_SCHEMA_VERSION
 # --- Globals ---
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -327,11 +326,12 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
     assert manifest["resolver"] == "openalex"
     assert manifest["url"] == "https://oa.example/direct.pdf"
     assert manifest["classification"] == "pdf"
+    assert manifest["schema_version"] == MANIFEST_SCHEMA_VERSION
     assert downloader.oa_config.email == "team@example.org"
     assert calls == ["machine learning"]
 
     index_path = manifest_path.with_suffix(".index.json")
-    convert_manifest_to_index(manifest_path, index_path)
+    assert index_path.exists()
     index_payload = json.loads(index_path.read_text(encoding="utf-8"))
     assert manifest["work_id"] in index_payload
     assert index_payload[manifest["work_id"]]["classification"] == "pdf"
@@ -428,8 +428,8 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
 
     downloader.main()
 
-    last_csv = manifest_path.with_name("manifest.last.csv")
-    convert_manifest_to_csv(manifest_path, last_csv)
+    last_csv = manifest_path.with_suffix(".last.csv")
+    assert last_csv.exists()
 
     with last_csv.open("r", encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -847,6 +847,9 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
         previous_lookup={},
         resume_completed=set(),
         max_bytes=None,
+        sniff_bytes=downloader.DEFAULT_SNIFF_BYTES,
+        min_pdf_bytes=downloader.DEFAULT_MIN_PDF_BYTES,
+        tail_check_bytes=downloader.DEFAULT_TAIL_CHECK_BYTES,
     )
 
     logger.close()
@@ -902,6 +905,9 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
         previous_lookup={},
         resume_completed={"W-RESUME"},
         max_bytes=None,
+        sniff_bytes=downloader.DEFAULT_SNIFF_BYTES,
+        min_pdf_bytes=downloader.DEFAULT_MIN_PDF_BYTES,
+        tail_check_bytes=downloader.DEFAULT_TAIL_CHECK_BYTES,
     )
 
     logger.close()
@@ -925,6 +931,7 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
     previous_manifest = tmp_path / "resume_manifest.jsonl"
     previous_entry = {
         "record_type": "manifest",
+        "schema_version": MANIFEST_SCHEMA_VERSION,
         "timestamp": "2024-05-01T00:00:00Z",
         "work_id": "WPARTIAL",
         "title": "Partial Record",
@@ -1028,7 +1035,11 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
     downloader.main()
 
     assert contexts, "expected pipeline context to be captured"
-    previous_map = contexts[0]["previous"]
+    context_payload = contexts[0]
+    assert context_payload["sniff_bytes"] == downloader.DEFAULT_SNIFF_BYTES
+    assert context_payload["min_pdf_bytes"] == downloader.DEFAULT_MIN_PDF_BYTES
+    assert context_payload["tail_check_bytes"] == downloader.DEFAULT_TAIL_CHECK_BYTES
+    previous_map = context_payload["previous"]
     assert previous_entry["url"] not in previous_map
 
     new_entries = [

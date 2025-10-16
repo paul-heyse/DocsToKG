@@ -1259,5 +1259,6 @@ def test_download_candidate_marks_corrupt_without_eof(tmp_path):
     responses.add(responses.HEAD, pdf_url, headers={"Content-Type": "application/pdf"}, status=200)
     session = requests.Session()
     outcome = downloader.download_candidate(session, artifact, pdf_url, referer=None, timeout=5.0)
-    assert outcome.classification is Classification.PDF_CORRUPT
+    assert outcome.classification is Classification.MISS
     assert outcome.path is None
+    assert outcome.error == "pdf-eof-missing"

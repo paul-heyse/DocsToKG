@@ -124,8 +124,26 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
         except Exception:  # pragma: no cover - defensive catch
             pass
 
+        confidence_candidates: List[float] = []
+
+        def _maybe_add_conf(value: object) -> None:
+            """Collect numeric confidence scores when they can be coerced to float."""
+            try:
+                if value is None:
+                    return
+                confidence_candidates.append(float(value))
+            except (TypeError, ValueError):
+                pass
+
         for annotation in annotations:
             try:
+                _maybe_add_conf(getattr(annotation, "confidence", None))
+                _maybe_add_conf(getattr(annotation, "score", None))
+                predicted = getattr(annotation, "predicted_classes", None)
+                if predicted:
+                    for cls in predicted:
+                        _maybe_add_conf(getattr(cls, "confidence", None))
+                        _maybe_add_conf(getattr(cls, "probability", None))
                 if isinstance(annotation, PictureDescriptionData) and annotation.text:
                     parts.append(f"Picture description: {annotation.text}")
                 elif (
@@ -156,6 +174,15 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
             flags["has_image_classification"] = (
                 flags["has_image_classification"] or has_classification
             )
+            if confidence_candidates:
+                candidate = max(confidence_candidates)
+                existing = flags.get("image_confidence")
+                try:
+                    existing_val = float(existing) if existing is not None else None
+                except (TypeError, ValueError):
+                    existing_val = None
+                if existing_val is None or candidate > existing_val:
+                    flags["image_confidence"] = candidate
             setattr(item, "_docstokg_flags", flags)
         except Exception:
             pass

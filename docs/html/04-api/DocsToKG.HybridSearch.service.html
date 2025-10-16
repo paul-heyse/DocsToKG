@@ -130,6 +130,10 @@ RequestValidationError: If <code class="docutils literal notranslate"><span clas
 <h3><code class="docutils literal notranslate"><span class="pre">_validate_request(self,</span> <span class="pre">request)</span></code><a class="headerlink" href="#validate-request-self-request" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="dense-store-self-namespace">
+<h3><code class="docutils literal notranslate"><span class="pre">_dense_store(self,</span> <span class="pre">namespace)</span></code><a class="headerlink" href="#dense-store-self-namespace" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="slice-from-cursor-self-results-cursor">
 <h3><code class="docutils literal notranslate"><span class="pre">_slice_from_cursor(self,</span> <span class="pre">results,</span> <span class="pre">cursor)</span></code><a class="headerlink" href="#slice-from-cursor-self-results-cursor" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
@@ -146,8 +150,8 @@ RequestValidationError: If <code class="docutils literal notranslate"><span clas
 <h3><code class="docutils literal notranslate"><span class="pre">_execute_splade(self,</span> <span class="pre">request,</span> <span class="pre">filters,</span> <span class="pre">config,</span> <span class="pre">query_features,</span> <span class="pre">timings)</span></code><a class="headerlink" href="#execute-splade-self-request-filters-config-query-features-timings" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="execute-dense-self-request-filters-config-query-features-timings">
-<h3><code class="docutils literal notranslate"><span class="pre">_execute_dense(self,</span> <span class="pre">request,</span> <span class="pre">filters,</span> <span class="pre">config,</span> <span class="pre">query_features,</span> <span class="pre">timings)</span></code><a class="headerlink" href="#execute-dense-self-request-filters-config-query-features-timings" title="Link to this heading"></a></h3>
+<section id="execute-dense-self-request-filters-config-query-features-timings-store">
+<h3><code class="docutils literal notranslate"><span class="pre">_execute_dense(self,</span> <span class="pre">request,</span> <span class="pre">filters,</span> <span class="pre">config,</span> <span class="pre">query_features,</span> <span class="pre">timings,</span> <span class="pre">store)</span></code><a class="headerlink" href="#execute-dense-self-request-filters-config-query-features-timings-store" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="filter-dense-hits-self-hits-filters">
@@ -216,7 +220,8 @@ ChannelResults(candidates=[], scores={})</p>
 <p>Attributes:
 _config_manager: Source of runtime hybrid-search configuration.
 _feature_generator: Component producing BM25/SPLADE/dense features.
-_faiss: GPU-backed FAISS index manager for dense retrieval.
+_faiss: Default FAISS index used for namespaces routed to the shared store.
+_faiss_router: Namespace-aware router managing FAISS stores.
 _opensearch: Lexical index used for BM25 and SPLADE lookups.
 _registry: Chunk registry providing metadata and FAISS id lookups.
 _observability: Telemetry facade for metrics and traces.</p>
@@ -227,7 +232,7 @@ _observability: Telemetry facade for metrics and traces.</p>
 <div><p class="rubric" id="file-backed-config-manager-json-yaml-on-disk">File-backed config manager (JSON/YAML on disk)</p>
 <p>from pathlib import Path  # doctest: +SKIP
 manager = HybridSearchConfigManager(Path(“config.json”))  # doctest: +SKIP
-from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator  # doctest: +SKIP
+from DocsToKG.HybridSearch.storage import OpenSearchSimulator  # doctest: +SKIP
 service = HybridSearchService(  # doctest: +SKIP
 …     config_manager=manager,
 …     feature_generator=FeatureGenerator(embedding_dim=16),

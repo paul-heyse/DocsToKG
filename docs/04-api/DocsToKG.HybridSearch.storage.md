@@ -91,6 +91,10 @@ None
 Returns:
 List containing every chunk payload stored in the registry.
 
+### `iter_all(self)`
+
+Yield chunk payloads without materialising the full list.
+
 ### `count(self)`
 
 Return the number of chunks tracked by the registry.

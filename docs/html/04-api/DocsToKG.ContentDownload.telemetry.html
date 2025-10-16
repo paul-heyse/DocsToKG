@@ -150,19 +150,26 @@ Exception: Implementations may propagate shutdown failures.</p>
 </section>
 <section id="id1">
 <h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Append an attempt record to the JSONL log.</p>
+<p>Args:
+record: Attempt metadata captured during resolver execution.
+timestamp: Optional ISO-8601 timestamp overriding the current time.</p>
 </section>
 <section id="id2">
 <h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Append a manifest record representing a persisted document.</p>
+<p>Args:
+entry: Manifest entry produced once a resolver finalises output.</p>
 </section>
 <section id="id3">
 <h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Append a run-level summary describing aggregate metrics.</p>
+<p>Args:
+summary: Mapping containing summary counters and metadata.</p>
 </section>
 <section id="id4">
 <h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Flush buffered data and close the underlying JSONL file handle.</p>
 </section>
 <section id="enter-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#enter-self" title="Link to this heading"></a></h3>
@@ -174,19 +181,22 @@ Exception: Implementations may propagate shutdown failures.</p>
 </section>
 <section id="id5">
 <h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Append an attempt record to the CSV log.</p>
+<p>Args:
+record: Attempt metadata captured during resolver execution.
+timestamp: Optional override for the timestamp column.</p>
 </section>
 <section id="id6">
 <h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Ignore manifest writes for CSV sinks (interface compatibility).</p>
 </section>
 <section id="id7">
 <h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Ignore summary writes for CSV sinks (interface compatibility).</p>
 </section>
 <section id="id8">
 <h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Flush buffered data and close the CSV file handle.</p>
 </section>
 <section id="id9">
 <h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
@@ -198,19 +208,19 @@ Exception: Implementations may propagate shutdown failures.</p>
 </section>
 <section id="id11">
 <h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Fan out an attempt record to each sink in the composite.</p>
 </section>
 <section id="id12">
 <h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Fan out manifest records to every sink in the collection.</p>
 </section>
 <section id="id13">
 <h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Fan out summary payloads to every sink in the collection.</p>
 </section>
 <section id="id14">
 <h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Close sinks while capturing the first raised exception.</p>
 </section>
 <section id="id15">
 <h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
@@ -220,6 +230,58 @@ Exception: Implementations may propagate shutdown failures.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id16" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="id17">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id17" title="Link to this heading"></a></h3>
+<p>No-op to satisfy the telemetry sink interface.</p>
+</section>
+<section id="id18">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id18" title="Link to this heading"></a></h3>
+<p>No-op because the manifest index only reacts to manifests.</p>
+</section>
+<section id="id19">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id19" title="Link to this heading"></a></h3>
+<p>Index the latest manifest metadata for <code class="docutils literal notranslate"><span class="pre">entry.work_id</span></code>.</p>
+</section>
+<section id="id20">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id20" title="Link to this heading"></a></h3>
+<p>Write the collected manifest index to disk once.</p>
+</section>
+<section id="id21">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id21" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id22">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id22" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id23">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id23" title="Link to this heading"></a></h3>
+<p>No-op to satisfy the telemetry sink interface.</p>
+</section>
+<section id="id24">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id24" title="Link to this heading"></a></h3>
+<p>No-op because the CSV sink only records manifest events.</p>
+</section>
+<section id="normalise-self-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalise(self,</span> <span class="pre">value)</span></code><a class="headerlink" href="#normalise-self-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id25">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id25" title="Link to this heading"></a></h3>
+<p>Store the most recent manifest attributes for <code class="docutils literal notranslate"><span class="pre">entry.work_id</span></code>.</p>
+</section>
+<section id="id26">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id26" title="Link to this heading"></a></h3>
+<p>Flush collected manifest rows to the CSV file.</p>
+</section>
+<section id="id27">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id27" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id28">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id28" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
@@ -227,6 +289,7 @@ Exception: Implementations may propagate shutdown failures.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">ManifestEntry</span></code><a class="headerlink" href="#manifestentry" title="Link to this heading"></a></h3>
 <p>Structured manifest entry describing a resolved artifact.</p>
 <p>Attributes:
+schema_version: Integer identifying the manifest schema revision.
 timestamp: ISO-8601 timestamp describing when the artifact was stored.
 work_id: Primary identifier (e.g., OpenAlex work ID) for the artifact.
 title: Human-readable work title.
@@ -249,6 +312,7 @@ dry_run: Flag indicating whether the artifact was processed in dry-run mode.</p>
 <div><blockquote>
 <div><blockquote>
 <div><p>entry = ManifestEntry(
+…     schema_version=2,
 …     timestamp=”2025-01-01T00:00:00Z”,
 …     work_id=”W123”,
 …     title=”Example”,
@@ -305,6 +369,14 @@ True</p>
 <section id="multisink">
 <h3><code class="docutils literal notranslate"><span class="pre">MultiSink</span></code><a class="headerlink" href="#multisink" title="Link to this heading"></a></h3>
 <p>Composite sink that fans out logging calls to multiple sinks.</p>
+</section>
+<section id="manifestindexsink">
+<h3><code class="docutils literal notranslate"><span class="pre">ManifestIndexSink</span></code><a class="headerlink" href="#manifestindexsink" title="Link to this heading"></a></h3>
+<p>Maintain a JSON index mapping work IDs to their latest PDF artefacts.</p>
+</section>
+<section id="lastattemptcsvsink">
+<h3><code class="docutils literal notranslate"><span class="pre">LastAttemptCsvSink</span></code><a class="headerlink" href="#lastattemptcsvsink" title="Link to this heading"></a></h3>
+<p>Write a CSV snapshot containing the most recent manifest entry per work.</p>
 </section>
 </section>
 </section>

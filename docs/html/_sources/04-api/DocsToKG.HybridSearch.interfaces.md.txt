@@ -103,6 +103,10 @@ Return the number of stored vectors.
 
 Return the CUDA device identifier used by the index.
 
+### `config(self)`
+
+Immutable configuration backing the dense store.
+
 ### `gpu_resources(self)`
 
 Return GPU resources when available, otherwise ``None``.
@@ -111,6 +115,10 @@ Return GPU resources when available, otherwise ``None``.
 
 Insert dense vectors.
 
+### `add_batch(self, vectors, vector_ids)`
+
+Insert vectors in batches; defaults mirror FAISS GPU-friendly chunking.
+
 ### `remove(self, vector_ids)`
 
 Delete dense vectors referenced by ``vector_ids``.
@@ -118,6 +126,14 @@ Delete dense vectors referenced by ``vector_ids``.
 ### `search(self, query, top_k)`
 
 Search for nearest neighbours of ``query``.
+
+### `search_many(self, queries, top_k)`
+
+Search for nearest neighbours of multiple queries.
+
+### `search_batch(self, queries, top_k)`
+
+Optional alias for batched search.
 
 ### `serialize(self)`
 
@@ -130,6 +146,22 @@ Restore index state from ``payload``.
 ### `stats(self)`
 
 Return implementation-defined statistics.
+
+### `rebuild_if_needed(self)`
+
+Perform compaction when the store indicates a rebuild is required.
+
+### `needs_training(self)`
+
+Return ``True`` when additional training is required.
+
+### `train(self, vectors)`
+
+Train the index with representative vectors.
+
+### `set_id_resolver(self, resolver)`
+
+Register a resolver translating FAISS integer IDs to external IDs.
 
 ## 3. Classes
 
@@ -144,7 +176,7 @@ Attributes:
 None
 
 Examples:
->>> from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator
+>>> from DocsToKG.HybridSearch.storage import OpenSearchSimulator
 >>> simulator: LexicalIndex = OpenSearchSimulator()
 >>> simulator.bulk_upsert([])  # doctest: +SKIP
 

@@ -110,7 +110,9 @@ landing pages. Use the following snippet to disable HEAD filtering for
 specific providers while leaving the feature enabled globally:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">enable_head_precheck</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="nt">resolver_head_precheck</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">landing_page</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 <span class="w">  </span><span class="nt">wayback</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">zenodo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </pre></div>
 </div>
 <p>Resolvers omitted from <code class="docutils literal notranslate"><span class="pre">resolver_head_precheck</span></code> inherit the global

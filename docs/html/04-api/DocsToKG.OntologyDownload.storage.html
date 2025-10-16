@@ -81,21 +81,124 @@
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.storage</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Storage backend facade retained for backward compatibility.</p>
+<p>Storage backend implementations for the ontology downloader.</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="load-core">
-<h3><code class="docutils literal notranslate"><span class="pre">_load_core()</span></code><a class="headerlink" href="#load-core" title="Link to this heading"></a></h3>
+<section id="safe-identifiers-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">_safe_identifiers(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#safe-identifiers-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Return identifiers sanitised for filesystem usage.</p>
+</section>
+<section id="directory-size-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_directory_size(path)</span></code><a class="headerlink" href="#directory-size-path" title="Link to this heading"></a></h3>
+<p>Return the total size in bytes for files rooted at <em>path</em>.</p>
+</section>
+<section id="get-storage-backend">
+<h3><code class="docutils literal notranslate"><span class="pre">get_storage_backend()</span></code><a class="headerlink" href="#get-storage-backend" title="Link to this heading"></a></h3>
+<p>Instantiate the storage backend based on environment configuration.</p>
+</section>
+<section id="prepare-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">prepare_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#prepare-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Return a workspace for the given ontology/version combination.</p>
+</section>
+<section id="ensure-local-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#ensure-local-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Ensure a local directory exists for the requested ontology version.</p>
+</section>
+<section id="available-versions-self-ontology-id">
+<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#available-versions-self-ontology-id" title="Link to this heading"></a></h3>
+<p>Return sorted version identifiers available for <em>ontology_id</em>.</p>
+</section>
+<section id="available-ontologies-self">
+<h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#available-ontologies-self" title="Link to this heading"></a></h3>
+<p>Return sorted ontology identifiers known to the backend.</p>
+</section>
+<section id="finalize-version-self-ontology-id-version-local-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#finalize-version-self-ontology-id-version-local-dir" title="Link to this heading"></a></h3>
+<p>Persist processed artefacts for <em>ontology_id</em>/<em>version</em>.</p>
+</section>
+<section id="version-path-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">version_path(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#version-path-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Return the canonical path for <em>ontology_id</em>/<em>version</em>.</p>
+</section>
+<section id="delete-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#delete-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Delete stored data for <em>ontology_id</em>/<em>version</em>, returning bytes reclaimed.</p>
+</section>
+<section id="set-latest-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">set_latest_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#set-latest-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Record the latest processed version for <em>ontology_id</em>.</p>
+</section>
+<section id="version-dir-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">_version_dir(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#version-dir-self-ontology-id-version" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="getattr-name">
-<h3><code class="docutils literal notranslate"><span class="pre">__getattr__(name)</span></code><a class="headerlink" href="#getattr-name" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">prepare_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Create a workspace for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code> with required subdirs.</p>
 </section>
-<section id="dir">
-<h3><code class="docutils literal notranslate"><span class="pre">__dir__()</span></code><a class="headerlink" href="#dir" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Ensure the version directory exists and return its path.</p>
+</section>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>List version identifiers currently stored for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>.</p>
+</section>
+<section id="id4">
+<h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<p>List ontology identifiers known to the local backend.</p>
+</section>
+<section id="id5">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<p>Hook for subclasses; local backend writes occur in-place already.</p>
+</section>
+<section id="id6">
+<h3><code class="docutils literal notranslate"><span class="pre">version_path(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<p>Return the filesystem path holding <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code> data.</p>
+</section>
+<section id="id7">
+<h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
+<p>Remove stored data for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code> and return bytes reclaimed.</p>
+</section>
+<section id="id8">
+<h3><code class="docutils literal notranslate"><span class="pre">set_latest_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
+<p>Update symbolic links/markers to highlight the latest processed version.</p>
+</section>
+<section id="remote-version-path-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">_remote_version_path(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#remote-version-path-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Return the remote storage path for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code>.</p>
+</section>
+<section id="id9">
+<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
+<p>Combine local and remote version identifiers for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>.</p>
+</section>
+<section id="id10">
+<h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
+<p>Return the union of ontology ids present locally and in remote storage.</p>
+</section>
+<section id="id11">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
+<p>Mirror processed artefacts to remote storage after local completion.</p>
+</section>
+<section id="id12">
+<h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<p>Remove local and remote artefacts for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code>.</p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="storagebackend">
+<h3><code class="docutils literal notranslate"><span class="pre">StorageBackend</span></code><a class="headerlink" href="#storagebackend" title="Link to this heading"></a></h3>
+<p>Protocol describing storage operations required by the pipeline.</p>
+</section>
+<section id="localstoragebackend">
+<h3><code class="docutils literal notranslate"><span class="pre">LocalStorageBackend</span></code><a class="headerlink" href="#localstoragebackend" title="Link to this heading"></a></h3>
+<p>Storage backend that keeps artefacts on the local filesystem.</p>
+</section>
+<section id="fsspecstoragebackend">
+<h3><code class="docutils literal notranslate"><span class="pre">FsspecStorageBackend</span></code><a class="headerlink" href="#fsspecstoragebackend" title="Link to this heading"></a></h3>
+<p>Hybrid backend that mirrors artefacts to an fsspec location.</p>
 </section>
 </section>
 </section>

@@ -26,7 +26,7 @@ Args:
 None
 
 Returns:
-FaissVectorStore associated with the ingestion pipeline.
+DenseVectorStore associated with the ingestion pipeline.
 
 ### `upsert_documents(self, documents)`
 
@@ -189,8 +189,8 @@ _observability: Observability facade for tracing and logging.
 
 Examples:
 >>> pipeline = ChunkIngestionPipeline(
-...     faiss_index=FaissVectorStore.build_in_memory(),
-...     opensearch=OpenSearchSimulator(),  # from DocsToKG.HybridSearch.devtools.opensearch_simulator  # doctest: +SKIP
+...     faiss_index=DenseVectorStore(...),
+...     opensearch=OpenSearchSimulator(),  # from DocsToKG.HybridSearch.storage  # doctest: +SKIP
 ...     registry=ChunkRegistry(),
 ... )
 >>> isinstance(pipeline.metrics.chunks_upserted, int)

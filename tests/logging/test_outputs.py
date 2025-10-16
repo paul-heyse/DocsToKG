@@ -86,8 +86,11 @@ pytest.importorskip("pyalex")
 from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
     CsvSink,
     JsonlSink,
+    LastAttemptCsvSink,
     ManifestEntry,
+    ManifestIndexSink,
     MultiSink,
+    MANIFEST_SCHEMA_VERSION,
 )
 from DocsToKG.ContentDownload.resolvers import AttemptRecord  # noqa: E402
 from scripts.export_attempts_csv import export_attempts_jsonl_to_csv  # noqa: E402
@@ -139,8 +142,8 @@ def test_multi_sink_synchronizes_timestamps(tmp_path: Path) -> None:
         metadata={},
         dry_run=True,
     )
-    with JsonlSink(jsonl_path) as jsonl, CsvSink(csv_path) as csv:
-        sink = MultiSink([jsonl, csv])
+    with JsonlSink(jsonl_path) as jsonl, CsvSink(csv_path) as csv_logger:
+        sink = MultiSink([jsonl, csv_logger])
         sink.log_attempt(record)
 
     json_payload = json.loads(jsonl_path.read_text(encoding="utf-8").strip())
@@ -229,6 +232,7 @@ def test_jsonl_sink_writes_valid_records(tmp_path: Path) -> None:
     logger.log_attempt(attempt)
 
     manifest_entry = ManifestEntry(
+        schema_version=MANIFEST_SCHEMA_VERSION,
         timestamp="2024-01-01T00:00:00Z",
         work_id="W1",
         title="Example",
@@ -260,6 +264,7 @@ def test_jsonl_sink_writes_valid_records(tmp_path: Path) -> None:
     assert attempt_record["metadata"] == {"source": "test"}
     assert attempt_record["sha256"] == "deadbeef"
     assert attempt_record["resolver_wall_time_ms"] == 321.0
+    assert parsed[1]["schema_version"] == MANIFEST_SCHEMA_VERSION
 
 
 def test_export_attempts_csv(tmp_path: Path) -> None:
@@ -343,8 +348,8 @@ def test_jsonl_sink_thread_safety(tmp_path: Path) -> None:
 def test_multi_sink_thread_safety(tmp_path: Path) -> None:
     jsonl_path = tmp_path / "attempts.jsonl"
     csv_path = tmp_path / "attempts.csv"
-    with JsonlSink(jsonl_path) as jsonl, CsvSink(csv_path) as csv:
-        sink = MultiSink([jsonl, csv])
+    with JsonlSink(jsonl_path) as jsonl, CsvSink(csv_path) as csv_logger:
+        sink = MultiSink([jsonl, csv_logger])
 
         def _worker(offset: int) -> None:
             for idx in range(1000):
@@ -486,6 +491,145 @@ def test_manifest_to_csv_tool_writes_latest_entries(tmp_path: Path) -> None:
             "resolver": "",
             "url": "",
             "classification": "",
+            "path": "",
+            "sha256": "",
+            "content_length": "",
+            "etag": "",
+            "last_modified": "",
+        },
+    ]
+
+
+def test_manifest_index_sink_writes_sorted_index(tmp_path: Path) -> None:
+    index_path = tmp_path / "manifest.index.json"
+    sink = ManifestIndexSink(index_path)
+    sink.log_manifest(
+        ManifestEntry(
+            schema_version=MANIFEST_SCHEMA_VERSION,
+            timestamp="2024-01-01T00:00:00Z",
+            work_id="W2",
+            title="Second",
+            publication_year=2024,
+            resolver="unpaywall",
+            url="https://example.org/second",
+            path=str(tmp_path / "pdf" / "second.pdf"),
+            classification="pdf",
+            content_type="application/pdf",
+            reason=None,
+            sha256="def",
+        )
+    )
+    sink.log_manifest(
+        ManifestEntry(
+            schema_version=MANIFEST_SCHEMA_VERSION,
+            timestamp="2024-01-02T00:00:00Z",
+            work_id="W1",
+            title="First",
+            publication_year=2023,
+            resolver="crossref",
+            url="https://example.org/first",
+            path=str(tmp_path / "html" / "first.html"),
+            classification="html",
+            content_type="text/html",
+            reason=None,
+        )
+    )
+    sink.close()
+
+    payload = json.loads(index_path.read_text(encoding="utf-8"))
+    assert list(payload.keys()) == ["W1", "W2"]
+    assert payload["W1"] == {
+        "classification": "html",
+        "pdf_path": None,
+        "sha256": None,
+    }
+    assert payload["W2"] == {
+        "classification": "pdf",
+        "pdf_path": str(tmp_path / "pdf" / "second.pdf"),
+        "sha256": "def",
+    }
+
+
+def test_last_attempt_csv_sink_writes_latest_entries(tmp_path: Path) -> None:
+    csv_path = tmp_path / "manifest.last.csv"
+    sink = LastAttemptCsvSink(csv_path)
+    sink.log_manifest(
+        ManifestEntry(
+            schema_version=MANIFEST_SCHEMA_VERSION,
+            timestamp="2024-01-01T00:00:00Z",
+            work_id="W-last",
+            title="Initial",
+            publication_year=2024,
+            resolver="unpaywall",
+            url="https://example.org/first",
+            path="/tmp/first.pdf",
+            classification="pdf",
+            content_type="application/pdf",
+            reason=None,
+            sha256="111",
+            content_length=100,
+        )
+    )
+    sink.log_manifest(
+        ManifestEntry(
+            schema_version=MANIFEST_SCHEMA_VERSION,
+            timestamp="2024-01-02T00:00:00Z",
+            work_id="W-last",
+            title="Updated",
+            publication_year=2024,
+            resolver="crossref",
+            url="https://example.org/second",
+            path="/tmp/second.pdf",
+            classification="pdf",
+            content_type="application/pdf",
+            reason=None,
+            sha256="222",
+            content_length=200,
+            etag="",
+            last_modified="",
+        )
+    )
+    sink.log_manifest(
+        ManifestEntry(
+            schema_version=MANIFEST_SCHEMA_VERSION,
+            timestamp="2024-01-03T00:00:00Z",
+            work_id="W-new",
+            title="New",
+            publication_year=None,
+            resolver=None,
+            url=None,
+            path=None,
+            classification="miss",
+            content_type=None,
+            reason=None,
+        )
+    )
+    sink.close()
+
+    with csv_path.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert rows == [
+        {
+            "work_id": "W-last",
+            "title": "Updated",
+            "publication_year": "2024",
+            "resolver": "crossref",
+            "url": "https://example.org/second",
+            "classification": "pdf",
+            "path": "/tmp/second.pdf",
+            "sha256": "222",
+            "content_length": "200",
+            "etag": "",
+            "last_modified": "",
+        },
+        {
+            "work_id": "W-new",
+            "title": "New",
+            "publication_year": "",
+            "resolver": "",
+            "url": "",
+            "classification": "miss",
             "path": "",
             "sha256": "",
             "content_length": "",

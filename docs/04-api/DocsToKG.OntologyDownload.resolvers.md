@@ -32,14 +32,6 @@ cleaned original value or ``None`` when the input is empty.
 
 Return a token bucket for resolver API requests respecting rate limits.
 
-### `_load_resolver_plugins(logger)`
-
-Discover resolver plugins registered via Python entry points.
-
-### `_ensure_plugins_loaded(logger)`
-
-Ensure resolver plugins are loaded at most once per interpreter.
-
 ### `_execute_with_retry(self, func)`
 
 Run a callable with retry semantics tailored for resolver APIs.

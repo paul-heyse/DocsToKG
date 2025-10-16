@@ -89,19 +89,29 @@ Exception: Implementations may propagate shutdown failures.
 
 ### `log_attempt(self, record)`
 
-*No documentation available.*
+Append an attempt record to the JSONL log.
+
+Args:
+record: Attempt metadata captured during resolver execution.
+timestamp: Optional ISO-8601 timestamp overriding the current time.
 
 ### `log_manifest(self, entry)`
 
-*No documentation available.*
+Append a manifest record representing a persisted document.
+
+Args:
+entry: Manifest entry produced once a resolver finalises output.
 
 ### `log_summary(self, summary)`
 
-*No documentation available.*
+Append a run-level summary describing aggregate metrics.
+
+Args:
+summary: Mapping containing summary counters and metadata.
 
 ### `close(self)`
 
-*No documentation available.*
+Flush buffered data and close the underlying JSONL file handle.
 
 ### `__enter__(self)`
 
@@ -113,19 +123,23 @@ Exception: Implementations may propagate shutdown failures.
 
 ### `log_attempt(self, record)`
 
-*No documentation available.*
+Append an attempt record to the CSV log.
+
+Args:
+record: Attempt metadata captured during resolver execution.
+timestamp: Optional override for the timestamp column.
 
 ### `log_manifest(self, entry)`
 
-*No documentation available.*
+Ignore manifest writes for CSV sinks (interface compatibility).
 
 ### `log_summary(self, summary)`
 
-*No documentation available.*
+Ignore summary writes for CSV sinks (interface compatibility).
 
 ### `close(self)`
 
-*No documentation available.*
+Flush buffered data and close the CSV file handle.
 
 ### `__enter__(self)`
 
@@ -137,19 +151,71 @@ Exception: Implementations may propagate shutdown failures.
 
 ### `log_attempt(self, record)`
 
+Fan out an attempt record to each sink in the composite.
+
+### `log_manifest(self, entry)`
+
+Fan out manifest records to every sink in the collection.
+
+### `log_summary(self, summary)`
+
+Fan out summary payloads to every sink in the collection.
+
+### `close(self)`
+
+Close sinks while capturing the first raised exception.
+
+### `__enter__(self)`
+
+*No documentation available.*
+
+### `__exit__(self, exc_type, exc, tb)`
+
+*No documentation available.*
+
+### `log_attempt(self, record)`
+
+No-op to satisfy the telemetry sink interface.
+
+### `log_summary(self, summary)`
+
+No-op because the manifest index only reacts to manifests.
+
+### `log_manifest(self, entry)`
+
+Index the latest manifest metadata for ``entry.work_id``.
+
+### `close(self)`
+
+Write the collected manifest index to disk once.
+
+### `__enter__(self)`
+
+*No documentation available.*
+
+### `__exit__(self, exc_type, exc, tb)`
+
+*No documentation available.*
+
+### `log_attempt(self, record)`
+
+No-op to satisfy the telemetry sink interface.
+
+### `log_summary(self, summary)`
+
+No-op because the CSV sink only records manifest events.
+
+### `_normalise(self, value)`
+
 *No documentation available.*
 
 ### `log_manifest(self, entry)`
 
-*No documentation available.*
-
-### `log_summary(self, summary)`
-
-*No documentation available.*
+Store the most recent manifest attributes for ``entry.work_id``.
 
 ### `close(self)`
 
-*No documentation available.*
+Flush collected manifest rows to the CSV file.
 
 ### `__enter__(self)`
 
@@ -166,6 +232,7 @@ Exception: Implementations may propagate shutdown failures.
 Structured manifest entry describing a resolved artifact.
 
 Attributes:
+schema_version: Integer identifying the manifest schema revision.
 timestamp: ISO-8601 timestamp describing when the artifact was stored.
 work_id: Primary identifier (e.g., OpenAlex work ID) for the artifact.
 title: Human-readable work title.
@@ -186,6 +253,7 @@ dry_run: Flag indicating whether the artifact was processed in dry-run mode.
 
 Examples:
 >>> entry = ManifestEntry(
+...     schema_version=2,
 ...     timestamp="2025-01-01T00:00:00Z",
 ...     work_id="W123",
 ...     title="Example",
@@ -236,3 +304,11 @@ Lightweight sink that mirrors attempt records into a CSV for spreadsheet review.
 ### `MultiSink`
 
 Composite sink that fans out logging calls to multiple sinks.
+
+### `ManifestIndexSink`
+
+Maintain a JSON index mapping work IDs to their latest PDF artefacts.
+
+### `LastAttemptCsvSink`
+
+Write a CSV snapshot containing the most recent manifest entry per work.

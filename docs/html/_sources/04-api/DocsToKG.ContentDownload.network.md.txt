@@ -55,6 +55,8 @@ is copied into the session's header store so caller-owned dictionaries remain
 unchanged.
 adapter_max_retries: Retry count configured on mounted HTTP adapters. Defaults to
 ``0`` so :func:`request_with_retries` governs retry behaviour.
+pool_connections: Lower bound of connection pools shared across the session's adapters.
+pool_maxsize: Maximum number of connections kept per host in the adapter pool.
 
 Returns:
 requests.Session: Session instance with HTTP/HTTPS adapters mounted and ready for pipeline usage.

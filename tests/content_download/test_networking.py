@@ -599,6 +599,9 @@ from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload.classifier import classify_payload
 from DocsToKG.ContentDownload.classifications import Classification
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (
+    DEFAULT_MIN_PDF_BYTES,
+    DEFAULT_SNIFF_BYTES,
+    DEFAULT_TAIL_CHECK_BYTES,
     WorkArtifact,
     _build_download_outcome,
     _make_session,
@@ -2852,6 +2855,9 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
         previous_lookup={},
         resume_completed=set(),
         max_bytes=None,
+        sniff_bytes=DEFAULT_SNIFF_BYTES,
+        min_pdf_bytes=DEFAULT_MIN_PDF_BYTES,
+        tail_check_bytes=DEFAULT_TAIL_CHECK_BYTES,
     )
 
     logger.close()

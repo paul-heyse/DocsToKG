@@ -85,14 +85,6 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="basic-tokenize-text">
-<h3><code class="docutils literal notranslate"><span class="pre">_basic_tokenize(text)</span></code><a class="headerlink" href="#basic-tokenize-text" title="Link to this heading"></a></h3>
-<p>Tokenize <code class="docutils literal notranslate"><span class="pre">text</span></code> using a simple regex to avoid devtools dependencies.</p>
-<p>Args:
-text: Source string to segment into lowercase tokens.</p>
-<p>Returns:
-List of tokens extracted from <code class="docutils literal notranslate"><span class="pre">text</span></code>.</p>
-</section>
 <section id="apply-mmr-diversification-fused-candidates-fused-scores-lambda-param-top-k">
 <h3><code class="docutils literal notranslate"><span class="pre">apply_mmr_diversification(fused_candidates,</span> <span class="pre">fused_scores,</span> <span class="pre">lambda_param,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#apply-mmr-diversification-fused-candidates-fused-scores-lambda-param-top-k" title="Link to this heading"></a></h3>
 <p>Apply maximal marginal relevance to promote diversity.</p>
@@ -102,8 +94,7 @@ fused_scores: Precomputed fused scores for each candidate vector ID.
 lambda_param: Balancing factor between relevance and diversity (0-1).
 top_k: Maximum number of diversified candidates to retain.
 device: GPU device identifier used for similarity computations.
-resources: Optional FAISS GPU resources used for pairwise similarity; falls back to
-CPU cosine when <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+resources: Optional FAISS GPU resources; falls back to CPU cosine when <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 <p>Returns:
 List[FusionCandidate]: Diversified candidate list ordered by MMR score.</p>
 <p>Raises:
@@ -141,6 +132,10 @@ and duplicate suppression.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_build_highlights(self,</span> <span class="pre">chunk,</span> <span class="pre">query_tokens)</span></code><a class="headerlink" href="#build-highlights-self-chunk-query-tokens" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="cosine-cpu-query-pool">
+<h3><code class="docutils literal notranslate"><span class="pre">_cosine_cpu(query,</span> <span class="pre">pool)</span></code><a class="headerlink" href="#cosine-cpu-query-pool" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
@@ -173,7 +168,7 @@ _gpu_resources: Optional FAISS resources for GPU pairwise similarity.</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator  # doctest: +SKIP
+<div><p>from DocsToKG.HybridSearch.storage import OpenSearchSimulator  # doctest: +SKIP
 shaper = ResultShaper(OpenSearchSimulator(), FusionConfig())  # doctest: +SKIP
 shaper.shape([], {}, HybridSearchRequest(query=””, namespace=None, filters={}, page_size=1), {})  # doctest: +SKIP
 []</p>

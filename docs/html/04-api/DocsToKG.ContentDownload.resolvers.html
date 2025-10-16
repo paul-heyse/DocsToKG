@@ -213,6 +213,10 @@ self: Download outcome to evaluate.</p>
 <p>Returns:
 bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> if the outcome corresponds to a PDF download.</p>
 </section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="is-enabled-self-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#is-enabled-self-config-artifact" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> if this resolver should run for the given artifact.</p>
@@ -303,198 +307,179 @@ None.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_request_json(self,</span> <span class="pre">session,</span> <span class="pre">method,</span> <span class="pre">url)</span></code><a class="headerlink" href="#request-json-self-session-method-url" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="id1">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
 config: Resolver configuration containing runtime toggles and credentials.
 artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
 bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
-</section>
-<section id="id2">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
-<p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
-<p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
 <section id="id3">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
 <section id="id4">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
 <section id="id5">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
 <section id="id6">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
 <section id="id7">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
 <section id="id8">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
 <section id="id9">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
 <section id="id10">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
 <section id="id11">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
 <section id="id12">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
 <section id="id13">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
 <section id="id14">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
 <section id="id15">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
 <section id="id16">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id16" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id16" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
 <section id="id17">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id17" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id17" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
 <section id="id18">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id18" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id18" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
 <section id="id19">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id19" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id19" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
 <section id="id20">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id20" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
-<p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
-<p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
-</section>
-<section id="id21">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id21" title="Link to this heading"></a></h3>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id20" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
 config: Resolver configuration containing runtime toggles and credentials.
@@ -502,8 +487,8 @@ artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
 bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
-<section id="id22">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id22" title="Link to this heading"></a></h3>
+<section id="id21">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id21" title="Link to this heading"></a></h3>
 <p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
 session: Requests session used to communicate with upstream providers.
@@ -512,8 +497,27 @@ artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
 Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
+<section id="id22">
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id22" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<p>Args:
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
+<p>Returns:
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+</section>
 <section id="id23">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id23" title="Link to this heading"></a></h3>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id23" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
+<p>Args:
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
+<p>Returns:
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+</section>
+<section id="id24">
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id24" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
 config: Resolver configuration containing runtime toggles and credentials.
@@ -525,8 +529,8 @@ bool: <code class="docutils literal notranslate"><span class="pre">True</span></
 <h3><code class="docutils literal notranslate"><span class="pre">_lookup_pmcids(self,</span> <span class="pre">session,</span> <span class="pre">identifiers,</span> <span class="pre">config)</span></code><a class="headerlink" href="#lookup-pmcids-self-session-identifiers-config" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="id24">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id24" title="Link to this heading"></a></h3>
+<section id="id25">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id25" title="Link to this heading"></a></h3>
 <p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
 session: Requests session used to communicate with upstream providers.
@@ -534,56 +538,37 @@ config: Resolver configuration supplying timeouts and headers.
 artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
 Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
-</section>
-<section id="id25">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id25" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
-<p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
-<p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
 <section id="id26">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id26" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id26" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
 <section id="id27">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id27" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id27" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
 <section id="id28">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id28" title="Link to this heading"></a></h3>
-<p>Yield resolver results discovered for the supplied artifact.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id28" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
-session: Requests session used to communicate with upstream providers.
-config: Resolver configuration supplying timeouts and headers.
-artifact: Work artifact describing the document under resolution.</p>
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
-Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
 <section id="id29">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id29" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
-<p>Args:
-config: Resolver configuration containing runtime toggles and credentials.
-artifact: Work artifact capturing document metadata and identifiers.</p>
-<p>Returns:
-bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
-</section>
-<section id="id30">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id30" title="Link to this heading"></a></h3>
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id29" title="Link to this heading"></a></h3>
 <p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
 session: Requests session used to communicate with upstream providers.
@@ -592,8 +577,8 @@ artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
 Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
-<section id="id31">
-<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id31" title="Link to this heading"></a></h3>
+<section id="id30">
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id30" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
 <p>Args:
 config: Resolver configuration containing runtime toggles and credentials.
@@ -601,8 +586,27 @@ artifact: Work artifact capturing document metadata and identifiers.</p>
 <p>Returns:
 bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
 </section>
+<section id="id31">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id31" title="Link to this heading"></a></h3>
+<p>Yield resolver results discovered for the supplied artifact.</p>
+<p>Args:
+session: Requests session used to communicate with upstream providers.
+config: Resolver configuration supplying timeouts and headers.
+artifact: Work artifact describing the document under resolution.</p>
+<p>Returns:
+Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
+</section>
 <section id="id32">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id32" title="Link to this heading"></a></h3>
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id32" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when resolver prerequisites are met for the artifact.</p>
+<p>Args:
+config: Resolver configuration containing runtime toggles and credentials.
+artifact: Work artifact capturing document metadata and identifiers.</p>
+<p>Returns:
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the resolver should attempt to resolve the artifact.</p>
+</section>
+<section id="id33">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#id33" title="Link to this heading"></a></h3>
 <p>Yield resolver results discovered for the supplied artifact.</p>
 <p>Args:
 session: Requests session used to communicate with upstream providers.
@@ -733,6 +737,10 @@ state: Mutable run state tracking attempts and duplicates.
 resolver_wall_time_ms: Wall-clock time spent in the resolver.</p>
 <p>Returns:
 PipelineResult when resolution succeeds, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</section>
+<section id="percentile-sorted-values-percentile">
+<h3><code class="docutils literal notranslate"><span class="pre">_percentile(sorted_values,</span> <span class="pre">percentile)</span></code><a class="headerlink" href="#percentile-sorted-values-percentile" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="submit-next-executor-start-index">
 <h3><code class="docutils literal notranslate"><span class="pre">submit_next(executor,</span> <span class="pre">start_index)</span></code><a class="headerlink" href="#submit-next-executor-start-index" title="Link to this heading"></a></h3>

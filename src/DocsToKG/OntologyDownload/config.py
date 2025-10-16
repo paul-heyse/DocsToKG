@@ -4,12 +4,6 @@
 #   "purpose": "Configuration models and helpers for the ontology downloader",
 #   "sections": [
 #     {
-#       "id": "configerror",
-#       "name": "ConfigError",
-#       "anchor": "class-configerror",
-#       "kind": "class"
-#     },
-#     {
 #       "id": "ensure-python-version",
 #       "name": "ensure_python_version",
 #       "anchor": "function-ensure-python-version",
@@ -148,14 +142,12 @@ from pydantic import ValidationError as PydanticValidationError
 from pydantic_core import ValidationError as CoreValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .errors import UserConfigError
+
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checkers only
     from .pipeline import ConfigurationError as _ConfigurationError
 
 PYTHON_MIN_VERSION = (3, 9)
-
-
-class ConfigError(RuntimeError):
-    """Raised when ontology configuration files are invalid or inconsistent."""
 
 
 def ensure_python_version() -> None:
@@ -174,8 +166,11 @@ def _coerce_sequence(value: Optional[Iterable[str]]) -> List[str]:
     return [str(item) for item in value]
 
 
+ConfigError = UserConfigError  # Backwards compatibility alias
+
+
 __all__ = [
-    "ConfigError",
+    "UserConfigError",
     "DefaultsConfig",
     "DownloadConfiguration",
     "LoggingConfiguration",
@@ -188,17 +183,17 @@ __all__ = [
     "load_raw_yaml",
     "parse_rate_limit_to_rps",
     "validate_config",
-    "ConfigurationError",
+    "PolicyError",
 ]
 
 
 def __getattr__(name: str):
     """Lazily expose pipeline exceptions without introducing import cycles."""
 
-    if name == "ConfigurationError":
-        from .pipeline import ConfigurationError as _ConfigurationError
+    if name == "PolicyError":
+        from .errors import PolicyError as _PolicyError
 
-        return _ConfigurationError
+        return _PolicyError
     raise AttributeError(name)
 
 
@@ -283,6 +278,10 @@ class DownloadConfiguration(BaseModel):
         default_factory=lambda: {
             "User-Agent": "DocsToKG-OntologyDownloader/1.0 (+https://github.com/allenai/DocsToKG)",
         }
+    )
+    shared_rate_limit_dir: Optional[Path] = Field(
+        default=None,
+        description="Directory used to persist shared token bucket state across processes",
     )
 
     @field_validator("rate_limits")
@@ -511,32 +510,36 @@ def _apply_env_overrides(defaults: DefaultsConfig) -> None:
 
 
 def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:
+    """Materialise a :class:`ResolvedConfig` from a raw mapping loaded from disk."""
+
     try:
         defaults_section = raw_config.get("defaults", {})
         if defaults_section and not isinstance(defaults_section, Mapping):
-            raise ConfigError("'defaults' section must be a mapping")
+            raise UserConfigError("'defaults' section must be a mapping")
         defaults = DefaultsConfig.model_validate(defaults_section)
     except (PydanticValidationError, CoreValidationError) as exc:
         messages = []
         for error in exc.errors():
             location = " -> ".join(str(part) for part in error["loc"])
             messages.append(f"{location}: {error['msg']}")
-        raise ConfigError("Configuration validation failed:\n  " + "\n  ".join(messages)) from exc
+        raise UserConfigError(
+            "Configuration validation failed:\n  " + "\n  ".join(messages)
+        ) from exc
 
     _apply_env_overrides(defaults)
 
     ontologies = raw_config.get("ontologies")
     if ontologies is None:
-        raise ConfigError("'ontologies' section is required")
+        raise UserConfigError("'ontologies' section is required")
     if not isinstance(ontologies, list):
-        raise ConfigError("'ontologies' must be a list")
+        raise UserConfigError("'ontologies' must be a list")
 
     from .pipeline import merge_defaults  # imported lazily to avoid circular dependency
 
     fetch_specs: List["FetchSpec"] = []
     for index, entry in enumerate(ontologies, start=1):
         if not isinstance(entry, Mapping):
-            raise ConfigError(f"Ontology entry #{index} must be a mapping")
+            raise UserConfigError(f"Ontology entry #{index} must be a mapping")
         fetch_specs.append(merge_defaults(entry, defaults))
 
     return ResolvedConfig(defaults=defaults, specs=fetch_specs)
@@ -568,10 +571,12 @@ def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig]
                 errors.append(f"'defaults.{section_name}' must be a mapping")
 
     if errors:
-        raise ConfigError("Configuration validation failed:\n- " + "\n- ".join(errors))
+        raise UserConfigError("Configuration validation failed:\n- " + "\n- ".join(errors))
 
 
 def load_raw_yaml(config_path: Path) -> Mapping[str, object]:
+    """Read a YAML configuration file and return its top-level mapping."""
+
     if not config_path.exists():
         print(f"Configuration file not found: {config_path}", file=sys.stderr)
         raise SystemExit(2)
@@ -580,16 +585,18 @@ def load_raw_yaml(config_path: Path) -> Mapping[str, object]:
         with config_path.open("r", encoding="utf-8") as handle:
             data = yaml.safe_load(handle)
     except yaml.YAMLError as exc:  # pragma: no cover - exercised via tests
-        raise ConfigError(
+        raise UserConfigError(
             f"Configuration file '{config_path}' contains invalid YAML"
         ) from exc
 
     if not isinstance(data, Mapping):
-        raise ConfigError("Configuration file must contain a mapping at the root")
+        raise UserConfigError("Configuration file must contain a mapping at the root")
     return data
 
 
 def load_config(config_path: Path) -> ResolvedConfig:
+    """Load, validate, and resolve configuration suitable for execution."""
+
     raw = load_raw_yaml(config_path)
     config = build_resolved_config(raw)
     _validate_schema(raw, config)
@@ -597,6 +604,8 @@ def load_config(config_path: Path) -> ResolvedConfig:
 
 
 def validate_config(config_path: Path) -> ResolvedConfig:
+    """Load a configuration solely for validation feedback."""
+
     raw = load_raw_yaml(config_path)
     config = build_resolved_config(raw)
     _validate_schema(raw, config)

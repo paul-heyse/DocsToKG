@@ -10,10 +10,6 @@ The PDF conversion logic now lives in :mod:`DocsToKG.DocParsing.pipelines`.
 This module re-exports the historical surface so downstream tooling and tests
 can continue importing ``DocsToKG.DocParsing.pdf_pipeline`` without changes.
 
-Importing this module emits a :class:`DeprecationWarning`; migrate to
-:mod:`DocsToKG.DocParsing.pipelines` (or the CLI entry points) before the shim is
-removed in a future release.
-
 ## 2. Functions
 
 ### `parse_args(argv)`

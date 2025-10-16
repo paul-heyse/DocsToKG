@@ -38,16 +38,21 @@ Tokenizer Alignment:
 
 ## 2. Functions
 
-### `compute_relative_doc_id(path, root)`
+### `_dedupe_preserve_order(markers)`
 
-Return POSIX-style relative identifier for a document path.
+Return a tuple with duplicates removed while preserving original order.
 
-Args:
-path: Absolute path to the document on disk.
-root: Root directory that anchors relative identifiers.
+### `_ensure_str_list(value, label)`
 
-Returns:
-str: POSIX-style relative path suitable for manifest IDs.
+Normalize configuration values into a list of non-empty strings.
+
+### `_load_structural_marker_config(path)`
+
+Load custom heading and caption markers from a YAML or JSON file.
+
+### `_validate_chunk_files(files, logger)`
+
+Validate chunk JSONL rows across supplied files.
 
 ### `read_utf8(p)`
 
@@ -85,15 +90,15 @@ None
 
 ### `summarize_image_metadata(chunk, text)`
 
-Infer image annotation flags and counts from chunk metadata and text.
+Infer image annotation flags, counts, and confidences from chunk metadata and text.
 
-Args:
-chunk: Chunk metadata object containing image annotations.
-text: Chunk text used to detect fallback caption cues.
+### `_chunk_worker_initializer(cfg)`
 
-Returns:
-Tuple of ``(has_caption, has_classification, num_images)`` describing
-inferred image metadata.
+Initialise worker-local tokenizer and chunker state for multiprocessing.
+
+### `_process_chunk_task(task)`
+
+Chunk a single DocTags file inside a worker process.
 
 ### `merge_rec(a, b, tokenizer)`
 
@@ -103,16 +108,20 @@ Args:
 a: First record to merge.
 b: Second record to merge.
 tokenizer: Tokenizer used to recompute token counts for combined text.
+recount: When ``True`` the merged text is re-tokenized; otherwise token
+counts are summed from inputs.
 
 Returns:
 New `Rec` instance containing fused text, token counts, and metadata.
 
-### `is_structural_boundary(rec)`
+### `is_structural_boundary(rec, heading_markers, caption_markers)`
 
 Detect whether a chunk begins with a structural heading or caption marker.
 
 Args:
 rec: Chunk record to inspect.
+heading_markers: Optional prefixes treated as section headings.
+caption_markers: Optional prefixes treated as caption markers.
 
 Returns:
 ``True`` when ``rec.text`` starts with a heading indicator (``#``) or a
@@ -124,7 +133,7 @@ True
 >>> is_structural_boundary(Rec(text="Regular paragraph", n_tok=2, src_idxs=[], refs=[], pages=[]))
 False
 
-### `coalesce_small_runs(records, tokenizer, min_tokens, max_tokens)`
+### `coalesce_small_runs(records, tokenizer, min_tokens, max_tokens, soft_barrier_margin, heading_markers, caption_markers)`
 
 Merge contiguous short chunks until they satisfy minimum token thresholds.
 
@@ -133,6 +142,9 @@ records: Ordered list of chunk records to normalize.
 tokenizer: Tokenizer used to recompute token counts for merged chunks.
 min_tokens: Target minimum tokens per chunk after coalescing.
 max_tokens: Hard ceiling to avoid producing overly large chunks.
+soft_barrier_margin: Margin applied when respecting structural boundaries.
+heading_markers: Optional heading prefixes treated as structural boundaries.
+caption_markers: Optional caption prefixes treated as structural boundaries.
 
 Returns:
 New list of records where small runs are merged while preserving order.
@@ -184,6 +196,10 @@ testing or orchestration.
 Returns:
 int: Exit code where ``0`` indicates success.
 
+### `_maybe_add_conf(value)`
+
+Collect numeric confidence scores from metadata sources.
+
 ### `is_small(idx)`
 
 Return True when the chunk at `idx` is below the minimum token threshold.
@@ -193,6 +209,13 @@ idx: Index of the chunk under evaluation.
 
 Returns:
 True if the chunk length is less than `min_tokens`, else False.
+
+### `handle_result(result)`
+
+Persist manifest information and raise on worker failure.
+
+Args:
+result: Structured outcome emitted by the chunking worker.
 
 ## 3. Classes
 

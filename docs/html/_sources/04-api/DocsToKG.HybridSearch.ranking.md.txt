@@ -8,16 +8,6 @@ Ranking, fusion, and result shaping utilities for DocsToKG hybrid search.
 
 ## 2. Functions
 
-### `_basic_tokenize(text)`
-
-Tokenize ``text`` using a simple regex to avoid devtools dependencies.
-
-Args:
-text: Source string to segment into lowercase tokens.
-
-Returns:
-List of tokens extracted from ``text``.
-
 ### `apply_mmr_diversification(fused_candidates, fused_scores, lambda_param, top_k)`
 
 Apply maximal marginal relevance to promote diversity.
@@ -28,8 +18,7 @@ fused_scores: Precomputed fused scores for each candidate vector ID.
 lambda_param: Balancing factor between relevance and diversity (0-1).
 top_k: Maximum number of diversified candidates to retain.
 device: GPU device identifier used for similarity computations.
-resources: Optional FAISS GPU resources used for pairwise similarity; falls back to
-CPU cosine when ``None``.
+resources: Optional FAISS GPU resources; falls back to CPU cosine when ``None``.
 
 Returns:
 List[FusionCandidate]: Diversified candidate list ordered by MMR score.
@@ -73,6 +62,10 @@ and duplicate suppression.
 
 *No documentation available.*
 
+### `_cosine_cpu(query, pool)`
+
+*No documentation available.*
+
 ## 3. Classes
 
 ### `ReciprocalRankFusion`
@@ -99,7 +92,7 @@ _gpu_device: CUDA device used for optional similarity checks.
 _gpu_resources: Optional FAISS resources for GPU pairwise similarity.
 
 Examples:
->>> from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator  # doctest: +SKIP
+>>> from DocsToKG.HybridSearch.storage import OpenSearchSimulator  # doctest: +SKIP
 >>> shaper = ResultShaper(OpenSearchSimulator(), FusionConfig())  # doctest: +SKIP
 >>> shaper.shape([], {}, HybridSearchRequest(query="", namespace=None, filters={}, page_size=1), {})  # doctest: +SKIP
 []
