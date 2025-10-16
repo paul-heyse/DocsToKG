@@ -4,26 +4,26 @@
 
 ### 1.1 Consolidate CLI Context Management
 
-- [ ] 1.1.1 Remove first `with JsonlLogger(manifest_path) as base_logger:` block and incomplete `_session_factory()` docstring
-- [ ] 1.1.2 Ensure single `contextlib.ExitStack()` manages all context resources (JSONL logger, CSV adapter if enabled)
-- [ ] 1.1.3 Move `load_previous_manifest()` and `clear_resolver_caches()` calls inside unified context
-- [ ] 1.1.4 Define `_session_factory()` exactly once with single return statement
-- [ ] 1.1.5 Remove all references to abandoned first context block
-- [ ] 1.1.6 Verify CSV adapter enters context via `stack.enter_context()` when `--log-format csv` specified
+- [x] 1.1.1 Remove first `with JsonlLogger(manifest_path) as base_logger:` block and incomplete `_session_factory()` docstring
+- [x] 1.1.2 Ensure single `contextlib.ExitStack()` manages all context resources (JSONL logger, CSV adapter if enabled)
+- [x] 1.1.3 Move `load_previous_manifest()` and `clear_resolver_caches()` calls inside unified context
+- [x] 1.1.4 Define `_session_factory()` exactly once with single return statement
+- [x] 1.1.5 Remove all references to abandoned first context block
+- [x] 1.1.6 Verify CSV adapter enters context via `stack.enter_context()` when `--log-format csv` specified
 
 ### 1.2 Fix CSV Resource Leak
 
-- [ ] 1.2.1 Modify `CsvAttemptLoggerAdapter.close()` to close CSV file handle under lock
-- [ ] 1.2.2 Ensure close() checks `self._file.closed` before closing to enable idempotency
-- [ ] 1.2.3 Update `__exit__()` to safely handle already-closed file
-- [ ] 1.2.4 Add unit test verifying file descriptor closure after explicit `close()` call
+- [x] 1.2.1 Modify `CsvAttemptLoggerAdapter.close()` to close CSV file handle under lock
+- [x] 1.2.2 Ensure close() checks `self._file.closed` before closing to enable idempotency
+- [x] 1.2.3 Update `__exit__()` to safely handle already-closed file
+- [x] 1.2.4 Add unit test verifying file descriptor closure after explicit `close()` call
 - [ ] 1.2.5 Add integration test confirming clean process exit on all platforms including Windows
 
 ### 1.3 Remove Duplicate Session Factory
 
-- [ ] 1.3.1 Delete unreachable second `return _make_session(config.polite_headers)` statement
-- [ ] 1.3.2 Ensure `_session_factory()` returns result of `_make_session(config.polite_headers)` exactly once
-- [ ] 1.3.3 Verify function contains complete docstring describing session configuration
+- [x] 1.3.1 Delete unreachable second `return _make_session(config.polite_headers)` statement
+- [x] 1.3.2 Ensure `_session_factory()` returns result of `_make_session(config.polite_headers)` exactly once
+- [x] 1.3.3 Verify function contains complete docstring describing session configuration
 
 ### 1.4 Unify HEAD Precheck Implementation
 
