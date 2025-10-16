@@ -11,7 +11,7 @@ The CLI orchestrator SHALL manage all context resources through a single `contex
 - **WHEN** the CLI main() function begins execution
 - **THEN** exactly one ExitStack context manager is created
 - **AND** the JSONL logger enters the context via stack.enter_context()
-- **AND** the CSV adapter (if enabled) enters the same context via stack.enter_context()
+- **AND** any CSV sink (if enabled) enters the same context via stack.enter_context()
 - **AND** all context resources are guaranteed closed on exit regardless of exceptions
 
 #### Scenario: Session factory definition
@@ -34,15 +34,14 @@ All context managers and closeable resources SHALL implement idempotent close() 
 
 #### Scenario: CSV file handle closure
 
-- **WHEN** CsvAttemptLoggerAdapter.close() is invoked
-- **THEN** the underlying JSONL logger is closed
-- **AND** the CSV file handle is checked for closed status under lock
+- **WHEN** CsvSink.close() is invoked
+- **THEN** the CSV file handle is checked for closed status under lock
 - **AND** the CSV file is closed if not already closed
 - **AND** subsequent close() calls do not raise exceptions
 
 #### Scenario: Multiple close invocations
 
-- **WHEN** a sink or adapter close() method is called multiple times
+- **WHEN** an AttemptSink implementation close() method is called multiple times
 - **THEN** the first call releases all resources
 - **AND** subsequent calls complete successfully without side effects
 - **AND** no file descriptor leaks occur on any platform including Windows

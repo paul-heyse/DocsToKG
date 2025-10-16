@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from importlib.util import find_spec
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple
 from unittest.mock import Mock, call, patch
 
@@ -22,8 +23,9 @@ import requests
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (
-    JsonlLogger,
+    JsonlSink,
     WorkArtifact,
+    _build_download_outcome,
     _make_session,
     download_candidate,
     process_one_work,
@@ -32,6 +34,7 @@ from DocsToKG.ContentDownload.network import (
     CachedResult,
     ConditionalRequestHelper,
     ModifiedResult,
+    head_precheck,
     parse_retry_after_header,
     request_with_retries,
 )
@@ -43,10 +46,6 @@ from DocsToKG.ContentDownload.resolvers import (
     ResolverPipeline,
     ResolverResult,
     WaybackResolver,
-    headers_cache_key,
-)
-from DocsToKG.ContentDownload.resolvers import (
-    _headers_cache_key as resolver_headers_cache_key,
 )
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
 
@@ -159,6 +158,109 @@ if HAS_REQUESTS and HAS_PYALEX:
         assert outcome.last_modified == previous["last_modified"]
         assert not (artifact.pdf_dir / "conditional.pdf").exists()
 
+    def test_download_candidate_handles_incomplete_resume_metadata(
+        tmp_path: Path, caplog
+    ) -> None:
+        artifact = _make_artifact(tmp_path)
+        url = "https://example.org/test.pdf"
+
+        class _StreamingResponse:
+            def __init__(self) -> None:
+                self.status_code = 200
+                self.headers = {"Content-Type": "application/pdf"}
+
+            def __enter__(self) -> "_StreamingResponse":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                self.close()
+
+            def iter_content(self, chunk_size: int = 1024):
+                yield b"%PDF-1.4\n"
+                yield b"%%EOF"
+
+            def close(self) -> None:
+                return None
+
+        class _Session:
+            def request(self, method: str, target: str, **kwargs: Any) -> _StreamingResponse:
+                assert method == "GET"
+                assert target == url
+                return _StreamingResponse()
+
+        context = {
+            "previous": {
+                url: {
+                    "etag": '"etag"',
+                    "last_modified": "Mon, 01 Jan 2024 00:00:00 GMT",
+                }
+            },
+            "dry_run": False,
+        }
+
+        with caplog.at_level("WARNING", logger="DocsToKG.ContentDownload.network"):
+            outcome = download_candidate(
+                _Session(),
+                artifact,
+                url,
+                referer=None,
+                timeout=5.0,
+                context=context,
+            )
+
+        assert outcome.classification == "pdf"
+        assert "resume-metadata-incomplete" in caplog.text
+
+    def test_build_download_outcome_accepts_small_pdf_with_head_pass(tmp_path: Path) -> None:
+        artifact = _make_artifact(tmp_path)
+        pdf_path = artifact.pdf_dir / "tiny.pdf"
+        artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
+        response = SimpleNamespace(status_code=200, headers={"Content-Type": "application/pdf"})
+        outcome = _build_download_outcome(
+            artifact=artifact,
+            classification="pdf",
+            dest_path=pdf_path,
+            response=response,
+            elapsed_ms=5.0,
+            flagged_unknown=False,
+            sha256="hash",
+            content_length=pdf_path.stat().st_size,
+            etag=None,
+            last_modified=None,
+            extracted_text_path=None,
+            tail_bytes=b"%%EOF",
+            dry_run=False,
+            head_precheck_passed=True,
+        )
+        assert outcome.classification == "pdf"
+        assert outcome.path == str(pdf_path)
+
+    def test_build_download_outcome_rejects_small_pdf_without_head(tmp_path: Path) -> None:
+        artifact = _make_artifact(tmp_path)
+        pdf_path = artifact.pdf_dir / "tiny.pdf"
+        artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
+        response = SimpleNamespace(status_code=200, headers={"Content-Type": "application/pdf"})
+        outcome = _build_download_outcome(
+            artifact=artifact,
+            classification="pdf",
+            dest_path=pdf_path,
+            response=response,
+            elapsed_ms=5.0,
+            flagged_unknown=False,
+            sha256="hash",
+            content_length=pdf_path.stat().st_size,
+            etag=None,
+            last_modified=None,
+            extracted_text_path=None,
+            tail_bytes=b"%%EOF",
+            dry_run=False,
+            head_precheck_passed=False,
+        )
+        assert outcome.classification == "pdf_corrupt"
+        assert outcome.path is None
+
     def test_manifest_entry_preserves_conditional_headers() -> None:
         outcome = DownloadOutcome(
             classification="pdf",
@@ -220,14 +322,14 @@ def test_build_headers_empty_metadata() -> None:
 def test_build_headers_etag_only() -> None:
     helper = ConditionalRequestHelper(prior_etag="abc123")
 
-    assert helper.build_headers() == {"If-None-Match": "abc123"}
+    assert helper.build_headers() == {}
 
 
 # ---- test_conditional_requests.py -----------------------------
 def test_build_headers_last_modified_only() -> None:
     helper = ConditionalRequestHelper(prior_last_modified="Wed, 21 Oct 2015 07:28:00 GMT")
 
-    assert helper.build_headers() == {"If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT"}
+    assert helper.build_headers() == {}
 
 
 # ---- test_conditional_requests.py -----------------------------
@@ -237,10 +339,7 @@ def test_build_headers_with_both_headers() -> None:
         prior_last_modified="Wed, 21 Oct 2015 07:28:00 GMT",
     )
 
-    assert helper.build_headers() == {
-        "If-None-Match": "abc123",
-        "If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT",
-    }
+    assert helper.build_headers() == {}
 
 
 # ---- test_conditional_requests.py -----------------------------
@@ -571,6 +670,143 @@ def test_download_candidate_avoids_per_request_head(http_server, tmp_path):
         assert handler.calls == [200]
     finally:
         session.close()
+
+
+# ---- test_head_precheck.py -----------------------------
+def test_head_precheck_allows_pdf(monkeypatch):
+    head_response = Mock(status_code=200, headers={"Content-Type": "application/pdf"})
+    head_response.close = Mock()
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.network.request_with_retries",
+        lambda *args, **kwargs: head_response,
+    )
+
+    assert head_precheck(Mock(), "https://example.org/file.pdf", timeout=10.0)
+    head_response.close.assert_called_once()
+
+
+def test_head_precheck_rejects_html(monkeypatch):
+    head_response = Mock(status_code=200, headers={"Content-Type": "text/html"})
+    head_response.close = Mock()
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.network.request_with_retries",
+        lambda *args, **kwargs: head_response,
+    )
+
+    assert not head_precheck(Mock(), "https://example.org/page", timeout=10.0)
+    head_response.close.assert_called_once()
+
+
+@pytest.mark.parametrize("status", [405, 501])
+def test_head_precheck_degrades_to_get_pdf(monkeypatch, status):
+    class _StreamResponse:
+        def __init__(self) -> None:
+            self.status_code = 200
+            self.headers = {"Content-Type": "application/pdf"}
+            self.closed = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            self.close()
+
+        def iter_content(self, chunk_size: int = 1024):
+            yield b"%PDF"
+
+        def close(self) -> None:
+            self.closed = True
+
+    head_response = Mock(status_code=status, headers={})
+    head_response.close = Mock()
+    stream_response = _StreamResponse()
+
+    responses = [head_response, stream_response]
+
+    def fake_request(*args, **kwargs):
+        return responses.pop(0)
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.network.request_with_retries",
+        fake_request,
+    )
+
+    assert head_precheck(Mock(), "https://example.org/pdf", timeout=10.0)
+    assert stream_response.closed is True
+
+
+@pytest.mark.parametrize("status", [405, 501])
+def test_head_precheck_degrades_to_get_html(monkeypatch, status):
+    class _StreamResponse:
+        def __init__(self) -> None:
+            self.status_code = 200
+            self.headers = {"Content-Type": "text/html"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            self.close()
+
+        def iter_content(self, chunk_size: int = 1024):
+            yield b"<html></html>"
+
+        def close(self) -> None:
+            return None
+
+    head_response = Mock(status_code=status, headers={})
+    head_response.close = Mock()
+    stream_response = _StreamResponse()
+
+    responses = [head_response, stream_response]
+
+    def fake_request(*args, **kwargs):
+        return responses.pop(0)
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.network.request_with_retries",
+        fake_request,
+    )
+
+    assert not head_precheck(Mock(), "https://example.org/html", timeout=10.0)
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [requests.Timeout("boom"), requests.ConnectionError("boom")],
+)
+def test_head_precheck_returns_true_on_exception(monkeypatch, exc):
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.network.request_with_retries",
+        Mock(side_effect=exc),
+    )
+
+    assert head_precheck(Mock(), "https://example.org/err", timeout=5.0)
+
+
+def test_conditional_request_build_headers_requires_complete_metadata(caplog) -> None:
+    helper = ConditionalRequestHelper(prior_etag="abc", prior_last_modified=None)
+    with caplog.at_level("WARNING", logger="DocsToKG.ContentDownload.network"):
+        headers = helper.build_headers()
+    assert headers == {}
+    assert "resume-metadata-incomplete" in caplog.text
+
+
+def test_conditional_request_build_headers_accepts_complete_metadata() -> None:
+    helper = ConditionalRequestHelper(
+        prior_etag="etag",
+        prior_last_modified="Mon, 01 Jan 2024 00:00:00 GMT",
+        prior_sha256="deadbeef",
+        prior_content_length=1024,
+        prior_path="/tmp/file.pdf",
+    )
+    headers = helper.build_headers()
+    assert headers == {
+        "If-None-Match": "etag",
+        "If-Modified-Since": "Mon, 01 Jan 2024 00:00:00 GMT",
+    }
 
 
 # ---- test_download_retries.py -----------------------------
@@ -1496,12 +1732,6 @@ except ImportError:  # pragma: no cover - optional dependency
     pytest.skip("hypothesis is required for these tests", allow_module_level=True)
 
 # ---- test_content_download_utils.py -----------------------------
-crossref_headers_cache_key = resolver_headers_cache_key
-
-# ---- test_content_download_utils.py -----------------------------
-unpaywall_headers_cache_key = resolver_headers_cache_key
-
-# ---- test_content_download_utils.py -----------------------------
 given = hypothesis.given
 
 
@@ -1583,17 +1813,6 @@ def test_dedupe_property(values: List[str]) -> None:
             seen.add(item)
 
     assert dedupe(values) == expected
-
-
-# ---- test_content_download_utils.py -----------------------------
-def test_headers_cache_key_determinism() -> None:
-    headers = {"User-Agent": "TestAgent", "accept": "text/html"}
-    expected = (("accept", "text/html"), ("user-agent", "TestAgent"))
-    key = headers_cache_key(headers)
-    assert key == expected
-    assert headers_cache_key(dict(headers)) == expected
-    assert unpaywall_headers_cache_key(headers) == expected
-    assert crossref_headers_cache_key(headers) == expected
 
 
 # ---- test_edge_cases.py -----------------------------
@@ -1684,7 +1903,7 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
 
     artifact = _make_artifact(tmp_path)
     logger_path = tmp_path / "attempts.jsonl"
-    logger = JsonlLogger(logger_path)
+    logger = JsonlSink(logger_path)
     metrics = ResolverMetrics()
 
     class StubResolver:
@@ -1764,7 +1983,7 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
 def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
     artifact = _make_artifact(tmp_path)
     logger_path = tmp_path / "attempts.jsonl"
-    logger = JsonlLogger(logger_path)
+    logger = JsonlSink(logger_path)
     metrics = ResolverMetrics()
     session = requests.Session()
     session.headers.update({"User-Agent": "EdgeTester/1.0"})

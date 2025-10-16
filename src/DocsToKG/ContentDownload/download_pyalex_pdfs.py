@@ -50,7 +50,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Protocol, Sequence, Set, Tuple, runtime_checkable
 from urllib.parse import unquote, urlsplit
 
 import requests
@@ -63,6 +63,7 @@ from DocsToKG.ContentDownload.network import (
     ConditionalRequestHelper,
     ModifiedResult,
     create_session,
+    head_precheck,
     request_with_retries,
 )
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
@@ -109,57 +110,6 @@ def _has_pdf_eof(path: Path) -> bool:
             return "%%EOF" in tail
     except OSError:
         return False
-
-
-def _head_precheck_candidate(
-    session: requests.Session,
-    url: str,
-    timeout: float,
-) -> bool:
-    """Evaluate whether ``url`` is likely to return a PDF payload.
-
-    The helper performs a single HEAD request with a tight timeout budget
-    to avoid fetching large payloads unnecessarily. Tests rely on this
-    behaviour to ensure dry-run execution does not trigger streaming
-    downloads.
-
-    Args:
-        session: HTTP session used for the outbound HEAD request.
-        url: Candidate download URL that should be validated.
-        timeout: Per-request timeout budget, in seconds.
-
-    Returns:
-        ``True`` when the HEAD response suggests the URL returns a PDF;
-        ``False`` when the response clearly indicates HTML or a missing file.
-    """
-
-    try:
-        response = request_with_retries(
-            session,
-            "HEAD",
-            url,
-            max_retries=1,
-            timeout=min(timeout, 5.0),
-            allow_redirects=True,
-        )
-    except Exception:
-        return True
-
-    try:
-        if response.status_code not in {200, 302, 304}:
-            return False
-
-        content_type = (response.headers.get("Content-Type") or "").lower()
-        content_length = response.headers.get("Content-Length", "")
-
-        if "text/html" in content_type:
-            return False
-        if content_length == "0":
-            return False
-
-        return True
-    finally:
-        response.close()
 
 
 def slugify(text: str, keep: int = 80) -> str:
@@ -314,63 +264,46 @@ class ManifestEntry:
     dry_run: bool = False
 
 
-class JsonlLogger:
-    """Structured logger that emits attempt, manifest, and summary JSONL records.
+@runtime_checkable
+class AttemptSink(Protocol):
+    """Protocol implemented by logging sinks that consume download telemetry."""
 
-    Attributes:
-        _path: Destination JSONL log path.
-        _file: Underlying file handle used for writes.
+    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        """Log a resolver attempt."""
 
-    Examples:
-        >>> logger = JsonlLogger(Path("logs/attempts.jsonl"))
-        >>> logger.log_summary({"processed": 10})
-        >>> logger.close()
+    def log_manifest(self, entry: ManifestEntry) -> None:
+        """Persist a manifest entry."""
 
-    The logger serialises records outside a thread lock and performs atomic
-    writes under the lock, ensuring well-formed output even when multiple
-    threads share the instance. It also implements the context manager protocol
-    for deterministic resource cleanup.
-    """
+    def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Record summary metrics for the run."""
+
+    def close(self) -> None:
+        """Release any underlying resources."""
+
+    def log(self, record: AttemptRecord) -> None:
+        """Compatibility alias delegating to :meth:`log_attempt`."""
+
+
+class JsonlSink:
+    """Structured sink that emits attempt, manifest, and summary JSONL records."""
 
     def __init__(self, path: Path) -> None:
-        """Create a logger backing to the given JSONL file path.
+        """Create a sink backed by the given JSONL file path."""
 
-        Args:
-            path: Destination JSONL log file.
-
-        Returns:
-            None
-        """
         self._path = path
         ensure_dir(path.parent)
         self._file = path.open("a", encoding="utf-8")
         self._lock = threading.Lock()
 
     def _write(self, payload: Dict[str, Any]) -> None:
-        """Append a JSON record to the log file ensuring timestamps are present.
-
-        Args:
-            payload: JSON-serializable mapping to write.
-
-        Returns:
-            None
-        """
         payload.setdefault("timestamp", _utc_timestamp())
-        line = json.dumps(payload, sort_keys=True) + "\n"
+        line = json.dumps(payload, sort_keys=True) + "
+"
         with self._lock:
             self._file.write(line)
             self._file.flush()
 
     def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
-        """Record a resolver attempt entry.
-
-        Args:
-            record: Attempt metadata captured from the resolver pipeline.
-            timestamp: Optional override timestamp (ISO format).
-
-        Returns:
-            None
-        """
         ts = timestamp or _utc_timestamp()
         self._write(
             {
@@ -394,25 +327,9 @@ class JsonlLogger:
         )
 
     def log(self, record: AttemptRecord) -> None:
-        """Compatibility shim mapping to :meth:`log_attempt`.
-
-        Args:
-            record: Attempt record to forward to :meth:`log_attempt`.
-
-        Returns:
-            None
-        """
         self.log_attempt(record)
 
     def log_manifest(self, entry: ManifestEntry) -> None:
-        """Persist a manifest entry to the JSONL log.
-
-        Args:
-            entry: Manifest entry to write.
-
-        Returns:
-            None
-        """
         self._write(
             {
                 "record_type": "manifest",
@@ -437,79 +354,27 @@ class JsonlLogger:
         )
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Write a summary record to the log.
-
-        Args:
-            summary: Mapping containing summary metrics.
-
-        Returns:
-            None
-        """
         payload = {
             "record_type": "summary",
             "timestamp": _utc_timestamp(),
+            **summary,
         }
-        payload.update(summary)
         self._write(payload)
 
     def close(self) -> None:
-        """Close the underlying file handle.
-
-        Args:
-            self: Logger instance managing the JSONL file descriptor.
-
-        Returns:
-            None
-        """
         with self._lock:
             if not self._file.closed:
                 self._file.close()
 
-    def __enter__(self) -> "JsonlLogger":
-        """Return ``self`` when used as a context manager.
-
-        Args:
-            None
-
-        Returns:
-            Logger instance configured for context-managed usage.
-        """
-
+    def __enter__(self) -> "JsonlSink":
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        """Close the file handle on context manager exit.
-
-        Args:
-            exc_type: Exception type raised within the context, if any.
-            exc: Exception instance raised within the context.
-            tb: Traceback associated with ``exc``.
-
-        Returns:
-            None
-        """
-
         self.close()
 
 
-class CsvAttemptLoggerAdapter:
-    """Adapter that mirrors attempt records to CSV for backward compatibility.
-
-    Attributes:
-        _logger: Underlying :class:`JsonlLogger` instance.
-        _file: CSV file handle used for writing.
-        _writer: ``csv.DictWriter`` writing to :attr:`_file`.
-
-    Examples:
-        >>> adapter = CsvAttemptLoggerAdapter(JsonlLogger(Path("attempts.jsonl")), Path("attempts.csv"))
-        >>> adapter.log_attempt(AttemptRecord(work_id="W1", resolver_name="unpaywall", resolver_order=1,
-        ...                                   url="https://example", status="pdf", http_status=200,
-        ...                                   content_type="application/pdf", elapsed_ms=120.0))
-        >>> adapter.close()
-
-    CSV writes are protected by a lock to ensure rows remain well formed when
-    multiple worker threads log through the same adapter instance.
-    """
+class CsvSink:
+    """CSV sink mirroring attempt records for reviewers that prefer spreadsheets."""
 
     HEADER = [
         "timestamp",
@@ -529,21 +394,7 @@ class CsvAttemptLoggerAdapter:
         "metadata",
     ]
 
-    def __init__(self, logger: JsonlLogger, path: Path) -> None:
-        """Initialise the adapter with JSONL and CSV targets.
-
-        Args:
-            logger: Underlying :class:`JsonlLogger` used for JSONL output.
-            path: Destination CSV path used to persist attempt records.
-
-        Returns:
-            None
-
-        Raises:
-            OSError: If the CSV file cannot be opened for appending.
-        """
-
-        self._logger = logger
+    def __init__(self, path: Path) -> None:
         ensure_dir(path.parent)
         exists = path.exists()
         self._file = path.open("a", newline="", encoding="utf-8")
@@ -552,17 +403,8 @@ class CsvAttemptLoggerAdapter:
         if not exists:
             self._writer.writeheader()
 
-    def log_attempt(self, record: AttemptRecord) -> None:
-        """Write an attempt record to both JSONL and CSV outputs.
-
-        Args:
-            record: Attempt record to persist.
-
-        Returns:
-            None
-        """
-        ts = _utc_timestamp()
-        self._logger.log_attempt(record, timestamp=ts)
+    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        ts = timestamp or _utc_timestamp()
         row = {
             "timestamp": ts,
             "work_id": record.work_id,
@@ -585,77 +427,186 @@ class CsvAttemptLoggerAdapter:
             self._file.flush()
 
     def log_manifest(self, entry: ManifestEntry) -> None:
-        """Forward manifest entries to the JSONL logger.
-
-        Args:
-            entry: Manifest entry to forward.
-
-        Returns:
-            None
-        """
-        self._logger.log_manifest(entry)
+        # CSV sink mirrors attempt records only; manifest entries remain JSONL-only.
+        return None
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Forward summary entries to the JSONL logger.
-
-        Args:
-            summary: Summary mapping to forward.
-
-        Returns:
-            None
-        """
-        self._logger.log_summary(summary)
+        return None
 
     def log(self, record: AttemptRecord) -> None:
-        """Compatibility shim mapping to :meth:`log_attempt`.
-
-        Args:
-            record: Attempt record to log.
-
-        Returns:
-            None
-        """
         self.log_attempt(record)
 
     def close(self) -> None:
-        """Close both the JSONL logger and the CSV file handle.
-
-        Args:
-            self: Adapter instance coordinating CSV and JSONL streams.
-
-        Returns:
-            None
-        """
-        self._logger.close()
-
-    def __enter__(self) -> "CsvAttemptLoggerAdapter":
-        """Return ``self`` when used as a context manager.
-
-        Args:
-            None
-
-        Returns:
-            Adapter instance configured for context-managed usage.
-        """
-
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        """Close the CSV file handle on context manager exit.
-
-        Args:
-            exc_type: Exception type raised within the context, if any.
-            exc: Exception instance raised within the context.
-            tb: Traceback associated with ``exc``.
-
-        Returns:
-            None
-        """
-
-        self.close()
         with self._lock:
             if not self._file.closed:
                 self._file.close()
+
+    def __enter__(self) -> "CsvSink":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+
+class MultiSink:
+    """Composite sink that fans out logging calls to multiple sinks."""
+
+    def __init__(self, sinks: Iterable[AttemptSink]):
+        self._sinks = list(sinks)
+
+    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        ts = timestamp or _utc_timestamp()
+        for sink in self._sinks:
+            sink.log_attempt(record, timestamp=ts)
+
+    def log_manifest(self, entry: ManifestEntry) -> None:
+        for sink in self._sinks:
+            sink.log_manifest(entry)
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:
+        for sink in self._sinks:
+            sink.log_summary(summary)
+
+    def log(self, record: AttemptRecord) -> None:
+        self.log_attempt(record)
+
+    def close(self) -> None:
+        errors: List[BaseException] = []
+        for sink in self._sinks:
+            try:
+                sink.close()
+            except BaseException as exc:  # pragma: no cover - defensive aggregation
+                errors.append(exc)
+        if errors:
+            raise errors[0]
+
+    def __enter__(self) -> "MultiSink":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        try:
+            self.close()
+        finally:
+            return None
+
+
+class ManifestIndexSink:
+    """Sink that accumulates manifest entries into a JSON index."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._index: Dict[str, Dict[str, Optional[str]]] = {}
+        self._closed = False
+
+    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        return None
+
+    def log(self, record: AttemptRecord) -> None:
+        return None
+
+    def log_manifest(self, entry: ManifestEntry) -> None:
+        payload: Dict[str, Optional[str]] = {
+            "classification": entry.classification,
+            "pdf_path": None,
+            "sha256": None,
+        }
+        if entry.path and entry.classification and entry.classification.startswith("pdf"):
+            payload["pdf_path"] = entry.path
+            payload["sha256"] = entry.sha256
+        elif entry.classification == "cached" and entry.path:
+            payload["pdf_path"] = entry.path
+            payload["sha256"] = entry.sha256
+        self._index[entry.work_id] = payload
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:
+        return None
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        ensure_dir(self._path.parent)
+        serializable = {k: v for k, v in sorted(self._index.items(), key=lambda item: item[0])}
+        try:
+            self._path.write_text(json.dumps(serializable, indent=2, sort_keys=True), encoding="utf-8")
+        except OSError as exc:
+            LOGGER.warning("Failed to write manifest index %s: %s", self._path, exc)
+
+    def __enter__(self) -> "ManifestIndexSink":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+
+class LastAttemptCsvSink:
+    """Sink that writes one manifest row per work to a CSV on close."""
+
+    HEADER = [
+        "work_id",
+        "title",
+        "publication_year",
+        "resolver",
+        "url",
+        "classification",
+        "path",
+        "sha256",
+        "content_length",
+        "etag",
+        "last_modified",
+    ]
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._entries: Dict[str, ManifestEntry] = {}
+        self._closed = False
+
+    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        return None
+
+    def log(self, record: AttemptRecord) -> None:
+        return None
+
+    def log_manifest(self, entry: ManifestEntry) -> None:
+        self._entries[entry.work_id] = entry
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:
+        return None
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        ensure_dir(self._path.parent)
+        try:
+            with self._path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=self.HEADER)
+                writer.writeheader()
+                for work_id in sorted(self._entries.keys()):
+                    entry = self._entries[work_id]
+                    writer.writerow(
+                        {
+                            "work_id": entry.work_id,
+                            "title": entry.title,
+                            "publication_year": entry.publication_year or "",
+                            "resolver": entry.resolver or "",
+                            "url": entry.url or "",
+                            "classification": entry.classification,
+                            "path": entry.path or "",
+                            "sha256": entry.sha256 or "",
+                            "content_length": entry.content_length or "",
+                            "etag": entry.etag or "",
+                            "last_modified": entry.last_modified or "",
+                        }
+                    )
+        except OSError as exc:
+            LOGGER.warning("Failed to write last-attempt CSV %s: %s", self._path, exc)
+
+    def __enter__(self) -> "LastAttemptCsvSink":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
 
 def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
@@ -781,6 +732,8 @@ def classify_payload(head_bytes: bytes, content_type: str, url: str) -> Optional
         return "html"
     if "pdf" in ctype:
         return "pdf"
+    if ctype == "application/octet-stream":
+        return None
 
     if url.lower().endswith(".pdf"):
         return "pdf"
@@ -1325,7 +1278,7 @@ def download_candidate(
     dry_run = bool(context.get("dry_run", False))
     head_precheck_passed = head_precheck_passed or bool(context.get("head_precheck_passed", False))
     if not head_precheck_passed and not context.get("skip_head_precheck", False):
-        head_precheck_passed = _head_precheck_candidate(session, url, timeout)
+        head_precheck_passed = head_precheck(session, url, timeout)
         context["head_precheck_passed"] = head_precheck_passed
     extract_html_text = bool(context.get("extract_html_text", False))
     previous_map: Dict[str, Dict[str, Any]] = context.get("previous", {})
@@ -1579,6 +1532,16 @@ def read_resolver_config(path: Path) -> Dict[str, Any]:
         return yaml.safe_load(text) or {}
 
 
+def _seed_resolver_toggle_defaults(
+    config: ResolverConfig, resolver_names: Sequence[str]
+) -> None:
+    """Ensure resolver toggles include defaults for every known resolver."""
+
+    for name in resolver_names:
+        default_enabled = resolvers.DEFAULT_RESOLVER_TOGGLES.get(name, True)
+        config.resolver_toggles.setdefault(name, default_enabled)
+
+
 def apply_config_overrides(
     config: ResolverConfig,
     data: Dict[str, Any],
@@ -1589,7 +1552,7 @@ def apply_config_overrides(
     Args:
         config: Resolver configuration object to mutate.
         data: Mapping loaded from a configuration file.
-        resolver_names: Known resolver names to seed toggle defaults.
+        resolver_names: Known resolver names. Defaults are applied after overrides.
 
     Returns:
         None
@@ -1619,9 +1582,8 @@ def apply_config_overrides(
         legacy_limits = data.get("resolver_rate_limits") or {}
         config.resolver_min_interval_s.update(legacy_limits)
 
-    for name in resolver_names:
-        default_enabled = name not in {"openaire", "hal", "osf"}
-        config.resolver_toggles.setdefault(name, default_enabled)
+    # Resolver toggle defaults are applied once after all overrides via
+    # ``_seed_resolver_toggle_defaults`` to ensure a single source of truth.
 
 
 def load_resolver_config(
@@ -1679,15 +1641,13 @@ def load_resolver_config(
                 ordered.append(name)
         config.resolver_order = ordered
 
-    for name in resolver_names:
-        default_enabled = name not in {"openaire", "hal", "osf"}
-        config.resolver_toggles.setdefault(name, default_enabled)
-
     for disabled in getattr(args, "disable_resolver", []) or []:
         config.resolver_toggles[disabled] = False
 
     for enabled in getattr(args, "enable_resolver", []) or []:
         config.resolver_toggles[enabled] = True
+
+    _seed_resolver_toggle_defaults(config, resolver_names)
 
     if hasattr(args, "global_url_dedup") and args.global_url_dedup is not None:
         config.enable_global_url_dedup = args.global_url_dedup
@@ -1756,7 +1716,7 @@ def process_one_work(
     pdf_dir: Path,
     html_dir: Path,
     pipeline: ResolverPipeline,
-    logger: JsonlLogger,
+    logger: AttemptSink,
     metrics: ResolverMetrics,
     *,
     dry_run: bool,
@@ -1884,7 +1844,7 @@ def process_one_work(
         elapsed_ms=None,
         error=reason,
     )
-    logger.log(
+    logger.log_attempt(
         AttemptRecord(
             work_id=artifact.work_id,
             resolver_name="final",
@@ -1950,10 +1910,25 @@ def main() -> None:
         default=None,
         help="Folder for HTML responses (default: sibling 'HTML').",
     )
-    parser.add_argument("--manifest", type=Path, default=None, help="Path to manifest JSONL log.")
     parser.add_argument(
-        "--mailto", type=str, default=None, help="Email for the OpenAlex polite pool."
+        "--staging",
+        action="store_true",
+        help="Create timestamped run directories under --out with separate PDF and HTML folders.",
     )
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        default=None,
+        help="Path to manifest JSONL log (replaces deprecated --log-path).",
+    )
+    parser.add_argument(
+        "--log-path",
+        dest="log_jsonl",
+        type=Path,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument("--mailto", type=str, default=None, help="Email for the OpenAlex polite pool.")
     parser.add_argument("--per-page", type=int, default=200, help="Results per page (1-200).")
     parser.add_argument("--max", type=int, default=None, help="Maximum works to process.")
     parser.add_argument("--oa-only", action="store_true", help="Only consider open-access works.")
@@ -1964,83 +1939,70 @@ def main() -> None:
         help="Sleep seconds between works (sequential mode).",
     )
 
-    # Resolver configuration
-    parser.add_argument(
+    resolver_group = parser.add_argument_group("Resolver settings")
+    resolver_group.add_argument(
         "--resolver-config", type=str, default=None, help="Path to resolver config (YAML/JSON)."
     )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--resolver-order",
         type=str,
         default=None,
         help="Comma-separated resolver order override (e.g., 'unpaywall,crossref').",
     )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--unpaywall-email", type=str, default=None, help="Override Unpaywall email credential."
     )
-    parser.add_argument("--core-api-key", type=str, default=None, help="CORE API key override.")
-    parser.add_argument(
+    resolver_group.add_argument("--core-api-key", type=str, default=None, help="CORE API key override.")
+    resolver_group.add_argument(
         "--semantic-scholar-api-key",
         type=str,
         default=None,
         help="Semantic Scholar Graph API key override.",
     )
-    parser.add_argument("--doaj-api-key", type=str, default=None, help="DOAJ API key override.")
-    parser.add_argument(
+    resolver_group.add_argument("--doaj-api-key", type=str, default=None, help="DOAJ API key override.")
+    resolver_group.add_argument(
         "--disable-resolver",
         action="append",
         default=[],
         help="Disable a resolver by name (can be repeated).",
     )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--enable-resolver",
         action="append",
         default=[],
         help="Enable a resolver by name (can be repeated).",
     )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--max-resolver-attempts",
         type=int,
         default=None,
         help="Maximum resolver attempts per work.",
     )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--resolver-timeout",
         type=float,
         default=None,
         help="Default timeout (seconds) for resolver HTTP requests.",
     )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--concurrent-resolvers",
         type=int,
         default=None,
         help="Maximum resolver threads per work item (default: 1).",
     )
-    parser.add_argument(
-        "--log-path",
-        dest="log_jsonl",
-        type=Path,
-        default=None,
-        help="Deprecated alias for --manifest.",
-    )
-    parser.add_argument(
-        "--log-csv",
-        type=Path,
-        default=None,
-        help="Optional CSV attempts log output path.",
-    )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--global-url-dedup",
         dest="global_url_dedup",
         action="store_true",
         help="Skip downloads when a URL was already fetched in this run.",
     )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--no-global-url-dedup",
         dest="global_url_dedup",
         action="store_false",
         help="Disable global URL deduplication (default).",
     )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--domain-min-interval",
         dest="domain_min_interval",
         type=_parse_domain_interval,
@@ -2052,30 +2014,37 @@ def main() -> None:
             "Repeat the option to configure multiple domains."
         ),
     )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--head-precheck",
         dest="head_precheck",
         action="store_true",
         help="Enable resolver HEAD preflight filtering (default).",
     )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--no-head-precheck",
         dest="head_precheck",
         action="store_false",
         help="Disable resolver HEAD preflight filtering.",
     )
-    parser.add_argument(
+    resolver_group.add_argument(
         "--accept",
         type=str,
         default=None,
         help="Override the Accept header sent with resolver HTTP requests.",
     )
     parser.set_defaults(head_precheck=True, global_url_dedup=None)
+
     parser.add_argument(
         "--log-format",
         choices=["jsonl", "csv"],
         default="jsonl",
         help="Log format for attempts (default: jsonl).",
+    )
+    parser.add_argument(
+        "--log-csv",
+        type=Path,
+        default=None,
+        help="Optional CSV attempts log output path.",
     )
     parser.add_argument(
         "--workers",
@@ -2099,7 +2068,6 @@ def main() -> None:
         action="store_true",
         help="Extract plaintext from HTML fallbacks (requires trafilatura).",
     )
-
     args = parser.parse_args()
 
     if args.workers < 1:
@@ -2130,8 +2098,21 @@ def main() -> None:
         )
     )
 
-    pdf_dir = args.out
-    html_dir = args.html_out or (pdf_dir.parent / "HTML")
+    base_pdf_dir = args.out
+    manifest_override = args.manifest or args.log_jsonl
+    if args.staging:
+        run_dir = base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M")
+        pdf_dir = run_dir / "PDF"
+        html_dir = run_dir / "HTML"
+        manifest_path = run_dir / "manifest.jsonl"
+        if args.html_out:
+            LOGGER.info("Staging mode overrides --html-out; using %s", html_dir)
+        if manifest_override:
+            LOGGER.info("Staging mode overrides --manifest/--log-path; writing to %s", manifest_path)
+    else:
+        pdf_dir = base_pdf_dir
+        html_dir = args.html_out or (pdf_dir.parent / "HTML")
+        manifest_path = manifest_override or (pdf_dir / "manifest.jsonl")
     ensure_dir(pdf_dir)
     ensure_dir(html_dir)
 
@@ -2153,7 +2134,6 @@ def main() -> None:
 
     config = load_resolver_config(args, resolver_names, resolver_order_override)
 
-    manifest_path = args.manifest or args.log_jsonl or (pdf_dir / "manifest.jsonl")
     if manifest_path.suffix != ".jsonl":
         manifest_path = manifest_path.with_suffix(".jsonl")
     csv_path = args.log_csv
@@ -2167,39 +2147,21 @@ def main() -> None:
     html_only = 0
     skipped = 0
 
-    with JsonlLogger(manifest_path) as base_logger:
-        attempt_logger: Any = base_logger
-        csv_adapter: Optional[CsvAttemptLoggerAdapter] = None
-        if csv_path:
-            csv_adapter = CsvAttemptLoggerAdapter(base_logger, csv_path)
-            attempt_logger = csv_adapter
-
-        resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
-        if args.resume_from:
-            clear_resolver_caches()
-
-        metrics = ResolverMetrics()
-        pipeline = ResolverPipeline(
-            resolvers=resolver_instances,
-            config=config,
-            download_func=download_candidate,
-            logger=attempt_logger,
-            metrics=metrics,
-        )
-
-        def _session_factory() -> requests.Session:
-            """Build a fresh requests session configured with polite headers."""
-
-    summary_record: Dict[str, Any] = {}
-
     with contextlib.ExitStack() as stack:
-        base_logger = stack.enter_context(JsonlLogger(manifest_path))
-        attempt_logger: Any = base_logger
-        csv_path = args.log_csv
-        if args.log_format == "csv":
-            csv_path = csv_path or manifest_path.with_suffix(".csv")
+        sinks: List[AttemptSink] = []
+        jsonl_sink = stack.enter_context(JsonlSink(manifest_path))
+        sinks.append(jsonl_sink)
+        index_path = manifest_path.with_suffix(".index.json")
+        index_sink = stack.enter_context(ManifestIndexSink(index_path))
+        sinks.append(index_sink)
         if csv_path:
-            attempt_logger = stack.enter_context(CsvAttemptLoggerAdapter(base_logger, csv_path))
+            csv_sink = stack.enter_context(CsvSink(csv_path))
+            sinks.append(csv_sink)
+        if args.log_format == "csv":
+            last_csv_path = manifest_path.with_name("manifest.last.csv")
+            last_attempt_sink = stack.enter_context(LastAttemptCsvSink(last_csv_path))
+            sinks.append(last_attempt_sink)
+        attempt_logger: AttemptSink = jsonl_sink if len(sinks) == 1 else MultiSink(sinks)
 
         resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
         if args.resume_from:
@@ -2215,9 +2177,15 @@ def main() -> None:
         )
 
         def _session_factory() -> requests.Session:
-            """Build a fresh requests session configured with polite headers."""
+            """Return a new :class:`requests.Session` using the run's polite headers.
 
-            return _make_session(config.polite_headers)
+            The factory is invoked by worker threads to obtain an isolated session
+            that inherits the resolver configuration's polite identification
+            headers. Creating sessions through this helper ensures each worker
+            reuses the shared retry configuration while keeping connection pools
+            thread-local.
+            """
+
             return _make_session(config.polite_headers)
 
         def _record_result(res: Dict[str, Any]) -> None:
@@ -2320,10 +2288,6 @@ def main() -> None:
                 )
             except Exception:
                 LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
-        finally:
-            if csv_adapter is not None:
-                csv_adapter.close()
-
     print(
         f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, skipped {skipped}."
     )
