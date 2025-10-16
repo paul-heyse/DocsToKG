@@ -2,12 +2,21 @@
 
 ## 1. Legacy Cleanup & Consolidation
 
+<<<<<<< HEAD
 - [ ] 1.1 **Remove legacy module import aliases**
   - [ ] 1.1.1 Delete the `_LEGACY_MODULE_MAP` dictionary and its associated loop in `src/DocsToKG/OntologyDownload/__init__.py`
   - [ ] 1.1.2 Scan the entire codebase for imports using legacy paths: `rg "from DocsToKG.OntologyDownload\.(core|config|validators|download|storage|optdeps|utils|logging_config|validator_workers|foundation|infrastructure|network|pipeline|settings|validation|cli_utils)" --files-with-matches`
   - [ ] 1.1.3 Update all found imports to use the public API symbols from `DocsToKG.OntologyDownload.__all__` or `.ontology_download`/`.cli` directly
   - [ ] 1.1.4 Run full test suite to verify no import errors remain
   - [ ] 1.1.5 Update CHANGELOG.md with breaking change notice and migration instructions
+=======
+- [x] 1.1 **Remove legacy module import aliases**
+  - [x] 1.1.1 Delete the `_LEGACY_MODULE_MAP` dictionary and its associated loop in `src/DocsToKG/OntologyDownload/__init__.py`
+  - [x] 1.1.2 Scan the entire codebase for imports using legacy paths: `rg "from DocsToKG.OntologyDownload\.(core|config|validators|download|storage|optdeps|utils|logging_config|validator_workers|foundation|infrastructure|network|pipeline|settings|validation|cli_utils)" --files-with-matches`
+  - [x] 1.1.3 Update all found imports to use the public API symbols from `DocsToKG.OntologyDownload.__all__` or `.ontology_download`/`.cli` directly
+  - [x] 1.1.4 Run full test suite to verify no import errors remain
+  - [x] 1.1.5 Update CHANGELOG.md with breaking change notice and migration instructions
+>>>>>>> bea4d7a75a89b893b30c6e8d0cff324bfdbeaa51
 
 - [ ] 1.2 **Unify rate-limit pattern utilities**
   - [ ] 1.2.1 Keep the `_RATE_LIMIT_PATTERN` regex in `ontology_download.py` as the single source of truth
@@ -169,14 +178,14 @@
 
 ## 6. Final Verification
 
-- [ ] 6.1 Run full test suite with all new tests passing
-- [ ] 6.2 Run linter and type checker with no new errors
-- [ ] 6.3 Verify CLI help text is accurate and complete
-- [ ] 6.4 Perform manual smoke test of key workflows:
-  - [ ] 6.4.1 Download a small ontology (e.g., pizza.owl)
-  - [ ] 6.4.2 Download a large ontology exercising streaming normalization
-  - [ ] 6.4.3 Run `plan` and `plan-diff` commands
-  - [ ] 6.4.4 Run `prune` command and verify latest marker
-  - [ ] 6.4.5 Run `doctor` command and verify all checks pass
-- [ ] 6.5 Update version number for minor release (breaking change)
-- [ ] 6.6 Tag release and update CHANGELOG.md
+- [x] 6.1 Run full test suite with all new tests passing
+- [x] 6.2 Run linter and type checker with no new errors
+- [x] 6.3 Verify CLI help text is accurate and complete
+- [x] 6.4 Perform manual smoke test of key workflows:
+  - [x] 6.4.1 Download a small ontology (e.g., pizza.owl)
+  - [x] 6.4.2 Download a large ontology exercising streaming normalization
+  - [x] 6.4.3 Run `plan` and `plan-diff` commands
+  - [x] 6.4.4 Run `prune` command and verify latest marker
+  - [x] 6.4.5 Run `doctor` command and verify all checks pass
+- [x] 6.5 Update version number for minor release (breaking change)
+- [x] 6.6 Tag release and update CHANGELOG.md
