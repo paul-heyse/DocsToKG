@@ -1,10 +1,10 @@
-"""PDF conversion pipeline with CUDA safety guarantees.
+"""Deprecated compatibility wrapper around the canonical PDF pipeline.
 
-This lightweight module exists primarily so test coverage can assert that the
-DocsToKG PDF conversion entrypoint enforces the ``spawn`` multiprocessing start
-method. The implementation keeps a close surface to the legacy script without
-depending on heavyweight optional libraries, allowing tests to monkeypatch
-behaviour as required.
+This module will be removed in a future release. Prefer importing from
+``DocsToKG.DocParsing.pipelines`` which contains the supported
+implementation. The lightweight compatibility shim exists primarily so
+tests can exercise historical entry points while the deprecation window
+remains open.
 """
 
 from __future__ import annotations

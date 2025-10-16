@@ -50,8 +50,11 @@ from DocsToKG.DocParsing._common import (
     data_manifests,
     data_pdfs,
     detect_data_root,
+    expand_path,
     find_free_port,
     get_logger,
+    resolve_model_root,
+    set_spawn_or_warn,
     load_manifest_index,
     manifest_append,
     resolve_hash_algorithm,
@@ -64,6 +67,52 @@ except Exception:  # pragma: no cover - guard for stripped-down runtime
     Version = None  # type: ignore[assignment]
 
 _LOGGER = get_logger(__name__)
+
+
+# -------- Model path resolution helpers --------
+
+PDF_MODEL_SUBDIR = Path("granite-docling-258M")
+
+
+def _expand_path(path: str | Path) -> Path:
+    """Expand a filesystem path to an absolute :class:`Path`."""
+
+    return Path(path).expanduser().resolve()
+
+
+def resolve_hf_home() -> Path:
+    """Resolve the HuggingFace cache directory respecting ``HF_HOME``."""
+
+    env = os.getenv("HF_HOME")
+    if env:
+        return _expand_path(env)
+    return Path.home().expanduser() / ".cache" / "huggingface"
+
+
+def resolve_model_root() -> Path:
+    """Resolve DocsToKG model root with environment override."""
+
+    env = os.getenv("DOCSTOKG_MODEL_ROOT")
+    if env:
+        return _expand_path(env)
+    return resolve_hf_home()
+
+
+def resolve_pdf_model_path(cli_value: str | None = None) -> str:
+    """Determine PDF model path using CLI and environment precedence."""
+
+    if cli_value:
+        return cli_value
+    env_model = os.getenv("DOCLING_PDF_MODEL")
+    if env_model:
+        return str(_expand_path(env_model))
+    model_root_env = os.getenv("DOCSTOKG_MODEL_ROOT")
+    if model_root_env:
+        return str((_expand_path(model_root_env) / PDF_MODEL_SUBDIR).resolve())
+    hf_home_env = os.getenv("HF_HOME")
+    if hf_home_env:
+        return str((_expand_path(hf_home_env) / PDF_MODEL_SUBDIR).resolve())
+    return str((Path.home().expanduser() / ".cache" / "huggingface" / PDF_MODEL_SUBDIR).resolve())
 
 
 # -------- Paths --------
@@ -368,8 +417,12 @@ def pdf_build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model",
         type=str,
-        default=DEFAULT_MODEL_PATH,
-        help="Path or identifier for the vLLM model to serve",
+        default=None,
+        help=(
+            "Path or identifier for the vLLM model to serve. "
+            "Defaults to DOCLING_PDF_MODEL, DOCSTOKG_MODEL_ROOT/"
+            f"{PDF_MODEL_SUBDIR}, or HF_HOME/{PDF_MODEL_SUBDIR}."
+        ),
     )
     parser.add_argument(
         "--served-model-name",
@@ -410,7 +463,6 @@ def pdf_parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return pdf_build_parser().parse_args(argv)
 
 
-DEFAULT_MODEL_PATH = "/home/paul/hf-cache/granite-docling-258M"
 DEFAULT_SERVED_MODEL_NAMES: Tuple[str, ...] = (
     "granite-docling-258M",
     "ibm-granite/granite-docling-258M",
@@ -986,6 +1038,7 @@ def pdf_convert_one(task: PdfTask) -> PdfConversionResult:
         from docling.pipeline.vlm_pipeline import VlmPipeline
 
         out_dir.mkdir(parents=True, exist_ok=True)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         if out_path.exists():
             return PdfConversionResult(
                 doc_id=task.doc_id,
@@ -1127,30 +1180,15 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         ValueError: If required configuration (such as auto-detected mode) is invalid.
     """
 
+    logger = get_logger(__name__)
+    set_spawn_or_warn(logger)
     import multiprocessing as mp
 
-    logger = get_logger(__name__)
-
-    try:
-        mp.set_start_method("spawn", force=True)
-        logger.info("Multiprocessing start method set to 'spawn' for CUDA safety")
-    except RuntimeError:
-        current_method = mp.get_start_method()
-        if current_method != "spawn":
-            logger.warning(
-                "Could not force spawn mode; current method is '%s'. CUDA operations in workers may fail.",
-                current_method,
-            )
     logger.info(
-        "Multiprocessing method: %s, CPU count: %s",
-        mp.get_start_method(),
-        os.cpu_count(),
-    )
-    logger.info(
-        "Multiprocessing method established",
+        "Multiprocessing configuration",
         extra={
             "extra_fields": {
-                "start_method": mp.get_start_method(),
+                "start_method": mp.get_start_method(allow_none=True),
                 "cpu_count": os.cpu_count(),
             }
         },
@@ -1164,7 +1202,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     if not hasattr(args, "served_model_names"):
         args.served_model_names = None
     if not hasattr(args, "model"):
-        args.model = DEFAULT_MODEL_PATH
+        args.model = None
     if not hasattr(args, "gpu_memory_utilization"):
         args.gpu_memory_utilization = DEFAULT_GPU_MEMORY_UTILIZATION
     if not hasattr(args, "workers"):
@@ -1180,7 +1218,8 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
 
     served_model_names = _normalize_served_model_names(args.served_model_names)
     inference_model = served_model_names[0]
-    model_path = args.model or DEFAULT_MODEL_PATH
+    model_path = resolve_pdf_model_path(args.model)
+    args.model = model_path
     gpu_memory_utilization = float(args.gpu_memory_utilization)
 
     vllm_version = detect_vllm_version()
@@ -1287,8 +1326,9 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         tasks: List[PdfTask] = []
         ok = fail = skip = 0
         for pdf_path in pdfs:
-            doc_id = pdf_path.relative_to(input_dir).as_posix()
-            out_path = output_dir / (pdf_path.stem + ".doctags")
+            rel_path = pdf_path.relative_to(input_dir)
+            doc_id = rel_path.as_posix()
+            out_path = (output_dir / rel_path).with_suffix(".doctags")
             input_hash = compute_content_hash(pdf_path)
             manifest_entry = manifest_index.get(doc_id)
             if (
@@ -1298,7 +1338,15 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                 and manifest_entry
                 and manifest_entry.get("input_hash") == input_hash
             ):
-                logger.info("Skipping %s: output exists and input unchanged", doc_id)
+                logger.info(
+                    "Skipping document: output exists and input unchanged",
+                    extra={
+                        "extra_fields": {
+                            "doc_id": doc_id,
+                            "output_path": str(out_path),
+                        }
+                    },
+                )
                 manifest_append(
                     stage=MANIFEST_STAGE,
                     doc_id=doc_id,
@@ -1683,10 +1731,16 @@ def html_main(args: argparse.Namespace | None = None) -> int:
 
     import multiprocessing as mp
 
-    try:
-        mp.set_start_method("spawn", force=True)
-    except RuntimeError:
-        pass  # already set
+    set_spawn_or_warn(_LOGGER)
+    _LOGGER.info(
+        "Multiprocessing configuration",
+        extra={
+            "extra_fields": {
+                "start_method": mp.get_start_method(allow_none=True),
+                "cpu_count": os.cpu_count(),
+            }
+        },
+    )
 
     if isinstance(args, argparse.Namespace):
         args = args
@@ -1744,14 +1798,15 @@ def html_main(args: argparse.Namespace | None = None) -> int:
     )
 
     if args.force:
-        _LOGGER.info("Force mode: reprocessing all documents")
+        _LOGGER.info(
+            "Force mode: reprocessing all documents",
+            extra={"extra_fields": {"mode": "force"}},
+        )
     elif args.resume:
-        _LOGGER.info("Resume mode enabled: unchanged outputs will be skipped")
-
-    if args.force:
-        print("Force mode: reprocessing all documents")
-    elif args.resume:
-        print("Resume mode enabled: unchanged outputs will be skipped")
+        _LOGGER.info(
+            "Resume mode enabled: unchanged outputs will be skipped",
+            extra={"extra_fields": {"mode": "resume"}},
+        )
 
     files = list_htmls(input_dir)
     if not files:
