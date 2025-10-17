@@ -197,7 +197,7 @@ from DocsToKG.ContentDownload.core import (
 )
 from DocsToKG.ContentDownload.core import normalize_arxiv as _normalize_arxiv
 from DocsToKG.ContentDownload.core import normalize_pmid as _normalize_pmid
-from DocsToKG.ContentDownload.networking import (
+from DocsToKG.ContentDownload.network import (
     CachedResult,
     ConditionalRequestHelper,
     ContentPolicyViolation,

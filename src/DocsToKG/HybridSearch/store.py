@@ -142,7 +142,6 @@ __all__ = (
     "FaissSearchResult",
     "ChunkRegistry",
     "OpenSearchSimulator",
-    "matches_filters",
     "cosine_against_corpus_gpu",
     "cosine_batch",
     "cosine_topk_blockwise",
@@ -1845,21 +1844,21 @@ def cosine_topk_blockwise(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return Top-K cosine similarities between ``q`` and ``C`` using GPU tiling.
 
-    The helper avoids materialising the full ``(N × M)`` similarity matrix by
+    The helper avoids materialising the full ``(N x M)`` similarity matrix by
     iterating over ``C`` in row blocks and maintaining a running Top-K per query
     row. Inputs are copied and normalised inside the routine so callers retain
     ownership of their buffers.
 
     Args:
-        q: Query vector or matrix (``N × D``).
-        C: Corpus matrix (``M × D``).
+        q: Query vector or matrix (``N x D``).
+        C: Corpus matrix (``M x D``).
         k: Number of neighbours to return per query row.
         device: CUDA device ordinal used for FAISS kernels.
         resources: FAISS GPU resources backing ``pairwise_distance_gpu``.
         block_rows: Number of corpus rows processed per iteration.
 
     Returns:
-        Tuple ``(scores, indices)`` where each has shape ``(N × K)``. Scores are
+        Tuple ``(scores, indices)`` where each has shape ``(N x K)``. Scores are
         sorted in descending order for every query row and indices reference rows
         within ``C``.
     """
@@ -2036,40 +2035,6 @@ class ChunkRegistry:
         return list(self._chunks.keys())
 
 
-def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
-    """Check whether ``chunk`` satisfies the provided OpenSearch-style filters."""
-
-    for key, expected in filters.items():
-        if key == "namespace":
-            if chunk.namespace != expected:
-                return False
-            continue
-
-        value = chunk.metadata.get(key)
-        if isinstance(expected, list):
-            if isinstance(value, list):
-                if not any(item in value for item in expected):
-                    return False
-            else:
-                if value not in expected:
-                    return False
-        else:
-            if value != expected:
-                return False
-    return True
-
-
-
-def __getattr__(name: str):
-    if name == "FaissIndexManager":
-        warnings.warn(
-            "FaissIndexManager is deprecated; import FaissVectorStore instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return FaissVectorStore
-    raise AttributeError(name)
-
 
 class ManagedFaissAdapter(DenseVectorStore):
     """Restrictive wrapper exposing only the managed DenseVectorStore surface."""
@@ -2120,6 +2085,11 @@ class ManagedFaissAdapter(DenseVectorStore):
             vectors: Embedding vectors to index.
             vector_ids: Identifiers associated with ``vectors``.
         """
+        if any(isinstance(vec_id, (int, np.integer)) for vec_id in vector_ids):
+            raise TypeError(
+                "ManagedFaissAdapter.add() expects UUID string identifiers; "
+                "use ChunkRegistry for FAISS id bridging"
+            )
         self._inner.add(vectors, vector_ids)
 
     def set_nprobe(

@@ -37,6 +37,7 @@ from .errors import (
     ConfigurationError,
     DownloadFailure,
     OntologyDownloadError,
+    PolicyError,
     ResolverError,
     ValidationError,
 )
@@ -1419,6 +1420,20 @@ def _resolve_plan_with_fallback(
         )
         try:
             plan = resolver.plan(spec, config, adapter)
+        except PolicyError as exc:
+            attempt_record.update({"status": "policy", "error": str(exc)})
+            resolver_attempts.append(dict(attempt_record))
+            adapter.warning(
+                "download attempt rejected by policy",
+                extra={
+                    "stage": "download",
+                    "resolver": candidate.resolver,
+                    "attempt": attempt_number,
+                    "error": str(exc),
+                },
+            )
+            last_error = exc
+            raise
         except (ConfigError, DownloadFailure) as exc:
             message = str(exc)
             attempts.append(f"{resolver_name}: {message}")
@@ -1828,7 +1843,7 @@ def fetch_one(
 
     if last_error is None:
         raise OntologyDownloadError(f"All resolver candidates failed for '{spec.id}'")
-    if isinstance(last_error, ConfigurationError):
+    if isinstance(last_error, (ConfigurationError, PolicyError)):
         raise last_error
     raise OntologyDownloadError(f"Download failed for '{spec.id}': {last_error}") from last_error
 
@@ -1972,7 +1987,7 @@ def plan_all(
                         "error": str(exc),
                     },
                 )
-                if isinstance(exc, (ConfigError, ConfigurationError)):
+                if isinstance(exc, (ConfigError, ConfigurationError, PolicyError)):
                     for pending in futures:
                         pending.cancel()
                     raise

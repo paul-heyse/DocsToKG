@@ -144,13 +144,14 @@ from .store import (
     FaissSearchResult,
     ManagedFaissAdapter,
     OpenSearchSimulator,
+    cosine_batch,
     cosine_topk_blockwise,
-    matches_filters,
     normalize_rows,
     pairwise_inner_products,
     restore_state,
     serialize_state,
 )
+from .devtools.opensearch_simulator import matches_filters
 from .types import (
     ChunkFeatures,
     ChunkPayload,
@@ -580,7 +581,12 @@ class ResultShaper:
 
     def _build_highlights(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
         highlights = self._opensearch.highlight(chunk, query_tokens)
-        return list(highlights)
+        if highlights:
+            return list(highlights)
+        if getattr(self._fusion_config, "strict_highlights", True):
+            return []
+        text = chunk.text[: min(len(chunk.text), 200)]
+        return [text] if text else []
 
 
 def apply_mmr_diversification(
@@ -690,21 +696,30 @@ def apply_mmr_diversification(
 
         query_vec = np.ascontiguousarray(embeddings[best_idx], dtype=np.float32)
         pool = np.ascontiguousarray(embeddings[remaining], dtype=np.float32)
-        if resources is not None and neighbor_lookup is not None:
-            sims = np.full(pool.shape[0], -np.inf, dtype=np.float32)
-            neighbor_scores = neighbor_lookup[best_idx]
-            for pos, idx in enumerate(remaining):
-                score = neighbor_scores.get(int(idx))
-                if score is not None:
-                    sims[pos] = score
-            missing_mask = sims == -np.inf
-            if np.any(missing_mask):
-                missing_ids = remaining[missing_mask]
-                raise RuntimeError(
-                    "cosine_topk_blockwise returned incomplete neighbourhood; "
-                    "increase block_rows or k to cover remaining candidate ids "
-                    f"{[int(idx) for idx in missing_ids]}"
-                )
+        if resources is not None:
+            if neighbor_lookup is not None:
+                sims = np.full(pool.shape[0], -np.inf, dtype=np.float32)
+                neighbor_scores = neighbor_lookup[best_idx]
+                for pos, idx in enumerate(remaining):
+                    score = neighbor_scores.get(int(idx))
+                    if score is not None:
+                        sims[pos] = score
+                missing_mask = sims == -np.inf
+                if np.any(missing_mask):
+                    gpu_scores = cosine_batch(
+                        query_vec.reshape(1, -1),
+                        pool,
+                        device=device,
+                        resources=resources,
+                    )[0]
+                    sims[missing_mask] = gpu_scores[missing_mask]
+            else:
+                sims = cosine_batch(
+                    query_vec.reshape(1, -1),
+                    pool,
+                    device=device,
+                    resources=resources,
+                )[0]
         else:
             sims = _cosine_cpu(query_vec, pool)
         max_sim[remaining] = np.maximum(max_sim[remaining], sims)
@@ -1365,7 +1380,7 @@ class HybridSearchService:
 
         score_floor = float(getattr(config.retrieval, "dense_score_floor", 0.0))
         use_score_floor = score_floor > 0.0
-        use_range = bool(getattr(request, "recall_first", False) and use_score_floor)
+        use_range = use_score_floor
         if use_range:
             hits = list(store.range_search(queries[0], score_floor, limit=None))
             self._observability.metrics.observe("faiss_search_batch_size", 1.0, channel="dense")

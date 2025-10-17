@@ -165,15 +165,15 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
     parsed = urlparse(url)
     logger = logging.getLogger("DocsToKG.OntologyDownload")
     if parsed.username or parsed.password:
-        raise ConfigError("Credentials in URLs are not allowed")
+        raise PolicyError("Credentials in URLs are not allowed")
 
     scheme = parsed.scheme.lower()
     if scheme not in {"http", "https"}:
-        raise ConfigError("Only HTTP(S) URLs are allowed for ontology downloads")
+        raise PolicyError("Only HTTP(S) URLs are allowed for ontology downloads")
 
     host = parsed.hostname
     if not host:
-        raise ConfigError("URL must include hostname")
+        raise PolicyError("URL must include hostname")
 
     try:
         ipaddress.ip_address(host)
@@ -187,7 +187,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
         try:
             ascii_host = host.encode("idna").decode("ascii").lower()
         except UnicodeError as exc:
-            raise ConfigError(f"Invalid internationalized hostname: {host}") from exc
+            raise PolicyError(f"Invalid internationalized hostname: {host}") from exc
 
     parsed = parsed._replace(netloc=_rebuild_netloc(parsed, ascii_host))
 
@@ -207,7 +207,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
         ):
             allow_private = True
         else:
-            raise ConfigError(f"Host {host} not in allowlist")
+            raise PolicyError(f"Host {host} not in allowlist")
 
     if scheme == "http":
         if allow_private:
@@ -224,7 +224,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
             scheme = "https"
 
     if scheme != "https" and not allow_private:
-        raise ConfigError("Only HTTPS URLs are allowed for ontology downloads")
+        raise PolicyError("Only HTTPS URLs are allowed for ontology downloads")
 
     port = parsed.port
     if port is None:
@@ -232,7 +232,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
 
     host_port_allowances = allowed_host_ports.get(ascii_host, set())
     if port not in allowed_port_set and port not in host_port_allowances:
-        raise ConfigError(f"Port {port} is not permitted for ontology downloads")
+        raise PolicyError(f"Port {port} is not permitted for ontology downloads")
 
     if is_ip:
         address = ipaddress.ip_address(ascii_host)

@@ -103,6 +103,9 @@ from numpy.typing import NDArray
 
 # --- Globals ---
 
+# NOTE: Identity bridging between UUIDs and FAISS integer ids is intentionally
+# kept internal to the storage layer (ChunkRegistry/FaissVectorStore). Do not
+# add UUID→int helpers here; see DocsToKG.HybridSearch.store for details.
 __all__ = (
     "ChunkFeatures",
     "ChunkPayload",

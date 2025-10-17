@@ -606,6 +606,13 @@ CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
             "help": "Validate chunk files and exit without producing new outputs.",
         },
     ),
+    CLIOption(
+        ("--inject-anchors",),
+        {
+            "action": "store_true",
+            "help": "Inject <<page:x>> / <<fig:y>> anchors at chunk boundaries for QA.",
+        },
+    ),
 )
 
 _LOGGER = get_logger(__name__)
@@ -1607,6 +1614,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         caption_markers=caption_markers,
         docling_version=docling_version,
         serializer_provider_spec=str(args.serializer_provider),
+        inject_anchors=bool(cfg.inject_anchors),
     )
 
     if "bert" in tokenizer_model.lower():
@@ -1634,6 +1642,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     config_snapshot["resume"] = bool(args.resume)
     config_snapshot["force"] = bool(args.force)
     config_snapshot["validate_only"] = bool(args.validate_only)
+    config_snapshot["inject_anchors"] = bool(args.inject_anchors)
     config_payload = dict(config_snapshot)
     config_payload.update(
         {

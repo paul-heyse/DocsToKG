@@ -2654,6 +2654,7 @@ Examples:
   python -m DocsToKG.DocParsing.cli chunk --data-root Data
   python -m DocsToKG.DocParsing.cli embed --resume
   python -m DocsToKG.DocParsing.cli doctags --mode pdf --workers 2
+  python -m DocsToKG.DocParsing.cli token-profiles --doctags-dir Data/DocTagsFiles
 """
 
 _PDF_SUFFIXES: tuple[str, ...] = (".pdf",)
@@ -2680,6 +2681,17 @@ def _run_embed(argv: Sequence[str]) -> int:
     parser.prog = "docparse embed"
     args = parser.parse_args(argv)
     return embedding_module.main(args)
+
+
+def _run_token_profiles(argv: Sequence[str]) -> int:
+    """Execute the tokenizer profiling subcommand."""
+
+    from DocsToKG.DocParsing import token_profiles as token_profiles_module
+
+    parser = token_profiles_module.build_parser()
+    parser.prog = "docparse token-profiles"
+    args = parser.parse_args(argv)
+    return token_profiles_module.main(args)
 
 
 def _build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentParser:
@@ -3553,6 +3565,10 @@ COMMANDS: Dict[str, _Command] = {
     "chunk": _Command(_run_chunk, "Run the Docling hybrid chunker"),
     "embed": _Command(_run_embed, "Generate BM25/SPLADE/dense vectors"),
     "doctags": _Command(_run_doctags, "Convert HTML/PDF corpora into DocTags"),
+    "token-profiles": _Command(
+        _run_token_profiles,
+        "Print token count ratios for DocTags samples across tokenizers",
+    ),
 }
 
 
@@ -3592,3 +3608,9 @@ def doctags(argv: Sequence[str] | None = None) -> int:
     """Public wrapper for the ``doctags`` subcommand."""
 
     return _run_doctags([] if argv is None else list(argv))
+
+
+def token_profiles(argv: Sequence[str] | None = None) -> int:
+    """Public wrapper for the ``token-profiles`` subcommand."""
+
+    return _run_token_profiles([] if argv is None else list(argv))

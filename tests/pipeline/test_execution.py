@@ -1177,7 +1177,7 @@ def test_real_network_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     logger = MemoryLogger([])
 
     from DocsToKG.ContentDownload.cli import download_candidate
-    from DocsToKG.ContentDownload.networking import create_session
+    from DocsToKG.ContentDownload.network import create_session
 
     session = create_session({"User-Agent": "DocsToKG-Test/1.0"})
     try:

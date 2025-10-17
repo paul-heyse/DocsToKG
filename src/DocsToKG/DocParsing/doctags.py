@@ -1989,6 +1989,7 @@ class HtmlTask:
     output_path: Path
     input_hash: str
     overwrite: bool
+    sanitizer_profile: str = "balanced"
     sanitizer_profile: str
 
 
@@ -2017,6 +2018,7 @@ class HtmlConversionResult:
     input_hash: str
     output_path: str
     error: str | None = None
+    sanitizer_profile: Optional[str] = None
     sanitizer_profile: Optional[str] = None
 
 

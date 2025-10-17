@@ -613,7 +613,7 @@ class OLSResolver(BaseResolver):
             headers=download_headers,
             filename_hint=filename,
             version=version,
-            license=license_value,
+            license=normalize_license_to_spdx(license_value),
             media_type=media_type,
             service="ols",
         )
@@ -662,7 +662,7 @@ class BioPortalResolver(BaseResolver):
         version = None
         license_value = None
         if isinstance(ontology, dict):
-            license_value = ontology.get("license")
+            license_value = normalize_license_to_spdx(ontology.get("license"))
         latest_submission = self._execute_with_retry(
             lambda: self.client.get_latest_submission(acronym),
             config=config,
@@ -684,7 +684,9 @@ class BioPortalResolver(BaseResolver):
                 links = getattr(latest_submission, "links", {})
                 download_url = links.get("download") if isinstance(links, dict) else None
             version = getattr(latest_submission, "version", None)
-            license_value = license_value or getattr(latest_submission, "license", None)
+            license_value = license_value or normalize_license_to_spdx(
+                getattr(latest_submission, "license", None)
+            )
         if not download_url:
             raise ResolverError(f"No BioPortal submission with download URL for {acronym}")
         headers: Dict[str, str] = {}
@@ -769,7 +771,7 @@ class LOVResolver(BaseResolver):
                 if candidate:
                     download_url = candidate
             if license_value is None:
-                license_value = entry.get("license")
+                license_value = normalize_license_to_spdx(entry.get("license"))
             if version_value is None:
                 candidate_version = entry.get("version") or entry.get("latestVersion")
                 if isinstance(candidate_version, str):
@@ -881,7 +883,7 @@ class DirectResolver(BaseResolver):
             headers=download_headers,
             filename_hint=filename_hint,
             version=version,
-            license=license_value,
+            license=normalize_license_to_spdx(license_value),
             media_type=media_type or default_media,
             service=extras.get("service"),
         )

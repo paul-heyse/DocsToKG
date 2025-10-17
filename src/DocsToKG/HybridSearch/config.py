@@ -195,6 +195,7 @@ class FusionConfig:
     # Mandatory shaping budgets
     token_budget: int = 2_000  # total tokens allowed across shaped results
     byte_budget: int = 32_000  # total UTF-8 bytes allowed across shaped results
+    strict_highlights: bool = True  # Only accept lexical index highlight spans
     channel_weights: Mapping[str, float] = field(
         default_factory=lambda: {"bm25": 1.0, "splade": 1.0, "dense": 1.0}
     )

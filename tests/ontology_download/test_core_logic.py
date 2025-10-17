@@ -115,6 +115,7 @@ from DocsToKG.OntologyDownload.settings import (
     DownloadFailure,
     ResolvedConfig,
 )
+from DocsToKG.OntologyDownload.errors import PolicyError
 from DocsToKG.OntologyDownload.validation import ValidationResult
 
 storage_mod = settings_mod
@@ -330,7 +331,7 @@ def test_plan_all_rejects_disallowed_host(monkeypatch: pytest.MonkeyPatch) -> No
 
     spec = core.FetchSpec(id="hp", resolver="blocked", extras={}, target_formats=("owl",))
 
-    with pytest.raises(ConfigError) as exc_info:
+    with pytest.raises(PolicyError) as exc_info:
         core.plan_all([spec], config=config)
 
     assert "blocked.example" in str(exc_info.value)

@@ -351,7 +351,6 @@ from .settings import (
     LoggingConfiguration,
     ResolvedConfig,
     ValidationConfig,
-    _directory_size,
     build_resolved_config,
     ensure_python_version,
     get_env_overrides,
@@ -1628,7 +1627,7 @@ def _resolve_version_metadata(
             timestamp = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
         except OSError:
             timestamp = None
-    size = _directory_size(path)
+    size = STORAGE.directory_size(path)
     return path, timestamp, size
 
 
@@ -1705,7 +1704,7 @@ def _collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
                 timestamp = datetime.fromtimestamp(manifest_path.stat().st_mtime, tz=timezone.utc)
             elif version_dir.exists():
                 timestamp = datetime.fromtimestamp(version_dir.stat().st_mtime, tz=timezone.utc)
-        size = _directory_size(version_dir)
+        size = STORAGE.directory_size(version_dir)
         metadata.append(
             {
                 "id": ontology_id,

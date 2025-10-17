@@ -283,7 +283,7 @@ Key Features:
 Dependencies:
 - requests: Outbound HTTP traffic and session management.
 - BeautifulSoup: Optional HTML parsing for resolver implementations.
-- DocsToKG.ContentDownload.networking: Shared retry and session helpers.
+- DocsToKG.ContentDownload.network: Shared retry and session helpers.
 
 Usage:
     from DocsToKG.ContentDownload import pipeline
@@ -311,7 +311,7 @@ import warnings
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from threading import BoundedSemaphore, Lock
 from types import MappingProxyType
@@ -348,7 +348,7 @@ from DocsToKG.ContentDownload.core import (
     parse_size,
     strip_prefix,
 )
-from DocsToKG.ContentDownload.networking import (
+from DocsToKG.ContentDownload.network import (
     CircuitBreaker,
     TokenBucket,
     head_precheck,
@@ -3570,6 +3570,9 @@ class ResolverPipeline:
         Returns:
             None
         """
+
+        if record.run_id is None and self._run_id is not None:
+            record = replace(record, run_id=self._run_id)
 
         if not hasattr(self.logger, "log_attempt") or not callable(
             getattr(self.logger, "log_attempt")

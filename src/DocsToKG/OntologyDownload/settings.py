@@ -394,6 +394,21 @@ class DefaultsConfig(BaseModel):
             )
         return value
 
+    @field_validator("accept_licenses")
+    @classmethod
+    def normalize_accept_licenses(cls, value: List[str]) -> List[str]:
+        """Normalize accept_licenses entries to canonical SPDX identifiers."""
+
+        from .resolvers import normalize_license_to_spdx
+
+        normalized: List[str] = []
+        for entry in value:
+            if not isinstance(entry, str) or not entry.strip():
+                continue
+            normalized_value = normalize_license_to_spdx(entry) or entry.strip()
+            normalized.append(normalized_value)
+        return normalized
+
     model_config = {
         "validate_assignment": True,
         "extra": "forbid",
@@ -951,6 +966,9 @@ class StorageBackend(Protocol):
     def mirror_cas_artifact(self, algorithm: str, digest: str, source: Path) -> Path:
         """Mirror ``source`` into a content-addressable cache and return its path."""
 
+    def directory_size(self, path: Path) -> int:
+        """Return the total size in bytes for files rooted at *path*."""
+
 
 def _safe_identifiers(ontology_id: str, version: str) -> Tuple[str, str]:
     """Return identifiers sanitised for filesystem usage."""
@@ -1073,6 +1091,11 @@ class LocalStorageBackend:
         if not cas_path.exists():
             shutil.copy2(source, cas_path)
         return cas_path
+
+    def directory_size(self, path: Path) -> int:
+        """Return the byte size for files rooted at ``path``."""
+
+        return _directory_size(path)
 
 
 class FsspecStorageBackend(LocalStorageBackend):
