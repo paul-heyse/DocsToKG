@@ -39,6 +39,7 @@ __all__ = [
     "get_default_schema_version",
     "get_compatible_versions",
     "validate_schema_version",
+    "ensure_chunk_schema",
     "validate_vector_row",
 ]
 
@@ -82,6 +83,34 @@ def validate_schema_version(
             f"supported versions: {', '.join(compatible)}"
         )
     return version
+
+
+def ensure_chunk_schema(
+    rec: dict,
+    *,
+    default_version: Optional[SchemaVersion] = None,
+    context: Optional[str] = None,
+) -> dict:
+    """Ensure ``rec`` declares a compatible chunk schema version.
+
+    When ``schema_version`` is missing it is populated with ``default_version``
+    (or :data:`CHUNK_SCHEMA_VERSION` when unspecified). When present it is
+    validated against the chunk compatibility set.
+    """
+
+    version = rec.get("schema_version")
+    if not version:
+        rec["schema_version"] = default_version or CHUNK_SCHEMA_VERSION
+        return rec
+
+    coerced = str(version)
+    validate_schema_version(
+        coerced,
+        SchemaKind.CHUNK,
+        context=context,
+    )
+    rec["schema_version"] = coerced
+    return rec
 
 
 def validate_vector_row(

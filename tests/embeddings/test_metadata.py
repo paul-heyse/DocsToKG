@@ -122,6 +122,8 @@ from typing import Any, Dict, List
 
 import pytest
 
+from DocsToKG.DocParsing.io import iter_jsonl
+
 from tests._stubs import dependency_stubs
 
 # --- Helper Functions ---
@@ -220,7 +222,7 @@ def test_process_pass_a_returns_stats_only(tmp_path: Path, monkeypatch: pytest.M
     stats = embed_module.process_pass_a([chunk_file], embed_module.get_logger(__name__))
     assert isinstance(stats, embed_module.BM25Stats)
     assert stats.N == 1
-    rows = embed_module.jsonl_load(chunk_file)
+    rows = list(iter_jsonl(chunk_file))
     assert rows[0]["uuid"], "UUIDs should be assigned in-place"
 
 
@@ -253,7 +255,17 @@ def test_process_chunk_file_vectors_reads_texts(
     captured_write_texts: List[str] = []
 
     def _write_vectors(
-        path, uuids, texts, splade_results, qwen_results, stats, args, rows, validator, logger
+        path,
+        uuids,
+        texts,
+        splade_results,
+        qwen_results,
+        stats,
+        args,
+        rows,
+        validator,
+        logger,
+        **_kwargs,
     ) -> tuple[int, List[int], List[float]]:
         captured_write_texts.extend(texts)
         return len(uuids), [1] * len(uuids), [1.0] * len(uuids)
@@ -503,7 +515,33 @@ def test_summary_manifest_includes_splade_backend_metadata(
 
     manifests: List[Dict[str, Any]] = []
 
-    def record_manifest(**entry: Any) -> None:
+    def record_manifest(stage: str, doc_id: str, status: str, **metadata: Any) -> None:
+        manifests.append({"stage": stage, "doc_id": doc_id, "status": status, **metadata})
+
+    def capture_success(
+        *,
+        stage: str,
+        doc_id: str,
+        duration_s: float,
+        schema_version: str,
+        input_path: str | Path,
+        input_hash: str,
+        output_path: str | Path,
+        hash_alg: str | None = None,
+        **extra: Any,
+    ) -> None:
+        entry = {
+            "stage": stage,
+            "doc_id": doc_id,
+            "status": "success",
+            "duration_s": duration_s,
+            "schema_version": schema_version,
+            "input_path": input_path,
+            "input_hash": input_hash,
+            "output_path": output_path,
+            "hash_alg": hash_alg,
+        }
+        entry.update(extra)
         manifests.append(entry)
 
     chunk_dir = tmp_path / "chunks"
@@ -524,6 +562,7 @@ def test_summary_manifest_includes_splade_backend_metadata(
 
     monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
     monkeypatch.setattr(embed_module, "manifest_append", record_manifest)
+    monkeypatch.setattr(embed_module, "manifest_log_success", capture_success)
     monkeypatch.setattr(embed_module, "iter_chunk_files", lambda _: [chunk_file])
     monkeypatch.setattr(
         embed_module,
@@ -551,9 +590,8 @@ def test_summary_manifest_includes_splade_backend_metadata(
         "detect_data_root",
         lambda override=None: Path(override) if override else tmp_path,
     )
-
     embed_module._SPLADE_ENCODER_BACKENDS.clear()
-    cfg = embed_module.SpladeCfg()
+    cfg = embed_module.SpladeCfg(model_dir=chunk_dir, device="cpu")
     key = (str(cfg.model_dir), cfg.device, cfg.attn_impl, cfg.max_active_dims)
     embed_module._SPLADE_ENCODER_BACKENDS[key] = "sdpa"
 
@@ -597,9 +635,63 @@ def test_model_dirs_follow_environment_defaults(
     def record_manifest(stage, doc_id, status, **metadata):
         manifests.append({"stage": stage, "doc_id": doc_id, "status": status, **metadata})
 
+    def capture_success(
+        *,
+        stage: str,
+        doc_id: str,
+        duration_s: float,
+        schema_version: str,
+        input_path: str | Path,
+        input_hash: str,
+        output_path: str | Path,
+        hash_alg: str | None = None,
+        **extra: Any,
+    ) -> None:
+        entry = {
+            "stage": stage,
+            "doc_id": doc_id,
+            "status": "success",
+            "duration_s": duration_s,
+            "schema_version": schema_version,
+            "input_path": input_path,
+            "input_hash": input_hash,
+            "output_path": output_path,
+            "hash_alg": hash_alg,
+        }
+        entry.update(extra)
+        manifests.append(entry)
+
+    def capture_success(
+        *,
+        stage: str,
+        doc_id: str,
+        duration_s: float,
+        schema_version: str,
+        input_path: str | Path,
+        input_hash: str,
+        output_path: str | Path,
+        hash_alg: str | None = None,
+        **extra: Any,
+    ) -> None:
+        entry = {
+            "stage": stage,
+            "doc_id": doc_id,
+            "status": "success",
+            "duration_s": duration_s,
+            "schema_version": schema_version,
+            "input_path": input_path,
+            "input_hash": input_hash,
+            "output_path": output_path,
+            "hash_alg": hash_alg,
+        }
+        entry.update(extra)
+        manifests.append(entry)
+
     monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
     monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
     monkeypatch.setattr(embed_module, "manifest_append", record_manifest)
+    monkeypatch.setattr(embed_module, "manifest_log_success", capture_success)
+    monkeypatch.setattr(embed_module, "manifest_log_success", capture_success)
     monkeypatch.setattr(embed_module, "_ensure_splade_dependencies", lambda: None)
     monkeypatch.setattr(embed_module, "_ensure_qwen_dependencies", lambda: None)
     monkeypatch.setattr(embed_module, "load_manifest_index", lambda *_, **__: {})
@@ -808,7 +900,7 @@ def test_pass_a_rejects_incompatible_chunk_schema(
 
     logger = SimpleNamespace(info=lambda *_, **__: None)
 
-    with pytest.raises(ValueError, match="Unsupported chunk schema_version"):
+    with pytest.raises(ValueError, match="Unsupported chunk schema version"):
         embed_module.process_pass_a([chunk_file], logger)
 
 

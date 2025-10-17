@@ -1547,6 +1547,7 @@ def build_artifact(tmp_path: Path) -> WorkArtifact:
         base_stem="example",
         pdf_dir=tmp_path / "pdf",
         html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
     )
 
 

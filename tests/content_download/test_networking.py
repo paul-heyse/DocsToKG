@@ -634,7 +634,7 @@ from DocsToKG.ContentDownload.pipeline import (
     ResolverResult,
     WaybackResolver,
 )
-from DocsToKG.ContentDownload.telemetry import JsonlSink, SqliteSink, load_manifest_url_index
+from DocsToKG.ContentDownload.telemetry import JsonlSink, RunTelemetry, SqliteSink, load_manifest_url_index
 
 # --- test_conditional_requests.py ---
 
@@ -660,12 +660,11 @@ given = hypothesis.given
 
 if HAS_REQUESTS and HAS_PYALEX:
     from DocsToKG.ContentDownload.cli import (
-        ManifestEntry,
         WorkArtifact,
-        build_manifest_entry,
         download_candidate,
     )
     from DocsToKG.ContentDownload.pipeline import DownloadOutcome
+    from DocsToKG.ContentDownload.telemetry import ManifestEntry, build_manifest_entry
 
     class _DummyResponse:
         def __init__(self, status_code: int, headers: Dict[str, str]) -> None:
@@ -3049,7 +3048,8 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
 
     artifact = _make_artifact(tmp_path)
     logger_path = tmp_path / "attempts.jsonl"
-    logger = JsonlSink(logger_path)
+    sink = JsonlSink(logger_path)
+    logger = RunTelemetry(sink)
     metrics = ResolverMetrics()
 
     class StubResolver:
@@ -3158,7 +3158,8 @@ def test_domain_bytes_budget_skips_over_limit(tmp_path: Path) -> None:
 
     artifact = _make_artifact(tmp_path)
     logger_path = tmp_path / "domain_budget.jsonl"
-    logger = JsonlSink(logger_path)
+    sink = JsonlSink(logger_path)
+    logger = RunTelemetry(sink)
     metrics = ResolverMetrics()
 
     class StubResolver:
@@ -3260,7 +3261,8 @@ def test_domain_bytes_budget_skips_over_limit(tmp_path: Path) -> None:
 
 
 def test_retry_after_updates_breakers(tmp_path: Path) -> None:
-    logger = JsonlSink(tmp_path / "breaker.jsonl")
+    sink = JsonlSink(tmp_path / "breaker.jsonl")
+    logger = RunTelemetry(sink)
     metrics = ResolverMetrics()
 
     class StubResolver:
@@ -3325,7 +3327,8 @@ def test_retry_after_updates_breakers(tmp_path: Path) -> None:
 def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
     artifact = _make_artifact(tmp_path)
     logger_path = tmp_path / "attempts.jsonl"
-    logger = JsonlSink(logger_path)
+    sink = JsonlSink(logger_path)
+    logger = RunTelemetry(sink)
     metrics = ResolverMetrics()
     session = requests.Session()
     session.headers.update({"User-Agent": "EdgeTester/1.0"})

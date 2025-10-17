@@ -190,7 +190,7 @@ def test_main_with_csv_releases_attempt_files(monkeypatch, tmp_path):
             self.logger = logger
             self.metrics = metrics
 
-        def run(self, session, artifact, context=None):
+        def run(self, session, artifact, context=None, session_factory=None):
             self.logger.log_attempt(
                 downloader.resolvers.AttemptRecord(
                     work_id=artifact.work_id,

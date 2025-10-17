@@ -277,7 +277,7 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
             self.metrics = metrics
             self.run_id = kwargs.get("run_id")
 
-        def run(self, session, artifact, context=None):
+        def run(self, session, artifact, context=None, session_factory=None):
             self.logger.log_attempt(
                 resolvers.AttemptRecord(
                     run_id=self.run_id,
@@ -394,7 +394,7 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
             self.run_id = kwargs.get("run_id")
             self.run_id = kwargs.get("run_id")
 
-        def run(self, session, artifact, context=None):
+        def run(self, session, artifact, context=None, session_factory=None):
             self.logger.log_attempt(
                 resolvers.AttemptRecord(
                     run_id=self.run_id,
@@ -516,7 +516,7 @@ def test_main_with_staging_creates_timestamped_directories(download_modules, mon
             self.metrics = metrics
             self.run_id = kwargs.get("run_id")
 
-        def run(self, session, artifact, context=None):
+        def run(self, session, artifact, context=None, session_factory=None):
             pdf_path.parent.mkdir(parents=True, exist_ok=True)
             pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
             self.logger.log_attempt(
@@ -622,7 +622,7 @@ def test_main_dry_run_skips_writing_files(download_modules, monkeypatch, tmp_pat
             self.logger = logger
             self.metrics = metrics
 
-        def run(self, session, artifact, context=None):
+        def run(self, session, artifact, context=None, session_factory=None):
             assert isinstance(context, DownloadContext)
             assert context.dry_run is True
             self.logger.log_attempt(
@@ -847,11 +847,12 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
 
     session = requests.Session()
     logger_path = tmp_path / "attempts.jsonl"
-    logger = downloader.JsonlSink(logger_path)
+    sink = downloader.JsonlSink(logger_path)
+    logger = downloader.RunTelemetry(sink)
     metrics = resolvers.ResolverMetrics()
 
     class _StubPipeline:
-        def run(self, session, artifact, context=None):  # pragma: no cover - interface shim
+        def run(self, session, artifact, context=None, session_factory=None):  # pragma: no cover - interface shim
             return resolvers.PipelineResult(
                 success=True,
                 resolver_name="stub",
@@ -902,7 +903,7 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
 
 
 class _NoopPipeline:
-    def run(self, session, artifact, context=None):  # pragma: no cover - should not run
+    def run(self, session, artifact, context=None, session_factory=None):  # pragma: no cover - should not run
         raise AssertionError("Pipeline should not execute when resume skips work")
 
 
@@ -916,7 +917,8 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
     xml_dir = tmp_path / "xml"
     session = requests.Session()
     logger_path = tmp_path / "attempts.jsonl"
-    logger = downloader.JsonlSink(logger_path)
+    sink = downloader.JsonlSink(logger_path)
+    logger = downloader.RunTelemetry(sink)
     metrics = resolvers.ResolverMetrics()
 
     work = {
@@ -1015,7 +1017,7 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
             self.metrics = metrics
             self.run_id = kwargs.get("run_id")
 
-        def run(self, session, artifact, context=None):
+        def run(self, session, artifact, context=None, session_factory=None):
             assert context is not None
             contexts.append(context)
             pdf_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
@@ -1188,7 +1190,7 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
             self.run_id = kwargs.get("run_id")
             self._throttle = DummyThrottle(config)
 
-        def run(self, session, artifact, context=None):
+        def run(self, session, artifact, context=None, session_factory=None):
             resolvers.ResolverPipeline._respect_domain_limit(
                 self._throttle, "https://example.org/resource.pdf"
             )
@@ -1325,7 +1327,7 @@ def test_cli_head_precheck_handles_head_hostile(download_modules, monkeypatch, t
             self.metrics = metrics
             self.run_id = kwargs.get("run_id")
 
-        def run(self, session, artifact, context=None):
+        def run(self, session, artifact, context=None, session_factory=None):
             passed = network_module.head_precheck(session, artifact.pdf_urls[0], timeout=3.0)
             assert passed is True
             pdf_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
@@ -1431,7 +1433,7 @@ def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, 
             self.metrics = metrics
             self.run_id = kwargs.get("run_id")
 
-        def run(self, session, artifact, context=None):
+        def run(self, session, artifact, context=None, session_factory=None):
             for order, resolver in enumerate(self.resolvers, start=1):
                 if self.logger is not None:
                     self.logger.log_attempt(
@@ -1540,7 +1542,7 @@ def test_cli_dry_run_metrics_align(download_modules, monkeypatch, tmp_path):
             self.metrics = metrics
             self.run_id = kwargs.get("run_id")
 
-        def run(self, session, artifact, context=None):
+        def run(self, session, artifact, context=None, session_factory=None):
             assert isinstance(context, DownloadContext)
             assert context.dry_run is True
             outcome = resolvers.DownloadOutcome(

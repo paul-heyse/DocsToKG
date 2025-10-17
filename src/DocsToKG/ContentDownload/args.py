@@ -1,0 +1,689 @@
+from __future__ import annotations
+
+import argparse
+import logging
+import uuid
+from dataclasses import dataclass
+from functools import lru_cache
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import requests
+from pyalex import Topics, Works
+from pyalex import config as oa_config
+
+from DocsToKG.ContentDownload import pipeline as resolvers
+from DocsToKG.ContentDownload.core import (
+    DEFAULT_MIN_PDF_BYTES,
+    DEFAULT_SNIFF_BYTES,
+    DEFAULT_TAIL_CHECK_BYTES,
+    Classification,
+)
+from DocsToKG.ContentDownload.download import RobotsCache, ensure_dir
+from DocsToKG.ContentDownload.pipeline import default_resolvers, load_resolver_config
+from DocsToKG.ContentDownload.telemetry import load_manifest_url_index
+
+__all__ = [
+    'ResolvedConfig',
+    'build_parser',
+    'parse_args',
+    'resolve_config',
+    'build_query',
+    'resolve_topic_id_if_needed',
+]
+
+LOGGER = logging.getLogger('DocsToKG.ContentDownload')
+
+
+@dataclass
+class ResolvedConfig:
+    args: argparse.Namespace
+    run_id: str
+    query: Works
+    pdf_dir: Path
+    html_dir: Path
+    xml_dir: Path
+    manifest_path: Path
+    csv_path: Optional[Path]
+    sqlite_path: Path
+    resolver_instances: List[Any]
+    resolver_config: Any
+    previous_url_index: Dict[str, Dict[str, Any]]
+    persistent_seen_urls: Set[str]
+    robots_checker: Optional[RobotsCache]
+    budget_requests: Optional[int]
+    budget_bytes: Optional[int]
+    concurrency_product: int
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Create and return the CLI argument parser."""
+    parser = argparse.ArgumentParser(
+        description="Download OpenAlex PDFs for a topic and year range with resolvers.",
+    )
+    parser.add_argument('--topic', type=str, help='Free-text topic search.')
+    parser.add_argument(
+        '--topic-id',
+        type=str,
+        help='OpenAlex Topic ID (e.g., https://openalex.org/T12345). Overrides --topic.',
+    )
+    parser.add_argument('--year-start', type=int, required=True, help='Start year (inclusive).')
+    parser.add_argument('--year-end', type=int, required=True, help='End year (inclusive).')
+    parser.add_argument('--out', type=Path, default=Path('./pdfs'), help='Output folder for PDFs.')
+    parser.add_argument(
+        '--html-out',
+        type=Path,
+        default=None,
+        help="Folder for HTML responses (default: sibling 'HTML').",
+    )
+    parser.add_argument(
+        '--xml-out',
+        type=Path,
+        default=None,
+        help="Folder for XML responses (default: sibling 'XML').",
+    )
+    parser.add_argument(
+        '--staging',
+        action='store_true',
+        help='Create timestamped run directories under --out with separate PDF, HTML, and XML folders.',
+    )
+    parser.add_argument(
+        '--content-addressed',
+        action='store_true',
+        help='Store PDFs using content-addressed paths with friendly symlinks.',
+    )
+    parser.add_argument(
+        '--manifest',
+        type=Path,
+        default=None,
+        help='Path to manifest JSONL log.',
+    )
+    parser.add_argument('--mailto', type=str, default=None, help='Email for the OpenAlex polite pool.')
+    parser.add_argument('--per-page', type=int, default=200, help='Results per page (1-200).')
+    parser.add_argument('--max', type=int, default=None, help='Maximum works to process.')
+    parser.add_argument('--oa-only', action='store_true', help='Only consider open-access works.')
+    parser.add_argument(
+        '--sleep',
+        type=float,
+        default=0.05,
+        help='Sleep seconds between works (sequential mode).',
+    )
+    parser.add_argument(
+        '--max-bytes',
+        type=int,
+        default=None,
+        help='Maximum bytes to download per request before aborting (default: unlimited).',
+    )
+    parser.add_argument(
+        '--ignore-robots',
+        action='store_true',
+        help='Bypass robots.txt checks (defaults to respecting policies).',
+    )
+    parser.add_argument(
+        '--budget',
+        action='append',
+        default=[],
+        metavar='KIND=VALUE',
+        help='Stop after reaching a budget (e.g., requests=1000, bytes=5GB). Option may repeat.',
+    )
+    parser.add_argument(
+        '--log-rotate',
+        type=_parse_size,
+        default=None,
+        metavar='SIZE',
+        help='Rotate JSONL logs after SIZE bytes (e.g., 250MB).',
+    )
+
+    classifier_group = parser.add_argument_group('Classifier settings')
+    classifier_group.add_argument(
+        '--sniff-bytes',
+        type=int,
+        default=DEFAULT_SNIFF_BYTES,
+        help=f'Bytes to buffer before inferring payload type (default: {DEFAULT_SNIFF_BYTES}).',
+    )
+    classifier_group.add_argument(
+        '--min-pdf-bytes',
+        type=int,
+        default=DEFAULT_MIN_PDF_BYTES,
+        help=f'Minimum PDF size required when HEAD precheck fails (default: {DEFAULT_MIN_PDF_BYTES}).',
+    )
+    classifier_group.add_argument(
+        '--tail-check-bytes',
+        type=int,
+        default=DEFAULT_TAIL_CHECK_BYTES,
+        help=f'Tail window size used to detect embedded HTML (default: {DEFAULT_TAIL_CHECK_BYTES}).',
+    )
+
+    resolver_group = parser.add_argument_group('Resolver settings')
+    resolver_group.add_argument('--resolver-config', type=str, default=None, help='Path to resolver config (YAML/JSON).')
+    resolver_group.add_argument(
+        '--resolver-order',
+        type=str,
+        default=None,
+        help="Comma-separated resolver order override (e.g., 'unpaywall,crossref').",
+    )
+    resolver_group.add_argument(
+        '--resolver-preset',
+        choices=['fast', 'broad'],
+        default=None,
+        help="Shortcut resolver ordering preset ('fast' prioritises OA, 'broad' keeps defaults).",
+    )
+    resolver_group.add_argument('--unpaywall-email', type=str, default=None, help='Override Unpaywall email credential.')
+    resolver_group.add_argument('--core-api-key', type=str, default=None, help='CORE API key override.')
+    resolver_group.add_argument(
+        '--semantic-scholar-api-key',
+        type=str,
+        default=None,
+        help='Semantic Scholar Graph API key override.',
+    )
+    resolver_group.add_argument('--doaj-api-key', type=str, default=None, help='DOAJ API key override.')
+    resolver_group.add_argument(
+        '--disable-resolver',
+        action='append',
+        default=[],
+        help='Disable a resolver by name (can be repeated).',
+    )
+    resolver_group.add_argument(
+        '--enable-resolver',
+        action='append',
+        default=[],
+        help='Enable a resolver by name (can be repeated).',
+    )
+    resolver_group.add_argument(
+        '--max-resolver-attempts',
+        type=int,
+        default=None,
+        help='Maximum resolver attempts per work.',
+    )
+    resolver_group.add_argument(
+        '--resolver-timeout',
+        type=float,
+        default=None,
+        help='Default timeout (seconds) for resolver HTTP requests.',
+    )
+    resolver_group.add_argument(
+        '--concurrent-resolvers',
+        type=int,
+        default=None,
+        help='Maximum resolver threads per work item (default: 1).',
+    )
+    resolver_group.add_argument(
+        '--max-concurrent-per-host',
+        type=int,
+        default=None,
+        help='Maximum concurrent downloads per host (default: 3). Set to 0 to disable.',
+    )
+    resolver_group.add_argument(
+        '--global-url-dedup',
+        dest='global_url_dedup',
+        action='store_true',
+        help='Skip downloads when a URL was already fetched in this run (default).',
+    )
+    resolver_group.add_argument(
+        '--no-global-url-dedup',
+        dest='global_url_dedup',
+        action='store_false',
+        help='Disable global URL deduplication.',
+    )
+    resolver_group.add_argument(
+        '--domain-min-interval',
+        dest='domain_min_interval',
+        type=_parse_domain_interval,
+        action='append',
+        default=[],
+        metavar='DOMAIN=SECONDS',
+        help='Enforce a minimum interval between requests to a domain. Repeat to configure multiple domains.',
+    )
+    resolver_group.add_argument(
+        '--domain-bytes-budget',
+        dest='domain_bytes_budget',
+        type=_parse_domain_bytes_budget,
+        action='append',
+        default=[],
+        metavar='DOMAIN=SIZE',
+        help='Cap total bytes downloaded per domain (e.g., example.org=500MB). Repeat to configure multiple domains.',
+    )
+    resolver_group.add_argument(
+        '--domain-token-bucket',
+        dest='domain_token_bucket',
+        type=_parse_domain_token_bucket,
+        action='append',
+        default=[],
+        metavar='DOMAIN=RPS[:capacity=N]',
+        help='Configure per-domain token buckets (e.g., example.org=0.5:capacity=2).',
+    )
+    resolver_group.add_argument(
+        '--head-precheck',
+        dest='head_precheck',
+        action='store_true',
+        help='Enable resolver HEAD preflight filtering (default).',
+    )
+    resolver_group.add_argument(
+        '--no-head-precheck',
+        dest='head_precheck',
+        action='store_false',
+        help='Disable resolver HEAD preflight filtering.',
+    )
+    resolver_group.add_argument('--accept', type=str, default=None, help='Override the Accept header sent with resolver HTTP requests.')
+
+    parser.set_defaults(head_precheck=True, global_url_dedup=None)
+
+    parser.add_argument(
+        '--log-format',
+        choices=['jsonl', 'csv'],
+        default='jsonl',
+        help='Log format for attempts (default: jsonl).',
+    )
+    parser.add_argument(
+        '--log-csv',
+        type=Path,
+        default=None,
+        help='Optional CSV attempts log output path.',
+    )
+    parser.add_argument('--workers', type=int, default=1, help='Number of parallel workers (default: 1 for sequential).')
+    parser.add_argument('--dry-run', action='store_true', help='Measure resolver coverage without writing files.')
+    parser.add_argument('--list-only', action='store_true', help='Discover candidate URLs but do not fetch content.')
+    parser.add_argument(
+        '--resume-from',
+        type=Path,
+        default=None,
+        help='Resume from manifest JSONL log, skipping completed works.',
+    )
+    parser.add_argument(
+        '--extract-text',
+        dest='extract_text',
+        choices=['html', 'never'],
+        default='never',
+        help="Extract plaintext sidecars for HTML downloads ('html') or disable ('never', default).",
+    )
+    parser.add_argument(
+        '--extract-html-text',
+        dest='extract_text',
+        action='store_const',
+        const='html',
+        help=argparse.SUPPRESS,
+    )
+
+    return parser
+
+
+def parse_args(parser: argparse.ArgumentParser, argv: Optional[List[str]] = None) -> argparse.Namespace:
+    """Parse CLI arguments using ``parser`` and optional argv override."""
+    return parser.parse_args(argv)
+
+
+def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) -> ResolvedConfig:
+    """Validate arguments, resolve configuration, and prepare run state."""
+    args.extract_html_text = args.extract_text == 'html'
+
+    if args.workers < 1:
+        parser.error('--workers must be >= 1')
+    if args.concurrent_resolvers is not None and args.concurrent_resolvers < 1:
+        parser.error('--concurrent-resolvers must be >= 1')
+    if args.max_concurrent_per_host is not None and args.max_concurrent_per_host < 0:
+        parser.error('--max-concurrent-per-host must be >= 0')
+    if not args.topic and not args.topic_id:
+        parser.error('Provide --topic or --topic-id.')
+    if args.max_bytes is not None and args.max_bytes <= 0:
+        parser.error('--max-bytes must be a positive integer')
+    for field_name in ('sniff_bytes', 'min_pdf_bytes', 'tail_check_bytes'):
+        value = getattr(args, field_name, None)
+        if value is not None and value < 0:
+            parser.error(f"--{field_name.replace('_', '-')} must be non-negative")
+
+    if args.mailto:
+        oa_config.email = args.mailto
+
+    topic_id = args.topic_id
+    if not topic_id and args.topic:
+        try:
+            topic_id = resolve_topic_id_if_needed(args.topic)
+        except Exception as exc:
+            LOGGER.warning("Failed to resolve topic ID for '%s': %s", args.topic, exc)
+            topic_id = None
+    if topic_id:
+        args.topic_id = topic_id
+
+    query = build_query(args)
+    run_id = uuid.uuid4().hex
+
+    base_pdf_dir = args.out
+    manifest_override = args.manifest
+    if args.staging:
+        run_dir = base_pdf_dir / datetime.now(UTC).strftime('%Y%m%d_%H%M')
+        pdf_dir = run_dir / 'PDF'
+        html_dir = run_dir / 'HTML'
+        xml_dir = run_dir / 'XML'
+        manifest_path = run_dir / 'manifest.jsonl'
+        if args.html_out:
+            LOGGER.info('Staging mode overrides --html-out; using %s', html_dir)
+        if args.xml_out:
+            LOGGER.info('Staging mode overrides --xml-out; using %s', xml_dir)
+        if manifest_override:
+            LOGGER.info('Staging mode overrides --manifest; writing to %s', manifest_path)
+    else:
+        pdf_dir = base_pdf_dir
+        html_dir = args.html_out or (pdf_dir.parent / 'HTML')
+        xml_dir = args.xml_out or (pdf_dir.parent / 'XML')
+        manifest_path = manifest_override or (pdf_dir / 'manifest.jsonl')
+
+    for path in (pdf_dir, html_dir, xml_dir):
+        ensure_dir(path)
+
+    resolver_instances = default_resolvers()
+    resolver_names = [resolver.name for resolver in resolver_instances]
+    resolver_order_override: Optional[List[str]] = None
+
+    def _normalise_order(order: List[str]) -> List[str]:
+        cleaned: List[str] = []
+        unknown: List[str] = []
+        for name in order:
+            if name not in resolver_names:
+                unknown.append(name)
+            elif name not in cleaned:
+                cleaned.append(name)
+        if unknown:
+            parser.error(
+                f"Unknown resolver(s) in order override: {', '.join(sorted(set(unknown)))}"
+            )
+        cleaned.extend(name for name in resolver_names if name not in cleaned)
+        return cleaned
+
+    if args.resolver_order:
+        raw_order = [name.strip() for name in args.resolver_order.split(',') if name.strip()]
+        if not raw_order:
+            parser.error('--resolver-order requires at least one resolver name.')
+        resolver_order_override = _normalise_order(raw_order)
+    elif getattr(args, 'resolver_preset', None):
+        if args.resolver_preset == 'fast':
+            preset = [
+                'openalex',
+                'unpaywall',
+                'crossref',
+                'landing_page',
+                'arxiv',
+                'pmc',
+                'europe_pmc',
+                'core',
+                'wayback',
+            ]
+        else:
+            preset = list(getattr(resolvers, 'DEFAULT_RESOLVER_ORDER', resolver_names))
+        resolver_order_override = _normalise_order(preset)
+
+    try:
+        config = load_resolver_config(args, resolver_names, resolver_order_override)
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    concurrency_product = max(args.workers, 1) * max(config.max_concurrent_resolvers, 1)
+    if concurrency_product > 32:
+        LOGGER.warning(
+            'High parallelism detected (workers x concurrent_resolvers = %s). Ensure resolver and domain rate limits are configured appropriately.',
+            concurrency_product,
+        )
+
+    if manifest_path.suffix != '.jsonl':
+        manifest_path = manifest_path.with_suffix('.jsonl')
+    csv_path = args.log_csv
+    if args.log_format == 'csv':
+        csv_path = csv_path or manifest_path.with_suffix('.csv')
+    sqlite_path = manifest_path.with_suffix('.sqlite3')
+
+    previous_url_index = load_manifest_url_index(sqlite_path)
+    persistent_seen_urls: Set[str] = {
+        url
+        for url, meta in previous_url_index.items()
+        if meta.get('path')
+        and Path(str(meta['path'])).exists()
+        and str(meta.get('classification', '')).lower()
+        in {Classification.PDF.value, Classification.CACHED.value, Classification.XML.value}
+    }
+
+    budget_requests: Optional[int] = None
+    budget_bytes: Optional[int] = None
+    robots_checker: Optional[RobotsCache] = None
+    if not args.ignore_robots:
+        user_agent = config.polite_headers.get('User-Agent', 'DocsToKGDownloader/1.0')
+        robots_checker = RobotsCache(user_agent)
+    for spec in args.budget or []:
+        try:
+            kind, amount = _parse_budget(spec)
+        except argparse.ArgumentTypeError as exc:
+            parser.error(str(exc))
+        if kind == 'requests':
+            budget_requests = amount if budget_requests is None else min(budget_requests, amount)
+        else:
+            budget_bytes = amount if budget_bytes is None else min(budget_bytes, amount)
+
+    args.manifest = manifest_path
+    args.log_csv = csv_path
+
+    return ResolvedConfig(
+        args=args,
+        run_id=run_id,
+        query=query,
+        pdf_dir=pdf_dir,
+        html_dir=html_dir,
+        xml_dir=xml_dir,
+        manifest_path=manifest_path,
+        csv_path=csv_path,
+        sqlite_path=sqlite_path,
+        resolver_instances=resolver_instances,
+        resolver_config=config,
+        previous_url_index=previous_url_index,
+        persistent_seen_urls=persistent_seen_urls,
+        robots_checker=robots_checker,
+        budget_requests=budget_requests,
+        budget_bytes=budget_bytes,
+        concurrency_product=concurrency_product,
+    )
+
+
+def _parse_size(value: str) -> int:
+    """Parse human-friendly size strings (e.g., ``10MB``) into bytes."""
+
+    text = (value or "").strip().lower().replace(",", "").replace("_", "")
+    if not text:
+        raise argparse.ArgumentTypeError("size value cannot be empty")
+    from DocsToKG.ContentDownload.core import parse_size
+
+    try:
+        return parse_size(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+def _parse_domain_interval(value: str) -> Tuple[str, float]:
+    """Parse ``DOMAIN=SECONDS`` CLI arguments for domain throttling.
+
+    Args:
+        value: Argument provided via ``--domain-min-interval``.
+
+    Returns:
+        Tuple containing the normalized domain name and interval seconds.
+
+    Raises:
+        argparse.ArgumentTypeError: If the argument is malformed or negative.
+    """
+
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("domain interval must use the format domain=seconds")
+    domain, interval = value.split("=", 1)
+    domain = domain.strip().lower()
+    if not domain:
+        raise argparse.ArgumentTypeError("domain component cannot be empty")
+    try:
+        seconds = float(interval)
+    except ValueError as exc:  # pragma: no cover - defensive parsing guard
+        raise argparse.ArgumentTypeError(
+            f"invalid interval for domain '{domain}': {interval}"
+        ) from exc
+    if seconds < 0:
+        raise argparse.ArgumentTypeError(f"interval for domain '{domain}' must be non-negative")
+    return domain, seconds
+
+def _parse_domain_bytes_budget(value: str) -> Tuple[str, int]:
+    """Parse ``DOMAIN=BYTES`` CLI arguments for domain byte budgets."""
+
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("domain bytes budget must use the format domain=size")
+    domain, raw = value.split("=", 1)
+    domain = domain.strip().lower()
+    if not domain:
+        raise argparse.ArgumentTypeError("domain component cannot be empty")
+    limit = _parse_size(raw)
+    return domain, limit
+
+def _parse_domain_token_bucket(value: str) -> Tuple[str, Dict[str, float]]:
+    """Parse ``DOMAIN=RPS[:capacity=X]`` specifications into bucket configs."""
+
+    if "=" not in value:
+        raise argparse.ArgumentTypeError(
+            "domain token bucket must use the format domain=rate[:capacity=N]"
+        )
+    domain, spec = value.split("=", 1)
+    domain = domain.strip().lower()
+    if not domain:
+        raise argparse.ArgumentTypeError("domain component cannot be empty")
+    rate: Optional[float] = None
+    capacity: Optional[float] = None
+    parts = [segment.strip() for segment in spec.split(":") if segment.strip()]
+    for index, part in enumerate(parts):
+        if "=" in part:
+            key, raw = part.split("=", 1)
+            key = key.strip().lower()
+            raw = raw.strip()
+            try:
+                value_float = float(raw)
+            except ValueError as exc:
+                raise argparse.ArgumentTypeError(
+                    f"invalid numeric value '{raw}' in token bucket spec"
+                ) from exc
+            if key in {"rate", "rps", "rate_per_second"}:
+                rate = value_float
+            elif key in {"capacity", "burst"}:
+                capacity = value_float
+            else:
+                raise argparse.ArgumentTypeError(f"unknown token bucket key '{key}'")
+        else:
+            try:
+                value_float = float(part)
+            except ValueError as exc:
+                raise argparse.ArgumentTypeError(f"invalid token bucket value '{part}'") from exc
+            if rate is None:
+                rate = value_float
+            elif capacity is None:
+                capacity = value_float
+            else:
+                raise argparse.ArgumentTypeError("unexpected extra token bucket value")
+
+    if rate is None or rate <= 0:
+        raise argparse.ArgumentTypeError("token bucket rate must be a positive number")
+    if capacity is None or capacity <= 0:
+        capacity = 1.0
+
+    return domain, {"rate_per_second": float(rate), "capacity": float(capacity)}
+
+def _parse_budget(value: str) -> Tuple[str, int]:
+    """Parse ``requests=N`` or ``bytes=N`` budget specifications."""
+
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("budget must use the format kind=value")
+    kind, raw_amount = value.split("=", 1)
+    key = kind.strip().lower()
+    if key not in {"requests", "bytes"}:
+        raise argparse.ArgumentTypeError("budget kind must be 'requests' or 'bytes'")
+    amount_text = raw_amount.strip().lower().replace(",", "").replace("_", "")
+    multiplier = 1
+    if amount_text.endswith("kb"):
+        multiplier = 1024
+        amount_text = amount_text[:-2]
+    elif amount_text.endswith("mb"):
+        multiplier = 1024**2
+        amount_text = amount_text[:-2]
+    elif amount_text.endswith("gb"):
+        multiplier = 1024**3
+        amount_text = amount_text[:-2]
+    elif amount_text.endswith("k"):
+        multiplier = 1000
+        amount_text = amount_text[:-1]
+    elif amount_text.endswith("m"):
+        multiplier = 1000**2
+        amount_text = amount_text[:-1]
+    elif amount_text.endswith("g"):
+        multiplier = 1000**3
+        amount_text = amount_text[:-1]
+    try:
+        amount = int(amount_text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid budget value: {raw_amount}") from exc
+    if amount <= 0:
+        raise argparse.ArgumentTypeError("budget value must be positive")
+    return key, amount * multiplier
+
+def build_query(args: argparse.Namespace) -> Works:
+    """Build a pyalex Works query based on CLI arguments.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Configured Works query object ready for iteration.
+    """
+    query = Works()
+    if args.topic_id:
+        query = query.filter(topics={"id": args.topic_id})
+    else:
+        query = query.search(args.topic)
+
+    query = query.filter(publication_year=f"{args.year_start}-{args.year_end}")
+    if args.oa_only:
+        query = query.filter(open_access={"is_oa": True})
+
+    query = query.select(
+        [
+            "id",
+            "title",
+            "publication_year",
+            "ids",
+            "open_access",
+            "best_oa_location",
+            "primary_location",
+            "locations",
+        ]
+    )
+
+    query = query.sort(publication_date="desc")
+    return query
+
+@lru_cache(maxsize=128)
+def _lookup_topic_id(topic_text: str) -> Optional[str]:
+    """Cached helper to resolve an OpenAlex topic identifier."""
+    try:
+        hits = Topics().search(topic_text).get()
+    except requests.RequestException as exc:  # pragma: no cover - network guard
+        LOGGER.warning("Topic lookup failed for %s: %s", topic_text, exc)
+        return None
+    if not hits:
+        return None
+    resolved = hits[0].get("id")
+    if resolved:
+        LOGGER.info("Resolved topic '%s' -> %s", topic_text, resolved)
+    return resolved
+
+def resolve_topic_id_if_needed(topic_text: Optional[str]) -> Optional[str]:
+    """Resolve a textual topic label into an OpenAlex topic identifier.
+
+    Args:
+        topic_text: Free-form topic text supplied via CLI.
+
+    Returns:
+        OpenAlex topic identifier string if resolved, else None.
+    """
+    if not topic_text:
+        return None
+    normalized = topic_text.strip()
+    if not normalized:
+        return None
+    return _lookup_topic_id(normalized)

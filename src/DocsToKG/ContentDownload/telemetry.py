@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol,
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
-    from DocsToKG.ContentDownload.pipeline import AttemptRecord, DownloadOutcome
+    from DocsToKG.ContentDownload.pipeline import AttemptRecord, DownloadOutcome, PipelineResult
 
 from DocsToKG.ContentDownload.core import (
     PDF_LIKE,
@@ -145,6 +145,8 @@ class ManifestEntry:
             object.__setattr__(self, "content_length", coerced)
 
 
+
+
 @runtime_checkable
 class AttemptSink(Protocol):
     """Protocol implemented by telemetry sinks used by the pipeline and CLI.
@@ -241,6 +243,82 @@ def _ensure_parent_exists(path: Path) -> None:
     """Ensure the parent directory for ``path`` exists."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
+
+
+class RunTelemetry(AttemptSink):
+    """Telemetry coordinator that centralises manifest aggregation and delegation."""
+
+    def __init__(self, sink: AttemptSink) -> None:
+        self._sink = sink
+
+    def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+        self._sink.log_attempt(record, timestamp=timestamp)
+
+    def log_manifest(self, entry: ManifestEntry) -> None:
+        self._sink.log_manifest(entry)
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:
+        self._sink.log_summary(summary)
+
+    def close(self) -> None:
+        self._sink.close()
+
+    def record_manifest(
+        self,
+        artifact: "WorkArtifact",
+        *,
+        resolver: Optional[str],
+        url: Optional[str],
+        outcome: Optional["DownloadOutcome"],
+        html_paths: Iterable[str],
+        dry_run: bool,
+        run_id: Optional[str],
+        reason: Optional[ReasonCode | str] = None,
+        reason_detail: Optional[str] = None,
+    ) -> ManifestEntry:
+        entry = build_manifest_entry(
+            artifact,
+            resolver=resolver,
+            url=url,
+            outcome=outcome,
+            html_paths=list(html_paths),
+            dry_run=dry_run,
+            run_id=run_id,
+            reason=reason,
+            reason_detail=reason_detail,
+        )
+        self.log_manifest(entry)
+        return entry
+
+    def record_pipeline_result(
+        self,
+        artifact: "WorkArtifact",
+        result: "PipelineResult",
+        *,
+        dry_run: bool,
+        run_id: Optional[str],
+    ) -> ManifestEntry:
+        outcome = result.outcome
+        reason_token = normalize_reason(result.reason) if result.reason else None
+        if reason_token is None and outcome is not None:
+            reason_token = normalize_reason(getattr(outcome, "reason", None))
+
+        detail_token = normalize_reason(result.reason_detail) if result.reason_detail else None
+        if detail_token is None and outcome is not None:
+            detail_token = normalize_reason(getattr(outcome, "reason_detail", None))
+
+        return self.record_manifest(
+            artifact,
+            resolver=result.resolver_name,
+            url=result.url,
+            outcome=outcome,
+            html_paths=list(result.html_paths),
+            dry_run=dry_run,
+            run_id=run_id,
+            reason=reason_token,
+            reason_detail=detail_token,
+        )
+
 
 
 class JsonlSink:
@@ -1222,23 +1300,14 @@ def build_manifest_entry(
         last_modified = None
         extracted_text_path = None
 
-    resolved_reason_code: Optional[ReasonCode]
-    if isinstance(reason, ReasonCode):
-        resolved_reason_code = reason
-    elif reason is not None:
-        resolved_reason_code = ReasonCode.from_wire(reason)
-    elif outcome:
-        resolved_reason_code = (
-            outcome_reason
-            if isinstance(outcome_reason, ReasonCode)
-            else ReasonCode.from_wire(outcome_reason)
-        )
-    else:
-        resolved_reason_code = None
+    reason_token = normalize_reason(reason)
+    if reason_token is None and outcome:
+        reason_token = normalize_reason(outcome_reason)
+    reason_value = reason_token.value if isinstance(reason_token, ReasonCode) else reason_token
 
-    resolved_detail = reason_detail
-    if resolved_detail is None:
-        resolved_detail = outcome_detail if outcome_detail else None
+    detail_source = reason_detail if reason_detail is not None else outcome_detail
+    detail_token = normalize_reason(detail_source)
+    detail_value = detail_token.value if isinstance(detail_token, ReasonCode) else detail_token
 
     return ManifestEntry(
         schema_version=MANIFEST_SCHEMA_VERSION,
@@ -1252,8 +1321,8 @@ def build_manifest_entry(
         path=path,
         classification=classification,
         content_type=content_type,
-        reason=resolved_reason_code.value if resolved_reason_code else None,
-        reason_detail=resolved_detail,
+        reason=reason_value,
+        reason_detail=detail_value,
         html_paths=list(html_paths),
         sha256=sha256,
         content_length=content_length,
@@ -1267,6 +1336,7 @@ def build_manifest_entry(
 __all__ = [
     "AttemptSink",
     "ManifestEntry",
+    "RunTelemetry",
     "MANIFEST_SCHEMA_VERSION",
     "JsonlSink",
     "RotatingJsonlSink",

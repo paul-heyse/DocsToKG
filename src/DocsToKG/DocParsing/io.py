@@ -17,11 +17,15 @@ import os
 import shutil
 import unicodedata
 import uuid
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, TextIO, Tuple
 
 from .env import data_manifests
+
+_SAFE_HASH_ALGORITHM = "sha256"
+_HASH_ALG_ENV_VAR = "DOCSTOKG_HASH_ALG"
 
 
 @contextlib.contextmanager
@@ -40,14 +44,82 @@ def atomic_write(path: Path) -> Iterator[TextIO]:
         raise
 
 
-def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> List[dict]:
-    """Load a JSONL file into memory with optional error tolerance."""
+def iter_jsonl(
+    path: Path,
+    *,
+    start: Optional[int] = None,
+    end: Optional[int] = None,
+    skip_invalid: bool = False,
+    max_errors: int = 10,
+) -> Iterator[dict]:
+    """Stream JSONL records from ``path`` without materialising the full file."""
 
+    yield from _iter_jsonl_records(
+        path,
+        start=start,
+        end=end,
+        skip_invalid=skip_invalid,
+        max_errors=max_errors,
+    )
+
+
+def iter_jsonl_batches(
+    paths: Iterable[Path],
+    batch_size: int = 1000,
+    *,
+    skip_invalid: bool = False,
+    max_errors: int = 10,
+) -> Iterator[List[dict]]:
+    """Yield JSONL rows from ``paths`` in batches of ``batch_size`` records."""
+
+    if batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
+
+    buffer: List[dict] = []
+    for source in paths:
+        for record in iter_jsonl(
+            source,
+            skip_invalid=skip_invalid,
+            max_errors=max_errors,
+        ):
+            buffer.append(record)
+            if len(buffer) >= batch_size:
+                yield buffer
+                buffer = []
+    if buffer:
+        yield buffer
+
+
+def dedupe_preserve_order(items: Iterable[str]) -> Tuple[str, ...]:
+    """Return ``items`` without duplicates while preserving encounter order."""
+
+    seen: set[str] = set()
+    ordered: List[str] = []
+    for item in items:
+        if not item:
+            continue
+        if item in seen:
+            continue
+        seen.add(item)
+        ordered.append(item)
+    return tuple(ordered)
+
+
+def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> List[dict]:
+    """Load a JSONL file into memory with optional error tolerance.
+
+    .. deprecated:: 0.2.0
+        Use :func:`iter_jsonl` or :func:`iter_jsonl_batches` for streaming access.
+    """
+
+    warnings.warn(
+        "jsonl_load is deprecated; switch to iter_jsonl for streaming access.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return list(
-        _iter_jsonl_records(
+        iter_jsonl(
             path,
-            start=None,
-            end=None,
             skip_invalid=skip_invalid,
             max_errors=max_errors,
         )
@@ -136,6 +208,19 @@ def build_jsonl_split_map(
     return offsets
 
 
+def iter_doctags(directory: Path) -> Iterator[Path]:
+    """Yield DocTags files within ``directory`` and subdirectories."""
+
+    extensions = ("*.doctags", "*.doctag")
+    seen = set()
+    for pattern in extensions:
+        for candidate in directory.rglob(pattern):
+            if candidate.is_file() and not candidate.name.startswith("."):
+                seen.add(candidate.resolve())
+    for path in sorted(seen):
+        yield path
+
+
 def _iter_jsonl_records(
     path: Path,
     *,
@@ -204,12 +289,23 @@ def _iter_jsonl_records(
         )
 
 
+def _sanitise_stage(stage: str) -> str:
+    """Return a filesystem-friendly identifier for ``stage``."""
+
+    safe = stage.strip() or "all"
+    return "".join(c if c.isalnum() or c in {"-", "_", "."} else "-" for c in safe)
+
+
+def _telemetry_filename(stage: str, kind: str) -> str:
+    """Return a telemetry filename for ``stage`` and ``kind``."""
+
+    return f"docparse.{_sanitise_stage(stage)}.{kind}.jsonl"
+
+
 def _manifest_filename(stage: str) -> str:
     """Return manifest filename for a given stage."""
 
-    safe = stage.strip() or "all"
-    safe = "".join(c if c.isalnum() or c in {"-", "_", "."} else "-" for c in safe)
-    return f"docparse.{safe}.manifest.jsonl"
+    return _telemetry_filename(stage, "manifest")
 
 
 def manifest_append(
@@ -229,7 +325,7 @@ def manifest_append(
     if status not in allowed_status:
         raise ValueError(f"status must be one of {sorted(allowed_status)}")
 
-    manifest_path = data_manifests() / _manifest_filename(stage)
+    manifest_path = resolve_manifest_path(stage)
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "stage": stage,
@@ -246,11 +342,88 @@ def manifest_append(
     jsonl_append_iter(manifest_path, [entry])
 
 
-def resolve_hash_algorithm(default: str = "sha1") -> str:
-    """Return the active content hash algorithm, honoring env overrides."""
+def resolve_manifest_path(stage: str, root: Optional[Path] = None) -> Path:
+    """Return the manifest path for ``stage`` relative to ``root``."""
 
-    env_override = os.getenv("DOCSTOKG_HASH_ALG")
-    return env_override.strip() if env_override else default
+    manifest_dir = data_manifests(root)
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    return manifest_dir / _manifest_filename(stage)
+
+
+def resolve_attempts_path(stage: str, root: Optional[Path] = None) -> Path:
+    """Return the attempts log path for ``stage`` relative to ``root``."""
+
+    manifest_dir = data_manifests(root)
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    return manifest_dir / _telemetry_filename(stage, "attempts")
+
+
+def _normalise_hash_name(candidate: Optional[str]) -> Optional[str]:
+    """Normalise algorithm names for comparison against hashlib."""
+
+    if candidate is None:
+        return None
+    text = str(candidate).strip().lower()
+    return text or None
+
+
+def _select_hash_algorithm(requested: Optional[str], default: Optional[str]) -> str:
+    """Return a supported hash algorithm honouring env overrides and defaults."""
+
+    available = {name.lower() for name in hashlib.algorithms_available}
+    if not available:
+        raise RuntimeError("No hash algorithms are available via hashlib.")
+
+    logger = logging.getLogger(__name__)
+    candidates = [
+        (_HASH_ALG_ENV_VAR, os.getenv(_HASH_ALG_ENV_VAR)),
+        ("algorithm parameter", requested),
+        ("default algorithm", default),
+    ]
+
+    for source, candidate in candidates:
+        normalised = _normalise_hash_name(candidate)
+        if normalised and normalised in available:
+            return normalised
+        if candidate is None:
+            continue
+        if normalised:
+            logger.warning(
+                "Unknown hash algorithm %r supplied via %s; ignoring.",
+                candidate,
+                source,
+            )
+        else:
+            logger.warning(
+                "Blank hash algorithm supplied via %s; ignoring.",
+                source,
+            )
+
+    fallback = _normalise_hash_name(default)
+    if not fallback or fallback not in available:
+        fallback = (
+            _SAFE_HASH_ALGORITHM
+            if _SAFE_HASH_ALGORITHM in available
+            else next(iter(sorted(available)))
+        )
+    logger.warning(
+        "No valid hash algorithm requested; falling back to %s.",
+        fallback,
+    )
+    return fallback
+
+
+def resolve_hash_algorithm(default: str = "sha1") -> str:
+    """Return the active content hash algorithm, guarding invalid overrides."""
+
+    return _select_hash_algorithm(requested=None, default=default)
+
+
+def make_hasher(name: Optional[str] = None, *, default: Optional[str] = None) -> "hashlib._Hash":
+    """Return a configured hashlib object with guarded algorithm resolution."""
+
+    algorithm = _select_hash_algorithm(requested=name, default=default)
+    return hashlib.new(algorithm)
 
 
 def compute_chunk_uuid(
@@ -269,8 +442,7 @@ def compute_chunk_uuid(
         safe_offset = 0
     normalised_text = unicodedata.normalize("NFKC", str(text or ""))
 
-    selected_algorithm = resolve_hash_algorithm(algorithm)
-    hasher = hashlib.new(selected_algorithm)
+    hasher = make_hasher(name=algorithm)
     hasher.update(safe_doc_id.encode("utf-8"))
     hasher.update(bytes((0x1F,)))
     hasher.update(str(safe_offset).encode("utf-8"))
@@ -361,8 +533,7 @@ def quarantine_artifact(
 def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
     """Compute a content hash for ``path`` using the requested algorithm."""
 
-    selected_algorithm = resolve_hash_algorithm(algorithm)
-    hasher = hashlib.new(selected_algorithm)
+    hasher = make_hasher(name=algorithm)
     try:
         text = path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
@@ -434,10 +605,17 @@ __all__ = [
     "build_jsonl_split_map",
     "compute_chunk_uuid",
     "compute_content_hash",
+    "make_hasher",
+    "iter_doctags",
     "iter_manifest_entries",
+    "iter_jsonl",
+    "iter_jsonl_batches",
     "jsonl_append_iter",
     "jsonl_load",
     "jsonl_save",
+    "dedupe_preserve_order",
+    "resolve_manifest_path",
+    "resolve_attempts_path",
     "load_manifest_index",
     "manifest_append",
     "quarantine_artifact",

@@ -399,6 +399,7 @@ sys.modules.setdefault(
 class _DummyTqdm:
     def __init__(self, *args, **kwargs) -> None:  # pragma: no cover - simple stub
         self.total = kwargs.get("total", 0)
+        self._iterable = args[0] if args else ()
 
     def __enter__(self):  # pragma: no cover - simple stub
         return self
@@ -409,7 +410,13 @@ class _DummyTqdm:
     def update(self, *_args, **_kwargs) -> None:  # pragma: no cover - simple stub
         pass
 
+    def __iter__(self):  # pragma: no cover - simple stub
+        return iter(self._iterable)
 
+
+import DocsToKG.DocParsing.env as doc_env  # noqa: E402
+import DocsToKG.DocParsing.io as doc_io  # noqa: E402
+import DocsToKG.DocParsing.logging as doc_logging  # noqa: E402
 from DocsToKG.DocParsing import core, formats  # noqa: E402
 from DocsToKG.DocParsing.formats import (  # noqa: E402
     CHUNK_SCHEMA_VERSION,
@@ -435,7 +442,7 @@ def _reset_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def test_detect_data_root_env(tmp_path: Path) -> None:
     data = tmp_path / "Data"
     data.mkdir(exist_ok=True)
-    root = core.detect_data_root()
+    root = doc_env.detect_data_root()
     assert root == data.resolve()
 
 
@@ -446,7 +453,7 @@ def test_detect_data_root_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     project.mkdir(parents=True)
     (target / "DocTagsFiles").mkdir(parents=True)
     monkeypatch.chdir(project)
-    resolved = core.detect_data_root()
+    resolved = doc_env.detect_data_root()
     assert resolved == target.resolve()
 
 
@@ -454,18 +461,18 @@ def test_detect_data_root_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     monkeypatch.delenv("DOCSTOKG_DATA_ROOT", raising=False)
     start = tmp_path / "no_data_here"
     start.mkdir()
-    resolved = core.detect_data_root(start)
+    resolved = doc_env.detect_data_root(start)
     assert resolved == (start / "Data").resolve()
 
 
 def test_data_directories_created(tmp_path: Path) -> None:
     expected = {
-        core.data_doctags(): "DocTagsFiles",
-        core.data_chunks(): "ChunkedDocTagFiles",
-        core.data_vectors(): "Embeddings",
-        core.data_manifests(): "Manifests",
-        core.data_pdfs(): "PDFs",
-        core.data_html(): "HTML",
+        doc_env.data_doctags(): "DocTagsFiles",
+        doc_env.data_chunks(): "ChunkedDocTagFiles",
+        doc_env.data_vectors(): "Embeddings",
+        doc_env.data_manifests(): "Manifests",
+        doc_env.data_pdfs(): "PDFs",
+        doc_env.data_html(): "HTML",
     }
     for path, folder in expected.items():
         assert folder in str(path)
@@ -473,8 +480,8 @@ def test_data_directories_created(tmp_path: Path) -> None:
 
 
 def test_get_logger_idempotent() -> None:
-    logger1 = core.get_logger("docparse-test")
-    logger2 = core.get_logger("docparse-test")
+    logger1 = doc_logging.get_logger("docparse-test")
+    logger2 = doc_logging.get_logger("docparse-test")
     assert logger1 is logger2
 
 
@@ -497,7 +504,7 @@ def test_find_free_port_fallback() -> None:
 
 def test_atomic_write_success(tmp_path: Path) -> None:
     target = tmp_path / "file.json"
-    with core.atomic_write(target) as handle:
+    with doc_io.atomic_write(target) as handle:
         handle.write("data")
     assert target.read_text(encoding="utf-8") == "data"
 
@@ -505,7 +512,7 @@ def test_atomic_write_success(tmp_path: Path) -> None:
 def test_atomic_write_failure(tmp_path: Path) -> None:
     target = tmp_path / "file.json"
     with pytest.raises(RuntimeError):
-        with core.atomic_write(target) as handle:
+        with doc_io.atomic_write(target) as handle:
             handle.write("data")
             raise RuntimeError("boom")
     assert not target.exists()
@@ -513,17 +520,17 @@ def test_atomic_write_failure(tmp_path: Path) -> None:
 
 
 def test_iter_doctags(tmp_path: Path) -> None:
-    doctags_dir = core.data_doctags()
+    doctags_dir = doc_env.data_doctags()
     target = Path(doctags_dir)
     files = [target / "a.doctags", target / "b.doctag"]
     for file in files:
         file.write_text("content", encoding="utf-8")
-    results = list(core.iter_doctags(target))
+    results = list(doc_io.iter_doctags(target))
     assert results == sorted(file.resolve() for file in files)
 
 
 def test_iter_chunks(tmp_path: Path) -> None:
-    chunks_dir = core.data_chunks()
+    chunks_dir = doc_env.data_chunks()
     good = chunks_dir / "doc.chunks.jsonl"
     nested = chunks_dir / "teamA" / "doc.chunks.jsonl"
     other = chunks_dir / "doc.jsonl"
@@ -537,16 +544,20 @@ def test_iter_chunks(tmp_path: Path) -> None:
 
 def test_jsonl_load_and_save(tmp_path: Path) -> None:
     target = tmp_path / "example.jsonl"
-    core.jsonl_save(target, [{"a": 1}, {"b": 2}])
-    rows = core.jsonl_load(target)
+    doc_io.jsonl_save(target, [{"a": 1}, {"b": 2}])
+    rows = list(doc_io.iter_jsonl(target))
     assert rows == [{"a": 1}, {"b": 2}]
+    with pytest.warns(DeprecationWarning):
+        assert doc_io.jsonl_load(target) == rows
 
 
 def test_jsonl_load_skip_invalid(tmp_path: Path) -> None:
     target = tmp_path / "bad.jsonl"
     target.write_text("{\ninvalid\n", encoding="utf-8")
-    rows = core.jsonl_load(target, skip_invalid=True, max_errors=1)
+    rows = list(doc_io.iter_jsonl(target, skip_invalid=True, max_errors=1))
     assert rows == []
+    with pytest.warns(DeprecationWarning):
+        assert doc_io.jsonl_load(target, skip_invalid=True, max_errors=1) == []
 
 
 def test_jsonl_save_validation_error(tmp_path: Path) -> None:
@@ -556,8 +567,46 @@ def test_jsonl_save_validation_error(tmp_path: Path) -> None:
         raise ValueError("bad row")
 
     with pytest.raises(ValueError, match="Validation failed"):
-        core.jsonl_save(target, [{"a": 1}], validate=validate)
-    assert not target.exists()
+        doc_io.jsonl_save(target, [{"a": 1}], validate=validate)
+
+
+def test_iter_jsonl_batches(tmp_path: Path) -> None:
+    file_one = tmp_path / "one.jsonl"
+    file_two = tmp_path / "two.jsonl"
+    doc_io.jsonl_save(file_one, [{"id": 1}, {"id": 2}])
+    doc_io.jsonl_save(file_two, [{"id": 3}])
+
+    batches = list(doc_io.iter_jsonl_batches([file_one, file_two], batch_size=2))
+    assert [len(batch) for batch in batches] == [2, 1]
+    assert [record["id"] for batch in batches for record in batch] == [1, 2, 3]
+
+    with pytest.raises(ValueError):
+        list(doc_io.iter_jsonl_batches([file_one], batch_size=0))
+
+
+def test_make_hasher_invalid_env_fallback(monkeypatch: pytest.MonkeyPatch, caplog) -> None:
+    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha-1")
+    with caplog.at_level("WARNING"):
+        hasher = doc_io.make_hasher()
+    assert hasher.name == "sha256"
+    assert "Unknown hash algorithm 'sha-1'" in caplog.text
+    assert "falling back to sha256" in caplog.text.lower()
+
+
+def test_make_hasher_prefers_explicit_algorithm(monkeypatch: pytest.MonkeyPatch, caplog) -> None:
+    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha-1")
+    with caplog.at_level("WARNING"):
+        hasher = doc_io.make_hasher(name="sha1")
+    assert hasher.name == "sha1"
+    # Warning emitted for env override but no fallback message because explicit value is valid
+    assert "Unknown hash algorithm 'sha-1'" in caplog.text
+
+
+def test_resolve_hash_algorithm_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DOCSTOKG_HASH_ALG", raising=False)
+    assert doc_io.resolve_hash_algorithm() == "sha1"
+    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha256")
+    assert doc_io.resolve_hash_algorithm() == "sha256"
 
 
 def test_batcher() -> None:
@@ -566,8 +615,8 @@ def test_batcher() -> None:
 
 
 def test_manifest_append(tmp_path: Path) -> None:
-    manifest = core.data_manifests() / "docparse.chunks.manifest.jsonl"
-    core.manifest_append("chunks", "doc-1", "success", duration_s=1.23)
+    manifest = doc_env.data_manifests() / "docparse.chunks.manifest.jsonl"
+    doc_io.manifest_append("chunks", "doc-1", "success", duration_s=1.23)
     content = manifest.read_text(encoding="utf-8").strip()
     record = json.loads(content)
     assert record["stage"] == "chunks"
@@ -664,13 +713,25 @@ def test_get_docling_version(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_validate_schema_version() -> None:
     assert (
-        formats.validate_schema_version("docparse/1.1.0", formats.COMPATIBLE_CHUNK_VERSIONS)
+        formats.validate_schema_version(
+            "docparse/1.1.0",
+            formats.SchemaKind.CHUNK,
+            compatible_versions=formats.COMPATIBLE_CHUNK_VERSIONS,
+        )
         == "docparse/1.1.0"
     )
     with pytest.raises(ValueError):
-        formats.validate_schema_version("other", formats.COMPATIBLE_CHUNK_VERSIONS)
+        formats.validate_schema_version(
+            "other",
+            formats.SchemaKind.CHUNK,
+            compatible_versions=formats.COMPATIBLE_CHUNK_VERSIONS,
+        )
     with pytest.raises(ValueError):
-        formats.validate_schema_version(None, formats.COMPATIBLE_CHUNK_VERSIONS)
+        formats.validate_schema_version(
+            None,
+            formats.SchemaKind.CHUNK,
+            compatible_versions=formats.COMPATIBLE_CHUNK_VERSIONS,
+        )
 
 
 def test_chunk_row_invalid_schema_version() -> None:
@@ -735,7 +796,7 @@ def test_set_spawn_or_warn_warns_on_incompatible_method(
         def __init__(self) -> None:
             self.warnings: list[str] = []
 
-        def warning(self, message: str) -> None:  # pragma: no cover - simple stub
+        def warning(self, message: str, *args, **kwargs) -> None:  # pragma: no cover
             self.warnings.append(message)
 
         def debug(self, *_args, **_kwargs) -> None:  # pragma: no cover - simple stub

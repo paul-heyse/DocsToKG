@@ -356,7 +356,7 @@ if not hasattr(chunker, "manifest_load"):
 if not hasattr(chunker, "RichSerializerProvider"):
     chunker.RichSerializerProvider = lambda: SimpleNamespace()
 from DocsToKG.ContentDownload.core import Classification  # noqa: E402
-from DocsToKG.DocParsing.core import jsonl_load  # noqa: E402
+from DocsToKG.DocParsing.core import iter_jsonl  # noqa: E402
 
 
 class DummyTokenizer:
@@ -717,7 +717,7 @@ def test_chunker_success_outputs_readable_file(tmp_path, monkeypatch):
 
     out_file = env.chunks_dir / "sample.chunks.jsonl"
     assert out_file.exists()
-    rows = jsonl_load(out_file)
+    rows = list(iter_jsonl(out_file))
     assert len(rows) == 2
     assert {row["chunk_id"] for row in rows} == {0, 1}
 
@@ -740,7 +740,7 @@ def test_chunker_promotes_image_metadata(tmp_path, monkeypatch):
     args = chunker_args(env)
     assert chunker.main(args) == 0
 
-    rows = jsonl_load(env.chunks_dir / "sample.chunks.jsonl")
+    rows = list(iter_jsonl(env.chunks_dir / "sample.chunks.jsonl"))
     assert rows[0]["has_image_captions"] is True
     assert rows[0]["has_image_classification"] is False
     assert rows[0]["num_images"] == 1
@@ -764,7 +764,7 @@ def test_chunker_resume_after_failure(tmp_path, monkeypatch):
     assert chunker.main(success_args) == 0
 
     out_file = env.chunks_dir / "sample.chunks.jsonl"
-    rows = jsonl_load(out_file)
+    rows = list(iter_jsonl(out_file))
     assert len(rows) == 2
 
     entries = [entry for entry in chunker_manifest_log if entry["doc_id"] == "sample.doctags"]
@@ -801,7 +801,7 @@ def test_chunker_concurrent_writes_isolated(tmp_path, monkeypatch):
     for name in ("doc1", "doc2"):
         out_file = env.chunks_dir / f"{name}.chunks.jsonl"
         assert out_file.exists()
-        rows = jsonl_load(out_file)
+        rows = list(iter_jsonl(out_file))
         texts = {row["text"] for row in rows}
         expected = set(texts_map[name])
         assert texts == expected

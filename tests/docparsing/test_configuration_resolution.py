@@ -46,11 +46,14 @@ from unittest.mock import patch
 
 import pytest
 
+from DocsToKG.DocParsing.chunking import ChunkerCfg
 from DocsToKG.DocParsing.doctags import (
+    DoctagsCfg,
     resolve_hf_home,
     resolve_model_root,
     resolve_pdf_model_path,
 )
+from DocsToKG.DocParsing.embedding import EmbedCfg
 
 # --- Test Cases ---
 
@@ -192,6 +195,46 @@ def test_path_resolution_edge_cases():
         result = resolve_pdf_model_path(cli_value="")
         assert isinstance(result, str)
         assert len(result) > 0  # Should not be empty
+
+
+def test_chunker_finalize_respects_data_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    data_root = tmp_path / "Data"
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+    cfg = ChunkerCfg()
+    cfg.finalize()
+    assert cfg.data_root == data_root.resolve()
+    assert cfg.in_dir == (data_root / "DocTagsFiles").resolve()
+    assert cfg.out_dir == (data_root / "ChunkedDocTagFiles").resolve()
+
+
+def test_chunker_finalize_token_window_invariant(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DOCSTOKG_DATA_ROOT", raising=False)
+    cfg = ChunkerCfg(min_tokens=10, max_tokens=5)
+    with pytest.raises(ValueError):
+        cfg.finalize()
+
+
+def test_embed_finalize_parallelism_invariant(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path / "Data"))
+    cfg = EmbedCfg(files_parallel=0)
+    with pytest.raises(ValueError):
+        cfg.finalize()
+
+
+def test_doctags_finalize_html_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    data_root = tmp_path / "Data"
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+    cfg = DoctagsCfg(mode="html")
+    cfg.finalize()
+    assert cfg.data_root == data_root.resolve()
+    assert cfg.input == (data_root / "HTML").resolve()
+    assert cfg.output == (data_root / "DocTagsFiles").resolve()
+
+
+def test_doctags_finalize_workers_invariant() -> None:
+    cfg = DoctagsCfg(workers=0)
+    with pytest.raises(ValueError):
+        cfg.finalize()
 
 
 # --- Module Entry Points ---

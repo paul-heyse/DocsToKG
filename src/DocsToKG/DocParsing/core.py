@@ -715,26 +715,20 @@ from __future__ import annotations
 import argparse
 import contextlib
 import hashlib
-import importlib
 import json
 import logging
 import math
 import os
 import re
-import shutil
 import socket
 import threading
 import time
-import unicodedata
 import uuid
-from collections import Counter, defaultdict
-from dataclasses import dataclass, field, fields
-from datetime import datetime, timezone
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Any,
     Callable,
-    ClassVar,
     Dict,
     Iterable,
     Iterator,
@@ -742,8 +736,6 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
-    Set,
-    TextIO,
     Tuple,
     TypeVar,
 )
@@ -753,8 +745,115 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from ..OntologyDownload.logging_utils import JSONFormatter
+from .config import (
+    StageConfigBase,
+    _load_toml_markers,
+    _load_yaml_markers,
+    load_config_mapping,
+)
+from .env import (
+    PDF_MODEL_SUBDIR,
+    data_chunks as _data_chunks,
+    data_doctags as _data_doctags,
+    data_html as _data_html,
+    data_manifests as _data_manifests,
+    data_pdfs as _data_pdfs,
+    data_vectors as _data_vectors,
+    detect_data_root as _detect_data_root,
+    ensure_model_environment as _ensure_model_environment,
+    ensure_qwen_dependencies as _ensure_qwen_dependencies,
+    ensure_qwen_environment as _ensure_qwen_environment,
+    ensure_splade_dependencies as _ensure_splade_dependencies,
+    ensure_splade_environment as _ensure_splade_environment,
+    expand_path as _expand_path,
+    init_hf_env as _init_hf_env,
+    looks_like_filesystem_path as _looks_like_fs_path,
+    prepare_data_root as _prepare_data_root,
+    resolve_hf_home as _resolve_hf_home,
+    resolve_model_root as _resolve_model_root,
+    resolve_pdf_model_path as _resolve_pdf_model_path,
+    resolve_pipeline_path as _resolve_pipeline_path,
+)
+from .io import (
+    atomic_write as _atomic_write,
+    build_jsonl_split_map as _build_jsonl_split_map,
+    compute_chunk_uuid as _compute_chunk_uuid,
+    compute_content_hash as _compute_content_hash,
+    dedupe_preserve_order as _dedupe_preserve_order,
+    make_hasher as _make_hasher,
+    iter_doctags as _iter_doctags,
+    iter_jsonl as _iter_jsonl,
+    iter_jsonl_batches as _iter_jsonl_batches,
+    iter_manifest_entries as _iter_manifest_entries,
+    jsonl_append_iter as _jsonl_append_iter,
+    jsonl_load as _jsonl_load,
+    jsonl_save as _jsonl_save,
+    load_manifest_index as _load_manifest_index,
+    manifest_append as _manifest_append,
+    quarantine_artifact as _quarantine_artifact,
+    relative_path as _relative_path,
+    resolve_hash_algorithm as _resolve_hash_algorithm,
+)
+from .logging import (
+    StructuredLogger as _StructuredLogger,
+    get_logger as _get_logger,
+    log_event as _log_event,
+    manifest_log_failure as _manifest_log_failure,
+    manifest_log_skip as _manifest_log_skip,
+    manifest_log_success as _manifest_log_success,
+    summarize_manifest as _summarize_manifest,
+)
 
 T = TypeVar("T")
+
+# Re-export helpers from focused modules while keeping legacy import paths.
+atomic_write = _atomic_write
+build_jsonl_split_map = _build_jsonl_split_map
+compute_chunk_uuid = _compute_chunk_uuid
+compute_content_hash = _compute_content_hash
+make_hasher = _make_hasher
+iter_manifest_entries = _iter_manifest_entries
+iter_doctags = _iter_doctags
+jsonl_append_iter = _jsonl_append_iter
+iter_jsonl = _iter_jsonl
+iter_jsonl_batches = _iter_jsonl_batches
+jsonl_load = _jsonl_load
+jsonl_save = _jsonl_save
+dedupe_preserve_order = _dedupe_preserve_order
+load_manifest_index = _load_manifest_index
+manifest_append = _manifest_append
+quarantine_artifact = _quarantine_artifact
+relative_path = _relative_path
+resolve_hash_algorithm = _resolve_hash_algorithm
+
+data_chunks = _data_chunks
+data_doctags = _data_doctags
+data_html = _data_html
+data_manifests = _data_manifests
+data_pdfs = _data_pdfs
+data_vectors = _data_vectors
+detect_data_root = _detect_data_root
+ensure_model_environment = _ensure_model_environment
+ensure_qwen_dependencies = _ensure_qwen_dependencies
+ensure_qwen_environment = _ensure_qwen_environment
+ensure_splade_dependencies = _ensure_splade_dependencies
+ensure_splade_environment = _ensure_splade_environment
+expand_path = _expand_path
+init_hf_env = _init_hf_env
+looks_like_filesystem_path = _looks_like_fs_path
+prepare_data_root = _prepare_data_root
+resolve_hf_home = _resolve_hf_home
+resolve_model_root = _resolve_model_root
+resolve_pdf_model_path = _resolve_pdf_model_path
+resolve_pipeline_path = _resolve_pipeline_path
+
+StructuredLogger = _StructuredLogger
+get_logger = _get_logger
+log_event = _log_event
+manifest_log_failure = _manifest_log_failure
+manifest_log_skip = _manifest_log_skip
+manifest_log_success = _manifest_log_success
+summarize_manifest = _summarize_manifest
 
 # Default structural marker configuration shared across stages.
 DEFAULT_HEADING_MARKERS: Tuple[str, ...] = ("#",)
@@ -770,21 +869,6 @@ DEFAULT_HTTP_TIMEOUT: Tuple[float, float] = (5.0, 30.0)
 _HTTP_SESSION_LOCK = threading.Lock()
 _HTTP_SESSION: Optional[requests.Session] = None
 _HTTP_SESSION_TIMEOUT: Tuple[float, float] = DEFAULT_HTTP_TIMEOUT
-
-
-def dedupe_preserve_order(markers: Sequence[str]) -> Tuple[str, ...]:
-    """Return ``markers`` without duplicates while preserving input order."""
-
-    seen: set[str] = set()
-    ordered: List[str] = []
-    for marker in markers:
-        if not marker:
-            continue
-        if marker in seen:
-            continue
-        seen.add(marker)
-        ordered.append(marker)
-    return tuple(ordered)
 
 
 def _ensure_str_sequence(value: object, label: str) -> List[str]:
@@ -1001,6 +1085,8 @@ __all__ = [
     "jsonl_load",
     "jsonl_save",
     "jsonl_append_iter",
+    "iter_jsonl",
+    "iter_jsonl_batches",
     "build_jsonl_split_map",
     "get_logger",
     "log_event",
@@ -1012,6 +1098,7 @@ __all__ = [
     "manifest_log_skip",
     "manifest_log_success",
     "compute_content_hash",
+    "make_hasher",
     "resolve_hash_algorithm",
     "load_manifest_index",
     "acquire_lock",
@@ -1157,427 +1244,6 @@ class ChunkResult:
     error: Optional[str] = None
 
 
-# --- Path Resolution ---
-
-
-def expand_path(path: str | Path) -> Path:
-    """Return ``path`` expanded to an absolute :class:`Path`.
-
-    Args:
-        path: Candidate filesystem path supplied as string or :class:`Path`.
-
-    Returns:
-        Absolute path with user home components resolved.
-    """
-
-    return Path(path).expanduser().resolve()
-
-
-def resolve_hf_home() -> Path:
-    """Resolve the HuggingFace cache directory respecting ``HF_HOME``.
-
-    Args:
-        None
-
-    Returns:
-        Path: Absolute path to the HuggingFace cache directory.
-    """
-
-    env = os.getenv("HF_HOME")
-    if env:
-        return expand_path(env)
-    return expand_path(Path.home() / ".cache" / "huggingface")
-
-
-def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
-    """Resolve the DocsToKG model root honoring ``DOCSTOKG_MODEL_ROOT``.
-
-    Args:
-        hf_home: Optional HuggingFace cache directory to treat as the base path.
-
-    Returns:
-        Path: Absolute directory where DocsToKG models should be stored.
-    """
-
-    env = os.getenv("DOCSTOKG_MODEL_ROOT")
-    if env:
-        return expand_path(env)
-    base = hf_home if hf_home is not None else resolve_hf_home()
-    return expand_path(base)
-
-
-def looks_like_filesystem_path(candidate: str) -> bool:
-    """Return ``True`` when ``candidate`` appears to reference a local path."""
-
-    expanded = Path(candidate).expanduser()
-    drive, _ = os.path.splitdrive(candidate)
-    if drive:
-        return True
-    if expanded.is_absolute() or expanded.exists():
-        return True
-    prefixes = ["~", "."]
-    if os.sep not in prefixes:
-        prefixes.append(os.sep)
-    alt = os.altsep
-    if alt and alt not in prefixes:
-        prefixes.append(alt)
-    return any(candidate.startswith(prefix) for prefix in prefixes)
-
-
-def resolve_pdf_model_path(cli_value: str | None = None) -> str:
-    """Determine PDF model path using CLI and environment precedence."""
-
-    if cli_value:
-        if looks_like_filesystem_path(cli_value):
-            return str(expand_path(cli_value))
-        return cli_value
-    env_model = os.getenv("DOCLING_PDF_MODEL")
-    if env_model:
-        return str(expand_path(env_model))
-    model_root = resolve_model_root()
-    return str(expand_path(model_root / PDF_MODEL_SUBDIR))
-
-
-def init_hf_env(
-    hf_home: Optional[Path] = None,
-    model_root: Optional[Path] = None,
-) -> tuple[Path, Path]:
-    """Initialise Hugging Face and transformer cache environment variables.
-
-    Args:
-        hf_home: Optional explicit HF cache directory.
-        model_root: Optional DocsToKG model root override.
-
-    Returns:
-        Tuple of ``(hf_home, model_root)`` paths after normalisation.
-    """
-
-    resolved_hf = expand_path(hf_home) if isinstance(hf_home, Path) else resolve_hf_home()
-    resolved_model_root = (
-        expand_path(model_root) if isinstance(model_root, Path) else resolve_model_root(resolved_hf)
-    )
-
-    os.environ["HF_HOME"] = str(resolved_hf)
-    os.environ["HF_HUB_CACHE"] = str(resolved_hf / "hub")
-    os.environ["TRANSFORMERS_CACHE"] = str(resolved_hf / "transformers")
-    os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(resolved_model_root)
-    os.environ["DOCSTOKG_MODEL_ROOT"] = str(resolved_model_root)
-
-    return resolved_hf, resolved_model_root
-
-
-_MODEL_ENV: Tuple[Path, Path] | None = None
-
-
-def _detect_cuda_device() -> str:
-    """Best-effort detection of CUDA availability to choose a default device."""
-
-    try:
-        import torch  # type: ignore
-
-        if torch.cuda.is_available():  # pragma: no cover - depends on runtime
-            return "cuda"
-    except Exception:  # pragma: no cover - torch missing or misconfigured
-        pass
-    return "cpu"
-
-
-def ensure_model_environment(
-    hf_home: Optional[Path] = None, model_root: Optional[Path] = None
-) -> Tuple[Path, Path]:
-    """Initialise and cache the HuggingFace/model-root environment settings."""
-
-    global _MODEL_ENV
-    if _MODEL_ENV is None or hf_home is not None or model_root is not None:
-        _MODEL_ENV = init_hf_env(hf_home=hf_home, model_root=model_root)
-    return _MODEL_ENV
-
-
-SPLADE_DEPENDENCY_MESSAGE = (
-    "Optional dependency 'sentence-transformers' is required for SPLADE embeddings. "
-    "Install it with `pip install sentence-transformers` or disable SPLADE generation."
-)
-QWEN_DEPENDENCY_MESSAGE = (
-    "Optional dependency 'vllm' is required for Qwen dense embeddings. "
-    "Install it with `pip install vllm` before running the embedding pipeline."
-)
-
-
-def _ensure_optional_dependency(
-    module_name: str, message: str, *, import_error: Exception | None = None
-) -> None:
-    """Import ``module_name`` or raise with ``message``."""
-
-    try:
-        importlib.import_module(module_name)
-    except ImportError as exc:  # pragma: no cover - dependency missing
-        cause = import_error or exc
-        raise ImportError(message) from cause
-
-
-def ensure_splade_dependencies(import_error: Exception | None = None) -> None:
-    """Validate that SPLADE optional dependencies are importable."""
-
-    _ensure_optional_dependency(
-        "sentence_transformers", SPLADE_DEPENDENCY_MESSAGE, import_error=import_error
-    )
-
-
-def ensure_qwen_dependencies(import_error: Exception | None = None) -> None:
-    """Validate that Qwen/vLLM optional dependencies are importable."""
-
-    _ensure_optional_dependency("vllm", QWEN_DEPENDENCY_MESSAGE, import_error=import_error)
-
-
-def ensure_splade_environment(
-    *, device: Optional[str] = None, cache_dir: Optional[Path] = None
-) -> Dict[str, str]:
-    """Bootstrap SPLADE-related environment defaults and return resolved settings."""
-
-    resolved_device = (
-        device
-        or os.getenv("DOCSTOKG_SPLADE_DEVICE")
-        or os.getenv("SPLADE_DEVICE")
-        or _detect_cuda_device()
-    )
-    os.environ.setdefault("DOCSTOKG_SPLADE_DEVICE", resolved_device)
-    os.environ.setdefault("SPLADE_DEVICE", resolved_device)
-
-    env_info: Dict[str, str] = {"device": resolved_device}
-
-    if cache_dir is not None:
-        cache_path = Path(cache_dir).expanduser().resolve()
-        os.environ.setdefault("DOCSTOKG_SPLADE_MODEL_DIR", str(cache_path))
-        env_info["model_dir"] = str(cache_path)
-
-    return env_info
-
-
-def ensure_qwen_environment(
-    *, device: Optional[str] = None, dtype: Optional[str] = None, model_dir: Optional[Path] = None
-) -> Dict[str, str]:
-    """Bootstrap Qwen/vLLM environment defaults and return resolved settings."""
-
-    resolved_device = (
-        device
-        or os.getenv("DOCSTOKG_QWEN_DEVICE")
-        or os.getenv("VLLM_DEVICE")
-        or _detect_cuda_device()
-    )
-    os.environ.setdefault("DOCSTOKG_QWEN_DEVICE", resolved_device)
-    os.environ.setdefault("VLLM_DEVICE", resolved_device)
-
-    resolved_dtype = dtype or os.getenv("DOCSTOKG_QWEN_DTYPE") or "bfloat16"
-    os.environ.setdefault("DOCSTOKG_QWEN_DTYPE", resolved_dtype)
-
-    env_info: Dict[str, str] = {"device": resolved_device, "dtype": str(resolved_dtype)}
-
-    if model_dir is not None:
-        model_path = Path(model_dir).expanduser().resolve()
-        os.environ.setdefault("DOCSTOKG_QWEN_MODEL_DIR", str(model_path))
-        env_info["model_dir"] = str(model_path)
-
-    return env_info
-
-
-def detect_data_root(start: Optional[Path] = None) -> Path:
-    """Locate the DocsToKG Data directory via env var or ancestor scan.
-
-    Checks the ``DOCSTOKG_DATA_ROOT`` environment variable first. If not set,
-    scans ancestor directories for a ``Data`` folder containing expected
-    subdirectories (``PDFs``, ``HTML``, ``DocTagsFiles``, or
-    ``ChunkedDocTagFiles``).
-
-    Args:
-        start: Starting directory for the ancestor scan. Defaults to the
-            current working directory when ``None``.
-
-    Returns:
-        Absolute path to the resolved ``Data`` directory. When
-        ``DOCSTOKG_DATA_ROOT`` is set but the directory does not yet exist,
-        it is created automatically.
-
-    Examples:
-        >>> os.environ["DOCSTOKG_DATA_ROOT"] = "/tmp/data"
-        >>> (Path("/tmp/data")).mkdir(parents=True, exist_ok=True)
-        >>> detect_data_root()
-        PosixPath('/tmp/data')
-
-        >>> os.environ.pop("DOCSTOKG_DATA_ROOT")
-        >>> detect_data_root(Path("/workspace/DocsToKG/src"))
-        PosixPath('/workspace/DocsToKG/Data')
-    """
-
-    env_root = os.getenv("DOCSTOKG_DATA_ROOT")
-    if env_root:
-        env_path = Path(env_root).expanduser().resolve()
-        if not env_path.exists():
-            env_path.mkdir(parents=True, exist_ok=True)
-        return env_path
-
-    start_path = Path.cwd() if start is None else Path(start).resolve()
-    expected_dirs = ["PDFs", "HTML", "DocTagsFiles", "ChunkedDocTagFiles"]
-    for ancestor in [start_path, *start_path.parents]:
-        candidate = ancestor / "Data"
-        if any((candidate / directory).is_dir() for directory in expected_dirs):
-            return candidate.resolve()
-
-    return (start_path / "Data").resolve()
-
-
-def _ensure_dir(path: Path) -> Path:
-    """Create ``path`` if needed and return its absolute form.
-
-    Args:
-        path: Directory to create when missing.
-
-    Returns:
-        Absolute path to the created directory.
-
-    Examples:
-        >>> _ensure_dir(Path("./tmp_dir"))
-        PosixPath('tmp_dir')
-    """
-
-    path.mkdir(parents=True, exist_ok=True)
-    return path.resolve()
-
-
-def data_doctags(root: Optional[Path] = None) -> Path:
-    """Return the DocTags directory and ensure it exists.
-
-    Args:
-        root: Optional override for the starting directory used when
-            resolving the DocsToKG data root.
-
-    Returns:
-        Absolute path to the DocTags directory.
-
-    Examples:
-        >>> isinstance(data_doctags(), Path)
-        True
-    """
-
-    return _ensure_dir(detect_data_root(root) / "DocTagsFiles")
-
-
-def data_chunks(root: Optional[Path] = None) -> Path:
-    """Return the chunk directory and ensure it exists.
-
-    Args:
-        root: Optional override for the starting directory used when
-            resolving the DocsToKG data root.
-
-    Returns:
-        Absolute path to the chunk directory.
-
-    Examples:
-        >>> isinstance(data_chunks(), Path)
-        True
-    """
-
-    return _ensure_dir(detect_data_root(root) / "ChunkedDocTagFiles")
-
-
-def data_vectors(root: Optional[Path] = None) -> Path:
-    """Return the vectors directory and ensure it exists.
-
-    Args:
-        root: Optional override for the starting directory used when
-            resolving the DocsToKG data root.
-
-    Returns:
-        Absolute path to the vectors directory.
-
-    Examples:
-        >>> isinstance(data_vectors(), Path)
-        True
-    """
-
-    return _ensure_dir(detect_data_root(root) / "Embeddings")
-
-
-def data_manifests(root: Optional[Path] = None) -> Path:
-    """Return the manifests directory and ensure it exists.
-
-    Args:
-        root: Optional override for the starting directory used when
-            resolving the DocsToKG data root.
-
-    Returns:
-        Absolute path to the manifests directory.
-
-    Examples:
-        >>> isinstance(data_manifests(), Path)
-        True
-    """
-
-    return _ensure_dir(detect_data_root(root) / "Manifests")
-
-
-def prepare_data_root(data_root_arg: Optional[Path], default_root: Path) -> Path:
-    """Resolve and prepare the DocsToKG data root for a pipeline invocation."""
-
-    resolved = detect_data_root(data_root_arg) if data_root_arg is not None else default_root
-    if data_root_arg is not None:
-        os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved)
-    data_manifests(resolved)
-    return resolved
-
-
-def resolve_pipeline_path(
-    *,
-    cli_value: Optional[Path],
-    default_path: Path,
-    resolved_data_root: Path,
-    data_root_overridden: bool,
-    resolver: Callable[[Path], Path],
-) -> Path:
-    """Derive a pipeline directory path respecting data-root overrides."""
-
-    if data_root_overridden and (cli_value is None or cli_value == default_path):
-        return resolver(resolved_data_root)
-    if cli_value is None:
-        return default_path
-    return cli_value
-
-
-def data_pdfs(root: Optional[Path] = None) -> Path:
-    """Return the PDFs directory and ensure it exists.
-
-    Args:
-        root: Optional override for the starting directory used when
-            resolving the DocsToKG data root.
-
-    Returns:
-        Absolute path to the PDFs directory.
-
-    Examples:
-        >>> isinstance(data_pdfs(), Path)
-        True
-    """
-
-    return _ensure_dir(detect_data_root(root) / "PDFs")
-
-
-def data_html(root: Optional[Path] = None) -> Path:
-    """Return the HTML directory and ensure it exists.
-
-    Args:
-        root: Optional override for the starting directory used when
-            resolving the DocsToKG data root.
-
-    Returns:
-        Absolute path to the HTML directory.
-
-    Examples:
-        >>> isinstance(data_html(), Path)
-        True
-    """
-
-    return _ensure_dir(detect_data_root(root) / "HTML")
-
-
 def derive_doc_id_and_doctags_path(
     source_pdf: Path, pdfs_root: Path, doctags_root: Path
 ) -> tuple[str, Path]:
@@ -1700,235 +1366,6 @@ class ResumeController:
         return not skip, entry
 
 
-def _stringify_path(value: Path | str | None) -> str | None:
-    """Return a string representation for path-like values used in manifests."""
-
-    if value is None:
-        return None
-    return str(value)
-
-
-def manifest_log_skip(
-    *,
-    stage: str,
-    doc_id: str,
-    input_path: Path | str,
-    input_hash: str,
-    output_path: Path | str,
-    duration_s: float = 0.0,
-    schema_version: Optional[str] = None,
-    hash_alg: Optional[str] = None,
-    **extra: object,
-) -> None:
-    """Record a manifest entry indicating the pipeline skipped work.
-
-    Args:
-        stage: Logical pipeline phase originating the log entry.
-        doc_id: Identifier of the document being processed.
-        input_path: Source artefact that would have been processed.
-        input_hash: Content hash associated with ``input_path``.
-        output_path: Destination artefact that remained unchanged.
-        duration_s: Elapsed seconds for the short-circuited step.
-        schema_version: Manifest schema version for downstream readers.
-        hash_alg: Hash algorithm used to compute ``input_hash``.
-        **extra: Additional metadata to merge into the manifest row.
-    """
-    payload: Dict[str, object] = {
-        "stage": stage,
-        "doc_id": doc_id,
-        "status": "skip",
-        "duration_s": float(duration_s),
-        "schema_version": schema_version,
-        "input_path": _stringify_path(input_path),
-        "input_hash": input_hash,
-        "hash_alg": hash_alg or resolve_hash_algorithm(),
-        "output_path": _stringify_path(output_path),
-    }
-    payload.update(extra)
-    manifest_append(**payload)
-
-
-def manifest_log_success(
-    *,
-    stage: str,
-    doc_id: str,
-    duration_s: float,
-    schema_version: str,
-    input_path: Path | str,
-    input_hash: str,
-    output_path: Path | str,
-    hash_alg: Optional[str] = None,
-    **extra: object,
-) -> None:
-    """Record a manifest entry marking successful pipeline output.
-
-    Args:
-        stage: Logical pipeline phase originating the log entry.
-        doc_id: Identifier of the document being processed.
-        duration_s: Elapsed seconds for the successful step.
-        schema_version: Manifest schema version for downstream readers.
-        input_path: Source artefact that produced ``output_path``.
-        input_hash: Content hash associated with ``input_path``.
-        output_path: Destination artefact written by the pipeline.
-        hash_alg: Hash algorithm used to compute ``input_hash``.
-        **extra: Additional metadata to merge into the manifest row.
-    """
-    payload: Dict[str, object] = {
-        "stage": stage,
-        "doc_id": doc_id,
-        "status": "success",
-        "duration_s": float(duration_s),
-        "schema_version": schema_version,
-        "input_path": _stringify_path(input_path),
-        "input_hash": input_hash,
-        "hash_alg": hash_alg or resolve_hash_algorithm(),
-        "output_path": _stringify_path(output_path),
-    }
-    payload.update(extra)
-    manifest_append(**payload)
-
-
-def manifest_log_failure(
-    *,
-    stage: str,
-    doc_id: str,
-    duration_s: float,
-    schema_version: str,
-    input_path: Path | str,
-    input_hash: str,
-    output_path: Path | str,
-    error: str,
-    hash_alg: Optional[str] = None,
-    **extra: object,
-) -> None:
-    """Record a manifest entry describing a failed pipeline attempt.
-
-    Args:
-        stage: Logical pipeline phase originating the log entry.
-        doc_id: Identifier of the document being processed.
-        duration_s: Elapsed seconds before the failure occurred.
-        schema_version: Manifest schema version for downstream readers.
-        input_path: Source artefact that triggered the failure.
-        input_hash: Content hash associated with ``input_path``.
-        output_path: Destination artefact that may be incomplete.
-        error: Human-readable description of the failure condition.
-        hash_alg: Hash algorithm used to compute ``input_hash``.
-        **extra: Additional metadata to merge into the manifest row.
-    """
-    payload: Dict[str, object] = {
-        "stage": stage,
-        "doc_id": doc_id,
-        "status": "failure",
-        "duration_s": float(duration_s),
-        "schema_version": schema_version,
-        "input_path": _stringify_path(input_path),
-        "input_hash": input_hash,
-        "hash_alg": hash_alg or resolve_hash_algorithm(),
-        "output_path": _stringify_path(output_path),
-        "error": error,
-    }
-    payload.update(extra)
-    manifest_append(**payload)
-
-
-# --- Logging and I/O Utilities ---
-
-
-class StructuredLogger(logging.LoggerAdapter):
-    """Logger adapter that enriches structured logs with shared context."""
-
-    def __init__(self, logger: logging.Logger, base_fields: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(logger, {})
-        self.base_fields: Dict[str, Any] = dict(base_fields or {})
-
-    def process(self, msg: str, kwargs: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-        """Merge adapter context into ``extra`` metadata for structured output."""
-
-        extra = kwargs.setdefault("extra", {})
-        fields = dict(self.base_fields)
-        extra_fields = extra.get("extra_fields")
-        if isinstance(extra_fields, dict):
-            fields.update(extra_fields)
-        extra["extra_fields"] = fields
-        kwargs["extra"] = extra
-        return msg, kwargs
-
-    def bind(self, **fields: object) -> "StructuredLogger":
-        """Attach additional persistent fields to the adapter and return ``self``."""
-
-        filtered = {k: v for k, v in fields.items() if v is not None}
-        self.base_fields.update(filtered)
-        return self
-
-    def child(self, **fields: object) -> "StructuredLogger":
-        """Create a new adapter inheriting context with optional overrides."""
-
-        merged = dict(self.base_fields)
-        merged.update({k: v for k, v in fields.items() if v is not None})
-        return StructuredLogger(self.logger, merged)
-
-
-def get_logger(name: str, level: str = "INFO", *, base_fields: Optional[Dict[str, Any]] = None) -> StructuredLogger:
-    """Get a structured JSON logger configured for console output.
-
-    Args:
-        name: Name of the logger to create or retrieve.
-        level: Logging level (case insensitive). Defaults to ``"INFO"``.
-
-    Returns:
-        Configured :class:`logging.Logger` instance.
-
-    Examples:
-        >>> logger = get_logger("docparse")
-        >>> logger.level == logging.INFO
-        True
-    """
-
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(JSONFormatter())
-        logger.addHandler(handler)
-        logger.propagate = False
-    logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    adapter = getattr(logger, "_docparse_adapter", None)
-    if not isinstance(adapter, StructuredLogger):
-        adapter = StructuredLogger(logger, base_fields)
-        setattr(logger, "_docparse_adapter", adapter)
-    elif base_fields:
-        adapter.bind(**base_fields)
-    return adapter
-
-
-def log_event(logger: logging.Logger, level: str, message: str, **fields: object) -> None:
-    """Emit a structured log record using the ``extra_fields`` convention."""
-
-    normalised_level = str(level).lower()
-    if normalised_level in {"warning", "error"}:
-        if "stage" not in fields:
-            base_stage = getattr(logger, "base_fields", {}).get("stage") if hasattr(logger, "base_fields") else None
-            fields["stage"] = base_stage or "unknown"
-        if "doc_id" not in fields:
-            fields["doc_id"] = "unknown"
-        if "input_hash" not in fields:
-            fields["input_hash"] = None
-        error_code = fields.get("error_code")
-        if not error_code:
-            fields["error_code"] = "UNKNOWN"
-        else:
-            fields["error_code"] = str(error_code).upper()
-    else:
-        if "stage" not in fields:
-            base_stage = getattr(logger, "base_fields", {}).get("stage") if hasattr(logger, "base_fields") else None
-            if base_stage is not None:
-                fields["stage"] = base_stage
-
-    emitter = getattr(logger, normalised_level, None)
-    if not callable(emitter):
-        raise AttributeError(f"Logger has no level '{level}'")
-    emitter(message, extra={"extra_fields": fields})
-
-
 def find_free_port(start: int = 8000, span: int = 32) -> int:
     """Locate an available TCP port on localhost within a range.
 
@@ -1970,75 +1407,7 @@ def find_free_port(start: int = 8000, span: int = 32) -> int:
         return sock.getsockname()[1]
 
 
-@contextlib.contextmanager
-def atomic_write(path: Path) -> Iterator[TextIO]:
-    """Write to a temporary file and atomically replace the destination.
-
-    Pattern: open a sibling ``*.tmp`` file, write the payload, flush and
-    ``fsync`` the descriptor, then ``rename`` it over the original path. This
-    guarantees that readers never observe a partially written file even if the
-    process crashes mid-write.
-
-    Args:
-        path: Target path to write.
-
-    Returns:
-        Context manager yielding a writable text handle.
-
-    Yields:
-        Writable text file handle. Caller must write data before context exit.
-
-    Raises:
-        Any exception raised while writing or replacing the file is propagated
-        after the temporary file is cleaned up.
-
-    Examples:
-        >>> target = Path("/tmp/example.txt")
-        >>> with atomic_write(target) as handle:
-        ...     _ = handle.write("hello")
-    """
-
-    tmp = path.with_name(f"{path.name}.tmp.{uuid.uuid4().hex}")
-    try:
-        with tmp.open("w", encoding="utf-8") as handle:
-            yield handle
-            handle.flush()
-            os.fsync(handle.fileno())
-        tmp.replace(path)
-    except Exception:
-        tmp.unlink(missing_ok=True)
-        raise
-
-
 # --- Dataset Iterators ---
-
-
-def iter_doctags(directory: Path) -> Iterator[Path]:
-    """Yield DocTags files within ``directory`` and subdirectories.
-
-    Args:
-        directory: Root directory to scan for DocTags artifacts.
-
-    Returns:
-        Iterator over absolute ``Path`` objects.
-
-    Yields:
-        Absolute paths to discovered ``.doctags`` or ``.doctag`` files sorted
-        lexicographically.
-
-    Examples:
-        >>> next(iter_doctags(Path(".")), None) is None
-        True
-    """
-
-    extensions = ("*.doctags", "*.doctag")
-    seen = set()
-    for pattern in extensions:
-        for candidate in directory.rglob(pattern):
-            if candidate.is_file() and not candidate.name.startswith("."):
-                seen.add(candidate.resolve())
-    for path in sorted(seen):
-        yield path
 
 
 def iter_chunks(directory: Path) -> Iterator[Path]:
@@ -2065,190 +1434,6 @@ def iter_chunks(directory: Path) -> Iterator[Path]:
             seen.add(candidate.resolve())
     for path in sorted(seen):
         yield path
-
-
-# --- JSONL Helpers ---
-
-
-def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> List[dict]:
-    """Load a JSONL file into memory with optional error tolerance."""
-
-    return list(
-        _iter_jsonl_records(
-            path,
-            start=None,
-            end=None,
-            skip_invalid=skip_invalid,
-            max_errors=max_errors,
-        )
-    )
-
-
-def jsonl_save(
-    path: Path, rows: List[dict], validate: Optional[Callable[[dict], None]] = None
-) -> None:
-    """Persist dictionaries to a JSONL file atomically.
-
-    Args:
-        path: Destination JSONL file.
-        rows: Sequence of dictionaries to serialize.
-        validate: Optional callback invoked per row before serialization.
-
-    Returns:
-        None: This function performs I/O side effects only.
-
-    Raises:
-        ValueError: If ``validate`` raises an exception for any row.
-
-    Examples:
-        >>> tmp = Path("/tmp/example.jsonl")
-        >>> jsonl_save(tmp, [{"a": 1}])
-        >>> tmp.read_text(encoding="utf-8").strip()
-        '{"a": 1}'
-    """
-
-    with atomic_write(path) as handle:
-        for index, row in enumerate(rows):
-            if validate is not None:
-                try:
-                    validate(row)
-                except Exception as exc:  # pragma: no cover - error path exercised
-                    raise ValueError(f"Validation failed for row {index}: {exc}") from exc
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-
-def jsonl_append_iter(
-    target: Path | TextIO,
-    rows: Iterable[Mapping],
-    *,
-    atomic: bool = True,
-) -> int:
-    """Append JSON-serialisable rows to a JSONL file.
-
-    Args:
-        target: Destination path or writable handle for the JSONL file.
-        rows: Iterable of JSON-serialisable mappings.
-        atomic: When True, writes occur via :func:`atomic_write` (ignored when
-            ``target`` is already an open handle).
-
-    Returns:
-        The number of rows written.
-    """
-
-    if hasattr(target, "write"):
-        handle = target  # type: ignore[assignment]
-        count = 0
-        for row in rows:
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")  # type: ignore[arg-type]
-            count += 1
-        return count
-
-    path = Path(target)
-    if not atomic:
-        count = 0
-        with path.open("a", encoding="utf-8") as handle:
-            for row in rows:
-                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-                count += 1
-        return count
-
-    count = 0
-    with atomic_write(path) as handle:
-        if path.exists():
-            with path.open("r", encoding="utf-8", errors="replace") as src:
-                shutil.copyfileobj(src, handle)
-        for row in rows:
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-            count += 1
-    return count
-
-
-def build_jsonl_split_map(
-    path: Path,
-    *,
-    chunk_bytes: int = 32 * 1024 * 1024,
-    min_chunk_bytes: int = 1 * 1024 * 1024,
-) -> List[Tuple[int, int]]:
-    """Return newline-aligned byte ranges that partition ``path``."""
-
-    size = path.stat().st_size
-    if size == 0:
-        return [(0, 0)]
-
-    chunk_bytes = max(chunk_bytes, min_chunk_bytes)
-    offsets: List[Tuple[int, int]] = []
-    with path.open("rb") as handle:
-        start = 0
-        while start < size:
-            target = start + chunk_bytes
-            if target >= size:
-                end = size
-            else:
-                handle.seek(target)
-                handle.readline()
-                end = handle.tell()
-                if end <= start:
-                    end = min(size, start + chunk_bytes)
-            offsets.append((start, end))
-            start = end
-    return offsets
-
-
-def _iter_jsonl_records(
-    path: Path,
-    *,
-    start: Optional[int],
-    end: Optional[int],
-    skip_invalid: bool,
-    max_errors: int,
-) -> Iterator[dict]:
-    logger = get_logger(__name__)
-    errors = 0
-    with path.open("rb") as handle:
-        if start:
-            handle.seek(start)
-            if start != 0:
-                handle.readline()
-        while True:
-            pos = handle.tell()
-            if end is not None and pos >= end:
-                break
-            raw = handle.readline()
-            if not raw:
-                break
-            line = raw.decode("utf-8", errors="replace").strip()
-            if not line:
-                continue
-            try:
-                yield json.loads(line)
-            except json.JSONDecodeError as exc:
-                if skip_invalid:
-                    errors += 1
-                    if errors >= max_errors:
-                        log_event(
-                            logger,
-                            "error",
-                            "Too many JSON errors",
-                            path=str(path),
-                            errors=errors,
-                            start=start,
-                            end=end,
-                        )
-                        break
-                    continue
-                raise ValueError(
-                    f"Invalid JSON in {path} at byte offset {pos}: {exc}"
-                ) from exc
-    if errors:
-        log_event(
-            logger,
-            "warning",
-            "Skipped invalid JSON lines",
-            path=str(path),
-            skipped=errors,
-            start=start,
-            end=end,
-        )
 
 
 # --- Collection Utilities ---
@@ -2322,343 +1507,6 @@ class Batcher(Iterable[List[T]]):
         for i in range(0, len(ordered_indices), self._batch_size):
             batch_indices = ordered_indices[i : i + self._batch_size]
             yield [self._items[idx] for idx in batch_indices]
-
-
-# --- Manifest Utilities ---
-
-
-def _manifest_filename(stage: str) -> str:
-    """Return manifest filename for a given stage."""
-
-    safe = stage.strip() or "all"
-    safe = "".join(c if c.isalnum() or c in {"-", "_", "."} else "-" for c in safe)
-    return f"docparse.{safe}.manifest.jsonl"
-
-
-def manifest_append(
-    stage: str,
-    doc_id: str,
-    status: str,
-    *,
-    duration_s: float = 0.0,
-    warnings: Optional[List[str]] = None,
-    error: Optional[str] = None,
-    schema_version: str = "",
-    **metadata,
-) -> None:
-    """Append a structured entry to the processing manifest.
-
-    Args:
-        stage: Pipeline stage emitting the entry.
-        doc_id: Identifier of the document being processed.
-        status: Outcome status (``success``, ``failure``, or ``skip``).
-        duration_s: Optional duration in seconds.
-        warnings: Optional list of warning labels.
-        error: Optional error description.
-        schema_version: Schema identifier recorded for the output.
-        **metadata: Arbitrary additional fields to include.
-
-    Returns:
-        ``None``.
-
-    Raises:
-        ValueError: If ``status`` is not recognised.
-
-    Examples:
-        >>> manifest_append("chunk", "doc1", "success")
-        >>> (data_manifests() / "docparse.chunk.manifest.jsonl").exists()
-        True
-    """
-
-    allowed_status = {"success", "failure", "skip"}
-    if status not in allowed_status:
-        raise ValueError(f"status must be one of {sorted(allowed_status)}")
-
-    manifest_path = data_manifests() / _manifest_filename(stage)
-    entry = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "stage": stage,
-        "doc_id": doc_id,
-        "status": status,
-        "duration_s": round(duration_s, 3),
-        "warnings": warnings or [],
-        "schema_version": schema_version,
-    }
-    if error is not None:
-        entry["error"] = str(error)
-    entry.update(metadata)
-
-    jsonl_append_iter(manifest_path, [entry])
-
-
-def resolve_hash_algorithm(default: str = "sha1") -> str:
-    """Return the active content hash algorithm, honoring env overrides.
-
-    Args:
-        default: Fallback algorithm name to use when no override is present.
-
-    Returns:
-        Hash algorithm identifier resolved from ``DOCSTOKG_HASH_ALG`` or ``default``.
-    """
-
-    env_override = os.getenv("DOCSTOKG_HASH_ALG")
-    return env_override.strip() if env_override else default
-
-
-def compute_chunk_uuid(
-    doc_id: str,
-    start_offset: int,
-    text: str,
-    *,
-    algorithm: str = "sha1",
-) -> str:
-    """Derive a deterministic UUID for a chunk using doc ID, offset, and text content.
-
-    Args:
-        doc_id: Identifier for the source document (used as a namespace component).
-        start_offset: Character offset of the chunk text within the document.
-        text: Chunk text used for content-based stability.
-        algorithm: Hash algorithm name; defaults to ``sha1`` but honours
-            :envvar:`DOCSTOKG_HASH_ALG` overrides.
-
-    Returns:
-        UUID string derived from the hash digest while enforcing RFC4122 metadata bits.
-    """
-
-    safe_doc_id = str(doc_id)
-    try:
-        safe_offset = int(start_offset)
-    except (TypeError, ValueError):
-        safe_offset = 0
-    normalised_text = unicodedata.normalize("NFKC", str(text or ""))
-
-    selected_algorithm = resolve_hash_algorithm(algorithm)
-    hasher = hashlib.new(selected_algorithm)
-    hasher.update(safe_doc_id.encode("utf-8"))
-    hasher.update(bytes((0x1F,)))
-    hasher.update(str(safe_offset).encode("utf-8"))
-    hasher.update(bytes((0x1F,)))
-    hasher.update(normalised_text.encode("utf-8"))
-    digest = hasher.digest()
-    if len(digest) < 16:
-        digest = (digest * ((16 // len(digest)) + 1))[:16]
-    raw = bytearray(digest[:16])
-    raw[6] = (raw[6] & 0x0F) | 0x50  # set UUID version bits to 5
-    raw[8] = (raw[8] & 0x3F) | 0x80  # set UUID variant bits to RFC 4122
-    return str(uuid.UUID(bytes=bytes(raw)))
-
-
-def relative_path(path: Path | str, root: Optional[Path]) -> str:
-    """Return ``path`` rendered relative to ``root`` when feasible."""
-
-    candidate = Path(path)
-    if root is None:
-        return str(candidate)
-    try:
-        root_path = Path(root).resolve()
-        return str(candidate.resolve().relative_to(root_path))
-    except Exception:
-        return str(candidate)
-
-
-def quarantine_artifact(
-    path: Path,
-    reason: str,
-    *,
-    logger: Optional[logging.Logger] = None,
-    create_placeholder: bool = False,
-) -> Path:
-    """Move ``path`` to a ``.quarantine`` sibling for operator review.
-
-    Args:
-        path: Artefact to quarantine.
-        reason: Explanation describing why the artefact was quarantined.
-        logger: Optional logger used to emit structured diagnostics.
-        create_placeholder: When ``True`` a placeholder file is created even if
-            ``path`` does not presently exist (useful for failed writes).
-
-    Returns:
-        Path to the quarantined artefact.
-    """
-
-    original = Path(path)
-    parent = original.parent
-    parent.mkdir(parents=True, exist_ok=True)
-    suffix = ".quarantine"
-    candidate = parent / f"{original.name}{suffix}"
-    counter = 1
-    while candidate.exists():
-        candidate = parent / f"{original.name}{suffix}{counter}"
-        counter += 1
-
-    try:
-        if original.exists():
-            original.rename(candidate)
-        elif create_placeholder:
-            candidate.write_text(reason + "\n", encoding="utf-8")
-    except Exception:
-        if logger:
-            logger.exception(
-                "Failed to quarantine artifact",
-                extra={
-                    "extra_fields": {
-                        "stage": "core",
-                        "doc_id": "__system__",
-                        "input_hash": None,
-                        "error_code": "QUARANTINE_FAILURE",
-                        "path": str(original),
-                        "attempted_quarantine": str(candidate),
-                        "reason": reason,
-                    }
-                },
-            )
-        raise
-
-    if logger:
-        log_event(
-            logger,
-            "warning",
-            "Quarantined artifact",
-            stage="core",
-            doc_id="__system__",
-            input_hash=None,
-            error_code="QUARANTINE_SUCCESS",
-            path=str(original),
-            quarantine_path=str(candidate),
-            reason=reason,
-        )
-    return candidate
-
-
-def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
-    """Compute a content hash for ``path`` using the requested algorithm.
-
-    Args:
-        path: File whose contents should be hashed.
-        algorithm: Hash algorithm name supported by :mod:`hashlib`.
-
-    Notes:
-        The ``DOCSTOKG_HASH_ALG`` environment variable overrides ``algorithm``
-        when set, enabling fleet-wide hash changes without code edits.
-
-    Returns:
-        Hex digest string.
-
-    Examples:
-        >>> tmp = Path("/tmp/hash.txt")
-        >>> _ = tmp.write_text("hello", encoding="utf-8")
-        >>> compute_content_hash(tmp) == hashlib.sha1(b"hello").hexdigest()
-        True
-    """
-
-    selected_algorithm = resolve_hash_algorithm(algorithm)
-    hasher = hashlib.new(selected_algorithm)
-    try:
-        text = path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(65536), b""):
-                hasher.update(chunk)
-        return hasher.hexdigest()
-
-    normalised = unicodedata.normalize("NFKC", text)
-    hasher.update(normalised.encode("utf-8"))
-    return hasher.hexdigest()
-
-
-def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, dict]:
-    """Load the latest manifest entries for a specific pipeline stage.
-
-    Args:
-        stage: Manifest stage identifier to filter entries by.
-        root: Optional DocsToKG data root used to resolve the manifest path.
-
-    Returns:
-        Mapping of ``doc_id`` to the most recent manifest entry for that stage.
-
-    Raises:
-        None: Manifest rows that fail to parse are skipped to keep processing resilient.
-
-    Examples:
-        >>> index = load_manifest_index("embeddings")  # doctest: +SKIP
-        >>> isinstance(index, dict)
-        True
-    """
-
-    manifest_dir = data_manifests(root)
-    stage_path = manifest_dir / _manifest_filename(stage)
-    index: Dict[str, dict] = {}
-    if not stage_path.exists():
-        return index
-
-    with stage_path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if entry.get("stage") != stage:
-                continue
-            doc_id = entry.get("doc_id")
-            if not doc_id:
-                continue
-            index[doc_id] = entry
-    return index
-
-
-def iter_manifest_entries(stages: Sequence[str], root: Optional[Path] = None) -> Iterator[dict]:
-    """Yield manifest entries for the requested ``stages`` sorted by timestamp."""
-
-    manifest_dir = data_manifests(root)
-    combined: List[dict] = []
-    for stage in stages:
-        stage_path = manifest_dir / _manifest_filename(stage)
-        if not stage_path.exists():
-            continue
-        with stage_path.open("r", encoding="utf-8") as handle:
-            for line in handle:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                entry.setdefault("stage", stage)
-                combined.append(entry)
-
-    combined.sort(key=lambda item: item.get("timestamp", ""))
-    for entry in combined:
-        yield entry
-
-
-def summarize_manifest(entries: Sequence[dict]) -> Dict[str, Any]:
-    """Compute status counts and durations for manifest ``entries``."""
-
-    status_counter: Dict[str, Counter] = defaultdict(Counter)
-    duration_totals: Dict[str, float] = defaultdict(float)
-    total_entries: Dict[str, int] = defaultdict(int)
-    for entry in entries:
-        stage = entry.get("stage", "unknown")
-        status = entry.get("status", "unknown")
-        total_entries[stage] += 1
-        status_counter[stage][status] += 1
-        try:
-            duration_totals[stage] += float(entry.get("duration_s", 0.0))
-        except (TypeError, ValueError):
-            continue
-
-    summary: Dict[str, Any] = {}
-    for stage, total in total_entries.items():
-        summary[stage] = {
-            "total": total,
-            "statuses": dict(status_counter[stage]),
-            "duration_s": round(duration_totals[stage], 3),
-        }
-    return summary
 
 
 # --- Concurrency Utilities ---
@@ -3302,12 +2150,15 @@ def _plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
 
     parser = chunk_module.build_parser()
     args, _unknown = parser.parse_known_args(argv)
-    resolved_root = doctags_module.prepare_data_root(args.data_root, chunk_module.DEFAULT_DATA_ROOT)
+    resolved_root = doctags_module.prepare_data_root(args.data_root, detect_data_root())
     data_root_overridden = args.data_root is not None
+
+    default_in_dir = data_doctags(resolved_root)
+    default_out_dir = data_chunks(resolved_root)
 
     in_dir = doctags_module.resolve_pipeline_path(
         cli_value=args.in_dir,
-        default_path=chunk_module.DEFAULT_IN_DIR,
+        default_path=default_in_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
         resolver=data_doctags,
@@ -3315,7 +2166,7 @@ def _plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
 
     out_dir = doctags_module.resolve_pipeline_path(
         cli_value=args.out_dir,
-        default_path=chunk_module.DEFAULT_OUT_DIR,
+        default_path=default_out_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
         resolver=data_chunks,
@@ -3366,14 +2217,15 @@ def _plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
 
     parser = embedding_module.build_parser()
     args, _unknown = parser.parse_known_args(argv)
-    resolved_root = doctags_module.prepare_data_root(
-        args.data_root, embedding_module.DEFAULT_DATA_ROOT
-    )
+    resolved_root = doctags_module.prepare_data_root(args.data_root, detect_data_root())
     data_root_overridden = args.data_root is not None
+
+    default_chunks_dir = data_chunks(resolved_root)
+    default_vectors_dir = data_vectors(resolved_root)
 
     chunks_dir = doctags_module.resolve_pipeline_path(
         cli_value=args.chunks_dir,
-        default_path=embedding_module.DEFAULT_CHUNKS_DIR,
+        default_path=default_chunks_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
         resolver=data_chunks,
@@ -3381,7 +2233,7 @@ def _plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
 
     vectors_dir = doctags_module.resolve_pipeline_path(
         cli_value=args.out_dir,
-        default_path=embedding_module.DEFAULT_VECTORS_DIR,
+        default_path=default_vectors_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
         resolver=data_vectors,

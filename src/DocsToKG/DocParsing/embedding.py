@@ -289,16 +289,43 @@ import time
 import tracemalloc
 import unicodedata
 import uuid
-from collections import Counter
+from collections import Counter, OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, fields
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable, ClassVar, Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Callable, ClassVar, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 # Third-party imports
-from tqdm import tqdm
+try:
+    from tqdm import tqdm  # type: ignore
+except Exception:  # pragma: no cover - fallback when tqdm is unavailable
+    class _TqdmFallback:
+        def __init__(self, iterable=None, **kwargs):
+            self._iterable = iterable
 
+        def __iter__(self):
+            if self._iterable is None:
+                return iter(())
+            return iter(self._iterable)
+
+        def update(self, *args, **kwargs):
+            return None
+
+        def close(self):
+            return None
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            self.close()
+            return False
+
+    def tqdm(iterable=None, **kwargs):  # type: ignore
+        return _TqdmFallback(iterable, **kwargs)
+
+from DocsToKG.DocParsing.config import StageConfigBase
 from DocsToKG.DocParsing.core import (
     DEFAULT_TOKENIZER,
     UUID_NAMESPACE,
@@ -307,18 +334,18 @@ from DocsToKG.DocParsing.core import (
     CLIOption,
     QwenCfg,
     SpladeCfg,
-    StageConfigBase,
     acquire_lock,
-    atomic_write,
     build_subcommand,
-    compute_chunk_uuid,
-    compute_content_hash,
-    quarantine_artifact,
+    compute_relative_doc_id,
     compute_stable_shard,
+    derive_doc_id_and_vectors_path,
+    iter_chunks,
+    ResumeController,
+)
+from DocsToKG.DocParsing.context import ParsingContext
+from DocsToKG.DocParsing.env import (
     data_chunks,
     data_vectors,
-    compute_relative_doc_id,
-    derive_doc_id_and_vectors_path,
     detect_data_root,
     ensure_model_environment,
     ensure_qwen_dependencies,
@@ -326,19 +353,25 @@ from DocsToKG.DocParsing.core import (
     ensure_splade_dependencies,
     ensure_splade_environment,
     expand_path,
-    get_logger,
-    iter_chunks,
-    jsonl_load,
+    prepare_data_root,
+    resolve_pipeline_path,
+)
+from DocsToKG.DocParsing.io import (
+    atomic_write,
+    compute_chunk_uuid,
+    compute_content_hash,
+    iter_jsonl,
+    manifest_append,
     load_manifest_index,
+    quarantine_artifact,
+    relative_path,
+)
+from DocsToKG.DocParsing.logging import (
+    get_logger,
     log_event,
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
-    prepare_data_root,
-    resolve_pipeline_path,
-    relative_path,
-    ResumeController,
-    _iter_jsonl_records,
 )
 from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
@@ -352,8 +385,8 @@ from DocsToKG.DocParsing.formats import (
     VectorRow,
 )
 from DocsToKG.DocParsing.schemas import (
-    COMPATIBLE_CHUNK_VERSIONS,
     SchemaKind,
+    ensure_chunk_schema,
     validate_schema_version,
     validate_vector_row as schema_validate_vector_row,
 )
@@ -383,6 +416,7 @@ __all__ = (
     "splade_encode",
     "tokens",
     "write_vectors",
+    "flush_llm_cache",
     "close_all_qwen",
 )
 
@@ -412,9 +446,6 @@ except Exception as exc:  # pragma: no cover - exercised via tests with stubs
     _VLLM_IMPORT_ERROR = exc
 
 
-_QWEN_LLM_CACHE: Dict[Tuple[str, str, int, float, str | None], LLM] = {}
-
-
 def _shutdown_llm_instance(llm) -> None:
     """Best-effort shutdown for a cached Qwen LLM instance."""
 
@@ -431,13 +462,69 @@ def _shutdown_llm_instance(llm) -> None:
         pass
 
 
+class _LRUCache:
+    """Simple LRU cache that automatically closes evicted entries."""
+
+    def __init__(
+        self,
+        maxsize: int = 2,
+        closer: Optional[Callable[[Any], None]] = None,
+    ) -> None:
+        self.maxsize = max(1, maxsize)
+        self._closer = closer
+        self._store: OrderedDict[Any, Any] = OrderedDict()
+
+    def get(self, key: Any) -> Any:
+        try:
+            value = self._store[key]
+        except KeyError:
+            return None
+        self._store.move_to_end(key)
+        return value
+
+    def put(self, key: Any, value: Any) -> None:
+        self._store[key] = value
+        self._store.move_to_end(key)
+        self._evict_if_needed()
+
+    def clear(self) -> None:
+        for _, value in list(self._store.items()):
+            self._close(value)
+        self._store.clear()
+
+    def items(self) -> List[Tuple[Any, Any]]:
+        return list(self._store.items())
+
+    def values(self) -> List[Any]:
+        return list(self._store.values())
+
+    def _evict_if_needed(self) -> None:
+        while len(self._store) > self.maxsize:
+            _, value = self._store.popitem(last=False)
+            self._close(value)
+
+    def _close(self, value: Any) -> None:
+        if self._closer is None:
+            return
+        try:
+            self._closer(value)
+        except Exception:  # pragma: no cover - defensive cleanup
+            pass
+
+
+_QWEN_LLM_CACHE = _LRUCache(maxsize=2, closer=_shutdown_llm_instance)
+
+
+def flush_llm_cache() -> None:
+    """Explicitly clear the cached Qwen LLM instances."""
+
+    _QWEN_LLM_CACHE.clear()
+
+
 def close_all_qwen() -> None:
     """Release all cached Qwen LLM instances."""
 
-    for key, llm in list(_QWEN_LLM_CACHE.items()):
-        _shutdown_llm_instance(llm)
-        _QWEN_LLM_CACHE.pop(key, None)
-    _QWEN_LLM_CACHE.clear()
+    flush_llm_cache()
 
 
 atexit.register(close_all_qwen)
@@ -542,9 +629,6 @@ def _percentile(data: Sequence[float], pct: float) -> float:
     return d0 + d1
 
 
-DEFAULT_DATA_ROOT = detect_data_root()
-DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
-DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "embeddings"
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
 EMBED_STAGE = "embedding"
@@ -632,8 +716,22 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
             "help": "Zero-based shard index to process (default: %(default)s).",
         },
     ),
-    CLIOption(("--chunks-dir",), {"type": Path, "default": DEFAULT_CHUNKS_DIR}),
-    CLIOption(("--out-dir",), {"type": Path, "default": DEFAULT_VECTORS_DIR}),
+    CLIOption(
+        ("--chunks-dir",),
+        {
+            "type": Path,
+            "default": None,
+            "help": "Chunk input directory (defaults to data_root/ChunkedDocTagFiles).",
+        },
+    ),
+    CLIOption(
+        ("--out-dir",),
+        {
+            "type": Path,
+            "default": None,
+            "help": "Vector output directory (defaults to data_root/Embeddings).",
+        },
+    ),
     CLIOption(
         ("--format",),
         {
@@ -753,8 +851,8 @@ class EmbedCfg(StageConfigBase):
 
     log_level: str = "INFO"
     data_root: Optional[Path] = None
-    chunks_dir: Path = DEFAULT_CHUNKS_DIR
-    out_dir: Path = DEFAULT_VECTORS_DIR
+    chunks_dir: Optional[Path] = None
+    out_dir: Optional[Path] = None
     vector_format: str = "jsonl"
     bm25_k1: float = 1.5
     bm25_b: float = 0.75
@@ -876,9 +974,25 @@ class EmbedCfg(StageConfigBase):
         """Normalise paths and casing after all sources have been applied."""
 
         if self.data_root is not None:
-            self.data_root = StageConfigBase._coerce_optional_path(self.data_root, None)
-        self.chunks_dir = StageConfigBase._coerce_path(self.chunks_dir, None)
-        self.out_dir = StageConfigBase._coerce_path(self.out_dir, None)
+            resolved_root = StageConfigBase._coerce_optional_path(self.data_root, None)
+        else:
+            env_root = os.getenv("DOCSTOKG_DATA_ROOT")
+            if env_root:
+                resolved_root = StageConfigBase._coerce_optional_path(env_root, None)
+            else:
+                resolved_root = detect_data_root()
+        self.data_root = resolved_root
+
+        if self.chunks_dir is None:
+            self.chunks_dir = data_chunks(resolved_root)
+        else:
+            self.chunks_dir = StageConfigBase._coerce_path(self.chunks_dir, None)
+
+        if self.out_dir is None:
+            self.out_dir = data_vectors(resolved_root)
+        else:
+            self.out_dir = StageConfigBase._coerce_path(self.out_dir, None)
+
         if self.splade_model_dir is not None:
             self.splade_model_dir = StageConfigBase._coerce_optional_path(
                 self.splade_model_dir, None
@@ -887,7 +1001,7 @@ class EmbedCfg(StageConfigBase):
             self.qwen_model_dir = StageConfigBase._coerce_optional_path(self.qwen_model_dir, None)
         if self.config is not None:
             self.config = StageConfigBase._coerce_optional_path(self.config, None)
-        self.log_level = str(self.log_level).upper()
+        self.log_level = str(self.log_level or "INFO").upper()
         self.vector_format = str(self.vector_format or "jsonl").lower()
         self.splade_attn = str(self.splade_attn or "auto").lower()
         if self.splade_max_active_dims in (None, "", []):
@@ -897,6 +1011,21 @@ class EmbedCfg(StageConfigBase):
         self.resume = bool(self.resume)
         self.force = bool(self.force)
         self.no_cache = bool(self.no_cache)
+
+        if self.batch_size_splade < 1:
+            raise ValueError("batch_size_splade must be >= 1")
+        if self.batch_size_qwen < 1:
+            raise ValueError("batch_size_qwen must be >= 1")
+        if self.files_parallel < 1:
+            raise ValueError("files_parallel must be >= 1")
+        if self.tp < 1:
+            raise ValueError("tp must be >= 1")
+        if self.shard_count < 1:
+            raise ValueError("shard_count must be >= 1")
+        if not (0 <= self.shard_index < self.shard_count):
+            raise ValueError("shard_index must be in [0, shard_count)")
+        if self.splade_max_active_dims is not None and self.splade_max_active_dims < 1:
+            raise ValueError("splade_max_active_dims must be >= 1 when provided")
 
 
 def _ensure_splade_dependencies() -> None:
@@ -976,31 +1105,6 @@ def _legacy_chunk_uuid(doc_id: str, source_chunk_idxs: Any, text_value: str) -> 
         return str(uuid.uuid5(UUID_NAMESPACE, name))
     except Exception:
         return str(uuid.uuid4())
-
-
-def ensure_chunk_schema(rows: Sequence[dict], source: Path) -> None:
-    """Assert that chunk rows declare a compatible schema version.
-
-    Args:
-        rows: Iterable of chunk dictionaries to validate.
-        source: Path to the originating chunk file, used for error context.
-
-    Returns:
-        None
-
-    Raises:
-        ValueError: Propagated when an incompatible schema version is detected.
-    """
-
-    for index, row in enumerate(rows, start=1):
-        version = row.get("schema_version")
-        if not version:
-            # Older chunk artifacts omitted explicit schema versions. Default
-            # them to the newest compatible revision so downstream validators
-            # continue to operate without forcing regeneration.
-            row["schema_version"] = COMPATIBLE_CHUNK_VERSIONS[-1]
-            continue
-        validate_schema_version(version, SchemaKind.CHUNK, context=f"{source}:{index}")
 
 
 def tokens(text: str) -> List[str]:
@@ -1403,7 +1507,7 @@ def _qwen_embed_direct(
             download_dir=str(HF_HOME),  # belt & suspenders: keep any aux files in your cache
         )
         if use_cache:
-            _QWEN_LLM_CACHE[cache_key] = llm
+            _QWEN_LLM_CACHE.put(cache_key, llm)
     pool = PoolingParams(normalize=True, dimensions=int(cfg.dim))
     out: List[List[float]] = []
     try:
@@ -1526,17 +1630,10 @@ def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
                     continue
                 row = json.loads(line)
 
-                # Ensure schema version
-                version = row.get("schema_version")
-                if not version:
-                    row["schema_version"] = COMPATIBLE_CHUNK_VERSIONS[-1]
+                previous_version = row.get("schema_version")
+                ensure_chunk_schema(row, context=f"{chunk_file}:{line_no}")
+                if row.get("schema_version") != previous_version:
                     updated = True
-                else:
-                    validate_schema_version(
-                        version,
-                        SchemaKind.CHUNK,
-                        context=f"{chunk_file}:{line_no}",
-                    )
 
                 # Ensure UUID
                 if ensure_uuid([row]):
@@ -1592,7 +1689,7 @@ def iter_rows_in_batches(
     """
 
     buf: List[dict] = []
-    for record in _iter_jsonl_records(
+    for record in iter_jsonl(
         path,
         start=start,
         end=end,
@@ -1605,6 +1702,16 @@ def iter_rows_in_batches(
             buf = []
     if buf:
         yield buf
+
+
+def _validate_chunk_file_schema(path: Path) -> None:
+    """Stream chunk file rows and assert schema compatibility."""
+
+    for index, row in enumerate(iter_jsonl(path), start=1):
+        version = row.get("schema_version")
+        if not version:
+            continue
+        validate_schema_version(str(version), SchemaKind.CHUNK, context=f"{path}:{index}")
 
 
 def iter_chunk_files(directory: Path) -> Iterator[Path]:
@@ -1719,12 +1826,12 @@ def process_chunk_file_vectors(
         for rows in iter_rows_in_batches(chunk_file, batch_size):
             if not rows:
                 continue
-            ensure_chunk_schema(rows, chunk_file)
 
             uuids: List[str] = []
             texts: List[str] = []
             lengths: List[int] = []
-            for row in rows:
+            for index, row in enumerate(rows, start=1):
+                ensure_chunk_schema(row, context=f"{chunk_file}:{index}")
                 uuid_value = row.get("uuid")
                 if not uuid_value:
                     raise ValueError(f"Chunk row missing UUID in {chunk_file}")
@@ -2209,9 +2316,9 @@ def main(args: argparse.Namespace | None = None) -> int:
     profile = getattr(namespace, "profile", None)
     defaults = EMBED_PROFILE_PRESETS.get(profile or "", {})
     cfg = EmbedCfg.from_args(namespace, defaults=defaults)
-    config_snapshot = cfg.to_manifest()
+    base_config = cfg.to_manifest()
     if profile:
-        config_snapshot.setdefault("profile", profile)
+        base_config.setdefault("profile", profile)
     for field_def in fields(EmbedCfg):
         setattr(namespace, field_def.name, getattr(cfg, field_def.name))
 
@@ -2344,12 +2451,15 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     data_root_override = cfg.data_root
     data_root_overridden = data_root_override is not None
-    resolved_root = prepare_data_root(data_root_override, DEFAULT_DATA_ROOT)
+    resolved_root = prepare_data_root(data_root_override, detect_data_root())
     logger.bind(data_root=str(resolved_root))
+
+    default_chunks_dir = data_chunks(resolved_root)
+    default_vectors_dir = data_vectors(resolved_root)
 
     chunks_dir = resolve_pipeline_path(
         cli_value=args.chunks_dir,
-        default_path=DEFAULT_CHUNKS_DIR,
+        default_path=default_chunks_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
         resolver=data_chunks,
@@ -2357,7 +2467,7 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     out_dir = resolve_pipeline_path(
         cli_value=args.out_dir,
-        default_path=DEFAULT_VECTORS_DIR,
+        default_path=default_vectors_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
         resolver=data_vectors,
@@ -2370,33 +2480,41 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     requested_parallel = max(1, int(cfg.files_parallel or 1))
 
-    config_snapshot.update(
-        {
-            "run_id": run_id,
-            "data_root": str(resolved_root),
-            "chunks_dir": str(chunks_dir),
-            "out_dir": str(out_dir),
-            "splade_model_dir": str(splade_model_dir),
-            "qwen_model_dir": str(qwen_model_dir),
-            "splade_env": splade_env,
-            "qwen_env": qwen_env,
-            "offline": bool(offline_mode),
-            "vector_format": vector_format,
-            "shard_count": shard_count,
-            "shard_index": shard_index,
-            "files_parallel_requested": requested_parallel,
-            "bm25_k1": float(cfg.bm25_k1),
-            "bm25_b": float(cfg.bm25_b),
-            "batch_size_splade": int(cfg.batch_size_splade),
-            "batch_size_qwen": int(cfg.batch_size_qwen),
-            "sparsity_warn_threshold_pct": float(cfg.sparsity_warn_threshold_pct),
-            "sparsity_report_top_n": int(cfg.sparsity_report_top_n),
-            "resume": bool(cfg.resume),
-            "force": bool(cfg.force),
-            "validate_only": bool(validate_only),
-            "plan_only": bool(plan_only),
-            "no_cache": bool(cfg.no_cache),
-        }
+    context = ParsingContext(run_id=run_id, data_root=resolved_root)
+    context.apply_config(cfg)
+    context.chunks_dir = chunks_dir
+    context.out_dir = out_dir
+    context.vectors_dir = out_dir
+    context.vector_format = vector_format
+    context.shard_count = shard_count
+    context.shard_index = shard_index
+    context.resume = bool(cfg.resume)
+    context.force = bool(cfg.force)
+    context.validate_only = bool(validate_only)
+    context.plan_only = bool(plan_only)
+    context.offline = bool(offline_mode)
+    context.files_parallel = None
+    context.profile = profile
+    base_extra = {
+        key: value
+        for key, value in base_config.items()
+        if key not in ParsingContext.field_names()
+    }
+    if base_extra:
+        context.merge_extra(base_extra)
+    context.update_extra(
+        splade_model_dir=str(splade_model_dir),
+        qwen_model_dir=str(qwen_model_dir),
+        splade_env=splade_env,
+        qwen_env=qwen_env,
+        files_parallel_requested=requested_parallel,
+        bm25_k1=float(cfg.bm25_k1),
+        bm25_b=float(cfg.bm25_b),
+        batch_size_splade=int(cfg.batch_size_splade),
+        batch_size_qwen=int(cfg.batch_size_qwen),
+        sparsity_warn_threshold_pct=float(cfg.sparsity_warn_threshold_pct),
+        sparsity_report_top_n=int(cfg.sparsity_report_top_n),
+        no_cache=bool(cfg.no_cache),
     )
 
     if validate_only:
@@ -2419,6 +2537,8 @@ def main(args: argparse.Namespace | None = None) -> int:
     else:
         out_dir.mkdir(parents=True, exist_ok=True)
 
+    context_payload = context.to_manifest()
+
     manifest_log_success(
         stage=MANIFEST_STAGE,
         doc_id="__config__",
@@ -2427,7 +2547,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         input_path=chunks_dir,
         input_hash="",
         output_path=out_dir,
-        config=config_snapshot,
+        config=context_payload,
     )
 
     if validate_only:
@@ -2529,9 +2649,8 @@ def main(args: argparse.Namespace | None = None) -> int:
     incompatible_chunks: List[Path] = []
     validated_files: List[Path] = []
     for chunk_file in files:
-        rows = jsonl_load(chunk_file)
         try:
-            ensure_chunk_schema(rows, chunk_file)
+            _validate_chunk_file_schema(chunk_file)
         except ValueError as exc:
             reason = str(exc)
             try:
@@ -2682,7 +2801,8 @@ def main(args: argparse.Namespace | None = None) -> int:
     files_parallel = min(requested_parallel, max(1, len(file_entries)))
     args.files_parallel = files_parallel
     cfg.files_parallel = files_parallel
-    config_snapshot["files_parallel_effective"] = files_parallel
+    context.files_parallel = files_parallel
+    context.update_extra(files_parallel_effective=files_parallel)
 
     if files_parallel > 1:
         log_event(logger, "info", "File-level parallelism enabled", files_parallel=files_parallel)

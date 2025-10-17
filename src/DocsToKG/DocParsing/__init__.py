@@ -17,6 +17,8 @@ from . import doctags as _doctags
 from . import embedding as _embedding
 from . import formats as _formats
 from . import token_profiles as _token_profiles
+from . import io as _io
+from . import logging as _logging
 
 __all__ = [
     "core",
@@ -136,8 +138,8 @@ def _populate_pdf_pipeline_module(module: types.ModuleType) -> None:
     )
     alias = module.__name__
     if alias not in _SHIM_LOGGED:
-        logger = _core.get_logger(__name__)
-        _core.log_event(
+        logger = _logging.get_logger(__name__)
+        _logging.log_event(
             logger,
             "warning",
             "pdf_pipeline shim is deprecated",
@@ -158,10 +160,10 @@ def _populate_pdf_pipeline_module(module: types.ModuleType) -> None:
     module.wait_for_vllm = backend.wait_for_vllm
     module.stop_vllm = backend.stop_vllm
     module.validate_served_models = backend.validate_served_models
-    module.manifest_append = _core.manifest_append
-    module.manifest_log_success = _core.manifest_log_success
-    module.manifest_log_failure = _core.manifest_log_failure
-    module.manifest_log_skip = _core.manifest_log_skip
+    module.manifest_append = _io.manifest_append
+    module.manifest_log_success = _logging.manifest_log_success
+    module.manifest_log_failure = _logging.manifest_log_failure
+    module.manifest_log_skip = _logging.manifest_log_skip
     module.list_pdfs = backend.list_pdfs
 
     def parse_args(argv: object | None = None):

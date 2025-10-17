@@ -191,6 +191,7 @@ __all__ = (
     "summarize_image_metadata",
 )
 
+from DocsToKG.DocParsing.config import StageConfigBase
 from DocsToKG.DocParsing.core import (
     DEFAULT_CAPTION_MARKERS,
     DEFAULT_HEADING_MARKERS,
@@ -200,34 +201,40 @@ from DocsToKG.DocParsing.core import (
     ChunkTask,
     ChunkWorkerConfig,
     CLIOption,
-    StageConfigBase,
     acquire_lock,
-    atomic_write,
     build_subcommand,
-    quarantine_artifact,
-    compute_chunk_uuid,
-    compute_content_hash,
     compute_relative_doc_id,
     compute_stable_shard,
-    data_chunks,
-    data_doctags,
     dedupe_preserve_order,
     derive_doc_id_and_chunks_path,
-    detect_data_root,
-    ensure_model_environment,
-    get_logger,
-    iter_doctags,
-    load_manifest_index,
     load_structural_marker_config,
-    log_event,
-    manifest_log_failure,
-    manifest_log_skip,
-    manifest_log_success,
-    prepare_data_root,
-    resolve_pipeline_path,
-    relative_path,
     set_spawn_or_warn,
     ResumeController,
+)
+from DocsToKG.DocParsing.context import ParsingContext
+from DocsToKG.DocParsing.env import (
+    data_chunks,
+    data_doctags,
+    detect_data_root,
+    ensure_model_environment,
+    prepare_data_root,
+    resolve_pipeline_path,
+)
+from DocsToKG.DocParsing.io import (
+    atomic_write,
+    compute_chunk_uuid,
+    compute_content_hash,
+    iter_doctags,
+    load_manifest_index,
+    quarantine_artifact,
+    relative_path,
+    resolve_attempts_path,
+    resolve_manifest_path,
+    resolve_hash_algorithm,
+)
+from DocsToKG.DocParsing.logging import (
+    get_logger,
+    log_event,
 )
 from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
@@ -240,6 +247,7 @@ from DocsToKG.DocParsing.formats import (
     get_docling_version,
     validate_chunk_row,
 )
+from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
 SOFT_BARRIER_MARGIN = 64
 CHUNK_STAGE = "chunking"
@@ -271,8 +279,15 @@ def _validate_chunk_files(
     logger,
     *,
     data_root: Optional[Path] = None,
-) -> tuple[int, int]:
-    """Validate chunk JSONL rows across supplied files."""
+    telemetry: Optional[StageTelemetry] = None,
+) -> Dict[str, int]:
+    """Validate chunk JSONL rows across supplied files.
+
+    Returns a dictionary summarising file, row, and quarantine counts. Detailed
+    log events for individual errors are emitted within the function; callers
+    are responsible for logging the aggregate summary so they can attach
+    run-specific context.
+    """
 
     validated_files = 0
     validated_rows = 0
@@ -316,17 +331,26 @@ def _validate_chunk_files(
                 input_hash = ""
             doc_id = path.stem
             quarantine_path = quarantine_artifact(path, reason=reason, logger=logger)
-            manifest_log_failure(
-                stage=MANIFEST_STAGE,
-                doc_id=doc_id,
-                duration_s=0.0,
-                schema_version=CHUNK_SCHEMA_VERSION,
-                input_path=path,
-                input_hash=input_hash,
-                output_path=quarantine_path,
-                error=reason,
-                quarantine=True,
-            )
+            if telemetry is not None:
+                telemetry.log_failure(
+                    doc_id=doc_id,
+                    input_path=path,
+                    duration_s=0.0,
+                    reason=reason,
+                    metadata={
+                        "input_path": str(path),
+                        "input_hash": input_hash,
+                        "quarantine": True,
+                    },
+                    manifest_metadata={
+                        "output_path": str(quarantine_path),
+                        "schema_version": CHUNK_SCHEMA_VERSION,
+                        "input_path": str(path),
+                        "input_hash": input_hash,
+                        "error": reason,
+                        "quarantine": True,
+                    },
+                )
             log_event(
                 logger,
                 "warning",
@@ -357,28 +381,15 @@ def _validate_chunk_files(
             quarantined=quarantined_files,
         )
 
-    log_event(
-        logger,
-        "info",
-        "Chunk validation complete",
-        status="validate-only",
-        stage=CHUNK_STAGE,
-        files=validated_files,
-        rows=validated_rows,
-        quarantined=quarantined_files,
-    )
-    print(
-        f"Validated {validated_rows} rows across {validated_files} chunk files."
-        + (f" Quarantined {quarantined_files} files." if quarantined_files else "")
-    )
-    return validated_files, validated_rows
+    return {
+        "files": validated_files,
+        "rows": validated_rows,
+        "quarantined": quarantined_files,
+    }
 
 
 # --- Defaults ---
 
-DEFAULT_DATA_ROOT = detect_data_root()
-DEFAULT_IN_DIR = data_doctags(DEFAULT_DATA_ROOT)
-DEFAULT_OUT_DIR = data_chunks(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "chunks"
 
 
@@ -388,8 +399,8 @@ class ChunkerCfg(StageConfigBase):
 
     log_level: str = "INFO"
     data_root: Optional[Path] = None
-    in_dir: Path = DEFAULT_IN_DIR
-    out_dir: Path = DEFAULT_OUT_DIR
+    in_dir: Optional[Path] = None
+    out_dir: Optional[Path] = None
     min_tokens: int = 256
     max_tokens: int = 512
     shard_count: int = 1
@@ -477,18 +488,48 @@ class ChunkerCfg(StageConfigBase):
 
     def finalize(self) -> None:
         """Normalise paths, casing, and defaults after all inputs are merged."""
+
         if self.data_root is not None:
-            self.data_root = StageConfigBase._coerce_optional_path(self.data_root, None)
-        self.in_dir = StageConfigBase._coerce_path(self.in_dir, None)
-        self.out_dir = StageConfigBase._coerce_path(self.out_dir, None)
+            resolved_root = StageConfigBase._coerce_optional_path(self.data_root, None)
+        else:
+            env_root = os.getenv("DOCSTOKG_DATA_ROOT")
+            if env_root:
+                resolved_root = StageConfigBase._coerce_optional_path(env_root, None)
+            else:
+                resolved_root = detect_data_root()
+        self.data_root = resolved_root
+
+        if self.in_dir is None:
+            self.in_dir = data_doctags(resolved_root)
+        else:
+            self.in_dir = StageConfigBase._coerce_path(self.in_dir, None)
+
+        if self.out_dir is None:
+            self.out_dir = data_chunks(resolved_root)
+        else:
+            self.out_dir = StageConfigBase._coerce_path(self.out_dir, None)
+
         if self.structural_markers is not None:
             self.structural_markers = StageConfigBase._coerce_optional_path(
                 self.structural_markers, None
             )
         if self.config is not None:
             self.config = StageConfigBase._coerce_optional_path(self.config, None)
-        self.log_level = str(self.log_level).upper()
+        self.log_level = str(self.log_level or "INFO").upper()
         self.serializer_provider = str(self.serializer_provider)
+
+        if self.min_tokens < 0 or self.max_tokens < 0:
+            raise ValueError("min_tokens and max_tokens must be non-negative")
+        if self.min_tokens > self.max_tokens:
+            raise ValueError("min_tokens must be <= max_tokens")
+        if self.workers < 1:
+            raise ValueError("workers must be >= 1")
+        if self.soft_barrier_margin < 0:
+            raise ValueError("soft_barrier_margin must be >= 0")
+        if self.shard_count < 1:
+            raise ValueError("shard_count must be >= 1")
+        if not (0 <= self.shard_index < self.shard_count):
+            raise ValueError("shard_index must be in [0, shard_count)")
 
     from_sources = from_args
 
@@ -539,8 +580,22 @@ CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
             "help": "Preset for workers/token windows/tokenizer (cpu-small, gpu-default, gpu-max, bert-compat).",
         },
     ),
-    CLIOption(("--in-dir",), {"type": Path, "default": DEFAULT_IN_DIR}),
-    CLIOption(("--out-dir",), {"type": Path, "default": DEFAULT_OUT_DIR}),
+    CLIOption(
+        ("--in-dir",),
+        {
+            "type": Path,
+            "default": None,
+            "help": "DocTags input directory (defaults to data_root/DocTagsFiles).",
+        },
+    ),
+    CLIOption(
+        ("--out-dir",),
+        {
+            "type": Path,
+            "default": None,
+            "help": "Chunk output directory (defaults to data_root/ChunkedDocTagFiles).",
+        },
+    ),
     CLIOption(("--min-tokens",), {"type": int, "default": 256}),
     CLIOption(("--max-tokens",), {"type": int, "default": 512}),
     CLIOption(
@@ -1151,6 +1206,7 @@ def coalesce_small_runs(
             • Leave chunks outside small runs unchanged.
     """
     out: List[Rec] = []
+    changed_ids: set[int] = set()
     i, N = 0, len(records)
     margin = max(0, soft_barrier_margin)
     heading_prefixes = (
@@ -1170,6 +1226,11 @@ def coalesce_small_runs(
             True if the chunk length is less than `min_tokens`, else False.
         """
         return records[idx].n_tok < min_tokens
+
+    def merge_without_recount(left: Rec, right: Rec) -> Rec:
+        merged = merge_rec(left, right, tokenizer, recount=False)
+        changed_ids.add(id(merged))
+        return merged
 
     while i < N:
         if not is_small(i):
@@ -1217,7 +1278,7 @@ def coalesce_small_runs(
                     break
 
                 if combined_size <= max_tokens:
-                    g = merge_rec(g, next_rec, tokenizer, recount=False)
+                    g = merge_without_recount(g, next_rec)
                     k += 1
                 else:
                     break
@@ -1256,7 +1317,7 @@ def coalesce_small_runs(
                         },
                     )
                 elif combined_size <= max_tokens:
-                    merged = merge_rec(groups[-2], tail, tokenizer, recount=False)
+                    merged = merge_without_recount(groups[-2], tail)
                     if out and out[-1].src_idxs == groups[-2].src_idxs:
                         out[-1] = merged
                     else:
@@ -1318,18 +1379,20 @@ def coalesce_small_runs(
 
             if left_ok and right_ok:
                 if out[-1].n_tok <= records[e].n_tok:
-                    out[-1] = merge_rec(out[-1], tail, tokenizer, recount=False)
+                    out[-1] = merge_without_recount(out[-1], tail)
                 else:
-                    records[e] = merge_rec(tail, records[e], tokenizer, recount=False)
+                    records[e] = merge_without_recount(tail, records[e])
             elif left_ok:
-                out[-1] = merge_rec(out[-1], tail, tokenizer, recount=False)
+                out[-1] = merge_without_recount(out[-1], tail)
             elif right_ok:
-                records[e] = merge_rec(tail, records[e], tokenizer, recount=False)
+                records[e] = merge_without_recount(tail, records[e])
             else:
                 out.append(tail)
 
-    for rec in out:
-        rec.n_tok = tokenizer.count_tokens(text=rec.text)
+    if changed_ids:
+        for rec in out:
+            if id(rec) in changed_ids:
+                rec.n_tok = tokenizer.count_tokens(text=rec.text)
 
     return out
 
@@ -1400,9 +1463,9 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     profile = getattr(namespace, "profile", None)
     defaults = CHUNK_PROFILE_PRESETS.get(profile or "", {})
     cfg = ChunkerCfg.from_args(namespace, defaults=defaults)
-    config_snapshot = cfg.to_manifest()
+    base_config = cfg.to_manifest()
     if profile:
-        config_snapshot.setdefault("profile", profile)
+        base_config.setdefault("profile", profile)
     for field_def in fields(ChunkerCfg):
         setattr(namespace, field_def.name, getattr(cfg, field_def.name))
 
@@ -1476,10 +1539,6 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     args.max_tokens = max_tokens
     args.soft_barrier_margin = soft_margin
     args.serializer_provider = serializer_spec
-    config_snapshot["min_tokens"] = args.min_tokens
-    config_snapshot["max_tokens"] = args.max_tokens
-    config_snapshot["soft_barrier_margin"] = args.soft_barrier_margin
-    config_snapshot["serializer_provider"] = serializer_spec
     log_event(
         logger,
         "info",
@@ -1498,12 +1557,10 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         raise ValueError("--shard-index must be between 0 and shard-count-1")
     args.shard_count = shard_count
     args.shard_index = shard_index
-    config_snapshot["shard_count"] = shard_count
-    config_snapshot["shard_index"] = shard_index
 
     data_root_override = args.data_root
     data_root_overridden = data_root_override is not None
-    resolved_data_root = prepare_data_root(data_root_override, DEFAULT_DATA_ROOT)
+    resolved_data_root = prepare_data_root(data_root_override, detect_data_root())
     ensure_model_environment()
     logger.bind(data_root=str(resolved_data_root))
 
@@ -1521,16 +1578,19 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     )
     docling_version = get_docling_version()
 
+    default_in_dir = data_doctags(resolved_data_root)
+    default_out_dir = data_chunks(resolved_data_root)
+
     in_dir = resolve_pipeline_path(
         cli_value=args.in_dir,
-        default_path=DEFAULT_IN_DIR,
+        default_path=default_in_dir,
         resolved_data_root=resolved_data_root,
         data_root_overridden=data_root_overridden,
         resolver=data_doctags,
     )
     out_dir = resolve_pipeline_path(
         cli_value=args.out_dir,
-        default_path=DEFAULT_OUT_DIR,
+        default_path=default_out_dir,
         resolved_data_root=resolved_data_root,
         data_root_overridden=data_root_overridden,
         resolver=data_chunks,
@@ -1543,10 +1603,31 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         input_relpath=relative_path(in_dir, resolved_data_root),
         output_relpath=relative_path(out_dir, resolved_data_root),
     )
-    config_snapshot["data_root"] = str(resolved_data_root)
-    config_snapshot["in_dir"] = str(in_dir)
-    config_snapshot["out_dir"] = str(out_dir)
-    config_snapshot["run_id"] = run_id
+
+    context = ParsingContext(run_id=run_id, data_root=resolved_data_root)
+    context.apply_config(cfg)
+    context.in_dir = in_dir
+    context.out_dir = out_dir
+    context.doctags_dir = in_dir
+    context.min_tokens = min_tokens
+    context.max_tokens = max_tokens
+    context.soft_barrier_margin = soft_margin
+    context.serializer_provider = serializer_spec
+    context.shard_count = shard_count
+    context.shard_index = shard_index
+    context.resume = bool(args.resume)
+    context.force = bool(args.force)
+    context.validate_only = bool(args.validate_only)
+    context.inject_anchors = bool(args.inject_anchors)
+    context.profile = profile
+    base_extra = {
+        key: value
+        for key, value in base_config.items()
+        if key not in ParsingContext.field_names()
+    }
+    if base_extra:
+        context.merge_extra(base_extra)
+
 
     heading_markers: Tuple[str, ...] = DEFAULT_HEADING_MARKERS
     caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS
@@ -1571,9 +1652,15 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         if extra_captions:
             caption_markers = dedupe_preserve_order((*caption_markers, *tuple(extra_captions)))
         args.structural_markers = markers_path
-        config_snapshot["structural_markers"] = str(markers_path)
+        context.update_extra(structural_markers=str(markers_path))
 
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    telemetry_sink = TelemetrySink(
+        resolve_attempts_path(MANIFEST_STAGE, resolved_data_root),
+        resolve_manifest_path(MANIFEST_STAGE, resolved_data_root),
+    )
+    stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=CHUNK_STAGE)
 
     files = list(iter_doctags(in_dir))
     if args.shard_count > 1:
@@ -1627,18 +1714,14 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     elif args.resume:
         logger.info("Resume mode enabled: unchanged inputs will be skipped")
 
-    chunk_manifest_index = (
-        load_manifest_index(MANIFEST_STAGE, resolved_data_root) if args.resume else {}
-    )
+    chunk_manifest_index: Dict[str, Any] = {}
+    if args.resume:
+        chunk_manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_data_root)
 
     tokenizer_model = args.tokenizer_model
     logger.info(
         "Loading tokenizer",
         extra={"extra_fields": {"tokenizer_model": tokenizer_model}},
-    )
-
-    chunk_manifest_index = (
-        load_manifest_index(MANIFEST_STAGE, resolved_data_root) if args.resume else {}
     )
 
     if getattr(args, "validate_only", False):
@@ -1652,6 +1735,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
             data_root=resolved_data_root,
             in_dir=in_dir,
             out_dir=out_dir,
+            telemetry=stage_telemetry,
         )
         return 0
 
@@ -1695,36 +1779,33 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         )
         worker_count = 1
 
-    config_snapshot["workers"] = worker_count
-    config_snapshot["resume"] = bool(args.resume)
-    config_snapshot["force"] = bool(args.force)
-    config_snapshot["validate_only"] = bool(args.validate_only)
-    config_snapshot["inject_anchors"] = bool(args.inject_anchors)
-    config_payload = dict(config_snapshot)
-    config_payload.update(
-        {
-            "docling_version": docling_version,
-            "custom_heading_markers": custom_heading_markers,
-            "custom_caption_markers": custom_caption_markers,
-        }
+    context.workers = worker_count
+    context.resume = bool(args.resume)
+    context.force = bool(args.force)
+    context.validate_only = bool(args.validate_only)
+    context.inject_anchors = bool(args.inject_anchors)
+    context.update_extra(
+        docling_version=docling_version,
+        custom_heading_markers=custom_heading_markers,
+        custom_caption_markers=custom_caption_markers,
     )
+    context_payload = context.to_manifest()
     log_event(
         logger,
         "info",
         "Chunking configuration",
         status="config",
         stage=CHUNK_STAGE,
-        **config_payload,
+        **context_payload,
     )
-    manifest_log_success(
-        stage=MANIFEST_STAGE,
-        doc_id="__config__",
-        duration_s=0.0,
-        schema_version=CHUNK_SCHEMA_VERSION,
-        input_path=in_dir,
-        input_hash="",
+    stage_telemetry.log_config(
         output_path=out_dir,
-        config=config_snapshot,
+        schema_version=CHUNK_SCHEMA_VERSION,
+        metadata={
+            "input_path": str(in_dir),
+            "input_hash": "",
+            "config": context_payload,
+        },
     )
 
     resume_controller = ResumeController(args.resume, args.force, chunk_manifest_index)
@@ -1743,14 +1824,17 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
 
         skip_doc, manifest_entry = resume_controller.should_skip(doc_id, out_path, input_hash)
         if skip_doc:
-            manifest_log_skip(
-                stage=MANIFEST_STAGE,
+            stage_telemetry.log_skip(
                 doc_id=doc_id,
                 input_path=path,
-                input_hash=input_hash,
-                output_path=out_path,
-                schema_version=CHUNK_SCHEMA_VERSION,
-                parse_engine=parse_engine,
+                reason="unchanged-input",
+                metadata={
+                    "input_path": str(path),
+                    "input_hash": input_hash,
+                    "output_path": str(out_path),
+                    "schema_version": CHUNK_SCHEMA_VERSION,
+                    "parse_engine": parse_engine,
+                },
             )
             log_event(
                 logger,
@@ -1799,16 +1883,17 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
                 error_class="RuntimeError",
                 error=result.error or "unknown error",
             )
-            manifest_log_failure(
-                stage=MANIFEST_STAGE,
+            stage_telemetry.log_failure(
                 doc_id=result.doc_id,
-                duration_s=duration,
-                schema_version=CHUNK_SCHEMA_VERSION,
                 input_path=result.input_path,
-                input_hash=result.input_hash,
-                output_path=result.output_path,
-                error=result.error or "unknown error",
-                parse_engine=result.parse_engine,
+                duration_s=duration,
+                reason=result.error or "unknown error",
+                metadata={
+                    "input_path": str(result.input_path),
+                    "input_hash": result.input_hash,
+                    "output_path": str(result.output_path),
+                    "parse_engine": result.parse_engine,
+                },
             )
             raise RuntimeError(
                 f"Chunking failed for {result.doc_id}: {result.error or 'unknown error'}"
@@ -1827,16 +1912,22 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
             chunk_count=result.chunk_count,
             parse_engine=result.parse_engine,
         )
-        manifest_log_success(
-            stage=MANIFEST_STAGE,
+        stage_telemetry.log_success(
             doc_id=result.doc_id,
-            duration_s=duration,
-            schema_version=CHUNK_SCHEMA_VERSION,
             input_path=result.input_path,
-            input_hash=result.input_hash,
             output_path=result.output_path,
-            chunk_count=result.chunk_count,
-            parse_engine=result.parse_engine,
+            tokens=result.chunk_count,
+            schema_version=CHUNK_SCHEMA_VERSION,
+            duration_s=duration,
+            metadata={
+                "input_path": str(result.input_path),
+                "input_hash": result.input_hash,
+                "chunk_count": result.chunk_count,
+                "parse_engine": result.parse_engine,
+                "hash_alg": resolve_hash_algorithm(),
+                "anchors_injected": result.anchors_injected,
+                "sanitizer_profile": result.sanitizer_profile,
+            },
         )
 
     if worker_count == 1:
@@ -1872,20 +1963,41 @@ def _run_validate_only(
     data_root: Optional[Path],
     in_dir: Path,
     out_dir: Path,
+    telemetry: StageTelemetry,
 ) -> None:
     """Validate chunk inputs and report statistics without writing outputs."""
 
-    validated_files, validated_rows = _validate_chunk_files(
+    stats = _validate_chunk_files(
         files,
         logger,
         data_root=data_root,
+        telemetry=telemetry,
     )
-    if not validated_files:
-        logger.info("No chunk files validated; exiting validate-only mode")
-        print("No chunk files validated.")
+    logger.bind(mode="validate-only")
+
+    if not stats["files"]:
+        log_event(
+            logger,
+            "info",
+            "No chunk files validated",
+            status="validate-only",
+            stage=CHUNK_STAGE,
+            doc_id="__aggregate__",
+            input_hash=None,
+            **stats,
+        )
         return
 
-    logger.bind(mode="validate-only")
+    log_event(
+        logger,
+        "info",
+        "Chunk validation complete",
+        status="validate-only",
+        stage=CHUNK_STAGE,
+        doc_id="__aggregate__",
+        input_hash=None,
+        **stats,
+    )
 
     ensure_model_environment()
     hf = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
@@ -1976,14 +2088,4 @@ def _run_validate_only(
         boundary_violations=boundary_violations,
         input_relpath=relative_path(in_dir, data_root),
         output_relpath=relative_path(out_dir, data_root),
-    )
-    print(
-        "Validate-only report:\n"
-        f"  Files checked: {validated_files}\n"
-        f"  Rows checked: {validated_rows}\n"
-        f"  Generated chunks: {total_records}\n"
-        f"  Tokens (avg/min/max): {avg_tokens:.2f} / {min_tokens} / {max_tokens}\n"
-        f"  Heading hits: {heading_hits}\n"
-        f"  Caption hits: {caption_hits}\n"
-        f"  Boundary violations: {boundary_violations}"
     )

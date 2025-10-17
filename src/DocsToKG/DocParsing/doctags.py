@@ -290,39 +290,46 @@ from typing import (
 import requests
 from tqdm import tqdm
 
+from DocsToKG.DocParsing.config import StageConfigBase
 from DocsToKG.DocParsing.core import (
     PDF_MODEL_SUBDIR,
     CLIOption,
-    StageConfigBase,
     acquire_lock,
     build_subcommand,
-    compute_content_hash,
+    DEFAULT_HTTP_TIMEOUT,
+    derive_doc_id_and_doctags_path,
+    find_free_port,
+    get_http_session,
+    normalize_http_timeout,
+    set_spawn_or_warn,
+    ResumeController,
+)
+from DocsToKG.DocParsing.env import (
     data_doctags,
     data_html,
     data_manifests,
     data_pdfs,
-    DEFAULT_HTTP_TIMEOUT,
-    get_http_session,
-    derive_doc_id_and_doctags_path,
     detect_data_root,
     ensure_model_environment,
-    find_free_port,
-    get_logger,
-    load_manifest_index,
-    log_event,
-    manifest_append,
-    manifest_log_failure,
-    manifest_log_skip,
-    manifest_log_success,
-    normalize_http_timeout,
     prepare_data_root,
     resolve_hf_home,
     resolve_model_root,
     resolve_pdf_model_path,
     resolve_pipeline_path,
+)
+from DocsToKG.DocParsing.io import (
+    compute_content_hash,
+    dedupe_preserve_order,
+    load_manifest_index,
+    manifest_append,
     relative_path,
-    set_spawn_or_warn,
-    ResumeController,
+)
+from DocsToKG.DocParsing.logging import (
+    get_logger,
+    log_event,
+    manifest_log_failure,
+    manifest_log_skip,
+    manifest_log_success,
 )
 
 try:  # pragma: no cover - optional dependency
@@ -357,10 +364,6 @@ __all__ = (
     "DoctagsCfg",
 )
 
-# Default data directories resolved relative to the workspace.
-DEFAULT_DATA_ROOT = detect_data_root()
-DEFAULT_INPUT = data_pdfs(DEFAULT_DATA_ROOT)
-DEFAULT_OUTPUT = data_doctags(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "doctags-pdf"
 
 # Execution defaults for the vLLM-backed conversion pipeline.
@@ -381,8 +384,8 @@ class DoctagsCfg(StageConfigBase):
 
     log_level: str = "INFO"
     data_root: Optional[Path] = None
-    input: Path = DEFAULT_INPUT
-    output: Path = DEFAULT_OUTPUT
+    input: Optional[Path] = None
+    output: Optional[Path] = None
     workers: int = DEFAULT_WORKERS
     port: int = PREFERRED_PORT
     model: Optional[str] = None
@@ -443,7 +446,6 @@ class DoctagsCfg(StageConfigBase):
     }
 
     @classmethod
-    @classmethod
     def from_env(
         cls,
         *,
@@ -484,13 +486,34 @@ class DoctagsCfg(StageConfigBase):
     def finalize(self) -> None:
         """Normalise derived fields after configuration sources are applied."""
         if self.data_root is not None:
-            self.data_root = StageConfigBase._coerce_optional_path(self.data_root, None)
-        self.input = StageConfigBase._coerce_path(self.input, None)
-        self.output = StageConfigBase._coerce_path(self.output, None)
+            resolved_root = StageConfigBase._coerce_optional_path(self.data_root, None)
+        else:
+            env_root = os.getenv("DOCSTOKG_DATA_ROOT")
+            if env_root:
+                resolved_root = StageConfigBase._coerce_optional_path(env_root, None)
+            else:
+                resolved_root = detect_data_root()
+        self.data_root = resolved_root
+
+        mode = (self.mode or "pdf").lower()
+        self.mode = mode
+
+        if self.input is None:
+            if mode == "html":
+                self.input = data_html(resolved_root)
+            else:
+                self.input = data_pdfs(resolved_root)
+        else:
+            self.input = StageConfigBase._coerce_path(self.input, None)
+
+        if self.output is None:
+            self.output = data_doctags(resolved_root)
+        else:
+            self.output = StageConfigBase._coerce_path(self.output, None)
+
         if self.config is not None:
             self.config = StageConfigBase._coerce_optional_path(self.config, None)
-        self.log_level = str(self.log_level).upper()
-        self.mode = (self.mode or "pdf").lower()
+        self.log_level = str(self.log_level or "INFO").upper()
         sanitizer = str(self.html_sanitizer or "balanced").lower()
         if sanitizer not in HTML_SANITIZER_CHOICES:
             raise ValueError(
@@ -508,6 +531,13 @@ class DoctagsCfg(StageConfigBase):
         else:
             self.vlm_stop = ("</doctag>", "<|end_of_text|>")
         self.http_timeout = normalize_http_timeout(self.http_timeout)
+
+        if self.workers < 1:
+            raise ValueError("workers must be >= 1")
+        if self.port <= 0:
+            raise ValueError("port must be a positive integer")
+        if self.gpu_memory_utilization < 0:
+            raise ValueError("gpu_memory_utilization must be non-negative")
 
     from_sources = from_args
 
@@ -559,11 +589,19 @@ PDF_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--input",),
-        {"type": Path, "default": DEFAULT_INPUT, "help": "Folder with PDFs (recurses)."},
+        {
+            "type": Path,
+            "default": None,
+            "help": "Folder with PDFs (defaults to data_root/PDFs).",
+        },
     ),
     CLIOption(
         ("--output",),
-        {"type": Path, "default": DEFAULT_OUTPUT, "help": "Folder for Doctags output."},
+        {
+            "type": Path,
+            "default": None,
+            "help": "Folder for Doctags output (defaults to data_root/DocTagsFiles).",
+        },
     ),
     CLIOption(
         ("--workers",),
@@ -739,31 +777,6 @@ def add_resume_force_options(
 # --- vLLM Lifecycle ---
 
 
-def _dedupe_preserve_order(names: Iterable[str]) -> List[str]:
-    """Return a list containing ``names`` without duplicates while preserving order.
-
-    Args:
-        names: Iterable of candidate names that may include duplicates or empty values.
-
-    Returns:
-        List of unique names in their original encounter order.
-
-    Examples:
-        >>> _dedupe_preserve_order(["a", "b", "a", "c"])
-        ['a', 'b', 'c']
-    """
-
-    seen = set()
-    unique: List[str] = []
-    for name in names:
-        if not name:
-            continue
-        if name not in seen:
-            seen.add(name)
-            unique.append(name)
-    return unique
-
-
 def _normalize_served_model_names(raw: Optional[Iterable[Iterable[str] | str]]) -> Tuple[str, ...]:
     """Flatten CLI-provided served model names into a deduplicated tuple.
 
@@ -788,7 +801,7 @@ def _normalize_served_model_names(raw: Optional[Iterable[Iterable[str] | str]]) 
             flattened.append(entry)
         else:
             flattened.extend(str(item) for item in entry)
-    return tuple(_dedupe_preserve_order(flattened)) or DEFAULT_SERVED_MODEL_NAMES
+    return dedupe_preserve_order(flattened) or DEFAULT_SERVED_MODEL_NAMES
 
 
 def detect_vllm_version() -> str:
@@ -1578,27 +1591,16 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
 
     vllm_version = detect_vllm_version()
 
-    data_root_override = cfg.data_root
-    resolved_root = (
-        detect_data_root(data_root_override)
-        if data_root_override is not None
-        else DEFAULT_DATA_ROOT
-    )
+    data_root_override = namespace.data_root if hasattr(namespace, "data_root") else None
+    resolved_root = cfg.data_root if cfg.data_root is not None else detect_data_root()
 
     if data_root_override is not None:
         os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved_root)
 
     data_manifests(resolved_root)
 
-    if cfg.input == DEFAULT_INPUT and data_root_override is not None:
-        input_dir = data_pdfs(resolved_root)
-    else:
-        input_dir = (cfg.input or DEFAULT_INPUT).resolve()
-
-    if cfg.output == DEFAULT_OUTPUT and data_root_override is not None:
-        output_dir = data_doctags(resolved_root)
-    else:
-        output_dir = (cfg.output or DEFAULT_OUTPUT).resolve()
+    input_dir = Path(cfg.input).resolve()
+    output_dir = Path(cfg.output).resolve()
 
     input_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1869,8 +1871,6 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
 
 # --- HTML Pipeline ---
 
-HTML_DEFAULT_INPUT_DIR = data_html()
-HTML_DEFAULT_OUTPUT_DIR = data_doctags()
 HTML_MANIFEST_STAGE = "doctags-html"
 HTML_DEFAULT_WORKERS = max(1, (os.cpu_count() or 8) - 1)
 HTML_SANITIZER_CHOICES: Tuple[str, ...] = ("strict", "balanced", "permissive")
@@ -1893,13 +1893,17 @@ HTML_CLI_OPTIONS: Tuple[CLIOption, ...] = (
         ("--input",),
         {
             "type": Path,
-            "default": HTML_DEFAULT_INPUT_DIR,
-            "help": "Folder with HTML files (recurses)",
+            "default": None,
+            "help": "Folder with HTML files (defaults to data_root/HTML)",
         },
     ),
     CLIOption(
         ("--output",),
-        {"type": Path, "default": HTML_DEFAULT_OUTPUT_DIR, "help": "Destination for .doctags"},
+        {
+            "type": Path,
+            "default": None,
+            "help": "Destination for .doctags (defaults to data_root/DocTagsFiles)",
+        },
     ),
     CLIOption(
         ("--workers",),
@@ -2265,27 +2269,16 @@ def html_main(args: argparse.Namespace | None = None) -> int:
 
     ensure_docling_dependencies()
 
-    data_root_override = cfg.data_root
-    resolved_root = (
-        detect_data_root(data_root_override)
-        if data_root_override is not None
-        else detect_data_root()
-    )
+    data_root_override = namespace.data_root if hasattr(namespace, "data_root") else None
+    resolved_root = cfg.data_root if cfg.data_root is not None else detect_data_root()
 
     if data_root_override is not None:
         os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved_root)
 
     data_manifests(resolved_root)
 
-    if cfg.input == HTML_DEFAULT_INPUT_DIR and data_root_override is not None:
-        input_dir: Path = data_html(resolved_root)
-    else:
-        input_dir = (cfg.input or HTML_DEFAULT_INPUT_DIR).resolve()
-
-    if cfg.output == HTML_DEFAULT_OUTPUT_DIR and data_root_override is not None:
-        output_dir: Path = data_doctags(resolved_root)
-    else:
-        output_dir = (cfg.output or HTML_DEFAULT_OUTPUT_DIR).resolve()
+    input_dir = Path(cfg.input).resolve()
+    output_dir = Path(cfg.output).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info(

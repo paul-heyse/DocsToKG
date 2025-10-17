@@ -3699,6 +3699,30 @@ class ResolverPipeline:
             raise AttributeError("ResolverPipeline logger must provide log_attempt().")
         self.logger.log_attempt(record, timestamp=timestamp)
 
+    def _record_skip(
+        self, resolver_name: str, reason: Union[str, ReasonCode], detail: Optional[Union[str, ReasonCode]] = None
+    ) -> None:
+        """Normalise and record skip telemetry for resolver events."""
+
+        reason_token = normalize_reason(reason)
+        if isinstance(reason_token, ReasonCode):
+            reason_text = reason_token.value.replace("_", "-")
+        else:
+            reason_text = str(reason_token if reason_token is not None else reason)
+        self.metrics.record_skip(resolver_name, reason_text)
+        if detail is None:
+            return
+        detail_token = normalize_reason(detail)
+        if isinstance(detail_token, ReasonCode):
+            detail_text = detail_token.value.replace("_", "-")
+        elif detail_token is None:
+            return
+        else:
+            detail_text = str(detail_token)
+        if detail_text and detail_text != reason_text:
+            self.metrics.record_skip(resolver_name, detail_text)
+
+
     def _respect_rate_limit(self, resolver_name: str) -> None:
         """Sleep as required to respect per-resolver rate limiting policies.
 
@@ -4240,7 +4264,7 @@ class ResolverPipeline:
                     resolver_wall_time_ms=0.0,
                 )
             )
-            self.metrics.record_skip(resolver_name, "missing")
+            self._record_skip(resolver_name, "missing")
             return None
 
         if not self.config.is_enabled(resolver_name):
@@ -4260,7 +4284,7 @@ class ResolverPipeline:
                     resolver_wall_time_ms=0.0,
                 )
             )
-            self.metrics.record_skip(resolver_name, "disabled")
+            self._record_skip(resolver_name, "disabled")
             return None
 
         if not resolver.is_enabled(self.config, artifact):
@@ -4280,7 +4304,7 @@ class ResolverPipeline:
                     resolver_wall_time_ms=0.0,
                 )
             )
-            self.metrics.record_skip(resolver_name, "not-applicable")
+            self._record_skip(resolver_name, "not-applicable")
             return None
 
         breaker = self._resolver_breakers.get(resolver_name)
@@ -4304,7 +4328,7 @@ class ResolverPipeline:
                     retry_after=remaining if remaining > 0 else None,
                 )
             )
-            self.metrics.record_skip(resolver_name, "breaker-open")
+            self._record_skip(resolver_name, "breaker-open")
             return None
 
         return resolver
@@ -4405,7 +4429,7 @@ class ResolverPipeline:
                 )
             )
             if result.event_reason:
-                self.metrics.record_skip(resolver_name, result.event_reason.value)
+                self._record_skip(resolver_name, result.event_reason.value)
             return None
 
         url = result.url
@@ -4436,7 +4460,7 @@ class ResolverPipeline:
                         resolver_wall_time_ms=resolver_wall_time_ms,
                     )
                 )
-                self.metrics.record_skip(resolver_name, "duplicate-url-global")
+                self._record_skip(resolver_name, "duplicate-url-global")
                 return None
         if url in state.seen_urls:
             self._emit_attempt(
@@ -4457,7 +4481,7 @@ class ResolverPipeline:
                     resolver_wall_time_ms=resolver_wall_time_ms,
                 )
             )
-            self.metrics.record_skip(resolver_name, "duplicate-url")
+            self._record_skip(resolver_name, "duplicate-url")
             return None
 
         state.seen_urls.add(url)
@@ -4482,7 +4506,7 @@ class ResolverPipeline:
                     resolver_wall_time_ms=resolver_wall_time_ms,
                 )
             )
-            self.metrics.record_skip(resolver_name, "list-only")
+            self._record_skip(resolver_name, "list-only")
             return None
 
         download_context = context.clone_for_download()
@@ -4525,7 +4549,7 @@ class ResolverPipeline:
                         resolver_wall_time_ms=resolver_wall_time_ms,
                     )
                 )
-                self.metrics.record_skip(resolver_name, "head-precheck-failed")
+                self._record_skip(resolver_name, "head-precheck-failed")
                 return None
             head_precheck_passed = True
 
@@ -4557,7 +4581,7 @@ class ResolverPipeline:
                                 resolver_wall_time_ms=resolver_wall_time_ms,
                             )
                         )
-                        self.metrics.record_skip(resolver_name, "domain-bytes-budget")
+                        self._record_skip(resolver_name, "domain-bytes-budget")
                         state.last_reason = ReasonCode.BUDGET_EXHAUSTED
                         state.last_reason_detail = "domain-bytes-budget"
                         if url not in state.failed_urls:
@@ -4585,7 +4609,7 @@ class ResolverPipeline:
                             retry_after=remaining if remaining > 0 else None,
                         )
                     )
-                    self.metrics.record_skip(resolver_name, "domain-breaker-open")
+                    self._record_skip(resolver_name, "domain-breaker-open", detail)
                     state.last_reason = ReasonCode.DOMAIN_BREAKER_OPEN
                     state.last_reason_detail = detail
                     return None

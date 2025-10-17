@@ -12,17 +12,15 @@ from typing import Any, Callable, ClassVar, Dict, Iterable, List, Optional, Sequ
 
 from transformers import AutoTokenizer
 
+from DocsToKG.DocParsing.config import StageConfigBase
 from DocsToKG.DocParsing.core import (
     CLIOption,
     DEFAULT_TOKENIZER,
-    StageConfigBase,
     build_subcommand,
-    data_doctags,
-    detect_data_root,
-    get_logger,
-    log_event,
-    iter_doctags,
 )
+from DocsToKG.DocParsing.env import data_doctags, detect_data_root
+from DocsToKG.DocParsing.io import iter_doctags
+from DocsToKG.DocParsing.logging import get_logger, log_event
 from DocsToKG.DocParsing.doctags import add_data_root_option
 
 __all__ = ["TokenProfilesCfg", "build_parser", "parse_args", "main"]
