@@ -116,19 +116,20 @@ from __future__ import annotations
 import base64
 import logging
 import time
+import uuid
 import warnings
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from threading import Event, RLock
-from typing import Callable, Dict, Iterator, List, Mapping, Optional, Sequence
+from typing import Callable, ClassVar, Dict, Iterator, List, Mapping, Optional, Sequence
 
 import numpy as np
 
 from .config import DenseIndexConfig
 from .interfaces import DenseVectorStore
-from .opensearch_simulator import OpenSearchSimulator
+from .devtools.opensearch_simulator import OpenSearchSimulator
 from .pipeline import Observability
-from .types import ChunkPayload, vector_uuid_to_faiss_int
+from .types import ChunkPayload
 
 # --- Globals ---
 
@@ -151,6 +152,14 @@ __all__ = (
     "restore_state",
     "serialize_state",
 )
+
+_MASK_63_BITS = (1 << 63) - 1
+
+
+def _vector_uuid_to_faiss_int(vector_id: str) -> int:
+    """Translate a vector UUID into a FAISS-compatible 63-bit integer."""
+
+    return uuid.UUID(vector_id).int & _MASK_63_BITS
 
 try:  # pragma: no cover - exercised via integration tests
     import faiss  # type: ignore
@@ -307,6 +316,9 @@ class _SearchCoalescer:
 
 
 class FaissVectorStore(DenseVectorStore):
+    _RUNTIME_MUTABLE_FIELDS: ClassVar[frozenset[str]] = frozenset(
+        {"nprobe", "ingest_dedupe_threshold"}
+    )
     """Manage a GPU-backed FAISS index for dense retrieval.
 
     The store encapsulates FAISS initialisation, GPU resource management,
@@ -428,6 +440,51 @@ class FaissVectorStore(DenseVectorStore):
             DenseIndexConfig: Active dense index configuration.
         """
         return self._config
+
+    def set_config(self, new_config: DenseIndexConfig) -> None:
+        """Apply runtime-safe configuration updates."""
+
+        if not isinstance(new_config, DenseIndexConfig):
+            raise TypeError("new_config must be a DenseIndexConfig instance")
+        current = asdict(self._config)
+        updated = asdict(new_config)
+        diffs: Dict[str, tuple[object, object]] = {}
+        for key, old_value in current.items():
+            new_value = updated.get(key, old_value)
+            if old_value != new_value:
+                diffs[key] = (old_value, new_value)
+        if not diffs:
+            return
+        disallowed = [name for name in diffs if name not in self._RUNTIME_MUTABLE_FIELDS]
+        if disallowed:
+            raise ValueError(
+                "Runtime config updates are restricted; attempted changes to disallowed fields: "
+                + ", ".join(sorted(disallowed))
+            )
+        changes = {name: change[1] for name, change in diffs.items()}
+        self._config = replace(self._config, **changes)
+        self._observability.logger.info(
+            "faiss-config-update",
+            extra={
+                "event": {
+                    "changes": {
+                        name: {"old": change[0], "new": change[1]}
+                        for name, change in diffs.items()
+                    }
+                }
+            },
+        )
+        if "nprobe" in changes:
+            with self._observability.trace("faiss_set_config_nprobe", nprobe=str(changes["nprobe"])):
+                with self._lock:
+                    self._set_nprobe()
+                    self._last_nprobe_update = time.time()
+            self._observability.metrics.set_gauge("faiss_nprobe", float(changes["nprobe"]))
+        if "ingest_dedupe_threshold" in changes:
+            self._observability.metrics.set_gauge(
+                "faiss_ingest_dedupe_threshold", float(changes["ingest_dedupe_threshold"])
+            )
+        self._emit_gpu_state("set_config")
 
     @property
     def dim(self) -> int:
@@ -564,12 +621,9 @@ class FaissVectorStore(DenseVectorStore):
             if not vectors:
                 return
             faiss_ids = np.asarray(
-                [vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64
+                [_vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64
             )
-            matrix = np.ascontiguousarray(
-                np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
-            )
-            faiss.normalize_L2(matrix)
+            matrix = self._coerce_batch(np.stack([self._ensure_dim(vec) for vec in vectors]))
             dedupe_threshold = float(getattr(self._config, "ingest_dedupe_threshold", 0.0))
             dropped = 0
             if dedupe_threshold > 0.0 and self.ntotal > 0:
@@ -646,7 +700,7 @@ class FaissVectorStore(DenseVectorStore):
         if not vector_ids:
             return
         count = len(vector_ids)
-        ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
+        ids = np.array([_vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
         with self._observability.trace("faiss_remove", count=str(count)):
             self._observability.metrics.increment("faiss_remove_vectors", amount=float(count))
             with self._lock:
@@ -702,11 +756,12 @@ class FaissVectorStore(DenseVectorStore):
     def search(self, query: np.ndarray, top_k: int) -> List[FaissSearchResult]:
         """Search the index for the ``top_k`` nearest neighbours of ``query``."""
 
-        vector = self._ensure_dim(query)
+        matrix = self._coerce_query(query)
+        vector = matrix[0]
         with self._observability.trace("faiss_search", top_k=str(top_k)):
             if self._search_coalescer is not None:
                 return self._search_coalescer.submit(vector, top_k)
-            results = self._search_batch_impl(vector.reshape(1, -1), top_k)
+            results = self._search_batch_impl(matrix, top_k)
             return results[0] if results else []
 
     def search_many(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
@@ -717,18 +772,14 @@ class FaissVectorStore(DenseVectorStore):
     def search_batch(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
         """Alias for ``search_many`` to support explicit batch workloads."""
 
-        matrix = np.atleast_2d(np.ascontiguousarray(queries, dtype=np.float32))
-        if matrix.shape[1] != self._dim:
-            raise ValueError(f"Query dimensionality {matrix.shape[1]} != index dim {self._dim}")
+        matrix = self._coerce_batch(queries)
         if matrix.shape[0] == 1 and self._search_coalescer is not None:
             hits = self._search_coalescer.submit(matrix[0], top_k)
             return [hits]
         return self._search_batch_impl(matrix, top_k)
 
     def _search_batch_impl(self, matrix: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
-        matrix = np.ascontiguousarray(matrix, dtype=np.float32)
-        if matrix.shape[1] != self._dim:
-            raise ValueError(f"Query dimensionality {matrix.shape[1]} != index dim {self._dim}")
+        matrix = self._coerce_batch(matrix)
         matrix = self._as_pinned(matrix)
         faiss.normalize_L2(matrix)
         batch = matrix.shape[0]
@@ -754,8 +805,7 @@ class FaissVectorStore(DenseVectorStore):
     ) -> List[FaissSearchResult]:
         """Return all vectors scoring above ``min_score`` for ``query``."""
 
-        vector = self._ensure_dim(query)
-        matrix = np.ascontiguousarray(vector.reshape(1, -1), dtype=np.float32)
+        matrix = self._coerce_query(query)
         matrix = self._as_pinned(matrix)
         faiss.normalize_L2(matrix)
         threshold = float(min_score)
@@ -1574,6 +1624,22 @@ class FaissVectorStore(DenseVectorStore):
             raise ValueError(f"vector dimension mismatch: expected {self._dim}, got {arr.size}")
         return arr
 
+    def _coerce_batch(self, xb: np.ndarray) -> np.ndarray:
+        array = np.asarray(xb, dtype=np.float32)
+        if array.ndim == 1:
+            array = array.reshape(1, -1)
+        if array.ndim != 2 or array.shape[1] != self._dim:
+            raise ValueError(f"bad batch shape {array.shape}, expected (*,{self._dim})")
+        array = np.ascontiguousarray(array, dtype=np.float32)
+        normalize_rows(array)
+        return array
+
+    def _coerce_query(self, x: np.ndarray) -> np.ndarray:
+        matrix = self._coerce_batch(x)
+        if matrix.shape[0] != 1:
+            raise ValueError("single-query operations require exactly one vector")
+        return matrix
+
     def _validate_snapshot_meta(self, meta: Mapping[str, object]) -> None:
         expected = self.snapshot_meta()
         mismatches: dict[str, tuple[object, object]] = {}
@@ -1914,19 +1980,25 @@ class ChunkRegistry:
         self._chunks: Dict[str, ChunkPayload] = {}
         self._bridge: Dict[int, str] = {}
 
+    @staticmethod
+    def to_faiss_id(vector_id: str) -> int:
+        """Return the FAISS integer identifier for ``vector_id``."""
+
+        return _vector_uuid_to_faiss_int(vector_id)
+
     def upsert(self, chunks: Sequence[ChunkPayload]) -> None:
         """Insert or update registry entries for ``chunks``."""
 
         for chunk in chunks:
             self._chunks[chunk.vector_id] = chunk
-            self._bridge[vector_uuid_to_faiss_int(chunk.vector_id)] = chunk.vector_id
+            self._bridge[self.to_faiss_id(chunk.vector_id)] = chunk.vector_id
 
     def delete(self, vector_ids: Sequence[str]) -> None:
         """Remove registry entries for the supplied vector identifiers."""
 
         for vector_id in vector_ids:
             self._chunks.pop(vector_id, None)
-            self._bridge.pop(vector_uuid_to_faiss_int(vector_id), None)
+            self._bridge.pop(self.to_faiss_id(vector_id), None)
 
     def get(self, vector_id: str) -> Optional[ChunkPayload]:
         """Return the chunk payload for ``vector_id`` when available."""
@@ -1985,6 +2057,7 @@ def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
             if value != expected:
                 return False
     return True
+
 
 
 def __getattr__(name: str):

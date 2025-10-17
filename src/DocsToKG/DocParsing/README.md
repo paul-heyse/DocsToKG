@@ -152,6 +152,27 @@ downstream consumers. When incrementing a schema version:
 2. Preserve validation helpers for older versions until consumers are migrated.
 3. Document migration guidance (see below) to keep operators informed.
 
+### Supported Schema Versions
+
+| Stage | Schema Identifier | Supported Versions | Validation Snippet |
+| --- | --- | --- | --- |
+| Chunking | `docparse` | `docparse/1.0.0`, `docparse/1.1.0` | `validate_schema_version("docparse/1.1.0", COMPATIBLE_CHUNK_VERSIONS)` |
+| Embeddings | `embeddings` | `embeddings/1.0.0` | `validate_schema_version("embeddings/1.0.0", COMPATIBLE_VECTOR_VERSIONS)` |
+
+```python
+from DocsToKG.DocParsing.formats import (
+    COMPATIBLE_CHUNK_VERSIONS,
+    COMPATIBLE_VECTOR_VERSIONS,
+    validate_schema_version,
+)
+
+# Chunk row check
+validate_schema_version("docparse/1.1.0", COMPATIBLE_CHUNK_VERSIONS)
+
+# Vector row check
+validate_schema_version("embeddings/1.0.0", COMPATIBLE_VECTOR_VERSIONS)
+```
+
 ## CLI Reference & Usage Examples
 
 Typical end-to-end workflow on a small corpus:
@@ -230,10 +251,10 @@ can reason about historical data sets.
 
 > **Deprecated**  
 > `DocsToKG.DocParsing.pdf_pipeline` remains temporarily available as a compatibility shim.
-> Importing it now emits a :class:`DeprecationWarning`; migrate to the CLI
-> (`python -m DocsToKG.DocParsing.cli doctags --mode pdf`) or the
-> :mod:`DocsToKG.DocParsing.doctags` APIs instead. The shim is scheduled for removal after
-> two minor releases once downstream consumers have migrated.
+> Importing it emits a :class:`DeprecationWarning` and a structured log pointing to the
+> :mod:`DocsToKG.DocParsing.doctags` replacement. The shim will be removed in
+> **DocsToKG 2.0.0**. Migrate now to the CLI (`python -m DocsToKG.DocParsing.cli doctags
+> --mode pdf`) or call the ``Doctags`` APIs directly to avoid last-minute surprises.
 
 ## Synthetic Benchmarking & Test Utilities
 

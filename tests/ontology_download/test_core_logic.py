@@ -247,6 +247,8 @@ def _run_fetch(
                 details = {
                     "normalized_sha256": normalized_hash,
                     "normalization_mode": normalization_mode,
+                    "streaming_nt_sha256": f"{normalized_hash}-stream",
+                    "streaming_prefix_sha256": f"prefix-{normalization_mode}",
                 }
             else:
                 details = {}
@@ -1111,6 +1113,9 @@ def test_manifest_fingerprint_ignores_target_format_order(
         normalized_hash="hash",
     )
     assert manifest_a["fingerprint"] == manifest_b["fingerprint"]
+    assert manifest_a["streaming_content_sha256"] == "hash-stream"
+    assert manifest_a["streaming_content_sha256"] == manifest_b["streaming_content_sha256"]
+    assert manifest_a["streaming_prefix_sha256"] == "prefix-in-memory"
 
 
 def test_manifest_fingerprint_changes_with_normalization_mode(
@@ -1131,3 +1136,5 @@ def test_manifest_fingerprint_changes_with_normalization_mode(
         normalized_hash="hash",
     )
     assert manifest_in_memory["fingerprint"] != manifest_streaming["fingerprint"]
+    assert manifest_streaming["streaming_prefix_sha256"] == "prefix-streaming"
+    assert manifest_streaming["streaming_content_sha256"] == "hash-stream"

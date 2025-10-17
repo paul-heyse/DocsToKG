@@ -1170,11 +1170,12 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
 
     class RecordingPipeline:
         def __init__(
-            self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_
+            self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **kwargs
         ):
             self.config = config
             self.logger = logger
             self.metrics = metrics
+            self.run_id = kwargs.get("run_id")
             self._throttle = DummyThrottle(config)
 
         def run(self, session, artifact, context=None):
@@ -1192,21 +1193,23 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
                 elapsed_ms=5.0,
                 error=None,
             )
-            self.logger.log_attempt(
-                resolvers.AttemptRecord(
-                    run_id=self.run_id,
-                    work_id=artifact.work_id,
-                    resolver_name="stub",
-                    resolver_order=1,
-                    url="https://example.org/resource.pdf",
-                    status="pdf",
-                    http_status=200,
-                    content_type="application/pdf",
-                    elapsed_ms=5.0,
-                    dry_run=False,
+            if self.logger is not None:
+                self.logger.log_attempt(
+                    resolvers.AttemptRecord(
+                        run_id=self.run_id,
+                        work_id=artifact.work_id,
+                        resolver_name="stub",
+                        resolver_order=1,
+                        url="https://example.org/resource.pdf",
+                        status="pdf",
+                        http_status=200,
+                        content_type="application/pdf",
+                        elapsed_ms=5.0,
+                        dry_run=False,
+                    )
                 )
-            )
-            self.metrics.record_attempt("stub", outcome)
+            if self.metrics is not None:
+                self.metrics.record_attempt("stub", outcome)
             return resolvers.PipelineResult(
                 success=True,
                 resolver_name="stub",
@@ -1310,6 +1313,7 @@ def test_cli_head_precheck_handles_head_hostile(download_modules, monkeypatch, t
         def __init__(self, *_, logger=None, metrics=None, **kwargs):
             self.logger = logger
             self.metrics = metrics
+            self.run_id = kwargs.get("run_id")
 
         def run(self, session, artifact, context=None):
             passed = network_module.head_precheck(session, artifact.pdf_urls[0], timeout=3.0)
@@ -1325,20 +1329,23 @@ def test_cli_head_precheck_handles_head_hostile(download_modules, monkeypatch, t
                 elapsed_ms=4.0,
                 error=None,
             )
-            self.logger.log_attempt(
-                resolvers.AttemptRecord(
-                    work_id=artifact.work_id,
-                    resolver_name="stub",
-                    resolver_order=1,
-                    url=artifact.pdf_urls[0],
-                    status="pdf",
-                    http_status=200,
-                    content_type="application/pdf",
-                    elapsed_ms=4.0,
-                    dry_run=False,
+            if self.logger is not None:
+                self.logger.log_attempt(
+                    resolvers.AttemptRecord(
+                        run_id=self.run_id,
+                        work_id=artifact.work_id,
+                        resolver_name="stub",
+                        resolver_order=1,
+                        url=artifact.pdf_urls[0],
+                        status="pdf",
+                        http_status=200,
+                        content_type="application/pdf",
+                        elapsed_ms=4.0,
+                        dry_run=False,
+                    )
                 )
-            )
-            self.metrics.record_attempt("stub", outcome)
+            if self.metrics is not None:
+                self.metrics.record_attempt("stub", outcome)
             return resolvers.PipelineResult(
                 success=True,
                 resolver_name="stub",
@@ -1407,27 +1414,30 @@ def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, 
 
     class RecordingPipeline:
         def __init__(
-            self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_
+            self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **kwargs
         ):
             self.resolvers = resolvers or []
             self.logger = logger
             self.metrics = metrics
+            self.run_id = kwargs.get("run_id")
 
         def run(self, session, artifact, context=None):
             for order, resolver in enumerate(self.resolvers, start=1):
-                self.logger.log_attempt(
-                    resolvers.AttemptRecord(
-                        work_id=artifact.work_id,
-                        resolver_name=resolver.name,
-                        resolver_order=order,
-                        url=f"https://example.org/{resolver.name}.pdf",
-                        status="skipped" if order < len(self.resolvers) else "pdf",
-                        http_status=200,
-                        content_type="application/pdf",
-                        elapsed_ms=order * 1.0,
-                        dry_run=False,
+                if self.logger is not None:
+                    self.logger.log_attempt(
+                        resolvers.AttemptRecord(
+                            run_id=self.run_id,
+                            work_id=artifact.work_id,
+                            resolver_name=resolver.name,
+                            resolver_order=order,
+                            url=f"https://example.org/{resolver.name}.pdf",
+                            status="skipped" if order < len(self.resolvers) else "pdf",
+                            http_status=200,
+                            content_type="application/pdf",
+                            elapsed_ms=order * 1.0,
+                            dry_run=False,
+                        )
                     )
-                )
             outcome = resolvers.DownloadOutcome(
                 classification="pdf",
                 path=str(artifact.pdf_dir / f"{artifact.base_stem}.pdf"),
@@ -1436,18 +1446,20 @@ def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, 
                 elapsed_ms=10.0,
                 error=None,
             )
-            self.logger.log_manifest(
-                downloader.build_manifest_entry(
-                    artifact,
-                    resolver="gamma",
-                    url="https://example.org/gamma.pdf",
-                    outcome=outcome,
-                    html_paths=[],
-                    dry_run=False,
-                    run_id=self.run_id,
+            if self.logger is not None:
+                self.logger.log_manifest(
+                    downloader.build_manifest_entry(
+                        artifact,
+                        resolver="gamma",
+                        url="https://example.org/gamma.pdf",
+                        outcome=outcome,
+                        html_paths=[],
+                        dry_run=False,
+                        run_id=self.run_id,
+                    )
                 )
-            )
-            self.metrics.record_attempt("gamma", outcome)
+            if self.metrics is not None:
+                self.metrics.record_attempt("gamma", outcome)
             return resolvers.PipelineResult(
                 success=True,
                 resolver_name="gamma",
@@ -1516,6 +1528,7 @@ def test_cli_dry_run_metrics_align(download_modules, monkeypatch, tmp_path):
         def __init__(self, *_, logger=None, metrics=None, **kwargs):
             self.logger = logger
             self.metrics = metrics
+            self.run_id = kwargs.get("run_id")
 
         def run(self, session, artifact, context=None):
             assert context and context.get("dry_run") is True
@@ -1527,7 +1540,8 @@ def test_cli_dry_run_metrics_align(download_modules, monkeypatch, tmp_path):
                 elapsed_ms=2.0,
                 error=None,
             )
-            self.metrics.record_attempt("stub", outcome)
+            if self.metrics is not None:
+                self.metrics.record_attempt("stub", outcome)
             return resolvers.PipelineResult(
                 success=True,
                 resolver_name="stub",

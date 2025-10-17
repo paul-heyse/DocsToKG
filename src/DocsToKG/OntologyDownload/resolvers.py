@@ -105,6 +105,7 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Protocol, Tuple
+from urllib.parse import urlparse
 
 import requests
 
@@ -160,9 +161,6 @@ _FORMAT_TO_MEDIA = {
     "trig": "application/trig",
 }
 
-_CHECKSUM_HEX_RE = re.compile(r"^[0-9a-fA-F]{32,128}$")
-_SUPPORTED_CHECKSUM_ALGORITHMS = {"md5", "sha1", "sha256", "sha512"}
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -208,58 +206,6 @@ def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
         return cleaned.upper()
     return cleaned
 
-
-def _parse_checksum_extra(value: object, *, context: str) -> Tuple[str, str]:
-    """Normalize checksum extras to ``(algorithm, value)`` tuples."""
-
-    if isinstance(value, str):
-        checksum = value.strip().lower()
-        if not _CHECKSUM_HEX_RE.fullmatch(checksum):
-            raise UserConfigError(f"{context} checksum must be a hex string")
-        return "sha256", checksum
-    if isinstance(value, Mapping):
-        algorithm_raw = value.get("algorithm", "sha256")
-        checksum_raw = value.get("value")
-        if not isinstance(algorithm_raw, str):
-            raise UserConfigError(f"{context} checksum algorithm must be a string")
-        if not isinstance(checksum_raw, str):
-            raise UserConfigError(f"{context} checksum value must be a string")
-        algorithm = algorithm_raw.strip().lower()
-        if algorithm not in _SUPPORTED_CHECKSUM_ALGORITHMS:
-            raise UserConfigError(f"{context} checksum algorithm '{algorithm}' is not supported")
-        checksum = checksum_raw.strip().lower()
-        if not _CHECKSUM_HEX_RE.fullmatch(checksum):
-            raise UserConfigError(f"{context} checksum must be a hex string")
-        return algorithm, checksum
-    raise UserConfigError(f"{context} checksum must be a string or mapping")
-
-
-def _parse_checksum_url_extra(value: object, *, context: str) -> Tuple[str, Optional[str]]:
-    """Normalize checksum URL extras to ``(url, algorithm)`` tuples."""
-
-    if isinstance(value, str):
-        url = value.strip()
-        if not url:
-            raise UserConfigError(f"{context} checksum_url must not be empty")
-        return url, None
-    if isinstance(value, Mapping):
-        url_value = value.get("url")
-        algorithm_value = value.get("algorithm")
-        if not isinstance(url_value, str) or not url_value.strip():
-            raise UserConfigError(f"{context} checksum_url must include a non-empty 'url'")
-        candidate = None
-        if algorithm_value is not None:
-            if not isinstance(algorithm_value, str):
-                raise UserConfigError(
-                    f"{context} checksum_url algorithm must be a string when provided"
-                )
-            candidate = algorithm_value.strip().lower()
-            if candidate not in _SUPPORTED_CHECKSUM_ALGORITHMS:
-                raise UserConfigError(
-                    f"{context} checksum_url algorithm '{candidate}' is not supported"
-                )
-        return url_value.strip(), candidate
-    raise UserConfigError(f"{context} checksum_url must be a string or mapping")
 
 
 # --- Resolver Data Structures ---
@@ -359,6 +305,7 @@ class BaseResolver:
         logger: logging.Logger,
         name: str,
         service: Optional[str] = None,
+        host: Optional[str] = None,
     ):
         """Run a callable with retry semantics tailored for resolver APIs."""
 
@@ -385,7 +332,7 @@ class BaseResolver:
                 get_bucket(
                     http_config=config.defaults.http,
                     service=service,
-                    host=None,
+                    host=host,
                 )
                 if service
                 else None
@@ -447,6 +394,60 @@ class BaseResolver:
             updater(headers)
         elif isinstance(mapping, dict):  # pragma: no cover - defensive branch
             mapping.update(headers)
+
+    def _request_with_retry(
+        self,
+        *,
+        method: str,
+        url: str,
+        config: ResolvedConfig,
+        logger: logging.Logger,
+        service: Optional[str],
+        session: Optional[requests.Session] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        timeout: Optional[int] = None,
+        **kwargs,
+    ) -> requests.Response:
+        """Issue an HTTP request with polite headers and retry semantics."""
+
+        final_headers: Dict[str, str] = dict(self._build_polite_headers(config, logger))
+        if headers:
+            final_headers.update({str(k): str(v) for k, v in dict(headers).items()})
+
+        timeout_value = timeout if timeout is not None else config.defaults.http.timeout_sec
+        request_kwargs = dict(kwargs)
+        request_kwargs.setdefault("headers", final_headers)
+        request_kwargs.setdefault("timeout", timeout_value)
+
+        method_name = method.lower()
+        method_upper = method.upper()
+
+        def _perform() -> requests.Response:
+            if session is not None:
+                requester = getattr(session, "request", None)
+                if callable(requester):
+                    response = requester(method=method_upper, url=url, **request_kwargs)
+                else:
+                    method_func = getattr(session, method_name, None)
+                    if not callable(method_func):
+                        raise AttributeError(f"session lacks '{method}' request method")
+                    response = method_func(url, **request_kwargs)
+            else:
+                response = requests.request(method_upper, url, **request_kwargs)
+            response.raise_for_status()
+            return response
+
+        parsed = urlparse(url)
+        host = parsed.hostname
+
+        return self._execute_with_retry(
+            _perform,
+            config=config,
+            logger=logger,
+            name=service or "resolver",
+            service=service,
+            host=host,
+        )
 
     def _build_plan(
         self,
@@ -566,6 +567,7 @@ class OLSResolver(BaseResolver):
                 logger=logger,
                 name="ols",
                 service="ols",
+                host=urlparse(getattr(self.client, "base_url", "https://www.ebi.ac.uk")).hostname,
             )
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
@@ -648,6 +650,7 @@ class BioPortalResolver(BaseResolver):
                 logger=logger,
                 name="bioportal",
                 service="bioportal",
+                host=urlparse(getattr(self.client, "base_url", "https://data.bioontology.org")).hostname,
             )
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
@@ -666,6 +669,7 @@ class BioPortalResolver(BaseResolver):
             logger=logger,
             name="bioportal",
             service="bioportal",
+            host=urlparse(getattr(self.client, "base_url", "https://data.bioontology.org")).hostname,
         )
         if isinstance(latest_submission, dict):
             download_url = (
@@ -720,15 +724,6 @@ class LOVResolver(BaseResolver):
     def __init__(self, session: Optional[requests.Session] = None) -> None:
         self.session = session or requests.Session()
 
-    def _fetch_metadata(self, uri: str, timeout: int) -> Any:
-        response = self.session.get(
-            f"{self.API_ROOT}/vocabulary/info",
-            params={"uri": uri},
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        return response.json()
-
     @staticmethod
     def _iter_dicts(payload: Any) -> Iterable[Dict[str, Any]]:
         if isinstance(payload, dict):
@@ -750,13 +745,18 @@ class LOVResolver(BaseResolver):
         self._apply_headers_to_session(self.session, headers)
 
         timeout = max(1, config.defaults.http.timeout_sec)
-        metadata = self._execute_with_retry(
-            lambda: self._fetch_metadata(uri, timeout),
+        response = self._request_with_retry(
+            method="GET",
+            url=f"{self.API_ROOT}/vocabulary/info",
             config=config,
             logger=logger,
-            name="lov",
             service="lov",
+            session=self.session,
+            headers=headers,
+            timeout=timeout,
+            params={"uri": uri},
         )
+        metadata = response.json()
         download_url = None
         license_value = None
         version_value = None
@@ -861,27 +861,6 @@ class DirectResolver(BaseResolver):
         if version is not None and not isinstance(version, str):
             raise UserConfigError("direct resolver expects 'extras.version' to be a string")
 
-        checksum_algorithm: Optional[str] = None
-        checksum_value: Optional[str] = None
-        checksum_url: Optional[str] = None
-        checksum_url_algorithm: Optional[str] = None
-
-        if "checksum" in extras:
-            checksum_algorithm, checksum_value = _parse_checksum_extra(
-                extras["checksum"], context="direct resolver extras.checksum"
-            )
-        if "checksum_url" in extras:
-            checksum_url, checksum_url_algorithm = _parse_checksum_url_extra(
-                extras["checksum_url"], context="direct resolver extras.checksum_url"
-            )
-            if checksum_url_algorithm:
-                checksum_algorithm = checksum_url_algorithm
-        if checksum_url_algorithm and checksum_value and checksum_algorithm:
-            if checksum_algorithm != checksum_url_algorithm:
-                raise UserConfigError(
-                    "direct resolver checksum algorithm mismatch between checksum and checksum_url"
-                )
-
         headers = self._build_polite_headers(config, logger)
         headers.update({str(k): str(v) for k, v in dict(headers_extra or {}).items()})
         logger.info(
@@ -905,9 +884,6 @@ class DirectResolver(BaseResolver):
             license=license_value,
             media_type=media_type or default_media,
             service=extras.get("service"),
-            checksum=checksum_value,
-            checksum_algorithm=checksum_algorithm,
-            checksum_url=checksum_url,
         )
 
 

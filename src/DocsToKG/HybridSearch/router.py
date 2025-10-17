@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from threading import RLock
-from typing import Callable, Dict, Mapping, Optional, Sequence
+from typing import Callable, Dict, Mapping, Optional, Sequence, Tuple
 
 from .interfaces import DenseVectorStore
 
 DEFAULT_NAMESPACE = "__default__"
+logger = logging.getLogger(__name__)
 
 
 class FaissRouter:
@@ -30,6 +33,9 @@ class FaissRouter:
             self._stores[DEFAULT_NAMESPACE] = default_store
         self._lock = RLock()
         self._resolver: Optional[Callable[[int], Optional[str]]] = None
+        now = time.time()
+        self._last_used: Dict[str, float] = {DEFAULT_NAMESPACE: now}
+        self._snapshots: Dict[str, Tuple[bytes, Optional[Mapping[str, object]]]] = {}
 
     @property
     def per_namespace(self) -> bool:
@@ -47,6 +53,7 @@ class FaissRouter:
         """Return the store serving ``namespace`` (creating one if necessary)."""
 
         if not self._per_namespace:
+            self._last_used[DEFAULT_NAMESPACE] = time.time()
             return self._default_store
         key = namespace or DEFAULT_NAMESPACE
         with self._lock:
@@ -55,17 +62,45 @@ class FaissRouter:
                 store = self._factory(key)  # type: ignore[arg-type]
                 if self._resolver:
                     store.set_id_resolver(self._resolver)
+                snapshot = self._snapshots.pop(key, None)
+                if snapshot is not None:
+                    payload, meta = snapshot
+                    try:
+                        store.restore(payload, meta=meta)
+                    except Exception:
+                        logger.exception(
+                            "faiss-router-restore-failed",
+                            extra={"event": {"namespace": key}},
+                        )
                 self._stores[key] = store
+            self._last_used[key] = time.time()
             return store
 
     def stats(self) -> Dict[str, object]:
         """Return stats for all managed stores (namespaced and aggregate)."""
 
         if not self._per_namespace:
-            snapshots = {DEFAULT_NAMESPACE: self._default_store.stats()}
+            stats = dict(self._default_store.stats())
+            stats["last_used_ts"] = self._last_used.get(DEFAULT_NAMESPACE, 0.0)
+            snapshots = {DEFAULT_NAMESPACE: stats}
         else:
             with self._lock:
-                snapshots = {ns: store.stats() for ns, store in self._stores.items()}
+                snapshots = {}
+                for ns, store in self._stores.items():
+                    payload = dict(store.stats())
+                    payload["last_used_ts"] = self._last_used.get(ns, 0.0)
+                    payload["evicted"] = False
+                    snapshots[ns] = payload
+                for ns, snapshot in self._snapshots.items():
+                    payload, _ = snapshot
+                    snapshots.setdefault(
+                        ns,
+                        {
+                            "evicted": True,
+                            "serialized_bytes": float(len(payload)),
+                            "last_used_ts": self._last_used.get(ns, 0.0),
+                        },
+                    )
         aggregate = self._aggregate_stats(snapshots)
         return {"namespaces": snapshots, "aggregate": aggregate}
 
@@ -90,6 +125,9 @@ class FaissRouter:
         with self._lock:
             for namespace, store in self._stores.items():
                 payloads[namespace] = store.serialize()
+            for namespace, snapshot in self._snapshots.items():
+                payload, _ = snapshot
+                payloads.setdefault(namespace, payload)
         return payloads
 
     def restore_all(self, payloads: Mapping[str, bytes]) -> None:
@@ -106,11 +144,16 @@ class FaissRouter:
                 if store is None:
                     if self._factory is None:
                         continue
-                    store = self._factory(namespace)
-                    if self._resolver:
-                        store.set_id_resolver(self._resolver)
-                self._stores[namespace] = store
+                store = self._factory(namespace)
+                if self._resolver:
+                    store.set_id_resolver(self._resolver)
+            self._stores[namespace] = store
+            try:
                 store.restore(blob)
+            finally:
+                self._last_used[namespace] = time.time()
+                if namespace in self._snapshots:
+                    self._snapshots.pop(namespace, None)
 
     def rebuild_if_needed(self) -> bool:
         """Attempt to rebuild all managed stores; returns True if any rebuild occurs."""
@@ -133,6 +176,52 @@ class FaissRouter:
         with self._lock:
             for store in self._stores.values():
                 store.set_id_resolver(resolver)
+
+    def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
+        """Alias for :meth:`set_resolver` to improve readability."""
+
+        self.set_resolver(resolver)
+
+    def evict_idle(self, *, max_idle_seconds: int, skip_default: bool = True) -> int:
+        """Serialize and evict stores idle longer than ``max_idle_seconds``."""
+
+        if max_idle_seconds <= 0:
+            raise ValueError("max_idle_seconds must be positive")
+        if not self._per_namespace:
+            return 0
+        evicted = 0
+        now = time.time()
+        with self._lock:
+            for namespace, store in list(self._stores.items()):
+                if skip_default and namespace == DEFAULT_NAMESPACE:
+                    continue
+                last_used = self._last_used.get(namespace, 0.0)
+                if last_used and now - last_used <= max_idle_seconds:
+                    continue
+                try:
+                    payload = store.serialize()
+                    meta_getter = getattr(store, "snapshot_meta", None)
+                    meta = meta_getter() if callable(meta_getter) else None
+                    self._snapshots[namespace] = (payload, meta)
+                except Exception:
+                    logger.exception(
+                        "faiss-router-serialize-failed",
+                        extra={"event": {"namespace": namespace}},
+                    )
+                    continue
+                closer = getattr(store, "close", None)
+                if callable(closer):
+                    try:
+                        closer()
+                    except Exception:
+                        logger.debug(
+                            "faiss-router-close-failed",
+                            extra={"event": {"namespace": namespace}},
+                            exc_info=True,
+                        )
+                del self._stores[namespace]
+                evicted += 1
+        return evicted
 
     def run_maintenance(
         self,

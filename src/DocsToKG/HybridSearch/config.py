@@ -192,6 +192,9 @@ class FusionConfig:
     enable_mmr: bool = True
     cosine_dedupe_threshold: float = 0.98
     max_chunks_per_doc: int = 3
+    # Mandatory shaping budgets
+    token_budget: int = 2_000  # total tokens allowed across shaped results
+    byte_budget: int = 32_000  # total UTF-8 bytes allowed across shaped results
     channel_weights: Mapping[str, float] = field(
         default_factory=lambda: {"bm25": 1.0, "splade": 1.0, "dense": 1.0}
     )

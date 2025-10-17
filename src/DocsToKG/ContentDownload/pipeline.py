@@ -1009,7 +1009,7 @@ def load_resolver_config(
     return config
 
 
-@dataclass
+@dataclass(frozen=True)
 class AttemptRecord:
     """Structured log record describing a resolver attempt.
 
@@ -1053,7 +1053,7 @@ class AttemptRecord:
     http_status: Optional[int]
     content_type: Optional[str]
     elapsed_ms: Optional[float]
-    reason: Optional[str] = None
+    reason: Optional[ReasonCode | str] = None
     reason_detail: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     sha256: Optional[str] = None
@@ -1064,25 +1064,34 @@ class AttemptRecord:
     run_id: Optional[str] = None
 
     def __post_init__(self) -> None:
+        status_value: Classification | str
         if not isinstance(self.status, Classification):
             converted = Classification.from_wire(self.status)
             if (
                 isinstance(self.status, str)
                 and converted is Classification.UNKNOWN
-                and self.status.lower() not in {cls.value for cls in Classification}
+                and self.status.lower() not in {member.value for member in Classification}
             ):
-                self.status = self.status
+                status_value = self.status
             else:
-                self.status = converted
-        if isinstance(self.reason, ReasonCode):
-            self.reason = self.reason.value.replace("_", "-")
-        elif self.reason is not None:
-            normalized = str(self.reason).replace("-", "_")
+                status_value = converted
+        else:
+            status_value = self.status
+        object.__setattr__(self, "status", status_value)
+
+        reason_value = self.reason
+        if isinstance(reason_value, ReasonCode):
+            normalized_reason: ReasonCode | str | None = reason_value
+        elif reason_value is not None:
+            normalized = str(reason_value).replace("-", "_")
             candidate = ReasonCode.from_wire(normalized)
             if candidate is not ReasonCode.UNKNOWN or normalized == ReasonCode.UNKNOWN.value:
-                self.reason = candidate.value.replace("_", "-")
+                normalized_reason = candidate
             else:
-                self.reason = str(self.reason)
+                normalized_reason = str(reason_value)
+        else:
+            normalized_reason = None
+        object.__setattr__(self, "reason", normalized_reason)
 
 
 @dataclass
@@ -1114,7 +1123,7 @@ class DownloadOutcome:
     http_status: Optional[int] = None
     content_type: Optional[str] = None
     elapsed_ms: Optional[float] = None
-    reason: Optional[str] = None
+    reason: Optional[ReasonCode | str] = None
     reason_detail: Optional[str] = None
     sha256: Optional[str] = None
     content_length: Optional[int] = None
@@ -1140,13 +1149,19 @@ class DownloadOutcome:
     def __post_init__(self) -> None:
         if not isinstance(self.classification, Classification):
             self.classification = Classification.from_wire(self.classification)
-        if isinstance(self.reason, ReasonCode):
-            return
-        if self.reason is not None:
-            normalized = str(self.reason).replace("-", "_")
+        reason_value = self.reason
+        if isinstance(reason_value, ReasonCode):
+            normalized_reason: ReasonCode | str = reason_value
+        elif reason_value is not None:
+            normalized = str(reason_value).replace("-", "_")
             candidate = ReasonCode.from_wire(normalized)
             if candidate is not ReasonCode.UNKNOWN or normalized == ReasonCode.UNKNOWN.value:
-                self.reason = candidate
+                normalized_reason = candidate
+            else:
+                normalized_reason = str(reason_value)
+        else:
+            normalized_reason = None
+        self.reason = normalized_reason
 
 
 @dataclass

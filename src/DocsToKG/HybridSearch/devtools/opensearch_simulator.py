@@ -152,6 +152,7 @@ class OpenSearchSchemaManager:
             chunking=chunking_config,
         )
         self._templates[namespace] = template
+        self.validate_namespace_schema(namespace)
         return template
 
     def get_template(self, namespace: str) -> Optional[OpenSearchIndexTemplate]:
@@ -177,6 +178,45 @@ class OpenSearchSchemaManager:
         """
 
         return dict(self._templates)
+
+    def validate_namespace_schema(self, namespace: str) -> None:
+        """Ensure required OpenSearch fields are present for ``namespace``."""
+
+        template = self.get_template(namespace)
+        if template is None:
+            raise ValueError(f"no template registered for namespace={namespace!r}")
+        try:
+            mappings = template.body["mappings"]  # type: ignore[index]
+            properties = mappings["properties"]  # type: ignore[index]
+        except Exception as exc:  # pragma: no cover - defensive guard
+            raise ValueError(
+                f"invalid template for namespace={namespace!r}: missing mappings/properties"
+            ) from exc
+        if not isinstance(properties, Mapping):
+            raise ValueError(
+                f"invalid template for namespace={namespace!r}: properties must be a mapping"
+            )
+
+        required_types = {
+            "doc_id": "keyword",
+            "chunk_id": "keyword",
+            "namespace": "keyword",
+            "vector_id": "keyword",
+            "text": "text",
+            "token_count": "integer",
+        }
+        for field, expected_type in required_types.items():
+            field_config = properties.get(field)
+            if not isinstance(field_config, Mapping) or field_config.get("type") != expected_type:
+                raise ValueError(
+                    f"template {namespace!r}: field {field!r} must declare type={expected_type}"
+                )
+
+        splade_config = properties.get("splade")
+        if not isinstance(splade_config, Mapping) or splade_config.get("type") != "rank_features":
+            raise ValueError(
+                f"template {namespace!r}: field 'splade' must declare type=rank_features"
+            )
 
 
 @dataclass(slots=True)

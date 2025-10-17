@@ -499,6 +499,10 @@ class ResultShaper:
         emitted_indices: List[int] = []
         results: List[HybridSearchResult] = []
         query_tokens = tokenize(request.query)
+        token_budget = int(self._fusion_config.token_budget)
+        byte_budget = int(self._fusion_config.byte_budget)
+        tokens_used = 0
+        bytes_used = 0
 
         for current_idx, chunk in enumerate(ordered_chunks):
             rank = current_idx + 1
@@ -509,6 +513,12 @@ class ResultShaper:
             ):
                 continue
             highlights = self._build_highlights(chunk, query_tokens)
+            chunk_tokens = int(getattr(chunk, "token_count", 0))
+            chunk_bytes = len(chunk.text.encode("utf-8"))
+            if token_budget and tokens_used + chunk_tokens > token_budget:
+                break
+            if byte_budget and bytes_used + chunk_bytes > byte_budget:
+                break
             diagnostics = HybridSearchDiagnostics(
                 bm25_score=channel_scores.get("bm25", {}).get(chunk.vector_id),
                 splade_score=channel_scores.get("splade", {}).get(chunk.vector_id),
@@ -531,6 +541,8 @@ class ResultShaper:
                 )
             )
             emitted_indices.append(current_idx)
+            tokens_used += chunk_tokens
+            bytes_used += chunk_bytes
         return results
 
     def _within_doc_limit(self, doc_id: str, doc_buckets: Dict[str, int]) -> bool:
@@ -568,13 +580,7 @@ class ResultShaper:
 
     def _build_highlights(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
         highlights = self._opensearch.highlight(chunk, query_tokens)
-        if highlights:
-            return highlights
-        tokens = tokenize(chunk.text)
-        matches = [token for token in tokens if token in set(query_tokens)]
-        if matches:
-            return [" ".join(tokens[: min(len(tokens), 40)])]
-        return [chunk.text[: min(len(chunk.text), 200)]]
+        return list(highlights)
 
 
 def apply_mmr_diversification(
@@ -587,6 +593,7 @@ def apply_mmr_diversification(
     device: int = 0,
     resources: Optional["faiss.StandardGpuResources"] = None,
     use_fp16: bool = False,
+    block_rows: int = 4096,
 ) -> List[FusionCandidate]:
     """Diversify fused candidates using Maximum Marginal Relevance.
 
@@ -598,6 +605,7 @@ def apply_mmr_diversification(
         embeddings: Optional dense embedding matrix aligned with ``fused_candidates``.
         device: GPU device id when leveraging FAISS GPU routines.
         resources: Optional FAISS GPU resources handle reused across calls.
+        block_rows: Corpus rows processed per block when estimating diversity on GPU.
 
     Returns:
         List of diversified `FusionCandidate` objects.
@@ -630,12 +638,40 @@ def apply_mmr_diversification(
     selected: List[int] = []
     remaining = np.arange(total, dtype=np.int64)
     max_sim = np.zeros(total, dtype=np.float32)
+    neighbor_lookup: Optional[List[Dict[int, float]]] = None
 
     def _cosine_cpu(query: np.ndarray, pool: np.ndarray) -> np.ndarray:
         norms = np.linalg.norm(pool, axis=1)
         norms[norms == 0.0] = 1.0
         query_norm = np.linalg.norm(query) or 1.0
         return (pool @ query) / (norms * query_norm)
+
+    if resources is not None:
+        try:
+            top_k_neighbors = min(total, 128)
+            scores_block, indices_block = cosine_topk_blockwise(
+                embeddings,
+                embeddings,
+                k=top_k_neighbors,
+                device=device,
+                resources=resources,
+                block_rows=block_rows,
+                use_fp16=use_fp16,
+            )
+        except Exception:
+            scores_block = indices_block = None
+        if scores_block is not None and indices_block is not None:
+            neighbor_lookup = []
+            for row in range(total):
+                row_scores = scores_block[row]
+                row_indices = indices_block[row]
+                row_map: Dict[int, float] = {}
+                for score, idx in zip(row_scores, row_indices):
+                    candidate_idx = int(idx)
+                    if candidate_idx < 0 or candidate_idx == row:
+                        continue
+                    row_map[candidate_idx] = float(score)
+                neighbor_lookup.append(row_map)
 
     while len(selected) < top_k and remaining.size:
         if not selected:
@@ -654,21 +690,21 @@ def apply_mmr_diversification(
 
         query_vec = np.ascontiguousarray(embeddings[best_idx], dtype=np.float32)
         pool = np.ascontiguousarray(embeddings[remaining], dtype=np.float32)
-        if resources is not None:
-            if pool.size == 0:
-                sims = np.empty(0, dtype=np.float32)
-            else:
-                scores_block, indices_block = cosine_topk_blockwise(
-                    query_vec,
-                    pool,
-                    k=pool.shape[0],
-                    device=device,
-                    resources=resources,
-                    use_fp16=use_fp16,
+        if resources is not None and neighbor_lookup is not None:
+            sims = np.full(pool.shape[0], -np.inf, dtype=np.float32)
+            neighbor_scores = neighbor_lookup[best_idx]
+            for pos, idx in enumerate(remaining):
+                score = neighbor_scores.get(int(idx))
+                if score is not None:
+                    sims[pos] = score
+            missing_mask = sims == -np.inf
+            if np.any(missing_mask):
+                missing_ids = remaining[missing_mask]
+                raise RuntimeError(
+                    "cosine_topk_blockwise returned incomplete neighbourhood; "
+                    "increase block_rows or k to cover remaining candidate ids "
+                    f"{[int(idx) for idx in missing_ids]}"
                 )
-                sims = np.full(pool.shape[0], -np.inf, dtype=np.float32)
-                order = indices_block[0]
-                sims[order] = scores_block[0]
         else:
             sims = _cosine_cpu(query_vec, pool)
         max_sim[remaining] = np.maximum(max_sim[remaining], sims)
@@ -758,6 +794,30 @@ class HybridSearchService:
         self._faiss_router.set_resolver(self._registry.resolve_faiss_id)
         self._dense_strategy = DenseSearchStrategy(cache_path=cache_path)
         self._executor = ThreadPoolExecutor(max_workers=3)
+        schema_manager = None
+        for attr in ("schema_manager", "schema", "_schema"):
+            candidate = getattr(self._opensearch, attr, None)
+            if candidate is not None:
+                schema_manager = candidate
+                break
+        if schema_manager is None and hasattr(self._opensearch, "validate_namespace_schema"):
+            schema_manager = self._opensearch
+        if schema_manager is not None and hasattr(schema_manager, "validate_namespace_schema"):
+            try:
+                namespaces: Sequence[str] = ()
+                if hasattr(schema_manager, "list_templates"):
+                    templates = schema_manager.list_templates()  # type: ignore[call-arg]
+                    if isinstance(templates, Mapping):
+                        namespaces = list(templates.keys())
+                if not namespaces and hasattr(schema_manager, "get_template"):
+                    default_ns = "default"
+                    template = schema_manager.get_template(default_ns)  # type: ignore[call-arg]
+                    if template is not None:
+                        namespaces = [default_ns]
+                for namespace in namespaces:
+                    schema_manager.validate_namespace_schema(namespace)  # type: ignore[attr-defined]
+            except Exception:
+                self._observability.logger.exception("lexical-schema-validation-warning")
         self._closed = False
         atexit.register(self.close)
 

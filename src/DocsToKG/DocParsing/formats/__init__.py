@@ -884,34 +884,43 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
         """
 
         parts: List[str] = []
+        parts_append = parts.append
         annotations: List[object] = []
         description_texts: List[str] = []
+        descriptions_append = description_texts.append
         classification_entries: List[Dict[str, Any]] = []
+        classification_append = classification_entries.append
         molecule_entries: List[Dict[str, Any]] = []
+        molecule_append = molecule_entries.append
         try:
             annotations = list(item.annotations or [])
         except Exception:  # pragma: no cover - defensive catch
             annotations = []
 
+        has_caption_flag = False
+        has_classification_flag = False
         try:
             caption = (item.caption_text(doc) or "").strip()
             if caption:
-                parts.append(f"Figure caption: {caption}")
+                parts_append(f"Figure caption: {caption}")
+                has_caption_flag = True
         except Exception:  # pragma: no cover - defensive catch
             pass
 
         confidence_candidates: List[float] = []
+        add_confidence = confidence_candidates.append
 
         def _maybe_add_conf(value: object) -> None:
             """Collect numeric confidence scores when they can be coerced to float."""
             try:
                 if value is None:
                     return
-                confidence_candidates.append(float(value))
+                add_confidence(float(value))
             except (TypeError, ValueError):
                 pass
 
         def _maybe_float(value: object) -> Optional[float]:
+            """Convert ``value`` to ``float`` when possible, otherwise return ``None``."""
             try:
                 if value is None:
                     return None
@@ -923,24 +932,23 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
             try:
                 _maybe_add_conf(getattr(annotation, "confidence", None))
                 _maybe_add_conf(getattr(annotation, "score", None))
-                predicted = getattr(annotation, "predicted_classes", None)
+                predicted = getattr(annotation, "predicted_classes", None) or []
                 if predicted:
+                    has_classification_flag = True
                     for cls in predicted:
                         _maybe_add_conf(getattr(cls, "confidence", None))
                         _maybe_add_conf(getattr(cls, "probability", None))
                 if isinstance(annotation, PictureDescriptionData) and annotation.text:
                     desc_text = annotation.text.strip()
                     if desc_text:
-                        parts.append(f"Picture description: {desc_text}")
-                        description_texts.append(desc_text)
-                elif (
-                    isinstance(annotation, PictureClassificationData)
-                    and annotation.predicted_classes
-                ):
-                    primary = annotation.predicted_classes[0]
-                    parts.append(f"Picture type: {primary.class_name}")
-                    for cls in annotation.predicted_classes:
-                        classification_entries.append(
+                        parts_append(f"Picture description: {desc_text}")
+                        descriptions_append(desc_text)
+                        has_caption_flag = True
+                elif isinstance(annotation, PictureClassificationData) and predicted:
+                    primary = predicted[0]
+                    parts_append(f"Picture type: {primary.class_name}")
+                    for cls in predicted:
+                        classification_append(
                             {
                                 "label": getattr(cls, "class_name", str(cls)),
                                 "confidence": _maybe_float(
@@ -949,8 +957,8 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
                             }
                         )
                 elif isinstance(annotation, PictureMoleculeData) and annotation.smi:
-                    parts.append(f"SMILES: {annotation.smi}")
-                    molecule_entries.append(
+                    parts_append(f"SMILES: {annotation.smi}")
+                    molecule_append(
                         {
                             "smiles": annotation.smi,
                             "confidence": _maybe_float(getattr(annotation, "confidence", None)),
@@ -959,14 +967,10 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
             except Exception:  # pragma: no cover - defensive catch
                 continue
         if not parts:
-            parts.append("<!-- image -->")
+            parts_append("<!-- image -->")
 
-        has_caption = len(parts) > 1 or (parts and parts[0] != "<!-- image -->")
-        has_classification = any(
-            isinstance(annotation, PictureClassificationData)
-            and getattr(annotation, "predicted_classes", None)
-            for annotation in annotations
-        )
+        has_caption = has_caption_flag or (parts and parts[0] != "<!-- image -->")
+        has_classification = has_classification_flag
         try:  # pragma: no cover - metadata enrichment best effort
             flags = getattr(item, "_docstokg_flags", {})
             if not isinstance(flags, dict):

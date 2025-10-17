@@ -416,10 +416,10 @@ def test_lov_resolver_contract(load_cassette, monkeypatch, resolved_config):
         def json(self):
             return self._payload
 
-    session = SimpleNamespace(
-        headers={},
-        get=lambda url, params=None, timeout=0: StubResponse(response_payload),
-    )
+    def _get(url, params=None, timeout=0, **kwargs):
+        return StubResponse(response_payload)
+
+    session = SimpleNamespace(headers={}, get=_get)
     monkeypatch.setattr(
         resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func()
     )
@@ -564,7 +564,7 @@ def test_lov_resolver_respects_timeout_and_rate_limit(monkeypatch, resolved_conf
         def __init__(self):
             self.headers = {}
 
-        def get(self, url, params=None, timeout=None):
+        def get(self, url, params=None, timeout=None, **kwargs):
             captured["timeout"] = timeout
             return StubResponse()
 
@@ -630,7 +630,7 @@ def test_lov_resolver_parses_metadata(resolved_config):
         def __init__(self):
             self.headers = {}
 
-        def get(self, url, params=None, timeout=None):
+        def get(self, url, params=None, timeout=None, **kwargs):
             assert params["uri"] == "http://purl.org/vocommons/voaf"
             return StubResponse(payload)
 

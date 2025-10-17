@@ -301,6 +301,7 @@ from DocsToKG.DocParsing.core import (
     build_subcommand,
     compute_chunk_uuid,
     compute_content_hash,
+    quarantine_artifact,
     compute_stable_shard,
     data_chunks,
     data_vectors,
@@ -320,7 +321,9 @@ from DocsToKG.DocParsing.core import (
     manifest_log_success,
     prepare_data_root,
     resolve_pipeline_path,
+    relative_path,
     should_skip_output,
+    _iter_jsonl_records,
 )
 from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
@@ -500,11 +503,32 @@ def _resolve_cli_path(value: Optional[Path], default: Path) -> Path:
     return Path(candidate).expanduser().resolve()
 
 
+def _percentile(data: Sequence[float], pct: float) -> float:
+    """Return the percentile of ``data`` without external dependencies."""
+
+    if not data:
+        return 0.0
+    if pct <= 0:
+        return float(min(data))
+    if pct >= 100:
+        return float(max(data))
+    ordered = sorted(float(x) for x in data)
+    k = (len(ordered) - 1) * (pct / 100.0)
+    f = math.floor(k)
+    c = math.ceil(k)
+    if f == c:
+        return ordered[int(k)]
+    d0 = ordered[f] * (c - k)
+    d1 = ordered[c] * (k - f)
+    return d0 + d1
+
+
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
 DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "embeddings"
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
+EMBED_STAGE = "embedding"
 
 EMBED_PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
     "cpu-small": {
@@ -1493,30 +1517,43 @@ def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
     return stats
 
 
-def iter_rows_in_batches(path: Path, batch_size: int) -> Iterator[List[dict]]:
+def iter_rows_in_batches(
+    path: Path,
+    batch_size: int,
+    *,
+    start: Optional[int] = None,
+    end: Optional[int] = None,
+    skip_invalid: bool = False,
+    max_errors: int = 10,
+) -> Iterator[List[dict]]:
     """Iterate over JSONL rows in batches to reduce memory usage.
 
     Args:
-        path: Path to JSONL file to read.
+        path: JSONL file to read.
         batch_size: Number of rows to yield per batch.
-
-    Returns:
-        Iterator[List[dict]]: Lazy iterator producing batched chunk rows.
+        start: Optional byte offset where iteration should begin.
+        end: Optional byte offset bounding the slice (exclusive).
+        skip_invalid: When ``True`` malformed rows are skipped up to
+            ``max_errors`` occurrences.
+        max_errors: Maximum tolerated malformed rows when ``skip_invalid`` is
+            enabled.
 
     Yields:
-        Lists of row dictionaries, each containing up to batch_size items.
+        Lists of row dictionaries containing at most ``batch_size`` entries.
     """
+
     buf: List[dict] = []
-    with path.open("r", encoding="utf-8", errors="replace") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
-            row = json.loads(line)
-            buf.append(row)
-            if len(buf) >= batch_size:
-                yield buf
-                buf = []
+    for record in _iter_jsonl_records(
+        path,
+        start=start,
+        end=end,
+        skip_invalid=skip_invalid,
+        max_errors=max_errors,
+    ):
+        buf.append(record)
+        if len(buf) >= batch_size:
+            yield buf
+            buf = []
     if buf:
         yield buf
 
@@ -1548,17 +1585,20 @@ class JsonlVectorWriter(VectorWriter):
     """Context manager that writes vector rows to JSONL atomically."""
 
     def __init__(self, path: Path) -> None:
+        """Initialise the writer with the destination ``path``."""
         self.path = path
         self._context = None
         self._handle = None
 
     def __enter__(self) -> "JsonlVectorWriter":
+        """Open the underlying atomic writer and return ``self`` for chaining."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._context = atomic_write(self.path)
         self._handle = self._context.__enter__()
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
+        """Close the atomic writer context, propagating exceptions."""
         if self._context is None:
             return False
         return self._context.__exit__(exc_type, exc, tb)
@@ -1634,27 +1674,60 @@ def process_chunk_file_vectors(
 
             uuids: List[str] = []
             texts: List[str] = []
+            lengths: List[int] = []
             for row in rows:
                 uuid_value = row.get("uuid")
                 if not uuid_value:
                     raise ValueError(f"Chunk row missing UUID in {chunk_file}")
                 uuids.append(uuid_value)
-                texts.append(str(row.get("text", "")))
+                text_value = str(row.get("text", ""))
+                texts.append(text_value)
+                length_val = row.get("num_tokens")
+                if length_val is None:
+                    length_val = len(text_value.split())
+                lengths.append(int(max(0, length_val)))
 
-            # SPLADE encoding for this batch
-            splade_results: List[Tuple[Sequence[str], Sequence[float]]] = []
-            for batch in Batcher(texts, args.batch_size_splade):
+            indices = list(range(len(texts)))
+
+            splade_tokens_by_idx: List[Sequence[str]] = [()] * len(texts)
+            splade_weights_by_idx: List[Sequence[float]] = [()] * len(texts)
+            for batch_indices in Batcher(
+                indices,
+                args.batch_size_splade,
+                policy="length",
+                lengths=lengths,
+            ):
+                batch_texts = [texts[i] for i in batch_indices]
                 tokens_batch, weights_batch = splade_encode(
-                    args.splade_cfg, list(batch), batch_size=args.batch_size_splade
+                    args.splade_cfg, batch_texts, batch_size=args.batch_size_splade
                 )
-                splade_results.extend(zip(tokens_batch, weights_batch))
+                for local_idx, global_idx in enumerate(batch_indices):
+                    splade_tokens_by_idx[global_idx] = tokens_batch[local_idx]
+                    splade_weights_by_idx[global_idx] = weights_batch[local_idx]
 
-            # Qwen embedding for this batch
-            qwen_queue = getattr(args, "qwen_queue", None)
-            if qwen_queue is not None:
-                qwen_results = qwen_queue.embed(texts, int(args.batch_size_qwen))
-            else:
-                qwen_results = qwen_embed(args.qwen_cfg, texts, batch_size=args.batch_size_qwen)
+            qwen_vectors_by_idx: List[Sequence[float]] = [()] * len(texts)
+
+            def _embed_batch(batch_texts: List[str]) -> Sequence[Sequence[float]]:
+                qwen_queue = getattr(args, "qwen_queue", None)
+                if qwen_queue is not None:
+                    return qwen_queue.embed(batch_texts, int(args.batch_size_qwen))
+                return qwen_embed(args.qwen_cfg, batch_texts, batch_size=args.batch_size_qwen)
+
+            for batch_indices in Batcher(
+                indices,
+                args.batch_size_qwen,
+                policy="length",
+                lengths=lengths,
+            ):
+                batch_texts = [texts[i] for i in batch_indices]
+                qwen_batch = _embed_batch(batch_texts)
+                for local_idx, global_idx in enumerate(batch_indices):
+                    qwen_vectors_by_idx[global_idx] = qwen_batch[local_idx]
+
+            splade_results: List[Tuple[Sequence[str], Sequence[float]]] = [
+                (splade_tokens_by_idx[idx], splade_weights_by_idx[idx]) for idx in indices
+            ]
+            qwen_results = [qwen_vectors_by_idx[idx] for idx in indices]
 
             # Write vectors for this batch immediately
             count, nnz, norms = write_vectors(
@@ -1748,17 +1821,6 @@ def write_vectors(
                 f"Qwen dimension mismatch for UUID={uuid_value}: expected {int(args.qwen_dim)}, "
                 f"got {len(qwen_vector)}"
             )
-            doc_id = row.get("doc_id", "unknown")
-            manifest_log_failure(
-                stage="embeddings",
-                doc_id=doc_id,
-                duration_s=0.0,
-                schema_version=VECTOR_SCHEMA_VERSION,
-                input_path=row.get("source_path", "unknown"),
-                input_hash=row.get("input_hash", ""),
-                output_path=output_ref,
-                error=message,
-            )
             raise ValueError(message)
 
         norm = math.sqrt(sum(float(x) * float(x) for x in qwen_vector))
@@ -1766,16 +1828,6 @@ def write_vectors(
             doc_id = row.get("doc_id", "unknown")
             message = f"Invalid Qwen vector (zero norm) for UUID={uuid_value}"
             logger.error(message)
-            manifest_log_failure(
-                stage="embeddings",
-                doc_id=doc_id,
-                duration_s=0.0,
-                schema_version=VECTOR_SCHEMA_VERSION,
-                input_path=row.get("source_path", "unknown"),
-                input_hash=row.get("input_hash", ""),
-                output_path=output_ref,
-                error=message,
-            )
             raise ValueError(message)
 
         if abs(norm - 1.0) > 0.01:
@@ -1840,10 +1892,71 @@ def write_vectors(
     return len(uuids), splade_nnz, qwen_norms
 
 
+def _handle_embedding_quarantine(
+    *,
+    chunk_path: Path,
+    vector_path: Path,
+    doc_id: str,
+    input_hash: str,
+    reason: str,
+    logger,
+    data_root: Optional[Path] = None,
+) -> None:
+    """Quarantine a problematic chunk or vector artefact and log manifest state."""
+
+    input_hash_value = input_hash
+    quarantine_path: Path
+    if chunk_path.exists():
+        try:
+            input_hash_value = compute_content_hash(chunk_path)
+        except Exception:
+            pass
+        quarantine_path = quarantine_artifact(chunk_path, reason=reason, logger=logger)
+        input_path = chunk_path
+    else:
+        quarantine_path = quarantine_artifact(
+            vector_path,
+            reason=reason,
+            logger=logger,
+            create_placeholder=True,
+        )
+        input_path = chunk_path
+
+    manifest_log_failure(
+        stage=MANIFEST_STAGE,
+        doc_id=doc_id,
+        duration_s=0.0,
+        schema_version=VECTOR_SCHEMA_VERSION,
+        input_path=input_path,
+        input_hash=input_hash_value,
+        output_path=quarantine_path,
+        error=reason,
+        quarantine=True,
+    )
+    log_event(
+        logger,
+        "warning",
+        "Embedding artefact quarantined",
+        status="quarantine",
+        stage=EMBED_STAGE,
+        doc_id=doc_id,
+        input_relpath=relative_path(input_path, data_root),
+        output_relpath=relative_path(quarantine_path, data_root),
+        error_class="ValueError",
+        reason=reason,
+    )
+
+
 # --- Main Driver ---
 
 
-def _validate_vectors_for_chunks(chunks_dir: Path, vectors_dir: Path, logger) -> tuple[int, int]:
+def _validate_vectors_for_chunks(
+    chunks_dir: Path,
+    vectors_dir: Path,
+    logger,
+    *,
+    data_root: Optional[Path] = None,
+) -> tuple[int, int]:
     """Validate vectors associated with chunk files without recomputing models.
 
     Returns:
@@ -1854,47 +1967,88 @@ def _validate_vectors_for_chunks(chunks_dir: Path, vectors_dir: Path, logger) ->
     files_checked = 0
     rows_validated = 0
     missing: List[tuple[str, Path]] = []
+    quarantined_files = 0
 
     for chunk_path in iter_chunks(chunks_dir):
         doc_id, vector_path = derive_doc_id_and_vectors_path(chunk_path, chunks_dir, vectors_dir)
         if not vector_path.exists():
             missing.append((doc_id, vector_path))
             continue
+        file_rows = 0
+        try:
+            for batch in iter_rows_in_batches(vector_path, 4096):
+                for row in batch:
+                    validate_vector_row(row)
+                    rows_validated += 1
+                    file_rows += 1
+        except ValueError as exc:
+            reason = f"{vector_path}: {exc}"
+            try:
+                input_hash = compute_content_hash(vector_path)
+            except Exception:
+                input_hash = ""
+            quarantine_path = quarantine_artifact(vector_path, reason=reason, logger=logger)
+            manifest_log_failure(
+                stage=MANIFEST_STAGE,
+                doc_id=doc_id,
+                duration_s=0.0,
+                schema_version=VECTOR_SCHEMA_VERSION,
+                input_path=vector_path,
+                input_hash=input_hash,
+                output_path=quarantine_path,
+                error=reason,
+                quarantine=True,
+            )
+            log_event(
+                logger,
+                "warning",
+                "Vector file quarantined",
+                status="quarantine",
+                stage=EMBED_STAGE,
+                doc_id=doc_id,
+                input_relpath=relative_path(vector_path, data_root),
+                output_relpath=relative_path(quarantine_path, data_root),
+                error_class="ValidationError",
+                reason=reason,
+            )
+            quarantined_files += 1
+            continue
+
         files_checked += 1
-        for batch in iter_rows_in_batches(vector_path, 4096):
-            for row in batch:
-                # Raises on error
-                validate_vector_row(row)
-                rows_validated += 1
 
     if missing:
         preview = ", ".join(doc for doc, _ in missing[:5])
         if len(missing) > 5:
             preview += ", ..."
-        logger.error(
+        log_event(
+            logger,
+            "error",
             "Missing vector files for chunk documents",
-            extra={
-                "extra_fields": {
-                    "missing": [str(path) for _, path in missing],
-                    "missing_count": len(missing),
-                    "chunks_dir": str(chunks_dir),
-                    "vectors_dir": str(vectors_dir),
-                }
-            },
+            status="missing",
+            stage=EMBED_STAGE,
+            missing=[str(path) for _, path in missing],
+            missing_count=len(missing),
+            chunks_dir=str(chunks_dir),
+            vectors_dir=str(vectors_dir),
         )
         raise FileNotFoundError("Vector files not found for documents: " + preview)
 
-    logger.info(
+    log_event(
+        logger,
+        "info",
         "Validated vector files",
-        extra={
-            "extra_fields": {
-                "files_checked": files_checked,
-                "rows_validated": rows_validated,
-                "chunks_dir": str(chunks_dir),
-                "vectors_dir": str(vectors_dir),
-            }
-        },
+        status="validate-only",
+        stage=EMBED_STAGE,
+        files_checked=files_checked,
+        rows_validated=rows_validated,
+        chunks_dir=str(chunks_dir),
+        vectors_dir=str(vectors_dir),
     )
+    if quarantined_files:
+        logger.warning(
+            "Quarantined vector files",
+            extra={"extra_fields": {"quarantined": quarantined_files}},
+        )
     print(
         f"Validated {rows_validated} rows across {files_checked} vector files under {vectors_dir}"
     )
@@ -1979,16 +2133,21 @@ def main(args: argparse.Namespace | None = None) -> int:
         setattr(namespace, field_def.name, getattr(cfg, field_def.name))
 
     log_level = cfg.log_level
-    logger = get_logger(__name__, level=str(log_level))
+    run_id = uuid.uuid4().hex
+    logger = get_logger(
+        __name__,
+        level=str(log_level),
+        base_fields={"run_id": run_id, "stage": EMBED_STAGE},
+    )
     if profile and defaults:
-        logger.info(
+        log_event(
+            logger,
+            "info",
             "Applying profile",
-            extra={
-                "extra_fields": {
-                    "profile": profile,
-                    **{key: defaults[key] for key in sorted(defaults)},
-                }
-            },
+            status="profile",
+            stage=EMBED_STAGE,
+            profile=profile,
+            **{key: defaults[key] for key in sorted(defaults)},
         )
     args = namespace
     offline_mode = bool(cfg.offline)
@@ -2089,6 +2248,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     data_root_override = cfg.data_root
     data_root_overridden = data_root_override is not None
     resolved_root = prepare_data_root(data_root_override, DEFAULT_DATA_ROOT)
+    logger.bind(data_root=str(resolved_root))
 
     chunks_dir = resolve_pipeline_path(
         cli_value=args.chunks_dir,
@@ -2106,10 +2266,16 @@ def main(args: argparse.Namespace | None = None) -> int:
         resolver=data_vectors,
     ).resolve()
 
+    logger.bind(
+        input_relpath=relative_path(chunks_dir, resolved_root),
+        output_relpath=relative_path(out_dir, resolved_root),
+    )
+
     requested_parallel = max(1, int(cfg.files_parallel or 1))
 
     config_snapshot.update(
         {
+            "run_id": run_id,
             "data_root": str(resolved_root),
             "chunks_dir": str(chunks_dir),
             "out_dir": str(out_dir),
@@ -2165,7 +2331,9 @@ def main(args: argparse.Namespace | None = None) -> int:
     )
 
     if validate_only:
-        files_checked, rows_validated = _validate_vectors_for_chunks(chunks_dir, out_dir, logger)
+        files_checked, rows_validated = _validate_vectors_for_chunks(
+            chunks_dir, out_dir, logger, data_root=resolved_root
+        )
         logger.info(
             "Validation-only mode complete",
             extra={
@@ -2181,26 +2349,26 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     args.out_dir = out_dir
 
-    logger.info(
+    log_event(
+        logger,
+        "info",
         "Embedding configuration",
-        extra={
-            "extra_fields": {
-                "data_root": str(resolved_root),
-                "chunks_dir": str(chunks_dir),
-                "embeddings_dir": str(out_dir),
-                "splade_model_dir": str(splade_model_dir),
-                "qwen_model_dir": str(qwen_model_dir),
-                "offline": offline_mode,
-                "requested_files_parallel": requested_parallel,
-                "shard_count": shard_count,
-                "shard_index": shard_index,
-                "vector_format": vector_format,
-                "qwen_cache_enabled": not bool(cfg.no_cache),
-                "sparsity_warn_threshold_pct": float(cfg.sparsity_warn_threshold_pct),
-                "sparsity_report_top_n": int(cfg.sparsity_report_top_n),
-                "profile": profile,
-            }
-        },
+        status="config",
+        stage=EMBED_STAGE,
+        data_root=str(resolved_root),
+        chunks_dir=str(chunks_dir),
+        embeddings_dir=str(out_dir),
+        splade_model_dir=str(splade_model_dir),
+        qwen_model_dir=str(qwen_model_dir),
+        offline=offline_mode,
+        requested_files_parallel=requested_parallel,
+        shard_count=shard_count,
+        shard_index=shard_index,
+        vector_format=vector_format,
+        qwen_cache_enabled=not bool(cfg.no_cache),
+        sparsity_warn_threshold_pct=float(cfg.sparsity_warn_threshold_pct),
+        sparsity_report_top_n=int(cfg.sparsity_report_top_n),
+        profile=profile,
     )
 
     files = list(iter_chunks(chunks_dir))
@@ -2244,28 +2412,39 @@ def main(args: argparse.Namespace | None = None) -> int:
             return 0
 
     incompatible_chunks: List[Path] = []
+    validated_files: List[Path] = []
     for chunk_file in files:
         rows = jsonl_load(chunk_file)
         try:
             ensure_chunk_schema(rows, chunk_file)
         except ValueError as exc:
-            incompatible_chunks.append(chunk_file)
+            reason = str(exc)
             logger.error(
                 "Chunk file rejected: incompatible schema",
                 extra={
                     "extra_fields": {
                         "chunk_file": str(chunk_file),
-                        "error": str(exc),
+                        "error": reason,
                     }
                 },
             )
+            incompatible_chunks.append(chunk_file)
+            try:
+                chunk_hash = compute_content_hash(chunk_file)
+            except Exception:
+                chunk_hash = ""
+            _handle_embedding_quarantine(
+                chunk_path=chunk_file,
+                vector_path=chunk_file.with_suffix(chunk_file.suffix + ".vectors"),
+                doc_id=chunk_file.stem,
+                input_hash=chunk_hash,
+                reason=reason,
+                logger=logger,
+            )
+            continue
+        validated_files.append(chunk_file)
     if incompatible_chunks:
-        summary = ", ".join(str(path) for path in incompatible_chunks[:5])
-        if len(incompatible_chunks) > 5:
-            summary += ", ..."
-        raise ValueError(
-            "Incompatible chunk schema detected; review chunk files before proceeding: " + summary
-        )
+        files = validated_files
 
     if cfg.force:
         logger.info("Force mode: reprocessing all chunk files")
@@ -2309,6 +2488,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
     file_entries: List[Tuple[Path, Path, str, str]] = []
     skipped_files = 0
+    quarantined_files = 0
     for chunk_file in files:
         doc_id, out_path = derive_doc_id_and_vectors_path(chunk_file, chunks_dir, args.out_dir)
         input_hash = compute_content_hash(chunk_file)
@@ -2318,8 +2498,11 @@ def main(args: argparse.Namespace | None = None) -> int:
                 logger,
                 "info",
                 "Skipping chunk file: output exists and input unchanged",
+                status="skip",
+                stage=EMBED_STAGE,
                 doc_id=doc_id,
-                output_path=str(out_path),
+                input_relpath=relative_path(chunk_file, resolved_root),
+                output_relpath=relative_path(out_path, resolved_root),
             )
             manifest_log_skip(
                 stage=MANIFEST_STAGE,
@@ -2351,21 +2534,35 @@ def main(args: argparse.Namespace | None = None) -> int:
 
         def _process_entry(
             entry: Tuple[Path, Path, str, str],
-        ) -> Tuple[int, List[int], List[float], float]:
+        ) -> Tuple[int, List[int], List[float], float, bool]:
             """Encode vectors for a chunk file and report per-file metrics."""
 
             chunk_path, vectors_path, input_hash, doc_id = entry
             start = time.perf_counter()
+            quarantined = False
             try:
                 with acquire_lock(vectors_path):
                     count, nnz, norms = process_chunk_file_vectors(
                         chunk_path, vectors_path, stats, args, validator, logger
                     )
+            except ValueError as exc:
+                duration = time.perf_counter() - start
+                _handle_embedding_quarantine(
+                    chunk_path=chunk_path,
+                    vector_path=vectors_path,
+                    doc_id=doc_id,
+                    input_hash=input_hash,
+                    reason=str(exc),
+                    logger=logger,
+                    data_root=resolved_root,
+                )
+                quarantined = True
+                count, nnz, norms = 0, [], []
             except Exception as exc:  # pragma: no cover - propagated to caller
                 duration = time.perf_counter() - start
                 raise EmbeddingProcessingError(exc, duration) from exc
             duration = time.perf_counter() - start
-            return count, nnz, norms, duration
+            return count, nnz, norms, duration, quarantined
 
         if not file_entries:
             pass
@@ -2380,7 +2577,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 for future in as_completed(future_map):
                     chunk_file, out_path, input_hash, doc_id = future_map[future]
                     try:
-                        count, nnz, norms, duration = future.result()
+                        count, nnz, norms, duration, quarantined = future.result()
                     except EmbeddingProcessingError as exc:
                         manifest_log_failure(
                             stage=MANIFEST_STAGE,
@@ -2407,6 +2604,10 @@ def main(args: argparse.Namespace | None = None) -> int:
                         )
                         bar.update(1)
                         raise
+                    if quarantined:
+                        quarantined_files += 1
+                        bar.update(1)
+                        continue
                     total_vectors += count
                     splade_nnz_all.extend(nnz)
                     qwen_norms_all.extend(norms)
@@ -2422,25 +2623,26 @@ def main(args: argparse.Namespace | None = None) -> int:
                     )
                     avg_nnz_file = statistics.mean(nnz) if nnz else 0.0
                     avg_norm_file = statistics.mean(norms) if norms else 0.0
-                    logger.info(
+                    log_event(
+                        logger,
+                        "info",
                         "Embedding file written",
-                        extra={
-                            "extra_fields": {
-                                "doc_id": doc_id,
-                                "vectors": count,
-                                "splade_avg_nnz": round(avg_nnz_file, 3),
-                                "qwen_avg_norm": round(avg_norm_file, 4),
-                                "duration_s": round(duration, 3),
-                                "output_file": out_path.name,
-                            }
-                        },
+                        status="success",
+                        stage=EMBED_STAGE,
+                        doc_id=doc_id,
+                        input_relpath=relative_path(chunk_file, resolved_root),
+                        output_relpath=relative_path(out_path, resolved_root),
+                        elapsed_ms=int(duration * 1000),
+                        vectors=count,
+                        splade_avg_nnz=round(avg_nnz_file, 3),
+                        qwen_avg_norm=round(avg_norm_file, 4),
                     )
                     bar.update(1)
         else:
             for entry in tqdm(file_entries, desc="Pass B: Encoding vectors", unit="file"):
                 chunk_file, out_path, input_hash, doc_id = entry
                 try:
-                    count, nnz, norms, duration = _process_entry(entry)
+                    count, nnz, norms, duration, quarantined = _process_entry(entry)
                 except EmbeddingProcessingError as exc:
                     manifest_log_failure(
                         stage=MANIFEST_STAGE,
@@ -2465,6 +2667,9 @@ def main(args: argparse.Namespace | None = None) -> int:
                         error=str(exc),
                     )
                     raise
+                if quarantined:
+                    quarantined_files += 1
+                    continue
                 total_vectors += count
                 splade_nnz_all.extend(nnz)
                 qwen_norms_all.extend(norms)
@@ -2480,23 +2685,34 @@ def main(args: argparse.Namespace | None = None) -> int:
                 )
                 avg_nnz_file = statistics.mean(nnz) if nnz else 0.0
                 avg_norm_file = statistics.mean(norms) if norms else 0.0
-                logger.info(
+                log_event(
+                    logger,
+                    "info",
                     "Embedding file written",
-                    extra={
-                        "extra_fields": {
-                            "doc_id": doc_id,
-                            "vectors": count,
-                            "splade_avg_nnz": round(avg_nnz_file, 3),
-                            "qwen_avg_norm": round(avg_norm_file, 4),
-                            "duration_s": round(duration, 3),
-                            "output_file": out_path.name,
-                        }
-                    },
+                    status="success",
+                    stage=EMBED_STAGE,
+                    doc_id=doc_id,
+                    input_relpath=relative_path(chunk_file, resolved_root),
+                    output_relpath=relative_path(out_path, resolved_root),
+                    elapsed_ms=int(duration * 1000),
+                    vectors=count,
+                    splade_avg_nnz=round(avg_nnz_file, 3),
+                    qwen_avg_norm=round(avg_norm_file, 4),
                 )
     finally:
         args.qwen_queue = None
         if qwen_queue is not None:
             qwen_queue.shutdown()
+
+    if quarantined_files:
+        log_event(
+            logger,
+            "warning",
+            "Quarantined chunk inputs during embedding",
+            status="quarantine-summary",
+            stage=EMBED_STAGE,
+            quarantined=quarantined_files,
+        )
 
     _current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
@@ -2509,8 +2725,16 @@ def main(args: argparse.Namespace | None = None) -> int:
     )
     avg_nnz = statistics.mean(splade_nnz_all) if splade_nnz_all else 0.0
     median_nnz = statistics.median(splade_nnz_all) if splade_nnz_all else 0.0
+    splade_p95 = _percentile(splade_nnz_all, 95.0)
+    splade_p99 = _percentile(splade_nnz_all, 99.0)
     avg_norm = statistics.mean(qwen_norms_all) if qwen_norms_all else 0.0
     std_norm = statistics.pstdev(qwen_norms_all) if len(qwen_norms_all) > 1 else 0.0
+    norm_p95 = _percentile(qwen_norms_all, 95.0)
+    norm_p99 = _percentile(qwen_norms_all, 99.0)
+    norm_low_threshold = 0.9
+    norm_high_threshold = 1.1
+    norm_low_outliers = len([n for n in qwen_norms_all if n < norm_low_threshold])
+    norm_high_outliers = len([n for n in qwen_norms_all if n > norm_high_threshold])
 
     backend_used = _get_splade_backend_used(args.splade_cfg)
 
@@ -2521,11 +2745,18 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "total_vectors": total_vectors,
                 "splade_avg_nnz": round(avg_nnz, 3),
                 "splade_median_nnz": round(median_nnz, 3),
+                "splade_p95_nnz": round(splade_p95, 3),
+                "splade_p99_nnz": round(splade_p99, 3),
                 "splade_zero_pct": round(zero_pct, 2),
                 "qwen_avg_norm": round(avg_norm, 4),
                 "qwen_std_norm": round(std_norm, 4),
+                "qwen_norm_p95": round(norm_p95, 4),
+                "qwen_norm_p99": round(norm_p99, 4),
+                "qwen_norm_low_outliers": norm_low_outliers,
+                "qwen_norm_high_outliers": norm_high_outliers,
                 "pass_b_seconds": round(elapsed_b, 3),
                 "skipped_files": skipped_files,
+                "quarantined_files": quarantined_files,
                 "files_parallel": files_parallel,
                 "splade_attn_backend_used": backend_used,
                 "sparsity_warn_threshold_pct": float(cfg.sparsity_warn_threshold_pct),
@@ -2546,25 +2777,34 @@ def main(args: argparse.Namespace | None = None) -> int:
         total_vectors=total_vectors,
         splade_avg_nnz=avg_nnz,
         splade_median_nnz=median_nnz,
+        splade_p95_nnz=splade_p95,
+        splade_p99_nnz=splade_p99,
         splade_zero_pct=zero_pct,
         qwen_avg_norm=avg_norm,
         qwen_std_norm=std_norm,
+        qwen_norm_p95=norm_p95,
+        qwen_norm_p99=norm_p99,
+        qwen_norm_low_outliers=norm_low_outliers,
+        qwen_norm_high_outliers=norm_high_outliers,
         peak_memory_gb=peak / 1024**3,
         skipped_files=skipped_files,
+        quarantined_files=quarantined_files,
         files_parallel=files_parallel,
         splade_attn_backend_used=backend_used,
         sparsity_warn_threshold_pct=float(cfg.sparsity_warn_threshold_pct),
     )
 
-    logger.info(
+    log_event(
+        logger,
+        "info",
         "[DONE] Saved vectors",
-        extra={
-            "extra_fields": {
-                "embeddings_dir": str(out_dir),
-                "processed_files": len(file_entries),
-                "skipped_files": skipped_files,
-            }
-        },
+        status="complete",
+        stage=EMBED_STAGE,
+        embeddings_dir=str(out_dir),
+        processed_files=len(file_entries),
+        skipped_files=skipped_files,
+        quarantined_files=quarantined_files,
+        total_vectors=total_vectors,
     )
 
     return 0

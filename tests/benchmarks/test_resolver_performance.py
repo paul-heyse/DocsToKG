@@ -92,6 +92,9 @@ class NullLogger:
     def log(self, record) -> None:  # pragma: no cover - trivial sink
         return None
 
+    def log_attempt(self, record, *, timestamp=None) -> None:  # pragma: no cover - benchmark helper
+        return None
+
 
 class SlowResolver:
     def __init__(self, name: str, delay: float) -> None:

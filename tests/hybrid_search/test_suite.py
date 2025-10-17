@@ -317,7 +317,6 @@ from DocsToKG.HybridSearch.store import (
 from DocsToKG.HybridSearch.types import (
     ChunkFeatures,
     ChunkPayload,
-    vector_uuid_to_faiss_int,
 )
 
 faiss = pytest.importorskip("faiss")
@@ -1262,7 +1261,8 @@ def _target_device() -> int:
 
 
 def _make_id_resolver(vector_ids: list[str]) -> Callable[[int], str | None]:
-    bridge = {vector_uuid_to_faiss_int(vid): vid for vid in vector_ids}
+    registry = ChunkRegistry()
+    bridge = {registry.to_faiss_id(vid): vid for vid in vector_ids}
     return bridge.get
 
 
@@ -1430,6 +1430,70 @@ def test_gpu_near_duplicate_detection_filters_duplicates() -> None:
     channel_scores = {"dense": fused_scores}
     results = shaper.shape([chunk_a, chunk_b], fused_scores, request, channel_scores)
     assert len(results) == 1, "GPU near-duplicate detection should filter duplicates"
+
+
+# --- test_hybridsearch_gpu_only.py ---
+
+
+def test_result_shaper_enforces_global_budgets() -> None:
+    embedding = np.ones(8, dtype=np.float32)
+    chunk_a = ChunkPayload(
+        doc_id="doc-1",
+        chunk_id="chunk-a",
+        vector_id="vec-a",
+        namespace="default",
+        text="Alpha beta gamma",
+        metadata={},
+        features=ChunkFeatures({}, {}, embedding.copy()),
+        token_count=3,
+        source_chunk_idxs=[0],
+        doc_items_refs=[],
+    )
+    chunk_b = ChunkPayload(
+        doc_id="doc-2",
+        chunk_id="chunk-b",
+        vector_id="vec-b",
+        namespace="default",
+        text="Delta epsilon zeta",
+        metadata={},
+        features=ChunkFeatures({}, {}, np.concatenate((np.ones(4), np.zeros(4))).astype(np.float32)),
+        token_count=3,
+        source_chunk_idxs=[1],
+        doc_items_refs=[],
+    )
+    chunk_c = ChunkPayload(
+        doc_id="doc-3",
+        chunk_id="chunk-c",
+        vector_id="vec-c",
+        namespace="default",
+        text="Eta theta iota",
+        metadata={},
+        features=ChunkFeatures({}, {}, np.concatenate((np.zeros(4), np.ones(4))).astype(np.float32)),
+        token_count=3,
+        source_chunk_idxs=[2],
+        doc_items_refs=[],
+    )
+
+    opensearch = OpenSearchSimulator()
+    opensearch.bulk_upsert([chunk_a, chunk_b, chunk_c])
+
+    shaper = ResultShaper(
+        opensearch,
+        FusionConfig(
+            max_chunks_per_doc=2,
+            token_budget=6,
+            byte_budget=60,
+        ),
+    )
+    request = HybridSearchRequest(query="alpha epsilon", namespace=None, filters={}, page_size=5)
+    ordered = [chunk_a, chunk_b, chunk_c]
+    fused_scores = {chunk.vector_id: score for chunk, score in zip(ordered, (1.0, 0.9, 0.8))}
+    channel_scores: Mapping[str, Mapping[str, float]] = {"dense": fused_scores, "bm25": {}, "splade": {}}
+
+    results = shaper.shape(ordered, fused_scores, request, channel_scores)
+    assert len(results) == 2, "Budgets should stop shaping before exhausting candidates"
+    assert {result.vector_id for result in results} == {"vec-a", "vec-b"}
+    assert all(result.highlights for result in results), "Highlights should come from lexical store"
 
 
 # --- test_hybridsearch_gpu_only.py ---

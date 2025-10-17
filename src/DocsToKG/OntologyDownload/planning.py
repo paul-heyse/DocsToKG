@@ -123,6 +123,7 @@ MANIFEST_JSON_SCHEMA: Dict[str, Any] = {
         "content_length": {"type": ["integer", "null"], "minimum": 0},
         "source_media_type_label": {"type": ["string", "null"]},
         "streaming_prefix_sha256": {"type": ["string", "null"]},
+        "streaming_content_sha256": {"type": ["string", "null"]},
         "expected_checksum": {
             "type": ["object", "null"],
             "properties": {
@@ -388,7 +389,7 @@ def validate_manifest_dict(payload: Mapping[str, Any], *, source: Optional[Path]
         raise ConfigurationError(f"Manifest validation failed{context}: {message}") from exc
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FetchSpec:
     """Specification describing a single ontology download.
 
@@ -474,7 +475,7 @@ def merge_defaults(
         raise ConfigError(f"{location}: {exc}") from exc
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FetchResult:
     """Outcome of a single ontology fetch operation.
 
@@ -530,7 +531,7 @@ class ExpectedChecksum:
 ResolvedConfig.model_rebuild()
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class Manifest:
     """Provenance information for a downloaded ontology artifact.
 
@@ -551,6 +552,8 @@ class Manifest:
         content_type: MIME type reported by upstream servers when available.
         content_length: Content-Length reported by upstream servers when available.
         source_media_type_label: Friendly label describing the source media type.
+        streaming_content_sha256: Streaming canonical content hash when available.
+        streaming_prefix_sha256: Hash of Turtle prefix header when available.
         downloaded_at: UTC timestamp of the completed download.
         target_formats: Desired conversion targets for normalization.
         validation: Mapping of validator names to their results.
@@ -608,6 +611,7 @@ class Manifest:
     content_length: Optional[int] = None
     source_media_type_label: Optional[str] = None
     streaming_prefix_sha256: Optional[str] = None
+    streaming_content_sha256: Optional[str] = None
     expected_checksum: Optional[ExpectedChecksum] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -638,6 +642,7 @@ class Manifest:
             "content_length": self.content_length,
             "source_media_type_label": self.source_media_type_label,
             "streaming_prefix_sha256": self.streaming_prefix_sha256,
+            "streaming_content_sha256": self.streaming_content_sha256,
             "expected_checksum": (
                 self.expected_checksum.to_mapping() if self.expected_checksum else None
             ),
@@ -1668,6 +1673,7 @@ def fetch_one(
                 validation_results = run_validators(validation_requests, adapter)
 
                 normalized_hash = None
+                streaming_content_hash = None
                 normalization_mode = "none"
                 rdflib_result = validation_results.get("rdflib")
                 if rdflib_result and isinstance(rdflib_result.details, dict):
@@ -1677,6 +1683,9 @@ def fetch_one(
                     maybe_mode = rdflib_result.details.get("normalization_mode")
                     if isinstance(maybe_mode, str):
                         normalization_mode = maybe_mode
+                    maybe_streaming_content = rdflib_result.details.get("streaming_nt_sha256")
+                    if isinstance(maybe_streaming_content, str):
+                        streaming_content_hash = maybe_streaming_content
 
                 streaming_prefix_hash = None
                 for item in validation_results.values():
@@ -1686,19 +1695,22 @@ def fetch_one(
                         if isinstance(maybe_stream, str):
                             streaming_prefix_hash = maybe_stream
                             break
+                        if streaming_content_hash is None:
+                            maybe_stream_hash = details.get("streaming_nt_sha256")
+                            if isinstance(maybe_stream_hash, str):
+                                streaming_content_hash = maybe_stream_hash
 
                 target_formats_sorted = ",".join(sorted(effective_spec.target_formats))
 
+                content_fingerprint_basis = (
+                    streaming_content_hash or normalized_hash or result.sha256
+                )
                 fingerprint_components = [
                     MANIFEST_SCHEMA_VERSION,
-                    effective_spec.id,
-                    effective_spec.resolver,
-                    version,
-                    result.sha256,
-                    normalized_hash or "",
-                    secure_url,
-                    target_formats_sorted,
+                    content_fingerprint_basis or "",
+                    streaming_prefix_hash or "",
                     normalization_mode,
+                    target_formats_sorted,
                 ]
                 fingerprint = hashlib.sha256(
                     "|".join(fingerprint_components).encode("utf-8")
@@ -1726,6 +1738,7 @@ def fetch_one(
                     sha256=result.sha256,
                     normalized_sha256=normalized_hash,
                     fingerprint=fingerprint,
+                    streaming_content_sha256=streaming_content_hash,
                     etag=result.etag,
                     last_modified=result.last_modified,
                     content_type=content_type,
@@ -1745,6 +1758,8 @@ def fetch_one(
                     "downloaded_at": manifest.downloaded_at,
                     "sha256": manifest.sha256,
                     "normalized_sha256": manifest.normalized_sha256,
+                    "streaming_content_sha256": manifest.streaming_content_sha256,
+                    "streaming_prefix_sha256": manifest.streaming_prefix_sha256,
                     "etag": manifest.etag,
                     "size": destination.stat().st_size if destination.exists() else None,
                     "source_url": manifest.url,

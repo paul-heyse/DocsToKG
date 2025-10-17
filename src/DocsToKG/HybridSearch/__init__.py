@@ -53,9 +53,12 @@ from __future__ import annotations
 __all__ = (
     "AdapterStats",
     "ChunkPayload",
+    "ChunkIngestionPipeline",
+    "DocumentInput",
     "FaissRouter",
     "FaissVectorStore",
     "HybridSearchAPI",
+    "HybridSearchConfigManager",
     "HybridSearchRequest",
     "HybridSearchResponse",
     "HybridSearchResult",
@@ -70,7 +73,8 @@ __all__ = (
 
 # --- Re-exports ---
 
-from .pipeline import Observability
+from .config import HybridSearchConfigManager
+from .pipeline import ChunkIngestionPipeline, Observability
 from .router import FaissRouter
 from .service import HybridSearchAPI, HybridSearchService, HybridSearchValidator
 from .store import (
@@ -80,4 +84,10 @@ from .store import (
     restore_state,
     serialize_state,
 )
-from .types import ChunkPayload, HybridSearchRequest, HybridSearchResponse, HybridSearchResult
+from .types import (
+    ChunkPayload,
+    DocumentInput,
+    HybridSearchRequest,
+    HybridSearchResponse,
+    HybridSearchResult,
+)

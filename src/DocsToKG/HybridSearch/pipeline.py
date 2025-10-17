@@ -95,7 +95,7 @@ from typing import (
 
 import numpy as np
 
-from .devtools.features import (  # noqa: F401
+from .features import (  # noqa: F401
     FeatureGenerator,
     sliding_window,
     tokenize,

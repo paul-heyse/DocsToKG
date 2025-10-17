@@ -1,40 +1,115 @@
-"""
-Compatibility layer for the retired ``DocsToKG.HybridSearch.features`` module.
-
-This shim is gated behind the ``DOCSTOKG_HYBRID_FEATURES_SHIM`` environment
-variable. By default the module raises an ImportError instructing callers to
-switch to ``DocsToKG.HybridSearch.devtools.features``. Setting the environment
-variable to a truthy value temporarily re-enables the shim (and emits a
-DeprecationWarning) so teams can smoke-test outstanding imports.
-"""
+"""Feature generation helpers for DocsToKG hybrid search."""
 
 from __future__ import annotations
 
-import importlib
-import os
-import warnings
+import hashlib
+import re
+from collections import Counter
+from typing import Dict, Iterator, List, Sequence, Tuple
 
-_ALLOW_SHIM = os.getenv("DOCSTOKG_HYBRID_FEATURES_SHIM")
+import numpy as np
+from numpy.typing import NDArray
 
-if not _ALLOW_SHIM or _ALLOW_SHIM.strip().lower() in {"", "0", "false", "no"}:
-    raise ImportError(
-        "DocsToKG.HybridSearch.features has been retired. Import from "
-        "DocsToKG.HybridSearch.devtools.features instead. "
-        "Set DOCSTOKG_HYBRID_FEATURES_SHIM=1 temporarily if you must rely on "
-        "the legacy shim while migrating."
-    )
+from .types import ChunkFeatures
 
-warnings.warn(
-    "DocsToKG.HybridSearch.features is deprecated; import from "
-    "DocsToKG.HybridSearch.devtools.features instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
+__all__ = ("FeatureGenerator", "sliding_window", "tokenize", "tokenize_with_spans")
 
-_devtools_features = importlib.import_module(".devtools.features", package=__package__)
-__all__ = getattr(
-    _devtools_features,
-    "__all__",
-    [name for name in dir(_devtools_features) if not name.startswith("_")],
-)
-globals().update({name: getattr(_devtools_features, name) for name in __all__})
+_TOKEN_PATTERN = re.compile(r"[\w']+")
+
+
+def tokenize(text: str) -> List[str]:
+    """Tokenize ``text`` into lower-cased alphanumeric tokens."""
+
+    return [match.group(0).lower() for match in _TOKEN_PATTERN.finditer(text)]
+
+
+def tokenize_with_spans(text: str) -> Tuple[List[str], List[Tuple[int, int]]]:
+    """Tokenize ``text`` and return token spans for highlight generation."""
+
+    tokens: List[str] = []
+    spans: List[Tuple[int, int]] = []
+    for match in _TOKEN_PATTERN.finditer(text):
+        tokens.append(match.group(0).lower())
+        spans.append((match.start(), match.end()))
+    return tokens, spans
+
+
+def sliding_window(
+    tokens: Sequence[str],
+    window: int,
+    overlap: int,
+) -> Iterator[List[str]]:
+    """Yield sliding windows across ``tokens`` with ``overlap`` between chunks."""
+
+    if window <= 0:
+        raise ValueError("window must be positive")
+    if overlap < 0:
+        raise ValueError("overlap must be non-negative")
+    if overlap >= window:
+        raise ValueError("overlap must be smaller than window")
+    start = 0
+    step = window - overlap
+    while start < len(tokens):
+        end = min(len(tokens), start + window)
+        yield list(tokens[start:end])
+        start += step
+
+
+class FeatureGenerator:
+    """Deterministic feature generator used by tests and validation harnesses."""
+
+    def __init__(self, *, embedding_dim: int = 2560) -> None:
+        if embedding_dim <= 0:
+            raise ValueError("embedding_dim must be positive")
+        self._embedding_dim = embedding_dim
+
+    @property
+    def embedding_dim(self) -> int:
+        """Return the configured dense embedding dimensionality."""
+
+        return self._embedding_dim
+
+    def compute_features(self, text: str) -> ChunkFeatures:
+        """Compute synthetic BM25, SPLADE, and dense vector features."""
+
+        tokens = tokenize(text)
+        return ChunkFeatures(
+            bm25_terms=self._compute_bm25(tokens),
+            splade_weights=self._compute_splade(tokens),
+            embedding=self._compute_dense_embedding(tokens),
+        )
+
+    def _compute_bm25(self, tokens: Sequence[str]) -> Dict[str, float]:
+        counter = Counter(tokens)
+        return {token: float(1.0 + np.log1p(freq)) for token, freq in counter.items()}
+
+    def _compute_splade(self, tokens: Sequence[str]) -> Dict[str, float]:
+        counter = Counter(tokens)
+        if not counter:
+            return {}
+        max_tf = max(counter.values())
+        output: Dict[str, float] = {}
+        for token, tf in counter.items():
+            output[token] = float(np.log1p(tf) * (0.5 + tf / max_tf))
+        return output
+
+    def _compute_dense_embedding(self, tokens: Sequence[str]) -> NDArray[np.float32]:
+        if not tokens:
+            return np.zeros(self._embedding_dim, dtype=np.float32)
+        aggregate = np.zeros(self._embedding_dim, dtype=np.float32)
+        for token in tokens:
+            aggregate += self._hash_to_vector(token)
+        return self._normalize(aggregate)
+
+    def _hash_to_vector(self, token: str) -> NDArray[np.float32]:
+        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        chunk = np.frombuffer(digest, dtype=np.uint8)
+        repeat = int(np.ceil(self._embedding_dim / chunk.size))
+        tiled = np.tile(chunk, repeat)[: self._embedding_dim]
+        return tiled.astype(np.float32) / 255.0
+
+    def _normalize(self, vector: NDArray[np.float32]) -> NDArray[np.float32]:
+        norm = np.linalg.norm(vector)
+        if norm == 0.0:
+            return vector
+        return vector / norm

@@ -151,11 +151,14 @@ import importlib
 import json
 import os
 import time
+import uuid
+import statistics
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Sequence, Tuple
+import uuid
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
@@ -195,6 +198,7 @@ from DocsToKG.DocParsing.core import (
     acquire_lock,
     atomic_write,
     build_subcommand,
+    quarantine_artifact,
     compute_chunk_uuid,
     compute_content_hash,
     compute_relative_doc_id,
@@ -215,6 +219,7 @@ from DocsToKG.DocParsing.core import (
     manifest_log_success,
     prepare_data_root,
     resolve_pipeline_path,
+    relative_path,
     set_spawn_or_warn,
     should_skip_output,
 )
@@ -231,6 +236,7 @@ from DocsToKG.DocParsing.formats import (
 )
 
 SOFT_BARRIER_MARGIN = 64
+CHUNK_STAGE = "chunking"
 
 
 def _resolve_serializer_provider(spec: str):
@@ -254,42 +260,106 @@ def _resolve_serializer_provider(spec: str):
     return provider_cls
 
 
-def _validate_chunk_files(files: Sequence[Path], logger) -> tuple[int, int]:
+def _validate_chunk_files(
+    files: Sequence[Path],
+    logger,
+    *,
+    data_root: Optional[Path] = None,
+) -> tuple[int, int]:
     """Validate chunk JSONL rows across supplied files."""
 
-    total_files = 0
-    total_rows = 0
-    errors: List[str] = []
+    validated_files = 0
+    validated_rows = 0
+    quarantined_files = 0
 
     for path in files:
-        total_files += 1
+        if not path.exists():
+            continue
+        file_rows = 0
+        file_errors: List[str] = []
         with path.open("r", encoding="utf-8", errors="replace") as handle:
             for line_no, line in enumerate(handle, start=1):
                 line = line.strip()
                 if not line:
                     continue
-                total_rows += 1
+                file_rows += 1
                 try:
                     validate_chunk_row(json.loads(line))
                 except ValueError as exc:
                     message = f"{path}:{line_no}: {exc}"
-                    logger.error("Chunk validation error: %s", message)
-                    errors.append(message)
+                    log_event(
+                        logger,
+                        "error",
+                        "Chunk validation error",
+                        status="invalid",
+                        stage=CHUNK_STAGE,
+                        doc_id=path.stem,
+                        input_relpath=relative_path(path, data_root),
+                        error_class="ValidationError",
+                        detail=message,
+                    )
+                    file_errors.append(message)
 
-    if errors:
-        preview = ", ".join(errors[:5])
-        if len(errors) > 5:
-            preview += ", ..."
-        raise ValueError(
-            "Chunk validation failed; fix the highlighted rows before continuing: " + preview
+        if file_errors:
+            reason = ", ".join(file_errors[:3])
+            if len(file_errors) > 3:
+                reason += ", ..."
+            try:
+                input_hash = compute_content_hash(path)
+            except Exception:
+                input_hash = ""
+            doc_id = path.stem
+            quarantine_path = quarantine_artifact(path, reason=reason, logger=logger)
+            manifest_log_failure(
+                stage=MANIFEST_STAGE,
+                doc_id=doc_id,
+                duration_s=0.0,
+                schema_version=CHUNK_SCHEMA_VERSION,
+                input_path=path,
+                input_hash=input_hash,
+                output_path=quarantine_path,
+                error=reason,
+                quarantine=True,
+            )
+            log_event(
+                logger,
+                "warning",
+                "Chunk file quarantined",
+                status="quarantine",
+                stage=CHUNK_STAGE,
+                doc_id=doc_id,
+                input_relpath=relative_path(path, data_root),
+                output_relpath=relative_path(quarantine_path, data_root),
+                error_class="ValidationError",
+                reason=reason,
+            )
+            quarantined_files += 1
+            continue
+
+        validated_files += 1
+        validated_rows += file_rows
+
+    if quarantined_files:
+        logger.warning(
+            "Quarantined chunk files",
+            extra={"extra_fields": {"quarantined": quarantined_files}},
         )
 
-    logger.info(
+    log_event(
+        logger,
+        "info",
         "Chunk validation complete",
-        extra={"extra_fields": {"files": total_files, "rows": total_rows}},
+        status="validate-only",
+        stage=CHUNK_STAGE,
+        files=validated_files,
+        rows=validated_rows,
+        quarantined=quarantined_files,
     )
-    print(f"Validated {total_rows} rows across {total_files} chunk files.")
-    return total_files, total_rows
+    print(
+        f"Validated {validated_rows} rows across {validated_files} chunk files."
+        + (f" Quarantined {quarantined_files} files." if quarantined_files else "")
+    )
+    return validated_files, validated_rows
 
 
 # --- Defaults ---
@@ -320,6 +390,7 @@ class ChunkerCfg(StageConfigBase):
     validate_only: bool = False
     resume: bool = False
     force: bool = False
+    inject_anchors: bool = False
 
     ENV_VARS: ClassVar[Dict[str, str]] = {
         "log_level": "DOCSTOKG_CHUNK_LOG_LEVEL",
@@ -338,6 +409,7 @@ class ChunkerCfg(StageConfigBase):
         "validate_only": "DOCSTOKG_CHUNK_VALIDATE_ONLY",
         "resume": "DOCSTOKG_CHUNK_RESUME",
         "force": "DOCSTOKG_CHUNK_FORCE",
+        "inject_anchors": "DOCSTOKG_CHUNK_INJECT_ANCHORS",
         "config": "DOCSTOKG_CHUNK_CONFIG",
     }
 
@@ -359,6 +431,7 @@ class ChunkerCfg(StageConfigBase):
         "validate_only": StageConfigBase._coerce_bool,
         "resume": StageConfigBase._coerce_bool,
         "force": StageConfigBase._coerce_bool,
+        "inject_anchors": StageConfigBase._coerce_bool,
     }
 
     @classmethod
@@ -635,6 +708,7 @@ def summarize_image_metadata(
             return
 
     def _normalise_meta(payload: object, doc_item: object) -> List[Dict[str, Any]]:
+        """Convert DocTags picture metadata into detached dictionaries safe for JSON."""
         entries: List[Dict[str, Any]] = []
         if isinstance(payload, dict):
             candidates = [payload]
@@ -709,6 +783,7 @@ def _extract_chunk_start(chunk: BaseChunk) -> Optional[int]:
     candidates: List[int] = []
 
     def _collect(source: object, *attrs: str) -> None:
+        """Harvest integer attributes from ``source`` and add them to ``candidates``."""
         if source is None:
             return
         for attr in attrs:
@@ -1283,16 +1358,20 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         setattr(namespace, field_def.name, getattr(cfg, field_def.name))
 
     log_level = getattr(namespace, "log_level", "INFO")
-    logger = get_logger(__name__, level=str(log_level))
+    run_id = uuid.uuid4().hex
+    logger = get_logger(
+        __name__,
+        level=str(log_level),
+        base_fields={"run_id": run_id, "stage": CHUNK_STAGE},
+    )
     if profile and defaults:
-        logger.info(
+        log_event(
+            logger,
+            "info",
             "Applying profile",
-            extra={
-                "extra_fields": {
-                    "profile": profile,
-                    **{key: defaults[key] for key in sorted(defaults)},
-                }
-            },
+            status="profile",
+            profile=profile,
+            **{key: defaults[key] for key in sorted(defaults)},
         )
     set_spawn_or_warn(logger)
     args = namespace
@@ -1377,6 +1456,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     data_root_overridden = data_root_override is not None
     resolved_data_root = prepare_data_root(data_root_override, DEFAULT_DATA_ROOT)
     ensure_model_environment()
+    logger.bind(data_root=str(resolved_data_root))
 
     html_manifest_index = load_manifest_index("doctags-html", resolved_data_root)
     pdf_manifest_index = load_manifest_index("doctags-pdf", resolved_data_root)
@@ -1410,9 +1490,14 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     out_dir = out_dir.resolve()
     args.in_dir = in_dir
     args.out_dir = out_dir
+    logger.bind(
+        input_relpath=relative_path(in_dir, resolved_data_root),
+        output_relpath=relative_path(out_dir, resolved_data_root),
+    )
     config_snapshot["data_root"] = str(resolved_data_root)
     config_snapshot["in_dir"] = str(in_dir)
     config_snapshot["out_dir"] = str(out_dir)
+    config_snapshot["run_id"] = run_id
 
     heading_markers: Tuple[str, ...] = DEFAULT_HEADING_MARKERS
     caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS
@@ -1500,7 +1585,17 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     )
 
     if getattr(args, "validate_only", False):
-        _validate_chunk_files(files, logger)
+        _run_validate_only(
+            files=files,
+            logger=logger,
+            cfg=cfg,
+            tokenizer_model=tokenizer_model,
+            heading_markers=heading_markers,
+            caption_markers=caption_markers,
+            data_root=resolved_data_root,
+            in_dir=in_dir,
+            out_dir=out_dir,
+        )
         return 0
 
     chunk_config = ChunkWorkerConfig(
@@ -1547,7 +1642,14 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
             "custom_caption_markers": custom_caption_markers,
         }
     )
-    logger.info("Chunking configuration", extra={"extra_fields": config_payload})
+    log_event(
+        logger,
+        "info",
+        "Chunking configuration",
+        status="config",
+        stage=CHUNK_STAGE,
+        **config_payload,
+    )
     manifest_log_success(
         stage=MANIFEST_STAGE,
         doc_id="__config__",
@@ -1582,6 +1684,16 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
                 schema_version=CHUNK_SCHEMA_VERSION,
                 parse_engine=parse_engine,
             )
+            log_event(
+                logger,
+                "info",
+                "Skipping chunk file: output exists and input unchanged",
+                status="skip",
+                stage=CHUNK_STAGE,
+                doc_id=doc_id,
+                input_relpath=relative_path(path, resolved_data_root),
+                output_relpath=relative_path(out_path, resolved_data_root),
+            )
             continue
 
         tasks.append(
@@ -1606,6 +1718,19 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         """
         duration = round(result.duration_s, 3)
         if result.status != "success":
+            log_event(
+                logger,
+                "error",
+                "Chunking failed",
+                status="failure",
+                stage=CHUNK_STAGE,
+                doc_id=result.doc_id,
+                input_relpath=relative_path(result.input_path, resolved_data_root),
+                output_relpath=relative_path(result.output_path, resolved_data_root),
+                elapsed_ms=int(result.duration_s * 1000),
+                error_class="RuntimeError",
+                error=result.error or "unknown error",
+            )
             manifest_log_failure(
                 stage=MANIFEST_STAGE,
                 doc_id=result.doc_id,
@@ -1621,18 +1746,18 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
                 f"Chunking failed for {result.doc_id}: {result.error or 'unknown error'}"
             )
 
-        logger.info(
+        log_event(
+            logger,
+            "info",
             "Chunk file written",
-            extra={
-                "extra_fields": {
-                    "doc_id": result.doc_id,
-                    "doc_stem": result.doc_stem,
-                    "chunks": result.chunk_count,
-                    "output_file": result.output_path.name,
-                    "duration_s": duration,
-                    "parse_engine": result.parse_engine,
-                }
-            },
+            status="success",
+            stage=CHUNK_STAGE,
+            doc_id=result.doc_id,
+            input_relpath=relative_path(result.input_path, resolved_data_root),
+            output_relpath=relative_path(result.output_path, resolved_data_root),
+            elapsed_ms=int(result.duration_s * 1000),
+            chunk_count=result.chunk_count,
+            parse_engine=result.parse_engine,
         )
         manifest_log_success(
             stage=MANIFEST_STAGE,
@@ -1668,3 +1793,129 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
 
 if __name__ == "__main__":
     raise SystemExit(main())
+def _run_validate_only(
+    *,
+    files: Sequence[Path],
+    logger,
+    cfg: ChunkerCfg,
+    tokenizer_model: str,
+    heading_markers: Tuple[str, ...],
+    caption_markers: Tuple[str, ...],
+    data_root: Optional[Path],
+    in_dir: Path,
+    out_dir: Path,
+) -> None:
+    """Validate chunk inputs and report statistics without writing outputs."""
+
+    validated_files, validated_rows = _validate_chunk_files(
+        files,
+        logger,
+        data_root=data_root,
+    )
+    if not validated_files:
+        logger.info("No chunk files validated; exiting validate-only mode")
+        print("No chunk files validated.")
+        return
+
+    logger.bind(mode="validate-only")
+
+    ensure_model_environment()
+    hf = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
+    tokenizer = HuggingFaceTokenizer(tokenizer=hf, max_tokens=cfg.max_tokens)
+    provider_cls = _resolve_serializer_provider(str(cfg.serializer_provider))
+    provider = provider_cls()
+    chunker = HybridChunker(
+        tokenizer=tokenizer,
+        merge_peers=True,
+        serializer_provider=provider,
+    )
+
+    total_chunks = 0
+    total_records = 0
+    token_counts: List[int] = []
+    boundary_violations = 0
+    heading_hits = 0
+    caption_hits = 0
+
+    for path in files:
+        if not path.exists():
+            continue
+        doctags_text = read_utf8(path)
+        doc = build_doc(doc_name=path.stem, doctags_text=doctags_text)
+        chunks = list(chunker.chunk(dl_doc=doc))
+        total_chunks += len(chunks)
+        recs: List[Rec] = []
+        for idx, ch in enumerate(chunks):
+            text = chunker.contextualize(ch)
+            n_tok = tokenizer.count_tokens(text=text)
+            has_caption, has_classification, num_images, image_confidence, picture_meta = (
+                summarize_image_metadata(ch, text)
+            )
+            recs.append(
+                Rec(
+                    text=text,
+                    n_tok=n_tok,
+                    src_idxs=[idx],
+                    refs=[],
+                    pages=[],
+                    has_image_captions=has_caption,
+                    has_image_classification=has_classification,
+                    num_images=num_images,
+                    image_confidence=image_confidence,
+                    start_offset=_extract_chunk_start(ch),
+                    picture_meta=picture_meta,
+                )
+            )
+        coalesced = coalesce_small_runs(
+            records=recs,
+            tokenizer=tokenizer,
+            min_tokens=cfg.min_tokens,
+            max_tokens=cfg.max_tokens,
+            soft_barrier_margin=cfg.soft_barrier_margin,
+            heading_markers=heading_markers,
+            caption_markers=caption_markers,
+        )
+        total_records += len(coalesced)
+        token_counts.extend(rec.n_tok for rec in coalesced)
+        boundary_violations += sum(
+            1 for rec in coalesced if rec.text.strip().startswith(heading_markers)
+        )
+        heading_hits += sum(1 for rec in coalesced if rec.text.strip().startswith(heading_markers))
+        caption_hits += sum(
+            1
+            for rec in coalesced
+            if any(marker in rec.text for marker in caption_markers if marker)
+        )
+
+    avg_tokens = statistics.mean(token_counts) if token_counts else 0.0
+    min_tokens = min(token_counts) if token_counts else 0
+    max_tokens = max(token_counts) if token_counts else 0
+
+    log_event(
+        logger,
+        "info",
+        "Validate-only summary",
+        status="validate-only-summary",
+        stage=CHUNK_STAGE,
+        validated_files=validated_files,
+        validated_rows=validated_rows,
+        generated_chunks=total_records,
+        avg_tokens=round(avg_tokens, 2),
+        min_tokens=min_tokens,
+        max_tokens=max_tokens,
+        heading_hits=heading_hits,
+        caption_hits=caption_hits,
+        boundary_violations=boundary_violations,
+        input_relpath=relative_path(in_dir, data_root),
+        output_relpath=relative_path(out_dir, data_root),
+    )
+    print(
+        "Validate-only report:\n"
+        f"  Files checked: {validated_files}\n"
+        f"  Rows checked: {validated_rows}\n"
+        f"  Generated chunks: {total_records}\n"
+        f"  Tokens (avg/min/max): {avg_tokens:.2f} / {min_tokens} / {max_tokens}\n"
+        f"  Heading hits: {heading_hits}\n"
+        f"  Caption hits: {caption_hits}\n"
+        f"  Boundary violations: {boundary_violations}"
+    )

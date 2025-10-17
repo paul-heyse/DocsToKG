@@ -93,7 +93,6 @@ Key Features:
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -115,27 +114,7 @@ __all__ = (
     "HybridSearchResult",
     "ValidationReport",
     "ValidationSummary",
-    "vector_uuid_to_faiss_int",
 )
-
-_MASK_63_BITS = (1 << 63) - 1
-
-
-# --- Public Functions ---
-
-
-def vector_uuid_to_faiss_int(vector_id: str) -> int:
-    """Return the FAISS-compatible integer identifier for a vector UUID.
-
-    Args:
-        vector_id: UUID string identifying the stored document vector.
-
-    Returns:
-        int: 63-bit integer compatible with FAISS index identifiers.
-    """
-
-    return uuid.UUID(vector_id).int & _MASK_63_BITS
-
 
 # --- Public Classes ---
 

@@ -26,7 +26,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol, Set, Tuple, runtime_checkable
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
@@ -44,7 +44,7 @@ MANIFEST_SCHEMA_VERSION = 2
 SQLITE_SCHEMA_VERSION = 2
 
 
-@dataclass
+@dataclass(frozen=True)
 class ManifestEntry:
     """Structured manifest entry describing a resolved artifact.
 
@@ -110,6 +110,7 @@ class ManifestEntry:
     run_id: Optional[str] = None
 
 
+@runtime_checkable
 class AttemptSink(Protocol):
     """Protocol implemented by telemetry sinks used by the pipeline and CLI.
 
@@ -187,6 +188,12 @@ class AttemptSink(Protocol):
         Raises:
             Exception: Implementations may propagate shutdown failures.
         """
+
+    def __enter__(self) -> "AttemptSink":  # pragma: no cover - structural typing helper
+        """Enter the runtime context for the sink."""
+
+    def __exit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - structural typing helper
+        """Exit the runtime context for the sink."""
 
 
 def _utc_timestamp() -> str:

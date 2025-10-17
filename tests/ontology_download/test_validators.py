@@ -428,7 +428,13 @@ def test_run_validators_matches_sequential(monkeypatch, tmp_path, config):
 
     assert set(seq_results) == set(conc_results) == set(validators)
     for name in validators:
-        assert seq_results[name].details == conc_results[name].details
+        assert "metrics" in seq_results[name].details
+        assert "metrics" in conc_results[name].details
+        seq_details = dict(seq_results[name].details)
+        conc_details = dict(conc_results[name].details)
+        seq_details.pop("metrics", None)
+        conc_details.pop("metrics", None)
+        assert seq_details == conc_details
 
 
 def test_sort_triple_file_falls_back_without_sort(monkeypatch, tmp_path):
@@ -574,6 +580,9 @@ def _noop_logger():
             pass
 
         def warning(self, *args, **kwargs):
+            pass
+
+        def error(self, *args, **kwargs):
             pass
 
     return _Logger()

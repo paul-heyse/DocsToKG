@@ -40,6 +40,9 @@ embedding = _embedding
 
 # Track which shims have emitted deprecation warnings to avoid duplicates.
 _SHIM_WARNED: set[str] = set()
+_SHIM_LOGGED: set[str] = set()
+
+_PDF_PIPELINE_REMOVAL_VERSION = "2.0.0"
 
 # Legacy alias retained for backwards compatibility
 pipelines = _doctags
@@ -82,6 +85,7 @@ def _populate_forwarding_module(module: types.ModuleType, target, *, doc_hint: s
     )
 
     def __getattr__(attr: str):
+        """Delegate attribute lookups to the replacement module populated above."""
         return getattr(target, attr)
 
     module.__getattr__ = __getattr__  # type: ignore[attr-defined]
@@ -116,10 +120,25 @@ def _populate_pdf_pipeline_module(module: types.ModuleType) -> None:
     """Populate the legacy ``pdf_pipeline`` module shim with a deprecation warning."""
 
     warnings.warn(
-        "DocsToKG.DocParsing.pdf_pipeline is deprecated; use DocsToKG.DocParsing.doctags",
+        (
+            "DocsToKG.DocParsing.pdf_pipeline is deprecated and will be removed in "
+            f"DocsToKG { _PDF_PIPELINE_REMOVAL_VERSION }; use DocsToKG.DocParsing.doctags"
+        ),
         DeprecationWarning,
         stacklevel=2,
     )
+    alias = module.__name__
+    if alias not in _SHIM_LOGGED:
+        logger = _core.get_logger(__name__)
+        _core.log_event(
+            logger,
+            "warning",
+            "pdf_pipeline shim is deprecated",
+            module=alias,
+            replacement="DocsToKG.DocParsing.doctags",
+            removal_version=_PDF_PIPELINE_REMOVAL_VERSION,
+        )
+        _SHIM_LOGGED.add(alias)
 
     backend = _doctags
     module.legacy_module = backend

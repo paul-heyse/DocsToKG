@@ -604,6 +604,7 @@ import hashlib
 import importlib
 import json
 import logging
+import math
 import os
 import shutil
 import socket
@@ -670,6 +671,7 @@ def _ensure_str_sequence(value: object, label: str) -> List[str]:
 
 
 def _load_yaml_markers(raw: str) -> object:
+    """Deserialize YAML marker overrides, raising when PyYAML is unavailable."""
     try:
         import yaml
     except ImportError as exc:  # pragma: no cover - optional dependency
@@ -680,6 +682,7 @@ def _load_yaml_markers(raw: str) -> object:
 
 
 def _load_toml_markers(raw: str) -> object:
+    """Deserialize TOML marker definitions with compatibility fallbacks."""
     try:
         import tomllib  # Python 3.11+
     except ModuleNotFoundError:  # pragma: no cover - fallback path
@@ -1001,6 +1004,7 @@ class StageConfigBase:
         return payload
 
     def _coerce_field(self, name: str, value: Any, base_dir: Optional[Path]) -> Any:
+        """Run field-specific coercion logic before manifest serialization."""
         parser = self.FIELD_PARSERS.get(name)
         if parser is None:
             return value
@@ -1040,10 +1044,12 @@ __all__ = [
     "jsonl_load",
     "jsonl_save",
     "jsonl_append_iter",
+    "build_jsonl_split_map",
     "get_logger",
     "log_event",
     "Batcher",
     "compute_chunk_uuid",
+    "quarantine_artifact",
     "manifest_append",
     "manifest_log_failure",
     "manifest_log_skip",
@@ -1059,6 +1065,7 @@ __all__ = [
     "compute_relative_doc_id",
     "compute_stable_shard",
     "should_skip_output",
+    "relative_path",
     "init_hf_env",
     "ensure_model_environment",
     "ensure_splade_dependencies",
@@ -1148,6 +1155,7 @@ class ChunkWorkerConfig:
     caption_markers: Tuple[str, ...]
     docling_version: str
     serializer_provider_spec: str = DEFAULT_SERIALIZER_PROVIDER
+    inject_anchors: bool = False
 
 
 @dataclass(slots=True)
@@ -1160,6 +1168,7 @@ class ChunkTask:
     doc_stem: str
     input_hash: str
     parse_engine: str
+    sanitizer_profile: Optional[str] = None
 
 
 @dataclass(slots=True)
@@ -1175,6 +1184,8 @@ class ChunkResult:
     input_hash: str
     chunk_count: int
     parse_engine: str
+    sanitizer_profile: Optional[str] = None
+    anchors_injected: bool = False
     error: Optional[str] = None
 
 
@@ -1758,7 +1769,35 @@ def manifest_log_failure(
 # --- Logging and I/O Utilities ---
 
 
-def get_logger(name: str, level: str = "INFO") -> logging.Logger:
+class StructuredLogger(logging.LoggerAdapter):
+    """Logger adapter that enriches structured logs with shared context."""
+
+    def __init__(self, logger: logging.Logger, base_fields: Optional[Dict[str, Any]] = None) -> None:
+        super().__init__(logger, {})
+        self.base_fields: Dict[str, Any] = dict(base_fields or {})
+
+    def process(self, msg: str, kwargs: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+        extra = kwargs.setdefault("extra", {})
+        fields = dict(self.base_fields)
+        extra_fields = extra.get("extra_fields")
+        if isinstance(extra_fields, dict):
+            fields.update(extra_fields)
+        extra["extra_fields"] = fields
+        kwargs["extra"] = extra
+        return msg, kwargs
+
+    def bind(self, **fields: object) -> "StructuredLogger":
+        filtered = {k: v for k, v in fields.items() if v is not None}
+        self.base_fields.update(filtered)
+        return self
+
+    def child(self, **fields: object) -> "StructuredLogger":
+        merged = dict(self.base_fields)
+        merged.update({k: v for k, v in fields.items() if v is not None})
+        return StructuredLogger(self.logger, merged)
+
+
+def get_logger(name: str, level: str = "INFO", *, base_fields: Optional[Dict[str, Any]] = None) -> StructuredLogger:
     """Get a structured JSON logger configured for console output.
 
     Args:
@@ -1819,7 +1858,7 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
         logger.addHandler(handler)
         logger.propagate = False
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    return logger
+    return StructuredLogger(logger, base_fields)
 
 
 def log_event(logger: logging.Logger, level: str, message: str, **fields: object) -> None:
@@ -1965,64 +2004,17 @@ def iter_chunks(directory: Path) -> Iterator[Path]:
 
 
 def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> List[dict]:
-    """Load a JSONL file into memory with optional error tolerance.
+    """Load a JSONL file into memory with optional error tolerance."""
 
-    Args:
-        path: JSON Lines file to read.
-        skip_invalid: When ``True``, invalid lines are skipped up to
-            ``max_errors`` occurrences instead of raising immediately.
-        max_errors: Maximum number of errors to tolerate when
-            ``skip_invalid`` is ``True``.
-
-    Returns:
-        List of parsed dictionaries.
-
-    Raises:
-        ValueError: If a malformed JSON line is encountered and ``skip_invalid``
-            is ``False``.
-
-    Examples:
-        >>> tmp = Path("/tmp/example.jsonl")
-        >>> _ = tmp.write_text('{"a": 1}\n', encoding="utf-8")
-        >>> jsonl_load(tmp)
-        [{'a': 1}]
-    """
-
-    logger = get_logger(__name__)
-    rows: List[dict] = []
-    errors: List[str] = []
-    with path.open("r", encoding="utf-8", errors="replace") as handle:
-        for line_number, line in enumerate(handle, start=1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rows.append(json.loads(line))
-            except json.JSONDecodeError as exc:  # pragma: no cover - exercised via tests
-                message = f"Line {line_number}: {exc}"
-                if skip_invalid:
-                    errors.append(message)
-                    if len(errors) >= max_errors:
-                        logger.error(
-                            "Too many JSON errors",
-                            extra={
-                                "extra_fields": {
-                                    "path": str(path),
-                                    "errors": len(errors),
-                                }
-                            },
-                        )
-                        break
-                else:
-                    raise ValueError(
-                        f"Invalid JSON in {path} at line {line_number}: {exc}"
-                    ) from exc
-    if errors:
-        logger.warning(
-            "Skipped invalid JSON lines",
-            extra={"extra_fields": {"path": str(path), "skipped": len(errors)}},
+    return list(
+        _iter_jsonl_records(
+            path,
+            start=None,
+            end=None,
+            skip_invalid=skip_invalid,
+            max_errors=max_errors,
         )
-    return rows
+    )
 
 
 def jsonl_save(
@@ -2104,57 +2096,165 @@ def jsonl_append_iter(
     return count
 
 
+def build_jsonl_split_map(
+    path: Path,
+    *,
+    chunk_bytes: int = 32 * 1024 * 1024,
+    min_chunk_bytes: int = 1 * 1024 * 1024,
+) -> List[Tuple[int, int]]:
+    """Return newline-aligned byte ranges that partition ``path``."""
+
+    size = path.stat().st_size
+    if size == 0:
+        return [(0, 0)]
+
+    chunk_bytes = max(chunk_bytes, min_chunk_bytes)
+    offsets: List[Tuple[int, int]] = []
+    with path.open("rb") as handle:
+        start = 0
+        while start < size:
+            target = start + chunk_bytes
+            if target >= size:
+                end = size
+            else:
+                handle.seek(target)
+                handle.readline()
+                end = handle.tell()
+                if end <= start:
+                    end = min(size, start + chunk_bytes)
+            offsets.append((start, end))
+            start = end
+    return offsets
+
+
+def _iter_jsonl_records(
+    path: Path,
+    *,
+    start: Optional[int],
+    end: Optional[int],
+    skip_invalid: bool,
+    max_errors: int,
+) -> Iterator[dict]:
+    logger = get_logger(__name__)
+    errors = 0
+    with path.open("rb") as handle:
+        if start:
+            handle.seek(start)
+            if start != 0:
+                handle.readline()
+        while True:
+            pos = handle.tell()
+            if end is not None and pos >= end:
+                break
+            raw = handle.readline()
+            if not raw:
+                break
+            line = raw.decode("utf-8", errors="replace").strip()
+            if not line:
+                continue
+            try:
+                yield json.loads(line)
+            except json.JSONDecodeError as exc:
+                if skip_invalid:
+                    errors += 1
+                    if errors >= max_errors:
+                        log_event(
+                            logger,
+                            "error",
+                            "Too many JSON errors",
+                            path=str(path),
+                            errors=errors,
+                            start=start,
+                            end=end,
+                        )
+                        break
+                    continue
+                raise ValueError(
+                    f"Invalid JSON in {path} at byte offset {pos}: {exc}"
+                ) from exc
+    if errors:
+        log_event(
+            logger,
+            "warning",
+            "Skipped invalid JSON lines",
+            path=str(path),
+            skipped=errors,
+            start=start,
+            end=end,
+        )
+
+
 # --- Collection Utilities ---
 
 
 class Batcher(Iterable[List[T]]):
-    """Yield fixed-size batches from an iterable.
+    """Yield fixed-size batches from an iterable with optional policies.
 
     Args:
         iterable: Source iterable providing items to batch.
         batch_size: Maximum number of elements per yielded batch.
+        policy: Optional batching policy. When ``"length"`` the iterable is
+            bucketed by ``lengths`` before batching.
+        lengths: Sequence of integer lengths aligned with ``iterable`` used for
+            length-aware batching policies.
 
     Examples:
         >>> list(Batcher([1, 2, 3, 4, 5], 2))
         [[1, 2], [3, 4], [5]]
     """
 
-    def __init__(self, iterable: Iterable[T], batch_size: int):
-        """Initialise the batching iterator.
-
-        Args:
-            iterable: Source iterable providing items to batch.
-            batch_size: Target size for each yielded batch.
-
-        Returns:
-            None
-
-        Raises:
-            ValueError: If ``batch_size`` is less than ``1``.
-        """
+    def __init__(
+        self,
+        iterable: Iterable[T],
+        batch_size: int,
+        *,
+        policy: Optional[str] = None,
+        lengths: Optional[Sequence[int]] = None,
+    ):
         if batch_size < 1:
             raise ValueError("batch_size must be >= 1")
-        self._iterable = iterable
+        self._items: List[T] = list(iterable)
         self._batch_size = batch_size
+        self._policy = (policy or "").lower() or None
+        if self._policy:
+            if self._policy not in {"length"}:
+                raise ValueError(f"Unsupported batching policy: {policy}")
+            if lengths is None:
+                raise ValueError("lengths must be provided when using a policy")
+            if len(lengths) != len(self._items):
+                raise ValueError("lengths must align with iterable length")
+            self._lengths = [int(max(0, length)) for length in lengths]
+        else:
+            self._lengths = None
+
+    @staticmethod
+    def _length_bucket(length: int) -> int:
+        """Return the power-of-two bucket for ``length``."""
+
+        if length <= 0:
+            return 0
+        return 1 << (int(math.log2(length - 1)) + 1)
+
+    def _ordered_indices(self) -> List[int]:
+        if not self._lengths:
+            return list(range(len(self._items)))
+        pairs = [
+            (idx, self._length_bucket(self._lengths[idx]))
+            for idx in range(len(self._items))
+        ]
+        pairs.sort(key=lambda pair: (pair[1], pair[0]))
+        return [idx for idx, _ in pairs]
 
     def __iter__(self) -> Iterator[List[T]]:
-        """Yield successive lists containing up to ``batch_size`` elements.
+        if not self._policy:
+            for i in range(0, len(self._items), self._batch_size):
+                yield self._items[i : i + self._batch_size]
+            return
 
-        Args:
-            None: Iteration consumes the iterable supplied to :class:`Batcher`.
-
-        Returns:
-            Iterator over lists where each list contains up to ``batch_size`` items.
-        """
-
-        batch: List[T] = []
-        for item in self._iterable:
-            batch.append(item)
-            if len(batch) >= self._batch_size:
-                yield batch
-                batch = []
-        if batch:
-            yield batch
+        ordered_indices = self._ordered_indices()
+        for i in range(0, len(ordered_indices), self._batch_size):
+            batch_indices = ordered_indices[i : i + self._batch_size]
+            yield [self._items[idx] for idx in batch_indices]
 
 
 # --- Manifest Utilities ---
@@ -2279,6 +2379,82 @@ def compute_chunk_uuid(
     raw[6] = (raw[6] & 0x0F) | 0x50  # set UUID version bits to 5
     raw[8] = (raw[8] & 0x3F) | 0x80  # set UUID variant bits to RFC 4122
     return str(uuid.UUID(bytes=bytes(raw)))
+
+
+def relative_path(path: Path | str, root: Optional[Path]) -> str:
+    """Return ``path`` rendered relative to ``root`` when feasible."""
+
+    candidate = Path(path)
+    if root is None:
+        return str(candidate)
+    try:
+        root_path = Path(root).resolve()
+        return str(candidate.resolve().relative_to(root_path))
+    except Exception:
+        return str(candidate)
+
+
+def quarantine_artifact(
+    path: Path,
+    reason: str,
+    *,
+    logger: Optional[logging.Logger] = None,
+    create_placeholder: bool = False,
+) -> Path:
+    """Move ``path`` to a ``.quarantine`` sibling for operator review.
+
+    Args:
+        path: Artefact to quarantine.
+        reason: Explanation describing why the artefact was quarantined.
+        logger: Optional logger used to emit structured diagnostics.
+        create_placeholder: When ``True`` a placeholder file is created even if
+            ``path`` does not presently exist (useful for failed writes).
+
+    Returns:
+        Path to the quarantined artefact.
+    """
+
+    original = Path(path)
+    parent = original.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    suffix = ".quarantine"
+    candidate = parent / f"{original.name}{suffix}"
+    counter = 1
+    while candidate.exists():
+        candidate = parent / f"{original.name}{suffix}{counter}"
+        counter += 1
+
+    try:
+        if original.exists():
+            original.rename(candidate)
+        elif create_placeholder:
+            candidate.write_text(reason + "\n", encoding="utf-8")
+    except Exception:
+        if logger:
+            logger.exception(
+                "Failed to quarantine artifact",
+                extra={
+                    "extra_fields": {
+                        "path": str(original),
+                        "attempted_quarantine": str(candidate),
+                        "reason": reason,
+                    }
+                },
+            )
+        raise
+
+    if logger:
+        logger.warning(
+            "Quarantined artifact",
+            extra={
+                "extra_fields": {
+                    "path": str(original),
+                    "quarantine_path": str(candidate),
+                    "reason": reason,
+                }
+            },
+        )
+    return candidate
 
 
 def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
@@ -3367,6 +3543,7 @@ class _Command:
     __slots__ = ("handler", "help")
 
     def __init__(self, handler: CommandHandler, help: str) -> None:
+        """Capture the callable ``handler`` and its CLI help text."""
         self.handler = handler
         self.help = help
 

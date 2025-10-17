@@ -260,13 +260,16 @@ from __future__ import annotations
 import argparse
 import os
 import random
+import re
 import shutil
 import socket
 import subprocess as sp
 import sys
+import tempfile
 import threading
 import time
 import types
+import uuid
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, fields
@@ -307,6 +310,7 @@ from DocsToKG.DocParsing.core import (
     get_logger,
     load_manifest_index,
     log_event,
+    manifest_append,
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
@@ -315,6 +319,7 @@ from DocsToKG.DocParsing.core import (
     resolve_model_root,
     resolve_pdf_model_path,
     resolve_pipeline_path,
+    relative_path,
     set_spawn_or_warn,
     should_skip_output,
 )
@@ -350,6 +355,7 @@ __all__ = (
     "resolve_pdf_model_path",
     "resolve_pipeline_path",
     "validate_served_models",
+    "manifest_append",
     "DoctagsCfg",
 )
 
@@ -391,6 +397,7 @@ class DoctagsCfg(StageConfigBase):
     force: bool = False
     overwrite: bool = False
     mode: str = "pdf"
+    html_sanitizer: str = "balanced"
 
     ENV_VARS: ClassVar[Dict[str, str]] = {
         "log_level": "DOCSTOKG_DOCTAGS_LOG_LEVEL",
@@ -410,6 +417,7 @@ class DoctagsCfg(StageConfigBase):
         "overwrite": "DOCSTOKG_DOCTAGS_OVERWRITE",
         "mode": "DOCSTOKG_DOCTAGS_MODE",
         "config": "DOCSTOKG_DOCTAGS_CONFIG",
+        "html_sanitizer": "DOCSTOKG_DOCTAGS_HTML_SANITIZER",
     }
 
     FIELD_PARSERS: ClassVar[Dict[str, Callable[[Any, Optional[Path]], Any]]] = {
@@ -430,6 +438,7 @@ class DoctagsCfg(StageConfigBase):
         "force": StageConfigBase._coerce_bool,
         "overwrite": StageConfigBase._coerce_bool,
         "mode": StageConfigBase._coerce_str,
+        "html_sanitizer": StageConfigBase._coerce_str,
     }
 
     @classmethod
@@ -481,6 +490,12 @@ class DoctagsCfg(StageConfigBase):
             self.config = StageConfigBase._coerce_optional_path(self.config, None)
         self.log_level = str(self.log_level).upper()
         self.mode = (self.mode or "pdf").lower()
+        sanitizer = str(self.html_sanitizer or "balanced").lower()
+        if sanitizer not in HTML_SANITIZER_CHOICES:
+            raise ValueError(
+                f"html_sanitizer must be one of {', '.join(HTML_SANITIZER_CHOICES)}"
+            )
+        self.html_sanitizer = sanitizer
         served = StageConfigBase._coerce_str_tuple(self.served_model_names, None)
         if served:
             self.served_model_names = _normalize_served_model_names(served)
@@ -1853,6 +1868,7 @@ HTML_DEFAULT_INPUT_DIR = data_html()
 HTML_DEFAULT_OUTPUT_DIR = data_doctags()
 HTML_MANIFEST_STAGE = "doctags-html"
 HTML_DEFAULT_WORKERS = max(1, (os.cpu_count() or 8) - 1)
+HTML_SANITIZER_CHOICES: Tuple[str, ...] = ("strict", "balanced", "permissive")
 
 HTML_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     CLIOption(
@@ -1886,6 +1902,18 @@ HTML_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--overwrite",), {"action": "store_true", "help": "Overwrite existing .doctags files"}
+    ),
+    CLIOption(
+        ("--html-sanitizer",),
+        {
+            "type": lambda value: str(value).lower(),
+            "default": "balanced",
+            "choices": list(HTML_SANITIZER_CHOICES),
+            "help": (
+                "HTML sanitizer profile controlling removal of scripts/styles/trackers "
+                "(strict, balanced, permissive)."
+            ),
+        },
     ),
 )
 
@@ -1961,6 +1989,7 @@ class HtmlTask:
     output_path: Path
     input_hash: str
     overwrite: bool
+    sanitizer_profile: str
 
 
 @dataclass
@@ -1988,6 +2017,7 @@ class HtmlConversionResult:
     input_hash: str
     output_path: str
     error: str | None = None
+    sanitizer_profile: Optional[str] = None
 
 
 def _get_converter() -> "DocumentConverter":
@@ -2018,6 +2048,56 @@ def list_htmls(root: Path) -> List[Path]:
     return sorted(out)
 
 
+def _sanitize_html_file(path: Path, profile: str) -> Tuple[Path, Optional[Path]]:
+    """Apply sanitizer profile to ``path``, returning the path to convert."""
+
+    profile = (profile or "balanced").lower()
+    if profile == "permissive":
+        return path, None
+
+    try:
+        raw = path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return path, None
+
+    sanitized = raw
+    # Remove script/style blocks for all profiles except permissive
+    sanitized = re.sub(r"<script\b.*?</script>", "", sanitized, flags=re.IGNORECASE | re.DOTALL)
+    sanitized = re.sub(r"<style\b.*?</style>", "", sanitized, flags=re.IGNORECASE | re.DOTALL)
+
+    if profile == "strict":
+        sanitized = re.sub(r"<iframe\b.*?</iframe>", "", sanitized, flags=re.IGNORECASE | re.DOTALL)
+        sanitized = re.sub(
+            r"<link\b[^>]*rel=\s*['\"]?stylesheet[^>]*>",
+            "",
+            sanitized,
+            flags=re.IGNORECASE,
+        )
+        sanitized = re.sub(r"<meta\b[^>]*>", "", sanitized, flags=re.IGNORECASE)
+        sanitized = re.sub(r"<!--.*?-->", "", sanitized, flags=re.DOTALL)
+        sanitized = re.sub(
+            r"\s+on[a-zA-Z]+\s*=\s*(\".*?\"|'[^']*'|[^\s>]+)",
+            "",
+            sanitized,
+            flags=re.IGNORECASE,
+        )
+
+    if sanitized == raw:
+        return path, None
+
+    tmp_handle = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        delete=False,
+        suffix=".sanitized.html",
+        dir=path.parent,
+    )
+    with tmp_handle as handle:
+        handle.write(sanitized)
+        temp_path = Path(handle.name)
+    return temp_path, temp_path
+
+
 def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
     """Convert a single HTML file to DocTags, honoring overwrite semantics.
 
@@ -2042,10 +2122,19 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
                 input_path=str(task.html_path),
                 input_hash=task.input_hash,
                 output_path=str(out_path),
+                sanitizer_profile=task.sanitizer_profile,
             )
 
+        sanitized_path, temp_path = _sanitize_html_file(task.html_path, task.sanitizer_profile)
         converter = _get_converter()
-        result = converter.convert(task.html_path, raises_on_error=False)
+        try:
+            result = converter.convert(sanitized_path, raises_on_error=False)
+        finally:
+            if temp_path is not None and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception:
+                    pass
 
         if result.document is None:
             return HtmlConversionResult(
@@ -2056,6 +2145,7 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
                 input_hash=task.input_hash,
                 output_path=str(out_path),
                 error="empty-document",
+                sanitizer_profile=task.sanitizer_profile,
             )
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2071,6 +2161,7 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
                         input_path=str(task.html_path),
                         input_hash=task.input_hash,
                         output_path=str(out_path),
+                        sanitizer_profile=task.sanitizer_profile,
                     )
                 result.document.save_as_doctags(tmp_path)
                 try:
@@ -2090,6 +2181,7 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
                 input_hash=task.input_hash,
                 output_path=str(out_path),
                 error=str(exc),
+                sanitizer_profile=task.sanitizer_profile,
             )
         return HtmlConversionResult(
             doc_id=task.relative_id,
@@ -2098,6 +2190,7 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
             input_path=str(task.html_path),
             input_hash=task.input_hash,
             output_path=str(out_path),
+            sanitizer_profile=task.sanitizer_profile,
         )
 
     except Exception as exc:  # pragma: no cover - integration failure path
@@ -2109,6 +2202,7 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
             input_hash=task.input_hash,
             output_path=str(task.output_path),
             error=str(exc),
+            sanitizer_profile=task.sanitizer_profile,
         )
 
 
@@ -2199,6 +2293,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
             "resume": bool(cfg.resume),
             "force": bool(cfg.force),
             "overwrite": bool(cfg.overwrite),
+            "html_sanitizer": cfg.html_sanitizer,
         }
     )
 
@@ -2260,6 +2355,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 output_path=out_path,
                 schema_version="docparse/1.1.0",
                 parse_engine="docling-html",
+                html_sanitizer=cfg.html_sanitizer,
             )
             skip += 1
             continue
@@ -2270,6 +2366,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 output_path=out_path,
                 input_hash=input_hash,
                 overwrite=cfg.overwrite,
+                sanitizer_profile=cfg.html_sanitizer,
             )
         )
 
@@ -2304,6 +2401,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                     input_hash=result.input_hash,
                     output_path=result.output_path,
                     parse_engine="docling-html",
+                    html_sanitizer=result.sanitizer_profile,
                 )
             elif result.status == "skip":
                 skip += 1
@@ -2316,6 +2414,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                     schema_version="docparse/1.1.0",
                     duration_s=duration,
                     parse_engine="docling-html",
+                    html_sanitizer=result.sanitizer_profile,
                 )
             else:
                 fail += 1
@@ -2338,6 +2437,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                     output_path=result.output_path,
                     error=result.error or "conversion failed",
                     parse_engine="docling-html",
+                    html_sanitizer=result.sanitizer_profile,
                 )
 
     logger.info(
@@ -2405,6 +2505,7 @@ def _install_docling_test_stubs() -> None:
         """Stubbed ``docling`` converter preserving the real API surface."""
 
         def __init__(self, *args, **kwargs) -> None:
+            """Record constructor arguments for verification in tests."""
             self.args = args
             self.kwargs = kwargs
 
@@ -2417,6 +2518,7 @@ def _install_docling_test_stubs() -> None:
         """Stub container matching ``docling`` PDF format options."""
 
         def __init__(self, *args, **kwargs) -> None:
+            """Capture PDF format options passed by callers under test."""
             self.args = args
             self.kwargs = kwargs
 
@@ -2443,6 +2545,7 @@ def _install_docling_test_stubs() -> None:
         """Stub options matching the constructor signature of the real class."""
 
         def __init__(self, num_threads: int = 1, device: str | None = None, **_kwargs) -> None:
+            """Persist accelerator selection hints used by doctests."""
             self.num_threads = num_threads
             self.device = device or AcceleratorDevice.CUDA
 
@@ -2452,16 +2555,22 @@ def _install_docling_test_stubs() -> None:
     base_mod = _ensure_stub_module("docling.datamodel.base_models")
 
     class _EnumValue:
+        """Simple enum stand-in that preserves a string ``value`` attribute."""
+
         def __init__(self, value: str) -> None:
+            """Store ``value`` for comparisons and repr output."""
             self.value = value
 
         def __repr__(self) -> str:  # pragma: no cover - trivial
+            """Return the stored value for readable debugging output."""
             return self.value
 
         def __hash__(self) -> int:  # pragma: no cover - trivial
+            """Compute a hash based on the underlying string value."""
             return hash(self.value)
 
         def __eq__(self, other: object) -> bool:  # pragma: no cover - trivial
+            """Support equality checks against other ``_EnumValue`` instances."""
             if isinstance(other, _EnumValue):
                 return self.value == other.value
             return False
@@ -2486,6 +2595,7 @@ def _install_docling_test_stubs() -> None:
         """Catch-all structure mimicking the real VLM pipeline options."""
 
         def __init__(self, **kwargs) -> None:
+            """Store arbitrary keyword options for inspection in tests."""
             for key, value in kwargs.items():
                 setattr(self, key, value)
 
@@ -2497,6 +2607,7 @@ def _install_docling_test_stubs() -> None:
         """Stub capturing API VLM options forwarded by planners."""
 
         def __init__(self, **kwargs) -> None:
+            """Persist VLM option values on the stub instance."""
             for key, value in kwargs.items():
                 setattr(self, key, value)
 

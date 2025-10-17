@@ -755,8 +755,8 @@ def test_cli_plugins_json(monkeypatch, capsys):
     exit_code = cli.cli_main(["plugins", "--kind", "all", "--json"])
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["resolver"]["demo"] == "resolver.Demo"
-    assert payload["validator"]["demo"] == "validator.Demo"
+    assert payload["resolver"]["demo"]["qualified"] == "resolver.Demo"
+    assert payload["validator"]["demo"]["qualified"] == "validator.Demo"
 
 
 def test_handle_plan_diff_uses_manifest_baseline(monkeypatch):

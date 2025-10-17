@@ -303,6 +303,7 @@ import yaml
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
+from . import plugins as plugin_mod
 from .errors import ConfigurationError, DownloadFailure, OntologyDownloadError
 from .io import (
     RDF_MIME_ALIASES,
@@ -502,6 +503,38 @@ def list_plugins(kind: str) -> Dict[str, str]:
     else:
         raise ValueError(f"Unknown plugin kind: {kind}")
     return OrderedDict(sorted(items.items()))
+
+
+def _collect_plugin_details(kind: str) -> "OrderedDict[str, Dict[str, str]]":
+    """Return plugin metadata including qualified path and version."""
+
+    if kind == "resolver":
+        registry = RESOLVERS
+    elif kind == "validator":
+        registry = VALIDATORS
+    else:
+        raise ValueError(f"Unknown plugin kind: {kind}")
+
+    discovered_meta = plugin_mod.get_registered_plugin_meta(kind)
+    details: Dict[str, Dict[str, str]] = {}
+    for name, qualified in list_plugins(kind).items():
+        meta = discovered_meta.get(name, {})
+        resolved_qualified = meta.get("qualified", qualified)
+        version = meta.get("version")
+        if not version or version == "unknown":
+            module_root = resolved_qualified.split(".")[0]
+            try:
+                version = importlib_metadata.version(module_root)
+            except importlib_metadata.PackageNotFoundError:
+                if resolved_qualified.startswith("DocsToKG."):
+                    version = _PACKAGE_VERSION
+                else:
+                    version = "unknown"
+        details[name] = {
+            "qualified": resolved_qualified,
+            "version": version,
+        }
+    return OrderedDict(sorted(details.items()))
 
 
 def about() -> Dict[str, object]:
@@ -1862,6 +1895,11 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
                     "service": manifest.get("service"),
                     "last_modified": manifest.get("last_modified"),
                     "content_length": manifest.get("content_length"),
+                    "sha256": manifest.get("sha256"),
+                    "normalized_sha256": manifest.get("normalized_sha256"),
+                    "fingerprint": manifest.get("fingerprint"),
+                    "streaming_content_sha256": manifest.get("streaming_content_sha256"),
+                    "streaming_prefix_sha256": manifest.get("streaming_prefix_sha256"),
                 }
             )
 
@@ -1877,15 +1915,15 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
     return diff
 
 
-def _handle_plugins(args) -> Dict[str, Dict[str, str]]:
+def _handle_plugins(args) -> Dict[str, Dict[str, Dict[str, str]]]:
     """Return plugin inventory for the requested kind."""
 
     if args.kind == "all":
         return {
-            "resolver": dict(list_plugins("resolver")),
-            "validator": dict(list_plugins("validator")),
+            "resolver": dict(_collect_plugin_details("resolver")),
+            "validator": dict(_collect_plugin_details("validator")),
         }
-    return {args.kind: dict(list_plugins(args.kind))}
+    return {args.kind: dict(_collect_plugin_details(args.kind))}
 
 
 def _handle_prune(args, logger) -> Dict[str, object]:
@@ -2553,8 +2591,10 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                     if not plugins:
                         print("  (none)")
                         continue
-                    for name, target in plugins.items():
-                        print(f"  - {name}: {target}")
+                    for name, data in plugins.items():
+                        qualified = data.get("qualified")
+                        version = data.get("version", "unknown")
+                        print(f"  - {name} ({version}): {qualified}")
         elif args.command == "prune":
             summary = _handle_prune(args, logger)
             if args.json:

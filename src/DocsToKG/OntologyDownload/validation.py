@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeoutError
@@ -36,9 +37,15 @@ from typing import (
     Union,
 )
 
+from threading import BoundedSemaphore
+
+import psutil
+
 from . import plugins as _plugins
 from .io import log_memory_usage
 from .settings import ResolvedConfig, get_owlready2, get_pronto, get_rdflib
+
+metadata = _plugins.metadata
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from .plugins import ResolverPlugin, ValidatorPlugin
@@ -46,7 +53,31 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 _RESOLVER_PLUGINS_LOADED = False
 _VALIDATOR_PLUGINS_LOADED = False
+_PROCESS = psutil.Process()
+_VALIDATOR_SEMAPHORE_CACHE: Dict[int, BoundedSemaphore] = {}
 
+
+def _current_memory_mb() -> float:
+    """Return the current resident memory usage in megabytes."""
+
+    return _PROCESS.memory_info().rss / (1024**2)
+
+
+def _acquire_validator_slot(config: ResolvedConfig) -> BoundedSemaphore:
+    """Return a process-wide semaphore guarding validator concurrency."""
+
+    limit = getattr(
+        config.defaults.validation,
+        "max_concurrent_validators",
+        2,
+    )
+    limit = int(limit)
+    limit = max(1, min(8, limit))
+    semaphore = _VALIDATOR_SEMAPHORE_CACHE.get(limit)
+    if semaphore is None:
+        semaphore = BoundedSemaphore(limit)
+        _VALIDATOR_SEMAPHORE_CACHE[limit] = semaphore
+    return semaphore
 
 def load_resolver_plugins(
     registry: MutableMapping[str, "ResolverPlugin"],
@@ -962,9 +993,28 @@ def validate_robot(request: ValidationRequest, logger: logging.Logger) -> Valida
         report_cmd = [robot_path, "report", "-i", str(request.file_path), "-o", str(report_path)]
         subprocess.run(convert_cmd, check=True, capture_output=True)
         subprocess.run(report_cmd, check=True, capture_output=True)
+        normalized_sha: Optional[str] = None
+        streaming_prefix_hash: Optional[str] = None
+        try:
+            streaming_hash, streaming_prefix_hash = normalize_streaming(
+                normalized_path,
+                output_path=normalized_path,
+                return_header_hash=True,
+            )
+            normalized_sha = streaming_hash
+        except Exception as exc:  # pragma: no cover - best-effort normalization
+            logger.warning(
+                "robot normalization failed",
+                extra={"stage": "validate", "validator": "robot", "error": str(exc)},
+            )
         log_memory_usage(logger, stage="validate", event="after", validator="robot")
         output_files = [str(normalized_path), str(report_path)]
         result_payload = {"ok": True, "outputs": output_files}
+        if normalized_sha:
+            result_payload["normalized_sha256"] = normalized_sha
+            result_payload["streaming_nt_sha256"] = normalized_sha
+        if streaming_prefix_hash:
+            result_payload["streaming_prefix_sha256"] = streaming_prefix_hash
         _write_validation_json(request.validation_dir / "robot_report.json", result_payload)
         return ValidationResult(ok=True, details=result_payload, output_files=output_files)
     except subprocess.CalledProcessError as exc:
@@ -1058,10 +1108,26 @@ def _run_validator_task(
 ) -> ValidationResult:
     """Execute a single validator with exception guards."""
 
+    start_time = time.perf_counter()
+    before_mb = _current_memory_mb()
+    log_memory_usage(logger, stage="validate", event="before", validator=request.name)
+    semaphore = _acquire_validator_slot(request.config)
+    acquired = semaphore.acquire(timeout=request.config.defaults.validation.parser_timeout_sec)
+    if not acquired:
+        raise ValidationTimeout("validator concurrency limit prevented start")  # pragma: no cover
     try:
-        return validator(request, logger)
+        result = validator(request, logger)
     except Exception as exc:  # pylint: disable=broad-except
+        duration = time.perf_counter() - start_time
+        after_mb = _current_memory_mb()
+        log_memory_usage(logger, stage="validate", event="after", validator=request.name)
         payload = {"ok": False, "error": str(exc)}
+        payload["metrics"] = {
+            "duration_sec": round(duration, 3),
+            "rss_mb_before": round(before_mb, 2),
+            "rss_mb_after": round(after_mb, 2),
+            "rss_mb_delta": round(after_mb - before_mb, 2),
+        }
         _write_validation_json(request.validation_dir / f"{request.name}_parse.json", payload)
         logger.error(
             "validator crashed",
@@ -1072,6 +1138,23 @@ def _run_validator_task(
             },
         )
         return ValidationResult(ok=False, details=payload, output_files=[])
+    else:
+        duration = time.perf_counter() - start_time
+        after_mb = _current_memory_mb()
+        log_memory_usage(logger, stage="validate", event="after", validator=request.name)
+        metrics = {
+            "duration_sec": round(duration, 3),
+            "rss_mb_before": round(before_mb, 2),
+            "rss_mb_after": round(after_mb, 2),
+            "rss_mb_delta": round(after_mb - before_mb, 2),
+        }
+        if not isinstance(result.details, dict):
+            result.details = {"value": result.details}
+        result.details.setdefault("metrics", {}).update(metrics)
+        return result
+    finally:
+        if acquired:
+            semaphore.release()
 
 
 def run_validators(
