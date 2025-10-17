@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import OrderedDict
 from importlib import metadata
 from typing import Any, Dict, MutableMapping, Optional, Protocol
 
@@ -12,6 +13,9 @@ __all__ = [
     "load_resolver_plugins",
     "ensure_resolver_plugins",
     "load_validator_plugins",
+    "register_plugin_registry",
+    "get_plugin_registry",
+    "list_registered_plugins",
     "get_registered_plugin_meta",
 ]
 
@@ -34,6 +38,7 @@ _RESOLVER_PLUGINS_LOADED = False
 _VALIDATOR_PLUGINS_LOADED = False
 _RESOLVER_ENTRY_META: Dict[str, Dict[str, str]] = {}
 _VALIDATOR_ENTRY_META: Dict[str, Dict[str, str]] = {}
+_PLUGIN_REGISTRIES: Dict[str, MutableMapping[str, Any]] = {}
 
 
 def _describe_plugin(obj: object) -> str:
@@ -158,6 +163,35 @@ def load_validator_plugins(
                 extra={"stage": "init", "validator": entry.name, "error": str(exc)},
             )
     _VALIDATOR_PLUGINS_LOADED = True
+
+
+def register_plugin_registry(kind: str, registry: MutableMapping[str, Any]) -> None:
+    """Register the in-memory plugin registry for discovery helpers."""
+
+    _PLUGIN_REGISTRIES[kind] = registry
+
+
+def get_plugin_registry(kind: str) -> MutableMapping[str, Any]:
+    """Return the registered plugin registry for ``kind``."""
+
+    try:
+        return _PLUGIN_REGISTRIES[kind]
+    except KeyError as exc:
+        raise ValueError(f"No plugin registry registered for kind '{kind}'") from exc
+
+
+def list_registered_plugins(kind: str) -> "OrderedDict[str, str]":
+    """Return mapping of plugin names to qualified identifiers for ``kind``."""
+
+    registry = get_plugin_registry(kind)
+    if kind == "resolver":
+        ensure_resolver_plugins(registry, logger=None)
+    elif kind == "validator":
+        load_validator_plugins(registry, logger=None, reload=False)
+    else:
+        raise ValueError(f"Unknown plugin kind: {kind}")
+    items = {name: _describe_plugin(obj) for name, obj in registry.items()}
+    return OrderedDict(sorted(items.items()))
 
 
 def get_registered_plugin_meta(kind: str) -> Dict[str, Dict[str, str]]:

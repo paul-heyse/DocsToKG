@@ -87,6 +87,17 @@ plan resolver fallback chains, download ontologies with hardened validation,
 perform stream normalization, and emit schema-compliant manifests with
 deterministic fingerprints.</p>
 </section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="getattr-name">
+<h3><code class="docutils literal notranslate"><span class="pre">__getattr__(name)</span></code><a class="headerlink" href="#getattr-name" title="Link to this heading"></a></h3>
+<p>Lazily import API exports to avoid resolver dependencies at import time.</p>
+</section>
+<section id="dir">
+<h3><code class="docutils literal notranslate"><span class="pre">__dir__()</span></code><a class="headerlink" href="#dir" title="Link to this heading"></a></h3>
+<p>Expose lazily-populated attributes in <code class="docutils literal notranslate"><span class="pre">dir()</span></code> results.</p>
+</section>
+</section>
 </section>
 
 

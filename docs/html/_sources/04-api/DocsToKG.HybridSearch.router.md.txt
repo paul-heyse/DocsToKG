@@ -44,6 +44,14 @@ Attempt to rebuild all managed stores; returns True if any rebuild occurs.
 
 Register a resolver applied to existing and future stores.
 
+### `set_id_resolver(self, resolver)`
+
+Alias for :meth:`set_resolver` to improve readability.
+
+### `evict_idle(self)`
+
+Serialize and evict stores idle longer than ``max_idle_seconds``.
+
 ### `run_maintenance(self)`
 
 Run optional training and rebuild checks across managed stores.

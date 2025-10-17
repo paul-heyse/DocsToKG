@@ -8,6 +8,14 @@ Validation and normalization utilities for ontology downloads.
 
 ## 2. Functions
 
+### `_current_memory_mb()`
+
+Return the current resident memory usage in megabytes.
+
+### `_acquire_validator_slot(config)`
+
+Return a process-wide semaphore guarding validator concurrency.
+
 ### `load_resolver_plugins(registry)`
 
 Proxy to :mod:`plugins` resolver discovery preserving legacy globals.
@@ -226,6 +234,10 @@ None
 ### `_run_validator_task(validator, request, logger)`
 
 Execute a single validator with exception guards.
+
+### `_run_validator_in_process(name, request)`
+
+Execute a validator inside a worker process.
 
 ### `run_validators(requests, logger)`
 

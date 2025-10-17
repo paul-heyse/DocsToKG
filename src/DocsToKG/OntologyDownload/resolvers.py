@@ -10,18 +10,6 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "parse-checksum-extra",
-#       "name": "_parse_checksum_extra",
-#       "anchor": "function-parse-checksum-extra",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "parse-checksum-url-extra",
-#       "name": "_parse_checksum_url_extra",
-#       "anchor": "function-parse-checksum-url-extra",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "fetchplan",
 #       "name": "FetchPlan",
 #       "anchor": "class-fetchplan",
@@ -111,13 +99,12 @@ import requests
 
 from .errors import ResolverError, UserConfigError
 from .io import (
-    RDF_MIME_FORMAT_LABELS,
     get_bucket,
     is_retryable_error,
     retry_with_backoff,
     validate_url_security,
 )
-from .plugins import ensure_resolver_plugins
+from .plugins import ensure_resolver_plugins, register_plugin_registry
 from .settings import DownloadConfiguration, ResolvedConfig, get_pystow
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
@@ -254,7 +241,7 @@ class BaseResolver:
         canonical = media_type.split(";")[0].strip().lower()
         if not canonical:
             return None
-        if canonical in RDF_MIME_FORMAT_LABELS:
+        if canonical in io.RDF_MIME_FORMAT_LABELS:
             return canonical
         return canonical
 
@@ -1004,6 +991,7 @@ if BioPortalClient is not None:
 else:  # pragma: no cover
     LOGGER.debug("BioPortal resolver disabled because ontoportal-client is not installed")
 
+register_plugin_registry("resolver", RESOLVERS)
 ensure_resolver_plugins(RESOLVERS, logger=LOGGER)
 
 

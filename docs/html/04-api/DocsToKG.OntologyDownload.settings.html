@@ -239,6 +239,10 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 <h3><code class="docutils literal notranslate"><span class="pre">validate_prefer_source(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-prefer-source-cls-value" title="Link to this heading"></a></h3>
 <p>Ensure preferred resolvers belong to the supported resolver set.</p>
 </section>
+<section id="normalize-accept-licenses-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">normalize_accept_licenses(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#normalize-accept-licenses-cls-value" title="Link to this heading"></a></h3>
+<p>Normalize accept_licenses entries to canonical SPDX identifiers.</p>
+</section>
 <section id="from-defaults-cls">
 <h3><code class="docutils literal notranslate"><span class="pre">from_defaults(cls)</span></code><a class="headerlink" href="#from-defaults-cls" title="Link to this heading"></a></h3>
 <p>Construct a resolved configuration populated with default values only.</p>
@@ -327,6 +331,10 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 <h3><code class="docutils literal notranslate"><span class="pre">mirror_cas_artifact(self,</span> <span class="pre">algorithm,</span> <span class="pre">digest,</span> <span class="pre">source)</span></code><a class="headerlink" href="#mirror-cas-artifact-self-algorithm-digest-source" title="Link to this heading"></a></h3>
 <p>Mirror <code class="docutils literal notranslate"><span class="pre">source</span></code> into a content-addressable cache and return its path.</p>
 </section>
+<section id="directory-size-self-path">
+<h3><code class="docutils literal notranslate"><span class="pre">directory_size(self,</span> <span class="pre">path)</span></code><a class="headerlink" href="#directory-size-self-path" title="Link to this heading"></a></h3>
+<p>Return the total size in bytes for files rooted at <em>path</em>.</p>
+</section>
 <section id="version-dir-self-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">_version_dir(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#version-dir-self-ontology-id-version" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
@@ -367,28 +375,32 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 <h3><code class="docutils literal notranslate"><span class="pre">mirror_cas_artifact(self,</span> <span class="pre">algorithm,</span> <span class="pre">digest,</span> <span class="pre">source)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
 <p>Copy <code class="docutils literal notranslate"><span class="pre">source</span></code> into the content-addressable cache.</p>
 </section>
+<section id="id12">
+<h3><code class="docutils literal notranslate"><span class="pre">directory_size(self,</span> <span class="pre">path)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<p>Return the byte size for files rooted at <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
+</section>
 <section id="remote-version-path-self-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">_remote_version_path(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#remote-version-path-self-ontology-id-version" title="Link to this heading"></a></h3>
 <p>Return the remote storage path for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code>.</p>
 </section>
-<section id="id12">
-<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<section id="id13">
+<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
 <p>Combine local and remote version identifiers for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>.</p>
 </section>
-<section id="id13">
-<h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
+<section id="id14">
+<h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
 <p>Return the union of ontology ids present locally and in remote storage.</p>
 </section>
-<section id="id14">
-<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
+<section id="id15">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
 <p>Mirror processed artefacts to remote storage after local completion.</p>
 </section>
-<section id="id15">
-<h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
+<section id="id16">
+<h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id16" title="Link to this heading"></a></h3>
 <p>Remove local and remote artefacts for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code>.</p>
 </section>
-<section id="id16">
-<h3><code class="docutils literal notranslate"><span class="pre">mirror_cas_artifact(self,</span> <span class="pre">algorithm,</span> <span class="pre">digest,</span> <span class="pre">source)</span></code><a class="headerlink" href="#id16" title="Link to this heading"></a></h3>
+<section id="id17">
+<h3><code class="docutils literal notranslate"><span class="pre">mirror_cas_artifact(self,</span> <span class="pre">algorithm,</span> <span class="pre">digest,</span> <span class="pre">source)</span></code><a class="headerlink" href="#id17" title="Link to this heading"></a></h3>
 <p>Mirror CAS artefact locally and to remote storage.</p>
 </section>
 <section id="terms-self">
@@ -462,8 +474,8 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 <h3><code class="docutils literal notranslate"><span class="pre">_StubOntology</span></code><a class="headerlink" href="#stubontology" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="id17">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubOntology</span></code><a class="headerlink" href="#id17" title="Link to this heading"></a></h3>
+<section id="id18">
+<h3><code class="docutils literal notranslate"><span class="pre">_StubOntology</span></code><a class="headerlink" href="#id18" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 </section>

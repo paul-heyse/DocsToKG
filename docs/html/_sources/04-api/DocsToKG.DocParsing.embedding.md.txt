@@ -82,6 +82,10 @@ default: Fallback path used when ``value`` is absent.
 Returns:
 Absolute path derived from ``value`` or ``default``.
 
+### `_percentile(data, pct)`
+
+Return the percentile of ``data`` without external dependencies.
+
 ### `_ensure_splade_dependencies()`
 
 Backward-compatible shim that delegates to core.ensure_splade_dependencies.
@@ -227,14 +231,17 @@ json.JSONDecodeError: If a chunk row contains invalid JSON.
 Iterate over JSONL rows in batches to reduce memory usage.
 
 Args:
-path: Path to JSONL file to read.
+path: JSONL file to read.
 batch_size: Number of rows to yield per batch.
-
-Returns:
-Iterator[List[dict]]: Lazy iterator producing batched chunk rows.
+start: Optional byte offset where iteration should begin.
+end: Optional byte offset bounding the slice (exclusive).
+skip_invalid: When ``True`` malformed rows are skipped up to
+``max_errors`` occurrences.
+max_errors: Maximum tolerated malformed rows when ``skip_invalid`` is
+enabled.
 
 Yields:
-Lists of row dictionaries, each containing up to batch_size items.
+Lists of row dictionaries containing at most ``batch_size`` entries.
 
 ### `iter_chunk_files(directory)`
 
@@ -290,6 +297,10 @@ and Qwen vector norms.
 
 Raises:
 ValueError: If vector lengths are inconsistent or fail validation.
+
+### `_handle_embedding_quarantine()`
+
+Quarantine a problematic chunk or vector artefact and log manifest state.
 
 ### `_validate_vectors_for_chunks(chunks_dir, vectors_dir, logger)`
 
@@ -414,11 +425,11 @@ Persist a batch of vector rows to the underlying storage medium.
 
 ### `__enter__(self)`
 
-*No documentation available.*
+Open the underlying atomic writer and return ``self`` for chaining.
 
 ### `__exit__(self, exc_type, exc, tb)`
 
-*No documentation available.*
+Close the atomic writer context, propagating exceptions.
 
 ### `write_rows(self, rows)`
 
@@ -427,6 +438,10 @@ Append ``rows`` to the active JSONL artifact created by ``__enter__``.
 ### `_process_entry(entry)`
 
 Encode vectors for a chunk file and report per-file metrics.
+
+### `_embed_batch(batch_texts)`
+
+*No documentation available.*
 
 ## 3. Classes
 

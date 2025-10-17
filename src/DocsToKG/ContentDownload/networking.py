@@ -111,7 +111,7 @@ Key Features:
 
 Usage:
 
-    from DocsToKG.ContentDownload.network import (
+    from DocsToKG.ContentDownload.networking import (
         ConditionalRequestHelper,
         create_session,
         request_with_retries,

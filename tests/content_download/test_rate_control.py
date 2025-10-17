@@ -1,7 +1,7 @@
 
 import pytest
 
-from DocsToKG.ContentDownload.network import CircuitBreaker
+from DocsToKG.ContentDownload.networking import CircuitBreaker
 from DocsToKG.ContentDownload.pipeline import (
     ResolverConfig,
     ResolverMetrics,
@@ -61,7 +61,7 @@ def test_circuit_breaker_cooldown(monkeypatch):
     def fake_monotonic() -> float:
         return fake_time[0]
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.network.time.monotonic", fake_monotonic)
+    monkeypatch.setattr("DocsToKG.ContentDownload.networking.time.monotonic", fake_monotonic)
 
     breaker = CircuitBreaker(failure_threshold=1, cooldown_seconds=5.0, name="test")
     assert breaker.allow() is True

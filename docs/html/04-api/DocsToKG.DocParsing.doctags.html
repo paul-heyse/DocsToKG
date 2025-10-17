@@ -110,10 +110,6 @@ exit_code = doctags_module.pdf_main(args)
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_docling_dependencies()</span></code><a class="headerlink" href="#ensure-docling-dependencies" title="Link to this heading"></a></h3>
 <p>Validate that required Docling packages are installed.</p>
 </section>
-<section id="http-session">
-<h3><code class="docutils literal notranslate"><span class="pre">_http_session()</span></code><a class="headerlink" href="#http-session" title="Link to this heading"></a></h3>
-<p>Return a shared <code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> configured with retries.</p>
-</section>
 <section id="add-data-root-option-parser">
 <h3><code class="docutils literal notranslate"><span class="pre">add_data_root_option(parser)</span></code><a class="headerlink" href="#add-data-root-option-parser" title="Link to this heading"></a></h3>
 <p>Attach the shared <code class="docutils literal notranslate"><span class="pre">--data-root</span></code> option to a CLI parser.</p>
@@ -305,13 +301,14 @@ Started subprocess handle for the vLLM server.</p>
 <p>Raises:
 SystemExit: If the <code class="docutils literal notranslate"><span class="pre">vllm</span></code> executable is not present on <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
 </section>
-<section id="wait-for-vllm-port-proc-timeout-s">
-<h3><code class="docutils literal notranslate"><span class="pre">wait_for_vllm(port,</span> <span class="pre">proc,</span> <span class="pre">timeout_s)</span></code><a class="headerlink" href="#wait-for-vllm-port-proc-timeout-s" title="Link to this heading"></a></h3>
+<section id="wait-for-vllm-port-proc">
+<h3><code class="docutils literal notranslate"><span class="pre">wait_for_vllm(port,</span> <span class="pre">proc)</span></code><a class="headerlink" href="#wait-for-vllm-port-proc" title="Link to this heading"></a></h3>
 <p>Poll the vLLM server until <code class="docutils literal notranslate"><span class="pre">/v1/models</span></code> responds with success.</p>
 <p>Args:
 port: HTTP port where the server is expected to listen.
 proc: Subprocess handle representing the running vLLM instance.
-timeout_s: Maximum time in seconds to wait for readiness.</p>
+timeout_s: Maximum time in seconds to wait for readiness.
+http_timeout: Optional override for HTTP connect/read timeouts used during probes.</p>
 <p>Returns:
 Model names reported by the server upon readiness.</p>
 <p>Raises:
@@ -335,7 +332,9 @@ None.</p>
 preferred: Preferred TCP port for the server.
 model_path: Model repository or path passed to the vLLM CLI.
 served_model_names: Aliases that should be exposed via the OpenAI API.
-gpu_memory_utilization: Fractional GPU memory reservation for the server.</p>
+gpu_memory_utilization: Fractional GPU memory reservation for the server.
+wait_timeout_s: Seconds to wait for vLLM readiness.
+http_timeout: Optional override for HTTP connect/read timeout when probing the server.</p>
 <p>Returns:
 Tuple containing <code class="docutils literal notranslate"><span class="pre">(port,</span> <span class="pre">process,</span> <span class="pre">owns_process)</span></code> where <code class="docutils literal notranslate"><span class="pre">process</span></code> is the
 managed subprocess handle (or None if reusing an existing server) and
@@ -405,6 +404,10 @@ root: Directory whose subtree should be searched for HTML files.</p>
 <p>Returns:
 Sorted list of discovered HTML file paths excluding normalized outputs.</p>
 </section>
+<section id="sanitize-html-file-path-profile">
+<h3><code class="docutils literal notranslate"><span class="pre">_sanitize_html_file(path,</span> <span class="pre">profile)</span></code><a class="headerlink" href="#sanitize-html-file-path-profile" title="Link to this heading"></a></h3>
+<p>Apply sanitizer profile to <code class="docutils literal notranslate"><span class="pre">path</span></code>, returning the path to convert.</p>
+</section>
 <section id="html-convert-one-task">
 <h3><code class="docutils literal notranslate"><span class="pre">html_convert_one(task)</span></code><a class="headerlink" href="#html-convert-one-task" title="Link to this heading"></a></h3>
 <p>Convert a single HTML file to DocTags, honoring overwrite semantics.</p>
@@ -453,15 +456,15 @@ Process exit code, where <code class="docutils literal notranslate"><span class=
 </section>
 <section id="repr-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__repr__(self)</span></code><a class="headerlink" href="#repr-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Return the stored value for readable debugging output.</p>
 </section>
 <section id="hash-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__hash__(self)</span></code><a class="headerlink" href="#hash-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Compute a hash based on the underlying string value.</p>
 </section>
 <section id="eq-self-other">
 <h3><code class="docutils literal notranslate"><span class="pre">__eq__(self,</span> <span class="pre">other)</span></code><a class="headerlink" href="#eq-self-other" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Support equality checks against other <code class="docutils literal notranslate"><span class="pre">_EnumValue</span></code> instances.</p>
 </section>
 </section>
 <section id="classes">
@@ -589,7 +592,7 @@ HtmlConversionResult(doc_id=’doc’, status=’success’, duration_s=1.0, inp
 </section>
 <section id="enumvalue">
 <h3><code class="docutils literal notranslate"><span class="pre">_EnumValue</span></code><a class="headerlink" href="#enumvalue" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Simple enum stand-in that preserves a string <code class="docutils literal notranslate"><span class="pre">value</span></code> attribute.</p>
 </section>
 <section id="conversionstatus">
 <h3><code class="docutils literal notranslate"><span class="pre">ConversionStatus</span></code><a class="headerlink" href="#conversionstatus" title="Link to this heading"></a></h3>

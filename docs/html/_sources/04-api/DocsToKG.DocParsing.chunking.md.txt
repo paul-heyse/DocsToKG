@@ -30,7 +30,7 @@ Tokenizer Alignment:
     tokenizers (for example, legacy BERT models), run the calibration utility
     beforehand to understand token count deltas::
 
-        python scripts/calibrate_tokenizers.py --doctags-dir Data/DocTagsFiles
+        python -m DocsToKG.DocParsing.token_profiles --doctags-dir Data/DocTagsFiles
 
     The calibration script reports relative token ratios and recommends
     adjustments to ``--min-tokens`` so chunk sizes remain compatible with the
@@ -192,6 +192,10 @@ testing or orchestration.
 Returns:
 int: Exit code where ``0`` indicates success.
 
+### `_run_validate_only()`
+
+Validate chunk inputs and report statistics without writing outputs.
+
 ### `from_env(cls, defaults)`
 
 Instantiate configuration derived solely from environment variables.
@@ -210,11 +214,11 @@ Collect numeric confidence scores from metadata sources.
 
 ### `_normalise_meta(payload, doc_item)`
 
-*No documentation available.*
+Convert DocTags picture metadata into detached dictionaries safe for JSON.
 
 ### `_collect(source)`
 
-*No documentation available.*
+Harvest integer attributes from ``source`` and add them to ``candidates``.
 
 ### `is_small(idx)`
 

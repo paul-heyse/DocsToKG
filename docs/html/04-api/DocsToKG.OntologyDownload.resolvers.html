@@ -89,14 +89,6 @@
 <h3><code class="docutils literal notranslate"><span class="pre">normalize_license_to_spdx(value)</span></code><a class="headerlink" href="#normalize-license-to-spdx-value" title="Link to this heading"></a></h3>
 <p>Normalize common license strings to canonical SPDX identifiers.</p>
 </section>
-<section id="parse-checksum-extra-value">
-<h3><code class="docutils literal notranslate"><span class="pre">_parse_checksum_extra(value)</span></code><a class="headerlink" href="#parse-checksum-extra-value" title="Link to this heading"></a></h3>
-<p>Normalize checksum extras to <code class="docutils literal notranslate"><span class="pre">(algorithm,</span> <span class="pre">value)</span></code> tuples.</p>
-</section>
-<section id="parse-checksum-url-extra-value">
-<h3><code class="docutils literal notranslate"><span class="pre">_parse_checksum_url_extra(value)</span></code><a class="headerlink" href="#parse-checksum-url-extra-value" title="Link to this heading"></a></h3>
-<p>Normalize checksum URL extras to <code class="docutils literal notranslate"><span class="pre">(url,</span> <span class="pre">algorithm)</span></code> tuples.</p>
-</section>
 <section id="plan-self-spec-config-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#plan-self-spec-config-logger" title="Link to this heading"></a></h3>
 <p>Produce a :class:<code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code> describing how to retrieve <code class="docutils literal notranslate"><span class="pre">spec</span></code>.</p>
@@ -129,6 +121,10 @@
 <h3><code class="docutils literal notranslate"><span class="pre">_apply_headers_to_session(session,</span> <span class="pre">headers)</span></code><a class="headerlink" href="#apply-headers-to-session-session-headers" title="Link to this heading"></a></h3>
 <p>Apply polite headers to a client session when supported.</p>
 </section>
+<section id="request-with-retry-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_request_with_retry(self)</span></code><a class="headerlink" href="#request-with-retry-self" title="Link to this heading"></a></h3>
+<p>Issue an HTTP request with polite headers and retry semantics.</p>
+</section>
 <section id="build-plan-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_plan(self)</span></code><a class="headerlink" href="#build-plan-self" title="Link to this heading"></a></h3>
 <p>Construct a <code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code> from resolver components.</p>
@@ -148,10 +144,6 @@
 <section id="id3">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
 <p>Plan a BioPortal download by combining ontology and submission metadata.</p>
-</section>
-<section id="fetch-metadata-self-uri-timeout">
-<h3><code class="docutils literal notranslate"><span class="pre">_fetch_metadata(self,</span> <span class="pre">uri,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#fetch-metadata-self-uri-timeout" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
 </section>
 <section id="iter-dicts-payload">
 <h3><code class="docutils literal notranslate"><span class="pre">_iter_dicts(payload)</span></code><a class="headerlink" href="#iter-dicts-payload" title="Link to this heading"></a></h3>
@@ -187,6 +179,10 @@
 </section>
 <section id="invoke">
 <h3><code class="docutils literal notranslate"><span class="pre">_invoke()</span></code><a class="headerlink" href="#invoke" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="perform">
+<h3><code class="docutils literal notranslate"><span class="pre">_perform()</span></code><a class="headerlink" href="#perform" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 </section>

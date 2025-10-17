@@ -16,12 +16,6 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "http-session",
-#       "name": "_http_session",
-#       "anchor": "function-http-session",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "add-data-root-option",
 #       "name": "add_data_root_option",
 #       "anchor": "function-add-data-root-option",
@@ -196,6 +190,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "sanitize-html-file",
+#       "name": "_sanitize_html_file",
+#       "anchor": "function-sanitize-html-file",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "html-convert-one",
 #       "name": "html_convert_one",
 #       "anchor": "function-html-convert-one",
@@ -288,9 +288,7 @@ from typing import (
 )
 
 import requests
-from requests.adapters import HTTPAdapter
 from tqdm import tqdm
-from urllib3.util.retry import Retry
 
 from DocsToKG.DocParsing.core import (
     PDF_MODEL_SUBDIR,
@@ -303,6 +301,8 @@ from DocsToKG.DocParsing.core import (
     data_html,
     data_manifests,
     data_pdfs,
+    DEFAULT_HTTP_TIMEOUT,
+    get_http_session,
     derive_doc_id_and_doctags_path,
     detect_data_root,
     ensure_model_environment,
@@ -314,6 +314,7 @@ from DocsToKG.DocParsing.core import (
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
+    normalize_http_timeout,
     prepare_data_root,
     resolve_hf_home,
     resolve_model_root,
@@ -321,7 +322,7 @@ from DocsToKG.DocParsing.core import (
     resolve_pipeline_path,
     relative_path,
     set_spawn_or_warn,
-    should_skip_output,
+    ResumeController,
 )
 
 try:  # pragma: no cover - optional dependency
@@ -331,9 +332,6 @@ except Exception:  # pragma: no cover - guard for stripped-down runtime
     Version = None  # type: ignore[assignment]
 
 _LOGGER = get_logger(__name__)
-
-_REQUEST_SESSION: requests.Session | None = None
-DEFAULT_HTTP_TIMEOUT: Tuple[float, float] = (5.0, 30.0)
 
 # --- Globals ---
 
@@ -393,6 +391,7 @@ class DoctagsCfg(StageConfigBase):
     vlm_prompt: str = "Convert this page to docling."
     vlm_stop: Tuple[str, ...] = ("</doctag>", "<|end_of_text|>")
     vllm_wait_timeout: int = WAIT_TIMEOUT_S
+    http_timeout: Tuple[float, float] = DEFAULT_HTTP_TIMEOUT
     resume: bool = False
     force: bool = False
     overwrite: bool = False
@@ -412,6 +411,7 @@ class DoctagsCfg(StageConfigBase):
         "vlm_prompt": "DOCSTOKG_DOCTAGS_VLM_PROMPT",
         "vlm_stop": "DOCSTOKG_DOCTAGS_VLM_STOP",
         "vllm_wait_timeout": "DOCSTOKG_DOCTAGS_VLLM_WAIT_TIMEOUT",
+        "http_timeout": "DOCSTOKG_DOCTAGS_HTTP_TIMEOUT",
         "resume": "DOCSTOKG_DOCTAGS_RESUME",
         "force": "DOCSTOKG_DOCTAGS_FORCE",
         "overwrite": "DOCSTOKG_DOCTAGS_OVERWRITE",
@@ -434,6 +434,7 @@ class DoctagsCfg(StageConfigBase):
         "vlm_prompt": StageConfigBase._coerce_str,
         "vlm_stop": StageConfigBase._coerce_str_tuple,
         "vllm_wait_timeout": StageConfigBase._coerce_int,
+        "http_timeout": lambda value, _base_dir: normalize_http_timeout(value),
         "resume": StageConfigBase._coerce_bool,
         "force": StageConfigBase._coerce_bool,
         "overwrite": StageConfigBase._coerce_bool,
@@ -506,6 +507,7 @@ class DoctagsCfg(StageConfigBase):
             self.vlm_stop = tuple(stop_values)
         else:
             self.vlm_stop = ("</doctag>", "<|end_of_text|>")
+        self.http_timeout = normalize_http_timeout(self.http_timeout)
 
     from_sources = from_args
 
@@ -605,6 +607,16 @@ PDF_CLI_OPTIONS: Tuple[CLIOption, ...] = (
         },
     ),
     CLIOption(
+        ("--http-timeout",),
+        {
+            "type": float,
+            "nargs": 2,
+            "metavar": ("CONNECT", "READ"),
+            "default": None,
+            "help": "Override HTTP connect/read timeout (seconds) for vLLM/docling probes",
+        },
+    ),
+    CLIOption(
         ("--vlm-prompt",),
         {
             "type": str,
@@ -662,28 +674,6 @@ os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("DOCLING_CUDA_USE_FLASH_ATTENTION2", "1")
 
 ARTIFACTS = os.environ.get("DOCLING_ARTIFACTS_PATH", "")
-
-
-def _http_session() -> requests.Session:
-    """Return a shared ``requests.Session`` configured with retries."""
-
-    global _REQUEST_SESSION
-    if _REQUEST_SESSION is None:
-        session = requests.Session()
-        retry = Retry(
-            total=5,
-            read=5,
-            connect=5,
-            backoff_factor=0.5,
-            status_forcelist=(429, 500, 502, 503, 504),
-            allowed_methods=("GET", "HEAD"),
-            raise_on_status=False,
-        )
-        adapter = HTTPAdapter(max_retries=retry)
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-        _REQUEST_SESSION = session
-    return _REQUEST_SESSION
 
 
 # --- CLI Helpers ---
@@ -1040,7 +1030,7 @@ def port_is_free(port: int) -> bool:
 
 
 def probe_models(
-    port: int, timeout=2.5
+    port: int, timeout: Optional[object] = None
 ) -> Tuple[Optional[List[str]], Optional[str], Optional[int]]:
     """Inspect the `/v1/models` endpoint exposed by a vLLM HTTP server.
 
@@ -1054,11 +1044,7 @@ def probe_models(
         represented by `(None, <error>, None)`.
     """
     url = f"http://127.0.0.1:{port}/v1/models"
-    session = _http_session()
-    if isinstance(timeout, (int, float)):
-        request_timeout: Tuple[float, float] = (DEFAULT_HTTP_TIMEOUT[0], float(timeout))
-    else:
-        request_timeout = timeout  # pragma: no cover - custom caller override
+    session, request_timeout = get_http_session(timeout=timeout)
     try:
         r = session.get(url, timeout=request_timeout)
         raw = r.text
@@ -1080,7 +1066,7 @@ def probe_models(
         return None, str(e), None
 
 
-def probe_metrics(port: int, timeout=2.5) -> Tuple[bool, Optional[int]]:
+def probe_metrics(port: int, timeout: Optional[object] = None) -> Tuple[bool, Optional[int]]:
     """Check whether the vLLM `/metrics` endpoint is healthy.
 
     Args:
@@ -1092,11 +1078,7 @@ def probe_metrics(port: int, timeout=2.5) -> Tuple[bool, Optional[int]]:
         endpoint responds with HTTP 200.
     """
     url = f"http://127.0.0.1:{port}/metrics"
-    session = _http_session()
-    if isinstance(timeout, (int, float)):
-        request_timeout: Tuple[float, float] = (DEFAULT_HTTP_TIMEOUT[0], float(timeout))
-    else:
-        request_timeout = timeout  # pragma: no cover - custom caller override
+    session, request_timeout = get_http_session(timeout=timeout)
     try:
         r = session.get(url, timeout=request_timeout)
         return (r.status_code == 200), r.status_code
@@ -1185,13 +1167,20 @@ def start_vllm(
     return proc
 
 
-def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S) -> List[str]:
+def wait_for_vllm(
+    port: int,
+    proc: sp.Popen,
+    *,
+    timeout_s: int = WAIT_TIMEOUT_S,
+    http_timeout: Optional[object] = None,
+) -> List[str]:
     """Poll the vLLM server until `/v1/models` responds with success.
 
     Args:
         port: HTTP port where the server is expected to listen.
         proc: Subprocess handle representing the running vLLM instance.
         timeout_s: Maximum time in seconds to wait for readiness.
+        http_timeout: Optional override for HTTP connect/read timeouts used during probes.
 
     Returns:
         Model names reported by the server upon readiness.
@@ -1226,7 +1215,7 @@ def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S) ->
                     )
                     raise RuntimeError(message)
 
-            names, raw, status = probe_models(port)
+            names, raw, status = probe_models(port, timeout=http_timeout)
             if status == 200 and names:
                 log_event(_LOGGER, "info", "vLLM models available", port=port, models=names)
                 if bar.n < timeout_s:
@@ -1292,6 +1281,7 @@ def ensure_vllm(
     gpu_memory_utilization: float,
     *,
     wait_timeout_s: int = WAIT_TIMEOUT_S,
+    http_timeout: Optional[object] = None,
 ) -> Tuple[int, Optional[sp.Popen], bool]:
     """Ensure a vLLM server is available, launching one when necessary.
 
@@ -1300,6 +1290,8 @@ def ensure_vllm(
         model_path: Model repository or path passed to the vLLM CLI.
         served_model_names: Aliases that should be exposed via the OpenAI API.
         gpu_memory_utilization: Fractional GPU memory reservation for the server.
+        wait_timeout_s: Seconds to wait for vLLM readiness.
+        http_timeout: Optional override for HTTP connect/read timeout when probing the server.
 
     Returns:
         Tuple containing `(port, process, owns_process)` where `process` is the
@@ -1313,12 +1305,12 @@ def ensure_vllm(
     # 1) If preferred is free, start there
     if port_is_free(preferred):
         proc = start_vllm(preferred, model_path, served_model_names, gpu_memory_utilization)
-        names = wait_for_vllm(preferred, proc, timeout_s=wait_timeout_s)
+        names = wait_for_vllm(preferred, proc, timeout_s=wait_timeout_s, http_timeout=http_timeout)
         validate_served_models(names, served_model_names)
         return preferred, proc, True
 
     # 2) If something is already on preferred, reuse if it's vLLM (any models list)
-    names, raw, status = probe_models(preferred)
+    names, raw, status = probe_models(preferred, timeout=http_timeout)
     if status == 200:
         validate_served_models(names, served_model_names)
         _LOGGER.info(
@@ -1344,7 +1336,7 @@ def ensure_vllm(
         },
     )
     proc = start_vllm(alt, model_path, served_model_names, gpu_memory_utilization)
-    names = wait_for_vllm(alt, proc, timeout_s=wait_timeout_s)
+    names = wait_for_vllm(alt, proc, timeout_s=wait_timeout_s, http_timeout=http_timeout)
     validate_served_models(names, served_model_names)
     return alt, proc, True
 
@@ -1625,6 +1617,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
             "resume": bool(cfg.resume),
             "force": bool(cfg.force),
             "vllm_wait_timeout": int(cfg.vllm_wait_timeout),
+            "http_timeout": [float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
         }
     )
 
@@ -1654,6 +1647,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                 "vllm_wait_timeout": int(cfg.vllm_wait_timeout),
                 "port": int(cfg.port),
                 "profile": profile,
+                "http_timeout": [float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
             }
         },
     )
@@ -1670,8 +1664,9 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         served_model_names,
         gpu_memory_utilization,
         wait_timeout_s=int(cfg.vllm_wait_timeout),
+        http_timeout=cfg.http_timeout,
     )
-    metrics_healthy, metrics_status = probe_metrics(port)
+    metrics_healthy, metrics_status = probe_metrics(port, timeout=cfg.http_timeout)
     manifest_log_success(
         stage=MANIFEST_STAGE,
         doc_id="__service__",
@@ -1686,6 +1681,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         owns_process=owns,
         metrics_healthy=metrics_healthy,
         metrics_status_code=metrics_status,
+        http_timeout=[float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
     )
     logger.info(
         "vLLM server ready",
@@ -1693,6 +1689,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
             "extra_fields": {
                 "port": port,
                 "owns_process": owns,
+                "http_timeout": [float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
             }
         },
     )
@@ -1700,13 +1697,20 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     try:
         pdfs = list_pdfs(input_dir)
         if not pdfs:
-            logger.warning(
+            log_event(
+                logger,
+                "warning",
                 "No PDFs found",
-                extra={"extra_fields": {"input_dir": str(input_dir)}},
+                stage=MANIFEST_STAGE,
+                doc_id="__aggregate__",
+                input_hash=None,
+                error_code="NO_INPUT_FILES",
+                input_dir=str(input_dir),
             )
             return 0
 
         manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
+        resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
 
         workers = max(1, int(cfg.workers))
         logger.info(
@@ -1724,8 +1728,8 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         for pdf_path in pdfs:
             doc_id, out_path = derive_doc_id_and_doctags_path(pdf_path, input_dir, output_dir)
             input_hash = compute_content_hash(pdf_path)
-            manifest_entry = manifest_index.get(doc_id)
-            if should_skip_output(out_path, manifest_entry, input_hash, cfg.resume, cfg.force):
+            skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+            if skip_doc:
                 logger.info(
                     "Skipping document: output exists and input unchanged",
                     extra={
@@ -1791,14 +1795,15 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                         skip += 1
                     else:
                         fail += 1
-                        logger.error(
+                        log_event(
+                            logger,
+                            "error",
                             "Conversion failed",
-                            extra={
-                                "extra_fields": {
-                                    "doc_id": result.doc_id,
-                                    "error": result.error or "unknown",
-                                }
-                            },
+                            stage=MANIFEST_STAGE,
+                            doc_id=result.doc_id,
+                            input_hash=result.input_hash,
+                            error_code="PDF_CONVERSION_FAILED",
+                            error=result.error or "unknown",
                         )
 
                     duration = round(result.duration_s, 3)
@@ -1899,6 +1904,16 @@ HTML_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     CLIOption(
         ("--workers",),
         {"type": int, "default": HTML_DEFAULT_WORKERS, "help": "Parallel workers"},
+    ),
+    CLIOption(
+        ("--http-timeout",),
+        {
+            "type": float,
+            "nargs": 2,
+            "metavar": ("CONNECT", "READ"),
+            "default": None,
+            "help": "Override HTTP connect/read timeout (seconds) for docling service calls",
+        },
     ),
     CLIOption(
         ("--overwrite",), {"action": "store_true", "help": "Overwrite existing .doctags files"}
@@ -2281,6 +2296,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 "input_dir": str(input_dir),
                 "output_dir": str(output_dir),
                 "workers": cfg.workers,
+                "http_timeout": [float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
             }
         },
     )
@@ -2296,6 +2312,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
             "force": bool(cfg.force),
             "overwrite": bool(cfg.overwrite),
             "html_sanitizer": cfg.html_sanitizer,
+            "http_timeout": [float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
         }
     )
 
@@ -2323,10 +2340,20 @@ def html_main(args: argparse.Namespace | None = None) -> int:
 
     files = list_htmls(input_dir)
     if not files:
-        logger.warning("No HTML files found", extra={"extra_fields": {"input_dir": str(input_dir)}})
+        log_event(
+            logger,
+            "warning",
+            "No HTML files found",
+            stage=HTML_MANIFEST_STAGE,
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="NO_INPUT_FILES",
+            input_dir=str(input_dir),
+        )
         return 0
 
     manifest_index = load_manifest_index(HTML_MANIFEST_STAGE, resolved_root) if cfg.resume else {}
+    resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
 
     tasks: List[HtmlTask] = []
     ok = fail = skip = 0
@@ -2335,19 +2362,16 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         doc_id = rel_path.as_posix()
         out_path = (output_dir / rel_path).with_suffix(".doctags")
         input_hash = compute_content_hash(path)
-        manifest_entry = manifest_index.get(doc_id)
-        if (
-            should_skip_output(out_path, manifest_entry, input_hash, cfg.resume, cfg.force)
-            and not cfg.overwrite
-        ):
-            logger.info(
+        skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+        if skip_doc and not cfg.overwrite:
+            log_event(
+                logger,
+                "info",
                 "Skipping HTML document",
-                extra={
-                    "extra_fields": {
-                        "doc_id": doc_id,
-                        "output_path": str(out_path),
-                    }
-                },
+                stage=HTML_MANIFEST_STAGE,
+                doc_id=doc_id,
+                input_hash=input_hash,
+                output_path=str(out_path),
             )
             manifest_log_skip(
                 stage=HTML_MANIFEST_STAGE,
@@ -2420,14 +2444,15 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 )
             else:
                 fail += 1
-                logger.error(
+                log_event(
+                    logger,
+                    "error",
                     "HTML conversion failure",
-                    extra={
-                        "extra_fields": {
-                            "doc_id": result.doc_id,
-                            "error": result.error or "conversion failed",
-                        }
-                    },
+                    stage=HTML_MANIFEST_STAGE,
+                    doc_id=result.doc_id,
+                    input_hash=result.input_hash,
+                    error_code="HTML_CONVERSION_FAILED",
+                    error=result.error or "conversion failed",
                 )
                 manifest_log_failure(
                     stage=HTML_MANIFEST_STAGE,

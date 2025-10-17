@@ -81,12 +81,57 @@
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.features</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Compatibility layer for the retired <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.features</span></code> module.</p>
-<p>This shim is gated behind the <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_HYBRID_FEATURES_SHIM</span></code> environment
-variable. By default the module raises an ImportError instructing callers to
-switch to <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.devtools.features</span></code>. Setting the environment
-variable to a truthy value temporarily re-enables the shim (and emits a
-DeprecationWarning) so teams can smoke-test outstanding imports.</p>
+<p>Feature generation helpers for DocsToKG hybrid search.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="tokenize-text">
+<h3><code class="docutils literal notranslate"><span class="pre">tokenize(text)</span></code><a class="headerlink" href="#tokenize-text" title="Link to this heading"></a></h3>
+<p>Tokenize <code class="docutils literal notranslate"><span class="pre">text</span></code> into lower-cased alphanumeric tokens.</p>
+</section>
+<section id="tokenize-with-spans-text">
+<h3><code class="docutils literal notranslate"><span class="pre">tokenize_with_spans(text)</span></code><a class="headerlink" href="#tokenize-with-spans-text" title="Link to this heading"></a></h3>
+<p>Tokenize <code class="docutils literal notranslate"><span class="pre">text</span></code> and return token spans for highlight generation.</p>
+</section>
+<section id="sliding-window-tokens-window-overlap">
+<h3><code class="docutils literal notranslate"><span class="pre">sliding_window(tokens,</span> <span class="pre">window,</span> <span class="pre">overlap)</span></code><a class="headerlink" href="#sliding-window-tokens-window-overlap" title="Link to this heading"></a></h3>
+<p>Yield sliding windows across <code class="docutils literal notranslate"><span class="pre">tokens</span></code> with <code class="docutils literal notranslate"><span class="pre">overlap</span></code> between chunks.</p>
+</section>
+<section id="embedding-dim-self">
+<h3><code class="docutils literal notranslate"><span class="pre">embedding_dim(self)</span></code><a class="headerlink" href="#embedding-dim-self" title="Link to this heading"></a></h3>
+<p>Return the configured dense embedding dimensionality.</p>
+</section>
+<section id="compute-features-self-text">
+<h3><code class="docutils literal notranslate"><span class="pre">compute_features(self,</span> <span class="pre">text)</span></code><a class="headerlink" href="#compute-features-self-text" title="Link to this heading"></a></h3>
+<p>Compute synthetic BM25, SPLADE, and dense vector features.</p>
+</section>
+<section id="compute-bm25-self-tokens">
+<h3><code class="docutils literal notranslate"><span class="pre">_compute_bm25(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#compute-bm25-self-tokens" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="compute-splade-self-tokens">
+<h3><code class="docutils literal notranslate"><span class="pre">_compute_splade(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#compute-splade-self-tokens" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="compute-dense-embedding-self-tokens">
+<h3><code class="docutils literal notranslate"><span class="pre">_compute_dense_embedding(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#compute-dense-embedding-self-tokens" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="hash-to-vector-self-token">
+<h3><code class="docutils literal notranslate"><span class="pre">_hash_to_vector(self,</span> <span class="pre">token)</span></code><a class="headerlink" href="#hash-to-vector-self-token" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="normalize-self-vector">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize(self,</span> <span class="pre">vector)</span></code><a class="headerlink" href="#normalize-self-vector" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="featuregenerator">
+<h3><code class="docutils literal notranslate"><span class="pre">FeatureGenerator</span></code><a class="headerlink" href="#featuregenerator" title="Link to this heading"></a></h3>
+<p>Deterministic feature generator used by tests and validation harnesses.</p>
+</section>
 </section>
 </section>
 

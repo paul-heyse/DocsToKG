@@ -1,7 +1,7 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.DocParsing.formats",
-#   "purpose": "Schema definitions and serializer providers for DocParsing formats",
+#   "module": "DocsToKG.DocParsing.formats.__init__",
+#   "purpose": "Data models and validators for DocParsing artifact formats",
 #   "sections": [
 #     {
 #       "id": "missing-pydantic-message",
@@ -52,6 +52,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "pydantic-validate-vector-row",
+#       "name": "_pydantic_validate_vector_row",
+#       "anchor": "function-pydantic-validate-vector-row",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "validate-vector-row",
 #       "name": "validate_vector_row",
 #       "anchor": "function-validate-vector-row",
@@ -61,12 +67,6 @@
 #       "id": "get-docling-version",
 #       "name": "get_docling_version",
 #       "anchor": "function-get-docling-version",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "validate-schema-version",
-#       "name": "validate_schema_version",
-#       "anchor": "function-validate-schema-version",
 #       "kind": "function"
 #     },
 #     {
@@ -296,10 +296,14 @@ def _missing_pydantic_message() -> str:
     )
 
 
-CHUNK_SCHEMA_VERSION = "docparse/1.1.0"
-VECTOR_SCHEMA_VERSION = "embeddings/1.0.0"
-COMPATIBLE_CHUNK_VERSIONS = ["docparse/1.0.0", "docparse/1.1.0"]
-COMPATIBLE_VECTOR_VERSIONS = ["embeddings/1.0.0"]
+from DocsToKG.DocParsing.schemas import (
+    CHUNK_SCHEMA_VERSION,
+    COMPATIBLE_CHUNK_VERSIONS,
+    COMPATIBLE_VECTOR_VERSIONS,
+    VECTOR_SCHEMA_VERSION,
+    SchemaKind,
+    validate_schema_version,
+)
 
 # --- Globals ---
 
@@ -476,11 +480,7 @@ class ChunkRow(BaseModel):
             ValueError: If the supplied schema version is not compatible.
         """
 
-        return validate_schema_version(
-            value,
-            COMPATIBLE_CHUNK_VERSIONS,
-            kind="chunk",
-        )
+        return validate_schema_version(value, SchemaKind.CHUNK)
 
     @field_validator("num_tokens")
     @classmethod
@@ -704,11 +704,7 @@ class VectorRow(BaseModel):
             ValueError: If the supplied schema version is not compatible.
         """
 
-        return validate_schema_version(
-            value,
-            COMPATIBLE_VECTOR_VERSIONS,
-            kind="vector",
-        )
+        return validate_schema_version(value, SchemaKind.VECTOR)
 
 
 # --- Public Functions ---
@@ -749,8 +745,8 @@ def validate_chunk_row(row: dict) -> ChunkRow:
         raise ValueError(f"Chunk row validation failed for doc_id={doc_id}: {exc}") from exc
 
 
-def validate_vector_row(row: dict) -> VectorRow:
-    """Validate and parse a vector JSONL row.
+def _pydantic_validate_vector_row(row: dict) -> VectorRow:
+    """Validate and parse a vector JSONL row using Pydantic models.
 
     Args:
         row: Raw dictionary from JSONL.
@@ -782,6 +778,14 @@ def validate_vector_row(row: dict) -> VectorRow:
         raise ValueError(f"Vector row validation failed for UUID={uuid}: {exc}") from exc
 
 
+def validate_vector_row(row: dict, *, expected_dimension: Optional[int] = None) -> VectorRow:
+    """Wrap :func:`DocParsing.schemas.validate_vector_row` for backward compatibility."""
+
+    from DocsToKG.DocParsing.schemas import validate_vector_row as _schema_validate_vector_row
+
+    return _schema_validate_vector_row(row, expected_dimension=expected_dimension)
+
+
 def get_docling_version() -> str:
     """Detect installed Docling package version.
 
@@ -805,46 +809,6 @@ def get_docling_version() -> str:
         return getattr(docling, "__version__", "unknown")
     except (ImportError, AttributeError):
         return "unknown"
-
-
-def validate_schema_version(
-    version: Optional[str],
-    compatible_versions: List[str],
-    *,
-    kind: str = "schema",
-    source: Optional[str] = None,
-) -> str:
-    """Ensure a schema version string is recognised.
-
-    Args:
-        version: Schema version string from a JSONL row.
-        compatible_versions: List of accepted version identifiers.
-        kind: Human-readable label describing the schema type.
-        source: Optional context describing where the version originated.
-
-    Returns:
-        The validated schema version.
-
-    Examples:
-        >>> validate_schema_version("docparse/1.1.0", COMPATIBLE_CHUNK_VERSIONS)
-        'docparse/1.1.0'
-
-    Raises:
-        ValueError: If the schema version is missing or unsupported.
-    """
-
-    if not version:
-        location = f" from {source}" if source else ""
-        expected = ", ".join(sorted(compatible_versions))
-        raise ValueError(f"Missing {kind} schema_version{location}. Expected one of: {expected}")
-    if version not in compatible_versions:
-        location = f" in {source}" if source else ""
-        expected = ", ".join(sorted(compatible_versions))
-        raise ValueError(
-            f"Unsupported {kind} schema_version '{version}'{location}. "
-            f"Supported versions: {expected}"
-        )
-    return version
 
 
 # --- Serializer Helpers ---

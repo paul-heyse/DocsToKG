@@ -1417,6 +1417,12 @@ class HybridSearchService:
                 "search_channel_candidates", len(filtered), channel="dense"
             )
             if adapter_stats is not None:
+                fp16_metric = (
+                    1.0 if bool(getattr(adapter_stats, "fp16_enabled", False)) else 0.0
+                )
+                self._observability.metrics.set_gauge(
+                    "faiss_fp16_enabled", fp16_metric, channel="dense"
+                )
                 self._observability.metrics.set_gauge(
                     "nprobe_in_effect", float(adapter_stats.nprobe), channel="dense"
                 )
@@ -1521,6 +1527,12 @@ class HybridSearchService:
             "search_channel_candidates", len(filtered), channel="dense"
         )
         if adapter_stats is not None:
+            fp16_metric = (
+                1.0 if bool(getattr(adapter_stats, "fp16_enabled", False)) else 0.0
+            )
+            self._observability.metrics.set_gauge(
+                "faiss_fp16_enabled", fp16_metric, channel="dense"
+            )
             self._observability.metrics.set_gauge(
                 "nprobe_in_effect", float(adapter_stats.nprobe), channel="dense"
             )

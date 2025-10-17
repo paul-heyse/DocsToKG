@@ -85,34 +85,6 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="normalize-algorithm-algorithm">
-<h3><code class="docutils literal notranslate"><span class="pre">_normalize_algorithm(algorithm)</span></code><a class="headerlink" href="#normalize-algorithm-algorithm" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="normalize-checksum-algorithm-value">
-<h3><code class="docutils literal notranslate"><span class="pre">_normalize_checksum(algorithm,</span> <span class="pre">value)</span></code><a class="headerlink" href="#normalize-checksum-algorithm-value" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="checksum-from-extras-extras">
-<h3><code class="docutils literal notranslate"><span class="pre">_checksum_from_extras(extras)</span></code><a class="headerlink" href="#checksum-from-extras-extras" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="checksum-url-from-extras-extras">
-<h3><code class="docutils literal notranslate"><span class="pre">_checksum_url_from_extras(extras)</span></code><a class="headerlink" href="#checksum-url-from-extras-extras" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="extract-checksum-from-text-text">
-<h3><code class="docutils literal notranslate"><span class="pre">_extract_checksum_from_text(text)</span></code><a class="headerlink" href="#extract-checksum-from-text-text" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="fetch-checksum-from-url">
-<h3><code class="docutils literal notranslate"><span class="pre">_fetch_checksum_from_url()</span></code><a class="headerlink" href="#fetch-checksum-from-url" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="resolve-expected-checksum">
-<h3><code class="docutils literal notranslate"><span class="pre">_resolve_expected_checksum()</span></code><a class="headerlink" href="#resolve-expected-checksum" title="Link to this heading"></a></h3>
-<p>Determine the expected checksum metadata for downstream enforcement.</p>
-</section>
 <section id="get-manifest-schema">
 <h3><code class="docutils literal notranslate"><span class="pre">get_manifest_schema()</span></code><a class="headerlink" href="#get-manifest-schema" title="Link to this heading"></a></h3>
 <p>Return a deep copy of the manifest JSON Schema definition.</p>
@@ -139,6 +111,10 @@ ConfigurationError: If validation fails.</p>
 <section id="merge-defaults-raw-spec-defaults">
 <h3><code class="docutils literal notranslate"><span class="pre">merge_defaults(raw_spec,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#merge-defaults-raw-spec-defaults" title="Link to this heading"></a></h3>
 <p>Merge user-provided specification with defaults to create a fetch spec.</p>
+</section>
+<section id="cancel-pending-futures-futures">
+<h3><code class="docutils literal notranslate"><span class="pre">_cancel_pending_futures(futures)</span></code><a class="headerlink" href="#cancel-pending-futures-futures" title="Link to this heading"></a></h3>
+<p>Cancel any futures that are still pending execution.</p>
 </section>
 <section id="parse-http-datetime-value">
 <h3><code class="docutils literal notranslate"><span class="pre">parse_http_datetime(value)</span></code><a class="headerlink" href="#parse-http-datetime-value" title="Link to this heading"></a></h3>
@@ -199,10 +175,6 @@ None: Returns <code class="docutils literal notranslate"><span class="pre">None<
 <section id="populate-plan-metadata-planned-config-adapter">
 <h3><code class="docutils literal notranslate"><span class="pre">_populate_plan_metadata(planned,</span> <span class="pre">config,</span> <span class="pre">adapter)</span></code><a class="headerlink" href="#populate-plan-metadata-planned-config-adapter" title="Link to this heading"></a></h3>
 <p>Augment planned fetch with HTTP metadata when available.</p>
-</section>
-<section id="migrate-manifest-inplace-payload">
-<h3><code class="docutils literal notranslate"><span class="pre">_migrate_manifest_inplace(payload)</span></code><a class="headerlink" href="#migrate-manifest-inplace-payload" title="Link to this heading"></a></h3>
-<p>Upgrade manifests created with older schema versions in place.</p>
 </section>
 <section id="read-manifest-manifest-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_read_manifest(manifest_path)</span></code><a class="headerlink" href="#read-manifest-manifest-path" title="Link to this heading"></a></h3>
@@ -343,14 +315,6 @@ is configured to stop on error.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_version_lock(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#version-lock-ontology-id-version" title="Link to this heading"></a></h3>
 <p>Acquire an inter-process lock for a specific ontology version.</p>
 </section>
-<section id="to-known-hash-self">
-<h3><code class="docutils literal notranslate"><span class="pre">to_known_hash(self)</span></code><a class="headerlink" href="#to-known-hash-self" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">algorithm:value</span></code> string suitable for pooch known_hash.</p>
-</section>
-<section id="to-mapping-self">
-<h3><code class="docutils literal notranslate"><span class="pre">to_mapping(self)</span></code><a class="headerlink" href="#to-mapping-self" title="Link to this heading"></a></h3>
-<p>Return mapping representation for manifest and index serialization.</p>
-</section>
 <section id="to-dict-self">
 <h3><code class="docutils literal notranslate"><span class="pre">to_dict(self)</span></code><a class="headerlink" href="#to-dict-self" title="Link to this heading"></a></h3>
 <p>Return a JSON-serializable dictionary for the manifest.</p>
@@ -431,9 +395,13 @@ result.status
 </div></blockquote>
 </div></blockquote>
 </section>
-<section id="expectedchecksum">
-<h3><code class="docutils literal notranslate"><span class="pre">ExpectedChecksum</span></code><a class="headerlink" href="#expectedchecksum" title="Link to this heading"></a></h3>
-<p>Expected checksum derived from configuration or resolver metadata.</p>
+<section id="batchplanningerror">
+<h3><code class="docutils literal notranslate"><span class="pre">BatchPlanningError</span></code><a class="headerlink" href="#batchplanningerror" title="Link to this heading"></a></h3>
+<p>Raised when ontology planning aborts after a failure.</p>
+</section>
+<section id="batchfetcherror">
+<h3><code class="docutils literal notranslate"><span class="pre">BatchFetchError</span></code><a class="headerlink" href="#batchfetcherror" title="Link to this heading"></a></h3>
+<p>Raised when ontology downloads abort after a failure.</p>
 </section>
 <section id="manifest">
 <h3><code class="docutils literal notranslate"><span class="pre">Manifest</span></code><a class="headerlink" href="#manifest" title="Link to this heading"></a></h3>
@@ -455,6 +423,8 @@ last_modified: Upstream last-modified timestamp, if supplied.
 content_type: MIME type reported by upstream servers when available.
 content_length: Content-Length reported by upstream servers when available.
 source_media_type_label: Friendly label describing the source media type.
+streaming_content_sha256: Streaming canonical content hash when available.
+streaming_prefix_sha256: Hash of Turtle prefix header when available.
 downloaded_at: UTC timestamp of the completed download.
 target_formats: Desired conversion targets for normalization.
 validation: Mapping of validator names to their results.

@@ -212,6 +212,17 @@ class OpenSearchSchemaManager:
                     f"template {namespace!r}: field {field!r} must declare type={expected_type}"
                 )
 
+        text_config = properties.get("text")
+        if not isinstance(text_config, Mapping) or text_config.get("type") != "text":
+            raise ValueError(
+                f"template {namespace!r}: field 'text' must declare type=text with a valid analyzer"
+            )
+        analyzer = text_config.get("analyzer")
+        if analyzer is not None and str(analyzer).lower() == "keyword":
+            raise ValueError(
+                f"template {namespace!r}: field 'text' must not use analyzer=keyword"
+            )
+
         splade_config = properties.get("splade")
         if not isinstance(splade_config, Mapping) or splade_config.get("type") != "rank_features":
             raise ValueError(

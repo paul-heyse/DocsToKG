@@ -27,7 +27,7 @@ try:  # pragma: no cover - platform specific availability
 except ImportError:  # pragma: no cover - non-windows
     msvcrt = None  # type: ignore[assignment]
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
 import requests
 from jsonschema import Draft202012Validator
@@ -41,6 +41,7 @@ from .errors import (
     ResolverError,
     ValidationError,
 )
+from .checksums import ExpectedChecksum, resolve_expected_checksum
 from .io import (
     RDF_MIME_ALIASES,
     RDF_MIME_FORMAT_LABELS,
@@ -50,6 +51,7 @@ from .io import (
     sanitize_filename,
     validate_url_security,
 )
+from .migrations import migrate_manifest
 from .logging_utils import setup_logging
 from .resolvers import (
     RESOLVERS,
@@ -80,9 +82,6 @@ from .settings import (
 from .validation import ValidationRequest, ValidationResult, run_validators
 
 MANIFEST_SCHEMA_VERSION = "1.0"
-
-_SUPPORTED_CHECKSUM_ALGORITHMS = {"md5", "sha1", "sha256", "sha512"}
-_CHECKSUM_HEX_RE = re.compile(r"^[0-9a-f]{32,128}$")
 
 MANIFEST_JSON_SCHEMA: Dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -176,176 +175,8 @@ MANIFEST_JSON_SCHEMA: Dict[str, Any] = {
     "additionalProperties": True,
 }
 
-
-def _normalize_algorithm(algorithm: Optional[str], *, context: str) -> str:
-    candidate = (algorithm or "sha256").strip().lower()
-    if candidate not in _SUPPORTED_CHECKSUM_ALGORITHMS:
-        raise ConfigError(f"{context}: unsupported checksum algorithm '{candidate}'")
-    return candidate
-
-
-def _normalize_checksum(algorithm: str, value: str, *, context: str) -> Tuple[str, str]:
-    normalized_algorithm = _normalize_algorithm(algorithm, context=context)
-    if not isinstance(value, str):
-        raise ConfigError(f"{context}: checksum value must be a string")
-    checksum = value.strip().lower()
-    if not _CHECKSUM_HEX_RE.fullmatch(checksum):
-        raise ConfigError(f"{context}: checksum must be a hexadecimal digest")
-    return normalized_algorithm, checksum
-
-
-def _checksum_from_extras(
-    extras: Mapping[str, object], *, context: str
-) -> Tuple[Optional[str], Optional[str]]:
-    payload = extras.get("checksum") if isinstance(extras, Mapping) else None
-    if payload is None:
-        return None, None
-    if isinstance(payload, str):
-        return _normalize_checksum("sha256", payload, context=context)
-    if isinstance(payload, Mapping):
-        algorithm = payload.get("algorithm", "sha256")
-        value = payload.get("value")
-        if not isinstance(algorithm, str):
-            raise ConfigError(f"{context}: checksum algorithm must be a string")
-        if not isinstance(value, str):
-            raise ConfigError(f"{context}: checksum value must be a string")
-        return _normalize_checksum(algorithm, value, context=context)
-    raise ConfigError(f"{context}: checksum must be provided as a string or mapping")
-
-
-def _checksum_url_from_extras(
-    extras: Mapping[str, object], *, context: str
-) -> Tuple[Optional[str], Optional[str]]:
-    payload = extras.get("checksum_url") if isinstance(extras, Mapping) else None
-    if payload is None:
-        return None, None
-    if isinstance(payload, str):
-        url = payload.strip()
-        if not url:
-            raise ConfigError(f"{context}: checksum_url must not be empty")
-        return url, None
-    if isinstance(payload, Mapping):
-        url_value = payload.get("url")
-        algorithm_value = payload.get("algorithm")
-        if not isinstance(url_value, str) or not url_value.strip():
-            raise ConfigError(f"{context}: checksum_url must include a non-empty 'url'")
-        algorithm = None
-        if algorithm_value is not None:
-            if not isinstance(algorithm_value, str):
-                raise ConfigError(
-                    f"{context}: checksum_url algorithm must be a string when provided"
-                )
-            algorithm = _normalize_algorithm(algorithm_value, context=context)
-        return url_value.strip(), algorithm
-    raise ConfigError(f"{context}: checksum_url must be provided as a string or mapping")
-
-
-def _extract_checksum_from_text(text: str, *, context: str) -> str:
-    match = re.search(r"[0-9a-fA-F]{32,128}", text)
-    if not match:
-        raise OntologyDownloadError(f"Unable to parse checksum from {context}")
-    return match.group(0).lower()
-
-
-def _fetch_checksum_from_url(
-    *,
-    url: str,
-    algorithm: str,
-    http_config: DownloadConfiguration,
-    logger: logging.Logger,
-) -> str:
-    secure_url = validate_url_security(url, http_config)
-    try:
-        response = requests.get(secure_url, timeout=http_config.timeout_sec)
-        response.raise_for_status()
-    except requests.RequestException as exc:
-        raise OntologyDownloadError(f"Failed to fetch checksum from {secure_url}: {exc}") from exc
-    digest = _extract_checksum_from_text(response.text, context=secure_url)
-    logger.info(
-        "fetched checksum",
-        extra={
-            "stage": "download",
-            "checksum_url": secure_url,
-            "algorithm": algorithm,
-        },
-    )
-    return digest
-
-
-def _resolve_expected_checksum(
-    *,
-    spec: FetchSpec,
-    plan: FetchPlan,
-    download_config: DownloadConfiguration,
-    logger: logging.Logger,
-) -> Optional[ExpectedChecksum]:
-    """Determine the expected checksum metadata for downstream enforcement."""
-
-    context = f"ontology '{spec.id}'"
-    plan_checksum: Optional[Tuple[str, str]] = None
-    if plan.checksum:
-        algorithm = plan.checksum_algorithm or "sha256"
-        plan_checksum = _normalize_checksum(
-            algorithm, plan.checksum, context=f"{context} resolver checksum"
-        )
-
-    spec_checksum = _checksum_from_extras(spec.extras, context=context)
-    if (
-        spec_checksum[1] is not None
-        and plan_checksum is not None
-        and spec_checksum[1] != plan_checksum[1]
-    ):
-        raise ConfigError(
-            f"{context}: conflicting checksum values between resolver and specification extras"
-        )
-
-    algorithm: Optional[str] = None
-    value: Optional[str] = None
-    if plan_checksum is not None:
-        algorithm, value = plan_checksum
-    if spec_checksum[1] is not None:
-        algorithm, value = spec_checksum
-
-    checksum_url_source: Optional[Tuple[str, Optional[str]]] = None
-    if plan.checksum_url:
-        checksum_url_source = (plan.checksum_url, plan.checksum_algorithm)
-    else:
-        url_from_extras = _checksum_url_from_extras(spec.extras, context=context)
-        if url_from_extras[0]:
-            checksum_url_source = url_from_extras
-
-    if value is None and checksum_url_source:
-        raw_url, url_algorithm = checksum_url_source
-        normalized_algorithm = _normalize_algorithm(
-            url_algorithm or algorithm or "sha256", context=context
-        )
-        value = _fetch_checksum_from_url(
-            url=raw_url,
-            algorithm=normalized_algorithm,
-            http_config=download_config,
-            logger=logger,
-        )
-        algorithm = normalized_algorithm
-
-    if value is None or algorithm is None:
-        return None
-
-    normalized_algorithm, normalized_value = _normalize_checksum(algorithm, value, context=context)
-    checksum = ExpectedChecksum(
-        algorithm=normalized_algorithm,
-        value=normalized_value,
-    )
-    logger.info(
-        "using expected checksum",
-        extra={
-            "stage": "download",
-            "ontology_id": spec.id,
-            "checksum": checksum.to_known_hash(),
-            "checksum_algorithm": checksum.algorithm,
-            "checksum_value": checksum.value,
-        },
-    )
-    return checksum
+# Maintain backwards compatibility for existing internal imports.
+_resolve_expected_checksum = resolve_expected_checksum
 
 
 Draft202012Validator.check_schema(MANIFEST_JSON_SCHEMA)
@@ -509,27 +340,73 @@ class FetchResult:
     sha256: str
     manifest_path: Path
     artifacts: Sequence[str]
-
-
-@dataclass(slots=True, frozen=True)
-class ExpectedChecksum:
-    """Expected checksum derived from configuration or resolver metadata."""
-
-    algorithm: str
-    value: str
-
-    def to_known_hash(self) -> str:
-        """Return ``algorithm:value`` string suitable for pooch known_hash."""
-
-        return f"{self.algorithm}:{self.value}"
-
-    def to_mapping(self) -> Dict[str, str]:
-        """Return mapping representation for manifest and index serialization."""
-
-        return {"algorithm": self.algorithm, "value": self.value}
-
+    expected_checksum: Optional[ExpectedChecksum] = None
 
 ResolvedConfig.model_rebuild()
+
+
+class BatchPlanningError(RuntimeError):
+    """Raised when ontology planning aborts after a failure."""
+
+    def __init__(
+        self,
+        *,
+        failed_spec: FetchSpec,
+        original: BaseException,
+        completed: List["PlannedFetch"],
+        total: int,
+    ) -> None:
+        self.failed_spec = failed_spec
+        self.original = original
+        self.completed = completed
+        self.total = total
+        successful = len(completed)
+        message = (
+            f"Planning aborted after {successful}/{total} completed when "
+            f"{failed_spec.id} failed: {original}"
+        )
+        super().__init__(message)
+
+
+class BatchFetchError(RuntimeError):
+    """Raised when ontology downloads abort after a failure."""
+
+    def __init__(
+        self,
+        *,
+        failed_spec: FetchSpec,
+        original: BaseException,
+        completed: List[FetchResult],
+        total: int,
+    ) -> None:
+        self.failed_spec = failed_spec
+        self.original = original
+        self.completed = completed
+        self.total = total
+        successful = len(completed)
+        message = (
+            f"Download aborted after {successful}/{total} completed when "
+            f"{failed_spec.id} failed: {original}"
+        )
+        super().__init__(message)
+
+
+def _cancel_pending_futures(
+    futures: Mapping[Future[Any], Tuple[int, FetchSpec]],
+    *,
+    current: Optional[Future[Any]] = None,
+) -> None:
+    """Cancel any futures that are still pending execution."""
+
+    for future in futures:
+        if future is current:
+            continue
+        done_fn = getattr(future, "done", None)
+        if callable(done_fn) and done_fn():
+            continue
+        cancel_fn = getattr(future, "cancel", None)
+        if callable(cancel_fn):
+            cancel_fn()
 
 
 @dataclass(slots=True, frozen=True)
@@ -1088,23 +965,6 @@ def _populate_plan_metadata(
     return planned
 
 
-def _migrate_manifest_inplace(payload: dict) -> None:
-    """Upgrade manifests created with older schema versions in place."""
-
-    version = str(payload.get("schema_version", "") or "")
-    if version in {"", "1.0"}:
-        payload.setdefault("schema_version", "1.0")
-        return
-    if version == "0.9":
-        payload["schema_version"] = "1.0"
-        payload.setdefault("resolver_attempts", [])
-        return
-    logging.getLogger(__name__).warning(
-        "unknown manifest schema version",
-        extra={"stage": "manifest", "schema_version": version},
-    )
-
-
 def _read_manifest(manifest_path: Path) -> Optional[dict]:
     """Return previously recorded manifest data if a valid JSON file exists.
 
@@ -1120,12 +980,12 @@ def _read_manifest(manifest_path: Path) -> Optional[dict]:
         payload = json.loads(manifest_path.read_text())
     except json.JSONDecodeError:
         return None
-    _migrate_manifest_inplace(payload)
+    payload = migrate_manifest(payload)
     validate_manifest_dict(payload, source=manifest_path)
     return payload
 
 
-def _validate_manifest(manifest: Manifest) -> None:
+def _validate_manifest(manifest: Manifest) -> Dict[str, Any]:
     """Check that a manifest instance satisfies structural and type requirements.
 
     Args:
@@ -1134,7 +994,8 @@ def _validate_manifest(manifest: Manifest) -> None:
     Raises:
         ConfigurationError: If required fields are missing or contain invalid types.
     """
-    validate_manifest_dict(manifest.to_dict())
+    payload = migrate_manifest(manifest.to_dict())
+    validate_manifest_dict(payload)
 
     required_fields = [
         "id",
@@ -1173,6 +1034,7 @@ def _validate_manifest(manifest: Manifest) -> None:
         manifest.streaming_prefix_sha256, str
     ):
         raise ConfigurationError("Manifest streaming_prefix_sha256 must be a string when provided")
+    return payload
 
 
 def _parse_last_modified(value: Optional[str]) -> Optional[datetime]:
@@ -1258,8 +1120,8 @@ def _write_manifest(manifest_path: Path, manifest: Manifest) -> None:
         manifest_path: Destination path for the manifest file.
         manifest: Manifest describing the downloaded ontology artifact.
     """
-    _validate_manifest(manifest)
-    _atomic_write_text(manifest_path, manifest.to_json())
+    payload = _validate_manifest(manifest)
+    _atomic_write_json(manifest_path, payload)
 
 
 def _append_index_entry(ontology_dir: Path, entry: Dict[str, Any]) -> None:
@@ -1806,6 +1668,7 @@ def fetch_one(
                     sha256=result.sha256,
                     manifest_path=manifest_path,
                     artifacts=artifacts,
+                    expected_checksum=expected_checksum,
                 )
 
         try:
@@ -1987,14 +1850,16 @@ def plan_all(
                         "error": str(exc),
                     },
                 )
+                _cancel_pending_futures(futures, current=future)
                 if isinstance(exc, (ConfigError, ConfigurationError, PolicyError)):
-                    for pending in futures:
-                        pending.cancel()
                     raise
-                if not active_config.defaults.continue_on_error:
-                    for pending in futures:
-                        pending.cancel()
-                    raise
+                completed_plans = [results[i] for i in sorted(results)]
+                raise BatchPlanningError(
+                    failed_spec=spec,
+                    original=exc,
+                    completed=completed_plans,
+                    total=len(spec_list),
+                ) from exc
             else:
                 results[index] = planned
 
@@ -2122,10 +1987,14 @@ def fetch_all(
                     "ontology fetch failed",
                     extra={"stage": "error", "ontology_id": spec.id, "error": str(exc)},
                 )
-                if not active_config.defaults.continue_on_error:
-                    for pending in futures:
-                        pending.cancel()
-                    raise
+                _cancel_pending_futures(futures, current=future)
+                completed_results = [results_map[i] for i in sorted(results_map)]
+                raise BatchFetchError(
+                    failed_spec=spec,
+                    original=exc,
+                    completed=completed_results,
+                    total=total,
+                ) from exc
 
     ordered_results = [results_map[i] for i in sorted(results_map)]
     return ordered_results

@@ -4,6 +4,12 @@
 #   "purpose": "Vector store orchestration, OpenSearch helpers, GPU similarity utilities, and persistence",
 #   "sections": [
 #     {
+#       "id": "vector-uuid-to-faiss-int",
+#       "name": "_vector_uuid_to_faiss_int",
+#       "anchor": "function-vector-uuid-to-faiss-int",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "faisssearchresult",
 #       "name": "FaissSearchResult",
 #       "anchor": "class-faisssearchresult",
@@ -86,18 +92,6 @@
 #       "name": "ChunkRegistry",
 #       "anchor": "class-chunkregistry",
 #       "kind": "class"
-#     },
-#     {
-#       "id": "matches-filters",
-#       "name": "matches_filters",
-#       "anchor": "function-matches-filters",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "getattr",
-#       "name": "__getattr__",
-#       "anchor": "function-getattr",
-#       "kind": "function"
 #     },
 #     {
 #       "id": "managedfaissadapter",
@@ -315,9 +309,6 @@ class _SearchCoalescer:
 
 
 class FaissVectorStore(DenseVectorStore):
-    _RUNTIME_MUTABLE_FIELDS: ClassVar[frozenset[str]] = frozenset(
-        {"nprobe", "ingest_dedupe_threshold"}
-    )
     """Manage a GPU-backed FAISS index for dense retrieval.
 
     The store encapsulates FAISS initialisation, GPU resource management,
@@ -340,6 +331,10 @@ class FaissVectorStore(DenseVectorStore):
         >>> [hit.vector_id for hit in results]
         ['chunk-1']
     """
+
+    _RUNTIME_MUTABLE_FIELDS: ClassVar[frozenset[str]] = frozenset(
+        {"nprobe", "ingest_dedupe_threshold"}
+    )
 
     @classmethod
     def create(
@@ -835,11 +830,16 @@ class FaissVectorStore(DenseVectorStore):
                 else:
                     start = int(lims[0])
                     end = int(lims[1])
-                    pairs = [
-                        (float(distances[i]), int(labels[i]))
-                        for i in range(start, end)
-                        if labels[i] != -1 and float(distances[i]) >= threshold
-                    ]
+                    pairs = []
+                    for i in range(start, end):
+                        if labels[i] == -1:
+                            continue
+                        score = float(distances[i])
+                        if score < threshold:
+                            continue
+                        pairs.append((score, int(labels[i])))
+                        if limit is not None and len(pairs) >= int(limit):
+                            break
                 scored: List[tuple[float, str]] = []
                 for score, internal_id in pairs:
                     vector_id = self._resolve_vector_id(int(internal_id))

@@ -158,15 +158,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import (
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Set,
-    Tuple,
-)
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 from urllib.parse import urlparse, urlsplit
 from urllib.robotparser import RobotFileParser
 
@@ -197,7 +189,7 @@ from DocsToKG.ContentDownload.core import (
 )
 from DocsToKG.ContentDownload.core import normalize_arxiv as _normalize_arxiv
 from DocsToKG.ContentDownload.core import normalize_pmid as _normalize_pmid
-from DocsToKG.ContentDownload.network import (
+from DocsToKG.ContentDownload.networking import (
     CachedResult,
     ConditionalRequestHelper,
     ContentPolicyViolation,
@@ -217,6 +209,8 @@ from DocsToKG.ContentDownload.pipeline import (
     load_resolver_config,
     read_resolver_config,
 )
+from DocsToKG.ContentDownload import pipeline as resolvers
+from DocsToKG.ContentDownload.providers import OpenAlexWorkProvider, WorkProvider
 from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
     AttemptSink,
@@ -249,6 +243,9 @@ __all__ = (
     "MultiSink",
     "MANIFEST_SCHEMA_VERSION",
     "WorkArtifact",
+    "WorkProvider",
+    "OpenAlexWorkProvider",
+    "resolvers",
     "apply_config_overrides",
     "build_manifest_entry",
     "build_query",
@@ -1483,7 +1480,7 @@ def iterate_openalex(
 
 
 def process_one_work(
-    work: Dict[str, Any],
+    work: Union[WorkArtifact, Dict[str, Any]],
     session: requests.Session,
     pdf_dir: Path,
     html_dir: Path,
@@ -1493,10 +1490,11 @@ def process_one_work(
     *,
     options: DownloadOptions,
 ) -> Dict[str, Any]:
-    """Process a single OpenAlex work through the resolver pipeline.
+    """Process a single work artifact through the resolver pipeline.
 
     Args:
-        work: OpenAlex work payload from :func:`iterate_openalex`.
+        work: Either a preconstructed :class:`WorkArtifact` or a raw OpenAlex
+            work payload. Raw payloads are normalised via :func:`create_artifact`.
         session: Requests session configured for resolver usage.
         pdf_dir: Directory where PDF artefacts are written.
         html_dir: Directory where HTML artefacts are written.
@@ -1513,7 +1511,10 @@ def process_one_work(
             unexpectedly outside guarded sections.
         Exception: Bubbling from resolver pipeline internals when not handled.
     """
-    artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
+    if isinstance(work, WorkArtifact):
+        artifact = work
+    else:
+        artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
     run_id = options.run_id
     dry_run = options.dry_run
     list_only = options.list_only
@@ -2227,6 +2228,22 @@ def main() -> None:
             run_id=run_id,
         )
 
+        work_iterable = iterate_openalex(
+            query,
+            per_page=args.per_page,
+            max_results=args.max,
+        )
+
+        provider: WorkProvider = OpenAlexWorkProvider(
+            query=query,
+            works_iterable=work_iterable,
+            artifact_factory=create_artifact,
+            pdf_dir=pdf_dir,
+            html_dir=html_dir,
+            per_page=args.per_page,
+            max_results=args.max,
+        )
+
         def _session_factory() -> requests.Session:
             """Return a new :class:`requests.Session` using the run's polite headers.
 
@@ -2273,13 +2290,11 @@ def main() -> None:
             if args.workers == 1:
                 session = _session_factory()
                 try:
-                    for work in iterate_openalex(
-                        query, per_page=args.per_page, max_results=args.max
-                    ):
+                    for artifact in provider.iter_artifacts():
                         if stop_due_to_budget:
                             break
                         result = process_one_work(
-                            work,
+                            artifact,
                             session,
                             pdf_dir,
                             html_dir,
@@ -2302,7 +2317,7 @@ def main() -> None:
                     in_flight: List[Future[Dict[str, Any]]] = []
                     max_in_flight = max(args.workers * 2, 1)
 
-                    def _submit(work_item: Dict[str, Any]) -> Future[Dict[str, Any]]:
+                    def _submit(work_item: WorkArtifact) -> Future[Dict[str, Any]]:
                         """Submit a work item to the executor for asynchronous processing."""
 
                         def _runner() -> Dict[str, Any]:
@@ -2326,9 +2341,7 @@ def main() -> None:
 
                         return executor.submit(_runner)
 
-                    for work in iterate_openalex(
-                        query, per_page=args.per_page, max_results=args.max
-                    ):
+                    for artifact in provider.iter_artifacts():
                         if stop_due_to_budget:
                             break
                         if len(in_flight) >= max_in_flight:
@@ -2342,7 +2355,7 @@ def main() -> None:
                                 break
                         if stop_due_to_budget:
                             break
-                        in_flight.append(_submit(work))
+                        in_flight.append(_submit(artifact))
 
                     if in_flight:
                         for future in as_completed(list(in_flight)):

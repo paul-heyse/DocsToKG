@@ -81,10 +81,10 @@
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Deprecated shim for the legacy <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network</span></code> module.</p>
-<p>The networking utilities were consolidated into :mod:<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.networking</span></code>.
-Re-export the public surface so older imports keep working while the rest of the
-codebase consistently uses the new module.</p>
+<p>Compatibility shim exposing networking helpers.</p>
+<p>The canonical implementations live in :mod:<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.networking</span></code>.
+This module re-exports that surface so existing imports continue to function
+while downstream code migrates to the new module name.</p>
 </section>
 </section>
 

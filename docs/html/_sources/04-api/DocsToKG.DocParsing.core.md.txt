@@ -45,11 +45,11 @@ Normalise structural marker entries into string lists.
 
 ### `_load_yaml_markers(raw)`
 
-*No documentation available.*
+Deserialize YAML marker overrides, raising when PyYAML is unavailable.
 
 ### `_load_toml_markers(raw)`
 
-*No documentation available.*
+Deserialize TOML marker definitions with compatibility fallbacks.
 
 ### `load_structural_marker_profile(path)`
 
@@ -90,6 +90,26 @@ Return ``value`` coerced to string.
 ### `_coerce_str_tuple(value, _base_dir)`
 
 Return ``value`` as a tuple of strings.
+
+### `normalize_http_timeout(timeout)`
+
+Normalize timeout inputs into a ``(connect, read)`` tuple of floats.
+
+### `get_http_session()`
+
+Return a shared :class:`requests.Session` configured with retries.
+
+Args:
+timeout: Optional override for the ``(connect, read)`` timeout tuple. Scalars
+override only the read timeout while preserving the default connect value.
+base_headers: Headers merged into the shared session.
+retry_total: Maximum retry attempts applied for connect/read failures.
+retry_backoff: Exponential backoff factor between retries.
+status_forcelist: HTTP status codes that trigger retries.
+allowed_methods: HTTP verbs eligible for retries.
+
+Returns:
+Tuple containing the shared session and the effective timeout tuple.
 
 ### `_manifest_value(value)`
 
@@ -148,6 +168,10 @@ model_root: Optional DocsToKG model root override.
 Returns:
 Tuple of ``(hf_home, model_root)`` paths after normalisation.
 
+### `_detect_cuda_device()`
+
+Best-effort detection of CUDA availability to choose a default device.
+
 ### `ensure_model_environment(hf_home, model_root)`
 
 Initialise and cache the HuggingFace/model-root environment settings.
@@ -163,6 +187,14 @@ Validate that SPLADE optional dependencies are importable.
 ### `ensure_qwen_dependencies(import_error)`
 
 Validate that Qwen/vLLM optional dependencies are importable.
+
+### `ensure_splade_environment()`
+
+Bootstrap SPLADE-related environment defaults and return resolved settings.
+
+### `ensure_qwen_environment()`
+
+Bootstrap Qwen/vLLM environment defaults and return resolved settings.
 
 ### `detect_data_root(start)`
 
@@ -497,27 +529,6 @@ True
 
 Load a JSONL file into memory with optional error tolerance.
 
-Args:
-path: JSON Lines file to read.
-skip_invalid: When ``True``, invalid lines are skipped up to
-``max_errors`` occurrences instead of raising immediately.
-max_errors: Maximum number of errors to tolerate when
-``skip_invalid`` is ``True``.
-
-Returns:
-List of parsed dictionaries.
-
-Raises:
-ValueError: If a malformed JSON line is encountered and ``skip_invalid``
-is ``False``.
-
-Examples:
->>> tmp = Path("/tmp/example.jsonl")
->>> _ = tmp.write_text('{"a": 1}
-', encoding="utf-8")
->>> jsonl_load(tmp)
-[{'a': 1}]
-
 ### `jsonl_save(path, rows, validate)`
 
 Persist dictionaries to a JSONL file atomically.
@@ -551,6 +562,14 @@ atomic: When True, writes occur via :func:`atomic_write` (ignored when
 
 Returns:
 The number of rows written.
+
+### `build_jsonl_split_map(path)`
+
+Return newline-aligned byte ranges that partition ``path``.
+
+### `_iter_jsonl_records(path)`
+
+*No documentation available.*
 
 ### `_manifest_filename(stage)`
 
@@ -605,6 +624,24 @@ algorithm: Hash algorithm name; defaults to ``sha1`` but honours
 Returns:
 UUID string derived from the hash digest while enforcing RFC4122 metadata bits.
 
+### `relative_path(path, root)`
+
+Return ``path`` rendered relative to ``root`` when feasible.
+
+### `quarantine_artifact(path, reason)`
+
+Move ``path`` to a ``.quarantine`` sibling for operator review.
+
+Args:
+path: Artefact to quarantine.
+reason: Explanation describing why the artefact was quarantined.
+logger: Optional logger used to emit structured diagnostics.
+create_placeholder: When ``True`` a placeholder file is created even if
+``path`` does not presently exist (useful for failed writes).
+
+Returns:
+Path to the quarantined artefact.
+
 ### `compute_content_hash(path, algorithm)`
 
 Compute a content hash for ``path`` using the requested algorithm.
@@ -644,6 +681,14 @@ Examples:
 >>> index = load_manifest_index("embeddings")  # doctest: +SKIP
 >>> isinstance(index, dict)
 True
+
+### `iter_manifest_entries(stages, root)`
+
+Yield manifest entries for the requested ``stages`` sorted by timestamp.
+
+### `summarize_manifest(entries)`
+
+Compute status counts and durations for manifest ``entries``.
 
 ### `acquire_lock(path, timeout)`
 
@@ -695,6 +740,18 @@ Execute the Docling chunker subcommand.
 ### `_run_embed(argv)`
 
 Execute the embedding pipeline subcommand.
+
+### `_run_token_profiles(argv)`
+
+Execute the tokenizer profiling subcommand.
+
+### `_run_plan(argv)`
+
+Display the doctags → chunk → embed plan without executing.
+
+### `_run_manifest(argv)`
+
+Inspect pipeline manifest artifacts via CLI.
 
 ### `_build_doctags_parser(prog)`
 
@@ -764,6 +821,22 @@ Public wrapper for the ``embed`` subcommand.
 
 Public wrapper for the ``doctags`` subcommand.
 
+### `token_profiles(argv)`
+
+Public wrapper for the ``token-profiles`` subcommand.
+
+### `plan(argv)`
+
+Public wrapper for the ``plan`` subcommand.
+
+### `manifest(argv)`
+
+Public wrapper for the ``manifest`` subcommand.
+
+### `_coerce_pair(values)`
+
+*No documentation available.*
+
 ### `apply_env(self)`
 
 Overlay configuration from environment variables.
@@ -790,31 +863,47 @@ Return a manifest-friendly snapshot of the configuration.
 
 ### `_coerce_field(self, name, value, base_dir)`
 
-*No documentation available.*
+Run field-specific coercion logic before manifest serialization.
 
 ### `is_overridden(self, field_name)`
 
 Return ``True`` when ``field_name`` was explicitly overridden.
 
+### `entry(self, doc_id)`
+
+Return the manifest entry associated with ``doc_id`` when available.
+
+### `should_skip(self, doc_id, output_path, input_hash)`
+
+Return ``True`` when work for ``doc_id`` can be safely skipped.
+
+### `should_process(self, doc_id, output_path, input_hash)`
+
+Return ``True`` when ``doc_id`` requires processing.
+
+### `process(self, msg, kwargs)`
+
+Merge adapter context into ``extra`` metadata for structured output.
+
+### `bind(self)`
+
+Attach additional persistent fields to the adapter and return ``self``.
+
+### `child(self)`
+
+Create a new adapter inheriting context with optional overrides.
+
+### `_length_bucket(length)`
+
+Return the power-of-two bucket for ``length``.
+
+### `_ordered_indices(self)`
+
+*No documentation available.*
+
 ### `__iter__(self)`
 
-Yield successive lists containing up to ``batch_size`` elements.
-
-Args:
-None: Iteration consumes the iterable supplied to :class:`Batcher`.
-
-Returns:
-Iterator over lists where each list contains up to ``batch_size`` items.
-
-### `format(self, record)`
-
-Render a log record as a JSON string.
-
-Args:
-record: Logging record produced by the DocParsing pipeline.
-
-Returns:
-JSON-formatted string containing canonical log fields and optional extras.
+*No documentation available.*
 
 ## 3. Classes
 
@@ -850,13 +939,25 @@ Work unit describing a single DocTags file to chunk.
 
 Result envelope emitted by chunker workers.
 
+### `ResumeController`
+
+Centralize resume/force decisions using manifest metadata.
+
+### `StructuredLogger`
+
+Logger adapter that enriches structured logs with shared context.
+
 ### `Batcher`
 
-Yield fixed-size batches from an iterable.
+Yield fixed-size batches from an iterable with optional policies.
 
 Args:
 iterable: Source iterable providing items to batch.
 batch_size: Maximum number of elements per yielded batch.
+policy: Optional batching policy. When ``"length"`` the iterable is
+bucketed by ``lengths`` before batching.
+lengths: Sequence of integer lengths aligned with ``iterable`` used for
+length-aware batching policies.
 
 Examples:
 >>> list(Batcher([1, 2, 3, 4, 5], 2))
@@ -865,15 +966,3 @@ Examples:
 ### `_Command`
 
 Callable wrapper storing handler metadata for subcommands.
-
-### `JSONFormatter`
-
-Emit structured JSON log messages for DocParsing utilities.
-
-Attributes:
-default_time_format: Timestamp template applied to log records.
-
-Examples:
->>> formatter = JSONFormatter()
->>> hasattr(formatter, "format")
-True

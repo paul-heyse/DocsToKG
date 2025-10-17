@@ -33,10 +33,6 @@ Usage:
 
 Validate that required Docling packages are installed.
 
-### `_http_session()`
-
-Return a shared ``requests.Session`` configured with retries.
-
 ### `add_data_root_option(parser)`
 
 Attach the shared ``--data-root`` option to a CLI parser.
@@ -243,7 +239,7 @@ Started subprocess handle for the vLLM server.
 Raises:
 SystemExit: If the `vllm` executable is not present on `PATH`.
 
-### `wait_for_vllm(port, proc, timeout_s)`
+### `wait_for_vllm(port, proc)`
 
 Poll the vLLM server until `/v1/models` responds with success.
 
@@ -251,6 +247,7 @@ Args:
 port: HTTP port where the server is expected to listen.
 proc: Subprocess handle representing the running vLLM instance.
 timeout_s: Maximum time in seconds to wait for readiness.
+http_timeout: Optional override for HTTP connect/read timeouts used during probes.
 
 Returns:
 Model names reported by the server upon readiness.
@@ -280,6 +277,8 @@ preferred: Preferred TCP port for the server.
 model_path: Model repository or path passed to the vLLM CLI.
 served_model_names: Aliases that should be exposed via the OpenAI API.
 gpu_memory_utilization: Fractional GPU memory reservation for the server.
+wait_timeout_s: Seconds to wait for vLLM readiness.
+http_timeout: Optional override for HTTP connect/read timeout when probing the server.
 
 Returns:
 Tuple containing `(port, process, owns_process)` where `process` is the
@@ -366,6 +365,10 @@ root: Directory whose subtree should be searched for HTML files.
 Returns:
 Sorted list of discovered HTML file paths excluding normalized outputs.
 
+### `_sanitize_html_file(path, profile)`
+
+Apply sanitizer profile to ``path``, returning the path to convert.
+
 ### `html_convert_one(task)`
 
 Convert a single HTML file to DocTags, honoring overwrite semantics.
@@ -419,15 +422,15 @@ Raise to indicate conversions are not executed in stub mode.
 
 ### `__repr__(self)`
 
-*No documentation available.*
+Return the stored value for readable debugging output.
 
 ### `__hash__(self)`
 
-*No documentation available.*
+Compute a hash based on the underlying string value.
 
 ### `__eq__(self, other)`
 
-*No documentation available.*
+Support equality checks against other ``_EnumValue`` instances.
 
 ## 3. Classes
 
@@ -538,7 +541,7 @@ Stub options matching the constructor signature of the real class.
 
 ### `_EnumValue`
 
-*No documentation available.*
+Simple enum stand-in that preserves a string ``value`` attribute.
 
 ### `ConversionStatus`
 

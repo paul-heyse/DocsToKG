@@ -949,7 +949,7 @@ from DocsToKG.ContentDownload.cli import (
     ensure_dir,
     load_resolver_config,
 )
-from DocsToKG.ContentDownload.core import Classification, classify_payload
+from DocsToKG.ContentDownload.core import Classification, ReasonCode, classify_payload
 from DocsToKG.ContentDownload.pipeline import (
     ApiResolverBase,
     ArxivResolver,
@@ -969,6 +969,8 @@ from DocsToKG.ContentDownload.pipeline import (
     ResolverMetrics,
     ResolverPipeline,
     ResolverResult,
+    ResolverEvent,
+    ResolverEventReason,
     SemanticScholarResolver,
     UnpaywallResolver,
     WaybackResolver,
@@ -1036,7 +1038,7 @@ def test_api_resolver_base_error_handling(monkeypatch: Any) -> None:
     )
     assert data is None
     assert error is not None
-    assert error.event_reason == "timeout"
+    assert error.event_reason is ResolverEventReason.TIMEOUT
     assert error.metadata["timeout"] == timeout_value
 
     monkeypatch.setattr(
@@ -1050,7 +1052,7 @@ def test_api_resolver_base_error_handling(monkeypatch: Any) -> None:
         config=config,
     )
     assert error is not None
-    assert error.event_reason == "connection-error"
+    assert error.event_reason is ResolverEventReason.CONNECTION_ERROR
 
     monkeypatch.setattr(
         "DocsToKG.ContentDownload.pipeline.request_with_retries",
@@ -1063,7 +1065,7 @@ def test_api_resolver_base_error_handling(monkeypatch: Any) -> None:
         config=config,
     )
     assert error is not None
-    assert error.event_reason == "request-error"
+    assert error.event_reason is ResolverEventReason.REQUEST_ERROR
 
     monkeypatch.setattr(
         "DocsToKG.ContentDownload.pipeline.request_with_retries",
@@ -1076,7 +1078,7 @@ def test_api_resolver_base_error_handling(monkeypatch: Any) -> None:
         config=config,
     )
     assert error is not None
-    assert error.event_reason == "http-error"
+    assert error.event_reason is ResolverEventReason.HTTP_ERROR
     assert error.http_status == 502
 
     monkeypatch.setattr(
@@ -1095,7 +1097,7 @@ def test_api_resolver_base_error_handling(monkeypatch: Any) -> None:
         config=config,
     )
     assert error is not None
-    assert error.event_reason == "json-error"
+    assert error.event_reason is ResolverEventReason.JSON_ERROR
     assert "content_preview" in error.metadata
 
     monkeypatch.setattr(
@@ -1482,6 +1484,12 @@ class DummyResponse:
 # --- test_resolver_pipeline.py ---
 
 
+def _reason_matches(value, expected: str) -> bool:
+    if isinstance(value, ReasonCode):
+        return value.value.replace("_", "-") == expected
+    return value == expected
+
+
 class ListLogger:
     def __init__(self):
         self.records = []
@@ -1639,7 +1647,7 @@ def test_pipeline_records_resolver_exception(tmp_path):
     result = pipeline.run(session, artifact)
 
     assert result.success is False
-    assert any(record.reason == "resolver-exception" for record in logger.records)
+    assert any(_reason_matches(record.reason, "resolver-exception") for record in logger.records)
     assert metrics.failures["exploder"] == 1
 
 
@@ -1875,7 +1883,7 @@ def test_head_precheck_skips_html(monkeypatch, tmp_path):
         return DummyHeadResponse(headers={"Content-Type": "text/html"})
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
 
@@ -1885,7 +1893,7 @@ def test_head_precheck_skips_html(monkeypatch, tmp_path):
 
     assert download_calls == []
     assert result.success is False
-    assert any(record.reason == "head-precheck-failed" for record in logger.records)
+    assert any(_reason_matches(record.reason, "head-precheck-failed") for record in logger.records)
 
 
 # --- test_resolver_pipeline.py ---
@@ -1906,7 +1914,7 @@ def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
         return DummyHeadResponse(headers={"Content-Length": "0"})
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
 
@@ -1915,7 +1923,7 @@ def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
     result = pipeline.run(session, artifact)
 
     assert result.success is False
-    assert any(record.reason == "head-precheck-failed" for record in logger.records)
+    assert any(_reason_matches(record.reason, "head-precheck-failed") for record in logger.records)
     assert download_calls == []
 
 
@@ -1937,7 +1945,7 @@ def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
         return DummyHeadResponse(status_code=404)
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
 
@@ -1946,7 +1954,7 @@ def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
     result = pipeline.run(session, artifact)
 
     assert result.success is False
-    assert any(record.reason == "head-precheck-failed" for record in logger.records)
+    assert any(_reason_matches(record.reason, "head-precheck-failed") for record in logger.records)
     assert download_calls == []
 
 
@@ -1968,7 +1976,7 @@ def test_head_precheck_allows_pdf(monkeypatch, tmp_path):
         return DummyHeadResponse(headers={"Content-Type": "application/pdf"})
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
 
@@ -2001,7 +2009,7 @@ def test_head_precheck_allows_redirect_to_pdf(monkeypatch, tmp_path):
         )
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
 
@@ -2031,7 +2039,7 @@ def test_head_precheck_failure_allows_download(monkeypatch, tmp_path):
         raise requests.Timeout("HEAD timeout")
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
 
@@ -2063,7 +2071,7 @@ def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
         return DummyHeadResponse()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
 
@@ -2101,7 +2109,7 @@ def test_head_precheck_resolver_override(monkeypatch, tmp_path):
         return DummyHeadResponse(headers={"Content-Type": "application/pdf"})
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
 
@@ -2146,7 +2154,7 @@ def test_pipeline_logs_missing_resolver(tmp_path):
     result = pipeline.run(session, artifact)
 
     assert result.success is False
-    assert logger.records[0].reason == "resolver-missing"
+    assert _reason_matches(logger.records[0].reason, "resolver-missing")
     assert metrics.skips["ghost:missing"] == 1
 
 
@@ -2170,7 +2178,7 @@ def test_pipeline_skips_disabled_resolver(tmp_path):
     session = DummySession({})
     pipeline.run(session, artifact)
 
-    assert logger.records[0].reason == "resolver-disabled"
+    assert _reason_matches(logger.records[0].reason, "resolver-disabled")
     assert metrics.skips["disabled:disabled"] == 1
 
 
@@ -2195,7 +2203,7 @@ def test_pipeline_skips_not_applicable_resolver(tmp_path):
 
     pipeline.run(DummySession({}), artifact)
 
-    assert logger.records[0].reason == "resolver-not-applicable"
+    assert _reason_matches(logger.records[0].reason, "resolver-not-applicable")
     assert metrics.skips["inapplicable:not-applicable"] == 1
 
 
@@ -2223,7 +2231,7 @@ def test_collect_resolver_results_handles_exception(tmp_path):
     )
 
     assert wall_ms >= 0.0
-    assert results[0].event_reason == "resolver-exception"
+    assert results[0].event_reason is ResolverEventReason.RESOLVER_EXCEPTION
     assert metrics.failures["boom"] == 1
 
 
@@ -2232,7 +2240,11 @@ def test_collect_resolver_results_handles_exception(tmp_path):
 
 def test_pipeline_records_event_and_skip_reason(tmp_path):
     artifact = build_artifact(tmp_path)
-    event_result = ResolverResult(url=None, event="info", event_reason="rate-limit")
+    event_result = ResolverResult(
+        url=None,
+        event=ResolverEvent.INFO,
+        event_reason=ResolverEventReason.RATE_LIMIT,
+    )
     resolver = StubResolver("stub", [event_result])
     config = ResolverConfig(resolver_order=["stub"])
     logger = ListLogger()
@@ -2253,6 +2265,7 @@ def test_pipeline_skips_duplicate_urls(tmp_path):
     duplicated = ResolverResult(url="https://example.org/dup.pdf")
     resolver = StubResolver("dup", [duplicated, duplicated])
     config = ResolverConfig(resolver_order=["dup"])
+    config.enable_global_url_dedup = False
     logger = ListLogger()
     metrics = ResolverMetrics()
 
@@ -2262,8 +2275,8 @@ def test_pipeline_skips_duplicate_urls(tmp_path):
     pipeline = ResolverPipeline([resolver], config, fake_download, logger, metrics)
     pipeline.run(DummySession({}), artifact)
 
-    reasons = [record.reason for record in logger.records if record.reason == "duplicate-url"]
-    assert reasons and metrics.skips["dup:duplicate-url"] == 1
+    assert any(_reason_matches(record.reason, "duplicate-url") for record in logger.records)
+    assert metrics.skips["dup:duplicate-url"] == 1
 
 
 # --- test_resolver_pipeline.py ---
@@ -2283,7 +2296,7 @@ def test_pipeline_head_precheck_failure_skips_attempt(monkeypatch, tmp_path):
     pipeline.run(DummySession({}), artifact)
 
     assert download_mock.called is False
-    assert logger.records[0].reason == "head-precheck-failed"
+    assert _reason_matches(logger.records[0].reason, "head-precheck-failed")
     assert metrics.skips["stub:head-precheck-failed"] == 1
 
 
@@ -2292,7 +2305,7 @@ def test_pipeline_head_precheck_failure_skips_attempt(monkeypatch, tmp_path):
 
 def test_pipeline_event_without_reason(tmp_path):
     artifact = build_artifact(tmp_path)
-    event_result = ResolverResult(url=None, event="info", event_reason=None)
+    event_result = ResolverResult(url=None, event=ResolverEvent.INFO, event_reason=None)
     resolver = StubResolver("stub", [event_result])
     config = ResolverConfig(resolver_order=["stub"])
     logger = ListLogger()
@@ -2382,7 +2395,7 @@ def test_pipeline_concurrent_skips_missing_resolver(tmp_path):
     result = pipeline.run(DummySession({}), artifact)
 
     assert result.success is True
-    assert any(record.reason == "resolver-missing" for record in logger.records)
+    assert any(_reason_matches(record.reason, "resolver-missing") for record in logger.records)
 
 
 # --- test_resolver_pipeline.py ---
@@ -2491,7 +2504,9 @@ def test_pipeline_global_deduplication_skips_repeat_urls(tmp_path):
     assert result_first.success is True
     assert result_second.success is False
     assert download_calls == [artifact.work_id]
-    assert any(record.reason == "duplicate-url-global" for record in logger.records)
+    assert any(
+        _reason_matches(record.reason, "duplicate-url-global") for record in logger.records
+    )
     assert metrics.skips["static:duplicate-url-global"] == 1
 
 
@@ -2547,6 +2562,7 @@ def test_pipeline_domain_rate_limiting_enforces_interval(monkeypatch, tmp_path):
 
     config = ResolverConfig(resolver_order=["dynamic"], resolver_toggles={"dynamic": True})
     config.enable_head_precheck = False
+    config.enable_global_url_dedup = False
     config.domain_min_interval_s = {"example.org": 0.5}
     logger = ListLogger()
     metrics = ResolverMetrics()
@@ -2691,7 +2707,7 @@ def test_arxiv_resolver_skips_missing_identifier(tmp_path) -> None:
 
     results = list(resolver.iter_urls(Mock(), config, artifact))
 
-    assert results[0].event_reason == "no-arxiv-id"
+    assert results[0].event_reason is ResolverEventReason.NO_ARXIV_ID
 
 
 # --- test_resolver_providers_additional.py ---
@@ -2717,7 +2733,7 @@ def test_openalex_resolver_skip(tmp_path) -> None:
 
     result = next(resolver.iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "no-openalex-urls"
+    assert result.event_reason is ResolverEventReason.NO_OPENALEX_URLS
 
 
 # --- test_resolver_providers_additional.py ---
@@ -2827,7 +2843,7 @@ def test_landing_page_resolver_http_error(monkeypatch, tmp_path) -> None:
 
     result = next(LandingPageResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "http-error"
+    assert result.event_reason is ResolverEventReason.HTTP_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -2836,9 +2852,9 @@ def test_landing_page_resolver_http_error(monkeypatch, tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.Timeout("slow"), "timeout"),
-        (requests.ConnectionError("down"), "connection-error"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.Timeout("slow"), ResolverEventReason.TIMEOUT),
+        (requests.ConnectionError("down"), ResolverEventReason.CONNECTION_ERROR),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_landing_page_resolver_request_errors(monkeypatch, tmp_path, exception, reason) -> None:
@@ -2854,7 +2870,7 @@ def test_landing_page_resolver_request_errors(monkeypatch, tmp_path, exception, 
 
     result = next(LandingPageResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == reason
+    assert result.event_reason is reason
 
 
 # --- test_resolver_providers_additional.py ---
@@ -2872,7 +2888,7 @@ def test_core_resolver_http_error(monkeypatch, tmp_path) -> None:
 
     results = list(CoreResolver().iter_urls(Mock(), config, artifact))
 
-    assert results[0].event_reason == "http-error"
+    assert results[0].event_reason is ResolverEventReason.HTTP_ERROR
     assert results[0].http_status == 503
 
 
@@ -2891,7 +2907,7 @@ def test_core_resolver_json_error(monkeypatch, tmp_path) -> None:
 
     results = list(CoreResolver().iter_urls(Mock(), config, artifact))
 
-    assert results[0].event_reason == "json-error"
+    assert results[0].event_reason is ResolverEventReason.JSON_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -2931,9 +2947,9 @@ def test_core_resolver_emits_results(monkeypatch, tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.Timeout("slow"), "timeout"),
-        (requests.ConnectionError("down"), "connection-error"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.Timeout("slow"), ResolverEventReason.TIMEOUT),
+        (requests.ConnectionError("down"), ResolverEventReason.CONNECTION_ERROR),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_core_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> None:
@@ -2948,7 +2964,7 @@ def test_core_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> 
 
     result = next(CoreResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == reason
+    assert result.event_reason is reason
 
 
 # --- test_resolver_providers_additional.py ---
@@ -2961,7 +2977,7 @@ def test_core_resolver_skips_when_no_doi(tmp_path) -> None:
 
     result = next(CoreResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "no-doi"
+    assert result.event_reason is ResolverEventReason.NO_DOI
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3009,7 +3025,7 @@ def test_crossref_resolver_http_error(monkeypatch, tmp_path) -> None:
 
     results = list(CrossrefResolver().iter_urls(Mock(), config, artifact))
 
-    assert results[0].event_reason == "http-error"
+    assert results[0].event_reason is ResolverEventReason.HTTP_ERROR
     assert results[0].http_status == 429
 
 
@@ -3072,7 +3088,7 @@ def test_crossref_resolver_skip_without_doi(tmp_path) -> None:
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
-    assert result.event_reason == "no-doi"
+    assert result.event_reason is ResolverEventReason.NO_DOI
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3143,7 +3159,7 @@ def test_crossref_resolver_cached_request_error(monkeypatch, tmp_path) -> None:
 
     result = next(CrossrefResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "request-error"
+    assert result.event_reason is ResolverEventReason.REQUEST_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3152,9 +3168,9 @@ def test_crossref_resolver_cached_request_error(monkeypatch, tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.Timeout("slow"), "timeout"),
-        (requests.ConnectionError("down"), "connection-error"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.Timeout("slow"), ResolverEventReason.TIMEOUT),
+        (requests.ConnectionError("down"), ResolverEventReason.CONNECTION_ERROR),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_crossref_resolver_session_errors(monkeypatch, tmp_path, exception, reason) -> None:
@@ -3171,7 +3187,7 @@ def test_crossref_resolver_session_errors(monkeypatch, tmp_path, exception, reas
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
-    assert result.event_reason == reason
+    assert result.event_reason is reason
     mock_request.assert_called_once()
 
 
@@ -3193,7 +3209,7 @@ def test_crossref_resolver_session_http_error(monkeypatch, tmp_path) -> None:
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
-    assert result.event_reason == "http-error"
+    assert result.event_reason is ResolverEventReason.HTTP_ERROR
     mock_request.assert_called_once()
 
 
@@ -3215,7 +3231,7 @@ def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
-    assert result.event_reason == "json-error"
+    assert result.event_reason is ResolverEventReason.JSON_ERROR
     mock_request.assert_called_once()
 
 
@@ -3262,10 +3278,10 @@ def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> No
             self.calls.append(response.status_code)
             return response
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.network.random.random", lambda: 0.0)
+    monkeypatch.setattr("DocsToKG.ContentDownload.networking.random.random", lambda: 0.0)
     sleep_calls: list[float] = []
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.time.sleep", lambda delay: sleep_calls.append(delay)
+        "DocsToKG.ContentDownload.networking.time.sleep", lambda delay: sleep_calls.append(delay)
     )
 
     session = _Session()
@@ -3291,7 +3307,7 @@ def test_doaj_resolver_http_error(monkeypatch, tmp_path) -> None:
 
     result = next(DoajResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "http-error"
+    assert result.event_reason is ResolverEventReason.HTTP_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3339,7 +3355,7 @@ def test_doaj_resolver_json_error(monkeypatch, tmp_path) -> None:
 
     result = next(DoajResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "json-error"
+    assert result.event_reason is ResolverEventReason.JSON_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3348,9 +3364,9 @@ def test_doaj_resolver_json_error(monkeypatch, tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.Timeout("slow"), "timeout"),
-        (requests.ConnectionError("down"), "connection-error"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.Timeout("slow"), ResolverEventReason.TIMEOUT),
+        (requests.ConnectionError("down"), ResolverEventReason.CONNECTION_ERROR),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_doaj_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> None:
@@ -3364,7 +3380,7 @@ def test_doaj_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> 
 
     result = next(DoajResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == reason
+    assert result.event_reason is reason
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3401,7 +3417,7 @@ def test_doaj_resolver_skip_no_doi(tmp_path) -> None:
 
     result = next(DoajResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "no-doi"
+    assert result.event_reason is ResolverEventReason.NO_DOI
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3435,7 +3451,7 @@ def test_europe_pmc_resolver_json_error(monkeypatch, tmp_path) -> None:
 
     result = next(EuropePmcResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "json-error"
+    assert result.event_reason is ResolverEventReason.JSON_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3488,7 +3504,11 @@ def test_europe_pmc_resolver_error_paths(monkeypatch, tmp_path, exception) -> No
 
     results = list(EuropePmcResolver().iter_urls(Mock(), config, artifact))
 
-    assert results[0].event_reason in {"timeout", "connection-error", "request-error"}
+    assert results[0].event_reason in {
+        ResolverEventReason.TIMEOUT,
+        ResolverEventReason.CONNECTION_ERROR,
+        ResolverEventReason.REQUEST_ERROR,
+    }
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3536,7 +3556,7 @@ def test_hal_resolver_json_error(monkeypatch, tmp_path) -> None:
 
     result = next(HalResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "json-error"
+    assert result.event_reason is ResolverEventReason.JSON_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3545,9 +3565,9 @@ def test_hal_resolver_json_error(monkeypatch, tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.Timeout("slow"), "timeout"),
-        (requests.ConnectionError("down"), "connection-error"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.Timeout("slow"), ResolverEventReason.TIMEOUT),
+        (requests.ConnectionError("down"), ResolverEventReason.CONNECTION_ERROR),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_hal_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> None:
@@ -3561,7 +3581,7 @@ def test_hal_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
 
     result = next(HalResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == reason
+    assert result.event_reason is reason
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3585,7 +3605,7 @@ def test_hal_resolver_skip_no_doi(tmp_path) -> None:
 
     result = next(HalResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "no-doi"
+    assert result.event_reason is ResolverEventReason.NO_DOI
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3636,7 +3656,7 @@ def test_openaire_resolver_json_error(monkeypatch, tmp_path) -> None:
 
     result = next(OpenAireResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "json-error"
+    assert result.event_reason is ResolverEventReason.JSON_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3680,9 +3700,9 @@ def test_openaire_resolver_fallback_json_load(monkeypatch, tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.Timeout("slow"), "timeout"),
-        (requests.ConnectionError("down"), "connection-error"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.Timeout("slow"), ResolverEventReason.TIMEOUT),
+        (requests.ConnectionError("down"), ResolverEventReason.CONNECTION_ERROR),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_openaire_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> None:
@@ -3696,7 +3716,7 @@ def test_openaire_resolver_error_paths(monkeypatch, tmp_path, exception, reason)
 
     result = next(OpenAireResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == reason
+    assert result.event_reason is reason
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3744,7 +3764,7 @@ def test_osf_resolver_json_error(monkeypatch, tmp_path) -> None:
 
     result = next(OsfResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "json-error"
+    assert result.event_reason is ResolverEventReason.JSON_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3753,9 +3773,9 @@ def test_osf_resolver_json_error(monkeypatch, tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.Timeout("slow"), "timeout"),
-        (requests.ConnectionError("down"), "connection-error"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.Timeout("slow"), ResolverEventReason.TIMEOUT),
+        (requests.ConnectionError("down"), ResolverEventReason.CONNECTION_ERROR),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_osf_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> None:
@@ -3769,7 +3789,7 @@ def test_osf_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
 
     result = next(OsfResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == reason
+    assert result.event_reason is reason
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3781,7 +3801,7 @@ def test_osf_resolver_skip_no_doi(tmp_path) -> None:
 
     result = next(OsfResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "no-doi"
+    assert result.event_reason is ResolverEventReason.NO_DOI
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3804,7 +3824,7 @@ def test_unpaywall_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
 
     results = list(UnpaywallResolver().iter_urls(_Session(), config, artifact))
 
-    assert results[0].event_reason == "http-error"
+    assert results[0].event_reason is ResolverEventReason.HTTP_ERROR
     assert results[0].http_status == 404
 
 
@@ -3847,9 +3867,9 @@ def test_unpaywall_resolver_cached_success(monkeypatch, tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.Timeout("slow"), "timeout"),
-        (requests.ConnectionError("down"), "connection-error"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.Timeout("slow"), ResolverEventReason.TIMEOUT),
+        (requests.ConnectionError("down"), ResolverEventReason.CONNECTION_ERROR),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_unpaywall_resolver_session_errors(monkeypatch, tmp_path, exception, reason) -> None:
@@ -3862,7 +3882,7 @@ def test_unpaywall_resolver_session_errors(monkeypatch, tmp_path, exception, rea
 
     result = next(UnpaywallResolver().iter_urls(session, config, artifact))
 
-    assert result.event_reason == reason
+    assert result.event_reason is reason
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3878,7 +3898,7 @@ def test_unpaywall_resolver_session_json_error(monkeypatch, tmp_path) -> None:
 
     result = next(UnpaywallResolver().iter_urls(session, config, artifact))
 
-    assert result.event_reason == "json-error"
+    assert result.event_reason is ResolverEventReason.JSON_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3937,7 +3957,7 @@ def test_semantic_scholar_resolver_http_error(monkeypatch, tmp_path) -> None:
 
     result = next(SemanticScholarResolver().iter_urls(_Session(), config, artifact))
 
-    assert result.event_reason == "http-error"
+    assert result.event_reason is ResolverEventReason.HTTP_ERROR
     assert result.http_status == 503
 
 
@@ -3947,9 +3967,9 @@ def test_semantic_scholar_resolver_http_error(monkeypatch, tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.Timeout("slow"), "timeout"),
-        (requests.ConnectionError("down"), "connection-error"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.Timeout("slow"), ResolverEventReason.TIMEOUT),
+        (requests.ConnectionError("down"), ResolverEventReason.CONNECTION_ERROR),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_semantic_scholar_resolver_errors(monkeypatch, tmp_path, exception, reason) -> None:
@@ -3966,7 +3986,7 @@ def test_semantic_scholar_resolver_errors(monkeypatch, tmp_path, exception, reas
 
     result = next(SemanticScholarResolver().iter_urls(_Session(), config, artifact))
 
-    assert result.event_reason == reason
+    assert result.event_reason is reason
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3986,7 +4006,7 @@ def test_semantic_scholar_resolver_json_error(monkeypatch, tmp_path) -> None:
 
     result = next(SemanticScholarResolver().iter_urls(_Session(), config, artifact))
 
-    assert result.event_reason == "json-error"
+    assert result.event_reason is ResolverEventReason.JSON_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -4006,7 +4026,7 @@ def test_semantic_scholar_resolver_no_open_access(monkeypatch, tmp_path) -> None
 
     result = next(SemanticScholarResolver().iter_urls(_Session(), config, artifact))
 
-    assert result.event_reason == "no-openaccess-pdf"
+    assert result.event_reason is ResolverEventReason.NO_OPENACCESS_PDF
 
 
 # --- test_resolver_providers_additional.py ---
@@ -4019,7 +4039,7 @@ def test_pmc_resolver_no_identifiers(tmp_path) -> None:
 
     result = next(resolver.iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "no-pmcid"
+    assert result.event_reason is ResolverEventReason.NO_PMCID
 
 
 # --- test_resolver_providers_additional.py ---
@@ -4036,7 +4056,7 @@ def test_pmc_resolver_timeout_fallback(monkeypatch, tmp_path) -> None:
 
     results = list(PmcResolver().iter_urls(Mock(), config, artifact))
 
-    assert results[0].event_reason == "timeout"
+    assert results[0].event_reason is ResolverEventReason.TIMEOUT
     assert results[1].metadata["source"] == "pdf-fallback"
 
 
@@ -4046,8 +4066,8 @@ def test_pmc_resolver_timeout_fallback(monkeypatch, tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.ConnectionError("down"), "connection-error"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.ConnectionError("down"), ResolverEventReason.CONNECTION_ERROR),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_pmc_resolver_other_errors(monkeypatch, tmp_path, exception, reason) -> None:
@@ -4061,7 +4081,7 @@ def test_pmc_resolver_other_errors(monkeypatch, tmp_path, exception, reason) -> 
 
     results = list(PmcResolver().iter_urls(Mock(), config, artifact))
 
-    assert results[0].event_reason == reason
+    assert results[0].event_reason is reason
 
 
 # --- test_resolver_providers_additional.py ---
@@ -4141,7 +4161,7 @@ def test_wayback_resolver_handles_http_error(monkeypatch, tmp_path) -> None:
 
     result = next(WaybackResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "http-error"
+    assert result.event_reason is ResolverEventReason.HTTP_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -4188,7 +4208,7 @@ def test_wayback_resolver_json_error(monkeypatch, tmp_path) -> None:
 
     result = next(WaybackResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "json-error"
+    assert result.event_reason is ResolverEventReason.JSON_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -4197,9 +4217,9 @@ def test_wayback_resolver_json_error(monkeypatch, tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.Timeout("slow"), "timeout"),
-        (requests.ConnectionError("down"), "connection-error"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.Timeout("slow"), ResolverEventReason.TIMEOUT),
+        (requests.ConnectionError("down"), ResolverEventReason.CONNECTION_ERROR),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_wayback_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> None:
@@ -4214,7 +4234,7 @@ def test_wayback_resolver_error_paths(monkeypatch, tmp_path, exception, reason) 
 
     result = next(WaybackResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == reason
+    assert result.event_reason is reason
 
 
 # --- test_resolver_providers_additional.py ---
@@ -4247,7 +4267,7 @@ def test_zenodo_resolver_no_doi(tmp_path) -> None:
 
     result = next(resolver.iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "no-doi"
+    assert result.event_reason is ResolverEventReason.NO_DOI
 
 
 # --- test_resolver_providers_additional.py ---
@@ -4256,8 +4276,8 @@ def test_zenodo_resolver_no_doi(tmp_path) -> None:
 @pytest.mark.parametrize(
     "exception,reason",
     [
-        (requests.Timeout("slow"), "timeout"),
-        (requests.RequestException("boom"), "request-error"),
+        (requests.Timeout("slow"), ResolverEventReason.TIMEOUT),
+        (requests.RequestException("boom"), ResolverEventReason.REQUEST_ERROR),
     ],
 )
 def test_zenodo_resolver_errors(monkeypatch, tmp_path, exception, reason) -> None:
@@ -4271,7 +4291,7 @@ def test_zenodo_resolver_errors(monkeypatch, tmp_path, exception, reason) -> Non
 
     result = next(ZenodoResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == reason
+    assert result.event_reason is reason
 
 
 # --- test_resolver_providers_additional.py ---
@@ -4288,7 +4308,7 @@ def test_zenodo_resolver_http_error(monkeypatch, tmp_path) -> None:
 
     result = next(ZenodoResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "http-error"
+    assert result.event_reason is ResolverEventReason.HTTP_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -4305,7 +4325,7 @@ def test_zenodo_resolver_json_error(monkeypatch, tmp_path) -> None:
 
     result = next(ZenodoResolver().iter_urls(Mock(), config, artifact))
 
-    assert result.event_reason == "json-error"
+    assert result.event_reason is ResolverEventReason.JSON_ERROR
 
 
 # --- test_resolver_providers_additional.py ---
@@ -4463,8 +4483,8 @@ def test_unpaywall_resolver_http_error(tmp_path):
         status=503,
     )
     results = list(UnpaywallResolver().iter_urls(session, config, artifact))
-    assert results[0].event == "error"
-    assert results[0].event_reason == "http-error"
+    assert results[0].event is ResolverEvent.ERROR
+    assert results[0].event_reason is ResolverEventReason.HTTP_ERROR
 
 
 # --- test_resolvers_unit.py ---
@@ -4511,8 +4531,8 @@ def test_crossref_resolver_handles_json_error(tmp_path):
         status=200,
     )
     results = list(CrossrefResolver().iter_urls(session, config, artifact))
-    assert results[0].event == "error"
-    assert results[0].event_reason == "json-error"
+    assert results[0].event is ResolverEvent.ERROR
+    assert results[0].event_reason is ResolverEventReason.JSON_ERROR
 
 
 # --- test_resolvers_unit.py ---
@@ -4557,7 +4577,7 @@ def test_landing_page_resolver_http_error(tmp_path):  # noqa: F811
     responses.add(responses.GET, "https://site.example/error", status=500)
     session = requests.Session()
     events = [r for r in LandingPageResolver().iter_urls(session, config, artifact) if r.is_event]
-    assert events[0].event_reason == "http-error"
+    assert events[0].event_reason is ResolverEventReason.HTTP_ERROR
 
 
 # --- test_resolvers_unit.py ---
@@ -4794,7 +4814,7 @@ def test_core_resolver_handles_failure(tmp_path):
     events = [
         result for result in CoreResolver().iter_urls(session, config, artifact) if result.is_event
     ]
-    assert events[0].event_reason == "http-error"
+    assert events[0].event_reason is ResolverEventReason.HTTP_ERROR
     assert events[0].http_status == 500
     assert "CORE API returned" in events[0].metadata["error_detail"]
 
@@ -4840,7 +4860,7 @@ def test_doaj_resolver_handles_error(tmp_path):
     events = [
         result for result in DoajResolver().iter_urls(session, config, artifact) if result.is_event
     ]
-    assert events[0].event_reason == "http-error"
+    assert events[0].event_reason is ResolverEventReason.HTTP_ERROR
     assert events[0].http_status == 429
     assert "DOAJ API returned" in events[0].metadata["error_detail"]
 
@@ -4860,7 +4880,7 @@ def test_semantic_scholar_resolver_handles_error(tmp_path):
     )
     results = list(SemanticScholarResolver().iter_urls(session, config, artifact))
     error = next(result for result in results if result.is_event)
-    assert error.event_reason == "http-error"
+    assert error.event_reason is ResolverEventReason.HTTP_ERROR
     assert error.http_status == 500
     assert "Semantic Scholar HTTPError" in error.metadata["error_detail"]
 

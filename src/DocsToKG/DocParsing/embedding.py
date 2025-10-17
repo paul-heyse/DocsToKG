@@ -47,6 +47,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "percentile",
+#       "name": "_percentile",
+#       "anchor": "function-percentile",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "embedcfg",
 #       "name": "EmbedCfg",
 #       "anchor": "class-embedcfg",
@@ -209,6 +215,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "handle-embedding-quarantine",
+#       "name": "_handle_embedding_quarantine",
+#       "anchor": "function-handle-embedding-quarantine",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "validate-vectors-for-chunks",
 #       "name": "_validate_vectors_for_chunks",
 #       "anchor": "function-validate-vectors-for-chunks",
@@ -305,11 +317,14 @@ from DocsToKG.DocParsing.core import (
     compute_stable_shard,
     data_chunks,
     data_vectors,
+    compute_relative_doc_id,
     derive_doc_id_and_vectors_path,
     detect_data_root,
     ensure_model_environment,
     ensure_qwen_dependencies,
+    ensure_qwen_environment,
     ensure_splade_dependencies,
+    ensure_splade_environment,
     expand_path,
     get_logger,
     iter_chunks,
@@ -322,7 +337,7 @@ from DocsToKG.DocParsing.core import (
     prepare_data_root,
     resolve_pipeline_path,
     relative_path,
-    should_skip_output,
+    ResumeController,
     _iter_jsonl_records,
 )
 from DocsToKG.DocParsing.doctags import (
@@ -330,13 +345,17 @@ from DocsToKG.DocParsing.doctags import (
     add_resume_force_options,
 )
 from DocsToKG.DocParsing.formats import (
-    COMPATIBLE_CHUNK_VERSIONS,
     VECTOR_SCHEMA_VERSION,
     BM25Vector,
     DenseVector,
     SPLADEVector,
     VectorRow,
+)
+from DocsToKG.DocParsing.schemas import (
+    COMPATIBLE_CHUNK_VERSIONS,
+    SchemaKind,
     validate_schema_version,
+    validate_vector_row as schema_validate_vector_row,
 )
 
 # --- Globals ---
@@ -536,12 +555,24 @@ EMBED_PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
         "batch_size_qwen": 16,
         "files_parallel": 1,
         "offline": True,
+        "splade_attn": "auto",
+        "splade_max_active_dims": 10000,
+        "qwen_dtype": "float32",
+        "qwen_dim": 2560,
+        "qwen_quant": None,
+        "tp": 1,
     },
     "gpu-default": {
         "batch_size_splade": 32,
         "batch_size_qwen": 64,
         "files_parallel": 1,
         "offline": False,
+        "splade_attn": "flash",
+        "splade_max_active_dims": 20000,
+        "qwen_dtype": "bfloat16",
+        "qwen_dim": 2560,
+        "qwen_quant": None,
+        "tp": 1,
     },
     "gpu-max": {
         "batch_size_splade": 64,
@@ -549,6 +580,11 @@ EMBED_PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
         "files_parallel": 4,
         "tp": 2,
         "offline": False,
+        "splade_attn": "flash",
+        "splade_max_active_dims": 32000,
+        "qwen_dtype": "bfloat16",
+        "qwen_dim": 2560,
+        "qwen_quant": "nf4",
     },
 }
 
@@ -564,7 +600,7 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
             "type": str,
             "default": None,
             "choices": sorted(EMBED_PROFILE_PRESETS),
-            "help": "Preset for batch sizes and parallelism (cpu-small, gpu-default, gpu-max).",
+            "help": "Preset for batch sizes, SPLADE backend, and Qwen settings (cpu-small, gpu-default, gpu-max).",
         },
     ),
     CLIOption(
@@ -690,6 +726,13 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     CLIOption(
         ("--validate-only",),
         {"action": "store_true", "help": "Validate existing vectors in --out-dir and exit"},
+    ),
+    CLIOption(
+        ("--plan-only",),
+        {
+            "action": "store_true",
+            "help": "Show resume/skip plan and exit without generating embeddings",
+        },
     ),
     CLIOption(
         ("--offline",),
@@ -957,12 +1000,7 @@ def ensure_chunk_schema(rows: Sequence[dict], source: Path) -> None:
             # continue to operate without forcing regeneration.
             row["schema_version"] = COMPATIBLE_CHUNK_VERSIONS[-1]
             continue
-        validate_schema_version(
-            version,
-            COMPATIBLE_CHUNK_VERSIONS,
-            kind="chunk",
-            source=f"{source}:{index}",
-        )
+        validate_schema_version(version, SchemaKind.CHUNK, context=f"{source}:{index}")
 
 
 def tokens(text: str) -> List[str]:
@@ -1305,18 +1343,30 @@ class SPLADEValidator:
             threshold = SPLADE_SPARSITY_WARN_THRESHOLD_PCT
         if pct > threshold:
             zero_count = len(zero_chunks)
-            logger.warning(
-                "SPLADE sparsity warning (threshold %.1f%%): %s / %s (%.1f%%) chunks have zero non-zero elements.",
-                threshold,
-                zero_count,
-                total,
-                pct,
+            log_event(
+                logger,
+                "warning",
+                "SPLADE sparsity exceeded threshold",
+                stage=EMBED_STAGE,
+                doc_id="__aggregate__",
+                input_hash=None,
+                error_code="SPLADE_SPARSITY",
+                zero_chunks=zero_count,
+                total_chunks=total,
+                percent_zero=round(pct, 3),
+                threshold_pct=float(threshold),
             )
-            logger.warning(
-                "Affected UUIDs (first %s of %s): %s",
-                top_n,
-                zero_count,
-                zero_chunks[:top_n],
+            log_event(
+                logger,
+                "warning",
+                "SPLADE sparsity affected UUIDs",
+                stage=EMBED_STAGE,
+                doc_id="__aggregate__",
+                input_hash=None,
+                error_code="SPLADE_SPARSITY_DETAILS",
+                preview_uuids=zero_chunks[:top_n],
+                total_zero=zero_count,
+                preview_limit=top_n,
             )
 
 
@@ -1484,9 +1534,8 @@ def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
                 else:
                     validate_schema_version(
                         version,
-                        COMPATIBLE_CHUNK_VERSIONS,
-                        kind="chunk",
-                        source=f"{chunk_file}:{line_no}",
+                        SchemaKind.CHUNK,
+                        context=f"{chunk_file}:{line_no}",
                     )
 
                 # Ensure UUID
@@ -1827,11 +1876,33 @@ def write_vectors(
         if norm <= 0:
             doc_id = row.get("doc_id", "unknown")
             message = f"Invalid Qwen vector (zero norm) for UUID={uuid_value}"
-            logger.error(message)
+            log_event(
+                logger,
+                "error",
+                message,
+                stage=EMBED_STAGE,
+                doc_id=doc_id,
+                input_hash=row.get("input_hash") if isinstance(row, dict) else None,
+                error_code="QWEN_ZERO_NORM",
+                uuid=uuid_value,
+            )
             raise ValueError(message)
 
         if abs(norm - 1.0) > 0.01:
-            logger.warning("Qwen norm for UUID=%s: %.4f (expected ~1.0)", uuid_value, norm)
+            doc_id = row.get("doc_id", "unknown") if isinstance(row, dict) else "unknown"
+            log_event(
+                logger,
+                "warning",
+                "Qwen vector norm outside expected tolerance",
+                stage=EMBED_STAGE,
+                doc_id=doc_id,
+                input_hash=row.get("input_hash") if isinstance(row, dict) else None,
+                error_code="QWEN_NORM_DEVIATION",
+                uuid=uuid_value,
+                norm=round(norm, 6),
+                expected=1.0,
+                tolerance=0.01,
+            )
         qwen_norms.append(norm)
 
         terms, weights = bm25_vector(text, stats, k1=bm25_k1, b=bm25_b)
@@ -1863,15 +1934,16 @@ def write_vectors(
             )
         except Exception as exc:
             doc_id = row.get("doc_id", "unknown")
-            logger.error(
+            log_event(
+                logger,
+                "error",
                 "Vector row validation failed",
-                extra={
-                    "extra_fields": {
-                        "uuid": uuid_value,
-                        "doc_id": doc_id,
-                        "error": str(exc),
-                    }
-                },
+                stage=EMBED_STAGE,
+                doc_id=doc_id,
+                input_hash=row.get("input_hash") if isinstance(row, dict) else None,
+                error_code="VECTOR_ROW_INVALID",
+                uuid=uuid_value,
+                error=str(exc),
             )
             manifest_log_failure(
                 stage="embeddings",
@@ -1956,14 +2028,13 @@ def _validate_vectors_for_chunks(
     logger,
     *,
     data_root: Optional[Path] = None,
+    expected_dimension: Optional[int] = None,
 ) -> tuple[int, int]:
     """Validate vectors associated with chunk files without recomputing models.
 
     Returns:
         (files_checked, rows_validated)
     """
-    from DocsToKG.DocParsing.formats import validate_vector_row
-
     files_checked = 0
     rows_validated = 0
     missing: List[tuple[str, Path]] = []
@@ -1978,7 +2049,7 @@ def _validate_vectors_for_chunks(
         try:
             for batch in iter_rows_in_batches(vector_path, 4096):
                 for row in batch:
-                    validate_vector_row(row)
+                    schema_validate_vector_row(row, expected_dimension=expected_dimension)
                     rows_validated += 1
                     file_rows += 1
         except ValueError as exc:
@@ -2026,6 +2097,9 @@ def _validate_vectors_for_chunks(
             "Missing vector files for chunk documents",
             status="missing",
             stage=EMBED_STAGE,
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="MISSING_VECTORS",
             missing=[str(path) for _, path in missing],
             missing_count=len(missing),
             chunks_dir=str(chunks_dir),
@@ -2045,9 +2119,15 @@ def _validate_vectors_for_chunks(
         vectors_dir=str(vectors_dir),
     )
     if quarantined_files:
-        logger.warning(
+        log_event(
+            logger,
+            "warning",
             "Quarantined vector files",
-            extra={"extra_fields": {"quarantined": quarantined_files}},
+            stage=EMBED_STAGE,
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="VECTOR_QUARANTINE",
+            quarantined=quarantined_files,
         )
     print(
         f"Validated {rows_validated} rows across {files_checked} vector files under {vectors_dir}"
@@ -2123,6 +2203,9 @@ def main(args: argparse.Namespace | None = None) -> int:
     else:
         namespace = parser.parse_args(args)
 
+    if getattr(namespace, "plan_only", False) and getattr(namespace, "validate_only", False):
+        raise ValueError("--plan-only cannot be combined with --validate-only")
+
     profile = getattr(namespace, "profile", None)
     defaults = EMBED_PROFILE_PRESETS.get(profile or "", {})
     cfg = EmbedCfg.from_args(namespace, defaults=defaults)
@@ -2131,6 +2214,9 @@ def main(args: argparse.Namespace | None = None) -> int:
         config_snapshot.setdefault("profile", profile)
     for field_def in fields(EmbedCfg):
         setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+
+    validate_only = bool(cfg.validate_only)
+    plan_only = bool(getattr(namespace, "plan_only", False))
 
     log_level = cfg.log_level
     run_id = uuid.uuid4().hex
@@ -2150,6 +2236,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             **{key: defaults[key] for key in sorted(defaults)},
         )
     args = namespace
+    args.plan_only = plan_only
     offline_mode = bool(cfg.offline)
 
     try:
@@ -2193,8 +2280,6 @@ def main(args: argparse.Namespace | None = None) -> int:
     splade_model_dir = cli_splade or default_splade_dir
     qwen_model_dir = cli_qwen or default_qwen_dir
 
-    validate_only = bool(cfg.validate_only)
-
     if offline_mode and not validate_only:
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
         missing_paths = []
@@ -2216,6 +2301,9 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     splade_model_dir = _resolve_cli_path(args.splade_model_dir, SPLADE_DIR)
     qwen_model_dir = _resolve_cli_path(args.qwen_model_dir, QWEN_DIR)
+
+    splade_env = ensure_splade_environment(cache_dir=splade_model_dir)
+    qwen_env = ensure_qwen_environment(dtype=cfg.qwen_dtype, model_dir=qwen_model_dir)
 
     if args.batch_size_splade < 1 or args.batch_size_qwen < 1:
         raise ValueError("Batch sizes must be >= 1")
@@ -2242,7 +2330,16 @@ def main(args: argparse.Namespace | None = None) -> int:
             _ensure_splade_dependencies()
             _ensure_qwen_dependencies()
         except ImportError as exc:
-            logger.error("Embedding dependencies unavailable: %s", exc)
+            log_event(
+                logger,
+                "error",
+                "Embedding dependencies unavailable",
+                stage=EMBED_STAGE,
+                doc_id="__system__",
+                input_hash=None,
+                error_code="MISSING_DEPENDENCY",
+                dependency_error=str(exc),
+            )
             raise
 
     data_root_override = cfg.data_root
@@ -2281,6 +2378,8 @@ def main(args: argparse.Namespace | None = None) -> int:
             "out_dir": str(out_dir),
             "splade_model_dir": str(splade_model_dir),
             "qwen_model_dir": str(qwen_model_dir),
+            "splade_env": splade_env,
+            "qwen_env": qwen_env,
             "offline": bool(offline_mode),
             "vector_format": vector_format,
             "shard_count": shard_count,
@@ -2295,6 +2394,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             "resume": bool(cfg.resume),
             "force": bool(cfg.force),
             "validate_only": bool(validate_only),
+            "plan_only": bool(plan_only),
             "no_cache": bool(cfg.no_cache),
         }
     )
@@ -2332,7 +2432,11 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     if validate_only:
         files_checked, rows_validated = _validate_vectors_for_chunks(
-            chunks_dir, out_dir, logger, data_root=resolved_root
+            chunks_dir,
+            out_dir,
+            logger,
+            data_root=resolved_root,
+            expected_dimension=int(cfg.qwen_dim),
         )
         logger.info(
             "Validation-only mode complete",
@@ -2360,6 +2464,9 @@ def main(args: argparse.Namespace | None = None) -> int:
         embeddings_dir=str(out_dir),
         splade_model_dir=str(splade_model_dir),
         qwen_model_dir=str(qwen_model_dir),
+        splade_device=splade_env.get("device"),
+        qwen_device=qwen_env.get("device"),
+        qwen_dtype=qwen_env.get("dtype"),
         offline=offline_mode,
         requested_files_parallel=requested_parallel,
         shard_count=shard_count,
@@ -2373,9 +2480,15 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     files = list(iter_chunks(chunks_dir))
     if not files:
-        logger.warning(
+        log_event(
+            logger,
+            "warning",
             "No chunk files found",
-            extra={"extra_fields": {"chunks_dir": str(chunks_dir)}},
+            stage=EMBED_STAGE,
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="NO_INPUT_FILES",
+            chunks_dir=str(chunks_dir),
         )
         return 0
 
@@ -2400,14 +2513,16 @@ def main(args: argparse.Namespace | None = None) -> int:
         )
         files = selected_files
         if not files:
-            logger.warning(
+            log_event(
+                logger,
+                "warning",
                 "Shard contains no chunk files",
-                extra={
-                    "extra_fields": {
-                        "shard_index": args.shard_index,
-                        "shard_count": args.shard_count,
-                    }
-                },
+                stage=EMBED_STAGE,
+                doc_id="__aggregate__",
+                input_hash=None,
+                error_code="SHARD_EMPTY",
+                shard_index=args.shard_index,
+                shard_count=args.shard_count,
             )
             return 0
 
@@ -2419,24 +2534,27 @@ def main(args: argparse.Namespace | None = None) -> int:
             ensure_chunk_schema(rows, chunk_file)
         except ValueError as exc:
             reason = str(exc)
-            logger.error(
-                "Chunk file rejected: incompatible schema",
-                extra={
-                    "extra_fields": {
-                        "chunk_file": str(chunk_file),
-                        "error": reason,
-                    }
-                },
-            )
-            incompatible_chunks.append(chunk_file)
             try:
                 chunk_hash = compute_content_hash(chunk_file)
             except Exception:
                 chunk_hash = ""
+            doc_id = compute_relative_doc_id(chunk_file, chunks_dir)
+            log_event(
+                logger,
+                "error",
+                "Chunk file rejected: incompatible schema",
+                stage=EMBED_STAGE,
+                doc_id=doc_id,
+                input_hash=chunk_hash,
+                error_code="CHUNK_SCHEMA_INCOMPATIBLE",
+                chunk_file=str(chunk_file),
+                error=reason,
+            )
+            incompatible_chunks.append(chunk_file)
             _handle_embedding_quarantine(
                 chunk_path=chunk_file,
                 vector_path=chunk_file.with_suffix(chunk_file.suffix + ".vectors"),
-                doc_id=chunk_file.stem,
+                doc_id=doc_id,
                 input_hash=chunk_hash,
                 reason=reason,
                 logger=logger,
@@ -2470,10 +2588,21 @@ def main(args: argparse.Namespace | None = None) -> int:
         cache_enabled=not bool(cfg.no_cache),
     )
 
-    stats = process_pass_a(files, logger)
-    if not stats.N:
-        logger.warning("No chunks found after Pass A")
-        return 0
+    if plan_only:
+        stats = BM25Stats(N=0, avgdl=0.0, df={})
+    else:
+        stats = process_pass_a(files, logger)
+        if not stats.N:
+            log_event(
+                logger,
+                "warning",
+                "No chunk statistics collected in Pass A",
+                stage=EMBED_STAGE,
+                doc_id="__aggregate__",
+                input_hash=None,
+                error_code="NO_PASS_A_DATA",
+            )
+            return 0
 
     validator = SPLADEValidator(
         warn_threshold_pct=float(cfg.sparsity_warn_threshold_pct),
@@ -2486,35 +2615,69 @@ def main(args: argparse.Namespace | None = None) -> int:
     qwen_norms_all: List[float] = []
 
     manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
+    resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
     file_entries: List[Tuple[Path, Path, str, str]] = []
     skipped_files = 0
     quarantined_files = 0
+    skipped_ids: List[str] = []
+    planned_ids: List[str] = []
     for chunk_file in files:
         doc_id, out_path = derive_doc_id_and_vectors_path(chunk_file, chunks_dir, args.out_dir)
         input_hash = compute_content_hash(chunk_file)
-        entry = manifest_index.get(doc_id)
-        if should_skip_output(out_path, entry, input_hash, cfg.resume, cfg.force):
-            log_event(
-                logger,
-                "info",
-                "Skipping chunk file: output exists and input unchanged",
-                status="skip",
-                stage=EMBED_STAGE,
-                doc_id=doc_id,
-                input_relpath=relative_path(chunk_file, resolved_root),
-                output_relpath=relative_path(out_path, resolved_root),
-            )
-            manifest_log_skip(
-                stage=MANIFEST_STAGE,
-                doc_id=doc_id,
-                input_path=chunk_file,
-                input_hash=input_hash,
-                output_path=out_path,
-                schema_version=VECTOR_SCHEMA_VERSION,
-            )
+        skip_file, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+        if skip_file:
+            skipped_ids.append(doc_id)
+            if not plan_only:
+                log_event(
+                    logger,
+                    "info",
+                    "Skipping chunk file: output exists and input unchanged",
+                    status="skip",
+                    stage=EMBED_STAGE,
+                    doc_id=doc_id,
+                    input_relpath=relative_path(chunk_file, resolved_root),
+                    output_relpath=relative_path(out_path, resolved_root),
+                )
+                manifest_log_skip(
+                    stage=MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    input_path=chunk_file,
+                    input_hash=input_hash,
+                    output_path=out_path,
+                    schema_version=VECTOR_SCHEMA_VERSION,
+                )
             skipped_files += 1
             continue
+        planned_ids.append(doc_id)
+        if plan_only:
+            continue
         file_entries.append((chunk_file, out_path, input_hash, doc_id))
+
+    if plan_only:
+        log_event(
+            logger,
+            "info",
+            "Embedding resume dry-run summary",
+            stage=EMBED_STAGE,
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="EMBED_PLAN_ONLY",
+            process_count=len(planned_ids),
+            skip_count=len(skipped_ids),
+        )
+        print("docparse embed plan")
+        print(f"- embed: process {len(planned_ids)}, skip {len(skipped_ids)}")
+        if planned_ids:
+            preview = ", ".join(planned_ids[:5])
+            if len(planned_ids) > 5:
+                preview += f", ... (+{len(planned_ids) - 5} more)"
+            print("  process preview:", preview)
+        if skipped_ids:
+            preview = ", ".join(skipped_ids[:5])
+            if len(skipped_ids) > 5:
+                preview += f", ... (+{len(skipped_ids) - 5} more)"
+            print("  skip preview:", preview)
+        return 0
 
     files_parallel = min(requested_parallel, max(1, len(file_entries)))
     args.files_parallel = files_parallel

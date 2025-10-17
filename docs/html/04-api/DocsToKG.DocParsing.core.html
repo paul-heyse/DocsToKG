@@ -122,11 +122,11 @@ third-party dependencies beyond the standard library.</p>
 </section>
 <section id="load-yaml-markers-raw">
 <h3><code class="docutils literal notranslate"><span class="pre">_load_yaml_markers(raw)</span></code><a class="headerlink" href="#load-yaml-markers-raw" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Deserialize YAML marker overrides, raising when PyYAML is unavailable.</p>
 </section>
 <section id="load-toml-markers-raw">
 <h3><code class="docutils literal notranslate"><span class="pre">_load_toml_markers(raw)</span></code><a class="headerlink" href="#load-toml-markers-raw" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Deserialize TOML marker definitions with compatibility fallbacks.</p>
 </section>
 <section id="load-structural-marker-profile-path">
 <h3><code class="docutils literal notranslate"><span class="pre">load_structural_marker_profile(path)</span></code><a class="headerlink" href="#load-structural-marker-profile-path" title="Link to this heading"></a></h3>
@@ -167,6 +167,24 @@ third-party dependencies beyond the standard library.</p>
 <section id="coerce-str-tuple-value-base-dir">
 <h3><code class="docutils literal notranslate"><span class="pre">_coerce_str_tuple(value,</span> <span class="pre">_base_dir)</span></code><a class="headerlink" href="#coerce-str-tuple-value-base-dir" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">value</span></code> as a tuple of strings.</p>
+</section>
+<section id="normalize-http-timeout-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">normalize_http_timeout(timeout)</span></code><a class="headerlink" href="#normalize-http-timeout-timeout" title="Link to this heading"></a></h3>
+<p>Normalize timeout inputs into a <code class="docutils literal notranslate"><span class="pre">(connect,</span> <span class="pre">read)</span></code> tuple of floats.</p>
+</section>
+<section id="get-http-session">
+<h3><code class="docutils literal notranslate"><span class="pre">get_http_session()</span></code><a class="headerlink" href="#get-http-session" title="Link to this heading"></a></h3>
+<p>Return a shared :class:<code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> configured with retries.</p>
+<p>Args:
+timeout: Optional override for the <code class="docutils literal notranslate"><span class="pre">(connect,</span> <span class="pre">read)</span></code> timeout tuple. Scalars
+override only the read timeout while preserving the default connect value.
+base_headers: Headers merged into the shared session.
+retry_total: Maximum retry attempts applied for connect/read failures.
+retry_backoff: Exponential backoff factor between retries.
+status_forcelist: HTTP status codes that trigger retries.
+allowed_methods: HTTP verbs eligible for retries.</p>
+<p>Returns:
+Tuple containing the shared session and the effective timeout tuple.</p>
 </section>
 <section id="manifest-value-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_manifest_value(value)</span></code><a class="headerlink" href="#manifest-value-value" title="Link to this heading"></a></h3>
@@ -217,6 +235,10 @@ model_root: Optional DocsToKG model root override.</p>
 <p>Returns:
 Tuple of <code class="docutils literal notranslate"><span class="pre">(hf_home,</span> <span class="pre">model_root)</span></code> paths after normalisation.</p>
 </section>
+<section id="detect-cuda-device">
+<h3><code class="docutils literal notranslate"><span class="pre">_detect_cuda_device()</span></code><a class="headerlink" href="#detect-cuda-device" title="Link to this heading"></a></h3>
+<p>Best-effort detection of CUDA availability to choose a default device.</p>
+</section>
 <section id="ensure-model-environment-hf-home-model-root">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_model_environment(hf_home,</span> <span class="pre">model_root)</span></code><a class="headerlink" href="#ensure-model-environment-hf-home-model-root" title="Link to this heading"></a></h3>
 <p>Initialise and cache the HuggingFace/model-root environment settings.</p>
@@ -232,6 +254,14 @@ Tuple of <code class="docutils literal notranslate"><span class="pre">(hf_home,<
 <section id="ensure-qwen-dependencies-import-error">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_qwen_dependencies(import_error)</span></code><a class="headerlink" href="#ensure-qwen-dependencies-import-error" title="Link to this heading"></a></h3>
 <p>Validate that Qwen/vLLM optional dependencies are importable.</p>
+</section>
+<section id="ensure-splade-environment">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_splade_environment()</span></code><a class="headerlink" href="#ensure-splade-environment" title="Link to this heading"></a></h3>
+<p>Bootstrap SPLADE-related environment defaults and return resolved settings.</p>
+</section>
+<section id="ensure-qwen-environment">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_qwen_environment()</span></code><a class="headerlink" href="#ensure-qwen-environment" title="Link to this heading"></a></h3>
+<p>Bootstrap Qwen/vLLM environment defaults and return resolved settings.</p>
 </section>
 <section id="detect-data-root-start">
 <h3><code class="docutils literal notranslate"><span class="pre">detect_data_root(start)</span></code><a class="headerlink" href="#detect-data-root-start" title="Link to this heading"></a></h3>
@@ -596,29 +626,6 @@ True</p>
 <section id="jsonl-load-path-skip-invalid-max-errors">
 <h3><code class="docutils literal notranslate"><span class="pre">jsonl_load(path,</span> <span class="pre">skip_invalid,</span> <span class="pre">max_errors)</span></code><a class="headerlink" href="#jsonl-load-path-skip-invalid-max-errors" title="Link to this heading"></a></h3>
 <p>Load a JSONL file into memory with optional error tolerance.</p>
-<p>Args:
-path: JSON Lines file to read.
-skip_invalid: When <code class="docutils literal notranslate"><span class="pre">True</span></code>, invalid lines are skipped up to
-<code class="docutils literal notranslate"><span class="pre">max_errors</span></code> occurrences instead of raising immediately.
-max_errors: Maximum number of errors to tolerate when
-<code class="docutils literal notranslate"><span class="pre">skip_invalid</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
-<p>Returns:
-List of parsed dictionaries.</p>
-<p>Raises:
-ValueError: If a malformed JSON line is encountered and <code class="docutils literal notranslate"><span class="pre">skip_invalid</span></code>
-is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>tmp = Path(“/tmp/example.jsonl”)
-_ = tmp.write_text(‘{“a”: 1}
-‘, encoding=”utf-8”)
-jsonl_load(tmp)
-[{‘a’: 1}]</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
 </section>
 <section id="jsonl-save-path-rows-validate">
 <h3><code class="docutils literal notranslate"><span class="pre">jsonl_save(path,</span> <span class="pre">rows,</span> <span class="pre">validate)</span></code><a class="headerlink" href="#jsonl-save-path-rows-validate" title="Link to this heading"></a></h3>
@@ -653,6 +660,14 @@ atomic: When True, writes occur via :func:<code class="docutils literal notransl
 <code class="docutils literal notranslate"><span class="pre">target</span></code> is already an open handle).</p>
 <p>Returns:
 The number of rows written.</p>
+</section>
+<section id="build-jsonl-split-map-path">
+<h3><code class="docutils literal notranslate"><span class="pre">build_jsonl_split_map(path)</span></code><a class="headerlink" href="#build-jsonl-split-map-path" title="Link to this heading"></a></h3>
+<p>Return newline-aligned byte ranges that partition <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
+</section>
+<section id="iter-jsonl-records-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_iter_jsonl_records(path)</span></code><a class="headerlink" href="#iter-jsonl-records-path" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="manifest-filename-stage">
 <h3><code class="docutils literal notranslate"><span class="pre">_manifest_filename(stage)</span></code><a class="headerlink" href="#manifest-filename-stage" title="Link to this heading"></a></h3>
@@ -705,6 +720,22 @@ algorithm: Hash algorithm name; defaults to <code class="docutils literal notran
 <p>Returns:
 UUID string derived from the hash digest while enforcing RFC4122 metadata bits.</p>
 </section>
+<section id="relative-path-path-root">
+<h3><code class="docutils literal notranslate"><span class="pre">relative_path(path,</span> <span class="pre">root)</span></code><a class="headerlink" href="#relative-path-path-root" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">path</span></code> rendered relative to <code class="docutils literal notranslate"><span class="pre">root</span></code> when feasible.</p>
+</section>
+<section id="quarantine-artifact-path-reason">
+<h3><code class="docutils literal notranslate"><span class="pre">quarantine_artifact(path,</span> <span class="pre">reason)</span></code><a class="headerlink" href="#quarantine-artifact-path-reason" title="Link to this heading"></a></h3>
+<p>Move <code class="docutils literal notranslate"><span class="pre">path</span></code> to a <code class="docutils literal notranslate"><span class="pre">.quarantine</span></code> sibling for operator review.</p>
+<p>Args:
+path: Artefact to quarantine.
+reason: Explanation describing why the artefact was quarantined.
+logger: Optional logger used to emit structured diagnostics.
+create_placeholder: When <code class="docutils literal notranslate"><span class="pre">True</span></code> a placeholder file is created even if
+<code class="docutils literal notranslate"><span class="pre">path</span></code> does not presently exist (useful for failed writes).</p>
+<p>Returns:
+Path to the quarantined artefact.</p>
+</section>
 <section id="compute-content-hash-path-algorithm">
 <h3><code class="docutils literal notranslate"><span class="pre">compute_content_hash(path,</span> <span class="pre">algorithm)</span></code><a class="headerlink" href="#compute-content-hash-path-algorithm" title="Link to this heading"></a></h3>
 <p>Compute a content hash for <code class="docutils literal notranslate"><span class="pre">path</span></code> using the requested algorithm.</p>
@@ -748,6 +779,14 @@ True</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
+</section>
+<section id="iter-manifest-entries-stages-root">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_manifest_entries(stages,</span> <span class="pre">root)</span></code><a class="headerlink" href="#iter-manifest-entries-stages-root" title="Link to this heading"></a></h3>
+<p>Yield manifest entries for the requested <code class="docutils literal notranslate"><span class="pre">stages</span></code> sorted by timestamp.</p>
+</section>
+<section id="summarize-manifest-entries">
+<h3><code class="docutils literal notranslate"><span class="pre">summarize_manifest(entries)</span></code><a class="headerlink" href="#summarize-manifest-entries" title="Link to this heading"></a></h3>
+<p>Compute status counts and durations for manifest <code class="docutils literal notranslate"><span class="pre">entries</span></code>.</p>
 </section>
 <section id="acquire-lock-path-timeout">
 <h3><code class="docutils literal notranslate"><span class="pre">acquire_lock(path,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#acquire-lock-path-timeout" title="Link to this heading"></a></h3>
@@ -797,6 +836,18 @@ the degraded safety state.</p>
 <section id="run-embed-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">_run_embed(argv)</span></code><a class="headerlink" href="#run-embed-argv" title="Link to this heading"></a></h3>
 <p>Execute the embedding pipeline subcommand.</p>
+</section>
+<section id="run-token-profiles-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_token_profiles(argv)</span></code><a class="headerlink" href="#run-token-profiles-argv" title="Link to this heading"></a></h3>
+<p>Execute the tokenizer profiling subcommand.</p>
+</section>
+<section id="run-plan-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_plan(argv)</span></code><a class="headerlink" href="#run-plan-argv" title="Link to this heading"></a></h3>
+<p>Display the doctags → chunk → embed plan without executing.</p>
+</section>
+<section id="run-manifest-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_manifest(argv)</span></code><a class="headerlink" href="#run-manifest-argv" title="Link to this heading"></a></h3>
+<p>Inspect pipeline manifest artifacts via CLI.</p>
 </section>
 <section id="build-doctags-parser-prog">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_doctags_parser(prog)</span></code><a class="headerlink" href="#build-doctags-parser-prog" title="Link to this heading"></a></h3>
@@ -866,6 +917,22 @@ the degraded safety state.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">doctags(argv)</span></code><a class="headerlink" href="#doctags-argv" title="Link to this heading"></a></h3>
 <p>Public wrapper for the <code class="docutils literal notranslate"><span class="pre">doctags</span></code> subcommand.</p>
 </section>
+<section id="token-profiles-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">token_profiles(argv)</span></code><a class="headerlink" href="#token-profiles-argv" title="Link to this heading"></a></h3>
+<p>Public wrapper for the <code class="docutils literal notranslate"><span class="pre">token-profiles</span></code> subcommand.</p>
+</section>
+<section id="plan-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(argv)</span></code><a class="headerlink" href="#plan-argv" title="Link to this heading"></a></h3>
+<p>Public wrapper for the <code class="docutils literal notranslate"><span class="pre">plan</span></code> subcommand.</p>
+</section>
+<section id="manifest-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">manifest(argv)</span></code><a class="headerlink" href="#manifest-argv" title="Link to this heading"></a></h3>
+<p>Public wrapper for the <code class="docutils literal notranslate"><span class="pre">manifest</span></code> subcommand.</p>
+</section>
+<section id="coerce-pair-values">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_pair(values)</span></code><a class="headerlink" href="#coerce-pair-values" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="apply-env-self">
 <h3><code class="docutils literal notranslate"><span class="pre">apply_env(self)</span></code><a class="headerlink" href="#apply-env-self" title="Link to this heading"></a></h3>
 <p>Overlay configuration from environment variables.</p>
@@ -892,27 +959,47 @@ the degraded safety state.</p>
 </section>
 <section id="coerce-field-self-name-value-base-dir">
 <h3><code class="docutils literal notranslate"><span class="pre">_coerce_field(self,</span> <span class="pre">name,</span> <span class="pre">value,</span> <span class="pre">base_dir)</span></code><a class="headerlink" href="#coerce-field-self-name-value-base-dir" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Run field-specific coercion logic before manifest serialization.</p>
 </section>
 <section id="is-overridden-self-field-name">
 <h3><code class="docutils literal notranslate"><span class="pre">is_overridden(self,</span> <span class="pre">field_name)</span></code><a class="headerlink" href="#is-overridden-self-field-name" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">field_name</span></code> was explicitly overridden.</p>
 </section>
+<section id="entry-self-doc-id">
+<h3><code class="docutils literal notranslate"><span class="pre">entry(self,</span> <span class="pre">doc_id)</span></code><a class="headerlink" href="#entry-self-doc-id" title="Link to this heading"></a></h3>
+<p>Return the manifest entry associated with <code class="docutils literal notranslate"><span class="pre">doc_id</span></code> when available.</p>
+</section>
+<section id="should-skip-self-doc-id-output-path-input-hash">
+<h3><code class="docutils literal notranslate"><span class="pre">should_skip(self,</span> <span class="pre">doc_id,</span> <span class="pre">output_path,</span> <span class="pre">input_hash)</span></code><a class="headerlink" href="#should-skip-self-doc-id-output-path-input-hash" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when work for <code class="docutils literal notranslate"><span class="pre">doc_id</span></code> can be safely skipped.</p>
+</section>
+<section id="should-process-self-doc-id-output-path-input-hash">
+<h3><code class="docutils literal notranslate"><span class="pre">should_process(self,</span> <span class="pre">doc_id,</span> <span class="pre">output_path,</span> <span class="pre">input_hash)</span></code><a class="headerlink" href="#should-process-self-doc-id-output-path-input-hash" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">doc_id</span></code> requires processing.</p>
+</section>
+<section id="process-self-msg-kwargs">
+<h3><code class="docutils literal notranslate"><span class="pre">process(self,</span> <span class="pre">msg,</span> <span class="pre">kwargs)</span></code><a class="headerlink" href="#process-self-msg-kwargs" title="Link to this heading"></a></h3>
+<p>Merge adapter context into <code class="docutils literal notranslate"><span class="pre">extra</span></code> metadata for structured output.</p>
+</section>
+<section id="bind-self">
+<h3><code class="docutils literal notranslate"><span class="pre">bind(self)</span></code><a class="headerlink" href="#bind-self" title="Link to this heading"></a></h3>
+<p>Attach additional persistent fields to the adapter and return <code class="docutils literal notranslate"><span class="pre">self</span></code>.</p>
+</section>
+<section id="child-self">
+<h3><code class="docutils literal notranslate"><span class="pre">child(self)</span></code><a class="headerlink" href="#child-self" title="Link to this heading"></a></h3>
+<p>Create a new adapter inheriting context with optional overrides.</p>
+</section>
+<section id="length-bucket-length">
+<h3><code class="docutils literal notranslate"><span class="pre">_length_bucket(length)</span></code><a class="headerlink" href="#length-bucket-length" title="Link to this heading"></a></h3>
+<p>Return the power-of-two bucket for <code class="docutils literal notranslate"><span class="pre">length</span></code>.</p>
+</section>
+<section id="ordered-indices-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_ordered_indices(self)</span></code><a class="headerlink" href="#ordered-indices-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="iter-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__iter__(self)</span></code><a class="headerlink" href="#iter-self" title="Link to this heading"></a></h3>
-<p>Yield successive lists containing up to <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> elements.</p>
-<p>Args:
-None: Iteration consumes the iterable supplied to :class:<code class="docutils literal notranslate"><span class="pre">Batcher</span></code>.</p>
-<p>Returns:
-Iterator over lists where each list contains up to <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> items.</p>
-</section>
-<section id="format-self-record">
-<h3><code class="docutils literal notranslate"><span class="pre">format(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#format-self-record" title="Link to this heading"></a></h3>
-<p>Render a log record as a JSON string.</p>
-<p>Args:
-record: Logging record produced by the DocParsing pipeline.</p>
-<p>Returns:
-JSON-formatted string containing canonical log fields and optional extras.</p>
+<p><em>No documentation available.</em></p>
 </section>
 </section>
 <section id="classes">
@@ -949,12 +1036,24 @@ JSON-formatted string containing canonical log fields and optional extras.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">ChunkResult</span></code><a class="headerlink" href="#chunkresult" title="Link to this heading"></a></h3>
 <p>Result envelope emitted by chunker workers.</p>
 </section>
+<section id="resumecontroller">
+<h3><code class="docutils literal notranslate"><span class="pre">ResumeController</span></code><a class="headerlink" href="#resumecontroller" title="Link to this heading"></a></h3>
+<p>Centralize resume/force decisions using manifest metadata.</p>
+</section>
+<section id="structuredlogger">
+<h3><code class="docutils literal notranslate"><span class="pre">StructuredLogger</span></code><a class="headerlink" href="#structuredlogger" title="Link to this heading"></a></h3>
+<p>Logger adapter that enriches structured logs with shared context.</p>
+</section>
 <section id="batcher">
 <h3><code class="docutils literal notranslate"><span class="pre">Batcher</span></code><a class="headerlink" href="#batcher" title="Link to this heading"></a></h3>
-<p>Yield fixed-size batches from an iterable.</p>
+<p>Yield fixed-size batches from an iterable with optional policies.</p>
 <p>Args:
 iterable: Source iterable providing items to batch.
-batch_size: Maximum number of elements per yielded batch.</p>
+batch_size: Maximum number of elements per yielded batch.
+policy: Optional batching policy. When <code class="docutils literal notranslate"><span class="pre">&quot;length&quot;</span></code> the iterable is
+bucketed by <code class="docutils literal notranslate"><span class="pre">lengths</span></code> before batching.
+lengths: Sequence of integer lengths aligned with <code class="docutils literal notranslate"><span class="pre">iterable</span></code> used for
+length-aware batching policies.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
@@ -968,22 +1067,6 @@ batch_size: Maximum number of elements per yielded batch.</p>
 <section id="command">
 <h3><code class="docutils literal notranslate"><span class="pre">_Command</span></code><a class="headerlink" href="#command" title="Link to this heading"></a></h3>
 <p>Callable wrapper storing handler metadata for subcommands.</p>
-</section>
-<section id="jsonformatter">
-<h3><code class="docutils literal notranslate"><span class="pre">JSONFormatter</span></code><a class="headerlink" href="#jsonformatter" title="Link to this heading"></a></h3>
-<p>Emit structured JSON log messages for DocParsing utilities.</p>
-<p>Attributes:
-default_time_format: Timestamp template applied to log records.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>formatter = JSONFormatter()
-hasattr(formatter, “format”)
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
 </section>
 </section>
 </section>

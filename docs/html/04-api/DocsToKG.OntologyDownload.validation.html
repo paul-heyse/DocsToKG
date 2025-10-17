@@ -85,6 +85,14 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="current-memory-mb">
+<h3><code class="docutils literal notranslate"><span class="pre">_current_memory_mb()</span></code><a class="headerlink" href="#current-memory-mb" title="Link to this heading"></a></h3>
+<p>Return the current resident memory usage in megabytes.</p>
+</section>
+<section id="acquire-validator-slot-config">
+<h3><code class="docutils literal notranslate"><span class="pre">_acquire_validator_slot(config)</span></code><a class="headerlink" href="#acquire-validator-slot-config" title="Link to this heading"></a></h3>
+<p>Return a process-wide semaphore guarding validator concurrency.</p>
+</section>
 <section id="load-resolver-plugins-registry">
 <h3><code class="docutils literal notranslate"><span class="pre">load_resolver_plugins(registry)</span></code><a class="headerlink" href="#load-resolver-plugins-registry" title="Link to this heading"></a></h3>
 <p>Proxy to :mod:<code class="docutils literal notranslate"><span class="pre">plugins</span></code> resolver discovery preserving legacy globals.</p>
@@ -268,6 +276,10 @@ None</p>
 <section id="run-validator-task-validator-request-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">_run_validator_task(validator,</span> <span class="pre">request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#run-validator-task-validator-request-logger" title="Link to this heading"></a></h3>
 <p>Execute a single validator with exception guards.</p>
+</section>
+<section id="run-validator-in-process-name-request">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_validator_in_process(name,</span> <span class="pre">request)</span></code><a class="headerlink" href="#run-validator-in-process-name-request" title="Link to this heading"></a></h3>
+<p>Execute a validator inside a worker process.</p>
 </section>
 <section id="run-validators-requests-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">run_validators(requests,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#run-validators-requests-logger" title="Link to this heading"></a></h3>

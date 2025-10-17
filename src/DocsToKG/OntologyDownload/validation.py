@@ -17,7 +17,7 @@ import sys
 import tempfile
 import time
 import zipfile
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from itertools import islice
@@ -1098,6 +1098,7 @@ VALIDATORS = {
 }
 
 
+_plugins.register_plugin_registry("validator", VALIDATORS)
 ensure_validator_plugins(VALIDATORS)
 
 
@@ -1105,16 +1106,20 @@ def _run_validator_task(
     validator: Callable[[ValidationRequest, logging.Logger], ValidationResult],
     request: ValidationRequest,
     logger: logging.Logger,
+    *,
+    use_semaphore: bool = True,
 ) -> ValidationResult:
     """Execute a single validator with exception guards."""
 
     start_time = time.perf_counter()
     before_mb = _current_memory_mb()
     log_memory_usage(logger, stage="validate", event="before", validator=request.name)
-    semaphore = _acquire_validator_slot(request.config)
-    acquired = semaphore.acquire(timeout=request.config.defaults.validation.parser_timeout_sec)
-    if not acquired:
-        raise ValidationTimeout("validator concurrency limit prevented start")  # pragma: no cover
+    semaphore = _acquire_validator_slot(request.config) if use_semaphore else None
+    acquired = False
+    if semaphore is not None:
+        acquired = semaphore.acquire(timeout=request.config.defaults.validation.parser_timeout_sec)
+        if not acquired:
+            raise ValidationTimeout("validator concurrency limit prevented start")  # pragma: no cover
     try:
         result = validator(request, logger)
     except Exception as exc:  # pylint: disable=broad-except
@@ -1153,8 +1158,26 @@ def _run_validator_task(
         result.details.setdefault("metrics", {}).update(metrics)
         return result
     finally:
-        if acquired:
+        if acquired and semaphore is not None:
             semaphore.release()
+
+
+def _run_validator_in_process(name: str, request: ValidationRequest) -> ValidationResult:
+    """Execute a validator inside a worker process."""
+
+    validator = VALIDATORS.get(name)
+    if validator is None:
+        raise ValueError(f"Unknown validator '{name}'")
+
+    process_logger = logging.getLogger(f"DocsToKG.Validator.{name}")
+    if not process_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+        process_logger.addHandler(handler)
+        process_logger.setLevel(logging.INFO)
+        process_logger.propagate = True
+
+    return _run_validator_task(validator, request, process_logger, use_semaphore=False)
 
 
 def run_validators(
@@ -1186,15 +1209,58 @@ def run_validators(
 
     max_workers = _determine_max_workers()
     results: Dict[str, ValidationResult] = {}
-    futures: Dict[Any, ValidationRequest] = {}
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for request in request_list:
-            validator = VALIDATORS.get(request.name)
-            if not validator:
-                continue
-            future = executor.submit(_run_validator_task, validator, request, logger)
-            futures[future] = request
+    process_enabled = False
+    process_validator_names: set[str] = set()
+    for request in request_list:
+        validation_config = getattr(request.config.defaults, "validation", None)
+        if validation_config is None:
+            continue
+        if getattr(validation_config, "use_process_pool", False):
+            process_enabled = True
+            for name in getattr(validation_config, "process_pool_validators", []):
+                if isinstance(name, str):
+                    process_validator_names.add(name.strip().lower())
+
+    thread_jobs: List[Tuple[Callable[[ValidationRequest, logging.Logger], ValidationResult], ValidationRequest]] = []
+    process_requests: List[ValidationRequest] = []
+    for request in request_list:
+        validator = VALIDATORS.get(request.name)
+        if not validator:
+            continue
+        normalized = request.name.lower()
+        if process_enabled and normalized in process_validator_names:
+            process_requests.append(request)
+        else:
+            thread_jobs.append((validator, request))
+
+    futures: Dict[Any, ValidationRequest] = {}
+    executors: List[Any] = []
+
+    try:
+        if thread_jobs:
+            thread_workers = min(max_workers, len(thread_jobs))
+            thread_workers = max(1, thread_workers)
+            thread_executor = ThreadPoolExecutor(max_workers=thread_workers)
+            executors.append(thread_executor)
+            for validator, request in thread_jobs:
+                future = thread_executor.submit(
+                    _run_validator_task,
+                    validator,
+                    request,
+                    logger,
+                    use_semaphore=True,
+                )
+                futures[future] = request
+
+        if process_requests:
+            process_workers = min(max_workers, len(process_requests))
+            process_workers = max(1, process_workers)
+            process_executor = ProcessPoolExecutor(max_workers=process_workers)
+            executors.append(process_executor)
+            for request in process_requests:
+                future = process_executor.submit(_run_validator_in_process, request.name, request)
+                futures[future] = request
 
         for future in as_completed(futures):
             request = futures[future]
@@ -1214,6 +1280,9 @@ def run_validators(
                     },
                 )
                 results[request.name] = ValidationResult(ok=False, details=payload, output_files=[])
+    finally:
+        for executor in executors:
+            executor.shutdown(wait=True, cancel_futures=False)
 
     return results
 

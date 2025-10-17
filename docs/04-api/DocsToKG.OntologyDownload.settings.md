@@ -165,6 +165,10 @@ Compute polite HTTP headers for outbound resolver requests.
 
 Ensure preferred resolvers belong to the supported resolver set.
 
+### `normalize_accept_licenses(cls, value)`
+
+Normalize accept_licenses entries to canonical SPDX identifiers.
+
 ### `from_defaults(cls)`
 
 Construct a resolved configuration populated with default values only.
@@ -253,6 +257,10 @@ Record the latest processed version for *ontology_id*.
 
 Mirror ``source`` into a content-addressable cache and return its path.
 
+### `directory_size(self, path)`
+
+Return the total size in bytes for files rooted at *path*.
+
 ### `_version_dir(self, ontology_id, version)`
 
 *No documentation available.*
@@ -292,6 +300,10 @@ Update symbolic links/markers to highlight the latest processed version.
 ### `mirror_cas_artifact(self, algorithm, digest, source)`
 
 Copy ``source`` into the content-addressable cache.
+
+### `directory_size(self, path)`
+
+Return the byte size for files rooted at ``path``.
 
 ### `_remote_version_path(self, ontology_id, version)`
 

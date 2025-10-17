@@ -125,6 +125,14 @@ class ValidationConfig(BaseModel):
     skip_reasoning_if_size_mb: int = Field(default=500, gt=0)
     streaming_normalization_threshold_mb: int = Field(default=200, ge=1)
     max_concurrent_validators: int = Field(default=2, ge=1, le=8)
+    use_process_pool: bool = Field(
+        default=False,
+        description="When true, run heavy validators (rdflib, owlready2) in a process pool for isolation.",
+    )
+    process_pool_validators: List[str] = Field(
+        default_factory=lambda: ["rdflib", "owlready2"],
+        description="Validator names that should run in the process pool when enabled.",
+    )
 
     model_config = {"validate_assignment": True}
 
@@ -151,6 +159,10 @@ class DownloadConfiguration(BaseModel):
     concurrent_downloads: int = Field(default=1, ge=1, le=10)
     concurrent_plans: int = Field(default=8, ge=1, le=32)
     validate_media_type: bool = Field(default=True)
+    strict_dns: bool = Field(
+        default=False,
+        description="When true, abort on DNS resolution failures instead of logging a warning.",
+    )
     rate_limits: Dict[str, str] = Field(
         default_factory=lambda: {
             "ols": "4/second",

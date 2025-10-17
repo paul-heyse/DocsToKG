@@ -42,6 +42,10 @@ Return a mapping of normalised URLs to manifest metadata from SQLite.
 
 Create a manifest entry summarising a download attempt.
 
+### `__post_init__(self)`
+
+*No documentation available.*
+
 ### `log_attempt(self, record)`
 
 Record a resolver attempt.
@@ -94,6 +98,14 @@ None
 
 Raises:
 Exception: Implementations may propagate shutdown failures.
+
+### `__enter__(self)`
+
+Enter the runtime context for the sink.
+
+### `__exit__(self, exc_type, exc, tb)`
+
+Exit the runtime context for the sink.
 
 ### `_write(self, payload)`
 

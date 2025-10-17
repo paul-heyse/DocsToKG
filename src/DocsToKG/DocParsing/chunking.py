@@ -105,6 +105,12 @@
 #       "name": "main",
 #       "anchor": "function-main",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "run-validate-only",
+#       "name": "_run_validate_only",
+#       "anchor": "function-run-validate-only",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -137,7 +143,7 @@ Tokenizer Alignment:
     tokenizers (for example, legacy BERT models), run the calibration utility
     beforehand to understand token count deltas::
 
-        python scripts/calibrate_tokenizers.py --doctags-dir Data/DocTagsFiles
+        python -m DocsToKG.DocParsing.token_profiles --doctags-dir Data/DocTagsFiles
 
     The calibration script reports relative token ratios and recommends
     adjustments to ``--min-tokens`` so chunk sizes remain compatible with the
@@ -221,7 +227,7 @@ from DocsToKG.DocParsing.core import (
     resolve_pipeline_path,
     relative_path,
     set_spawn_or_warn,
-    should_skip_output,
+    ResumeController,
 )
 from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
@@ -340,9 +346,15 @@ def _validate_chunk_files(
         validated_rows += file_rows
 
     if quarantined_files:
-        logger.warning(
+        log_event(
+            logger,
+            "warning",
             "Quarantined chunk files",
-            extra={"extra_fields": {"quarantined": quarantined_files}},
+            stage=CHUNK_STAGE,
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="QUARANTINE_DETECTED",
+            quarantined=quarantined_files,
         )
 
     log_event(
@@ -487,18 +499,28 @@ CHUNK_PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
         "min_tokens": 128,
         "max_tokens": 256,
         "soft_barrier_margin": 24,
+        "tokenizer_model": DEFAULT_TOKENIZER,
     },
     "gpu-default": {
         "workers": 1,
         "min_tokens": 256,
         "max_tokens": 512,
         "soft_barrier_margin": SOFT_BARRIER_MARGIN,
+        "tokenizer_model": DEFAULT_TOKENIZER,
     },
     "gpu-max": {
         "workers": max(1, (os.cpu_count() or 16) - 2),
         "min_tokens": 256,
         "max_tokens": 768,
         "soft_barrier_margin": max(32, SOFT_BARRIER_MARGIN * 2),
+        "tokenizer_model": DEFAULT_TOKENIZER,
+    },
+    "bert-compat": {
+        "workers": 1,
+        "min_tokens": 192,
+        "max_tokens": 320,
+        "soft_barrier_margin": 32,
+        "tokenizer_model": "bert-base-uncased",
     },
 }
 
@@ -514,7 +536,7 @@ CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
             "type": str,
             "default": None,
             "choices": sorted(CHUNK_PROFILE_PRESETS),
-            "help": "Preset for workers/token windows (cpu-small, gpu-default, gpu-max).",
+            "help": "Preset for workers/token windows/tokenizer (cpu-small, gpu-default, gpu-max, bert-compat).",
         },
     ),
     CLIOption(("--in-dir",), {"type": Path, "default": DEFAULT_IN_DIR}),
@@ -1555,20 +1577,28 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         )
         files = selected_files
         if not files:
-            logger.warning(
+            log_event(
+                logger,
+                "warning",
                 "Shard contains no DocTags files",
-                extra={
-                    "extra_fields": {
-                        "shard_index": args.shard_index,
-                        "shard_count": args.shard_count,
-                    }
-                },
+                stage=CHUNK_STAGE,
+                doc_id="__aggregate__",
+                input_hash=None,
+                error_code="SHARD_EMPTY",
+                shard_index=args.shard_index,
+                shard_count=args.shard_count,
             )
             return 0
     if not files:
-        logger.warning(
+        log_event(
+            logger,
+            "warning",
             "No .doctags files found",
-            extra={"extra_fields": {"input_dir": str(in_dir)}},
+            stage=CHUNK_STAGE,
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="NO_INPUT_FILES",
+            input_dir=str(in_dir),
         )
         return 0
 
@@ -1618,23 +1648,30 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     )
 
     if "bert" in tokenizer_model.lower():
-        logger.warning(
-            "BERT tokenizer may not align with Qwen embedder. Consider running "
-            "scripts/calibrate_tokenizers.py or using --tokenizer-model "
-            f"{DEFAULT_TOKENIZER}.",
-            extra={"extra_fields": {"tokenizer_model": tokenizer_model}},
+        log_event(
+            logger,
+            "warning",
+            "Tokenizer may not align with downstream embedder; consider calibration",
+            stage=CHUNK_STAGE,
+            doc_id="__config__",
+            input_hash=None,
+            error_code="TOKENIZER_MISMATCH",
+            tokenizer_model=tokenizer_model,
+            recommended_tokenizer=DEFAULT_TOKENIZER,
         )
 
     worker_count = max(1, int(getattr(args, "workers", 1)))
     if worker_count > 1 and str(args.serializer_provider) != DEFAULT_SERIALIZER_PROVIDER:
-        logger.warning(
+        log_event(
+            logger,
+            "warning",
             "Falling back to single worker because serializer provider may be stateful",
-            extra={
-                "extra_fields": {
-                    "requested_workers": int(getattr(args, "workers", 1)),
-                    "serializer_provider": str(args.serializer_provider),
-                }
-            },
+            stage=CHUNK_STAGE,
+            doc_id="__config__",
+            input_hash=None,
+            error_code="STATEFUL_SERIALIZER",
+            requested_workers=int(getattr(args, "workers", 1)),
+            serializer_provider=str(args.serializer_provider),
         )
         worker_count = 1
 
@@ -1670,12 +1707,13 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         config=config_snapshot,
     )
 
+    resume_controller = ResumeController(args.resume, args.force, chunk_manifest_index)
+
     tasks: List[ChunkTask] = []
     for path in files:
         doc_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
         name = path.stem
         input_hash = compute_content_hash(path)
-        manifest_entry = chunk_manifest_index.get(doc_id)
         parse_engine = parse_engine_lookup.get(doc_id, "docling-html")
         if doc_id not in parse_engine_lookup:
             logger.debug(
@@ -1683,7 +1721,8 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
                 extra={"extra_fields": {"doc_id": doc_id}},
             )
 
-        if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force):
+        skip_doc, manifest_entry = resume_controller.should_skip(doc_id, out_path, input_hash)
+        if skip_doc:
             manifest_log_skip(
                 stage=MANIFEST_STAGE,
                 doc_id=doc_id,

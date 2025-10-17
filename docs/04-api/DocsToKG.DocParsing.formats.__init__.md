@@ -58,9 +58,9 @@ Examples:
 >>> chunk.schema_version
 'docparse/1.1.0'
 
-### `validate_vector_row(row)`
+### `_pydantic_validate_vector_row(row)`
 
-Validate and parse a vector JSONL row.
+Validate and parse a vector JSONL row using Pydantic models.
 
 Args:
 row: Raw dictionary from JSONL.
@@ -81,6 +81,10 @@ Examples:
 >>> vector.UUID
 'uuid'
 
+### `validate_vector_row(row)`
+
+Wrap :func:`DocParsing.schemas.validate_vector_row` for backward compatibility.
+
 ### `get_docling_version()`
 
 Detect installed Docling package version.
@@ -97,26 +101,6 @@ True
 
 Raises:
 None: This helper does not raise exceptions.
-
-### `validate_schema_version(version, compatible_versions)`
-
-Ensure a schema version string is recognised.
-
-Args:
-version: Schema version string from a JSONL row.
-compatible_versions: List of accepted version identifiers.
-kind: Human-readable label describing the schema type.
-source: Optional context describing where the version originated.
-
-Returns:
-The validated schema version.
-
-Examples:
->>> validate_schema_version("docparse/1.1.0", COMPATIBLE_CHUNK_VERSIONS)
-'docparse/1.1.0'
-
-Raises:
-ValueError: If the schema version is missing or unsupported.
 
 ### `validate_parse_engine(cls, value)`
 
@@ -316,7 +300,7 @@ Collect numeric confidence scores when they can be coerced to float.
 
 ### `_maybe_float(value)`
 
-*No documentation available.*
+Convert ``value`` to ``float`` when possible, otherwise return ``None``.
 
 ### `model_dump(self)`
 

@@ -85,13 +85,13 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="main">
-<h3><code class="docutils literal notranslate"><span class="pre">main()</span></code><a class="headerlink" href="#main" title="Link to this heading"></a></h3>
-<p>CLI entry point delegating to the validation worker.</p>
+<section id="validator-worker-main">
+<h3><code class="docutils literal notranslate"><span class="pre">validator_worker_main()</span></code><a class="headerlink" href="#validator-worker-main" title="Link to this heading"></a></h3>
+<p>Entry point used by validator worker console scripts.</p>
 </section>
-<section id="describe-plugin-obj">
-<h3><code class="docutils literal notranslate"><span class="pre">_describe_plugin(obj)</span></code><a class="headerlink" href="#describe-plugin-obj" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<section id="validate-url-security-url-http-config">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_url_security(url,</span> <span class="pre">http_config)</span></code><a class="headerlink" href="#validate-url-security-url-http-config" title="Link to this heading"></a></h3>
+<p>Wrapper that normalizes PolicyError into ConfigError for the public API.</p>
 </section>
 <section id="list-plugins-kind">
 <h3><code class="docutils literal notranslate"><span class="pre">list_plugins(kind)</span></code><a class="headerlink" href="#list-plugins-kind" title="Link to this heading"></a></h3>
@@ -100,6 +100,10 @@
 kind: Plugin category (<code class="docutils literal notranslate"><span class="pre">&quot;resolver&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;validator&quot;</span></code>).</p>
 <p>Returns:
 Mapping of plugin names to import-qualified identifiers.</p>
+</section>
+<section id="collect-plugin-details-kind">
+<h3><code class="docutils literal notranslate"><span class="pre">_collect_plugin_details(kind)</span></code><a class="headerlink" href="#collect-plugin-details-kind" title="Link to this heading"></a></h3>
+<p>Return plugin metadata including qualified path and version.</p>
 </section>
 <section id="about">
 <h3><code class="docutils literal notranslate"><span class="pre">about()</span></code><a class="headerlink" href="#about" title="Link to this heading"></a></h3>

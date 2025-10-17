@@ -109,6 +109,28 @@ class ManifestEntry:
     dry_run: bool = False
     run_id: Optional[str] = None
 
+    def __post_init__(self) -> None:
+        normalized_classification = Classification.from_wire(self.classification)
+        object.__setattr__(self, "classification", normalized_classification.value)
+
+        if isinstance(self.reason, ReasonCode):
+            object.__setattr__(self, "reason", self.reason.value)
+
+        reason_detail = self.reason_detail
+        if isinstance(reason_detail, ReasonCode):
+            object.__setattr__(self, "reason_detail", reason_detail.value)
+
+        length = self.content_length
+        if length is not None:
+            try:
+                coerced = int(length)
+            except (TypeError, ValueError):
+                coerced = None
+            else:
+                if coerced < 0:
+                    coerced = None
+            object.__setattr__(self, "content_length", coerced)
+
 
 @runtime_checkable
 class AttemptSink(Protocol):

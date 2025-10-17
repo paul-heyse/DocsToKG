@@ -4,8 +4,8 @@ This reference documents the DocsToKG module ``DocsToKG.ContentDownload.network`
 
 ## 1. Overview
 
-Deprecated shim for the legacy ``DocsToKG.ContentDownload.network`` module.
+Compatibility shim exposing networking helpers.
 
-The networking utilities were consolidated into :mod:`DocsToKG.ContentDownload.networking`.
-Re-export the public surface so older imports keep working while the rest of the
-codebase consistently uses the new module.
+The canonical implementations live in :mod:`DocsToKG.ContentDownload.networking`.
+This module re-exports that surface so existing imports continue to function
+while downstream code migrates to the new module name.

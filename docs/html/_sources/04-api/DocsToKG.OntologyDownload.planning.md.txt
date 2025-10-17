@@ -8,34 +8,6 @@ Download planning and orchestration helpers for ontology fetching.
 
 ## 2. Functions
 
-### `_normalize_algorithm(algorithm)`
-
-*No documentation available.*
-
-### `_normalize_checksum(algorithm, value)`
-
-*No documentation available.*
-
-### `_checksum_from_extras(extras)`
-
-*No documentation available.*
-
-### `_checksum_url_from_extras(extras)`
-
-*No documentation available.*
-
-### `_extract_checksum_from_text(text)`
-
-*No documentation available.*
-
-### `_fetch_checksum_from_url()`
-
-*No documentation available.*
-
-### `_resolve_expected_checksum()`
-
-Determine the expected checksum metadata for downstream enforcement.
-
 ### `get_manifest_schema()`
 
 Return a deep copy of the manifest JSON Schema definition.
@@ -67,6 +39,10 @@ Create a fetch specification from raw configuration and defaults.
 ### `merge_defaults(raw_spec, defaults)`
 
 Merge user-provided specification with defaults to create a fetch spec.
+
+### `_cancel_pending_futures(futures)`
+
+Cancel any futures that are still pending execution.
 
 ### `parse_http_datetime(value)`
 
@@ -139,10 +115,6 @@ Return validator names appropriate for ``media_type``.
 ### `_populate_plan_metadata(planned, config, adapter)`
 
 Augment planned fetch with HTTP metadata when available.
-
-### `_migrate_manifest_inplace(payload)`
-
-Upgrade manifests created with older schema versions in place.
 
 ### `_read_manifest(manifest_path)`
 
@@ -304,14 +276,6 @@ Return a filesystem-safe token for lock filenames.
 
 Acquire an inter-process lock for a specific ontology version.
 
-### `to_known_hash(self)`
-
-Return ``algorithm:value`` string suitable for pooch known_hash.
-
-### `to_mapping(self)`
-
-Return mapping representation for manifest and index serialization.
-
 ### `to_dict(self)`
 
 Return a JSON-serializable dictionary for the manifest.
@@ -387,9 +351,13 @@ Examples:
 >>> result.status
 'success'
 
-### `ExpectedChecksum`
+### `BatchPlanningError`
 
-Expected checksum derived from configuration or resolver metadata.
+Raised when ontology planning aborts after a failure.
+
+### `BatchFetchError`
+
+Raised when ontology downloads abort after a failure.
 
 ### `Manifest`
 
@@ -412,6 +380,8 @@ last_modified: Upstream last-modified timestamp, if supplied.
 content_type: MIME type reported by upstream servers when available.
 content_length: Content-Length reported by upstream servers when available.
 source_media_type_label: Friendly label describing the source media type.
+streaming_content_sha256: Streaming canonical content hash when available.
+streaming_prefix_sha256: Hash of Turtle prefix header when available.
 downloaded_at: UTC timestamp of the completed download.
 target_formats: Desired conversion targets for normalization.
 validation: Mapping of validator names to their results.

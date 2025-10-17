@@ -8,13 +8,13 @@ Public facade aggregating ontology downloader modules.
 
 ## 2. Functions
 
-### `main()`
+### `validator_worker_main()`
 
-CLI entry point delegating to the validation worker.
+Entry point used by validator worker console scripts.
 
-### `_describe_plugin(obj)`
+### `validate_url_security(url, http_config)`
 
-*No documentation available.*
+Wrapper that normalizes PolicyError into ConfigError for the public API.
 
 ### `list_plugins(kind)`
 
@@ -25,6 +25,10 @@ kind: Plugin category (``"resolver"`` or ``"validator"``).
 
 Returns:
 Mapping of plugin names to import-qualified identifiers.
+
+### `_collect_plugin_details(kind)`
+
+Return plugin metadata including qualified path and version.
 
 ### `about()`
 

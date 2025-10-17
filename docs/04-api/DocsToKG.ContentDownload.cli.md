@@ -185,10 +185,11 @@ Iterable yielding the same work payload dictionaries for convenience.
 
 ### `process_one_work(work, session, pdf_dir, html_dir, pipeline, logger, metrics)`
 
-Process a single OpenAlex work through the resolver pipeline.
+Process a single work artifact through the resolver pipeline.
 
 Args:
-work: OpenAlex work payload from :func:`iterate_openalex`.
+work: Either a preconstructed :class:`WorkArtifact` or a raw OpenAlex
+work payload. Raw payloads are normalised via :func:`create_artifact`.
 session: Requests session configured for resolver usage.
 pdf_dir: Directory where PDF artefacts are written.
 html_dir: Directory where HTML artefacts are written.

@@ -16,6 +16,7 @@ from . import core as _core
 from . import doctags as _doctags
 from . import embedding as _embedding
 from . import formats as _formats
+from . import token_profiles as _token_profiles
 
 __all__ = [
     "core",
@@ -23,6 +24,9 @@ __all__ = [
     "doctags",
     "chunking",
     "embedding",
+    "token_profiles",
+    "plan",
+    "manifest",
     "pipelines",
     "pdf_build_parser",
     "pdf_parse_args",
@@ -37,6 +41,9 @@ formats = _formats
 doctags = _doctags
 chunking = _chunking
 embedding = _embedding
+token_profiles = _token_profiles
+plan = _core.plan
+manifest = _core.manifest
 
 # Track which shims have emitted deprecation warnings to avoid duplicates.
 _SHIM_WARNED: set[str] = set()

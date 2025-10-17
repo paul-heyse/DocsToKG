@@ -20,6 +20,7 @@ top_k: Maximum number of diversified candidates to retain.
 embeddings: Optional dense embedding matrix aligned with ``fused_candidates``.
 device: GPU device id when leveraging FAISS GPU routines.
 resources: Optional FAISS GPU resources handle reused across calls.
+block_rows: Corpus rows processed per block when estimating diversity on GPU.
 
 Returns:
 List of diversified `FusionCandidate` objects.

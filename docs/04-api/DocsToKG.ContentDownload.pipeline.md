@@ -21,7 +21,7 @@ Key Features:
 Dependencies:
 - requests: Outbound HTTP traffic and session management.
 - BeautifulSoup: Optional HTML parsing for resolver implementations.
-- DocsToKG.ContentDownload.networking: Shared retry and session helpers.
+- DocsToKG.ContentDownload.network: Shared retry and session helpers.
 
 Usage:
     from DocsToKG.ContentDownload import pipeline
@@ -129,6 +129,10 @@ name: Argument name whose presence should be detected.
 Returns:
 bool: ``True`` when ``func`` accepts the argument or variable parameters.
 
+### `__post_init__(self)`
+
+*No documentation available.*
+
 ### `is_event(self)`
 
 Return ``True`` when this result represents an informational event.
@@ -194,6 +198,14 @@ bool: ``True`` if the outcome corresponds to a PDF download.
 ### `__post_init__(self)`
 
 *No documentation available.*
+
+### `from_wire(cls, value)`
+
+Coerce serialized event values into :class:`ResolverEvent` members.
+
+### `from_wire(cls, value)`
+
+Coerce serialized reason values into :class:`ResolverEventReason` members.
 
 ### `is_enabled(self, config, artifact)`
 
@@ -1009,6 +1021,14 @@ reason: Optional reason string explaining failures.
 
 Examples:
 >>> PipelineResult(success=True, resolver_name="unpaywall", url="https://example")
+
+### `ResolverEvent`
+
+Canonical resolver event categories emitted via :class:`ResolverResult`.
+
+### `ResolverEventReason`
+
+Structured reason taxonomy for resolver events.
 
 ### `Resolver`
 

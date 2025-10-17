@@ -85,6 +85,14 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="describe-plugin-obj">
+<h3><code class="docutils literal notranslate"><span class="pre">_describe_plugin(obj)</span></code><a class="headerlink" href="#describe-plugin-obj" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="detect-entry-version-entry">
+<h3><code class="docutils literal notranslate"><span class="pre">_detect_entry_version(entry)</span></code><a class="headerlink" href="#detect-entry-version-entry" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="load-resolver-plugins-registry">
 <h3><code class="docutils literal notranslate"><span class="pre">load_resolver_plugins(registry)</span></code><a class="headerlink" href="#load-resolver-plugins-registry" title="Link to this heading"></a></h3>
 <p>Discover resolver plugins registered via <code class="docutils literal notranslate"><span class="pre">entry_points</span></code>.</p>
@@ -96,6 +104,22 @@
 <section id="load-validator-plugins-registry">
 <h3><code class="docutils literal notranslate"><span class="pre">load_validator_plugins(registry)</span></code><a class="headerlink" href="#load-validator-plugins-registry" title="Link to this heading"></a></h3>
 <p>Discover validator plugins registered via <code class="docutils literal notranslate"><span class="pre">entry_points</span></code>.</p>
+</section>
+<section id="register-plugin-registry-kind-registry">
+<h3><code class="docutils literal notranslate"><span class="pre">register_plugin_registry(kind,</span> <span class="pre">registry)</span></code><a class="headerlink" href="#register-plugin-registry-kind-registry" title="Link to this heading"></a></h3>
+<p>Register the in-memory plugin registry for discovery helpers.</p>
+</section>
+<section id="get-plugin-registry-kind">
+<h3><code class="docutils literal notranslate"><span class="pre">get_plugin_registry(kind)</span></code><a class="headerlink" href="#get-plugin-registry-kind" title="Link to this heading"></a></h3>
+<p>Return the registered plugin registry for <code class="docutils literal notranslate"><span class="pre">kind</span></code>.</p>
+</section>
+<section id="list-registered-plugins-kind">
+<h3><code class="docutils literal notranslate"><span class="pre">list_registered_plugins(kind)</span></code><a class="headerlink" href="#list-registered-plugins-kind" title="Link to this heading"></a></h3>
+<p>Return mapping of plugin names to qualified identifiers for <code class="docutils literal notranslate"><span class="pre">kind</span></code>.</p>
+</section>
+<section id="get-registered-plugin-meta-kind">
+<h3><code class="docutils literal notranslate"><span class="pre">get_registered_plugin_meta(kind)</span></code><a class="headerlink" href="#get-registered-plugin-meta-kind" title="Link to this heading"></a></h3>
+<p>Return metadata captured for entry-point registered plugins.</p>
 </section>
 <section id="plan-self">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self)</span></code><a class="headerlink" href="#plan-self" title="Link to this heading"></a></h3>

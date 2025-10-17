@@ -8,6 +8,10 @@ Unified FAISS vector store, GPU similarity utilities, and state helpers.
 
 ## 2. Functions
 
+### `_vector_uuid_to_faiss_int(vector_id)`
+
+Translate a vector UUID into a FAISS-compatible 63-bit integer.
+
 ### `normalize_rows(matrix)`
 
 L2-normalise each row of ``matrix`` in-place.
@@ -88,21 +92,21 @@ numpy.ndarray: Pairwise cosine similarities with shape ``(N, M)``.
 
 Return Top-K cosine similarities between ``q`` and ``C`` using GPU tiling.
 
-The helper avoids materialising the full ``(N × M)`` similarity matrix by
+The helper avoids materialising the full ``(N x M)`` similarity matrix by
 iterating over ``C`` in row blocks and maintaining a running Top-K per query
 row. Inputs are copied and normalised inside the routine so callers retain
 ownership of their buffers.
 
 Args:
-q: Query vector or matrix (``N × D``).
-C: Corpus matrix (``M × D``).
+q: Query vector or matrix (``N x D``).
+C: Corpus matrix (``M x D``).
 k: Number of neighbours to return per query row.
 device: CUDA device ordinal used for FAISS kernels.
 resources: FAISS GPU resources backing ``pairwise_distance_gpu``.
 block_rows: Number of corpus rows processed per iteration.
 
 Returns:
-Tuple ``(scores, indices)`` where each has shape ``(N × K)``. Scores are
+Tuple ``(scores, indices)`` where each has shape ``(N x K)``. Scores are
 sorted in descending order for every query row and indices reference rows
 within ``C``.
 
@@ -131,14 +135,6 @@ None
 
 Raises:
 ValueError: If the payload is missing the FAISS byte stream.
-
-### `matches_filters(chunk, filters)`
-
-Check whether ``chunk`` satisfies the provided OpenSearch-style filters.
-
-### `__getattr__(name)`
-
-*No documentation available.*
 
 ### `set_result(self, result)`
 
@@ -187,6 +183,10 @@ None
 
 Returns:
 DenseIndexConfig: Active dense index configuration.
+
+### `set_config(self, new_config)`
+
+Apply runtime-safe configuration updates.
 
 ### `dim(self)`
 
@@ -519,6 +519,14 @@ linked FAISS build.
 
 *No documentation available.*
 
+### `_coerce_batch(self, xb)`
+
+*No documentation available.*
+
+### `_coerce_query(self, x)`
+
+*No documentation available.*
+
 ### `_validate_snapshot_meta(self, meta)`
 
 *No documentation available.*
@@ -530,6 +538,10 @@ linked FAISS build.
 ### `_resolve_device(self, config)`
 
 *No documentation available.*
+
+### `to_faiss_id(vector_id)`
+
+Return the FAISS integer identifier for ``vector_id``.
 
 ### `upsert(self, chunks)`
 

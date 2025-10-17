@@ -121,6 +121,14 @@
 <h3><code class="docutils literal notranslate"><span class="pre">set_resolver(self,</span> <span class="pre">resolver)</span></code><a class="headerlink" href="#set-resolver-self-resolver" title="Link to this heading"></a></h3>
 <p>Register a resolver applied to existing and future stores.</p>
 </section>
+<section id="set-id-resolver-self-resolver">
+<h3><code class="docutils literal notranslate"><span class="pre">set_id_resolver(self,</span> <span class="pre">resolver)</span></code><a class="headerlink" href="#set-id-resolver-self-resolver" title="Link to this heading"></a></h3>
+<p>Alias for :meth:<code class="docutils literal notranslate"><span class="pre">set_resolver</span></code> to improve readability.</p>
+</section>
+<section id="evict-idle-self">
+<h3><code class="docutils literal notranslate"><span class="pre">evict_idle(self)</span></code><a class="headerlink" href="#evict-idle-self" title="Link to this heading"></a></h3>
+<p>Serialize and evict stores idle longer than <code class="docutils literal notranslate"><span class="pre">max_idle_seconds</span></code>.</p>
+</section>
 <section id="run-maintenance-self">
 <h3><code class="docutils literal notranslate"><span class="pre">run_maintenance(self)</span></code><a class="headerlink" href="#run-maintenance-self" title="Link to this heading"></a></h3>
 <p>Run optional training and rebuild checks across managed stores.</p>

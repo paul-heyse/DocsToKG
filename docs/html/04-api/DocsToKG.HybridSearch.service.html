@@ -95,7 +95,8 @@ lambda_param: Trade-off between relevance and diversity (0.0-1.0).
 top_k: Maximum number of diversified candidates to retain.
 embeddings: Optional dense embedding matrix aligned with <code class="docutils literal notranslate"><span class="pre">fused_candidates</span></code>.
 device: GPU device id when leveraging FAISS GPU routines.
-resources: Optional FAISS GPU resources handle reused across calls.</p>
+resources: Optional FAISS GPU resources handle reused across calls.
+block_rows: Corpus rows processed per block when estimating diversity on GPU.</p>
 <p>Returns:
 List of diversified <code class="docutils literal notranslate"><span class="pre">FusionCandidate</span></code> objects.</p>
 </section>

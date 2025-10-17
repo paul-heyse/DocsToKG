@@ -408,8 +408,8 @@ def test_plan_all_honors_concurrent_plan_limit(monkeypatch: pytest.MonkeyPatch) 
     assert [plan.spec.id for plan in plans] == [spec.id for spec in specs]
 
 
-def test_plan_all_skips_failures_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
-    """plan_all should continue when continue_on_error is enabled."""
+def test_plan_all_aborts_on_first_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """plan_all cancels outstanding work when a resolver fails."""
 
     defaults = DefaultsConfig()
     defaults.http.concurrent_plans = 2
@@ -423,7 +423,7 @@ def test_plan_all_skips_failures_when_configured(monkeypatch: pytest.MonkeyPatch
 
     def fake_plan_one(spec, **_kwargs):
         if spec.id == "bad":
-            raise core.ResolverError("boom")
+            raise ResolverError("boom")
         return core.PlannedFetch(
             spec=spec,
             resolver="obo",
@@ -460,10 +460,11 @@ def test_plan_all_skips_failures_when_configured(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
     monkeypatch.setattr(core, "plan_one", fake_plan_one, raising=False)
 
-    plans = core.plan_all(specs, config=config)
+    with pytest.raises(core.BatchPlanningError) as excinfo:
+        core.plan_all(specs, config=config)
 
-    assert len(plans) == 1
-    assert plans[0].spec.id == "good"
+    assert excinfo.value.failed_spec.id == "bad"
+    assert [plan.spec.id for plan in excinfo.value.completed] == ["good"]
 
 
 def test_plan_all_since_filters_outdated_plans(monkeypatch: pytest.MonkeyPatch) -> None:

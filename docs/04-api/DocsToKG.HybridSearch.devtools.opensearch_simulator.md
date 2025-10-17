@@ -70,6 +70,10 @@ None
 Returns:
 Mapping of namespace names to template definitions.
 
+### `validate_namespace_schema(self, namespace)`
+
+Ensure required OpenSearch fields are present for ``namespace``.
+
 ### `bulk_upsert(self, chunks)`
 
 Insert or update ``chunks`` within the simulator.

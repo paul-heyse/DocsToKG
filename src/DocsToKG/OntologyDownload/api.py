@@ -4,21 +4,27 @@
 #   "purpose": "CLI entry points for ontology downloads",
 #   "sections": [
 #     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "function-main",
+#       "id": "validator-worker-main",
+#       "name": "validator_worker_main",
+#       "anchor": "function-validator-worker-main",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "describe-plugin",
-#       "name": "_describe_plugin",
-#       "anchor": "function-describe-plugin",
+#       "id": "validate-url-security",
+#       "name": "validate_url_security",
+#       "anchor": "function-validate-url-security",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "list-plugins",
 #       "name": "list_plugins",
 #       "anchor": "function-list-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-plugin-details",
+#       "name": "_collect_plugin_details",
+#       "anchor": "function-collect-plugin-details",
 #       "kind": "function"
 #     },
 #     {
@@ -304,7 +310,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
 from . import plugins as plugin_mod
-from .errors import ConfigurationError, DownloadFailure, OntologyDownloadError
+from .errors import ConfigurationError, DownloadFailure, OntologyDownloadError, PolicyError
 from .io import (
     RDF_MIME_ALIASES,
     DownloadResult,
@@ -315,13 +321,15 @@ from .io import (
     mask_sensitive_data,
     retry_with_backoff,
     sanitize_filename,
-    validate_url_security,
+    validate_url_security as _validate_url_security,
 )
 from .logging_utils import setup_logging
 from .planning import (
     MANIFEST_JSON_SCHEMA,
     MANIFEST_SCHEMA_VERSION,
     RESOLVERS,
+    BatchFetchError,
+    BatchPlanningError,
     FetchResult,
     FetchSpec,
     PlannedFetch,
@@ -395,16 +403,46 @@ LoggingConfig = LoggingConfiguration
 ValidationConfiguration = ValidationConfig
 
 
-def main() -> None:
-    """CLI entry point delegating to the validation worker."""
+def validator_worker_main() -> None:
+    """Entry point used by validator worker console scripts."""
 
     validation_main()
 
 
+def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
+    """Wrapper that normalizes PolicyError into ConfigError for the public API."""
+
+    try:
+        return _validate_url_security(url, http_config)
+    except PolicyError as exc:  # pragma: no cover - thin wrapper
+        raise ConfigError(str(exc)) from exc
+
+
+PUBLIC_API_MANIFEST: Dict[str, str] = {
+    "FetchSpec": "class",
+    "PlannedFetch": "class",
+    "FetchResult": "class",
+    "DownloadResult": "class",
+    "DownloadFailure": "class",
+    "OntologyDownloadError": "class",
+    "ValidationRequest": "class",
+    "ValidationResult": "class",
+    "ValidationTimeout": "class",
+    "ValidatorSubprocessError": "class",
+    "plan_all": "function",
+    "plan_one": "function",
+    "fetch_all": "function",
+    "fetch_one": "function",
+    "run_validators": "function",
+    "validate_manifest_dict": "function",
+    "__version__": "const",
+    "PUBLIC_API_MANIFEST": "const",
+}
+
 __all__ = [
     "FetchSpec",
-    "FetchResult",
     "PlannedFetch",
+    "FetchResult",
     "DownloadResult",
     "DownloadFailure",
     "OntologyDownloadError",
@@ -412,77 +450,17 @@ __all__ = [
     "ValidationResult",
     "ValidationTimeout",
     "ValidatorSubprocessError",
-    "ResolverCandidate",
-    "ResolvedConfig",
-    "ConfigError",
-    "ConfigurationError",
-    "DefaultsConfig",
-    "DownloadConfiguration",
-    "ValidationConfig",
-    "LoggingConfiguration",
-    "build_resolved_config",
-    "get_env_overrides",
-    "load_raw_yaml",
-    "merge_defaults",
-    "validate_config",
-    "CACHE_DIR",
-    "CONFIG_DIR",
-    "LOG_DIR",
-    "LOCAL_ONTOLOGY_DIR",
-    "STORAGE",
-    "RDF_MIME_ALIASES",
-    "MANIFEST_SCHEMA_VERSION",
-    "MANIFEST_JSON_SCHEMA",
-    "fetch_one",
-    "fetch_all",
-    "plan_one",
     "plan_all",
-    "_build_destination",
-    "download_stream",
-    "extract_archive_safe",
-    "validate_manifest_dict",
-    "validate_url_security",
+    "plan_one",
+    "fetch_all",
+    "fetch_one",
     "run_validators",
-    "normalize_streaming",
-    "validate_rdflib",
-    "validate_pronto",
-    "validate_owlready2",
-    "validate_robot",
-    "validate_arelle",
-    "main",
-    "parse_iso_datetime",
-    "parse_http_datetime",
-    "parse_version_timestamp",
-    "infer_version_timestamp",
-    "setup_logging",
-    "load_config",
-    "ensure_python_version",
-    "retry_with_backoff",
-    "sanitize_filename",
-    "generate_correlation_id",
-    "parse_rate_limit_to_rps",
-    "get_pystow",
-    "get_rdflib",
-    "get_pronto",
-    "get_owlready2",
-    "get_manifest_schema",
-    "mask_sensitive_data",
-    "list_plugins",
-    "about",
-    "format_table",
-    "format_plan_rows",
-    "format_results_table",
-    "format_validation_summary",
+    "validate_manifest_dict",
     "cli_main",
+    "validator_worker_main",
     "__version__",
-    "hashlib",
+    "PUBLIC_API_MANIFEST",
 ]
-
-
-def _describe_plugin(obj: object) -> str:
-    module = getattr(obj, "__module__", obj.__class__.__module__)
-    name = getattr(obj, "__qualname__", obj.__class__.__name__)
-    return f"{module}.{name}"
 
 
 def list_plugins(kind: str) -> Dict[str, str]:
@@ -495,13 +473,10 @@ def list_plugins(kind: str) -> Dict[str, str]:
         Mapping of plugin names to import-qualified identifiers.
     """
 
-    if kind == "resolver":
-        items = {name: _describe_plugin(resolver) for name, resolver in RESOLVERS.items()}
-    elif kind == "validator":
-        items = {name: _describe_plugin(handler) for name, handler in VALIDATORS.items()}
-    else:
-        raise ValueError(f"Unknown plugin kind: {kind}")
-    return OrderedDict(sorted(items.items()))
+    try:
+        return plugin_mod.list_registered_plugins(kind)
+    except ValueError as exc:  # pragma: no cover - defensive
+        raise ValueError(f"Unknown plugin kind: {kind}") from exc
 
 
 def _collect_plugin_details(kind: str) -> "OrderedDict[str, Dict[str, str]]":
@@ -538,6 +513,49 @@ def _collect_plugin_details(kind: str) -> "OrderedDict[str, Dict[str, str]]":
 
 def about() -> Dict[str, object]:
     """Return metadata describing the ontology download subsystem."""
+    config = ResolvedConfig.from_defaults()
+    defaults = config.defaults
+
+    logging_cfg = defaults.logging
+    http_cfg = defaults.http
+    validation_cfg = defaults.validation
+
+    config_summary = {
+        "logging": {
+            "level": logging_cfg.level,
+            "retention_days": logging_cfg.retention_days,
+            "max_log_size_mb": logging_cfg.max_log_size_mb,
+        },
+        "http": {
+            "timeout_sec": http_cfg.timeout_sec,
+            "download_timeout_sec": http_cfg.download_timeout_sec,
+            "max_retries": http_cfg.max_retries,
+            "concurrent_plans": http_cfg.concurrent_plans,
+            "concurrent_downloads": http_cfg.concurrent_downloads,
+            "strict_dns": http_cfg.strict_dns,
+        },
+        "validation": {
+            "parser_timeout_sec": validation_cfg.parser_timeout_sec,
+            "max_concurrent_validators": validation_cfg.max_concurrent_validators,
+            "use_process_pool": validation_cfg.use_process_pool,
+        },
+    }
+
+    rate_limits = {
+        "per_host": http_cfg.per_host_rate_limit,
+        "services": dict(http_cfg.rate_limits),
+    }
+
+    storage_backend = STORAGE
+    storage_info: Dict[str, object] = {
+        "backend": type(storage_backend).__name__,
+    }
+    local_root = getattr(storage_backend, "root", None)
+    if isinstance(local_root, Path):
+        storage_info["local_root"] = str(local_root)
+    remote_root = getattr(storage_backend, "base_path", None)
+    if remote_root is not None:
+        storage_info["remote_root"] = str(remote_root)
 
     return {
         "package_version": _PACKAGE_VERSION,
@@ -546,6 +564,14 @@ def about() -> Dict[str, object]:
             "resolver": list_plugins("resolver"),
             "validator": list_plugins("validator"),
         },
+        "config": config_summary,
+        "rate_limits": rate_limits,
+        "paths": {
+            "cache_dir": str(CACHE_DIR),
+            "log_dir": str(LOG_DIR),
+            "ontology_dir": str(LOCAL_ONTOLOGY_DIR),
+        },
+        "storage": storage_info,
     }
 
 
@@ -825,7 +851,29 @@ def format_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
     return "\n".join(lines)
 
 
-def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[Tuple[str, str, str, str, str]]:
+
+PlanRow = Tuple[str, str, str, str, str, str, str, str]
+PLAN_TABLE_HEADERS: Tuple[str, ...] = (
+    "id",
+    "resolver",
+    "service",
+    "media_type",
+    "version",
+    "license",
+    "expected_checksum",
+    "url",
+)
+RESULT_TABLE_HEADERS: Tuple[str, ...] = (
+    "id",
+    "resolver",
+    "status",
+    "sha256",
+    "expected_checksum",
+    "file",
+)
+
+
+def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[PlanRow]:
     """Convert planner output into rows for table rendering.
 
     Args:
@@ -835,14 +883,25 @@ def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[Tuple[str, str, str,
         List of tuples suitable for :func:`format_table`.
     """
 
-    rows: List[Tuple[str, str, str, str, str]] = []
+    rows: List[PlanRow] = []
     for plan in plans:
+        expected_checksum = ""
+        checksum = plan.metadata.get("expected_checksum")
+        if isinstance(checksum, dict):
+            algorithm = checksum.get("algorithm")
+            value = checksum.get("value")
+            if isinstance(algorithm, str) and isinstance(value, str):
+                expected_checksum = f"{algorithm}:{value[:12]}…" if len(value) > 12 else f"{algorithm}:{value}"
+
         rows.append(
             (
                 plan.spec.id,
                 plan.resolver,
                 plan.plan.service or "",
                 plan.plan.media_type or "",
+                plan.plan.version or "",
+                plan.plan.license or "",
+                expected_checksum,
                 plan.plan.url,
             )
         )
@@ -859,17 +918,34 @@ def format_results_table(results: Iterable[FetchResult]) -> str:
         Formatted table summarizing ontology downloads.
     """
 
-    rows = [
-        (
-            result.spec.id,
-            result.spec.resolver,
-            result.status,
-            result.sha256,
-            str(result.local_path),
+    rows = []
+    for result in results:
+        checksum_text = ""
+        checksum_obj = getattr(result, "expected_checksum", None)
+        if checksum_obj is not None:
+            checksum_text = checksum_obj.to_known_hash()
+            if ":" in checksum_text:
+                algo, value = checksum_text.split(":", 1)
+                checksum_text = f"{algo}:{value[:12]}…" if len(value) > 12 else checksum_text
+        else:
+            extras = result.spec.extras if isinstance(result.spec.extras, dict) else {}
+            checksum = extras.get("expected_checksum") if isinstance(extras, dict) else None
+            if isinstance(checksum, dict):
+                algo = checksum.get("algorithm")
+                value = checksum.get("value")
+                if isinstance(algo, str) and isinstance(value, str):
+                    checksum_text = f"{algo}:{value[:12]}…" if len(value) > 12 else f"{algo}:{value}"
+        rows.append(
+            (
+                result.spec.id,
+                result.spec.resolver,
+                result.status,
+                result.sha256,
+                checksum_text,
+                str(result.local_path),
+            )
         )
-        for result in results
-    ]
-    return format_table(("id", "resolver", "status", "sha256", "file"), rows)
+    return format_table(RESULT_TABLE_HEADERS, rows)
 
 
 def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
@@ -1346,6 +1422,9 @@ def _results_to_dict(result: FetchResult) -> dict:
         "sha256": result.sha256,
         "manifest": str(result.manifest_path),
         "artifacts": list(result.artifacts),
+        "expected_checksum": result.expected_checksum.to_mapping()
+        if getattr(result, "expected_checksum", None)
+        else None,
     }
 
 
@@ -2521,12 +2600,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                 else:
                     if plans:
                         rows = format_plan_rows(plans)
-                        print(
-                            format_table(
-                                ("id", "resolver", "service", "media_type", "url"),
-                                rows,
-                            )
-                        )
+                        print(format_table(PLAN_TABLE_HEADERS, rows))
                     else:
                         print("No ontologies to process")
             else:
@@ -2558,12 +2632,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
             else:
                 if plans:
                     rows = format_plan_rows(plans)
-                    print(
-                        format_table(
-                            ("id", "resolver", "service", "media_type", "url"),
-                            rows,
-                        )
-                    )
+                    print(format_table(PLAN_TABLE_HEADERS, rows))
                 else:
                     print("No ontologies to process")
         elif args.command == "plan-diff":

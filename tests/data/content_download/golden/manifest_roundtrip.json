@@ -1,0 +1,70 @@
+{
+  "jsonl": {
+    "classification": "pdf",
+    "content_length": 12345,
+    "content_type": "application/pdf",
+    "dry_run": false,
+    "etag": "\"etag\"",
+    "extracted_text_path": "/tmp/paper.txt",
+    "html_paths": [
+      "/tmp/paper.html"
+    ],
+    "last_modified": "Wed, 01 Jan 2025 00:00:00 GMT",
+    "path": "/tmp/paper.pdf",
+    "publication_year": 2024,
+    "reason": null,
+    "reason_detail": null,
+    "record_type": "manifest",
+    "resolver": "contract-resolver",
+    "run_id": "run-contract",
+    "schema_version": 2,
+    "sha256": "deadbeefcafebabe",
+    "timestamp": "2025-01-01T00:00:00Z",
+    "title": "Contract Test Work",
+    "url": "https://pub.example/paper.pdf",
+    "work_id": "W-contract"
+  },
+  "per_work": {
+    "W-contract": {
+      "https://pub.example/paper.pdf": {
+        "classification": "pdf",
+        "content_length": 12345,
+        "content_type": "application/pdf",
+        "dry_run": false,
+        "etag": "\"etag\"",
+        "extracted_text_path": "/tmp/paper.txt",
+        "html_paths": [
+          "/tmp/paper.html"
+        ],
+        "last_modified": "Wed, 01 Jan 2025 00:00:00 GMT",
+        "path": "/tmp/paper.pdf",
+        "publication_year": 2024,
+        "reason": null,
+        "reason_detail": null,
+        "record_type": "manifest",
+        "resolver": "contract-resolver",
+        "run_id": "run-contract",
+        "schema_version": 2,
+        "sha256": "deadbeefcafebabe",
+        "timestamp": "2025-01-01T00:00:00Z",
+        "title": "Contract Test Work",
+        "url": "https://pub.example/paper.pdf",
+        "work_id": "W-contract"
+      }
+    }
+  },
+  "completed": [
+    "W-contract"
+  ],
+  "sqlite": {
+    "https://pub.example/paper.pdf": {
+      "classification": "pdf",
+      "content_length": 12345,
+      "etag": "\"etag\"",
+      "last_modified": "Wed, 01 Jan 2025 00:00:00 GMT",
+      "path": "/tmp/paper.pdf",
+      "sha256": "deadbeefcafebabe",
+      "url": "https://pub.example/paper.pdf"
+    }
+  }
+}

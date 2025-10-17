@@ -240,9 +240,10 @@ Iterable yielding the same work payload dictionaries for convenience.</p>
 </section>
 <section id="process-one-work-work-session-pdf-dir-html-dir-pipeline-logger-metrics">
 <h3><code class="docutils literal notranslate"><span class="pre">process_one_work(work,</span> <span class="pre">session,</span> <span class="pre">pdf_dir,</span> <span class="pre">html_dir,</span> <span class="pre">pipeline,</span> <span class="pre">logger,</span> <span class="pre">metrics)</span></code><a class="headerlink" href="#process-one-work-work-session-pdf-dir-html-dir-pipeline-logger-metrics" title="Link to this heading"></a></h3>
-<p>Process a single OpenAlex work through the resolver pipeline.</p>
+<p>Process a single work artifact through the resolver pipeline.</p>
 <p>Args:
-work: OpenAlex work payload from :func:<code class="docutils literal notranslate"><span class="pre">iterate_openalex</span></code>.
+work: Either a preconstructed :class:<code class="docutils literal notranslate"><span class="pre">WorkArtifact</span></code> or a raw OpenAlex
+work payload. Raw payloads are normalised via :func:<code class="docutils literal notranslate"><span class="pre">create_artifact</span></code>.
 session: Requests session configured for resolver usage.
 pdf_dir: Directory where PDF artefacts are written.
 html_dir: Directory where HTML artefacts are written.

@@ -105,7 +105,7 @@ The default tokenizer (<code class="docutils literal notranslate"><span class="p
 embedder used by the embeddings pipeline. When experimenting with other
 tokenizers (for example, legacy BERT models), run the calibration utility
 beforehand to understand token count deltas::</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>    python scripts/calibrate_tokenizers.py --doctags-dir Data/DocTagsFiles
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>    python -m DocsToKG.DocParsing.token_profiles --doctags-dir Data/DocTagsFiles
 
 The calibration script reports relative token ratios and recommends
 adjustments to ``--min-tokens`` so chunk sizes remain compatible with the
@@ -252,6 +252,10 @@ testing or orchestration.</p>
 <p>Returns:
 int: Exit code where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
 </section>
+<section id="run-validate-only">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_validate_only()</span></code><a class="headerlink" href="#run-validate-only" title="Link to this heading"></a></h3>
+<p>Validate chunk inputs and report statistics without writing outputs.</p>
+</section>
 <section id="from-env-cls-defaults">
 <h3><code class="docutils literal notranslate"><span class="pre">from_env(cls,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#from-env-cls-defaults" title="Link to this heading"></a></h3>
 <p>Instantiate configuration derived solely from environment variables.</p>
@@ -270,11 +274,11 @@ int: Exit code where <code class="docutils literal notranslate"><span class="pre
 </section>
 <section id="normalise-meta-payload-doc-item">
 <h3><code class="docutils literal notranslate"><span class="pre">_normalise_meta(payload,</span> <span class="pre">doc_item)</span></code><a class="headerlink" href="#normalise-meta-payload-doc-item" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Convert DocTags picture metadata into detached dictionaries safe for JSON.</p>
 </section>
 <section id="collect-source">
 <h3><code class="docutils literal notranslate"><span class="pre">_collect(source)</span></code><a class="headerlink" href="#collect-source" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Harvest integer attributes from <code class="docutils literal notranslate"><span class="pre">source</span></code> and add them to <code class="docutils literal notranslate"><span class="pre">candidates</span></code>.</p>
 </section>
 <section id="is-small-idx">
 <h3><code class="docutils literal notranslate"><span class="pre">is_small(idx)</span></code><a class="headerlink" href="#is-small-idx" title="Link to this heading"></a></h3>

@@ -4,12 +4,6 @@
 #   "purpose": "Typed payloads and request/response contracts",
 #   "sections": [
 #     {
-#       "id": "vector-uuid-to-faiss-int",
-#       "name": "vector_uuid_to_faiss_int",
-#       "anchor": "function-vector-uuid-to-faiss-int",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "documentinput",
 #       "name": "DocumentInput",
 #       "anchor": "class-documentinput",

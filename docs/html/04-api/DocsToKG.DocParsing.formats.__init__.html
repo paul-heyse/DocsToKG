@@ -138,9 +138,9 @@ chunk.schema_version
 </div></blockquote>
 </div></blockquote>
 </section>
-<section id="validate-vector-row-row">
-<h3><code class="docutils literal notranslate"><span class="pre">validate_vector_row(row)</span></code><a class="headerlink" href="#validate-vector-row-row" title="Link to this heading"></a></h3>
-<p>Validate and parse a vector JSONL row.</p>
+<section id="pydantic-validate-vector-row-row">
+<h3><code class="docutils literal notranslate"><span class="pre">_pydantic_validate_vector_row(row)</span></code><a class="headerlink" href="#pydantic-validate-vector-row-row" title="Link to this heading"></a></h3>
+<p>Validate and parse a vector JSONL row using Pydantic models.</p>
 <p>Args:
 row: Raw dictionary from JSONL.</p>
 <p>Returns:
@@ -163,6 +163,10 @@ vector.UUID
 </div></blockquote>
 </div></blockquote>
 </section>
+<section id="validate-vector-row-row">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_vector_row(row)</span></code><a class="headerlink" href="#validate-vector-row-row" title="Link to this heading"></a></h3>
+<p>Wrap :func:<code class="docutils literal notranslate"><span class="pre">DocParsing.schemas.validate_vector_row</span></code> for backward compatibility.</p>
+</section>
 <section id="get-docling-version">
 <h3><code class="docutils literal notranslate"><span class="pre">get_docling_version()</span></code><a class="headerlink" href="#get-docling-version" title="Link to this heading"></a></h3>
 <p>Detect installed Docling package version.</p>
@@ -181,28 +185,6 @@ True</p>
 </div></blockquote>
 <p>Raises:
 None: This helper does not raise exceptions.</p>
-</section>
-<section id="validate-schema-version-version-compatible-versions">
-<h3><code class="docutils literal notranslate"><span class="pre">validate_schema_version(version,</span> <span class="pre">compatible_versions)</span></code><a class="headerlink" href="#validate-schema-version-version-compatible-versions" title="Link to this heading"></a></h3>
-<p>Ensure a schema version string is recognised.</p>
-<p>Args:
-version: Schema version string from a JSONL row.
-compatible_versions: List of accepted version identifiers.
-kind: Human-readable label describing the schema type.
-source: Optional context describing where the version originated.</p>
-<p>Returns:
-The validated schema version.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>validate_schema_version(“docparse/1.1.0”, COMPATIBLE_CHUNK_VERSIONS)
-‘docparse/1.1.0’</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-<p>Raises:
-ValueError: If the schema version is missing or unsupported.</p>
 </section>
 <section id="validate-parse-engine-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_parse_engine(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-parse-engine-cls-value" title="Link to this heading"></a></h3>
@@ -363,7 +345,7 @@ Dictionary containing the supplied configuration data.</p>
 </section>
 <section id="maybe-float-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_maybe_float(value)</span></code><a class="headerlink" href="#maybe-float-value" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Convert <code class="docutils literal notranslate"><span class="pre">value</span></code> to <code class="docutils literal notranslate"><span class="pre">float</span></code> when possible, otherwise return <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 </section>
 <section id="model-dump-self">
 <h3><code class="docutils literal notranslate"><span class="pre">model_dump(self)</span></code><a class="headerlink" href="#model-dump-self" title="Link to this heading"></a></h3>

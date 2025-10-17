@@ -70,6 +70,18 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "resolverevent",
+#       "name": "ResolverEvent",
+#       "anchor": "class-resolverevent",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolvereventreason",
+#       "name": "ResolverEventReason",
+#       "anchor": "class-resolvereventreason",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "resolver",
 #       "name": "Resolver",
 #       "anchor": "class-resolver",
@@ -310,6 +322,7 @@ import time as _time
 import warnings
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
+from enum import Enum
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -329,6 +342,7 @@ from typing import (
     Set,
     Tuple,
     Type,
+    Union,
 )
 from urllib.parse import quote, urljoin, urlparse, urlsplit
 
@@ -348,7 +362,7 @@ from DocsToKG.ContentDownload.core import (
     parse_size,
     strip_prefix,
 )
-from DocsToKG.ContentDownload.network import (
+from DocsToKG.ContentDownload.networking import (
     CircuitBreaker,
     TokenBucket,
     head_precheck,
@@ -404,6 +418,8 @@ __all__ = [
     "ResolverPipeline",
     "ResolverRegistry",
     "ResolverResult",
+    "ResolverEvent",
+    "ResolverEventReason",
     "RegisteredResolver",
     "apply_config_overrides",
     "default_resolvers",
@@ -433,9 +449,15 @@ class ResolverResult:
     url: Optional[str]
     referer: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    event: Optional[str] = None
-    event_reason: Optional[str] = None
+    event: Optional[ResolverEvent] = None
+    event_reason: Optional[ResolverEventReason] = None
     http_status: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        if self.event is not None and not isinstance(self.event, ResolverEvent):
+            self.event = ResolverEvent.from_wire(self.event)
+        if self.event_reason is not None and not isinstance(self.event_reason, ResolverEventReason):
+            self.event_reason = ResolverEventReason.from_wire(self.event_reason)
 
     @property
     def is_event(self) -> bool:
@@ -1195,6 +1217,68 @@ class PipelineResult:
             self.reason = self.reason.value.replace("_", "-")
 
 
+class ResolverEvent(Enum):
+    """Canonical resolver event categories emitted via :class:`ResolverResult`."""
+
+    ERROR = "error"
+    SKIPPED = "skipped"
+    INFO = "info"
+
+    @classmethod
+    def from_wire(cls, value: Union[str, "ResolverEvent", None]) -> Optional["ResolverEvent"]:
+        """Coerce serialized event values into :class:`ResolverEvent` members."""
+
+        if value is None:
+            return None
+        if isinstance(value, cls):
+            return value
+        text = str(value).strip().lower()
+        if not text:
+            return None
+        for member in cls:
+            if member.value == text:
+                return member
+        raise ValueError(f"Unknown resolver event '{value}'")
+
+
+class ResolverEventReason(Enum):
+    """Structured reason taxonomy for resolver events."""
+
+    CONNECTION_ERROR = "connection-error"
+    HTTP_ERROR = "http-error"
+    JSON_ERROR = "json-error"
+    REQUEST_ERROR = "request-error"
+    UNEXPECTED_ERROR = "unexpected-error"
+    TIMEOUT = "timeout"
+    NO_ARXIV_ID = "no-arxiv-id"
+    NO_DOI = "no-doi"
+    NO_BEAUTIFULSOUP = "no-beautifulsoup"
+    NO_FAILED_URLS = "no-failed-urls"
+    NO_OPENACCESS_PDF = "no-openaccess-pdf"
+    NO_OPENALEX_URLS = "no-openalex-urls"
+    NO_PMCID = "no-pmcid"
+    RESOLVER_EXCEPTION = "resolver-exception"
+    RATE_LIMIT = "rate-limit"
+    NOT_APPLICABLE = "not-applicable"
+
+    @classmethod
+    def from_wire(
+        cls, value: Union[str, "ResolverEventReason", None]
+    ) -> Optional["ResolverEventReason"]:
+        """Coerce serialized reason values into :class:`ResolverEventReason` members."""
+
+        if value is None:
+            return None
+        if isinstance(value, cls):
+            return value
+        text = str(value).strip().lower()
+        if not text:
+            return None
+        for member in cls:
+            if member.value == text:
+                return member
+        raise ValueError(f"Unknown resolver event reason '{value}'")
+
 class Resolver(Protocol):
     """Protocol that resolver implementations must follow.
 
@@ -1604,8 +1688,8 @@ class ApiResolverBase(RegisteredResolver, register=False):
                 None,
                 ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="timeout",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.TIMEOUT,
                     metadata={
                         "url": url,
                         "timeout": timeout_value,
@@ -1618,8 +1702,8 @@ class ApiResolverBase(RegisteredResolver, register=False):
                 None,
                 ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="connection-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.CONNECTION_ERROR,
                     metadata={"url": url, "error": str(exc)},
                 ),
             )
@@ -1628,8 +1712,8 @@ class ApiResolverBase(RegisteredResolver, register=False):
                 None,
                 ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="request-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.REQUEST_ERROR,
                     metadata={"url": url, "error": str(exc)},
                 ),
             )
@@ -1639,8 +1723,8 @@ class ApiResolverBase(RegisteredResolver, register=False):
                 None,
                 ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="unexpected-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.UNEXPECTED_ERROR,
                     metadata={
                         "url": url,
                         "error": str(exc),
@@ -1655,8 +1739,8 @@ class ApiResolverBase(RegisteredResolver, register=False):
                     None,
                     ResolverResult(
                         url=None,
-                        event="error",
-                        event_reason="http-error",
+                        event=ResolverEvent.ERROR,
+                        event_reason=ResolverEventReason.HTTP_ERROR,
                         http_status=response.status_code,
                         metadata={
                             "url": url,
@@ -1671,8 +1755,8 @@ class ApiResolverBase(RegisteredResolver, register=False):
                 None,
                 ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="json-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.JSON_ERROR,
                     metadata={
                         "url": url,
                         "error_detail": str(json_err),
@@ -1837,7 +1921,7 @@ class ArxivResolver(RegisteredResolver):
         """
         arxiv_id = artifact.arxiv_id
         if not arxiv_id:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-arxiv-id")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_ARXIV_ID)
             return
         arxiv_id = strip_prefix(arxiv_id, "arxiv:")
         yield ResolverResult(
@@ -1890,7 +1974,7 @@ class CoreResolver(ApiResolverBase):
         """
         doi = normalize_doi(artifact.doi)
         if not doi:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_DOI)
             return
         headers = {"Authorization": f"Bearer {config.core_api_key}"}
         data, error = self._request_json(
@@ -1962,7 +2046,7 @@ class CrossrefResolver(ApiResolverBase):
         """
         doi = normalize_doi(artifact.doi)
         if not doi:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_DOI)
             return
         email = config.mailto or config.unpaywall_email
         params = {"mailto": email} if email else None
@@ -2043,7 +2127,7 @@ class DoajResolver(ApiResolverBase):
         """
         doi = normalize_doi(artifact.doi)
         if not doi:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_DOI)
             return
         extra_headers: Dict[str, str] = {}
         if config.doaj_api_key:
@@ -2115,7 +2199,7 @@ class EuropePmcResolver(ApiResolverBase):
         """
         doi = normalize_doi(artifact.doi)
         if not doi:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_DOI)
             return
         data, error = self._request_json(
             session,
@@ -2125,7 +2209,7 @@ class EuropePmcResolver(ApiResolverBase):
             params={"query": f'DOI:"{doi}"', "format": "json", "pageSize": 3},
         )
         if error:
-            if error.event_reason == "http-error":
+            if error.event_reason is ResolverEventReason.HTTP_ERROR:
                 return
             yield error
             return
@@ -2188,7 +2272,7 @@ class FigshareResolver(ApiResolverBase):
         """
         doi = normalize_doi(artifact.doi)
         if not doi:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_DOI)
             return
 
         extra_headers = {"Content-Type": "application/json"}
@@ -2282,7 +2366,7 @@ class HalResolver(ApiResolverBase):
         """
         doi = normalize_doi(artifact.doi)
         if not doi:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_DOI)
             return
         data, error = self._request_json(
             session,
@@ -2354,7 +2438,7 @@ class LandingPageResolver(RegisteredResolver):
             Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
         """
         if BeautifulSoup is None:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-beautifulsoup")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_BEAUTIFULSOUP)
             return
         for landing in artifact.landing_urls:
             try:
@@ -2368,8 +2452,8 @@ class LandingPageResolver(RegisteredResolver):
             except _requests.Timeout as exc:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="timeout",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.TIMEOUT,
                     metadata={
                         "landing": landing,
                         "timeout": config.get_timeout(self.name),
@@ -2380,16 +2464,16 @@ class LandingPageResolver(RegisteredResolver):
             except _requests.ConnectionError as exc:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="connection-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.CONNECTION_ERROR,
                     metadata={"landing": landing, "error": str(exc)},
                 )
                 continue
             except _requests.RequestException as exc:  # pragma: no cover - network errors
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="request-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.REQUEST_ERROR,
                     metadata={"landing": landing, "error": str(exc)},
                 )
                 continue
@@ -2397,8 +2481,8 @@ class LandingPageResolver(RegisteredResolver):
                 LOGGER.exception("Unexpected error scraping landing page")
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="unexpected-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.UNEXPECTED_ERROR,
                     metadata={
                         "landing": landing,
                         "error": str(exc),
@@ -2410,8 +2494,8 @@ class LandingPageResolver(RegisteredResolver):
             if resp.status_code != 200:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="http-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.HTTP_ERROR,
                     http_status=resp.status_code,
                     metadata={
                         "landing": landing,
@@ -2479,7 +2563,7 @@ class OpenAireResolver(RegisteredResolver):
         """
         doi = normalize_doi(artifact.doi)
         if not doi:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_DOI)
             return
         try:
             resp = request_with_retries(
@@ -2493,24 +2577,24 @@ class OpenAireResolver(RegisteredResolver):
         except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="timeout",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.TIMEOUT,
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
         except _requests.ConnectionError as exc:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="connection-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.CONNECTION_ERROR,
                 metadata={"error": str(exc)},
             )
             return
         except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="request-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.REQUEST_ERROR,
                 metadata={"error": str(exc)},
             )
             return
@@ -2518,16 +2602,16 @@ class OpenAireResolver(RegisteredResolver):
             LOGGER.exception("Unexpected error in OpenAIRE resolver")
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="unexpected-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.UNEXPECTED_ERROR,
                 metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
         if resp.status_code != 200:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="http-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.HTTP_ERROR,
                 http_status=resp.status_code,
                 metadata={"error_detail": f"OpenAIRE API returned {resp.status_code}"},
             )
@@ -2541,8 +2625,8 @@ class OpenAireResolver(RegisteredResolver):
                 preview = resp.text[:200] if hasattr(resp, "text") else ""
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="json-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.JSON_ERROR,
                     metadata={"error_detail": str(json_err), "content_preview": preview},
                 )
                 return
@@ -2550,8 +2634,8 @@ class OpenAireResolver(RegisteredResolver):
             LOGGER.exception("Unexpected JSON error in OpenAIRE resolver")
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="unexpected-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.UNEXPECTED_ERROR,
                 metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
@@ -2608,7 +2692,7 @@ class OpenAlexResolver(RegisteredResolver):
             candidates.append(artifact.open_access_url)
 
         if not candidates:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-openalex-urls")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_OPENALEX_URLS)
             return
 
         for url in dedupe(candidates):
@@ -2660,7 +2744,7 @@ class OsfResolver(ApiResolverBase):
         """
         doi = normalize_doi(artifact.doi)
         if not doi:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_DOI)
             return
         data, error = self._request_json(
             session,
@@ -2791,7 +2875,7 @@ class PmcResolver(RegisteredResolver):
             pmcids.extend(self._lookup_pmcids(session, identifiers, config))
 
         if not pmcids:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-pmcid")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_PMCID)
             return
 
         for pmcid in dedupe(pmcids):
@@ -2808,8 +2892,8 @@ class PmcResolver(RegisteredResolver):
             except _requests.Timeout as exc:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="timeout",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.TIMEOUT,
                     metadata={
                         "pmcid": pmcid,
                         "timeout": config.get_timeout(self.name),
@@ -2824,8 +2908,8 @@ class PmcResolver(RegisteredResolver):
             except _requests.ConnectionError as exc:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="connection-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.CONNECTION_ERROR,
                     metadata={"pmcid": pmcid, "error": str(exc)},
                 )
                 yield ResolverResult(
@@ -2836,8 +2920,8 @@ class PmcResolver(RegisteredResolver):
             except _requests.RequestException as exc:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="request-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.REQUEST_ERROR,
                     metadata={"pmcid": pmcid, "error": str(exc)},
                 )
                 yield ResolverResult(
@@ -2849,8 +2933,8 @@ class PmcResolver(RegisteredResolver):
                 LOGGER.exception("Unexpected PMC OA lookup error")
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="unexpected-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.UNEXPECTED_ERROR,
                     metadata={"pmcid": pmcid, "error": str(exc), "error_type": type(exc).__name__},
                 )
                 yield ResolverResult(
@@ -2861,8 +2945,8 @@ class PmcResolver(RegisteredResolver):
             if resp.status_code != 200:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="http-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.HTTP_ERROR,
                     http_status=resp.status_code,
                     metadata={
                         "pmcid": pmcid,
@@ -2962,23 +3046,23 @@ class SemanticScholarResolver(RegisteredResolver):
         """
         doi = normalize_doi(artifact.doi)
         if not doi:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_DOI)
             return
         try:
             data = _fetch_semantic_scholar_data(session, config, doi)
         except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="timeout",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.TIMEOUT,
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
         except _requests.ConnectionError as exc:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="connection-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.CONNECTION_ERROR,
                 metadata={"error": str(exc)},
             )
             return
@@ -2993,8 +3077,8 @@ class SemanticScholarResolver(RegisteredResolver):
                     status = int(match.group(1))
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="http-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.HTTP_ERROR,
                 http_status=status,
                 metadata={"error_detail": str(exc)},
             )
@@ -3002,16 +3086,16 @@ class SemanticScholarResolver(RegisteredResolver):
         except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="request-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.REQUEST_ERROR,
                 metadata={"error": str(exc)},
             )
             return
         except ValueError as exc:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="json-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.JSON_ERROR,
                 metadata={"error_detail": str(exc)},
             )
             return
@@ -3019,8 +3103,8 @@ class SemanticScholarResolver(RegisteredResolver):
             LOGGER.exception("Unexpected Semantic Scholar resolver error")
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="unexpected-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.UNEXPECTED_ERROR,
                 metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
@@ -3032,8 +3116,8 @@ class SemanticScholarResolver(RegisteredResolver):
         else:
             yield ResolverResult(
                 url=None,
-                event="skipped",
-                event_reason="no-openaccess-pdf",
+                event=ResolverEvent.SKIPPED,
+                event_reason=ResolverEventReason.NO_OPENACCESS_PDF,
                 metadata={"doi": doi},
             )
 
@@ -3081,23 +3165,23 @@ class UnpaywallResolver(RegisteredResolver):
         """
         doi = normalize_doi(artifact.doi)
         if not doi:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_DOI)
             return
         try:
             data = _fetch_unpaywall_data(session, config, doi)
         except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="timeout",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.TIMEOUT,
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
         except _requests.ConnectionError as exc:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="connection-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.CONNECTION_ERROR,
                 metadata={"error": str(exc)},
             )
             return
@@ -3112,8 +3196,8 @@ class UnpaywallResolver(RegisteredResolver):
                     status = int(match.group(1))
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="http-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.HTTP_ERROR,
                 http_status=status,
                 metadata={"error_detail": str(exc)},
             )
@@ -3121,16 +3205,16 @@ class UnpaywallResolver(RegisteredResolver):
         except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="request-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.REQUEST_ERROR,
                 metadata={"error": str(exc)},
             )
             return
         except ValueError as json_err:
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="json-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.JSON_ERROR,
                 metadata={"error_detail": str(json_err)},
             )
             return
@@ -3138,8 +3222,8 @@ class UnpaywallResolver(RegisteredResolver):
             LOGGER.exception("Unexpected error in Unpaywall resolver session path")
             yield ResolverResult(
                 url=None,
-                event="error",
-                event_reason="unexpected-error",
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.UNEXPECTED_ERROR,
                 metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
@@ -3207,7 +3291,7 @@ class WaybackResolver(RegisteredResolver):
             Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
         """
         if not artifact.failed_pdf_urls:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-failed-urls")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_FAILED_URLS)
             return
 
         for original in artifact.failed_pdf_urls:
@@ -3223,8 +3307,8 @@ class WaybackResolver(RegisteredResolver):
             except _requests.Timeout as exc:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="timeout",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.TIMEOUT,
                     metadata={
                         "original": original,
                         "timeout": config.get_timeout(self.name),
@@ -3235,16 +3319,16 @@ class WaybackResolver(RegisteredResolver):
             except _requests.ConnectionError as exc:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="connection-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.CONNECTION_ERROR,
                     metadata={"original": original, "error": str(exc)},
                 )
                 continue
             except _requests.RequestException as exc:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="request-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.REQUEST_ERROR,
                     metadata={"original": original, "error": str(exc)},
                 )
                 continue
@@ -3252,8 +3336,8 @@ class WaybackResolver(RegisteredResolver):
                 LOGGER.exception("Unexpected Wayback resolver error")
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="unexpected-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.UNEXPECTED_ERROR,
                     metadata={
                         "original": original,
                         "error": str(exc),
@@ -3264,8 +3348,8 @@ class WaybackResolver(RegisteredResolver):
             if resp.status_code != 200:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="http-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.HTTP_ERROR,
                     http_status=resp.status_code,
                     metadata={
                         "original": original,
@@ -3278,8 +3362,8 @@ class WaybackResolver(RegisteredResolver):
             except ValueError as json_err:
                 yield ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="json-error",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.JSON_ERROR,
                     metadata={"original": original, "error_detail": str(json_err)},
                 )
                 continue
@@ -3335,7 +3419,7 @@ class ZenodoResolver(ApiResolverBase):
         """
         doi = normalize_doi(artifact.doi)
         if not doi:
-            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            yield ResolverResult(url=None, event=ResolverEvent.SKIPPED, event_reason=ResolverEventReason.NO_DOI)
             return
 
         data, error = self._request_json(
@@ -3346,8 +3430,8 @@ class ZenodoResolver(ApiResolverBase):
             params={"q": f'doi:"{doi}"', "size": 3, "sort": "mostrecent"},
         )
         if error:
-            if error.event_reason == "connection-error":
-                error.event_reason = "request-error"
+            if error.event_reason is ResolverEventReason.CONNECTION_ERROR:
+                error.event_reason = ResolverEventReason.REQUEST_ERROR
             yield error
             return
 
@@ -3573,6 +3657,13 @@ class ResolverPipeline:
 
         if record.run_id is None and self._run_id is not None:
             record = replace(record, run_id=self._run_id)
+
+        if isinstance(record.reason, ReasonCode):
+            reason_text = record.reason.value.replace("_", "-")
+            record = replace(record, reason=reason_text)
+        if isinstance(record.reason_detail, ReasonCode):
+            detail_text = record.reason_detail.value.replace("_", "-")
+            record = replace(record, reason_detail=detail_text)
 
         if not hasattr(self.logger, "log_attempt") or not callable(
             getattr(self.logger, "log_attempt")
@@ -4019,8 +4110,8 @@ class ResolverPipeline:
                         results = [
                             ResolverResult(
                                 url=None,
-                                event="error",
-                                event_reason="resolver-exception",
+                                event=ResolverEvent.ERROR,
+                                event_reason=ResolverEventReason.RESOLVER_EXCEPTION,
                                 metadata={"message": str(exc)},
                             )
                         ]
@@ -4185,8 +4276,8 @@ class ResolverPipeline:
             results.append(
                 ResolverResult(
                     url=None,
-                    event="error",
-                    event_reason="resolver-exception",
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.RESOLVER_EXCEPTION,
                     metadata={"message": str(exc)},
                 )
             )
@@ -4222,8 +4313,15 @@ class ResolverPipeline:
         """
 
         if result.is_event:
-            reason_text = result.event_reason or result.event
-            status_value: Any = result.event or Classification.SKIPPED
+            if result.event_reason is not None:
+                reason_text: Optional[str] = result.event_reason.value
+            elif result.event is not None:
+                reason_text = result.event.value
+            else:
+                reason_text = None
+            status_value: Any = (
+                result.event.value if result.event is not None else Classification.SKIPPED
+            )
             self._emit_attempt(
                 AttemptRecord(
                     run_id=self._run_id,
@@ -4243,7 +4341,7 @@ class ResolverPipeline:
                 )
             )
             if result.event_reason:
-                self.metrics.record_skip(resolver_name, result.event_reason)
+                self.metrics.record_skip(resolver_name, result.event_reason.value)
             return None
 
         url = result.url

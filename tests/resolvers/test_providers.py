@@ -133,7 +133,13 @@ from pathlib import Path
 import pytest
 
 from DocsToKG.ContentDownload import cli as downloader
-from DocsToKG.ContentDownload.pipeline import FigshareResolver, ResolverConfig, ZenodoResolver
+from DocsToKG.ContentDownload.pipeline import (
+    FigshareResolver,
+    ResolverConfig,
+    ResolverEvent,
+    ResolverEventReason,
+    ZenodoResolver,
+)
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
@@ -318,8 +324,8 @@ def test_figshare_resolver_http_error(tmp_path):
         if result.is_event
     ]
 
-    assert events[0].event == "error"
-    assert events[0].event_reason == "http-error"
+    assert events[0].event is ResolverEvent.ERROR
+    assert events[0].event_reason is ResolverEventReason.HTTP_ERROR
     assert events[0].http_status == 404
     assert "Figshare API returned" in events[0].metadata["error_detail"]
 
@@ -346,8 +352,8 @@ def test_figshare_resolver_json_error(tmp_path):
         if result.is_event
     ]
 
-    assert events[0].event == "error"
-    assert events[0].event_reason == "json-error"
+    assert events[0].event is ResolverEvent.ERROR
+    assert events[0].event_reason is ResolverEventReason.JSON_ERROR
     assert "content_preview" in events[0].metadata
 
 
@@ -372,8 +378,8 @@ def test_figshare_resolver_network_error(tmp_path):
         if result.is_event
     ]
 
-    assert events[0].event == "error"
-    assert events[0].event_reason == "connection-error"
+    assert events[0].event is ResolverEvent.ERROR
+    assert events[0].event_reason is ResolverEventReason.CONNECTION_ERROR
     assert "boom" in events[0].metadata["error"]
 
 
@@ -389,8 +395,8 @@ def test_figshare_resolver_disabled_without_doi(tmp_path):
     session = requests.Session()
     results = list(FigshareResolver().iter_urls(session, config, artifact))
     assert len(results) == 1
-    assert results[0].event == "skipped"
-    assert results[0].event_reason == "no-doi"
+    assert results[0].event is ResolverEvent.SKIPPED
+    assert results[0].event_reason is ResolverEventReason.NO_DOI
 
 
 # --- test_zenodo_resolver.py ---
@@ -530,8 +536,8 @@ def test_zenodo_resolver_http_error(tmp_path):
         if result.is_event
     ]
 
-    assert events[0].event == "error"
-    assert events[0].event_reason == "http-error"
+    assert events[0].event is ResolverEvent.ERROR
+    assert events[0].event_reason is ResolverEventReason.HTTP_ERROR
     assert events[0].http_status == 404
     assert "Zenodo API returned" in events[0].metadata["error_detail"]
 
@@ -558,8 +564,8 @@ def test_zenodo_resolver_json_error(tmp_path):
         if result.is_event
     ]
 
-    assert events[0].event == "error"
-    assert events[0].event_reason == "json-error"
+    assert events[0].event is ResolverEvent.ERROR
+    assert events[0].event_reason is ResolverEventReason.JSON_ERROR
     assert "error_detail" in events[0].metadata
 
 
@@ -584,8 +590,8 @@ def test_zenodo_resolver_network_error(tmp_path):
         if result.is_event
     ]
 
-    assert events[0].event == "error"
-    assert events[0].event_reason == "request-error"
+    assert events[0].event is ResolverEvent.ERROR
+    assert events[0].event_reason is ResolverEventReason.REQUEST_ERROR
     assert "boom" in events[0].metadata["error"]
 
 
@@ -601,5 +607,5 @@ def test_zenodo_resolver_disabled_without_doi(tmp_path):
     session = requests.Session()
     results = list(ZenodoResolver().iter_urls(session, config, artifact))
     assert len(results) == 1
-    assert results[0].event == "skipped"
-    assert results[0].event_reason == "no-doi"
+    assert results[0].event is ResolverEvent.SKIPPED
+    assert results[0].event_reason is ResolverEventReason.NO_DOI

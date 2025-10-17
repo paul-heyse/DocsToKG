@@ -22,7 +22,7 @@ Populate the legacy ``pdf_pipeline`` module shim with a deprecation warning.
 
 ### `__getattr__(attr)`
 
-*No documentation available.*
+Delegate attribute lookups to the replacement module populated above.
 
 ### `parse_args(argv)`
 

@@ -94,6 +94,18 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "normalize-http-timeout",
+#       "name": "normalize_http_timeout",
+#       "anchor": "function-normalize-http-timeout",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-http-session",
+#       "name": "get_http_session",
+#       "anchor": "function-get-http-session",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "manifest-value",
 #       "name": "_manifest_value",
 #       "anchor": "function-manifest-value",
@@ -184,6 +196,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "detect-cuda-device",
+#       "name": "_detect_cuda_device",
+#       "anchor": "function-detect-cuda-device",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "ensure-model-environment",
 #       "name": "ensure_model_environment",
 #       "anchor": "function-ensure-model-environment",
@@ -205,6 +223,18 @@
 #       "id": "ensure-qwen-dependencies",
 #       "name": "ensure_qwen_dependencies",
 #       "anchor": "function-ensure-qwen-dependencies",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-splade-environment",
+#       "name": "ensure_splade_environment",
+#       "anchor": "function-ensure-splade-environment",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-qwen-environment",
+#       "name": "ensure_qwen_environment",
+#       "anchor": "function-ensure-qwen-environment",
 #       "kind": "function"
 #     },
 #     {
@@ -304,6 +334,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "resumecontroller",
+#       "name": "ResumeController",
+#       "anchor": "class-resumecontroller",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "stringify-path",
 #       "name": "_stringify_path",
 #       "anchor": "function-stringify-path",
@@ -326,6 +362,12 @@
 #       "name": "manifest_log_failure",
 #       "anchor": "function-manifest-log-failure",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "structuredlogger",
+#       "name": "StructuredLogger",
+#       "anchor": "class-structuredlogger",
+#       "kind": "class"
 #     },
 #     {
 #       "id": "get-logger",
@@ -382,6 +424,18 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "build-jsonl-split-map",
+#       "name": "build_jsonl_split_map",
+#       "anchor": "function-build-jsonl-split-map",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-jsonl-records",
+#       "name": "_iter_jsonl_records",
+#       "anchor": "function-iter-jsonl-records",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "batcher",
 #       "name": "Batcher",
 #       "anchor": "class-batcher",
@@ -412,6 +466,18 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "relative-path",
+#       "name": "relative_path",
+#       "anchor": "function-relative-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "quarantine-artifact",
+#       "name": "quarantine_artifact",
+#       "anchor": "function-quarantine-artifact",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "compute-content-hash",
 #       "name": "compute_content_hash",
 #       "anchor": "function-compute-content-hash",
@@ -421,6 +487,18 @@
 #       "id": "load-manifest-index",
 #       "name": "load_manifest_index",
 #       "anchor": "function-load-manifest-index",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-manifest-entries",
+#       "name": "iter_manifest_entries",
+#       "anchor": "function-iter-manifest-entries",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "summarize-manifest",
+#       "name": "summarize_manifest",
+#       "anchor": "function-summarize-manifest",
 #       "kind": "function"
 #     },
 #     {
@@ -451,6 +529,24 @@
 #       "id": "run-embed",
 #       "name": "_run_embed",
 #       "anchor": "function-run-embed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-token-profiles",
+#       "name": "_run_token_profiles",
+#       "anchor": "function-run-token-profiles",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-plan",
+#       "name": "_run_plan",
+#       "anchor": "function-run-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-manifest",
+#       "name": "_run_manifest",
+#       "anchor": "function-run-manifest",
 #       "kind": "function"
 #     },
 #     {
@@ -560,6 +656,24 @@
 #       "name": "doctags",
 #       "anchor": "function-doctags",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "token-profiles",
+#       "name": "token_profiles",
+#       "anchor": "function-token-profiles",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan",
+#       "name": "plan",
+#       "anchor": "function-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest",
+#       "name": "manifest",
+#       "anchor": "function-manifest",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -606,11 +720,14 @@ import json
 import logging
 import math
 import os
+import re
 import shutil
 import socket
+import threading
 import time
 import unicodedata
 import uuid
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field, fields
 from datetime import datetime, timezone
 from pathlib import Path
@@ -631,6 +748,12 @@ from typing import (
     TypeVar,
 )
 
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+from ..OntologyDownload.logging_utils import JSONFormatter
+
 T = TypeVar("T")
 
 # Default structural marker configuration shared across stages.
@@ -641,6 +764,12 @@ DEFAULT_CAPTION_MARKERS: Tuple[str, ...] = (
     "Picture description:",
     "<!-- image -->",
 )
+
+DEFAULT_HTTP_TIMEOUT: Tuple[float, float] = (5.0, 30.0)
+
+_HTTP_SESSION_LOCK = threading.Lock()
+_HTTP_SESSION: Optional[requests.Session] = None
+_HTTP_SESSION_TIMEOUT: Tuple[float, float] = DEFAULT_HTTP_TIMEOUT
 
 
 def dedupe_preserve_order(markers: Sequence[str]) -> Tuple[str, ...]:
@@ -886,6 +1015,104 @@ def _coerce_str_tuple(value: object, _base_dir: Optional[Path] = None) -> Tuple[
     return tuple(part for part in parts if part)
 
 
+def normalize_http_timeout(timeout: Optional[object]) -> Tuple[float, float]:
+    """Normalize timeout inputs into a ``(connect, read)`` tuple of floats."""
+
+    if timeout is None:
+        return DEFAULT_HTTP_TIMEOUT
+
+    def _coerce_pair(values: Sequence[object]) -> Tuple[float, float]:
+        extracted = [v for v in values if v is not None]
+        if not extracted:
+            return DEFAULT_HTTP_TIMEOUT
+        if len(extracted) == 1:
+            return float(DEFAULT_HTTP_TIMEOUT[0]), float(extracted[0])
+        return float(extracted[0]), float(extracted[1])
+
+    if isinstance(timeout, (int, float)):
+        return float(DEFAULT_HTTP_TIMEOUT[0]), float(timeout)
+
+    if isinstance(timeout, str):
+        parts = [part for part in re.split(r"[;,\\s]+", timeout) if part]
+        if not parts:
+            return DEFAULT_HTTP_TIMEOUT
+        return _coerce_pair(parts)
+
+    if isinstance(timeout, (list, tuple, set)):
+        return _coerce_pair(list(timeout))
+
+    if hasattr(timeout, "__iter__"):
+        try:
+            return _coerce_pair(list(timeout))  # type: ignore[arg-type]
+        except TypeError as exc:  # pragma: no cover - defensive
+            raise ValueError("Unable to interpret HTTP timeout iterable") from exc
+
+    raise TypeError(f"Unsupported timeout type: {type(timeout)!r}")
+
+
+def get_http_session(
+    *,
+    timeout: Optional[object] = None,
+    base_headers: Optional[Mapping[str, str]] = None,
+    retry_total: int = 5,
+    retry_backoff: float = 0.5,
+    status_forcelist: Sequence[int] = (429, 500, 502, 503, 504),
+    allowed_methods: Sequence[str] = ("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"),
+) -> Tuple[requests.Session, Tuple[float, float]]:
+    """Return a shared :class:`requests.Session` configured with retries.
+
+    Args:
+        timeout: Optional override for the ``(connect, read)`` timeout tuple. Scalars
+            override only the read timeout while preserving the default connect value.
+        base_headers: Headers merged into the shared session.
+        retry_total: Maximum retry attempts applied for connect/read failures.
+        retry_backoff: Exponential backoff factor between retries.
+        status_forcelist: HTTP status codes that trigger retries.
+        allowed_methods: HTTP verbs eligible for retries.
+
+    Returns:
+        Tuple containing the shared session and the effective timeout tuple.
+    """
+
+    effective_timeout = normalize_http_timeout(timeout)
+
+    with _HTTP_SESSION_LOCK:
+        global _HTTP_SESSION, _HTTP_SESSION_TIMEOUT
+        if _HTTP_SESSION is None:
+            session = requests.Session()
+            retry = Retry(
+                total=retry_total,
+                read=retry_total,
+                connect=retry_total,
+                backoff_factor=retry_backoff,
+                status_forcelist=tuple(int(code) for code in status_forcelist),
+                allowed_methods=frozenset(method.upper() for method in allowed_methods),
+                raise_on_status=False,
+            )
+            adapter = HTTPAdapter(max_retries=retry)
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            _HTTP_SESSION = session
+            logging.getLogger(__name__).debug(
+                "Created shared HTTP session",
+                extra={
+                    "extra_fields": {
+                        "retry_total": retry_total,
+                        "status_forcelist": list(status_forcelist),
+                        "allowed_methods": [method.upper() for method in allowed_methods],
+                    }
+                },
+            )
+
+        if base_headers:
+            _HTTP_SESSION.headers.update(
+                {key: value for key, value in base_headers.items() if value is not None}
+            )
+
+        _HTTP_SESSION_TIMEOUT = effective_timeout
+        return _HTTP_SESSION, _HTTP_SESSION_TIMEOUT
+
+
 def _manifest_value(value: Any) -> Any:
     """Convert values to manifest-friendly representations."""
 
@@ -1070,6 +1297,14 @@ __all__ = [
     "ensure_model_environment",
     "ensure_splade_dependencies",
     "ensure_qwen_dependencies",
+    "ensure_splade_environment",
+    "ensure_qwen_environment",
+    "DEFAULT_HTTP_TIMEOUT",
+    "normalize_http_timeout",
+    "get_http_session",
+    "iter_manifest_entries",
+    "summarize_manifest",
+    "ResumeController",
     "UUID_NAMESPACE",
     "BM25Stats",
     "SpladeCfg",
@@ -1097,6 +1332,9 @@ __all__ = [
     "chunk",
     "embed",
     "doctags",
+    "token_profiles",
+    "plan",
+    "manifest",
 ]
 
 # --- Data Containers ---
@@ -1301,6 +1539,19 @@ def init_hf_env(
 _MODEL_ENV: Tuple[Path, Path] | None = None
 
 
+def _detect_cuda_device() -> str:
+    """Best-effort detection of CUDA availability to choose a default device."""
+
+    try:
+        import torch  # type: ignore
+
+        if torch.cuda.is_available():  # pragma: no cover - depends on runtime
+            return "cuda"
+    except Exception:  # pragma: no cover - torch missing or misconfigured
+        pass
+    return "cpu"
+
+
 def ensure_model_environment(
     hf_home: Optional[Path] = None, model_root: Optional[Path] = None
 ) -> Tuple[Path, Path]:
@@ -1346,6 +1597,57 @@ def ensure_qwen_dependencies(import_error: Exception | None = None) -> None:
     """Validate that Qwen/vLLM optional dependencies are importable."""
 
     _ensure_optional_dependency("vllm", QWEN_DEPENDENCY_MESSAGE, import_error=import_error)
+
+
+def ensure_splade_environment(
+    *, device: Optional[str] = None, cache_dir: Optional[Path] = None
+) -> Dict[str, str]:
+    """Bootstrap SPLADE-related environment defaults and return resolved settings."""
+
+    resolved_device = (
+        device
+        or os.getenv("DOCSTOKG_SPLADE_DEVICE")
+        or os.getenv("SPLADE_DEVICE")
+        or _detect_cuda_device()
+    )
+    os.environ.setdefault("DOCSTOKG_SPLADE_DEVICE", resolved_device)
+    os.environ.setdefault("SPLADE_DEVICE", resolved_device)
+
+    env_info: Dict[str, str] = {"device": resolved_device}
+
+    if cache_dir is not None:
+        cache_path = Path(cache_dir).expanduser().resolve()
+        os.environ.setdefault("DOCSTOKG_SPLADE_MODEL_DIR", str(cache_path))
+        env_info["model_dir"] = str(cache_path)
+
+    return env_info
+
+
+def ensure_qwen_environment(
+    *, device: Optional[str] = None, dtype: Optional[str] = None, model_dir: Optional[Path] = None
+) -> Dict[str, str]:
+    """Bootstrap Qwen/vLLM environment defaults and return resolved settings."""
+
+    resolved_device = (
+        device
+        or os.getenv("DOCSTOKG_QWEN_DEVICE")
+        or os.getenv("VLLM_DEVICE")
+        or _detect_cuda_device()
+    )
+    os.environ.setdefault("DOCSTOKG_QWEN_DEVICE", resolved_device)
+    os.environ.setdefault("VLLM_DEVICE", resolved_device)
+
+    resolved_dtype = dtype or os.getenv("DOCSTOKG_QWEN_DTYPE") or "bfloat16"
+    os.environ.setdefault("DOCSTOKG_QWEN_DTYPE", resolved_dtype)
+
+    env_info: Dict[str, str] = {"device": resolved_device, "dtype": str(resolved_dtype)}
+
+    if model_dir is not None:
+        model_path = Path(model_dir).expanduser().resolve()
+        os.environ.setdefault("DOCSTOKG_QWEN_MODEL_DIR", str(model_path))
+        env_info["model_dir"] = str(model_path)
+
+    return env_info
 
 
 def detect_data_root(start: Optional[Path] = None) -> Path:
@@ -1635,6 +1937,39 @@ def should_skip_output(
     return stored_hash == input_hash
 
 
+@dataclass(slots=True)
+class ResumeController:
+    """Centralize resume/force decisions using manifest metadata."""
+
+    resume: bool
+    force: bool
+    manifest_index: Optional[Mapping[str, Mapping[str, object]]] = None
+
+    def entry(self, doc_id: str) -> Optional[Mapping[str, object]]:
+        """Return the manifest entry associated with ``doc_id`` when available."""
+
+        if not self.manifest_index:
+            return None
+        return self.manifest_index.get(doc_id)
+
+    def should_skip(
+        self, doc_id: str, output_path: Path, input_hash: str
+    ) -> Tuple[bool, Optional[Mapping[str, object]]]:
+        """Return ``True`` when work for ``doc_id`` can be safely skipped."""
+
+        entry = self.entry(doc_id)
+        skip = should_skip_output(output_path, entry, input_hash, self.resume, self.force)
+        return skip, entry
+
+    def should_process(
+        self, doc_id: str, output_path: Path, input_hash: str
+    ) -> Tuple[bool, Optional[Mapping[str, object]]]:
+        """Return ``True`` when ``doc_id`` requires processing."""
+
+        skip, entry = self.should_skip(doc_id, output_path, input_hash)
+        return not skip, entry
+
+
 def _stringify_path(value: Path | str | None) -> str | None:
     """Return a string representation for path-like values used in manifests."""
 
@@ -1777,6 +2112,8 @@ class StructuredLogger(logging.LoggerAdapter):
         self.base_fields: Dict[str, Any] = dict(base_fields or {})
 
     def process(self, msg: str, kwargs: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+        """Merge adapter context into ``extra`` metadata for structured output."""
+
         extra = kwargs.setdefault("extra", {})
         fields = dict(self.base_fields)
         extra_fields = extra.get("extra_fields")
@@ -1787,11 +2124,15 @@ class StructuredLogger(logging.LoggerAdapter):
         return msg, kwargs
 
     def bind(self, **fields: object) -> "StructuredLogger":
+        """Attach additional persistent fields to the adapter and return ``self``."""
+
         filtered = {k: v for k, v in fields.items() if v is not None}
         self.base_fields.update(filtered)
         return self
 
     def child(self, **fields: object) -> "StructuredLogger":
+        """Create a new adapter inheriting context with optional overrides."""
+
         merged = dict(self.base_fields)
         merged.update({k: v for k, v in fields.items() if v is not None})
         return StructuredLogger(self.logger, merged)
@@ -1816,55 +2157,43 @@ def get_logger(name: str, level: str = "INFO", *, base_fields: Optional[Dict[str
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-
-        class JSONFormatter(logging.Formatter):
-            """Emit structured JSON log messages for DocParsing utilities.
-
-            Attributes:
-                default_time_format: Timestamp template applied to log records.
-
-            Examples:
-                >>> formatter = JSONFormatter()
-                >>> hasattr(formatter, "format")
-                True
-            """
-
-            def format(self, record: logging.LogRecord) -> str:
-                """Render a log record as a JSON string.
-
-                Args:
-                    record: Logging record produced by the DocParsing pipeline.
-
-                Returns:
-                    JSON-formatted string containing canonical log fields and optional extras.
-                """
-                ts = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(
-                    timespec="milliseconds"
-                )
-                if ts.endswith("+00:00"):
-                    ts = ts[:-6] + "Z"
-                payload = {
-                    "timestamp": ts,
-                    "level": record.levelname,
-                    "logger": record.name,
-                    "message": record.getMessage(),
-                }
-                extra_fields = getattr(record, "extra_fields", None)
-                if isinstance(extra_fields, dict):
-                    payload.update(extra_fields)
-                return json.dumps(payload, ensure_ascii=False)
-
         handler.setFormatter(JSONFormatter())
         logger.addHandler(handler)
         logger.propagate = False
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    return StructuredLogger(logger, base_fields)
+    adapter = getattr(logger, "_docparse_adapter", None)
+    if not isinstance(adapter, StructuredLogger):
+        adapter = StructuredLogger(logger, base_fields)
+        setattr(logger, "_docparse_adapter", adapter)
+    elif base_fields:
+        adapter.bind(**base_fields)
+    return adapter
 
 
 def log_event(logger: logging.Logger, level: str, message: str, **fields: object) -> None:
     """Emit a structured log record using the ``extra_fields`` convention."""
 
-    emitter = getattr(logger, level, None)
+    normalised_level = str(level).lower()
+    if normalised_level in {"warning", "error"}:
+        if "stage" not in fields:
+            base_stage = getattr(logger, "base_fields", {}).get("stage") if hasattr(logger, "base_fields") else None
+            fields["stage"] = base_stage or "unknown"
+        if "doc_id" not in fields:
+            fields["doc_id"] = "unknown"
+        if "input_hash" not in fields:
+            fields["input_hash"] = None
+        error_code = fields.get("error_code")
+        if not error_code:
+            fields["error_code"] = "UNKNOWN"
+        else:
+            fields["error_code"] = str(error_code).upper()
+    else:
+        if "stage" not in fields:
+            base_stage = getattr(logger, "base_fields", {}).get("stage") if hasattr(logger, "base_fields") else None
+            if base_stage is not None:
+                fields["stage"] = base_stage
+
+    emitter = getattr(logger, normalised_level, None)
     if not callable(emitter):
         raise AttributeError(f"Logger has no level '{level}'")
     emitter(message, extra={"extra_fields": fields})
@@ -1894,9 +2223,17 @@ def find_free_port(start: int = 8000, span: int = 32) -> int:
                 return port
 
     logger = get_logger(__name__)
-    logger.warning(
+    log_event(
+        logger,
+        "warning",
         "Port scan exhausted",
-        extra={"extra_fields": {"start": start, "span": span, "action": "ephemeral_port"}},
+        stage="core",
+        doc_id="__system__",
+        input_hash=None,
+        error_code="PORT_SCAN_EXHAUSTED",
+        start=start,
+        span=span,
+        action="ephemeral_port",
     )
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -2435,6 +2772,10 @@ def quarantine_artifact(
                 "Failed to quarantine artifact",
                 extra={
                     "extra_fields": {
+                        "stage": "core",
+                        "doc_id": "__system__",
+                        "input_hash": None,
+                        "error_code": "QUARANTINE_FAILURE",
                         "path": str(original),
                         "attempted_quarantine": str(candidate),
                         "reason": reason,
@@ -2444,15 +2785,17 @@ def quarantine_artifact(
         raise
 
     if logger:
-        logger.warning(
+        log_event(
+            logger,
+            "warning",
             "Quarantined artifact",
-            extra={
-                "extra_fields": {
-                    "path": str(original),
-                    "quarantine_path": str(candidate),
-                    "reason": reason,
-                }
-            },
+            stage="core",
+            doc_id="__system__",
+            input_hash=None,
+            error_code="QUARANTINE_SUCCESS",
+            path=str(original),
+            quarantine_path=str(candidate),
+            reason=reason,
         )
     return candidate
 
@@ -2534,6 +2877,58 @@ def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, di
                 continue
             index[doc_id] = entry
     return index
+
+
+def iter_manifest_entries(stages: Sequence[str], root: Optional[Path] = None) -> Iterator[dict]:
+    """Yield manifest entries for the requested ``stages`` sorted by timestamp."""
+
+    manifest_dir = data_manifests(root)
+    combined: List[dict] = []
+    for stage in stages:
+        stage_path = manifest_dir / _manifest_filename(stage)
+        if not stage_path.exists():
+            continue
+        with stage_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                entry.setdefault("stage", stage)
+                combined.append(entry)
+
+    combined.sort(key=lambda item: item.get("timestamp", ""))
+    for entry in combined:
+        yield entry
+
+
+def summarize_manifest(entries: Sequence[dict]) -> Dict[str, Any]:
+    """Compute status counts and durations for manifest ``entries``."""
+
+    status_counter: Dict[str, Counter] = defaultdict(Counter)
+    duration_totals: Dict[str, float] = defaultdict(float)
+    total_entries: Dict[str, int] = defaultdict(int)
+    for entry in entries:
+        stage = entry.get("stage", "unknown")
+        status = entry.get("status", "unknown")
+        total_entries[stage] += 1
+        status_counter[stage][status] += 1
+        try:
+            duration_totals[stage] += float(entry.get("duration_s", 0.0))
+        except (TypeError, ValueError):
+            continue
+
+    summary: Dict[str, Any] = {}
+    for stage, total in total_entries.items():
+        summary[stage] = {
+            "total": total,
+            "statuses": dict(status_counter[stage]),
+            "duration_s": round(duration_totals[stage], 3),
+        }
+    return summary
 
 
 # --- Concurrency Utilities ---
@@ -2636,9 +3031,27 @@ def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
             current or "unset"
         )
         if logger is not None:
-            logger.warning(message)
+            log_event(
+                logger,
+                "warning",
+                message,
+                stage="core",
+                doc_id="__system__",
+                input_hash=None,
+                error_code="MP_SPAWN_REQUIRED",
+                current_method=current or "unset",
+            )
         else:
-            logging.getLogger(__name__).warning(message)
+            log_event(
+                logging.getLogger(__name__),
+                "warning",
+                message,
+                stage="core",
+                doc_id="__system__",
+                input_hash=None,
+                error_code="MP_SPAWN_REQUIRED",
+                current_method=current or "unset",
+            )
 
 
 # --- Unified CLI ---
@@ -2655,6 +3068,8 @@ Examples:
   python -m DocsToKG.DocParsing.cli embed --resume
   python -m DocsToKG.DocParsing.cli doctags --mode pdf --workers 2
   python -m DocsToKG.DocParsing.cli token-profiles --doctags-dir Data/DocTagsFiles
+  python -m DocsToKG.DocParsing.cli manifest --stage chunk --tail 10
+  python -m DocsToKG.DocParsing.cli plan --data-root Data --mode auto
 """
 
 _PDF_SUFFIXES: tuple[str, ...] = (".pdf",)
@@ -2692,6 +3107,142 @@ def _run_token_profiles(argv: Sequence[str]) -> int:
     parser.prog = "docparse token-profiles"
     args = parser.parse_args(argv)
     return token_profiles_module.main(args)
+
+
+def _run_plan(argv: Sequence[str]) -> int:
+    """Display the doctags → chunk → embed plan without executing."""
+
+    args = list(argv)
+    if "--plan" not in args:
+        args.append("--plan")
+    return _run_all(args)
+
+
+def _run_manifest(argv: Sequence[str]) -> int:
+    """Inspect pipeline manifest artifacts via CLI."""
+
+    parser = argparse.ArgumentParser(
+        prog="docparse manifest",
+        description="Inspect DocParsing manifest artifacts",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--stage",
+        dest="stages",
+        action="append",
+        default=None,
+        help="Manifest stage to inspect (repeatable). Defaults to doctags, chunk, embeddings.",
+    )
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=None,
+        help="DocsToKG data root override used when resolving manifests",
+    )
+    parser.add_argument(
+        "--tail",
+        type=int,
+        default=0,
+        help="Print the last N manifest entries",
+    )
+    parser.add_argument(
+        "--summarize",
+        action="store_true",
+        help="Print per-stage status and duration summary",
+    )
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Output tail entries as JSON instead of human-readable text",
+    )
+
+    args = parser.parse_args(argv)
+    manifest_dir = data_manifests(args.data_root)
+    if args.stages:
+        seen = []
+        for stage in args.stages:
+            trimmed = stage.strip()
+            if trimmed and trimmed not in seen:
+                seen.append(trimmed)
+        stages = seen
+    else:
+        discovered = []
+        for path in sorted(manifest_dir.glob("docparse.*.manifest.jsonl")):
+            parts = path.name.split(".")
+            if len(parts) >= 4:
+                stage = parts[1]
+                if stage not in discovered:
+                    discovered.append(stage)
+        stages = discovered
+    if not stages:
+        stages = ["embeddings"]
+    logger = get_logger(
+        __name__,
+        base_fields={"stage": "manifest"},
+    )
+
+    entries = list(iter_manifest_entries(stages, args.data_root))
+    if not entries:
+        log_event(
+            logger,
+            "warning",
+            "No manifest entries located",
+            stage="manifest",
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="NO_MANIFEST_ENTRIES",
+            stages=stages,
+        )
+        print("No manifest entries found for the requested stages.")
+        return 0
+
+    tail_count = max(0, int(args.tail))
+    tail_entries = entries[-tail_count:] if tail_count else []
+
+    if tail_count:
+        print(f"docparse manifest tail (last {len(tail_entries)} entries)")
+        if args.raw:
+            for entry in tail_entries:
+                print(json.dumps(entry, ensure_ascii=False))
+        else:
+            for entry in tail_entries:
+                timestamp = entry.get("timestamp", "")
+                stage = entry.get("stage", "unknown")
+                doc_id = entry.get("doc_id", "unknown")
+                status = entry.get("status", "unknown")
+                duration = entry.get("duration_s")
+                line = f"{timestamp} [{stage}] {doc_id} status={status}"
+                if duration is not None:
+                    line += f" duration={duration}"
+                error = entry.get("error")
+                if error:
+                    line += f" error={error}"
+                print(line)
+
+    if args.summarize or not tail_count:
+        summary = summarize_manifest(entries)
+        print("\nManifest summary")
+        for stage in sorted(summary):
+            data = summary[stage]
+            print(f"- {stage}: total={data['total']} duration_s={data['duration_s']}")
+            status_map = data.get("statuses", {})
+            if status_map:
+                statuses = ", ".join(f"{name}={count}" for name, count in sorted(status_map.items()))
+                print(f"  statuses: {statuses}")
+
+    log_event(
+        logger,
+        "info",
+        "Manifest inspection completed",
+        stage="manifest",
+        doc_id="__aggregate__",
+        input_hash=None,
+        error_code="MANIFEST_OK",
+        tail_count=tail_count,
+        summarize=bool(args.summarize or not tail_count),
+        stages=stages,
+    )
+    return 0
 
 
 def _build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentParser:
@@ -2937,7 +3488,8 @@ def _plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
     from DocsToKG.DocParsing import doctags as doctags_module
 
     parser = _build_doctags_parser()
-    args = parser.parse_args(argv)
+
+    args, _unknown = parser.parse_known_args(argv)
     resolved_root = (
         detect_data_root(args.data_root) if args.data_root is not None else detect_data_root()
     )
@@ -2986,14 +3538,14 @@ def _plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
         overwrite = False
 
     manifest_index = load_manifest_index(manifest_stage, resolved_root) if args.resume else {}
+    resume_controller = ResumeController(args.resume, args.force, manifest_index)
     planned: List[str] = []
     skipped: List[str] = []
 
     for path in files:
         doc_id, out_path = derive_doc_id_and_doctags_path(path, input_dir, output_dir)
         input_hash = compute_content_hash(path)
-        manifest_entry = manifest_index.get(doc_id)
-        skip = should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force)
+        skip, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
         if mode == "html" and overwrite:
             skip = False
         if skip:
@@ -3019,7 +3571,7 @@ def _plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
     from DocsToKG.DocParsing import doctags as doctags_module
 
     parser = chunk_module.build_parser()
-    args = parser.parse_args(argv)
+    args, _unknown = parser.parse_known_args(argv)
     resolved_root = doctags_module.prepare_data_root(args.data_root, chunk_module.DEFAULT_DATA_ROOT)
     data_root_overridden = args.data_root is not None
 
@@ -3053,14 +3605,15 @@ def _plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
     manifest_index = (
         load_manifest_index(chunk_module.MANIFEST_STAGE, resolved_root) if args.resume else {}
     )
+    resume_controller = ResumeController(args.resume, args.force, manifest_index)
     planned: List[str] = []
     skipped: List[str] = []
 
     for path in files:
         rel_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
         input_hash = compute_content_hash(path)
-        manifest_entry = manifest_index.get(rel_id)
-        if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force):
+        skip, _ = resume_controller.should_skip(rel_id, out_path, input_hash)
+        if skip:
             skipped.append(rel_id)
         else:
             planned.append(rel_id)
@@ -3082,7 +3635,7 @@ def _plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     from DocsToKG.DocParsing import embedding as embedding_module
 
     parser = embedding_module.build_parser()
-    args = parser.parse_args(argv)
+    args, _unknown = parser.parse_known_args(argv)
     resolved_root = doctags_module.prepare_data_root(
         args.data_root, embedding_module.DEFAULT_DATA_ROOT
     )
@@ -3129,14 +3682,15 @@ def _plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     manifest_index = (
         load_manifest_index(embedding_module.MANIFEST_STAGE, resolved_root) if args.resume else {}
     )
+    resume_controller = ResumeController(args.resume, args.force, manifest_index)
     planned: List[str] = []
     skipped: List[str] = []
 
     for chunk_path in files:
         doc_id, vector_path = derive_doc_id_and_vectors_path(chunk_path, chunks_dir, vectors_dir)
         input_hash = compute_content_hash(chunk_path)
-        manifest_entry = manifest_index.get(doc_id)
-        if should_skip_output(vector_path, manifest_entry, input_hash, args.resume, args.force):
+        skip, _ = resume_controller.should_skip(doc_id, vector_path, input_hash)
+        if skip:
             skipped.append(doc_id)
         else:
             planned.append(doc_id)
@@ -3523,25 +4077,43 @@ def _run_all(argv: Sequence[str]) -> int:
 
     exit_code = _run_doctags(doctags_args)
     if exit_code != 0:
-        logger.error(
+        log_event(
+            logger,
+            "error",
             "DocTags stage failed",
-            extra={"extra_fields": {"exit_code": exit_code}},
+            stage="docparse_all",
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="DOCTAGS_STAGE_FAILED",
+            exit_code=exit_code,
         )
         return exit_code
 
     exit_code = _run_chunk(chunk_args)
     if exit_code != 0:
-        logger.error(
+        log_event(
+            logger,
+            "error",
             "Chunk stage failed",
-            extra={"extra_fields": {"exit_code": exit_code}},
+            stage="docparse_all",
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="CHUNK_STAGE_FAILED",
+            exit_code=exit_code,
         )
         return exit_code
 
     exit_code = _run_embed(embed_args)
     if exit_code != 0:
-        logger.error(
+        log_event(
+            logger,
+            "error",
             "Embedding stage failed",
-            extra={"extra_fields": {"exit_code": exit_code}},
+            stage="docparse_all",
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="EMBED_STAGE_FAILED",
+            exit_code=exit_code,
         )
         return exit_code
 
@@ -3568,6 +4140,14 @@ COMMANDS: Dict[str, _Command] = {
     "token-profiles": _Command(
         _run_token_profiles,
         "Print token count ratios for DocTags samples across tokenizers",
+    ),
+    "plan": _Command(
+        _run_plan,
+        "Show the projected doctags → chunk → embed actions without running stages",
+    ),
+    "manifest": _Command(
+        _run_manifest,
+        "Inspect manifest artifacts (tail/summarize)",
     ),
 }
 
@@ -3614,3 +4194,15 @@ def token_profiles(argv: Sequence[str] | None = None) -> int:
     """Public wrapper for the ``token-profiles`` subcommand."""
 
     return _run_token_profiles([] if argv is None else list(argv))
+
+
+def plan(argv: Sequence[str] | None = None) -> int:
+    """Public wrapper for the ``plan`` subcommand."""
+
+    return _run_plan([] if argv is None else list(argv))
+
+
+def manifest(argv: Sequence[str] | None = None) -> int:
+    """Public wrapper for the ``manifest`` subcommand."""
+
+    return _run_manifest([] if argv is None else list(argv))

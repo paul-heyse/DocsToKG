@@ -249,6 +249,8 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
             "dns resolution failed",
             extra={"stage": "download", "hostname": host, "error": str(exc)},
         )
+        if http_config and getattr(http_config, "strict_dns", False):
+            raise ConfigError(f"DNS resolution failed for {host}: {exc}") from exc
         return urlunparse(parsed)
 
     for info in infos:

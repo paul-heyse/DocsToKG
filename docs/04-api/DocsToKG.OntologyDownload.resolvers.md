@@ -12,14 +12,6 @@ Resolver implementations for DocsToKG ontology downloads.
 
 Normalize common license strings to canonical SPDX identifiers.
 
-### `_parse_checksum_extra(value)`
-
-Normalize checksum extras to ``(algorithm, value)`` tuples.
-
-### `_parse_checksum_url_extra(value)`
-
-Normalize checksum URL extras to ``(url, algorithm)`` tuples.
-
 ### `plan(self, spec, config, logger)`
 
 Produce a :class:`FetchPlan` describing how to retrieve ``spec``.
@@ -52,6 +44,10 @@ Create polite headers derived from configuration and logger context.
 
 Apply polite headers to a client session when supported.
 
+### `_request_with_retry(self)`
+
+Issue an HTTP request with polite headers and retry semantics.
+
 ### `_build_plan(self)`
 
 Construct a ``FetchPlan`` from resolver components.
@@ -71,10 +67,6 @@ Plan an OLS download by negotiating media type and authentication.
 ### `plan(self, spec, config, logger)`
 
 Plan a BioPortal download by combining ontology and submission metadata.
-
-### `_fetch_metadata(self, uri, timeout)`
-
-*No documentation available.*
 
 ### `_iter_dicts(payload)`
 
@@ -109,6 +101,10 @@ Plan an Ontobee download by composing the appropriate REST endpoint.
 *No documentation available.*
 
 ### `_invoke()`
+
+*No documentation available.*
+
+### `_perform()`
 
 *No documentation available.*
 
