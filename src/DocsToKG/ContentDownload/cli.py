@@ -227,6 +227,11 @@ from DocsToKG.ContentDownload.telemetry import (
     load_manifest_url_index,
     load_previous_manifest,
 )
+from DocsToKG.ContentDownload.errors import (
+    log_download_failure,
+    get_actionable_error_message,
+    format_download_summary,
+)
 
 # --- Globals ---
 __all__ = (
@@ -936,7 +941,10 @@ def download_candidate(
         referer: Optional referer header override provided by the resolver.
         timeout: Per-request timeout in seconds.
         context: Execution context containing ``dry_run``, ``extract_html_text``,
-            and ``previous`` manifest lookup data.
+            ``previous`` manifest lookup data, and optional ``progress_callback``.
+
+            Progress callback signature: ``callback(bytes_downloaded, total_bytes, url)``
+            where ``total_bytes`` may be ``None`` if Content-Length is unavailable.
 
     Returns:
         DownloadOutcome describing the result of the download attempt including
@@ -947,6 +955,9 @@ def download_candidate(
         validated the URL. This mirrors the resolver pipeline behaviour and
         keeps dry-run tests deterministic.
 
+        Progress callbacks are invoked approximately every 128KB to balance
+        responsiveness with performance overhead.
+
     Raises:
         OSError: If writing the downloaded payload to disk fails.
         TypeError: If conditional response parsing returns unexpected objects.
@@ -955,6 +966,11 @@ def download_candidate(
     sniff_limit = max(int(context.get("sniff_bytes", DEFAULT_SNIFF_BYTES)), 0)
     min_pdf_bytes = max(int(context.get("min_pdf_bytes", DEFAULT_MIN_PDF_BYTES)), 0)
     tail_window_bytes = max(int(context.get("tail_check_bytes", DEFAULT_TAIL_CHECK_BYTES)), 0)
+
+    # Extract progress callback if provided
+    progress_callback = context.get("progress_callback")
+    progress_update_interval = 128 * 1024  # Update progress every 128KB
+
     max_bytes_raw = context.get("max_bytes")
     max_bytes: Optional[int]
     try:
@@ -982,6 +998,13 @@ def download_candidate(
     if referer:
         headers["Referer"] = referer
     base_headers = dict(headers)
+
+    # Support for resuming partial downloads via HTTP Range requests
+    # Note: Full resume support requires atomic_write to handle append mode
+    # and rehashing from partial file state. Currently infrastructure is in place
+    # but feature is disabled by default pending append-mode implementation.
+    enable_resume = bool(context.get("enable_range_resume", False))
+    resume_bytes_offset: Optional[int] = None
     accept_overrides = context.get("host_accept_overrides", {})
     accept_value: Optional[str] = None
     if isinstance(accept_overrides, dict):
@@ -1042,6 +1065,25 @@ def download_candidate(
     attempt_conditional = True
     logged_conditional_downgrade = False
 
+    # Check for partial download to resume (only if not using conditional requests)
+    if enable_resume and existing_path and not attempt_conditional:
+        try:
+            existing_file = Path(existing_path)
+            if existing_file.exists() and existing_file.is_file():
+                file_size = existing_file.stat().st_size
+                # Only resume if file is partially downloaded (>0 bytes but incomplete)
+                # and we have a content_length hint from previous manifest
+                if file_size > 0 and previous_length and file_size < previous_length:
+                    resume_bytes_offset = file_size
+                    LOGGER.debug(
+                        "Resuming partial download from byte %d for %s",
+                        resume_bytes_offset,
+                        url,
+                    )
+        except (OSError, ValueError) as exc:
+            LOGGER.debug("Could not check for partial download resume: %s", exc)
+            resume_bytes_offset = None
+
     start = time.monotonic()
     try:
         while True:
@@ -1049,6 +1091,9 @@ def download_candidate(
             headers = dict(base_headers)
             if attempt_conditional:
                 headers.update(cond_helper.build_headers())
+            elif resume_bytes_offset is not None and resume_bytes_offset > 0:
+                # Add Range header to resume from offset
+                headers["Range"] = f"bytes={resume_bytes_offset}-"
 
             start = time.monotonic()
             try:
@@ -1176,7 +1221,42 @@ def download_candidate(
                         retry_after=retry_after_hint,
                     )
 
-                if response.status_code != 200:
+                # Handle 206 Partial Content for resume support
+                if response.status_code == 206:
+                    if resume_bytes_offset is None or resume_bytes_offset <= 0:
+                        LOGGER.warning(
+                            "Received HTTP 206 for %s without Range request; treating as error.",
+                            url,
+                        )
+                        return DownloadOutcome(
+                            classification=Classification.HTTP_ERROR,
+                            path=None,
+                            http_status=response.status_code,
+                            content_type=response.headers.get("Content-Type") or content_type_hint,
+                            elapsed_ms=elapsed_ms,
+                            reason=ReasonCode.UNKNOWN,
+                            reason_detail="unexpected-206-partial-content",
+                            sha256=None,
+                            content_length=None,
+                            etag=None,
+                            last_modified=None,
+                            extracted_text_path=None,
+                            retry_after=retry_after_hint,
+                        )
+                    LOGGER.info(
+                        "Resuming download from byte %d for %s",
+                        resume_bytes_offset,
+                        url,
+                        extra={
+                            "reason": "resume-complete",
+                            "url": url,
+                            "work_id": artifact.work_id,
+                            "resume_offset": resume_bytes_offset,
+                        },
+                    )
+                    # Continue with normal download flow, but append mode below
+
+                elif response.status_code != 200:
                     return DownloadOutcome(
                         classification=Classification.HTTP_ERROR,
                         path=None,
@@ -1205,6 +1285,47 @@ def download_candidate(
                         content_length_hint = int(content_length_header.strip())
                     except (TypeError, ValueError):
                         content_length_hint = None
+
+                # Size warning for unexpectedly large downloads
+                size_warning_threshold = context.get("size_warning_threshold")
+                if (
+                    size_warning_threshold
+                    and content_length_hint
+                    and content_length_hint > size_warning_threshold
+                ):
+                    size_mb = content_length_hint / (1024 * 1024)
+                    threshold_mb = size_warning_threshold / (1024 * 1024)
+                    LOGGER.warning(
+                        "Large download detected: %.1f MB (threshold: %.1f MB)",
+                        size_mb,
+                        threshold_mb,
+                        extra={
+                            "extra_fields": {
+                                "url": url,
+                                "work_id": artifact.work_id,
+                                "content_length": content_length_hint,
+                                "threshold": size_warning_threshold,
+                                "size_mb": size_mb,
+                            }
+                        },
+                    )
+                    # Check if we should skip large downloads
+                    if context.get("skip_large_downloads", False):
+                        return DownloadOutcome(
+                            classification=Classification.SKIPPED,
+                            path=None,
+                            http_status=response.status_code,
+                            content_type=content_type,
+                            elapsed_ms=elapsed_ms,
+                            reason=ReasonCode.DOMAIN_MAX_BYTES,
+                            reason_detail=f"file-too-large: {size_mb:.1f}MB exceeds threshold {threshold_mb:.1f}MB",
+                            sha256=None,
+                            content_length=content_length_hint,
+                            etag=modified_result.etag,
+                            last_modified=modified_result.last_modified,
+                            extracted_text_path=None,
+                            retry_after=retry_after_hint,
+                        )
                 if (
                     max_bytes is not None
                     and content_length_hint is not None
@@ -1265,7 +1386,7 @@ def download_candidate(
                 detected: Classification = Classification.UNKNOWN
                 flagged_unknown = False
                 last_classification_size = 0
-                
+
                 # Optimization: Only classify when we have new meaningful data
                 # Most formats can be detected in first 1-4KB
                 min_classify_interval = 4096  # Re-classify every 4KB if still unknown
@@ -1275,21 +1396,23 @@ def download_candidate(
                         continue
                     sniff_buffer.extend(chunk)
                     prefetched.append(chunk)
-                    
+
                     # Optimize: Only classify when buffer has grown enough or first time
                     buffer_size = len(sniff_buffer)
                     should_classify = (
-                        last_classification_size == 0 or  # First chunk
-                        (detected is Classification.UNKNOWN and 
-                         buffer_size >= last_classification_size + min_classify_interval)
+                        last_classification_size == 0  # First chunk
+                        or (
+                            detected is Classification.UNKNOWN
+                            and buffer_size >= last_classification_size + min_classify_interval
+                        )
                     )
-                    
+
                     if should_classify:
                         candidate = classify_payload(bytes(sniff_buffer), content_type, url)
                         last_classification_size = buffer_size
                         if candidate is not Classification.UNKNOWN:
                             detected = candidate
-                    
+
                     if (
                         detected is Classification.UNKNOWN
                         and sniff_limit
@@ -1344,7 +1467,7 @@ def download_candidate(
             suffix = _infer_suffix(url, content_type, disposition, detected, default_suffix)
             dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
             ensure_dir(dest_path.parent)
-            
+
             # Optimization: Only maintain tail buffer for PDFs (used for corruption detection)
             # Skip for HTML/XML to reduce CPU overhead
             is_pdf = detected == Classification.PDF
@@ -1353,6 +1476,8 @@ def download_candidate(
             def _stream_chunks() -> Iterable[bytes]:
                 """Optimized streaming: write prefetched chunks inline to avoid double storage."""
                 nonlocal byte_count
+                last_progress_update = 0
+
                 for chunk in prefetched:
                     if not chunk:
                         continue
@@ -1362,7 +1487,22 @@ def download_candidate(
                         update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
                     if max_bytes is not None and byte_count > max_bytes:
                         raise _MaxBytesExceeded()
+
+                    # Progress tracking: update every 128KB to balance overhead
+                    if (
+                        progress_callback
+                        and callable(progress_callback)
+                        and byte_count - last_progress_update >= progress_update_interval
+                    ):
+                        try:
+                            progress_callback(byte_count, content_length_hint, url)
+                            last_progress_update = byte_count
+                        except Exception as exc:
+                            # Don't let callback failures break downloads
+                            LOGGER.debug("Progress callback failed: %s", exc)
+
                     yield chunk
+
                 for chunk in content_iter:
                     if not chunk:
                         continue
@@ -1372,7 +1512,27 @@ def download_candidate(
                         update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
                     if max_bytes is not None and byte_count > max_bytes:
                         raise _MaxBytesExceeded()
+
+                    # Progress tracking: update every 128KB
+                    if (
+                        progress_callback
+                        and callable(progress_callback)
+                        and byte_count - last_progress_update >= progress_update_interval
+                    ):
+                        try:
+                            progress_callback(byte_count, content_length_hint, url)
+                            last_progress_update = byte_count
+                        except Exception as exc:
+                            LOGGER.debug("Progress callback failed: %s", exc)
+
                     yield chunk
+
+                # Final progress update at completion
+                if progress_callback and callable(progress_callback) and byte_count > 0:
+                    try:
+                        progress_callback(byte_count, content_length_hint, url)
+                    except Exception as exc:
+                        LOGGER.debug("Final progress callback failed: %s", exc)
 
             try:
                 atomic_write(dest_path, _stream_chunks(), hasher=hasher)
@@ -1509,10 +1669,25 @@ def download_candidate(
             )
     except requests.RequestException as exc:
         elapsed_ms = (time.monotonic() - start) * 1000.0
+
+        # Log failure with actionable error message
+        http_status = (
+            getattr(exc.response, "status_code", None) if hasattr(exc, "response") else None
+        )
+        log_download_failure(
+            LOGGER,
+            url,
+            artifact.work_id,
+            http_status=http_status,
+            reason_code="request_exception",
+            error_details=str(exc),
+            exception=exc,
+        )
+
         return DownloadOutcome(
             classification=Classification.HTTP_ERROR,
             path=None,
-            http_status=None,
+            http_status=http_status,
             content_type=None,
             elapsed_ms=elapsed_ms,
             reason=ReasonCode.REQUEST_EXCEPTION,

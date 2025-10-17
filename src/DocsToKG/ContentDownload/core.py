@@ -73,7 +73,12 @@ def atomic_write(
     hasher: Optional[Any] = None,
     temp_suffix: str = ".part",
 ) -> int:
-    """Atomically write ``chunks`` to ``path`` and return the byte count."""
+    """Atomically write ``chunks`` to ``path`` and return the byte count.
+
+    Performance Note:
+        When ``hasher`` is provided, uses an optimized code path that avoids
+        conditional checks in the hot loop for better throughput on large files.
+    """
 
     path.parent.mkdir(parents=True, exist_ok=True)
     suffix = temp_suffix if temp_suffix.startswith(".") else f".{temp_suffix}"
@@ -83,13 +88,20 @@ def atomic_write(
     replaced = False
     try:
         with temp_path.open("wb") as handle:
-            for chunk in chunks:
-                if not chunk:
-                    continue
-                handle.write(chunk)
-                written += len(chunk)
-                if hasher is not None:
+            # Optimization: Use separate code paths to avoid hasher None check in hot loop
+            if hasher is not None:
+                for chunk in chunks:
+                    if not chunk:
+                        continue
+                    handle.write(chunk)
+                    written += len(chunk)
                     hasher.update(chunk)
+            else:
+                for chunk in chunks:
+                    if not chunk:
+                        continue
+                    handle.write(chunk)
+                    written += len(chunk)
         os.replace(temp_path, path)
         replaced = True
         return written

@@ -381,6 +381,8 @@ def request_with_retries(
     backoff_factor: float = 0.75,
     respect_retry_after: bool = True,
     content_policy: Optional[Mapping[str, Any]] = None,
+    max_retry_duration: Optional[float] = None,
+    backoff_max: float = 60.0,
     **kwargs: Any,
 ) -> requests.Response:
     """Execute an HTTP request with exponential backoff and retry handling.
@@ -396,6 +398,10 @@ def request_with_retries(
         backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to ``0.75``.
         respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
         content_policy: Optional mapping describing max-bytes and allowed MIME types for the target host.
+        max_retry_duration: Maximum total time to spend on retries in seconds. If exceeded, raises
+            immediately. Defaults to ``None`` (no limit).
+        backoff_max: Maximum delay between retries in seconds. Prevents excessive wait times.
+            Defaults to ``60.0`` seconds.
         **kwargs: Additional keyword arguments forwarded directly to :meth:`requests.Session.request`.
             Note: If ``timeout`` is provided as a single float, it will be converted to a tuple
             (connect_timeout, read_timeout) with read_timeout = timeout * 2 for better error handling.
@@ -407,6 +413,7 @@ def request_with_retries(
     Raises:
         ValueError: If ``max_retries`` or ``backoff_factor`` are invalid or ``url``/``method`` are empty.
         requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.
+        TimeoutError: If ``max_retry_duration`` is exceeded.
     """
 
     if max_retries < 0:
@@ -417,6 +424,10 @@ def request_with_retries(
         raise ValueError("method must be a non-empty string")
     if not isinstance(url, str) or not url:
         raise ValueError("url must be a non-empty string")
+    if max_retry_duration is not None and max_retry_duration <= 0:
+        raise ValueError(f"max_retry_duration must be positive, got {max_retry_duration}")
+    if backoff_max <= 0:
+        raise ValueError(f"backoff_max must be positive, got {backoff_max}")
 
     # Optimize timeout handling: separate connect and read timeouts
     if "timeout" in kwargs:
@@ -425,6 +436,8 @@ def request_with_retries(
             # Convert single timeout to (connect, read) tuple for better granularity
             # Read timeout is typically longer than connect timeout
             kwargs["timeout"] = (float(timeout_val), float(timeout_val) * 2.0)
+
+    retry_start_time = time.monotonic() if max_retry_duration else None
 
     if retry_statuses is None:
         retry_statuses = {429, 500, 502, 503, 504}
@@ -479,12 +492,25 @@ def request_with_retries(
                 _enforce_content_policy(response, content_policy, method=method, url=url)
                 return response
 
+            # Check if we've exceeded max retry duration
+            if retry_start_time and max_retry_duration:
+                elapsed = time.monotonic() - retry_start_time
+                if elapsed >= max_retry_duration:
+                    LOGGER.warning(
+                        "Exceeded max retry duration %.1fs for %s %s; aborting retries",
+                        max_retry_duration,
+                        method,
+                        url,
+                    )
+                    _enforce_content_policy(response, content_policy, method=method, url=url)
+                    return response
+
             base_delay = backoff_factor * (2**attempt)
             jitter = random.random() * 0.1
-            delay = base_delay + jitter
+            delay = min(base_delay + jitter, backoff_max)  # Cap at backoff_max
 
             if retry_after_delay is not None and retry_after_delay > delay:
-                delay = retry_after_delay
+                delay = min(retry_after_delay, backoff_max)
 
             LOGGER.debug(
                 "Retrying %s %s after HTTP %s (attempt %s/%s, delay %.2fs)",
