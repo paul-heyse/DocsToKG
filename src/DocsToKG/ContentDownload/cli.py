@@ -1124,6 +1124,11 @@ def download_candidate(
     existing_path = previous.get("path")
     previous_sha = previous.get("sha256")
     previous_length = previous.get("content_length")
+    if isinstance(previous_length, str):
+        try:
+            previous_length = int(previous_length)
+        except ValueError:
+            previous_length = None
 
     cond_helper = ConditionalRequestHelper(
         prior_etag=previous_etag,
@@ -1136,28 +1141,34 @@ def download_candidate(
     attempt_conditional = True
     logged_conditional_downgrade = False
 
-    # Check for partial download to resume (only if not using conditional requests)
-    if enable_resume and existing_path and not attempt_conditional:
-        try:
-            existing_file = Path(existing_path)
-            if existing_file.exists() and existing_file.is_file():
-                file_size = existing_file.stat().st_size
-                # Only resume if file is partially downloaded (>0 bytes but incomplete)
-                # and we have a content_length hint from previous manifest
-                if file_size > 0 and previous_length and file_size < previous_length:
-                    resume_bytes_offset = file_size
-                    LOGGER.debug(
-                        "Resuming partial download from byte %d for %s",
-                        resume_bytes_offset,
-                        url,
-                    )
-        except (OSError, ValueError) as exc:
-            LOGGER.debug("Could not check for partial download resume: %s", exc)
-            resume_bytes_offset = None
-
     start = time.monotonic()
     try:
         while True:
+            if (
+                enable_resume
+                and existing_path
+                and not attempt_conditional
+                and resume_bytes_offset is None
+            ):
+                try:
+                    existing_file = Path(existing_path)
+                    if existing_file.exists() and existing_file.is_file():
+                        file_size = existing_file.stat().st_size
+                        if (
+                            file_size > 0
+                            and isinstance(previous_length, int)
+                            and file_size < previous_length
+                        ):
+                            resume_bytes_offset = file_size
+                            LOGGER.debug(
+                                "Resuming partial download from byte %d for %s",
+                                resume_bytes_offset,
+                                url,
+                            )
+                except (OSError, ValueError) as exc:
+                    LOGGER.debug("Could not check for partial download resume: %s", exc)
+                    resume_bytes_offset = None
+
             retry_after_hint: Optional[float] = None
             headers = dict(base_headers)
             if attempt_conditional:
@@ -1218,6 +1229,37 @@ def download_candidate(
                 status_code = response.status_code or 0
                 if status_code >= 400:
                     retry_after_hint = parse_retry_after_header(response)
+                if response.status_code == 412:
+                    if attempt_conditional:
+                        if not logged_conditional_downgrade:
+                            LOGGER.warning(
+                                "Conditional validators rejected for %s; retrying without conditional headers.",
+                                url,
+                                extra={
+                                    "reason": "conditional-precondition-failed",
+                                    "url": url,
+                                    "work_id": artifact.work_id,
+                                },
+                            )
+                            logged_conditional_downgrade = True
+                        attempt_conditional = False
+                        cond_helper = ConditionalRequestHelper()
+                        continue
+                    return DownloadOutcome(
+                        classification=Classification.HTTP_ERROR,
+                        path=None,
+                        http_status=response.status_code,
+                        content_type=response.headers.get("Content-Type") or content_type_hint,
+                        elapsed_ms=elapsed_ms,
+                        reason=None,
+                        reason_detail="precondition-failed",
+                        sha256=None,
+                        content_length=None,
+                        etag=None,
+                        last_modified=None,
+                        extracted_text_path=None,
+                        retry_after=retry_after_hint,
+                    )
                 if response.status_code == 304:
                     if not attempt_conditional:
                         LOGGER.warning(
@@ -1326,6 +1368,32 @@ def download_candidate(
                         },
                     )
                     # Continue with normal download flow, but append mode below
+
+                elif response.status_code == 416:
+                    if resume_bytes_offset:
+                        LOGGER.warning(
+                            "Server rejected resume Range request for %s at offset %d; retrying full download.",
+                            url,
+                            resume_bytes_offset,
+                            extra={
+                                "reason": "resume-range-not-satisfiable",
+                                "url": url,
+                                "work_id": artifact.work_id,
+                                "resume_offset": resume_bytes_offset,
+                            },
+                        )
+                    if existing_path:
+                        try:
+                            Path(existing_path).unlink()
+                        except FileNotFoundError:
+                            pass
+                        except OSError as exc:
+                            LOGGER.debug("Failed to remove partial file %s: %s", existing_path, exc)
+                    existing_path = None
+                    resume_bytes_offset = None
+                    attempt_conditional = False
+                    cond_helper = ConditionalRequestHelper()
+                    continue
 
                 elif response.status_code != 200:
                     return DownloadOutcome(

@@ -1894,7 +1894,7 @@ def test_parse_retry_after_header_http_date() -> None:
 
     wait = parse_retry_after_header(response)
     assert wait is not None
-    assert 0.0 <= wait <= 30.0
+    assert 0.0 < wait <= 30.0
 
 
 # --- test_http_retry.py ---
@@ -1903,6 +1903,23 @@ def test_parse_retry_after_header_http_date() -> None:
 def test_parse_retry_after_header_invalid_date() -> None:
     response = requests.Response()
     response.headers = {"Retry-After": "Thu, 32 Foo 2024 00:00:00 GMT"}
+
+    assert parse_retry_after_header(response) is None
+
+
+def test_parse_retry_after_header_rejects_non_positive_seconds() -> None:
+    response_zero = requests.Response()
+    response_zero.headers = {"Retry-After": "0"}
+    response_negative = requests.Response()
+    response_negative.headers = {"Retry-After": "-1"}
+
+    assert parse_retry_after_header(response_zero) is None
+    assert parse_retry_after_header(response_negative) is None
+
+
+def test_parse_retry_after_header_rejects_nan() -> None:
+    response = requests.Response()
+    response.headers = {"Retry-After": "NaN"}
 
     assert parse_retry_after_header(response) is None
 
@@ -2019,7 +2036,8 @@ def test_parse_retry_after_header_property(value: str) -> None:
     result = parse_retry_after_header(response)
 
     if result is not None:
-        assert result >= 0.0 or math.isnan(result)
+        assert result > 0.0
+        assert math.isfinite(result)
 
 
 # --- test_http_retry.py ---
@@ -2185,12 +2203,14 @@ def test_respect_retry_after_false_skips_header(mock_parse: Mock, mock_sleep: Mo
 
 
 def test_parse_retry_after_header_naive_datetime() -> None:
+    future = datetime.now(timezone.utc) + timedelta(seconds=45)
+    header_value = future.replace(tzinfo=None).strftime("%a, %d %b %Y %H:%M:%S")
     response = requests.Response()
-    response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00"}
+    response.headers = {"Retry-After": header_value}
 
     wait = parse_retry_after_header(response)
     assert wait is not None
-    assert wait >= 0.0
+    assert 0.0 < wait <= 45.0
 
 
 # --- test_http_retry.py ---

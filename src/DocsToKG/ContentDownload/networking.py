@@ -268,25 +268,28 @@ def parse_retry_after_header(response: requests.Response) -> Optional[float]:
         return None
 
     try:
-        value = float(retry_after)
-    except ValueError:
+        seconds = float(retry_after)
+    except (TypeError, ValueError):
         pass
     else:
-        if math.isnan(value) or value >= 0.0:
-            return value
+        if seconds > 0.0 and math.isfinite(seconds):
+            return seconds
         return None
 
     try:
         target_time = parsedate_to_datetime(retry_after)
-        if target_time is None:
-            return None
-        if target_time.tzinfo is None:
-            target_time = target_time.replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
-        delta = (target_time - now).total_seconds()
-        return max(0.0, delta)
-    except (ValueError, TypeError, OverflowError):
+    except Exception:
         return None
+
+    if target_time is None:
+        return None
+    if target_time.tzinfo is None:
+        target_time = target_time.replace(tzinfo=timezone.utc)
+
+    delta = (target_time - datetime.now(timezone.utc)).total_seconds()
+    if delta > 0.0 and math.isfinite(delta):
+        return delta
+    return None
 
 
 class ContentPolicyViolation(requests.RequestException):
@@ -468,6 +471,14 @@ def request_with_retries(
         )
 
     last_exception: Optional[Exception] = None
+    response: Optional[requests.Response] = None
+
+    def _close_response() -> None:
+        nonlocal response
+        if response is not None:
+            with contextlib.suppress(Exception):
+                response.close()
+            response = None
 
     for attempt in range(max_retries + 1):
         try:
@@ -521,12 +532,12 @@ def request_with_retries(
                 max_retries + 1,
                 delay,
             )
-            with contextlib.suppress(Exception):
-                response.close()
+            _close_response()
             time.sleep(delay)
 
         except requests.Timeout as exc:
             last_exception = exc
+            _close_response()
             LOGGER.debug(
                 "Request %s %s timed out (attempt %s/%s): %s",
                 method,
@@ -546,6 +557,7 @@ def request_with_retries(
 
         except requests.ConnectionError as exc:
             last_exception = exc
+            _close_response()
             LOGGER.debug(
                 "Request %s %s encountered connection error (attempt %s/%s): %s",
                 method,
@@ -568,6 +580,7 @@ def request_with_retries(
 
         except requests.RequestException as exc:
             last_exception = exc
+            _close_response()
             LOGGER.debug(
                 "Request %s %s failed (attempt %s/%s): %s",
                 method,

@@ -210,17 +210,23 @@ class DownloadStatistics:
 
     def get_success_rate(self) -> float:
         """Calculate overall success rate as percentage."""
-        if self.total_attempts == 0:
+        with self._lock:
+            total_attempts = self.total_attempts
+            total_successes = self.total_successes
+        if total_attempts == 0:
             return 0.0
-        return (self.total_successes / self.total_attempts) * 100.0
+        return (total_successes / total_attempts) * 100.0
 
     def get_average_speed_mbps(self) -> float:
         """Calculate average download speed in megabits per second."""
-        if self.total_time_ms == 0:
+        with self._lock:
+            total_time_ms = self.total_time_ms
+            total_bytes = self.total_bytes
+        if total_time_ms == 0:
             return 0.0
 
-        seconds = self.total_time_ms / 1000.0
-        bytes_per_second = self.total_bytes / seconds
+        seconds = total_time_ms / 1000.0
+        bytes_per_second = total_bytes / seconds
         bits_per_second = bytes_per_second * 8
         return bits_per_second / (1024 * 1024)
 
@@ -233,23 +239,29 @@ class DownloadStatistics:
         Returns:
             Download time in milliseconds at the percentile
         """
-        if not self.download_times:
+        with self._lock:
+            times_snapshot = tuple(self.download_times)
+        if not times_snapshot:
             return 0.0
 
-        sorted_times = sorted(self.download_times)
+        sorted_times = sorted(times_snapshot)
         index = int((percentile / 100.0) * len(sorted_times))
         index = min(index, len(sorted_times) - 1)
         return sorted_times[index]
 
     def get_average_size_mb(self) -> float:
         """Get average file size in megabytes."""
-        if not self.sizes_mb:
+        with self._lock:
+            sizes_snapshot = tuple(self.sizes_mb)
+        if not sizes_snapshot:
             return 0.0
-        return sum(self.sizes_mb) / len(self.sizes_mb)
+        return sum(sizes_snapshot) / len(sizes_snapshot)
 
     def get_total_mb(self) -> float:
         """Get total megabytes downloaded."""
-        return self.total_bytes / (1024 * 1024)
+        with self._lock:
+            total_bytes = self.total_bytes
+        return total_bytes / (1024 * 1024)
 
     def get_elapsed_seconds(self) -> float:
         """Get total elapsed time since tracker creation."""
@@ -268,7 +280,7 @@ class DownloadStatistics:
             sorted_failures = sorted(
                 self.failures_by_reason.items(), key=lambda x: x[1], reverse=True
             )
-            return sorted_failures[:limit]
+        return sorted_failures[:limit]
 
     def get_top_failing_domains(self, limit: int = 5) -> List[tuple[str, int]]:
         """Get domains with most failures.
@@ -283,7 +295,7 @@ class DownloadStatistics:
             sorted_domains = sorted(
                 self.failures_by_domain.items(), key=lambda x: x[1], reverse=True
             )
-            return sorted_domains[:limit]
+        return sorted_domains[:limit]
 
     def format_summary(self) -> str:
         """Format comprehensive statistics summary.
@@ -291,10 +303,40 @@ class DownloadStatistics:
         Returns:
             Human-readable statistics summary
         """
+        with self._lock:
+            total_attempts = self.total_attempts
+            total_successes = self.total_successes
+            total_failures = self.total_failures
+            total_bytes = self.total_bytes
+            total_time_ms = self.total_time_ms
+            sizes_snapshot = tuple(self.sizes_mb)
+            download_times_snapshot = tuple(self.download_times)
+            by_classification_snapshot = dict(self.by_classification)
+            failures_by_reason_snapshot = dict(self.failures_by_reason)
+            resolver_stats_snapshot = {
+                name: ResolverStats(
+                    attempts=stats.attempts,
+                    successes=stats.successes,
+                    failures=stats.failures,
+                    total_bytes=stats.total_bytes,
+                    total_time_ms=stats.total_time_ms,
+                    failures_by_reason=dict(stats.failures_by_reason),
+                )
+                for name, stats in self.resolver_stats.items()
+            }
+
         elapsed = self.get_elapsed_seconds()
-        success_rate = self.get_success_rate()
-        total_mb = self.get_total_mb()
-        avg_speed = self.get_average_speed_mbps()
+        success_rate = (
+            (total_successes / total_attempts) * 100.0 if total_attempts else 0.0
+        )
+        avg_speed = 0.0
+        if total_time_ms:
+            seconds = total_time_ms / 1000.0
+            if seconds > 0:
+                bytes_per_second = total_bytes / seconds
+                bits_per_second = bytes_per_second * 8
+                avg_speed = bits_per_second / (1024 * 1024)
+        total_mb = total_bytes / (1024 * 1024)
         current_bandwidth = self.bandwidth_tracker.get_bandwidth_mbps()
 
         lines = [
@@ -303,9 +345,9 @@ class DownloadStatistics:
             "=" * 70,
             "",
             "Overall Performance:",
-            f"  Total attempts: {self.total_attempts}",
-            f"  Successes: {self.total_successes} ({success_rate:.1f}%)",
-            f"  Failures: {self.total_failures}",
+            f"  Total attempts: {total_attempts}",
+            f"  Successes: {total_successes} ({success_rate:.1f}%)",
+            f"  Failures: {total_failures}",
             f"  Elapsed time: {elapsed:.1f}s",
             "",
             "Data Transfer:",
@@ -314,18 +356,26 @@ class DownloadStatistics:
             f"  Current bandwidth: {current_bandwidth:.2f} Mbps",
         ]
 
-        if self.sizes_mb:
-            avg_size = self.get_average_size_mb()
+        if sizes_snapshot:
+            avg_size = sum(sizes_snapshot) / len(sizes_snapshot)
             lines.extend(
                 [
                     f"  Average file size: {avg_size:.2f} MB",
                 ]
             )
 
-        if self.download_times:
-            p50 = self.get_percentile_time(50)
-            p95 = self.get_percentile_time(95)
-            p99 = self.get_percentile_time(99)
+        if download_times_snapshot:
+            sorted_times = sorted(download_times_snapshot)
+            last_index = len(sorted_times) - 1
+
+            def percentile_value(p: float) -> float:
+                index = int((p / 100.0) * len(sorted_times))
+                index = min(max(index, 0), last_index)
+                return sorted_times[index]
+
+            p50 = percentile_value(50)
+            p95 = percentile_value(95)
+            p99 = percentile_value(99)
             lines.extend(
                 [
                     "",
@@ -336,24 +386,29 @@ class DownloadStatistics:
                 ]
             )
 
-        if self.by_classification:
+        if by_classification_snapshot:
             lines.extend(["", "Content Types:"])
             for classification, count in sorted(
-                self.by_classification.items(), key=lambda x: x[1], reverse=True
+                by_classification_snapshot.items(), key=lambda x: x[1], reverse=True
             ):
-                pct = (count / self.total_attempts * 100) if self.total_attempts > 0 else 0
+                pct = (count / total_attempts * 100) if total_attempts > 0 else 0
                 lines.append(f"  {classification}: {count} ({pct:.1f}%)")
 
-        if self.failures_by_reason:
+        if failures_by_reason_snapshot:
             lines.extend(["", "Top Failure Reasons:"])
-            for reason, count in self.get_top_failures(5):
-                pct = (count / self.total_failures * 100) if self.total_failures > 0 else 0
+            sorted_failures = sorted(
+                failures_by_reason_snapshot.items(), key=lambda x: x[1], reverse=True
+            )[:5]
+            for reason, count in sorted_failures:
+                pct = (count / total_failures * 100) if total_failures > 0 else 0
                 lines.append(f"  {reason}: {count} ({pct:.1f}% of failures)")
 
-        if self.resolver_stats:
+        if resolver_stats_snapshot:
             lines.extend(["", "Resolver Performance:"])
             for name, stats in sorted(
-                self.resolver_stats.items(), key=lambda x: x[1].successes, reverse=True
+                resolver_stats_snapshot.items(),
+                key=lambda x: x[1].successes,
+                reverse=True,
             ):
                 lines.append(
                     f"  {name}: {stats.successes}/{stats.attempts} "

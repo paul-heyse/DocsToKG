@@ -1075,63 +1075,65 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
                 if record_type != "manifest":
                     continue
 
-            schema_version_raw = data.get("schema_version")
-            if schema_version_raw is None:
-                raise ValueError("Manifest entries must include a schema_version field.")
-            try:
-                schema_version = int(schema_version_raw)
-            except (TypeError, ValueError) as exc:
-                raise ValueError(
-                    f"Manifest entry schema_version must be an integer, got {schema_version_raw!r}"
-                ) from exc
-            if schema_version != MANIFEST_SCHEMA_VERSION:
-                qualifier = (
-                    "newer"
-                    if schema_version > MANIFEST_SCHEMA_VERSION
-                    else "older" if schema_version < MANIFEST_SCHEMA_VERSION else "unknown"
-                )
-                raise ValueError(
-                    "Unsupported manifest schema_version {observed} ({qualifier}); expected version {expected}. "
-                    "Regenerate the manifest using a compatible DocsToKG downloader release.".format(
-                        observed=schema_version,
-                        qualifier=qualifier,
-                        expected=MANIFEST_SCHEMA_VERSION,
-                    )
-                )
-            data["schema_version"] = schema_version
-
-            work_id = data.get("work_id")
-            url = data.get("url")
-            if not work_id or not url:
-                raise ValueError("Manifest entries must include work_id and url fields.")
-
-            content_length = data.get("content_length")
-            if isinstance(content_length, str):
+                schema_version_raw = data.get("schema_version")
+                if schema_version_raw is None:
+                    raise ValueError("Manifest entries must include a schema_version field.")
                 try:
-                    data["content_length"] = int(content_length)
-                except ValueError:
-                    data["content_length"] = None
+                    schema_version = int(schema_version_raw)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(
+                        f"Manifest entry schema_version must be an integer, got {schema_version_raw!r}"
+                    ) from exc
+                if schema_version != MANIFEST_SCHEMA_VERSION:
+                    qualifier = (
+                        "newer"
+                        if schema_version > MANIFEST_SCHEMA_VERSION
+                        else "older"
+                        if schema_version < MANIFEST_SCHEMA_VERSION
+                        else "unknown"
+                    )
+                    raise ValueError(
+                        "Unsupported manifest schema_version {observed} ({qualifier}); expected version {expected}. "
+                        "Regenerate the manifest using a compatible DocsToKG downloader release.".format(
+                            observed=schema_version,
+                            qualifier=qualifier,
+                            expected=MANIFEST_SCHEMA_VERSION,
+                        )
+                    )
+                data["schema_version"] = schema_version
 
-            key = normalize_url(url)
-            per_work.setdefault(work_id, {})[key] = data
+                work_id = data.get("work_id")
+                url = data.get("url")
+                if not work_id or not url:
+                    raise ValueError("Manifest entries must include work_id and url fields.")
 
-            raw_classification = data.get("classification")
-            classification_text = (raw_classification or "").strip()
-            if not classification_text:
-                raise ValueError("Manifest entries must declare a classification.")
+                content_length = data.get("content_length")
+                if isinstance(content_length, str):
+                    try:
+                        data["content_length"] = int(content_length)
+                    except ValueError:
+                        data["content_length"] = None
 
-            classification_code = Classification.from_wire(classification_text)
-            data["classification"] = classification_code.value
-            if classification_code in PDF_LIKE:
-                completed.add(work_id)
+                key = normalize_url(url)
+                per_work.setdefault(work_id, {})[key] = data
 
-            raw_reason = data.get("reason")
-            if raw_reason is not None:
-                data["reason"] = ReasonCode.from_wire(raw_reason).value
-            if data.get("reason_detail") is not None:
-                detail = data["reason_detail"]
-                if detail == "":
-                    data["reason_detail"] = None
+                raw_classification = data.get("classification")
+                classification_text = (raw_classification or "").strip()
+                if not classification_text:
+                    raise ValueError("Manifest entries must declare a classification.")
+
+                classification_code = Classification.from_wire(classification_text)
+                data["classification"] = classification_code.value
+                if classification_code in PDF_LIKE:
+                    completed.add(work_id)
+
+                raw_reason = data.get("reason")
+                if raw_reason is not None:
+                    data["reason"] = ReasonCode.from_wire(raw_reason).value
+                if data.get("reason_detail") is not None:
+                    detail = data["reason_detail"]
+                    if detail == "":
+                        data["reason_detail"] = None
 
     return per_work, completed
 
