@@ -626,11 +626,13 @@ def _parse_domain_token_bucket(value: str) -> Tuple[str, Dict[str, float]]:
 
 
 class RobotsCache:
-    """Cache robots.txt policies per host and evaluate allowed URLs."""
+    """Cache robots.txt policies per host and evaluate allowed URLs with TTL."""
 
-    def __init__(self, user_agent: str) -> None:
+    def __init__(self, user_agent: str, *, ttl_seconds: int = 3600) -> None:
         self._user_agent = user_agent
         self._parsers: Dict[str, RobotFileParser] = {}
+        self._fetched_at: Dict[str, float] = {}
+        self._ttl = float(ttl_seconds)
         self._lock = threading.Lock()
 
     def is_allowed(self, session: requests.Session, url: str, timeout: float) -> bool:
@@ -640,12 +642,7 @@ class RobotsCache:
         if not parsed.scheme or not parsed.netloc:
             return True
         origin = f"{parsed.scheme}://{parsed.netloc}"
-        with self._lock:
-            parser = self._parsers.get(origin)
-        if parser is None:
-            parser = self._fetch(session, origin, timeout)
-            with self._lock:
-                self._parsers[origin] = parser
+        parser = self._lookup_parser(session, origin, timeout)
 
         path = parsed.path or "/"
         if parsed.params:
@@ -656,6 +653,25 @@ class RobotsCache:
             return parser.can_fetch(self._user_agent, path or "/")
         except Exception:
             return True
+
+    def _lookup_parser(
+        self,
+        session: requests.Session,
+        origin: str,
+        timeout: float,
+    ) -> RobotFileParser:
+        now = time.time()
+        with self._lock:
+            parser = self._parsers.get(origin)
+            fetched_at = self._fetched_at.get(origin, 0.0)
+
+        if parser is None or (self._ttl > 0 and (now - fetched_at) >= self._ttl):
+            parser = self._fetch(session, origin, timeout)
+            with self._lock:
+                self._parsers[origin] = parser
+                self._fetched_at[origin] = now
+
+        return parser
 
     def _fetch(self, session: requests.Session, origin: str, timeout: float) -> RobotFileParser:
         """Fetch and parse the robots.txt policy for ``origin``."""
@@ -862,6 +878,61 @@ def resolve_topic_id_if_needed(topic_text: Optional[str]) -> Optional[str]:
     if not normalized:
         return None
     return _lookup_topic_id(normalized)
+
+
+def _cohort_order_for(artifact: WorkArtifact) -> List[str]:
+    """Return a resolver order tailored to the artifact's identifiers."""
+
+    sources = {s.strip() for s in (artifact.source_display_names or []) if s}
+    paywalled_publishers = {
+        "Elsevier",
+        "Wiley",
+        "IEEE",
+        "ACM",
+        "Taylor & Francis",
+        "Springer",
+        "SAGE",
+    }
+
+    if getattr(artifact, "pmcid", None):
+        return [
+            "pmc",
+            "europe_pmc",
+            "unpaywall",
+            "crossref",
+            "landing_page",
+            "wayback",
+        ]
+
+    if getattr(artifact, "arxiv_id", None):
+        return [
+            "arxiv",
+            "unpaywall",
+            "crossref",
+            "landing_page",
+            "wayback",
+        ]
+
+    if sources & paywalled_publishers:
+        return [
+            "unpaywall",
+            "core",
+            "doaj",
+            "crossref",
+            "landing_page",
+            "wayback",
+        ]
+
+    try:
+        from DocsToKG.ContentDownload import pipeline as _pipeline
+
+        default_order = getattr(_pipeline, "DEFAULT_RESOLVER_ORDER", None)
+        if default_order:
+            return list(default_order)
+    except Exception:  # pragma: no cover - defensive
+        pass
+
+    return []
 
 
 def create_artifact(
@@ -1846,6 +1917,10 @@ def process_one_work(
         "content_addressed": content_addressed,
     }
 
+    cohort_order = _cohort_order_for(artifact)
+    if cohort_order:
+        download_context["resolver_order_override"] = cohort_order
+
     if artifact.work_id in resume_completed:
         LOGGER.info("Skipping %s (already completed)", artifact.work_id)
         skipped_outcome = DownloadOutcome(
@@ -2150,6 +2225,12 @@ def main() -> None:
         help="Comma-separated resolver order override (e.g., 'unpaywall,crossref').",
     )
     resolver_group.add_argument(
+        "--resolver-preset",
+        choices=["fast", "broad"],
+        default=None,
+        help="Shortcut resolver ordering preset ('fast' prioritises OA, 'broad' keeps defaults).",
+    )
+    resolver_group.add_argument(
         "--unpaywall-email", type=str, default=None, help="Override Unpaywall email credential."
     )
     resolver_group.add_argument(
@@ -2382,18 +2463,43 @@ def main() -> None:
     resolver_instances = default_resolvers()
     resolver_names = [resolver.name for resolver in resolver_instances]
     resolver_order_override: Optional[List[str]] = None
-    if args.resolver_order:
-        resolver_order_override = [
-            name.strip() for name in args.resolver_order.split(",") if name.strip()
-        ]
-        if not resolver_order_override:
-            parser.error("--resolver-order requires at least one resolver name.")
-        unknown = [name for name in resolver_order_override if name not in resolver_names]
+
+    def _normalise_order(order: List[str]) -> List[str]:
+        cleaned: List[str] = []
+        unknown: List[str] = []
+        for name in order:
+            if name not in resolver_names:
+                unknown.append(name)
+            elif name not in cleaned:
+                cleaned.append(name)
         if unknown:
-            parser.error(f"Unknown resolver(s) in --resolver-order: {', '.join(unknown)}")
-        resolver_order_override.extend(
-            name for name in resolver_names if name not in resolver_order_override
-        )
+            parser.error(
+                f"Unknown resolver(s) in order override: {', '.join(sorted(set(unknown)))}"
+            )
+        cleaned.extend(name for name in resolver_names if name not in cleaned)
+        return cleaned
+
+    if args.resolver_order:
+        raw_order = [name.strip() for name in args.resolver_order.split(",") if name.strip()]
+        if not raw_order:
+            parser.error("--resolver-order requires at least one resolver name.")
+        resolver_order_override = _normalise_order(raw_order)
+    elif getattr(args, "resolver_preset", None):
+        if args.resolver_preset == "fast":
+            preset = [
+                "openalex",
+                "unpaywall",
+                "crossref",
+                "landing_page",
+                "arxiv",
+                "pmc",
+                "europe_pmc",
+                "core",
+                "wayback",
+            ]
+        else:  # broad preset
+            preset = list(getattr(resolvers, "DEFAULT_RESOLVER_ORDER", resolver_names))
+        resolver_order_override = _normalise_order(preset)
 
     try:
         config = load_resolver_config(args, resolver_names, resolver_order_override)

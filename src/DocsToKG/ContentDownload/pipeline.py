@@ -2082,21 +2082,50 @@ class CrossrefResolver(ApiResolverBase):
         if not isinstance(link_section, list):
             link_section = []
 
-        candidates: List[Tuple[str, Dict[str, Any]]] = []
+        pdf_candidates: List[Tuple[str, Dict[str, Any]]] = []
         for entry in link_section:
             if not isinstance(entry, dict):
                 continue
-            url = entry.get("URL")
-            content_type = entry.get("content-type")
-            ctype = (content_type or "").lower()
-            if url and ctype in {"application/pdf", "application/x-pdf", "text/html"}:
-                candidates.append((url, {"content_type": content_type}))
+            url = entry.get("URL") or entry.get("url")
+            content_type = (
+                entry.get("content-type")
+                or entry.get("content_type")
+                or ""
+            ).lower()
+            if not url or "application/pdf" not in content_type:
+                continue
+            pdf_candidates.append((url, entry))
 
-        for url in dedupe([candidate_url for candidate_url, _ in candidates]):
-            for candidate_url, metadata in candidates:
-                if candidate_url == url:
-                    yield ResolverResult(url=url, metadata=metadata)
-                    break
+        if not pdf_candidates:
+            return
+
+        def _score(candidate: Tuple[str, Dict[str, Any]]) -> int:
+            _, meta = candidate
+            version = (
+                meta.get("content-version")
+                or meta.get("content_version")
+                or ""
+            ).lower()
+            return 1 if version == "vor" else 0
+
+        pdf_candidates.sort(key=_score, reverse=True)
+
+        seen: Set[str] = set()
+        for url, meta in pdf_candidates:
+            normalized = normalize_url(url)
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            yield ResolverResult(
+                url=normalized,
+                metadata={
+                    "source": "crossref",
+                    "content-version": meta.get("content-version")
+                    or meta.get("content_version"),
+                    "content_type": meta.get("content-type")
+                    or meta.get("content_type"),
+                },
+            )
 
 
 class DoajResolver(ApiResolverBase):
@@ -4036,7 +4065,18 @@ class ResolverPipeline:
             PipelineResult summarising the sequential run outcome.
         """
 
-        for order_index, resolver_name in enumerate(self.config.resolver_order, start=1):
+        override = context_data.get("resolver_order_override")
+        if override:
+            ordered_names = [name for name in override if name in self._resolver_map]
+            ordered_names.extend(
+                name
+                for name in self.config.resolver_order
+                if name not in ordered_names
+            )
+        else:
+            ordered_names = list(self.config.resolver_order)
+
+        for order_index, resolver_name in enumerate(ordered_names, start=1):
             resolver = self._prepare_resolver(resolver_name, order_index, artifact, state)
             if resolver is None:
                 continue
@@ -4089,6 +4129,17 @@ class ResolverPipeline:
             PipelineResult summarising the concurrent run outcome.
         """
 
+        override = context_data.get("resolver_order_override")
+        if override:
+            resolver_order = [name for name in override if name in self._resolver_map]
+            resolver_order.extend(
+                name
+                for name in self.config.resolver_order
+                if name not in resolver_order
+            )
+        else:
+            resolver_order = list(self.config.resolver_order)
+
         max_workers = self.config.max_concurrent_resolvers
         active_futures: Dict[Future[Tuple[List[ResolverResult], float]], Tuple[str, int]] = {}
 
@@ -4106,8 +4157,8 @@ class ResolverPipeline:
                 Updated index pointing to the next resolver candidate that has not been submitted.
             """
             index = start_index
-            while len(active_futures) < max_workers and index < len(self.config.resolver_order):
-                resolver_name = self.config.resolver_order[index]
+            while len(active_futures) < max_workers and index < len(resolver_order):
+                resolver_name = resolver_order[index]
                 order_index = index + 1
                 index += 1
                 resolver = self._prepare_resolver(resolver_name, order_index, artifact, state)
