@@ -144,7 +144,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any, Callable, Mapping, MutableMapping, Optional, Set, Union
+from typing import Any, Callable, Dict, Mapping, MutableMapping, Optional, Set, Union
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -158,7 +158,9 @@ __all__ = (
     "ContentPolicyViolation",
     "CircuitBreaker",
     "TokenBucket",
+    "ThreadLocalSessionFactory",
     "create_session",
+    "get_thread_session",
     "head_precheck",
     "parse_retry_after_header",
     "request_with_retries",
@@ -168,6 +170,73 @@ LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
 
 # --- Public Functions ---
+
+
+class ThreadLocalSessionFactory:
+    """Create or reuse :class:`requests.Session` instances per thread.
+
+    The factory caches sessions keyed by thread identifier so worker pools can
+    retain warm connection pools while avoiding cross-thread sharing. Callers
+    should invoke :meth:`close_all` when tearing down the pool to release open
+    sockets promptly.
+    """
+
+    def __init__(self, builder: Callable[[], requests.Session]) -> None:
+        self._builder = builder
+        self._local = threading.local()
+        self._lock = threading.Lock()
+        self._sessions: Dict[int, requests.Session] = {}
+
+    def get_thread_session(self) -> requests.Session:
+        """Return a session scoped to the current thread."""
+
+        session = getattr(self._local, "session", None)
+        if session is None:
+            session = self._builder()
+            setattr(self._local, "session", session)
+            with self._lock:
+                self._sessions[id(session)] = session
+        return session
+
+    def __call__(self) -> requests.Session:
+        """Allow instances to be used as session factories callable."""
+
+        return self.get_thread_session()
+
+    def close_current(self) -> None:
+        """Close and remove the session bound to the current thread."""
+
+        session = getattr(self._local, "session", None)
+        if session is None:
+            return
+        setattr(self._local, "session", None)
+        with self._lock:
+            self._sessions.pop(id(session), None)
+        with contextlib.suppress(Exception):
+            session.close()
+
+    def close_all(self) -> None:
+        """Close all cached sessions and reset thread-local state."""
+
+        with self._lock:
+            sessions = list(self._sessions.values())
+            self._sessions.clear()
+        setattr(self._local, "session", None)
+        for session in sessions:
+            with contextlib.suppress(Exception):
+                session.close()
+
+
+_DEFAULT_THREAD_SESSION_FACTORY: Optional[ThreadLocalSessionFactory] = None
+
+
+def get_thread_session() -> requests.Session:
+    """Return a default thread-local session using :func:`create_session`."""
+
+    global _DEFAULT_THREAD_SESSION_FACTORY
+    if _DEFAULT_THREAD_SESSION_FACTORY is None:
+        _DEFAULT_THREAD_SESSION_FACTORY = ThreadLocalSessionFactory(create_session)
+    return _DEFAULT_THREAD_SESSION_FACTORY.get_thread_session()
 
 
 def create_session(
@@ -197,9 +266,10 @@ def create_session(
         None.
 
     Notes:
-        The returned session uses ``HTTPAdapter`` for connection pooling. It is safe to share
-        across threads provided callers avoid mutating shared mutable state (for example,
-        updating ``session.headers``) once the session is distributed to worker threads.
+        The returned session uses ``HTTPAdapter`` for connection pooling. When executing
+        concurrently, prefer wrapping :func:`create_session` with
+        :class:`ThreadLocalSessionFactory` so each worker maintains its own connection
+        pool without sharing mutable session state across threads.
 
         When ``enable_compression`` is ``True``, the session automatically requests gzip
         and deflate compression, which can reduce bandwidth usage by 60-80% for text-heavy

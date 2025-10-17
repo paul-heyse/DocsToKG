@@ -949,7 +949,7 @@ from DocsToKG.ContentDownload.cli import (
     ensure_dir,
     load_resolver_config,
 )
-from DocsToKG.ContentDownload.core import Classification, ReasonCode, classify_payload
+from DocsToKG.ContentDownload.core import Classification, DownloadContext, ReasonCode, classify_payload
 from DocsToKG.ContentDownload.pipeline import (
     ApiResolverBase,
     ArxivResolver,
@@ -2336,7 +2336,9 @@ def test_pipeline_downloads_with_context_argument(tmp_path):
     pipeline = ResolverPipeline([resolver], config, download_with_context, logger, metrics)
     pipeline.run(DummySession({}), artifact, context={"dry_run": False})
 
-    assert context_received["value"]["dry_run"] is False
+    context_obj = context_received["value"]
+    assert isinstance(context_obj, DownloadContext)
+    assert context_obj.dry_run is False
     assert logger.records[-1].status is Classification.HTTP_ERROR
 
 

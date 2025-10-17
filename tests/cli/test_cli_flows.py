@@ -150,7 +150,7 @@ import pytest
 
 from DocsToKG.ContentDownload import cli as downloader
 from DocsToKG.ContentDownload import pipeline as resolvers
-from DocsToKG.ContentDownload.core import Classification
+from DocsToKG.ContentDownload.core import Classification, DownloadContext
 from DocsToKG.ContentDownload.telemetry import MANIFEST_SCHEMA_VERSION
 from tools.manifest_to_index import convert_manifest_to_index
 
@@ -623,7 +623,8 @@ def test_main_dry_run_skips_writing_files(download_modules, monkeypatch, tmp_pat
             self.metrics = metrics
 
         def run(self, session, artifact, context=None):
-            assert context and context.get("dry_run") is True
+            assert isinstance(context, DownloadContext)
+            assert context.dry_run is True
             self.logger.log_attempt(
                 resolvers.AttemptRecord(
                     work_id=artifact.work_id,
@@ -1540,7 +1541,8 @@ def test_cli_dry_run_metrics_align(download_modules, monkeypatch, tmp_path):
             self.run_id = kwargs.get("run_id")
 
         def run(self, session, artifact, context=None):
-            assert context and context.get("dry_run") is True
+            assert isinstance(context, DownloadContext)
+            assert context.dry_run is True
             outcome = resolvers.DownloadOutcome(
                 classification="pdf",
                 path=None,

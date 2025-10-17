@@ -68,7 +68,8 @@ def test_manifest_entry_schema_backward_compatible(tmp_path: Path):
     }
     pdf_dir = tmp_path / "pdf"
     html_dir = tmp_path / "html"
-    artifact = downloader.create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
+    xml_dir = tmp_path / "xml"
+    artifact = downloader.create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir, xml_dir=xml_dir)
 
     outcome = resolvers.DownloadOutcome(
         classification="pdf",

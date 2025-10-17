@@ -916,9 +916,29 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             text = chunker.contextualize(ch)
             n_tok = tokenizer.count_tokens(text=text)
             refs, pages = extract_refs_and_pages(ch)
-            has_caption, has_classification, num_images, image_confidence, picture_meta = (
-                summarize_image_metadata(ch, text)
-            )
+            image_metadata = summarize_image_metadata(ch, text)
+            picture_meta: List[Dict[str, Any]] = []
+            if isinstance(image_metadata, (list, tuple)):
+                if len(image_metadata) == 4:
+                    (
+                        has_caption,
+                        has_classification,
+                        num_images,
+                        image_confidence,
+                    ) = image_metadata
+                else:
+                    (
+                        has_caption,
+                        has_classification,
+                        num_images,
+                        image_confidence,
+                        picture_meta,
+                    ) = image_metadata  # type: ignore[misc]
+            else:
+                has_caption = False
+                has_classification = False
+                num_images = 0
+                image_confidence = None
             recs.append(
                 Rec(
                     text=text,

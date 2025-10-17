@@ -59,6 +59,9 @@ _LEGACY_EXPORTS = {
     "DownloadConfiguration",
     "ResolvedConfig",
     "ResolverCandidate",
+    "LoggingConfiguration",
+    "mask_sensitive_data",
+    "setup_logging",
 }
 
 if TYPE_CHECKING:  # pragma: no cover - import for static analysis only

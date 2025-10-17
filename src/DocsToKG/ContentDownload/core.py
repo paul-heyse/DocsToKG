@@ -17,7 +17,7 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Union
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 __all__ = (
@@ -28,6 +28,7 @@ __all__ = (
     "DEFAULT_MIN_PDF_BYTES",
     "DEFAULT_TAIL_CHECK_BYTES",
     "WorkArtifact",
+    "DownloadContext",
     "atomic_write",
     "atomic_write_bytes",
     "atomic_write_text",
@@ -45,6 +46,8 @@ __all__ = (
     "normalize_arxiv",
     "slugify",
     "normalize_url",
+    "normalize_classification",
+    "normalize_reason",
     "parse_size",
 )
 
@@ -72,6 +75,7 @@ def atomic_write(
     *,
     hasher: Optional[Any] = None,
     temp_suffix: str = ".part",
+    keep_partial_on_error: bool = False,
 ) -> int:
     """Atomically write ``chunks`` to ``path`` and return the byte count.
 
@@ -86,6 +90,7 @@ def atomic_write(
     temp_path = path.with_name(temp_name)
     written = 0
     replaced = False
+    partial_kept = False
     try:
         with temp_path.open("wb") as handle:
             # Optimization: Use separate code paths to avoid hasher None check in hot loop
@@ -105,8 +110,30 @@ def atomic_write(
         os.replace(temp_path, path)
         replaced = True
         return written
+    except Exception:
+        if keep_partial_on_error:
+            partial_path = path.with_suffix(path.suffix + suffix)
+            try:
+                partial_path.parent.mkdir(parents=True, exist_ok=True)
+            except FileExistsError:
+                pass
+            with suppress(FileNotFoundError):
+                partial_path.unlink()
+            try:
+                os.replace(temp_path, partial_path)
+                partial_kept = True
+            except FileNotFoundError:
+                partial_kept = False
+            except OSError:
+                partial_kept = False
+                with suppress(FileNotFoundError):
+                    temp_path.unlink()
+        else:
+            with suppress(FileNotFoundError):
+                temp_path.unlink()
+        raise
     finally:
-        if not replaced:
+        if not replaced and not partial_kept:
             with suppress(FileNotFoundError):
                 temp_path.unlink()
 
@@ -116,10 +143,16 @@ def atomic_write_bytes(
     chunks: Iterable[bytes],
     *,
     hasher: Optional[Any] = None,
+    keep_partial_on_error: bool = False,
 ) -> int:
     """Backward-compatible wrapper for :func:`atomic_write`."""
 
-    return atomic_write(path, chunks, hasher=hasher)
+    return atomic_write(
+        path,
+        chunks,
+        hasher=hasher,
+        keep_partial_on_error=keep_partial_on_error,
+    )
 
 
 def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
@@ -156,6 +189,211 @@ class WorkArtifact:
             "html": self.html_dir,
             "xml": self.xml_dir,
         }
+
+
+@dataclass
+class DownloadContext:
+    """Typed execution context shared by the CLI and resolver pipeline."""
+
+    resolver_order: List[str] = field(default_factory=list)
+    dry_run: bool = False
+    list_only: bool = False
+    extract_html_text: bool = False
+    previous: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    global_manifest_index: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    max_bytes: Optional[int] = None
+    sniff_bytes: int = DEFAULT_SNIFF_BYTES
+    min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
+    tail_check_bytes: int = DEFAULT_TAIL_CHECK_BYTES
+    domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    host_accept_overrides: Dict[str, Any] = field(default_factory=dict)
+    progress_callback: Optional[Callable[[int, Optional[int], str], None]] = None
+    enable_range_resume: bool = False
+    robots_checker: Optional["RobotsCache"] = None
+    skip_head_precheck: bool = False
+    head_precheck_passed: bool = False
+    content_addressed: bool = False
+    skip_large_downloads: bool = False
+    size_warning_threshold: Optional[int] = None
+    chunk_size: Optional[int] = None
+    stream_retry_attempts: int = 0
+    extra: Dict[str, Any] = field(default_factory=dict)
+    provided_fields: Set[str] = field(default_factory=set, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self.resolver_order = self._normalize_sequence(self.resolver_order)
+        self.previous = self._normalize_mapping(self.previous)
+        self.global_manifest_index = self._normalize_mapping(self.global_manifest_index)
+        self.domain_content_rules = self._normalize_mapping(self.domain_content_rules)
+        self.host_accept_overrides = self._normalize_mapping(self.host_accept_overrides)
+        self.extra = self._normalize_mapping(self.extra)
+
+        self.dry_run = bool(self.dry_run)
+        self.list_only = bool(self.list_only)
+        self.extract_html_text = bool(self.extract_html_text)
+        self.enable_range_resume = bool(self.enable_range_resume)
+        self.skip_head_precheck = bool(self.skip_head_precheck)
+        self.head_precheck_passed = bool(self.head_precheck_passed)
+        self.content_addressed = bool(self.content_addressed)
+        self.skip_large_downloads = bool(self.skip_large_downloads)
+
+        self.max_bytes = self._coerce_optional_positive(self.max_bytes)
+        self.size_warning_threshold = self._coerce_optional_positive(self.size_warning_threshold)
+        self.chunk_size = self._coerce_optional_positive(self.chunk_size)
+        self.stream_retry_attempts = max(int(self.stream_retry_attempts or 0), 0)
+
+        self.sniff_bytes = self._coerce_non_negative(self.sniff_bytes, DEFAULT_SNIFF_BYTES)
+        self.min_pdf_bytes = self._coerce_non_negative(self.min_pdf_bytes, DEFAULT_MIN_PDF_BYTES)
+        self.tail_check_bytes = self._coerce_non_negative(
+            self.tail_check_bytes, DEFAULT_TAIL_CHECK_BYTES
+        )
+        self.provided_fields = {str(field) for field in self.provided_fields if field}
+
+    @classmethod
+    def from_mapping(cls, data: Optional[Mapping[str, Any]] = None) -> "DownloadContext":
+        """Construct a context instance from a mapping-based payload."""
+
+        if isinstance(data, cls):
+            return data
+
+        mapping = dict(data or {})
+        provided: Set[str] = set()
+
+        def _pop(name: str, default: Any = None, *, canonical: Optional[str] = None) -> Any:
+            key = canonical or name
+            if name in mapping:
+                provided.add(key)
+            return mapping.pop(name, default)
+
+        resolver_order_value = _pop("resolver_order", None, canonical="resolver_order")
+        override_value = _pop("resolver_order_override", None, canonical="resolver_order")
+        if resolver_order_value is None:
+            resolver_order_value = override_value or []
+        stream_attempts = _pop(
+            "_stream_retry_attempts",
+            _pop("stream_retry_attempts", 0, canonical="stream_retry_attempts"),
+            canonical="stream_retry_attempts",
+        )
+        context = cls(
+            resolver_order=resolver_order_value,
+            dry_run=_pop("dry_run", False),
+            list_only=_pop("list_only", False),
+            extract_html_text=_pop("extract_html_text", False),
+            previous=_pop("previous", {}),
+            global_manifest_index=_pop("global_manifest_index", {}),
+            max_bytes=_pop("max_bytes", None),
+            sniff_bytes=_pop("sniff_bytes", DEFAULT_SNIFF_BYTES),
+            min_pdf_bytes=_pop("min_pdf_bytes", DEFAULT_MIN_PDF_BYTES),
+            tail_check_bytes=_pop("tail_check_bytes", DEFAULT_TAIL_CHECK_BYTES),
+            domain_content_rules=_pop("domain_content_rules", {}),
+            host_accept_overrides=_pop("host_accept_overrides", {}),
+            progress_callback=_pop("progress_callback", None),
+            enable_range_resume=_pop("enable_range_resume", False),
+            robots_checker=_pop("robots_checker", None),
+            skip_head_precheck=_pop("skip_head_precheck", False),
+            head_precheck_passed=_pop("head_precheck_passed", False),
+            content_addressed=_pop("content_addressed", False),
+            skip_large_downloads=_pop("skip_large_downloads", False),
+            size_warning_threshold=_pop("size_warning_threshold", None),
+            chunk_size=_pop("chunk_size", None),
+            stream_retry_attempts=stream_attempts,
+        )
+        context.provided_fields.update(provided)
+        if mapping:
+            context.extra.update(mapping)
+        return context
+
+    def mark_explicit(self, *fields: str) -> None:
+        """Record that the given fields were explicitly provided by the caller."""
+
+        self.provided_fields.update(field for field in fields if field)
+
+    def is_explicit(self, field: str) -> bool:
+        """Return ``True`` when ``field`` was explicitly provided by the caller."""
+
+        return field in self.provided_fields
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the context to a mapping for legacy integrations."""
+
+        payload: Dict[str, Any] = {
+            "resolver_order": list(self.resolver_order),
+            "dry_run": self.dry_run,
+            "list_only": self.list_only,
+            "extract_html_text": self.extract_html_text,
+            "previous": self.previous,
+            "global_manifest_index": self.global_manifest_index,
+            "max_bytes": self.max_bytes,
+            "sniff_bytes": self.sniff_bytes,
+            "min_pdf_bytes": self.min_pdf_bytes,
+            "tail_check_bytes": self.tail_check_bytes,
+            "domain_content_rules": self.domain_content_rules,
+            "host_accept_overrides": self.host_accept_overrides,
+            "progress_callback": self.progress_callback,
+            "enable_range_resume": self.enable_range_resume,
+            "robots_checker": self.robots_checker,
+            "skip_head_precheck": self.skip_head_precheck,
+            "head_precheck_passed": self.head_precheck_passed,
+            "content_addressed": self.content_addressed,
+            "skip_large_downloads": self.skip_large_downloads,
+            "size_warning_threshold": self.size_warning_threshold,
+            "chunk_size": self.chunk_size,
+        }
+        if self.stream_retry_attempts:
+            payload["stream_retry_attempts"] = self.stream_retry_attempts
+        if self.extra:
+            payload.update(self.extra)
+        return payload
+
+    def clone_for_download(self) -> "DownloadContext":
+        """Return a shallow clone suitable for per-download mutation."""
+
+        clone = DownloadContext.from_mapping(self.to_dict())
+        clone.stream_retry_attempts = 0
+        clone.provided_fields = set(self.provided_fields)
+        return clone
+
+    @staticmethod
+    def _normalize_sequence(value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            items = [value]
+        else:
+            try:
+                items = list(value)
+            except TypeError:
+                items = [value]
+        return [str(item) for item in items if item]
+
+    @staticmethod
+    def _normalize_mapping(value: Any) -> Dict[str, Any]:
+        if value is None:
+            return {}
+        if isinstance(value, Mapping):
+            return dict(value)
+        try:
+            return dict(value)
+        except (TypeError, ValueError):
+            return {}
+
+    @staticmethod
+    def _coerce_optional_positive(value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            return None
+        return number if number > 0 else None
+
+    @staticmethod
+    def _coerce_non_negative(value: Any, default: int) -> int:
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            return default
+        return number if number >= 0 else max(default, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -254,6 +492,44 @@ class ReasonCode(Enum):
             if member.value == text:
                 return member
         return cls.UNKNOWN
+
+
+
+
+def normalize_classification(value: Union[str, Classification, None]) -> Union[Classification, str]:
+    """Return a normalized classification token preserving unknown custom codes."""
+
+    if isinstance(value, Classification):
+        return value
+    if value is None:
+        return Classification.UNKNOWN
+    text = str(value).strip()
+    if not text:
+        return Classification.UNKNOWN
+    candidate = Classification.from_wire(text)
+    if isinstance(value, str):
+        lowered = text.lower()
+        if candidate is Classification.UNKNOWN and lowered not in {member.value for member in Classification}:
+            return value
+    return candidate
+
+
+
+def normalize_reason(value: Optional[Union[str, ReasonCode]]) -> Optional[Union[ReasonCode, str]]:
+    """Return a normalized reason token preserving unknown custom codes."""
+
+    if isinstance(value, ReasonCode):
+        return value
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    normalized = text.replace('-', '_')
+    candidate = ReasonCode.from_wire(normalized)
+    if candidate is not ReasonCode.UNKNOWN or normalized == ReasonCode.UNKNOWN.value:
+        return candidate
+    return text
 
 
 # ---------------------------------------------------------------------------

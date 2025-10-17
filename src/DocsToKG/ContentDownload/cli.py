@@ -158,7 +158,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple, Union
 from urllib.parse import urlparse, urlsplit
 from urllib.robotparser import RobotFileParser
 
@@ -173,6 +173,7 @@ from DocsToKG.ContentDownload.core import (
     PDF_LIKE,
     Classification,
     ReasonCode,
+    DownloadContext,
     WorkArtifact,
     _infer_suffix,
     atomic_write,
@@ -194,6 +195,7 @@ from DocsToKG.ContentDownload.networking import (
     ConditionalRequestHelper,
     ContentPolicyViolation,
     ModifiedResult,
+    ThreadLocalSessionFactory,
     create_session,
     head_precheck,
     parse_retry_after_header,
@@ -999,7 +1001,7 @@ def download_candidate(
     url: str,
     referer: Optional[str],
     timeout: float,
-    context: Optional[Dict[str, Any]] = None,
+    context: Optional[Union[DownloadContext, Mapping[str, Any]]] = None,
     head_precheck_passed: bool = False,
 ) -> DownloadOutcome:
     """Download a single candidate URL and classify the payload.
@@ -1011,8 +1013,9 @@ def download_candidate(
         url: Candidate download URL discovered by a resolver.
         referer: Optional referer header override provided by the resolver.
         timeout: Per-request timeout in seconds.
-        context: Execution context containing ``dry_run``, ``extract_html_text``,
-            ``previous`` manifest lookup data, and optional ``progress_callback``.
+        context: :class:`DownloadContext` (or mapping convertible to it) containing
+            ``dry_run``, ``extract_html_text``, prior manifest lookups, and optional
+            ``progress_callback``.
 
             Progress callback signature: ``callback(bytes_downloaded, total_bytes, url)``
             where ``total_bytes`` may be ``None`` if Content-Length is unavailable.
@@ -1033,25 +1036,18 @@ def download_candidate(
         OSError: If writing the downloaded payload to disk fails.
         TypeError: If conditional response parsing returns unexpected objects.
     """
-    context = context or {}
-    sniff_limit = max(int(context.get("sniff_bytes", DEFAULT_SNIFF_BYTES)), 0)
-    min_pdf_bytes = max(int(context.get("min_pdf_bytes", DEFAULT_MIN_PDF_BYTES)), 0)
-    tail_window_bytes = max(int(context.get("tail_check_bytes", DEFAULT_TAIL_CHECK_BYTES)), 0)
+    ctx = DownloadContext.from_mapping(context)
+    sniff_limit = ctx.sniff_bytes
+    min_pdf_bytes = ctx.min_pdf_bytes
+    tail_window_bytes = ctx.tail_check_bytes
 
     # Extract progress callback if provided
-    progress_callback = context.get("progress_callback")
+    progress_callback = ctx.progress_callback
     progress_update_interval = 128 * 1024  # Update progress every 128KB
 
-    max_bytes_raw = context.get("max_bytes")
-    max_bytes: Optional[int]
-    try:
-        max_bytes = int(max_bytes_raw) if max_bytes_raw is not None else None
-    except (TypeError, ValueError):
-        max_bytes = None
-    if max_bytes is not None and max_bytes <= 0:
-        max_bytes = None
+    max_bytes: Optional[int] = ctx.max_bytes
     parsed_url = urlsplit(url)
-    domain_policies: Dict[str, Dict[str, Any]] = context.get("domain_content_rules", {})
+    domain_policies: Dict[str, Dict[str, Any]] = ctx.domain_content_rules
     host_key = (parsed_url.hostname or parsed_url.netloc or "").lower()
     content_policy: Optional[Dict[str, Any]] = None
     if domain_policies and host_key:
@@ -1074,9 +1070,10 @@ def download_candidate(
     # Note: Full resume support requires atomic_write to handle append mode
     # and rehashing from partial file state. Currently infrastructure is in place
     # but feature is disabled by default pending append-mode implementation.
-    enable_resume = bool(context.get("enable_range_resume", False))
+    enable_resume = ctx.enable_range_resume
     resume_bytes_offset: Optional[int] = None
-    accept_overrides = context.get("host_accept_overrides", {})
+    resume_probe_path: Optional[Path] = None
+    accept_overrides = ctx.host_accept_overrides
     accept_value: Optional[str] = None
     if isinstance(accept_overrides, dict):
         host_for_accept = (parsed_url.netloc or "").lower()
@@ -1087,8 +1084,8 @@ def download_candidate(
     if accept_value:
         base_headers["Accept"] = str(accept_value)
 
-    dry_run = bool(context.get("dry_run", False))
-    robots_checker: Optional[RobotsCache] = context.get("robots_checker")
+    dry_run = ctx.dry_run
+    robots_checker: Optional[RobotsCache] = ctx.robots_checker
     if robots_checker is not None:
         robots_allowed = robots_checker.is_allowed(session, url, timeout)
         if not robots_allowed:
@@ -1110,13 +1107,13 @@ def download_candidate(
                 reason=ReasonCode.ROBOTS_DISALLOWED,
                 reason_detail="robots-disallowed",
             )
-    head_precheck_passed = head_precheck_passed or bool(context.get("head_precheck_passed", False))
-    if not head_precheck_passed and not context.get("skip_head_precheck", False):
+    head_precheck_passed = head_precheck_passed or ctx.head_precheck_passed
+    if not head_precheck_passed and not ctx.skip_head_precheck:
         head_precheck_passed = head_precheck(session, url, timeout, content_policy=content_policy)
-        context["head_precheck_passed"] = head_precheck_passed
-    extract_html_text = bool(context.get("extract_html_text", False))
-    previous_map: Dict[str, Dict[str, Any]] = context.get("previous", {})
-    global_index: Dict[str, Dict[str, Any]] = context.get("global_manifest_index", {})
+        ctx.head_precheck_passed = head_precheck_passed
+    extract_html_text = ctx.extract_html_text
+    previous_map = ctx.previous
+    global_index = ctx.global_manifest_index
     normalized_url = normalize_url(url)
     previous = previous_map.get(normalized_url) or global_index.get(normalized_url, {})
     previous_etag = previous.get("etag")
@@ -1144,6 +1141,7 @@ def download_candidate(
     start = time.monotonic()
     try:
         while True:
+            resume_probe_path = None
             if (
                 enable_resume
                 and existing_path
@@ -1152,18 +1150,27 @@ def download_candidate(
             ):
                 try:
                     existing_file = Path(existing_path)
-                    if existing_file.exists() and existing_file.is_file():
-                        file_size = existing_file.stat().st_size
+                    candidate_file = existing_file
+                    if not candidate_file.exists():
+                        candidate_part = existing_file.with_suffix(
+                            existing_file.suffix + ".part"
+                        )
+                        if candidate_part.exists():
+                            candidate_file = candidate_part
+                    if candidate_file.exists() and candidate_file.is_file():
+                        file_size = candidate_file.stat().st_size
                         if (
                             file_size > 0
                             and isinstance(previous_length, int)
                             and file_size < previous_length
                         ):
                             resume_bytes_offset = file_size
+                            resume_probe_path = candidate_file
                             LOGGER.debug(
-                                "Resuming partial download from byte %d for %s",
+                                "Resuming partial download from byte %d for %s (source=%s)",
                                 resume_bytes_offset,
                                 url,
+                                candidate_file,
                             )
                 except (OSError, ValueError) as exc:
                     LOGGER.debug("Could not check for partial download resume: %s", exc)
@@ -1382,15 +1389,28 @@ def download_candidate(
                                 "resume_offset": resume_bytes_offset,
                             },
                         )
+                    cleanup_targets: List[Path] = []
                     if existing_path:
+                        cleanup_targets.append(Path(existing_path))
+                        cleanup_targets.append(
+                            Path(existing_path).with_suffix(Path(existing_path).suffix + ".part")
+                        )
+                    if resume_probe_path:
+                        cleanup_targets.append(resume_probe_path)
+                    seen: Set[Path] = set()
+                    for candidate in cleanup_targets:
+                        if candidate in seen:
+                            continue
+                        seen.add(candidate)
                         try:
-                            Path(existing_path).unlink()
+                            candidate.unlink()
                         except FileNotFoundError:
-                            pass
+                            continue
                         except OSError as exc:
-                            LOGGER.debug("Failed to remove partial file %s: %s", existing_path, exc)
+                            LOGGER.debug("Failed to remove partial file %s: %s", candidate, exc)
                     existing_path = None
                     resume_bytes_offset = None
+                    resume_probe_path = None
                     attempt_conditional = False
                     cond_helper = ConditionalRequestHelper()
                     continue
@@ -1426,7 +1446,7 @@ def download_candidate(
                         content_length_hint = None
 
                 # Size warning for unexpectedly large downloads
-                size_warning_threshold = context.get("size_warning_threshold")
+                size_warning_threshold = ctx.size_warning_threshold
                 if (
                     size_warning_threshold
                     and content_length_hint
@@ -1449,7 +1469,7 @@ def download_candidate(
                         },
                     )
                     # Check if we should skip large downloads
-                    if context.get("skip_large_downloads", False):
+                    if ctx.skip_large_downloads:
                         return DownloadOutcome(
                             classification=Classification.SKIPPED,
                             path=None,
@@ -1518,7 +1538,7 @@ def download_candidate(
                 hasher = hashlib.sha256() if not dry_run else None
                 byte_count = 0
                 # Get configurable chunk size, defaulting to 32KB
-                chunk_size = int(context.get("chunk_size", 1 << 15))
+                chunk_size = int(ctx.chunk_size or (1 << 15))
                 content_iter = response.iter_content(chunk_size=chunk_size)
                 sniff_buffer = bytearray()
                 prefetched: List[bytes] = []
@@ -1674,7 +1694,12 @@ def download_candidate(
                         LOGGER.debug("Final progress callback failed: %s", exc)
 
             try:
-                atomic_write(dest_path, _stream_chunks(), hasher=hasher)
+                atomic_write(
+                    dest_path,
+                    _stream_chunks(),
+                    hasher=hasher,
+                    keep_partial_on_error=True,
+                )
             except _MaxBytesExceeded:
                 LOGGER.warning(
                     "Aborting download during stream due to max-bytes limit",
@@ -1728,9 +1753,9 @@ def download_candidate(
                     exc,
                     extra={"extra_fields": {"work_id": artifact.work_id}},
                 )
-                seen_attempts = int(context.get("_stream_retry_attempts", 0))
+                seen_attempts = ctx.stream_retry_attempts
                 if seen_attempts < 1:
-                    context["_stream_retry_attempts"] = seen_attempts + 1
+                    ctx.stream_retry_attempts = seen_attempts + 1
                     attempt_conditional = False
                     LOGGER.info("Retrying download for %s after stream failure", url)
                     continue
@@ -1758,7 +1783,7 @@ def download_candidate(
                 content_length = byte_count
             if (
                 dest_path
-                and context.get("content_addressed")
+                and ctx.content_addressed
                 and sha256
                 and detected is Classification.PDF
             ):
@@ -1786,7 +1811,7 @@ def download_candidate(
                             atomic_write_text(text_path, text)
                             extracted_text_path = str(text_path)
 
-            context.pop("_stream_retry_attempts", None)
+            ctx.stream_retry_attempts = 0
             return _build_download_outcome(
                 artifact=artifact,
                 classification=detected,
@@ -1876,6 +1901,7 @@ def process_one_work(
     metrics: ResolverMetrics,
     *,
     options: DownloadOptions,
+    session_factory: Optional[Callable[[], requests.Session]] = None,
 ) -> Dict[str, Any]:
     """Process a single work artifact through the resolver pipeline.
 
@@ -1890,6 +1916,8 @@ def process_one_work(
         logger: Structured attempt logger capturing manifest records.
         metrics: Resolver metrics collector.
         options: :class:`DownloadOptions` describing download behaviour for the work.
+        session_factory: Optional callable returning a thread-local session for
+            resolver execution when concurrency is enabled.
 
     Returns:
         Dictionary summarizing the outcome (saved/html_only/skipped flags).
@@ -1972,22 +2000,35 @@ def process_one_work(
             "sha256": sha256,
             "content_length": content_length_value,
         }
-    download_context = {
-        "dry_run": dry_run,
-        "extract_html_text": extract_html_text,
-        "previous": previous_map,
-        "list_only": list_only,
-        "max_bytes": max_bytes,
-        "sniff_bytes": sniff_bytes,
-        "min_pdf_bytes": min_pdf_bytes,
-        "tail_check_bytes": tail_check_bytes,
-        "robots_checker": robots_checker,
-        "content_addressed": content_addressed,
-    }
+    download_context = DownloadContext(
+        dry_run=dry_run,
+        extract_html_text=extract_html_text,
+        previous=previous_map,
+        list_only=list_only,
+        max_bytes=max_bytes,
+        sniff_bytes=sniff_bytes,
+        min_pdf_bytes=min_pdf_bytes,
+        tail_check_bytes=tail_check_bytes,
+        robots_checker=robots_checker,
+        content_addressed=content_addressed,
+    )
+    download_context.mark_explicit(
+        "dry_run",
+        "extract_html_text",
+        "previous",
+        "list_only",
+        "max_bytes",
+        "sniff_bytes",
+        "min_pdf_bytes",
+        "tail_check_bytes",
+        "robots_checker",
+        "content_addressed",
+    )
 
     cohort_order = _cohort_order_for(artifact)
     if cohort_order:
-        download_context["resolver_order_override"] = cohort_order
+        download_context.resolver_order = list(dict.fromkeys(cohort_order))
+        download_context.mark_explicit("resolver_order")
 
     if artifact.work_id in resume_completed:
         LOGGER.info("Skipping %s (already completed)", artifact.work_id)
@@ -2043,7 +2084,12 @@ def process_one_work(
         result["skipped"] = True
         return result
 
-    pipeline_result = pipeline.run(session, artifact, context=download_context)
+    pipeline_result = pipeline.run(
+        session,
+        artifact,
+        context=download_context,
+        session_factory=session_factory,
+    )
     html_paths_total = list(pipeline_result.html_paths)
 
     if list_only:
@@ -2697,23 +2743,17 @@ def main() -> None:
             max_results=args.max,
         )
 
-        def _session_factory() -> requests.Session:
-            """Return a new :class:`requests.Session` using the run's polite headers.
+        pool_connections = min(max(64, concurrency_product * 4), 512)
+        pool_maxsize = min(max(128, concurrency_product * 8), 1024)
 
-            The factory is invoked by worker threads to obtain an isolated session
-            that inherits the resolver configuration's polite identification
-            headers. Creating sessions through this helper ensures each worker
-            reuses the shared retry configuration while keeping connection pools
-            thread-local.
-            """
-
-            pool_connections = min(max(64, concurrency_product * 4), 512)
-            pool_maxsize = min(max(128, concurrency_product * 8), 1024)
+        def _build_thread_session() -> requests.Session:
             return create_session(
                 config.polite_headers,
                 pool_connections=pool_connections,
                 pool_maxsize=pool_maxsize,
             )
+
+        session_factory = ThreadLocalSessionFactory(_build_thread_session)
 
         def _record_result(res: Dict[str, Any]) -> None:
             """Update aggregate counters based on a single work result."""
@@ -2741,15 +2781,44 @@ def main() -> None:
                 return True
             return False
 
+        worker_failures = 0
+
         try:
             if args.workers == 1:
-                session = _session_factory()
-                try:
-                    for artifact in provider.iter_artifacts():
-                        if stop_due_to_budget:
-                            break
-                        result = process_one_work(
-                            artifact,
+                session = session_factory()
+                for artifact in provider.iter_artifacts():
+                    if stop_due_to_budget:
+                        break
+                    result = process_one_work(
+                        artifact,
+                        session,
+                        pdf_dir,
+                        html_dir,
+                        xml_dir,
+                        pipeline,
+                        attempt_logger,
+                        metrics,
+                        options=download_options,
+                        session_factory=session_factory,
+                    )
+                    _record_result(result)
+                    if not stop_due_to_budget and _should_stop():
+                        stop_due_to_budget = True
+                        break
+                    if args.sleep > 0:
+                        time.sleep(args.sleep)
+            else:
+                with ThreadPoolExecutor(max_workers=args.workers) as executor:
+                    in_flight: List[Future[Dict[str, Any]]] = []
+                    max_in_flight = max(args.workers * 2, 1)
+                    future_work_ids: Dict[Future[Dict[str, Any]], Optional[str]] = {}
+
+                    def _runner(work_item: WorkArtifact) -> Dict[str, Any]:
+                        """Process a single work item within a worker-managed session."""
+
+                        session = session_factory()
+                        return process_one_work(
+                            work_item,
                             session,
                             pdf_dir,
                             html_dir,
@@ -2758,45 +2827,40 @@ def main() -> None:
                             attempt_logger,
                             metrics,
                             options=download_options,
+                            session_factory=session_factory,
                         )
-                        _record_result(result)
-                        if not stop_due_to_budget and _should_stop():
-                            stop_due_to_budget = True
-                            break
-                        if args.sleep > 0:
-                            time.sleep(args.sleep)
-                finally:
-                    if hasattr(session, "close"):
-                        session.close()
-            else:
-                with ThreadPoolExecutor(max_workers=args.workers) as executor:
-                    in_flight: List[Future[Dict[str, Any]]] = []
-                    max_in_flight = max(args.workers * 2, 1)
 
                     def _submit(work_item: WorkArtifact) -> Future[Dict[str, Any]]:
                         """Submit a work item to the executor for asynchronous processing."""
 
-                        def _runner() -> Dict[str, Any]:
-                            """Process a single work item within a worker-managed session."""
+                        future = executor.submit(_runner, work_item)
+                        future_work_ids[future] = getattr(work_item, "work_id", None)
+                        return future
 
-                            session = _session_factory()
-                            try:
-                                return process_one_work(
-                                    work_item,
-                                    session,
-                                    pdf_dir,
-                                    html_dir,
-                                    xml_dir,
-                                    pipeline,
-                                    attempt_logger,
-                                    metrics,
-                                    options=download_options,
-                                )
-                            finally:
-                                if hasattr(session, "close"):
-                                    session.close()
+                    def _handle_future(completed_future: Future[Dict[str, Any]]) -> None:
+                        """Resolve a completed future, logging and continuing on errors."""
 
-                        return executor.submit(_runner)
+                        nonlocal stop_due_to_budget, worker_failures
+                        work_id = future_work_ids.pop(completed_future, None)
+                        try:
+                            result = completed_future.result()
+                        except Exception as exc:
+                            worker_failures += 1
+                            extra_fields: Dict[str, Any] = {"error": str(exc)}
+                            if work_id:
+                                extra_fields["work_id"] = work_id
+                            LOGGER.exception(
+                                "worker_crash",
+                                extra={"extra_fields": extra_fields},
+                            )
+                            _record_result({"skipped": True})
+                            if not stop_due_to_budget and _should_stop():
+                                stop_due_to_budget = True
+                            return
+
+                        _record_result(result)
+                        if not stop_due_to_budget and _should_stop():
+                            stop_due_to_budget = True
 
                     for artifact in provider.iter_artifacts():
                         if stop_due_to_budget:
@@ -2804,21 +2868,16 @@ def main() -> None:
                         if len(in_flight) >= max_in_flight:
                             done, pending = wait(set(in_flight), return_when=FIRST_COMPLETED)
                             for completed_future in done:
-                                _record_result(completed_future.result())
-                                if not stop_due_to_budget and _should_stop():
-                                    stop_due_to_budget = True
+                                _handle_future(completed_future)
                             in_flight = list(pending)
                             if stop_due_to_budget:
                                 break
-                        if stop_due_to_budget:
-                            break
-                        in_flight.append(_submit(artifact))
+                        future = _submit(artifact)
+                        in_flight.append(future)
 
                     if in_flight:
                         for future in as_completed(list(in_flight)):
-                            _record_result(future.result())
-                            if not stop_due_to_budget and _should_stop():
-                                stop_due_to_budget = True
+                            _handle_future(future)
         except Exception:
             raise
         else:
@@ -2844,6 +2903,7 @@ def main() -> None:
                 "html_only": html_only,
                 "xml_only": xml_only,
                 "skipped": skipped,
+                "worker_failures": worker_failures,
                 "bytes_downloaded": total_downloaded_bytes,
                 "budget": {
                     "requests": budget_requests,
@@ -2869,6 +2929,8 @@ def main() -> None:
                 )
             except Exception:
                 LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
+        finally:
+            session_factory.close_all()
     print(
         f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, XML-only {xml_only}, skipped {skipped}."
     )
@@ -2877,6 +2939,8 @@ def main() -> None:
         print("Budget exhausted; halting further work.")
     if args.dry_run:
         print("DRY RUN: no files written, resolver coverage only.")
+    if worker_failures:
+        print(f"Worker exceptions encountered: {worker_failures}")
     print("Resolver summary:")
     for key in ("attempts", "successes", "html", "xml", "skips", "failures"):
         values = summary.get(key, {})
@@ -2913,6 +2977,7 @@ def main() -> None:
             "html_only": html_only,
             "xml_only": xml_only,
             "skipped": skipped,
+            "worker_failures": worker_failures,
             "bytes_downloaded": total_downloaded_bytes,
             "budget": {
                 "requests": budget_requests,

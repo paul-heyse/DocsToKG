@@ -36,6 +36,8 @@ from DocsToKG.ContentDownload.core import (
     PDF_LIKE,
     Classification,
     ReasonCode,
+    normalize_classification,
+    normalize_reason,
     atomic_write_text,
     normalize_url,
 )
@@ -110,15 +112,26 @@ class ManifestEntry:
     run_id: Optional[str] = None
 
     def __post_init__(self) -> None:
-        normalized_classification = Classification.from_wire(self.classification)
-        object.__setattr__(self, "classification", normalized_classification.value)
+        classification_token = normalize_classification(self.classification)
+        if isinstance(classification_token, Classification):
+            classification_value = classification_token.value
+        else:
+            classification_value = Classification.from_wire(classification_token).value
+        object.__setattr__(self, "classification", classification_value)
 
-        if isinstance(self.reason, ReasonCode):
-            object.__setattr__(self, "reason", self.reason.value)
+        reason_token = normalize_reason(self.reason)
+        if isinstance(reason_token, ReasonCode):
+            reason_value = reason_token.value
+        else:
+            reason_value = reason_token
+        object.__setattr__(self, "reason", reason_value)
 
-        reason_detail = self.reason_detail
-        if isinstance(reason_detail, ReasonCode):
-            object.__setattr__(self, "reason_detail", reason_detail.value)
+        detail_token = normalize_reason(self.reason_detail)
+        if isinstance(detail_token, ReasonCode):
+            detail_value = detail_token.value
+        else:
+            detail_value = detail_token
+        object.__setattr__(self, "reason_detail", detail_value)
 
         length = self.content_length
         if length is not None:

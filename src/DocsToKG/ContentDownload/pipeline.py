@@ -355,6 +355,9 @@ from DocsToKG.ContentDownload.core import (
     PDF_LIKE,
     Classification,
     ReasonCode,
+    normalize_classification,
+    normalize_reason,
+    DownloadContext,
     dedupe,
     normalize_doi,
     normalize_pmcid,
@@ -1098,33 +1101,10 @@ class AttemptRecord:
     run_id: Optional[str] = None
 
     def __post_init__(self) -> None:
-        status_value: Classification | str
-        if not isinstance(self.status, Classification):
-            converted = Classification.from_wire(self.status)
-            if (
-                isinstance(self.status, str)
-                and converted is Classification.UNKNOWN
-                and self.status.lower() not in {member.value for member in Classification}
-            ):
-                status_value = self.status
-            else:
-                status_value = converted
-        else:
-            status_value = self.status
-        object.__setattr__(self, "status", status_value)
+        normalized_status = normalize_classification(self.status)
+        object.__setattr__(self, "status", normalized_status)
 
-        reason_value = self.reason
-        if isinstance(reason_value, ReasonCode):
-            normalized_reason: ReasonCode | str | None = reason_value
-        elif reason_value is not None:
-            normalized = str(reason_value).replace("-", "_")
-            candidate = ReasonCode.from_wire(normalized)
-            if candidate is not ReasonCode.UNKNOWN or normalized == ReasonCode.UNKNOWN.value:
-                normalized_reason = candidate
-            else:
-                normalized_reason = str(reason_value)
-        else:
-            normalized_reason = None
+        normalized_reason = normalize_reason(self.reason)
         object.__setattr__(self, "reason", normalized_reason)
 
 
@@ -1181,21 +1161,13 @@ class DownloadOutcome:
         return self.classification in PDF_LIKE
 
     def __post_init__(self) -> None:
-        if not isinstance(self.classification, Classification):
-            self.classification = Classification.from_wire(self.classification)
-        reason_value = self.reason
-        if isinstance(reason_value, ReasonCode):
-            normalized_reason: ReasonCode | str = reason_value
-        elif reason_value is not None:
-            normalized = str(reason_value).replace("-", "_")
-            candidate = ReasonCode.from_wire(normalized)
-            if candidate is not ReasonCode.UNKNOWN or normalized == ReasonCode.UNKNOWN.value:
-                normalized_reason = candidate
-            else:
-                normalized_reason = str(reason_value)
+        normalized_status = normalize_classification(self.classification)
+        if isinstance(normalized_status, Classification):
+            self.classification = normalized_status
         else:
-            normalized_reason = None
-        self.reason = normalized_reason
+            self.classification = Classification.from_wire(normalized_status)
+
+        self.reason = normalize_reason(self.reason)
 
 
 @dataclass
@@ -3620,9 +3592,9 @@ class ResolverPipeline:
     The pipeline is safe to reuse across worker threads when
     :attr:`ResolverConfig.max_concurrent_resolvers` is greater than one. All
     mutable shared state is protected by :class:`threading.Lock` instances and
-    only read concurrently without mutation. HTTP ``_requests.Session`` objects
-    are treated as read-only; callers must avoid mutating shared sessions after
-    handing them to the pipeline.
+    only read concurrently without mutation. Resolver execution retrieves
+    thread-local HTTP sessions via the supplied factory so each worker maintains
+    its own connection pool without cross-thread sharing.
 
     Attributes:
         config: Resolver configuration containing ordering and rate limits.
@@ -4025,47 +3997,58 @@ class ResolverPipeline:
         self,
         session: _requests.Session,
         artifact: "WorkArtifact",
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[Union[DownloadContext, Mapping[str, Any]]] = None,
+        *,
+        session_factory: Optional[Callable[[], _requests.Session]] = None,
     ) -> PipelineResult:
         """Execute resolvers until a PDF is obtained or resolvers are exhausted.
 
         Args:
             session: Requests session used for resolver HTTP calls.
             artifact: Work artifact describing the document to resolve.
-            context: Optional execution context containing flags such as ``dry_run``.
+            context: Optional :class:`DownloadContext` (or mapping) containing execution flags.
+            session_factory: Optional callable returning a thread-local session for
+                resolver execution. When omitted, the provided ``session`` is reused.
 
         Returns:
             PipelineResult capturing resolver attempts and successful downloads.
         """
 
-        context_data: Dict[str, Any] = context or {}
-        state = _RunState(dry_run=bool(context_data.get("dry_run", False)))
+        context_obj = DownloadContext.from_mapping(context)
+        state = _RunState(dry_run=context_obj.dry_run)
+        if session_factory is None:
+            def session_provider() -> _requests.Session:
+                return session
+        else:
+            session_provider = session_factory
 
         if self.config.max_concurrent_resolvers == 1:
-            return self._run_sequential(session, artifact, context_data, state)
+            return self._run_sequential(session, session_provider, artifact, context_obj, state)
 
-        return self._run_concurrent(session, artifact, context_data, state)
+        return self._run_concurrent(session, session_provider, artifact, context_obj, state)
 
     def _run_sequential(
         self,
         session: _requests.Session,
+        session_provider: Callable[[], _requests.Session],
         artifact: "WorkArtifact",
-        context_data: Dict[str, Any],
+        context: DownloadContext,
         state: _RunState,
     ) -> PipelineResult:
         """Execute resolvers in order using the current thread.
 
         Args:
             session: Shared requests session for resolver HTTP calls.
+            session_provider: Callable returning the session for the active thread.
             artifact: Work artifact describing the document being processed.
-            context_data: Execution context dictionary.
+            context: Execution context object.
             state: Mutable run state tracking attempts and duplicates.
 
         Returns:
             PipelineResult summarising the sequential run outcome.
         """
 
-        override = context_data.get("resolver_order_override")
+        override = list(context.resolver_order)
         if override:
             ordered_names = [name for name in override if name in self._resolver_map]
             ordered_names.extend(
@@ -4084,7 +4067,7 @@ class ResolverPipeline:
             results, wall_ms = self._collect_resolver_results(
                 resolver_name,
                 resolver,
-                session,
+                session_provider,
                 artifact,
             )
 
@@ -4095,7 +4078,7 @@ class ResolverPipeline:
                     resolver_name,
                     order_index,
                     result,
-                    context_data,
+                    context,
                     state,
                     resolver_wall_time_ms=wall_ms,
                 )
@@ -4113,23 +4096,25 @@ class ResolverPipeline:
     def _run_concurrent(
         self,
         session: _requests.Session,
+        session_provider: Callable[[], _requests.Session],
         artifact: "WorkArtifact",
-        context_data: Dict[str, Any],
+        context: DownloadContext,
         state: _RunState,
     ) -> PipelineResult:
         """Execute resolvers concurrently using a thread pool.
 
         Args:
             session: Shared requests session for resolver HTTP calls.
+            session_provider: Callable returning the session for the active thread.
             artifact: Work artifact describing the document being processed.
-            context_data: Execution context dictionary.
+            context: Execution context object.
             state: Mutable run state tracking attempts and duplicates.
 
         Returns:
             PipelineResult summarising the concurrent run outcome.
         """
 
-        override = context_data.get("resolver_order_override")
+        override = list(context.resolver_order)
         if override:
             resolver_order = [name for name in override if name in self._resolver_map]
             resolver_order.extend(
@@ -4168,7 +4153,7 @@ class ResolverPipeline:
                     self._collect_resolver_results,
                     resolver_name,
                     resolver,
-                    session,
+                    session_provider,
                     artifact,
                 )
                 active_futures[future] = (resolver_name, order_index)
@@ -4202,7 +4187,7 @@ class ResolverPipeline:
                             resolver_name,
                             order_index,
                             result,
-                            context_data,
+                            context,
                             state,
                             resolver_wall_time_ms=wall_ms,
                         )
@@ -4328,7 +4313,7 @@ class ResolverPipeline:
         self,
         resolver_name: str,
         resolver: Resolver,
-        session: _requests.Session,
+        session_provider: Callable[[], _requests.Session],
         artifact: "WorkArtifact",
     ) -> Tuple[List[ResolverResult], float]:
         """Collect resolver results while applying rate limits and error handling.
@@ -4336,13 +4321,14 @@ class ResolverPipeline:
         Args:
             resolver_name: Name of the resolver being executed (for logging and limits).
             resolver: Resolver instance that will generate candidate URLs.
-            session: Requests session forwarded to the resolver.
+            session_provider: Callable returning the requests session for the current thread.
             artifact: Work artifact describing the current document.
 
         Returns:
             Tuple of resolver results and the resolver wall time (ms).
         """
 
+        session = session_provider()
         results: List[ResolverResult] = []
         self._respect_rate_limit(resolver_name)
         start = _time.monotonic()
@@ -4369,7 +4355,7 @@ class ResolverPipeline:
         resolver_name: str,
         order_index: int,
         result: ResolverResult,
-        context_data: Dict[str, Any],
+        context: DownloadContext,
         state: _RunState,
         *,
         resolver_wall_time_ms: Optional[float] = None,
@@ -4382,7 +4368,7 @@ class ResolverPipeline:
             resolver_name: Name of the resolver that produced the result.
             order_index: 1-based index of the resolver in the execution order.
             result: Resolver result containing either a URL or event metadata.
-            context_data: Execution context dictionary.
+            context: Execution context object.
             state: Mutable run state tracking attempts and duplicates.
             resolver_wall_time_ms: Wall-clock time spent in the resolver.
 
@@ -4477,7 +4463,7 @@ class ResolverPipeline:
         state.seen_urls.add(url)
         parsed_url = urlsplit(url)
         host_for_policy = parsed_url.hostname or parsed_url.netloc
-        if context_data.get("list_only"):
+        if context.list_only:
             self._emit_attempt(
                 AttemptRecord(
                     run_id=self._run_id,
@@ -4499,14 +4485,20 @@ class ResolverPipeline:
             self.metrics.record_skip(resolver_name, "list-only")
             return None
 
-        download_context = dict(context_data)
+        download_context = context.clone_for_download()
         # Ensure downstream download heuristics are present with config defaults.
-        download_context.setdefault("sniff_bytes", self.config.sniff_bytes)
-        download_context.setdefault("min_pdf_bytes", self.config.min_pdf_bytes)
-        download_context.setdefault("tail_check_bytes", self.config.tail_check_bytes)
-        download_context.setdefault("host_accept_overrides", self.config.host_accept_overrides)
-        download_context.setdefault("global_manifest_index", self._global_manifest_index)
-        download_context.setdefault("domain_content_rules", self.config.domain_content_rules)
+        if not context.is_explicit("sniff_bytes"):
+            download_context.sniff_bytes = self.config.sniff_bytes
+        if not context.is_explicit("min_pdf_bytes"):
+            download_context.min_pdf_bytes = self.config.min_pdf_bytes
+        if not context.is_explicit("tail_check_bytes"):
+            download_context.tail_check_bytes = self.config.tail_check_bytes
+        if not context.is_explicit("host_accept_overrides"):
+            download_context.host_accept_overrides = self.config.host_accept_overrides
+        if not context.is_explicit("global_manifest_index"):
+            download_context.global_manifest_index = self._global_manifest_index
+        if not context.is_explicit("domain_content_rules"):
+            download_context.domain_content_rules = self.config.domain_content_rules
         head_precheck_passed = False
         if self._should_attempt_head_check(resolver_name, url):
             head_precheck_passed = self._head_precheck_url(
