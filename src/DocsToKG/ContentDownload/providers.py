@@ -19,7 +19,7 @@ from pyalex import Works
 
 from DocsToKG.ContentDownload.core import WorkArtifact
 
-ArtifactFactory = Callable[[Dict[str, Any], Path, Path], WorkArtifact]
+ArtifactFactory = Callable[[Dict[str, Any], Path, Path, Path], WorkArtifact]
 
 
 @runtime_checkable
@@ -48,6 +48,7 @@ class OpenAlexWorkProvider:
         artifact_factory: ArtifactFactory,
         pdf_dir: Path,
         html_dir: Path,
+        xml_dir: Path,
         per_page: int = 200,
         max_results: Optional[int] = None,
     ) -> None:
@@ -58,6 +59,7 @@ class OpenAlexWorkProvider:
         self._artifact_factory = artifact_factory
         self._pdf_dir = pdf_dir
         self._html_dir = html_dir
+        self._xml_dir = xml_dir
         self._per_page = max(1, per_page)
         self._max_results = max_results if (max_results is None or max_results > 0) else None
 
@@ -66,7 +68,7 @@ class OpenAlexWorkProvider:
 
         yielded = 0
         for work in self._iter_source():
-            artifact = self._artifact_factory(work, self._pdf_dir, self._html_dir)
+            artifact = self._artifact_factory(work, self._pdf_dir, self._html_dir, self._xml_dir)
             yield artifact
             yielded += 1
             if self._max_results is not None and yielded >= self._max_results:

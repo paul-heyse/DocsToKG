@@ -451,21 +451,22 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
     with last_csv.open("r", encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
 
-    assert rows == [
-        {
-            "work_id": "WCSV",
-            "title": "CSV Work",
-            "publication_year": "2021",
-            "resolver": "openalex",
-            "url": "https://oa.example/direct.pdf",
-            "classification": "pdf",
-            "path": str(out_dir / "pdfs" / "out.pdf"),
-            "sha256": "",
-            "content_length": "",
-            "etag": "",
-            "last_modified": "",
-        }
-    ]
+    assert len(rows) == 1
+    captured_row = rows[0]
+    assert captured_row.pop("run_id")
+    assert captured_row == {
+        "work_id": "WCSV",
+        "title": "CSV Work",
+        "publication_year": "2021",
+        "resolver": "openalex",
+        "url": "https://oa.example/direct.pdf",
+        "classification": "pdf",
+        "path": str(out_dir / "pdfs" / "out.pdf"),
+        "sha256": "",
+        "content_length": "",
+        "etag": "",
+        "last_modified": "",
+    }
 
 
 def test_main_with_staging_creates_timestamped_directories(download_modules, monkeypatch, tmp_path):
@@ -513,6 +514,7 @@ def test_main_with_staging_creates_timestamped_directories(download_modules, mon
         def __init__(self, *_, logger=None, metrics=None, **kwargs):
             self.logger = logger
             self.metrics = metrics
+            self.run_id = kwargs.get("run_id")
 
         def run(self, session, artifact, context=None):
             pdf_path.parent.mkdir(parents=True, exist_ok=True)
@@ -567,6 +569,7 @@ def test_main_with_staging_creates_timestamped_directories(download_modules, mon
     assert run_dir.is_dir()
     assert (run_dir / "PDF").is_dir()
     assert (run_dir / "HTML").is_dir()
+    assert (run_dir / "XML").is_dir()
 
     manifest_path = run_dir / "manifest.jsonl"
     assert manifest_path.exists()
@@ -752,6 +755,7 @@ def test_cli_flag_propagation_and_metrics_export(download_modules, monkeypatch, 
         "attempts",
         "successes",
         "html",
+        "xml",
         "skips",
         "failures",
         "latency_ms",
@@ -785,6 +789,7 @@ def test_download_candidate_dry_run_does_not_create_files(download_modules, tmp_
         base_stem="dry-run-example",
         pdf_dir=tmp_path / "pdf",
         html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
     )
 
     session = requests.Session()
@@ -826,6 +831,7 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
         base_stem="dry-run-example",
         pdf_dir=tmp_path / "pdf",
         html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
     )
     work = {
         "id": "https://openalex.org/W1",
@@ -876,6 +882,7 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
         session,
         artifact.pdf_dir,
         artifact.html_dir,
+        artifact.xml_dir,
         pipeline=_StubPipeline(),
         logger=logger,
         metrics=metrics,
@@ -905,6 +912,7 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
 
     pdf_dir = tmp_path / "pdf"
     html_dir = tmp_path / "html"
+    xml_dir = tmp_path / "xml"
     session = requests.Session()
     logger_path = tmp_path / "attempts.jsonl"
     logger = downloader.JsonlSink(logger_path)
@@ -938,6 +946,7 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
         session,
         pdf_dir,
         html_dir,
+        xml_dir,
         pipeline=_NoopPipeline(),
         logger=logger,
         metrics=metrics,

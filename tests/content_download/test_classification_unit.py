@@ -54,8 +54,10 @@ def test_classify_payload_octet_stream_pdf_signature():
 def test_build_download_outcome_respects_head_flag(tmp_path):
     pdf_dir = tmp_path / "pdf"
     html_dir = tmp_path / "html"
+    xml_dir = tmp_path / "xml"
     pdf_dir.mkdir()
     html_dir.mkdir()
+    xml_dir.mkdir()
     artifact = WorkArtifact(
         work_id="W-test",
         title="Test",
@@ -71,6 +73,7 @@ def test_build_download_outcome_respects_head_flag(tmp_path):
         base_stem="test",
         pdf_dir=pdf_dir,
         html_dir=html_dir,
+        xml_dir=xml_dir,
     )
 
     pdf_path = pdf_dir / "small.pdf"

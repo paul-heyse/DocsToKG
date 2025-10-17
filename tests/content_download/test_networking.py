@@ -737,8 +737,10 @@ if HAS_REQUESTS and HAS_PYALEX:
     def _make_artifact(tmp_path: Path) -> WorkArtifact:
         pdf_dir = tmp_path / "pdfs"
         html_dir = tmp_path / "html"
+        xml_dir = tmp_path / "xml"
         pdf_dir.mkdir()
         html_dir.mkdir()
+        xml_dir.mkdir()
         return WorkArtifact(
             work_id="W-cond",
             title="Conditional",
@@ -754,6 +756,7 @@ if HAS_REQUESTS and HAS_PYALEX:
             base_stem="conditional",
             pdf_dir=pdf_dir,
             html_dir=html_dir,
+            xml_dir=xml_dir,
         )
 
     def test_download_candidate_returns_cached(tmp_path: Path) -> None:
@@ -1175,6 +1178,7 @@ if HAS_REQUESTS and HAS_PYALEX:
             base_stem="conditional",
             pdf_dir=Path("/tmp"),
             html_dir=Path("/tmp"),
+            xml_dir=Path("/tmp"),
         )
         entry = build_manifest_entry(
             artifact, "resolver", "https://example.org", outcome, [], dry_run=False
@@ -1482,8 +1486,10 @@ def http_server():
 def _make_artifact(base_dir: Path) -> WorkArtifact:
     pdf_dir = base_dir / "pdfs"
     html_dir = base_dir / "html"
+    xml_dir = base_dir / "xml"
     pdf_dir.mkdir()
     html_dir.mkdir()
+    xml_dir.mkdir()
     return WorkArtifact(
         work_id="W1",
         title="Test",
@@ -1499,6 +1505,7 @@ def _make_artifact(base_dir: Path) -> WorkArtifact:
         base_stem="test",
         pdf_dir=pdf_dir,
         html_dir=html_dir,
+        xml_dir=xml_dir,
     )
 
 
@@ -2272,9 +2279,11 @@ def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
         base_stem="outcome-example",
         pdf_dir=tmp_path / "pdf",
         html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
     )
     artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
     artifact.html_dir.mkdir(parents=True, exist_ok=True)
+    artifact.xml_dir.mkdir(parents=True, exist_ok=True)
     return artifact
 
 
@@ -2952,6 +2961,7 @@ def _make_artifact(tmp_path: Path, **overrides: Any) -> WorkArtifact:
         base_stem="edge-case",
         pdf_dir=tmp_path / "pdf",
         html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
     )
     params.update(overrides)
     return WorkArtifact(**params)
@@ -3076,6 +3086,7 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
         requests.Session(),
         artifact.pdf_dir,
         artifact.html_dir,
+        artifact.xml_dir,
         pipeline,
         logger,
         metrics,
@@ -3192,6 +3203,7 @@ def test_domain_bytes_budget_skips_over_limit(tmp_path: Path) -> None:
             session,
             artifact.pdf_dir,
             artifact.html_dir,
+            artifact.xml_dir,
             pipeline,
             logger,
             metrics,
@@ -3203,6 +3215,7 @@ def test_domain_bytes_budget_skips_over_limit(tmp_path: Path) -> None:
             session,
             artifact.pdf_dir,
             artifact.html_dir,
+            artifact.xml_dir,
             pipeline,
             logger,
             metrics,

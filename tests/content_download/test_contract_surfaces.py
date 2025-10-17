@@ -125,8 +125,10 @@ def test_manifest_entry_roundtrip_matches_golden(tmp_path: Path) -> None:
 def test_resolver_event_attempt_contract(tmp_path: Path) -> None:
     pdf_dir = tmp_path / "pdf"
     html_dir = tmp_path / "html"
+    xml_dir = tmp_path / "xml"
     pdf_dir.mkdir()
     html_dir.mkdir()
+    xml_dir.mkdir()
 
     artifact = WorkArtifact(
         work_id="W-contract",
@@ -143,6 +145,7 @@ def test_resolver_event_attempt_contract(tmp_path: Path) -> None:
         base_stem="contracted",
         pdf_dir=pdf_dir,
         html_dir=html_dir,
+        xml_dir=xml_dir,
     )
 
     config = ResolverConfig(

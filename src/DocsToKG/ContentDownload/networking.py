@@ -176,6 +176,7 @@ def create_session(
     adapter_max_retries: int = 0,
     pool_connections: int = 64,
     pool_maxsize: int = 128,
+    enable_compression: bool = True,
 ) -> requests.Session:
     """Return a ``requests.Session`` configured for DocsToKG network requests.
 
@@ -187,6 +188,7 @@ def create_session(
             ``0`` so :func:`request_with_retries` governs retry behaviour.
         pool_connections: Lower bound of connection pools shared across the session's adapters.
         pool_maxsize: Maximum number of connections kept per host in the adapter pool.
+        enable_compression: Whether to request gzip/deflate compression. Defaults to ``True``.
 
     Returns:
         requests.Session: Session instance with HTTP/HTTPS adapters mounted and ready for pipeline usage.
@@ -198,9 +200,19 @@ def create_session(
         The returned session uses ``HTTPAdapter`` for connection pooling. It is safe to share
         across threads provided callers avoid mutating shared mutable state (for example,
         updating ``session.headers``) once the session is distributed to worker threads.
+
+        When ``enable_compression`` is ``True``, the session automatically requests gzip
+        and deflate compression, which can reduce bandwidth usage by 60-80% for text-heavy
+        HTML/XML content.
     """
 
     session = requests.Session()
+
+    # Enable compression by default for bandwidth savings
+    if enable_compression and hasattr(session, "headers"):
+        session_headers = session.headers
+        if isinstance(session_headers, MutableMapping):
+            session_headers["Accept-Encoding"] = "gzip, deflate"
 
     if headers and hasattr(session, "headers"):
         session_headers = session.headers
@@ -385,6 +397,8 @@ def request_with_retries(
         respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
         content_policy: Optional mapping describing max-bytes and allowed MIME types for the target host.
         **kwargs: Additional keyword arguments forwarded directly to :meth:`requests.Session.request`.
+            Note: If ``timeout`` is provided as a single float, it will be converted to a tuple
+            (connect_timeout, read_timeout) with read_timeout = timeout * 2 for better error handling.
 
     Returns:
         requests.Response: Successful response object. Callers are responsible for closing the
@@ -403,6 +417,14 @@ def request_with_retries(
         raise ValueError("method must be a non-empty string")
     if not isinstance(url, str) or not url:
         raise ValueError("url must be a non-empty string")
+
+    # Optimize timeout handling: separate connect and read timeouts
+    if "timeout" in kwargs:
+        timeout_val = kwargs["timeout"]
+        if isinstance(timeout_val, (int, float)) and not isinstance(timeout_val, bool):
+            # Convert single timeout to (connect, read) tuple for better granularity
+            # Read timeout is typically longer than connect timeout
+            kwargs["timeout"] = (float(timeout_val), float(timeout_val) * 2.0)
 
     if retry_statuses is None:
         retry_statuses = {429, 500, 502, 503, 504}

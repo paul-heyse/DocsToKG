@@ -374,13 +374,17 @@ if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
 
 try:  # Optional dependency guarded at runtime
-    from bs4 import BeautifulSoup  # type: ignore
+    from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning  # type: ignore
 except Exception:  # pragma: no cover - optional dependency missing
     BeautifulSoup = None
+    XMLParsedAsHTMLWarning = None
 
 # --- Globals ---
 
 LOGGER = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_RESOLVER_CREDENTIALS_PATH = PROJECT_ROOT / "config" / "resolver_credentials.yaml"
 
 DEFAULT_RESOLVER_ORDER: List[str] = [
     "openalex",
@@ -935,8 +939,16 @@ def load_resolver_config(
     """Construct resolver configuration combining CLI, config files, and env vars."""
 
     config = ResolverConfig()
+    config_paths: List[Path] = []
+
+    if DEFAULT_RESOLVER_CREDENTIALS_PATH.is_file():
+        config_paths.append(DEFAULT_RESOLVER_CREDENTIALS_PATH)
+
     if args.resolver_config:
-        config_data = read_resolver_config(Path(args.resolver_config))
+        config_paths.append(Path(args.resolver_config))
+
+    for config_path in config_paths:
+        config_data = read_resolver_config(config_path)
         apply_config_overrides(config, config_data, resolver_names)
 
     config.unpaywall_email = (
@@ -1341,6 +1353,7 @@ class ResolverMetrics:
     attempts: Counter = field(default_factory=Counter)
     successes: Counter = field(default_factory=Counter)
     html: Counter = field(default_factory=Counter)
+    xml: Counter = field(default_factory=Counter)
     skips: Counter = field(default_factory=Counter)
     failures: Counter = field(default_factory=Counter)
     latency_ms: defaultdict[str, List[float]] = field(default_factory=lambda: defaultdict(list))
@@ -1363,6 +1376,8 @@ class ResolverMetrics:
             self.attempts[resolver_name] += 1
             if outcome.classification is Classification.HTML:
                 self.html[resolver_name] += 1
+            if outcome.classification is Classification.XML:
+                self.xml[resolver_name] += 1
             if outcome.is_pdf:
                 self.successes[resolver_name] += 1
             classification_key = outcome.classification.value
@@ -1477,6 +1492,7 @@ class ResolverMetrics:
                 "attempts": dict(self.attempts),
                 "successes": dict(self.successes),
                 "html": dict(self.html),
+                "xml": dict(self.xml),
                 "skips": dict(self.skips),
                 "failures": dict(self.failures),
                 "latency_ms": latency_summary,
@@ -2504,7 +2520,18 @@ class LandingPageResolver(RegisteredResolver):
                 )
                 continue
 
-            soup = BeautifulSoup(resp.text, "lxml")
+            if BeautifulSoup is None:
+                continue
+            parser_name = "lxml"
+            content_type = (resp.headers.get("Content-Type") or "").lower()
+            if "xml" in content_type:
+                parser_name = "lxml-xml"
+            if XMLParsedAsHTMLWarning is not None:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+                    soup = BeautifulSoup(resp.text, parser_name)
+            else:
+                soup = BeautifulSoup(resp.text, parser_name)
             for pattern, finder in (
                 ("meta", find_pdf_via_meta),
                 ("link", find_pdf_via_link),

@@ -739,6 +739,7 @@ def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
         base_stem="example",
         pdf_dir=tmp_path / "pdf",
         html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
     )
 
 
@@ -1074,6 +1075,7 @@ def _make_artifact(tmp_path: Path) -> WorkArtifact:  # noqa: F811
         base_stem="2024__Integration__W-integration",
         pdf_dir=tmp_path / "pdf",
         html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
     )
 
 

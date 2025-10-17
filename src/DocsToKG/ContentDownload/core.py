@@ -134,11 +134,16 @@ class WorkArtifact:
     base_stem: str
     pdf_dir: Path
     html_dir: Path
+    xml_dir: Path
     failed_pdf_urls: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        self.namespaces: Dict[str, Path] = {"pdf": self.pdf_dir, "html": self.html_dir}
+        self.namespaces: Dict[str, Path] = {
+            "pdf": self.pdf_dir,
+            "html": self.html_dir,
+            "xml": self.xml_dir,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +155,7 @@ class Classification(Enum):
 
     PDF = "pdf"
     HTML = "html"
+    XML = "xml"
     MISS = "miss"
     UNKNOWN = "unknown"
     HTTP_ERROR = "http_error"
@@ -254,18 +260,26 @@ def classify_payload(head_bytes: bytes, content_type: Optional[str], url: str) -
     if prefix.startswith(b"<head") or prefix.startswith(b"<body"):
         return Classification.HTML
 
+    if prefix.startswith(b"<?xml") or prefix.startswith(b"<rss") or prefix.startswith(b"<feed"):
+        return Classification.XML
+
     if stripped.startswith(b"%PDF") or (head_bytes or b"")[:2048].find(b"%PDF") != -1:
         return Classification.PDF
 
     if "html" in ctype:
         return Classification.HTML
+    if "xml" in ctype:
+        return Classification.XML
     if "pdf" in ctype:
         return Classification.PDF
     if ctype == "application/octet-stream":
         return Classification.UNKNOWN
 
-    if url.lower().endswith(".pdf"):
+    lowered_url = url.lower()
+    if lowered_url.endswith(".pdf"):
         return Classification.PDF
+    if lowered_url.endswith(".xml"):
+        return Classification.XML
 
     return Classification.UNKNOWN
 
@@ -350,6 +364,8 @@ def _infer_suffix(
         return ".pdf"
     if ctype in {"text/html", "application/xhtml+xml"} or "html" in ctype:
         return ".html"
+    if ctype in {"application/xml", "text/xml"} or "xml" in ctype:
+        return ".xml"
 
     if classification_text.startswith("pdf"):
         path_suffix = Path(urlsplit(url).path).suffix.lower()
@@ -362,6 +378,11 @@ def _infer_suffix(
         if path_suffix:
             return path_suffix
         return default_suffix
+    if classification_code is Classification.XML:
+        path_suffix = Path(urlsplit(url).path).suffix.lower()
+        if path_suffix:
+            return path_suffix
+        return ".xml"
 
     return default_suffix
 

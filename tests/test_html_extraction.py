@@ -83,6 +83,7 @@ def test_html_extraction_creates_text_file(tmp_path: Path, monkeypatch: pytest.M
         base_stem="html-example",
         pdf_dir=tmp_path / "pdf",
         html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
     )
 
     url = artifact.pdf_urls[0]

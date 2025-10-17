@@ -859,13 +859,19 @@ def resolve_topic_id_if_needed(topic_text: Optional[str]) -> Optional[str]:
     return _lookup_topic_id(normalized)
 
 
-def create_artifact(work: Dict[str, Any], pdf_dir: Path, html_dir: Path) -> WorkArtifact:
+def create_artifact(
+    work: Dict[str, Any],
+    pdf_dir: Path,
+    html_dir: Path,
+    xml_dir: Path,
+) -> WorkArtifact:
     """Normalize an OpenAlex work into a WorkArtifact instance.
 
     Args:
         work: Raw OpenAlex work payload.
         pdf_dir: Directory where PDFs should be stored.
         html_dir: Directory where HTML resources should be stored.
+        xml_dir: Directory where XML resources should be stored.
 
     Returns:
         WorkArtifact describing the work and candidate URLs.
@@ -905,6 +911,7 @@ def create_artifact(work: Dict[str, Any], pdf_dir: Path, html_dir: Path) -> Work
         base_stem=base,
         pdf_dir=pdf_dir,
         html_dir=html_dir,
+        xml_dir=xml_dir,
         metadata={"openalex_id": work.get("id")},
     )
     return artifact
@@ -1250,21 +1257,39 @@ def download_candidate(
                     )
                 hasher = hashlib.sha256() if not dry_run else None
                 byte_count = 0
-                tail_buffer = bytearray()
-                content_iter = response.iter_content(chunk_size=1 << 15)
+                # Get configurable chunk size, defaulting to 32KB
+                chunk_size = int(context.get("chunk_size", 1 << 15))
+                content_iter = response.iter_content(chunk_size=chunk_size)
                 sniff_buffer = bytearray()
                 prefetched: List[bytes] = []
                 detected: Classification = Classification.UNKNOWN
                 flagged_unknown = False
+                last_classification_size = 0
+                
+                # Optimization: Only classify when we have new meaningful data
+                # Most formats can be detected in first 1-4KB
+                min_classify_interval = 4096  # Re-classify every 4KB if still unknown
 
                 for chunk in content_iter:
                     if not chunk:
                         continue
                     sniff_buffer.extend(chunk)
                     prefetched.append(chunk)
-                    candidate = classify_payload(bytes(sniff_buffer), content_type, url)
-                    if candidate is not Classification.UNKNOWN:
-                        detected = candidate
+                    
+                    # Optimize: Only classify when buffer has grown enough or first time
+                    buffer_size = len(sniff_buffer)
+                    should_classify = (
+                        last_classification_size == 0 or  # First chunk
+                        (detected is Classification.UNKNOWN and 
+                         buffer_size >= last_classification_size + min_classify_interval)
+                    )
+                    
+                    if should_classify:
+                        candidate = classify_payload(bytes(sniff_buffer), content_type, url)
+                        last_classification_size = buffer_size
+                        if candidate is not Classification.UNKNOWN:
+                            detected = candidate
+                    
                     if (
                         detected is Classification.UNKNOWN
                         and sniff_limit
@@ -1307,19 +1332,34 @@ def download_candidate(
                     retry_after=retry_after_hint,
                 )
 
-            default_suffix = ".html" if detected == Classification.HTML else ".pdf"
+            if detected == Classification.HTML:
+                default_suffix = ".html"
+                dest_dir = artifact.html_dir
+            elif detected == Classification.XML:
+                default_suffix = ".xml"
+                dest_dir = artifact.xml_dir
+            else:
+                default_suffix = ".pdf"
+                dest_dir = artifact.pdf_dir
             suffix = _infer_suffix(url, content_type, disposition, detected, default_suffix)
-            dest_dir = artifact.html_dir if detected == Classification.HTML else artifact.pdf_dir
             dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
             ensure_dir(dest_path.parent)
+            
+            # Optimization: Only maintain tail buffer for PDFs (used for corruption detection)
+            # Skip for HTML/XML to reduce CPU overhead
+            is_pdf = detected == Classification.PDF
+            tail_buffer = bytearray() if is_pdf else None
 
             def _stream_chunks() -> Iterable[bytes]:
+                """Optimized streaming: write prefetched chunks inline to avoid double storage."""
                 nonlocal byte_count
                 for chunk in prefetched:
                     if not chunk:
                         continue
                     byte_count += len(chunk)
-                    update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
+                    # Only update tail buffer for PDFs
+                    if is_pdf and tail_buffer is not None:
+                        update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
                     if max_bytes is not None and byte_count > max_bytes:
                         raise _MaxBytesExceeded()
                     yield chunk
@@ -1327,7 +1367,9 @@ def download_candidate(
                     if not chunk:
                         continue
                     byte_count += len(chunk)
-                    update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
+                    # Only update tail buffer for PDFs
+                    if is_pdf and tail_buffer is not None:
+                        update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
                     if max_bytes is not None and byte_count > max_bytes:
                         raise _MaxBytesExceeded()
                     yield chunk
@@ -1380,6 +1422,35 @@ def download_candidate(
                     extracted_text_path=None,
                     retry_after=retry_after_hint,
                 )
+            except (requests.exceptions.ChunkedEncodingError, AttributeError) as exc:
+                LOGGER.warning(
+                    "Streaming download failed for %s: %s",
+                    url,
+                    exc,
+                    extra={"extra_fields": {"work_id": artifact.work_id}},
+                )
+                seen_attempts = int(context.get("_stream_retry_attempts", 0))
+                if seen_attempts < 1:
+                    context["_stream_retry_attempts"] = seen_attempts + 1
+                    attempt_conditional = False
+                    LOGGER.info("Retrying download for %s after stream failure", url)
+                    continue
+                elapsed_err = (time.monotonic() - start) * 1000.0
+                return DownloadOutcome(
+                    classification=Classification.HTTP_ERROR,
+                    path=None,
+                    http_status=response.status_code,
+                    content_type=content_type,
+                    elapsed_ms=elapsed_err,
+                    reason=ReasonCode.REQUEST_EXCEPTION,
+                    reason_detail=f"stream-error: {exc}",
+                    sha256=None,
+                    content_length=None,
+                    etag=modified_result.etag,
+                    last_modified=modified_result.last_modified,
+                    extracted_text_path=None,
+                    retry_after=retry_after_hint,
+                )
 
             sha256: Optional[str] = None
             content_length: Optional[int] = None
@@ -1416,6 +1487,7 @@ def download_candidate(
                             atomic_write_text(text_path, text)
                             extracted_text_path = str(text_path)
 
+            context.pop("_stream_retry_attempts", None)
             return _build_download_outcome(
                 artifact=artifact,
                 classification=detected,
@@ -1484,6 +1556,7 @@ def process_one_work(
     session: requests.Session,
     pdf_dir: Path,
     html_dir: Path,
+    xml_dir: Path,
     pipeline: ResolverPipeline,
     logger: AttemptSink,
     metrics: ResolverMetrics,
@@ -1498,6 +1571,7 @@ def process_one_work(
         session: Requests session configured for resolver usage.
         pdf_dir: Directory where PDF artefacts are written.
         html_dir: Directory where HTML artefacts are written.
+        xml_dir: Directory where XML artefacts are written.
         pipeline: Resolver pipeline orchestrating downstream resolvers.
         logger: Structured attempt logger capturing manifest records.
         metrics: Resolver metrics collector.
@@ -1514,7 +1588,7 @@ def process_one_work(
     if isinstance(work, WorkArtifact):
         artifact = work
     else:
-        artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
+        artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir, xml_dir=xml_dir)
     run_id = options.run_id
     dry_run = options.dry_run
     list_only = options.list_only
@@ -1532,6 +1606,7 @@ def process_one_work(
         "work_id": artifact.work_id,
         "saved": False,
         "html_only": False,
+        "xml_only": False,
         "skipped": False,
         "downloaded_bytes": 0,
     }
@@ -1623,10 +1698,12 @@ def process_one_work(
         return result
 
     existing_pdf = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
-    if not dry_run and existing_pdf.exists():
+    existing_xml = artifact.xml_dir / f"{artifact.base_stem}.xml"
+    if not dry_run and (existing_pdf.exists() or existing_xml.exists()):
+        cached_path = existing_pdf if existing_pdf.exists() else existing_xml
         existing_outcome = DownloadOutcome(
             classification=Classification.CACHED,
-            path=str(existing_pdf),
+            path=str(cached_path) if cached_path else None,
             http_status=None,
             content_type=None,
             elapsed_ms=None,
@@ -1668,8 +1745,22 @@ def process_one_work(
         logger.log_manifest(entry)
         if pipeline_result.outcome.is_pdf:
             result["saved"] = True
+            LOGGER.info(
+                "downloaded %s via %s -> %s",
+                artifact.work_id,
+                pipeline_result.resolver_name,
+                pipeline_result.outcome.path or pipeline_result.url,
+            )
         elif pipeline_result.outcome.classification is Classification.HTML:
             result["html_only"] = True
+        elif pipeline_result.outcome.classification is Classification.XML:
+            result["xml_only"] = True
+            LOGGER.info(
+                "downloaded %s (XML) via %s -> %s",
+                artifact.work_id,
+                pipeline_result.resolver_name,
+                pipeline_result.outcome.path or pipeline_result.url,
+            )
         length_hint = pipeline_result.outcome.content_length
         bytes_downloaded = 0
         if isinstance(length_hint, str):
@@ -1794,9 +1885,15 @@ def main() -> None:
         help="Folder for HTML responses (default: sibling 'HTML').",
     )
     parser.add_argument(
+        "--xml-out",
+        type=Path,
+        default=None,
+        help="Folder for XML responses (default: sibling 'XML').",
+    )
+    parser.add_argument(
         "--staging",
         action="store_true",
-        help="Create timestamped run directories under --out with separate PDF and HTML folders.",
+        help="Create timestamped run directories under --out with separate PDF, HTML, and XML folders.",
     )
     parser.add_argument(
         "--content-addressed",
@@ -2090,17 +2187,22 @@ def main() -> None:
         run_dir = base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M")
         pdf_dir = run_dir / "PDF"
         html_dir = run_dir / "HTML"
+        xml_dir = run_dir / "XML"
         manifest_path = run_dir / "manifest.jsonl"
         if args.html_out:
             LOGGER.info("Staging mode overrides --html-out; using %s", html_dir)
+        if args.xml_out:
+            LOGGER.info("Staging mode overrides --xml-out; using %s", xml_dir)
         if manifest_override:
             LOGGER.info("Staging mode overrides --manifest; writing to %s", manifest_path)
     else:
         pdf_dir = base_pdf_dir
         html_dir = args.html_out or (pdf_dir.parent / "HTML")
+        xml_dir = args.xml_out or (pdf_dir.parent / "XML")
         manifest_path = manifest_override or (pdf_dir / "manifest.jsonl")
     ensure_dir(pdf_dir)
     ensure_dir(html_dir)
+    ensure_dir(xml_dir)
 
     resolver_instances = default_resolvers()
     resolver_names = [resolver.name for resolver in resolver_instances]
@@ -2144,7 +2246,7 @@ def main() -> None:
         if meta.get("path")
         and Path(str(meta["path"])).exists()
         and str(meta.get("classification", "")).lower()
-        in {Classification.PDF.value, Classification.CACHED.value}
+        in {Classification.PDF.value, Classification.CACHED.value, Classification.XML.value}
     }
 
     budget_requests: Optional[int] = None
@@ -2168,6 +2270,7 @@ def main() -> None:
     processed = 0
     saved = 0
     html_only = 0
+    xml_only = 0
     skipped = 0
     total_downloaded_bytes = 0
     stop_due_to_budget = False
@@ -2240,6 +2343,7 @@ def main() -> None:
             artifact_factory=create_artifact,
             pdf_dir=pdf_dir,
             html_dir=html_dir,
+            xml_dir=xml_dir,
             per_page=args.per_page,
             max_results=args.max,
         )
@@ -2265,12 +2369,14 @@ def main() -> None:
         def _record_result(res: Dict[str, Any]) -> None:
             """Update aggregate counters based on a single work result."""
 
-            nonlocal processed, saved, html_only, skipped, total_downloaded_bytes
+            nonlocal processed, saved, html_only, xml_only, skipped, total_downloaded_bytes
             processed += 1
             if res.get("saved"):
                 saved += 1
             if res.get("html_only"):
                 html_only += 1
+            if res.get("xml_only"):
+                xml_only += 1
             if res.get("skipped"):
                 skipped += 1
             downloaded = res.get("downloaded_bytes") or 0
@@ -2298,6 +2404,7 @@ def main() -> None:
                             session,
                             pdf_dir,
                             html_dir,
+                            xml_dir,
                             pipeline,
                             attempt_logger,
                             metrics,
@@ -2330,6 +2437,7 @@ def main() -> None:
                                     session,
                                     pdf_dir,
                                     html_dir,
+                                    xml_dir,
                                     pipeline,
                                     attempt_logger,
                                     metrics,
@@ -2385,6 +2493,7 @@ def main() -> None:
                 "processed": processed,
                 "saved": saved,
                 "html_only": html_only,
+                "xml_only": xml_only,
                 "skipped": skipped,
                 "bytes_downloaded": total_downloaded_bytes,
                 "budget": {
@@ -2412,7 +2521,7 @@ def main() -> None:
             except Exception:
                 LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
     print(
-        f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, skipped {skipped}."
+        f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, XML-only {xml_only}, skipped {skipped}."
     )
     print(f"Total bytes downloaded {total_downloaded_bytes}.")
     if stop_due_to_budget:
@@ -2420,7 +2529,7 @@ def main() -> None:
     if args.dry_run:
         print("DRY RUN: no files written, resolver coverage only.")
     print("Resolver summary:")
-    for key in ("attempts", "successes", "html", "skips", "failures"):
+    for key in ("attempts", "successes", "html", "xml", "skips", "failures"):
         values = summary.get(key, {})
         if values:
             print(f"  {key}: {values}")
@@ -2453,6 +2562,7 @@ def main() -> None:
             "processed": processed,
             "saved": saved,
             "html_only": html_only,
+            "xml_only": xml_only,
             "skipped": skipped,
             "bytes_downloaded": total_downloaded_bytes,
             "budget": {

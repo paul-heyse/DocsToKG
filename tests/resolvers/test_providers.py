@@ -196,6 +196,7 @@ def make_artifact(tmp_path: Path, **overrides):
         base_stem="figshare-example",
         pdf_dir=tmp_path / "pdf",
         html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
     )
     base_kwargs.update(overrides)
     return downloader.WorkArtifact(**base_kwargs)
@@ -431,6 +432,7 @@ def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifac
         base_stem="zenodo-example",
         pdf_dir=tmp_path / "pdf",
         html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
     )
     base_kwargs.update(overrides)
     return downloader.WorkArtifact(**base_kwargs)

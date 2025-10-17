@@ -201,8 +201,10 @@ if DOWNLOAD_DEPS_AVAILABLE:
     def _make_artifact(tmp_path: Path) -> WorkArtifact:
         pdf_dir = tmp_path / "pdfs"
         html_dir = tmp_path / "html"
+        xml_dir = tmp_path / "xml"
         pdf_dir.mkdir()
         html_dir.mkdir()
+        xml_dir.mkdir()
         return WorkArtifact(
             work_id="W-atomic",
             title="Atomic Test",
@@ -218,6 +220,7 @@ if DOWNLOAD_DEPS_AVAILABLE:
             base_stem="atomic",
             pdf_dir=pdf_dir,
             html_dir=html_dir,
+            xml_dir=xml_dir,
         )
 
     def _download_with_session(

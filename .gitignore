@@ -51,6 +51,7 @@ git-restore-mtime
 .env.test.local
 .env.production.local
 .direnv/
+config/resolver_credentials.yaml
 
 # IDE and editor files
 .vscode/
