@@ -44,9 +44,6 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli embed \
 
 ## Common commands
 ```bash
-# Discover tasks (TODO add justfile entry if available)
-just --list
-
 # Table stakes CLI flows
 direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --help
 direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --help
@@ -161,7 +158,7 @@ direnv exec . mypy src/DocsToKG/DocParsing
 direnv exec . pytest tests/docparsing -q
 direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # optional perf check
 ```
-- Format / lint: TODO add `just fmt` or `python -m ruff format`.
+- Format / lint: `direnv exec . ruff format src/DocsToKG/DocParsing tests/docparsing`.
 - Use dependency stubs in tests (`tests.docparsing.stubs`) to run without GPUs.
 
 ## Agent guardrails
