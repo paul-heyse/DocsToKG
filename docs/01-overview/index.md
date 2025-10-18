@@ -5,27 +5,28 @@
 DocsToKG is a Python toolkit for turning raw documents into searchable, richly annotated
 knowledge artefacts. It combines document acquisition, Docling-based parsing, ontology
 enrichment, and a FAISS-backed hybrid search engine to surface relevant context for
-downstream applications.
+downstream applications. The current release (0.2.0) ships with modular DocParsing shims,
+resolver telemetry improvements, and hybrid search validation harnesses.
 
 ## 3. Core Capabilities
 
 ### Content Acquisition & Parsing
 
-- Download corpora and metadata from external sources (e.g., Pyalex) using the `ContentDownload` utilities.
-- Convert PDFs and HTML into DocTags, chunked Markdown, and embeddings via `DocParsing` pipelines.
-- Preserve provenance (page numbers, figure references, captions) for downstream quality checks.
+- Download corpora and metadata from external sources (e.g., Pyalex) using the `DocsToKG.ContentDownload.cli` orchestration entry point.
+- Convert PDFs and HTML into DocTags, chunked Markdown, and embeddings via `DocsToKG.DocParsing.chunking` and `DocsToKG.DocParsing.embedding`, backed by Docling.
+- Preserve provenance (page numbers, figure references, captions) and telemetry via manifest sinks for downstream quality checks.
 
 ### Hybrid Search
 
-- Fuse lexical (BM25), sparse (SPLADE), and dense (FAISS) retrieval signals for robust ranking.
-- Support namespace-aware search, diagnostics, and cursor-based pagination.
-- Expose programmatic APIs (`HybridSearchService`, `HybridSearchAPI`) for integration.
+- Fuse lexical (BM25), sparse (SPLADE), and dense (FAISS) retrieval signals using `HybridSearchService`.
+- Support namespace-aware search, diagnostics, and cursor-based pagination with configurable weighting (`hybrid_config.json`).
+- Expose programmatic APIs (`HybridSearchAPI`) for embedding into FastAPI or other web layers.
 
 ### Ontology Integration
 
-- Download, validate, and catalogue ontologies through the `OntologyDownload` CLI.
-- Enrich document metadata using controlled vocabularies and reusable resolver logic.
-- Keep terminologies current with automated validation and manifests.
+- Download, validate, and catalogue ontologies with `DocsToKG.OntologyDownload.cli`.
+- Enrich document metadata using controlled vocabularies and reusable resolver logic housed in the `OntologyDownload` package.
+- Keep terminologies current with automated validation and manifests persisted to object storage.
 
 ## 4. Architecture Overview
 
@@ -41,11 +42,11 @@ graph LR
 
 ## 5. Key Components
 
-- **ContentDownload** – Resolvers and utilities for fetching PDFs and metadata (e.g., Pyalex support).
-- **DocParsing** – Docling pipelines that chunk documents, extract captions, and generate embeddings.
-- **HybridSearch** – Retrieval service combining FAISS, BM25, and SPLADE with fusion, observability, and API layers.
-- **OntologyDownload** – CLI-driven ontology fetcher with validation pipelines and manifest management.
-- **Documentation Tooling** – Scripts under `docs/scripts/` to generate API docs, run validations, and build Sphinx sites.
+- **ContentDownload** – Resolver pipelines, telemetry sinks, and download orchestration that pull artefacts from Pyalex, Crossref, Zenodo, Figshare, and more.
+- **DocParsing** – Docling-powered chunking and embedding pipelines with CLI shims that feed the unified DocParsing command set.
+- **HybridSearch** – Retrieval service combining FAISS, BM25, and SPLADE with fusion, observability hooks, and API layers.
+- **OntologyDownload** – CLI-driven ontology fetcher with validation pipelines, storage adapters, and manifest management.
+- **Documentation Tooling** – Scripts under `docs/scripts/` for API generation, documentation validation, and link checking; `openspec/` manages spec-driven workflows.
 
 ## 6. Use Cases
 
@@ -69,12 +70,13 @@ graph LR
 
 ## 7. Technology Stack
 
-- **Language & Runtime**: Python ≥3.12, type hints enforced via `mypy --strict`
+- **Language & Runtime**: Python ≥3.13 (bootstrapped via `scripts/bootstrap_env.sh`), type hints enforced via `mypy --strict`
 - **Parsing & NLP**: Docling, Hugging Face Transformers, vLLM for accelerated inference
-- **Retrieval**: FAISS (dense), BM25/SPLADE simulators for sparse signals
-- **Ontology & RDF**: `oaklib`, `ols-client`, `ontoportal-client`, `rdflib`, `owlready2`, `pronto`, `arelle`
-- **Tooling**: Sphinx, Vale (optional), pytest, ruff, black
-- **Automation Scripts**: `docs/scripts/` orchestration, `tests/` for quality gates
+- **Retrieval**: FAISS (dense), BM25/SPLADE for sparse signals, configurable fusion kernels
+- **Ontology & RDF**: `oaklib`, `ontoportal-client`, `ols-client`, `rdflib`, `owlready2`, `pronto`, `arelle`
+- **Telemetry & Logging**: `structlog`, `prometheus-fastapi-instrumentator`, and staged JSONL/SQLite sinks
+- **Tooling**: Sphinx, Vale (optional), pytest, ruff, black, openspec CLI
+- **Automation**: `docs/scripts/` for doc hygiene, `tests/` with GPU and integration markers, `scripts/dev.sh` helpers
 
 ## 8. Getting Started
 
@@ -87,9 +89,9 @@ Ready to explore DocsToKG? Here's your path:
 
 ## 9. Project Status
 
-- **Current Version**: 0.1.0
-- **Development Phase**: Active development
-- **Documentation**: Framework established with automated validation
+- **Current Version**: 0.2.0
+- **Development Phase**: Active development with spec-driven proposals (`openspec/changes`)
+- **Documentation**: Automated validation (code annotations, Sphinx builds, link checks) part of CI
 - **Community**: Contributions welcome via GitHub issues and pull requests
 
 For the latest updates, check our [GitHub repository](https://github.com/paul-heyse/DocsToKG) or the [Development Guide](../05-development/index.md).

@@ -17,11 +17,18 @@ Instructions for AI coding assistants using OpenSpec for spec-driven development
 
 AI assistants **must** operate inside the project virtual environment; otherwise required packages (docling, vLLM, tqdm, etc.) will be missing and commands will fail. Follow this sequence before running any tooling, tests, or CLIs:
 
+0. **Install Git LFS (one-time per machine)**
+   ```bash
+   git lfs install
+   git lfs pull
+   ```
+   Custom wheels (FAISS, CuPy, vLLM) live under `ci/wheels/` and are stored via Git LFS. If LFS is not installed, the wheel files will be empty text pointers, and environment bootstrap will fail.
+
 1. **Bootstrap the virtualenv (idempotent)**
    ```bash
    ./scripts/bootstrap_env.sh
    ```
-   Creates `.venv` if absent and installs DocsToKG in editable mode so the package resolves from `src/`.
+   Creates `.venv` with Python 3.13, installs DocsToKG in editable mode, and pulls dependencies from `requirements.txt` (including the checked-in wheels).
 
 2. **Load `.envrc` via direnv**
    ```bash
@@ -40,6 +47,13 @@ AI assistants **must** operate inside the project virtual environment; otherwise
    source .venv/bin/activate
    export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
    ```
+   Alternatively use the wrapper:
+   ```bash
+   ./scripts/dev.sh exec pytest -q
+   ./scripts/dev.sh python -m DocsToKG.HybridSearch.validation --help
+   ./scripts/dev.sh pip list
+   ```
+   The `dev.sh` helper prefixes `.venv/bin` and exports `VIRTUAL_ENV`, so commands run with the correct interpreter even without `direnv`.
 
 5. **Verify activation before working**
    ```bash
@@ -48,6 +62,8 @@ AI assistants **must** operate inside the project virtual environment; otherwise
    ```
 
 > ❗ **Never** run project scripts with the system Python. Missing dependencies indicate the virtual environment was not activated; repeat steps 1–3 to recover.
+
+> 💡 **System packages:** GitHub CI installs `libopenblas0` so FAISS can load. If you see `ImportError: libopenblas.so.0` locally, install the matching package for your OS (e.g. `sudo apt-get install libopenblas0` on Ubuntu).
 
 ## Three-Stage Workflow
 

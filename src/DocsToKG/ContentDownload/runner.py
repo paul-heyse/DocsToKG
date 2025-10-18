@@ -95,6 +95,16 @@ class DownloadRun:
         self.provider: Optional[WorkProvider] = None
         self.state: Optional[DownloadRunState] = None
         self._ephemeral_stack: Optional[contextlib.ExitStack] = None
+        # Sink factories (overridable for tests/embedding)
+        self.jsonl_sink_factory = JsonlSink
+        self.rotating_jsonl_sink_factory = RotatingJsonlSink
+        self.manifest_index_sink_factory = ManifestIndexSink
+        self.last_attempt_sink_factory = LastAttemptCsvSink
+        self.sqlite_sink_factory = SqliteSink
+        self.summary_sink_factory = SummarySink
+        self.csv_sink_factory = CsvSink
+        self.multi_sink_factory = MultiSink
+        self.run_telemetry_factory = RunTelemetry
 
     def __enter__(self) -> "DownloadRun":
         return self
@@ -128,34 +138,34 @@ class DownloadRun:
 
         if self.args.log_rotate:
             jsonl_sink = stack.enter_context(
-                RotatingJsonlSink(manifest_path, max_bytes=self.args.log_rotate)
+                self.rotating_jsonl_sink_factory(manifest_path, max_bytes=self.args.log_rotate)
             )
         else:
-            jsonl_sink = stack.enter_context(JsonlSink(manifest_path))
+            jsonl_sink = stack.enter_context(self.jsonl_sink_factory(manifest_path))
         sinks.append(jsonl_sink)
 
         index_path = manifest_path.with_suffix(".index.json")
-        index_sink = stack.enter_context(ManifestIndexSink(index_path))
+        index_sink = stack.enter_context(self.manifest_index_sink_factory(index_path))
         sinks.append(index_sink)
 
         last_attempt_path = manifest_path.with_suffix(".last.csv")
-        last_attempt_sink = stack.enter_context(LastAttemptCsvSink(last_attempt_path))
+        last_attempt_sink = stack.enter_context(self.last_attempt_sink_factory(last_attempt_path))
         sinks.append(last_attempt_sink)
 
-        sqlite_sink = stack.enter_context(SqliteSink(self.resolved.sqlite_path))
+        sqlite_sink = stack.enter_context(self.sqlite_sink_factory(self.resolved.sqlite_path))
         sinks.append(sqlite_sink)
 
         summary_path = manifest_path.with_suffix(".summary.json")
-        summary_sink = stack.enter_context(SummarySink(summary_path))
+        summary_sink = stack.enter_context(self.summary_sink_factory(summary_path))
         sinks.append(summary_sink)
 
         if self.resolved.csv_path:
-            csv_sink = stack.enter_context(CsvSink(self.resolved.csv_path))
+            csv_sink = stack.enter_context(self.csv_sink_factory(self.resolved.csv_path))
             sinks.append(csv_sink)
 
-        combined_sink = MultiSink(sinks)
+        combined_sink = self.multi_sink_factory(sinks)
         self.multi_sink = combined_sink
-        self.attempt_logger = RunTelemetry(combined_sink)
+        self.attempt_logger = self.run_telemetry_factory(combined_sink)
         return combined_sink
 
     def setup_resolver_pipeline(self) -> ResolverPipeline:
@@ -223,6 +233,7 @@ class DownloadRun:
                 robots_cache if robots_cache is not None else self.resolved.robots_checker
             ),
             content_addressed=self.args.content_addressed,
+            verify_cache_digest=self.args.verify_cache_digest,
         )
         state = DownloadRunState(
             session_factory=session_factory,

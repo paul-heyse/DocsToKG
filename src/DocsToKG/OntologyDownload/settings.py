@@ -375,6 +375,17 @@ class DownloadConfiguration(BaseModel):
     model_config = {"validate_assignment": True}
 
 
+class PlannerConfig(BaseModel):
+    """Planner-specific HTTP probing behaviour."""
+
+    probing_enabled: bool = Field(
+        default=True,
+        description="When false, planner metadata HTTP probes are skipped after URL validation.",
+    )
+
+    model_config = {"validate_assignment": True}
+
+
 _VALID_RESOLVERS = {
     "obo",
     "bioregistry",
@@ -397,6 +408,7 @@ class DefaultsConfig(BaseModel):
     normalize_to: List[str] = Field(default_factory=lambda: ["ttl"])
     prefer_source: List[str] = Field(default_factory=lambda: ["obo", "ols", "bioportal", "direct"])
     http: DownloadConfiguration = Field(default_factory=DownloadConfiguration)
+    planner: PlannerConfig = Field(default_factory=PlannerConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     logging: LoggingConfiguration = Field(default_factory=LoggingConfiguration)
     continue_on_error: bool = Field(default=True)
@@ -616,6 +628,7 @@ def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig]
             "normalize_to",
             "prefer_source",
             "http",
+            "planner",
             "validation",
             "logging",
             "continue_on_error",
@@ -624,7 +637,7 @@ def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig]
         for key in defaults:
             if key not in allowed_keys:
                 errors.append(f"Unknown key in defaults: {key}")
-        for section_name in ("http", "validation", "logging"):
+        for section_name in ("http", "planner", "validation", "logging"):
             section = defaults.get(section_name)
             if section is not None and not isinstance(section, Mapping):
                 errors.append(f"'defaults.{section_name}' must be a mapping")
@@ -1269,6 +1282,7 @@ __all__ = [
     "DownloadConfiguration",
     "LoggingConfiguration",
     "ValidationConfig",
+    "PlannerConfig",
     "ResolvedConfig",
     "EnvironmentOverrides",
     "build_resolved_config",

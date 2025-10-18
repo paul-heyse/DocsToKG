@@ -67,8 +67,9 @@ from .cli import (
     plan,
     run_all,
     token_profiles,
+    _Command,
 )
-from .cli_utils import CLIOption, build_subcommand
+from .cli_utils import CLIOption, build_subcommand, detect_mode
 from .concurrency import acquire_lock, find_free_port, set_spawn_or_warn
 from .discovery import (
     DEFAULT_CAPTION_MARKERS,
@@ -171,7 +172,9 @@ __all__ = [
     "resolve_pipeline_path",
     "load_structural_marker_profile",
     "load_structural_marker_config",
+    "detect_mode",
     "CommandHandler",
+    "_Command",
     "CLI_DESCRIPTION",
     "main",
     "run_all",

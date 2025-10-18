@@ -10,31 +10,29 @@ import re
 import shutil
 import subprocess
 import sys
-from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Union
 
 import requests
 import yaml
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
-from . import plugins as plugin_mod
-from .errors import ConfigError, OntologyDownloadError, PolicyError, UnsupportedPythonError
+from .api import _collect_plugin_details
+from .errors import ConfigError, OntologyDownloadError, UnsupportedPythonError
 from .formatters import (
     PLAN_TABLE_HEADERS,
-    RESULT_TABLE_HEADERS,
     format_plan_rows,
     format_results_table,
     format_table,
     format_validation_summary,
 )
-from .api import _collect_plugin_details
+from .io import format_bytes
+from .logging_utils import setup_logging
 from .manifests import (
     DEFAULT_LOCKFILE_PATH,
     DEFAULT_PLAN_BASELINE,
-    LOCKFILE_SCHEMA_VERSION,
     collect_version_metadata,
     compute_plan_diff,
     ensure_manifest_path,
@@ -43,29 +41,18 @@ from .manifests import (
     load_lockfile_payload,
     load_manifest,
     plan_to_dict,
-    resolve_version_metadata,
     results_to_dict,
     specs_from_lock_payload,
     write_lockfile,
 )
 from .planning import (
-    MANIFEST_JSON_SCHEMA,
     MANIFEST_SCHEMA_VERSION,
-    RESOLVERS,
-    FetchResult,
     FetchSpec,
     PlannedFetch,
-    ResolverCandidate,
     fetch_all,
-    fetch_one,
     get_manifest_schema,
-    infer_version_timestamp,
-    merge_defaults,
-    parse_http_datetime,
-    parse_iso_datetime,
     parse_version_timestamp,
     plan_all,
-    plan_one,
     validate_manifest_dict,
 )
 from .settings import (
@@ -75,32 +62,17 @@ from .settings import (
     LOG_DIR,
     STORAGE,
     ResolvedConfig,
-    build_resolved_config,
-    ensure_python_version,
     get_default_config,
-    get_env_overrides,
     load_config,
-    load_raw_yaml,
     parse_rate_limit_to_rps,
     validate_config,
 )
 from .validation import (
-    VALIDATORS,
     ValidationRequest,
-    ValidationResult,
-    ValidationTimeout,
-    ValidatorSubprocessError,
-    normalize_streaming,
     run_validators,
-    validate_arelle,
-    validate_owlready2,
-    validate_pronto,
-    validate_rdflib,
-    validate_robot,
 )
-from .validation import main as validation_main
-from .io import format_bytes
-from .logging_utils import setup_logging
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """Configure the top-level CLI parser and subcommands.
 
@@ -158,6 +130,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Comma-separated list of additional hosts permitted for this run",
     )
     pull.add_argument(
+        "--planner-probes",
+        dest="planner_probes",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable or disable planner metadata HTTP probes (default: enabled).",
+    )
+    pull.add_argument(
         "--lock",
         type=Path,
         help="Path to ontologies.lock.json to pin downloads to exact planned inputs",
@@ -194,6 +173,13 @@ def _build_parser() -> argparse.ArgumentParser:
     plan_cmd.add_argument(
         "--allowed-hosts",
         help="Comma-separated list of additional hosts permitted for this run",
+    )
+    plan_cmd.add_argument(
+        "--planner-probes",
+        dest="planner_probes",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable or disable planner metadata HTTP probes (default: enabled).",
     )
     plan_cmd.add_argument("--json", action="store_true", help="Emit plan details as JSON")
     plan_cmd.add_argument(
@@ -255,6 +241,13 @@ def _build_parser() -> argparse.ArgumentParser:
     plan_diff.add_argument(
         "--allowed-hosts",
         help="Comma-separated list of additional hosts permitted for this run",
+    )
+    plan_diff.add_argument(
+        "--planner-probes",
+        dest="planner_probes",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable or disable planner metadata HTTP probes (default: enabled).",
     )
     plan_diff.add_argument("--json", action="store_true", help="Emit plan diff as JSON")
     plan_diff.add_argument(
@@ -529,6 +522,10 @@ def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
             if host not in existing:
                 existing.append(host)
         config.defaults.http.allowed_hosts = existing
+
+    planner_override = getattr(args, "planner_probes", None)
+    if planner_override is not None:
+        config.defaults.planner.probing_enabled = bool(planner_override)
 
 
 def _resolve_specs_from_args(
@@ -1308,9 +1305,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
             else:
                 results = _handle_pull(args, base_config, dry_run=False)
                 if args.json:
-                    json.dump(
-                        [results_to_dict(result) for result in results], sys.stdout, indent=2
-                    )
+                    json.dump([results_to_dict(result) for result in results], sys.stdout, indent=2)
                     sys.stdout.write("\n")
                 else:
                     if results:

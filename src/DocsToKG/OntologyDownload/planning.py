@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import tempfile
+import time
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -30,6 +31,7 @@ except ImportError:  # pragma: no cover - non-windows
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
 import requests
+from requests.structures import CaseInsensitiveDict
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 
@@ -45,12 +47,18 @@ from .errors import (
 from .io import (
     RDF_MIME_ALIASES,
     RDF_MIME_FORMAT_LABELS,
+    SESSION_POOL,
+    apply_retry_after,
     download_stream,
     extract_archive_safe,
     generate_correlation_id,
+    get_bucket,
+    is_retryable_error,
+    retry_with_backoff,
     sanitize_filename,
     validate_url_security,
 )
+from .io.network import _extract_correlation_id, _parse_retry_after
 from .logging_utils import setup_logging
 from .migrations import migrate_manifest
 from .resolvers import (
@@ -74,12 +82,30 @@ from .settings import (
     STORAGE,
     ConfigError,
     DefaultsConfig,
+    DownloadConfiguration,
     ResolvedConfig,
     _coerce_sequence,
     ensure_python_version,
     get_default_config,
 )
 from .validation import ValidationRequest, ValidationResult, run_validators
+
+
+def _log_with_extra(
+    logger: logging.Logger,
+    level: int,
+    message: str,
+    extra: Mapping[str, object],
+) -> None:
+    """Log ``message`` with structured ``extra`` supporting LoggerAdapters."""
+
+    if isinstance(logger, logging.LoggerAdapter):
+        adapter_extra = getattr(logger, "extra", None)
+        merged: Dict[str, object] = dict(adapter_extra or {})
+        merged.update(extra)
+        logger.logger.log(level, message, extra=merged)
+        return
+    logger.log(level, message, extra=extra)
 
 MANIFEST_SCHEMA_VERSION = "1.0"
 
@@ -811,6 +837,180 @@ def _select_validators(media_type: Optional[str]) -> List[str]:
     return [name for name in DEFAULT_VALIDATOR_NAMES if name in allowed]
 
 
+@dataclass
+class PlannerProbeResult:
+    """Normalized response metadata produced by planner HTTP probes."""
+
+    url: str
+    method: str
+    status_code: int
+    ok: bool
+    headers: CaseInsensitiveDict[str]
+
+
+def planner_http_probe(
+    *,
+    url: str,
+    http_config: DownloadConfiguration,
+    logger: logging.Logger,
+    headers: Optional[Mapping[str, str]] = None,
+    service: Optional[str] = None,
+    context: Optional[Mapping[str, object]] = None,
+    method: str = "HEAD",
+) -> Optional[PlannerProbeResult]:
+    """Issue a polite planner probe using shared networking primitives.
+
+    Call graph: :func:`plan_one`/ :func:`plan_all` → :func:`_populate_plan_metadata` /
+    :func:`_fetch_last_modified` → :func:`planner_http_probe` → :func:`SESSION_POOL.lease`.
+    """
+
+    primary_method = (method or "HEAD").upper()
+    parsed = urlparse(url)
+    host = parsed.hostname
+
+    base_extra: Dict[str, object] = {"stage": "plan", "url": url}
+    if service:
+        base_extra["service"] = service
+    if host:
+        base_extra["host"] = host
+    if context:
+        for key, value in context.items():
+            base_extra[key] = value
+
+    correlation_id = _extract_correlation_id(logger)
+    polite_headers = http_config.polite_http_headers(correlation_id=correlation_id)
+    merged_headers: Dict[str, str] = {str(key): str(value) for key, value in polite_headers.items()}
+    if headers:
+        for key, value in headers.items():
+            merged_headers[str(key)] = str(value)
+
+    timeout = max(1, getattr(http_config, "timeout_sec", 30) or 30)
+    bucket = get_bucket(http_config=http_config, service=service, host=host)
+
+    _log_with_extra(
+        logger,
+        logging.INFO,
+        "planner probe start",
+        {**base_extra, "method": primary_method, "event": "planner_probe_start"},
+    )
+
+    delay_attr = "_retry_after_delay"
+
+    with SESSION_POOL.lease(service=service, host=host) as session:
+
+        def _issue(current_method: str) -> requests.Response:
+            def _perform_once() -> requests.Response:
+                bucket.consume()
+                response = session.request(
+                    current_method,
+                    url,
+                    headers=merged_headers,
+                    timeout=timeout,
+                    allow_redirects=True,
+                    stream=current_method != "HEAD",
+                )
+                if response.status_code in {429, 503}:
+                    retry_after_header = response.headers.get("Retry-After")
+                    retry_delay = _parse_retry_after(retry_after_header)
+                    if retry_delay is not None:
+                        apply_retry_after(
+                            http_config=http_config,
+                            service=service,
+                            host=host,
+                            delay=retry_delay,
+                        )
+                    http_error = requests.HTTPError(
+                        f"HTTP error {response.status_code}", response=response
+                    )
+                    setattr(http_error, delay_attr, retry_delay)
+                    response.close()
+                    raise http_error
+                return response
+
+            def _on_retry(attempt: int, exc: Exception, delay: float) -> None:
+                retry_extra = dict(base_extra)
+                retry_extra.update(
+                    {
+                        "method": current_method,
+                        "attempt": attempt,
+                        "retry_delay_sec": round(delay, 2),
+                        "error": str(exc),
+                        "event": "planner_probe_retry",
+                    }
+                )
+                _log_with_extra(logger, logging.WARNING, "planner probe retrying", retry_extra)
+
+            return retry_with_backoff(
+                _perform_once,
+                retryable=is_retryable_error,
+                max_attempts=max(1, http_config.max_retries),
+                backoff_base=http_config.backoff_factor,
+                jitter=http_config.backoff_factor,
+                callback=_on_retry,
+                retry_after=lambda exc: getattr(exc, delay_attr, None),
+            )
+
+        try:
+            response = _issue(primary_method)
+        except Exception as exc:  # pragma: no cover - exercised via tests
+            failure_extra = dict(base_extra)
+            failure_extra.update(
+                {"method": primary_method, "error": str(exc), "event": "planner_probe_failed"}
+            )
+            _log_with_extra(logger, logging.WARNING, "planner probe failed", failure_extra)
+            return None
+
+        method_used = primary_method
+
+        if response.status_code == 405 and primary_method == "HEAD":
+            response.close()
+            _log_with_extra(
+                logger,
+                logging.INFO,
+                "planner probe fallback",
+                {
+                    **base_extra,
+                    "from_method": "HEAD",
+                    "to_method": "GET",
+                    "event": "planner_probe_fallback",
+                },
+            )
+            try:
+                response = _issue("GET")
+            except Exception as exc:  # pragma: no cover - exercised via tests
+                failure_extra = dict(base_extra)
+                failure_extra.update(
+                    {"method": "GET", "error": str(exc), "event": "planner_probe_failed"}
+                )
+                _log_with_extra(logger, logging.WARNING, "planner probe failed", failure_extra)
+                return None
+            method_used = "GET"
+
+        headers_map: CaseInsensitiveDict[str] = CaseInsensitiveDict(response.headers)
+        status_code = response.status_code
+        ok = response.ok
+        response.close()
+
+        completion_extra = dict(base_extra)
+        completion_extra.update(
+            {
+                "method": method_used,
+                "status_code": status_code,
+                "ok": ok,
+                "event": "planner_probe_complete",
+            }
+        )
+        _log_with_extra(logger, logging.INFO, "planner probe complete", completion_extra)
+
+        return PlannerProbeResult(
+            url=url,
+            method=method_used,
+            status_code=status_code,
+            ok=ok,
+            headers=headers_map,
+        )
+
+
 def _populate_plan_metadata(
     planned: PlannedFetch,
     config: ResolvedConfig,
@@ -850,85 +1050,74 @@ def _populate_plan_metadata(
     if not (needs_size or needs_last_modified):
         return planned
 
+    http_config = config.defaults.http
+    planner_defaults = getattr(config.defaults, "planner", None)
+
     try:
-        validate_url_security(planned.plan.url, config.defaults.http)
-    except ConfigError as exc:
-        adapter.error(
+        secure_url = validate_url_security(planned.plan.url, http_config)
+    except (ConfigError, PolicyError) as exc:
+        _log_with_extra(
+            adapter,
+            logging.ERROR,
             "metadata probe blocked by URL policy",
-            extra={
+            {
                 "stage": "plan",
                 "ontology_id": planned.spec.id,
                 "url": planned.plan.url,
                 "error": str(exc),
+                "event": "planner_probe_blocked",
             },
         )
         raise
 
-    timeout = getattr(config.defaults.http, "timeout_sec", 30)
-    headers = dict(planned.plan.headers or {})
+    planned.plan.url = secure_url
 
-    try:
-        head_response = requests.head(
-            planned.plan.url,
-            headers=headers,
-            allow_redirects=True,
-            timeout=timeout,
-        )
-    except requests.RequestException as exc:
-        adapter.warning(
-            "metadata probe failed",
-            extra={
+    probing_enabled = True if planner_defaults is None else planner_defaults.probing_enabled
+    if not probing_enabled:
+        _log_with_extra(
+            adapter,
+            logging.INFO,
+            "planner probe skipped by configuration",
+            {
                 "stage": "plan",
                 "ontology_id": planned.spec.id,
-                "url": planned.plan.url,
-                "error": str(exc),
+                "url": secure_url,
+                "reason": "planner.probing_enabled=false",
+                "event": "planner_probe_skipped",
             },
         )
         return planned
 
-    headers_map = head_response.headers
-    status = head_response.status_code
-    ok = head_response.ok
-    head_response.close()
+    probe_result = planner_http_probe(
+        url=secure_url,
+        http_config=http_config,
+        logger=adapter,
+        headers=planned.plan.headers,
+        service=planned.plan.service,
+        context={"ontology_id": planned.spec.id, "resolver": planned.resolver},
+    )
+    if probe_result is None:
+        return planned
 
-    if status == 405:
-        try:
-            get_response = requests.get(
-                planned.plan.url,
-                headers=headers,
-                allow_redirects=True,
-                timeout=timeout,
-                stream=True,
-            )
-        except requests.RequestException as exc:
-            adapter.warning(
-                "metadata probe failed",
-                extra={
-                    "stage": "plan",
-                    "ontology_id": planned.spec.id,
-                    "url": planned.plan.url,
-                    "error": str(exc),
-                },
-            )
-            return planned
-        headers_map = get_response.headers
-        ok = get_response.ok
-        status = get_response.status_code
-        get_response.close()
-
-    if not ok:
-        adapter.warning(
+    if not probe_result.ok:
+        _log_with_extra(
+            adapter,
+            logging.WARNING,
             "metadata probe rejected",
-            extra={
+            {
                 "stage": "plan",
                 "ontology_id": planned.spec.id,
-                "url": planned.plan.url,
-                "status": status,
+                "url": secure_url,
+                "status": probe_result.status_code,
+                "resolver": planned.resolver,
+                "event": "planner_probe_rejected",
             },
         )
         return planned
 
-    last_modified_value = headers_map.get("Last-Modified") or headers_map.get("last-modified")
+    headers_map = probe_result.headers
+
+    last_modified_value = headers_map.get("Last-Modified")
     if last_modified_value:
         normalized = _normalize_timestamp(last_modified_value)
         planned.last_modified = normalized or last_modified_value
@@ -936,7 +1125,7 @@ def _populate_plan_metadata(
         planned.plan.last_modified = normalized or last_modified_value
         metadata["last_modified"] = planned.plan.last_modified
 
-    content_type_value = headers_map.get("Content-Type") or headers_map.get("content-type")
+    content_type_value = headers_map.get("Content-Type")
     canonical_type = _canonical_media_type(content_type_value)
     if canonical_type:
         metadata["content_type"] = canonical_type
@@ -946,9 +1135,7 @@ def _populate_plan_metadata(
             metadata["source_media_type_label"] = label
 
     if planned.size is None:
-        content_length_value = headers_map.get("Content-Length") or headers_map.get(
-            "content-length"
-        )
+        content_length_value = headers_map.get("Content-Length")
         if content_length_value:
             try:
                 parsed_length = int(content_length_value)
@@ -959,7 +1146,7 @@ def _populate_plan_metadata(
                 planned.plan.content_length = parsed_length
                 metadata["content_length"] = parsed_length
 
-    etag = headers_map.get("ETag") or headers_map.get("etag")
+    etag = headers_map.get("ETag")
     if etag:
         metadata["etag"] = etag
 
@@ -1057,33 +1244,71 @@ def _fetch_last_modified(
 ) -> Optional[str]:
     """Probe the upstream plan URL for a Last-Modified header."""
 
-    timeout = max(1, getattr(config.defaults.http, "timeout_sec", 30) or 30)
-    headers = dict(plan.headers or {})
+    http_config = config.defaults.http
+    planner_defaults = getattr(config.defaults, "planner", None)
+
     try:
-        response = requests.head(
-            plan.url,
-            headers=headers,
-            timeout=timeout,
-            allow_redirects=True,
+        secure_url = validate_url_security(plan.url, http_config)
+    except (ConfigError, PolicyError) as exc:
+        _log_with_extra(
+            logger,
+            logging.ERROR,
+            "metadata probe blocked by URL policy",
+            {
+                "stage": "plan",
+                "url": plan.url,
+                "resolver": plan.service or plan.url,
+                "error": str(exc),
+                "event": "planner_probe_blocked",
+            },
         )
-        if response.status_code == 405:
-            response.close()
-            response = requests.get(
-                plan.url,
-                headers=headers,
-                timeout=timeout,
-                allow_redirects=True,
-                stream=True,
-            )
-        header = response.headers.get("Last-Modified")
-        response.close()
-        return header
-    except requests.RequestException as exc:  # pragma: no cover - depends on network
-        logger.warning(
-            "last-modified probe failed",
-            extra={"stage": "plan", "resolver": plan.service or plan.url, "error": str(exc)},
+        raise
+
+    plan.url = secure_url
+
+    probing_enabled = True if planner_defaults is None else planner_defaults.probing_enabled
+    if not probing_enabled:
+        _log_with_extra(
+            logger,
+            logging.INFO,
+            "planner probe skipped by configuration",
+            {
+                "stage": "plan",
+                "url": secure_url,
+                "resolver": plan.service or plan.url,
+                "reason": "planner.probing_enabled=false",
+                "event": "planner_probe_skipped",
+            },
         )
         return None
+
+    result = planner_http_probe(
+        url=secure_url,
+        http_config=http_config,
+        logger=logger,
+        headers=plan.headers,
+        service=plan.service,
+        context={"resolver": plan.service or plan.url},
+    )
+    if result is None:
+        return None
+
+    if not result.ok:
+        _log_with_extra(
+            logger,
+            logging.WARNING,
+            "metadata probe rejected",
+            {
+                "stage": "plan",
+                "url": secure_url,
+                "resolver": plan.service or plan.url,
+                "status": result.status_code,
+                "event": "planner_probe_rejected",
+            },
+        )
+        return None
+
+    return result.headers.get("Last-Modified")
 
 
 def _atomic_write_text(path: Path, content: str) -> None:
@@ -1125,31 +1350,108 @@ def _write_manifest(manifest_path: Path, manifest: Manifest) -> None:
     _atomic_write_json(manifest_path, payload)
 
 
-def _append_index_entry(ontology_dir: Path, entry: Dict[str, Any]) -> None:
-    """Append or update the ontology-level ``index.json`` with ``entry``."""
+def _append_index_entry(
+    ontology_dir: Path,
+    entry: Dict[str, Any],
+    *,
+    logger: Optional[logging.Logger] = None,
+) -> None:
+    """Append or update the ontology-level ``index.json`` with ``entry`` safely."""
 
-    index_path = ontology_dir / "index.json"
-    try:
-        existing = json.loads(index_path.read_text())
-        if not isinstance(existing, list):
+    log = logger or logging.getLogger("DocsToKG.OntologyDownload")
+    base_extra: Dict[str, object] = {"ontology_index": ontology_dir.name}
+    adapter_extra = getattr(log, "extra", None)
+    if isinstance(adapter_extra, dict):
+        for key, value in adapter_extra.items():
+            base_extra.setdefault(key, value)
+    base_extra.setdefault("stage", "download")
+
+    with _ontology_index_lock(ontology_dir, logger=log, extra=base_extra):
+        index_path = ontology_dir / "index.json"
+        try:
+            existing = json.loads(index_path.read_text())
+            if not isinstance(existing, list):
+                existing = []
+        except FileNotFoundError:
             existing = []
-    except FileNotFoundError:
-        existing = []
-    except json.JSONDecodeError:
-        existing = []
+        except json.JSONDecodeError:
+            existing = []
 
-    filtered: List[Dict[str, Any]] = []
-    for item in existing:
-        if not isinstance(item, dict):
-            continue
-        same_version = item.get("version") == entry.get("version")
-        same_hash = item.get("sha256") == entry.get("sha256")
-        if same_version and same_hash:
-            continue
-        filtered.append(item)
+        filtered: List[Dict[str, Any]] = []
+        for item in existing:
+            if not isinstance(item, dict):
+                continue
+            same_version = item.get("version") == entry.get("version")
+            same_hash = item.get("sha256") == entry.get("sha256")
+            if same_version and same_hash:
+                continue
+            filtered.append(item)
 
-    filtered.insert(0, entry)
-    _atomic_write_json(index_path, filtered)
+        filtered.insert(0, entry)
+        _atomic_write_json(index_path, filtered)
+
+
+@contextmanager
+def _ontology_index_lock(
+    ontology_dir: Path,
+    *,
+    logger: Optional[logging.Logger] = None,
+    extra: Optional[Mapping[str, object]] = None,
+) -> Iterator[None]:
+    """Serialize ontology index mutations across versions for the same ontology."""
+
+    lock_root = CACHE_DIR / "locks" / "ontology-index"
+    lock_root.mkdir(parents=True, exist_ok=True)
+    token_source = ontology_dir.name or ontology_dir.as_posix()
+    token = _safe_lock_component(token_source)
+    lock_path = lock_root / f"{token}.lock"
+
+    wait_start = time.monotonic()
+    if logger:
+        wait_extra = dict(extra or {})
+        wait_extra.setdefault("stage", "download")
+        wait_extra["event"] = "ontology_index_lock_wait"
+        wait_extra["lock_path"] = str(lock_path)
+        _log_with_extra(logger, logging.DEBUG, "waiting for ontology index lock", wait_extra)
+
+    with lock_path.open("a+b") as handle:
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"0")
+            handle.flush()
+
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        elif msvcrt is not None:
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        else:  # pragma: no cover - fallback when no locking backend available
+            yield
+            return
+
+        wait_duration = time.monotonic() - wait_start
+        if logger:
+            acquired_extra = dict(extra or {})
+            acquired_extra.setdefault("stage", "download")
+            acquired_extra["event"] = "ontology_index_lock_acquired"
+            acquired_extra["lock_path"] = str(lock_path)
+            acquired_extra["wait_sec"] = round(wait_duration, 3)
+            _log_with_extra(logger, logging.INFO, "ontology index lock acquired", acquired_extra)
+
+        try:
+            yield
+        finally:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            elif msvcrt is not None:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            if logger:
+                release_extra = dict(extra or {})
+                release_extra.setdefault("stage", "download")
+                release_extra["event"] = "ontology_index_lock_released"
+                release_extra["lock_path"] = str(lock_path)
+                _log_with_extra(logger, logging.DEBUG, "ontology index lock released", release_extra)
 
 
 def _mirror_to_cas_if_enabled(
@@ -1648,7 +1950,7 @@ def fetch_one(
                     index_entry["expected_checksum"] = expected_checksum.to_mapping()
                 if cas_path:
                     index_entry["cas_path"] = str(cas_path)
-                _append_index_entry(base_dir.parent, index_entry)
+                _append_index_entry(base_dir.parent, index_entry, logger=adapter)
                 STORAGE.finalize_version(effective_spec.id, version, base_dir)
 
                 adapter.info(

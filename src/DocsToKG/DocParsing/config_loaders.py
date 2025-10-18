@@ -19,6 +19,8 @@ class ConfigLoadError(RuntimeError):
     message: str
 
     def __str__(self) -> str:  # pragma: no cover - dataclass convenience
+        """Return the stored error message for human-facing output."""
+
         return self.message
 
 

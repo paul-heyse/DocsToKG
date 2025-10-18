@@ -78,6 +78,15 @@ CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
         },
     ),
     CLIOption(
+        ("--heading-markers",),
+        {
+            "type": Path,
+            "default": None,
+            "dest": "structural_markers",
+            "help": "Deprecated alias for --structural-markers maintained for compatibility.",
+        },
+    ),
+    CLIOption(
         ("--serializer-provider",),
         {
             "type": str,
@@ -89,8 +98,6 @@ CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     CLIOption(("--shard-count",), {"type": int, "default": 1}),
     CLIOption(("--shard-index",), {"type": int, "default": 0}),
     CLIOption(("--validate-only",), {"action": "store_true"}),
-    CLIOption(("--resume",), {"action": "store_true"}),
-    CLIOption(("--force",), {"action": "store_true"}),
     CLIOption(("--inject-anchors",), {"action": "store_true"}),
 )
 

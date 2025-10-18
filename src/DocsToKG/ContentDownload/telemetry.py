@@ -31,6 +31,7 @@ from typing import (
     Any,
     Dict,
     Iterable,
+    Iterator,
     List,
     Optional,
     Protocol,
@@ -53,8 +54,8 @@ from DocsToKG.ContentDownload.core import (
     normalize_url,
 )
 
-MANIFEST_SCHEMA_VERSION = 2
-SQLITE_SCHEMA_VERSION = 2
+MANIFEST_SCHEMA_VERSION = 3
+SQLITE_SCHEMA_VERSION = 4
 
 
 @dataclass(frozen=True)
@@ -120,6 +121,7 @@ class ManifestEntry:
     last_modified: Optional[str] = None
     extracted_text_path: Optional[str] = None
     dry_run: bool = False
+    path_mtime_ns: Optional[int] = None
     run_id: Optional[str] = None
 
     def __post_init__(self) -> None:
@@ -155,6 +157,140 @@ class ManifestEntry:
                     coerced = None
             object.__setattr__(self, "content_length", coerced)
 
+        mtime_ns = self.path_mtime_ns
+        if mtime_ns is not None:
+            try:
+                coerced_mtime = int(mtime_ns)
+            except (TypeError, ValueError):
+                coerced_mtime = None
+            else:
+                if coerced_mtime < 0:
+                    coerced_mtime = None
+            object.__setattr__(self, "path_mtime_ns", coerced_mtime)
+
+
+class ManifestUrlIndex:
+    """Lazy lookup helper for manifest metadata stored in SQLite."""
+
+    def __init__(self, sqlite_path: Optional[Path], *, eager: bool = False) -> None:
+        self._path = sqlite_path
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._loaded_all = False
+        if eager:
+            self._ensure_loaded()
+
+    def get(self, url: str, default: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """Return manifest metadata for ``url`` if present in the SQLite cache.
+
+        Args:
+            url: URL whose manifest metadata should be retrieved.
+            default: Fallback value returned when the URL has no cached record.
+
+        Returns:
+            Manifest metadata dictionary when found; otherwise ``default``.
+        """
+        normalized = normalize_url(url)
+        if normalized in self._cache:
+            return self._cache[normalized]
+        if self._loaded_all:
+            return default
+        record = self._fetch_one(normalized)
+        if record is None:
+            return default
+        self._cache[normalized] = record
+        return record
+
+    def __contains__(self, url: str) -> bool:  # pragma: no cover - trivial wrapper
+        normalized = normalize_url(url)
+        if normalized in self._cache:
+            return True
+        if self._loaded_all or not self._path or not self._path.exists():
+            return False
+        record = self._fetch_one(normalized)
+        if record is None:
+            return False
+        self._cache[normalized] = record
+        return True
+
+    def items(self) -> Iterable[Tuple[str, Dict[str, Any]]]:
+        """Iterate over cached manifest entries keyed by normalized URL.
+
+        Returns:
+            Iterable of ``(normalized_url, metadata)`` pairs from the cache.
+        """
+        self._ensure_loaded()
+        return self._cache.items()
+
+    def iter_existing(self) -> Iterator[Tuple[str, Dict[str, Any]]]:
+        """Yield manifest entries whose artifact paths still exist on disk.
+
+        Returns:
+            Iterator with cached entries whose ``path`` resolves to an existing file.
+        """
+        for normalized, meta in self.items():
+            path_value = meta.get("path")
+            if path_value and Path(path_value).exists():
+                yield normalized, meta
+
+    def as_dict(self) -> Dict[str, Dict[str, Any]]:
+        """Return a defensive copy of the manifest cache.
+
+        Returns:
+            Dictionary of normalized URLs to manifest metadata.
+        """
+        self._ensure_loaded()
+        return dict(self._cache)
+
+    def _ensure_loaded(self) -> None:
+        if self._loaded_all:
+            return
+        if not self._path or not self._path.exists():
+            self._loaded_all = True
+            return
+        dataset = load_manifest_url_index(self._path)
+        self._cache.update(dataset)
+        self._loaded_all = True
+
+    def _fetch_one(self, normalized: str) -> Optional[Dict[str, Any]]:
+        if not self._path or not self._path.exists():
+            return None
+        conn = sqlite3.connect(self._path)
+        try:
+            try:
+                cursor = conn.execute(
+                    (
+                        "SELECT url, path, sha256, classification, etag, last_modified, content_length, path_mtime_ns "
+                        "FROM manifests WHERE normalized_url = ? ORDER BY timestamp DESC LIMIT 1"
+                    ),
+                    (normalized,),
+                )
+            except sqlite3.OperationalError:
+                return None
+            row = cursor.fetchone()
+        finally:
+            conn.close()
+        if row is None:
+            return None
+        (
+            url,
+            stored_path,
+            sha256,
+            classification,
+            etag,
+            last_modified,
+            content_length,
+            path_mtime_ns,
+        ) = row
+        return {
+            "url": url,
+            "path": stored_path,
+            "sha256": sha256,
+            "classification": classification,
+            "etag": etag,
+            "last_modified": last_modified,
+            "content_length": content_length,
+            "mtime_ns": path_mtime_ns,
+        }
 
 @runtime_checkable
 class AttemptSink(Protocol):
@@ -985,7 +1121,9 @@ class SqliteSink:
                     publication_year,
                     resolver,
                     url,
+                    normalized_url,
                     path,
+                    path_mtime_ns,
                     classification,
                     content_type,
                     reason,
@@ -997,7 +1135,7 @@ class SqliteSink:
                     last_modified,
                     extracted_text_path,
                     dry_run
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     entry.timestamp,
@@ -1008,7 +1146,9 @@ class SqliteSink:
                     entry.publication_year,
                     entry.resolver,
                     entry.url,
+                    normalize_url(entry.url) if entry.url else None,
                     entry.path,
+                    entry.path_mtime_ns,
                     entry.classification,
                     entry.content_type,
                     entry.reason,
@@ -1101,7 +1241,9 @@ class SqliteSink:
                 publication_year INTEGER,
                 resolver TEXT,
                 url TEXT,
+                normalized_url TEXT,
                 path TEXT,
+                path_mtime_ns INTEGER,
                 classification TEXT,
                 content_type TEXT,
                 reason TEXT,
@@ -1138,8 +1280,13 @@ class SqliteSink:
             self._safe_add_column("manifests", "run_id", "TEXT")
             self._safe_add_column("attempts", "retry_after", "REAL")
             self._safe_add_column("attempts", "reason_detail", "TEXT")
+        if current_version < 3:
+            self._safe_add_column("manifests", "path_mtime_ns", "INTEGER")
             self._safe_add_column("manifests", "reason_detail", "TEXT")
             self._migrate_summary_table()
+        if current_version < 4:
+            self._safe_add_column("manifests", "normalized_url", "TEXT")
+            self._populate_normalized_urls()
 
     def _safe_add_column(self, table: str, column: str, declaration: str) -> None:
         try:
@@ -1169,6 +1316,21 @@ class SqliteSink:
             )
         self._conn.execute("DROP TABLE IF EXISTS summaries")
         self._conn.execute("ALTER TABLE summaries_new RENAME TO summaries")
+
+    def _populate_normalized_urls(self) -> None:
+        try:
+            rows = list(self._conn.execute("SELECT id, url FROM manifests WHERE normalized_url IS NULL"))
+        except sqlite3.OperationalError:
+            return
+        for row_id, url in rows:
+            if not url:
+                continue
+            normalized = normalize_url(url)
+            self._conn.execute(
+                "UPDATE manifests SET normalized_url = ? WHERE id = ?",
+                (normalized, row_id),
+            )
+        self._conn.commit()
 
 
 def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
@@ -1239,6 +1401,7 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
                 url = data.get("url")
                 if not work_id or not url:
                     raise ValueError("Manifest entries must include work_id and url fields.")
+                data["normalized_url"] = normalize_url(url)
 
                 content_length = data.get("content_length")
                 if isinstance(content_length, str):
@@ -1246,6 +1409,14 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
                         data["content_length"] = int(content_length)
                     except ValueError:
                         data["content_length"] = None
+
+                path_mtime_ns = data.get("path_mtime_ns")
+                if isinstance(path_mtime_ns, str):
+                    try:
+                        data["path_mtime_ns"] = int(path_mtime_ns)
+                    except ValueError:
+                        data["path_mtime_ns"] = None
+                data["mtime_ns"] = data.get("path_mtime_ns")
 
                 key = normalize_url(url)
                 per_work.setdefault(work_id, {})[key] = data
@@ -1280,17 +1451,27 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
     try:
         try:
             cursor = conn.execute(
-                "SELECT url, path, sha256, classification, etag, last_modified, content_length "
+                "SELECT url, normalized_url, path, sha256, classification, etag, last_modified, content_length, path_mtime_ns "
                 "FROM manifests ORDER BY timestamp"
             )
         except sqlite3.OperationalError:
             return {}
         mapping: Dict[str, Dict[str, Any]] = {}
-        for url, stored_path, sha256, classification, etag, last_modified, content_length in cursor:
+        for (
+            url,
+            normalized_url,
+            stored_path,
+            sha256,
+            classification,
+            etag,
+            last_modified,
+            content_length,
+            path_mtime_ns,
+        ) in cursor:
             if not url:
                 continue
-            normalised = normalize_url(url)
-            mapping[normalised] = {
+            normalized_value = normalized_url or normalize_url(url)
+            mapping[normalized_value] = {
                 "url": url,
                 "path": stored_path,
                 "sha256": sha256,
@@ -1298,6 +1479,7 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
                 "etag": etag,
                 "last_modified": last_modified,
                 "content_length": content_length,
+                "mtime_ns": path_mtime_ns,
             }
         return mapping
     finally:
@@ -1342,6 +1524,13 @@ def build_manifest_entry(
         last_modified = None
         extracted_text_path = None
 
+    path_mtime_ns: Optional[int] = None
+    if path:
+        try:
+            path_mtime_ns = Path(path).stat().st_mtime_ns
+        except OSError:
+            path_mtime_ns = None
+
     reason_token = normalize_reason(reason)
     if reason_token is None and outcome:
         reason_token = normalize_reason(outcome_reason)
@@ -1361,6 +1550,7 @@ def build_manifest_entry(
         resolver=resolver,
         url=url,
         path=path,
+        path_mtime_ns=path_mtime_ns,
         classification=classification,
         content_type=content_type,
         reason=reason_value,
@@ -1378,6 +1568,7 @@ def build_manifest_entry(
 __all__ = [
     "AttemptSink",
     "ManifestEntry",
+    "ManifestUrlIndex",
     "RunTelemetry",
     "MANIFEST_SCHEMA_VERSION",
     "JsonlSink",

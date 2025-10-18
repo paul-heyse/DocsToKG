@@ -28,7 +28,7 @@ Planner HTTP probes MUST reuse the polite networking stack (headers, session poo
 - **WHEN** planner probes target a host with configured rate limits
 - **THEN** the probes SHALL acquire the same per-host bucket as download requests
 - **AND** throttling behaviour (token exhaustion, backoff) SHALL mirror the download pipeline
-- **AND** telemetry SHALL capture planner probe metrics using the same schema fields.
+- **AND** telemetry SHALL capture planner probe metrics using the same event type and schema fields as downloads.
 
 ### Requirement: Safe ontology index maintenance
 Ontology index updates MUST be serialised across versions to prevent concurrent runs from clobbering entries.

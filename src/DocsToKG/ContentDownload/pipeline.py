@@ -64,24 +64,6 @@
 #       "kind": "class"
 #     },
 #     {
-#       "id": "resolverevent",
-#       "name": "ResolverEvent",
-#       "anchor": "class-resolverevent",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "resolvereventreason",
-#       "name": "ResolverEventReason",
-#       "anchor": "class-resolvereventreason",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "resolver",
-#       "name": "Resolver",
-#       "anchor": "class-resolver",
-#       "kind": "class"
-#     },
-#     {
 #       "id": "resolvermetrics",
 #       "name": "ResolverMetrics",
 #       "anchor": "class-resolvermetrics",
@@ -1311,7 +1293,7 @@ class ResolverPipeline:
         self._last_invocation: Dict[str, float] = defaultdict(lambda: 0.0)
         self._lock = threading.Lock()
         self._global_seen_urls: set[str] = set(initial_seen_urls or ())
-        self._global_manifest_index: Dict[str, Dict[str, Any]] = dict(global_manifest_index or {})
+        self._global_manifest_index = global_manifest_index or {}
         self._global_lock = threading.Lock()
         self._last_host_hit: Dict[str, float] = {}
         self._host_lock = threading.Lock()
@@ -1541,6 +1523,8 @@ class ResolverPipeline:
 
     def _record_domain_bytes(self, host_key: str, outcome: DownloadOutcome) -> None:
         if host_key not in self.config.domain_bytes_budget:
+            return
+        if outcome.reason is ReasonCode.SKIP_LARGE_DOWNLOAD:
             return
         bytes_used = self._estimate_outcome_bytes(outcome)
         if bytes_used is None or bytes_used <= 0:
@@ -2325,6 +2309,10 @@ class ResolverPipeline:
             extra_context = getattr(download_context, "extra", None)
             if isinstance(extra_context, dict) and extra_context.get("resume_disabled"):
                 metadata_payload["resume_disabled"] = True
+            # Strip any legacy resume hints to avoid re-enabling deprecated range flows.
+            for key in list(metadata_payload):
+                if key.startswith("resume_") and key != "resume_disabled":
+                    metadata_payload.pop(key, None)
 
             self._emit_attempt(
                 AttemptRecord(

@@ -4,6 +4,12 @@
 #   "purpose": "CLI entry points for ontology downloads",
 #   "sections": [
 #     {
+#       "id": "results-to-dict",
+#       "name": "_results_to_dict",
+#       "anchor": "function-results-to-dict",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "validator-worker-main",
 #       "name": "validator_worker_main",
 #       "anchor": "function-validator-worker-main",
@@ -31,246 +37,6 @@
 #       "id": "about",
 #       "name": "about",
 #       "anchor": "function-about",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "format-table",
-#       "name": "format_table",
-#       "anchor": "function-format-table",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "format-plan-rows",
-#       "name": "format_plan_rows",
-#       "anchor": "function-format-plan-rows",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "format-results-table",
-#       "name": "format_results_table",
-#       "anchor": "function-format-results-table",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "format-validation-summary",
-#       "name": "format_validation_summary",
-#       "anchor": "function-format-validation-summary",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "build-parser",
-#       "name": "_build_parser",
-#       "anchor": "function-build-parser",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "parse-target-formats",
-#       "name": "_parse_target_formats",
-#       "anchor": "function-parse-target-formats",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "parse-positive-int",
-#       "name": "_parse_positive_int",
-#       "anchor": "function-parse-positive-int",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "parse-allowed-hosts",
-#       "name": "_parse_allowed_hosts",
-#       "anchor": "function-parse-allowed-hosts",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "normalize-plan-args",
-#       "name": "_normalize_plan_args",
-#       "anchor": "function-normalize-plan-args",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "parse-since-arg",
-#       "name": "_parse_since_arg",
-#       "anchor": "function-parse-since-arg",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "parse-since",
-#       "name": "_parse_since",
-#       "anchor": "function-parse-since",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "apply-cli-overrides",
-#       "name": "_apply_cli_overrides",
-#       "anchor": "function-apply-cli-overrides",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "results-to-dict",
-#       "name": "_results_to_dict",
-#       "anchor": "function-results-to-dict",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "compute-plan-diff",
-#       "name": "_compute_plan_diff",
-#       "anchor": "function-compute-plan-diff",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "format-plan-diff",
-#       "name": "_format_plan_diff",
-#       "anchor": "function-format-plan-diff",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "plan-to-dict",
-#       "name": "_plan_to_dict",
-#       "anchor": "function-plan-to-dict",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "write-json-atomic",
-#       "name": "_write_json_atomic",
-#       "anchor": "function-write-json-atomic",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "write-lockfile",
-#       "name": "_write_lockfile",
-#       "anchor": "function-write-lockfile",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-lockfile-payload",
-#       "name": "_load_lockfile_payload",
-#       "anchor": "function-load-lockfile-payload",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "spec-from-lock-entry",
-#       "name": "_spec_from_lock_entry",
-#       "anchor": "function-spec-from-lock-entry",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "specs-from-lock-payload",
-#       "name": "_specs_from_lock_payload",
-#       "anchor": "function-specs-from-lock-payload",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-version-metadata",
-#       "name": "_resolve_version_metadata",
-#       "anchor": "function-resolve-version-metadata",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-manifest-path",
-#       "name": "_ensure_manifest_path",
-#       "anchor": "function-ensure-manifest-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-manifest",
-#       "name": "_load_manifest",
-#       "anchor": "function-load-manifest",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "collect-version-metadata",
-#       "name": "_collect_version_metadata",
-#       "anchor": "function-collect-version-metadata",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-latest-manifest",
-#       "name": "_load_latest_manifest",
-#       "anchor": "function-load-latest-manifest",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-specs-from-args",
-#       "name": "_resolve_specs_from_args",
-#       "anchor": "function-resolve-specs-from-args",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "handle-pull",
-#       "name": "_handle_pull",
-#       "anchor": "function-handle-pull",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "handle-plan",
-#       "name": "_handle_plan",
-#       "anchor": "function-handle-plan",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "handle-plan-diff",
-#       "name": "_handle_plan_diff",
-#       "anchor": "function-handle-plan-diff",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "handle-plugins",
-#       "name": "_handle_plugins",
-#       "anchor": "function-handle-plugins",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "handle-prune",
-#       "name": "_handle_prune",
-#       "anchor": "function-handle-prune",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "doctor-report",
-#       "name": "_doctor_report",
-#       "anchor": "function-doctor-report",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "apply-doctor-fixes",
-#       "name": "_apply_doctor_fixes",
-#       "anchor": "function-apply-doctor-fixes",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "print-doctor-report",
-#       "name": "_print_doctor_report",
-#       "anchor": "function-print-doctor-report",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "handle-show",
-#       "name": "_handle_show",
-#       "anchor": "function-handle-show",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "selected-validators",
-#       "name": "_selected_validators",
-#       "anchor": "function-selected-validators",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "handle-validate",
-#       "name": "_handle_validate",
-#       "anchor": "function-handle-validate",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "handle-init",
-#       "name": "_handle_init",
-#       "anchor": "function-handle-init",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "handle-config-validate",
-#       "name": "_handle_config_validate",
-#       "anchor": "function-handle-config-validate",
 #       "kind": "function"
 #     },
 #     {
@@ -317,15 +83,27 @@ from .errors import (
     UnsupportedPythonError,
 )
 from .exports import PUBLIC_API_MANIFEST as EXPORT_MANIFEST, PUBLIC_EXPORT_NAMES
+from .formatters import (
+    PLAN_TABLE_HEADERS,
+    RESULT_TABLE_HEADERS,
+    VALIDATION_TABLE_HEADERS,
+    format_plan_rows,
+    format_results_table,
+    format_table,
+    format_validation_summary,
+)
 from .io import (
+    mask_sensitive_data,
     validate_url_security as _validate_url_security,
 )
 from .logging_utils import setup_logging
 from .planning import (
     MANIFEST_SCHEMA_VERSION,
+    _build_destination,
     FetchResult,
     FetchSpec,
     PlannedFetch,
+    ResolverCandidate,
     fetch_all,
     get_manifest_schema,
     infer_version_timestamp,
@@ -334,6 +112,7 @@ from .planning import (
     plan_all,
     validate_manifest_dict,
 )
+from .manifests import results_to_dict as _manifest_results_to_dict
 from .settings import (
     CACHE_DIR,
     CONFIG_DIR,
@@ -373,6 +152,15 @@ LoggingConfig = LoggingConfiguration
 ValidationConfiguration = ValidationConfig
 
 
+def _results_to_dict(result: FetchResult) -> dict:
+    """Compatibility wrapper returning CLI-oriented fetch result payloads."""
+
+    payload = _manifest_results_to_dict(result)
+    payload["manifest"] = str(result.manifest_path) if result.manifest_path else ""
+    payload["artifacts"] = [str(path) for path in result.artifacts]
+    return payload
+
+
 def validator_worker_main() -> None:
     """Entry point used by validator worker console scripts."""
 
@@ -389,6 +177,17 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
 
 
 __all__ = list(PUBLIC_EXPORT_NAMES)
+__all__ += [
+    "format_table",
+    "format_plan_rows",
+    "format_results_table",
+    "format_validation_summary",
+    "PLAN_TABLE_HEADERS",
+    "RESULT_TABLE_HEADERS",
+    "VALIDATION_TABLE_HEADERS",
+    "_results_to_dict",
+    "mask_sensitive_data",
+]
 
 
 def list_plugins(kind: str) -> Dict[str, str]:

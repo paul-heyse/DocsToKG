@@ -98,6 +98,15 @@ def _populate_forwarding_module(module: types.ModuleType, target, *, doc_hint: s
         return getattr(target, attr)
 
     module.__getattr__ = __getattr__  # type: ignore[attr-defined]
+
+    def __setattr__(attr: str, value) -> None:
+        """Mirror attribute updates onto the target module when applicable."""
+
+        if hasattr(target, attr):
+            setattr(target, attr, value)
+        module.__dict__[attr] = value
+
+    module.__setattr__ = __setattr__  # type: ignore[attr-defined]
     module.__dict__.setdefault("__file__", getattr(target, "__file__", __file__))
 
 
@@ -113,6 +122,7 @@ def _populate_cli_module(module: types.ModuleType) -> None:
     module.embed = _core.embed
     module.doctags = _core.doctags
     module._Command = _core._Command
+    module._detect_mode = _core.detect_mode
     module.COMMANDS = _core.COMMANDS
     module.__all__ = [
         "CommandHandler",

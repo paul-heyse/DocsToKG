@@ -14,6 +14,7 @@ from DocsToKG.ContentDownload.providers import WorkProvider
 from DocsToKG.ContentDownload.runner import DownloadRun
 from DocsToKG.ContentDownload.telemetry import (
     JsonlSink,
+    ManifestUrlIndex,
     MultiSink,
     RunTelemetry,
     SummarySink,
@@ -43,6 +44,8 @@ def _build_args(**overrides: object) -> argparse.Namespace:
         "min_pdf_bytes": 1024,
         "tail_check_bytes": 2048,
         "content_addressed": False,
+        "verify_cache_digest": False,
+        "warm_manifest_cache": False,
         "per_page": 25,
         "max": None,
         "workers": 1,
@@ -84,13 +87,14 @@ def make_resolved_config(
         sqlite_path=sqlite_path,
         resolver_instances=[],
         resolver_config=resolver_config,
-        previous_url_index={},
+        previous_url_index=ManifestUrlIndex(None),
         persistent_seen_urls=set(),
         robots_checker=None,
         budget_requests=budgets.get("requests"),
         budget_bytes=budgets.get("bytes"),
         concurrency_product=max(workers, 1),
         extract_html_text=False,
+        verify_cache_digest=False,
     )
 
 

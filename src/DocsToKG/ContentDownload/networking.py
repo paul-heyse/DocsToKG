@@ -819,6 +819,7 @@ class CachedResult:
     content_length: int
     etag: Optional[str]
     last_modified: Optional[str]
+    recorded_mtime_ns: Optional[int] = None
 
 
 @dataclass
@@ -866,6 +867,7 @@ class ConditionalRequestHelper:
         prior_sha256: Optional[str] = None,
         prior_content_length: Optional[int] = None,
         prior_path: Optional[str] = None,
+        prior_mtime_ns: Optional[int] = None,
     ) -> None:
         """Initialise cached metadata for conditional requests.
 
@@ -893,6 +895,7 @@ class ConditionalRequestHelper:
         self.prior_sha256 = prior_sha256
         self.prior_content_length = prior_content_length
         self.prior_path = prior_path
+        self.prior_mtime_ns = prior_mtime_ns
 
     def build_headers(self) -> Mapping[str, str]:
         """Generate conditional request headers from cached metadata.
@@ -985,6 +988,7 @@ class ConditionalRequestHelper:
                 content_length=self.prior_content_length,
                 etag=self.prior_etag,
                 last_modified=self.prior_last_modified,
+                recorded_mtime_ns=self.prior_mtime_ns,
             )
         return ModifiedResult(
             etag=response.headers.get("ETag"),

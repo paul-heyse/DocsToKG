@@ -95,8 +95,7 @@ The API returns at most `page_size` results per call. When additional results ar
 ```
 
 Cursor chains are stable across requests unless the underlying index changes significantly.
-Use `DocsToKG.HybridSearch.service.verify_pagination` during integration tests to ensure
-continuity.
+Use `DocsToKG.HybridSearch.service.verify_pagination` during integration tests to ensure continuity.
 
 ## 4. Diagnostics
 
@@ -145,14 +144,14 @@ curl -X POST http://localhost:8000/v1/hybrid-search \
 When embedding DocsToKG directly inside Python code, call the service layer once you have constructed it (see `docs/06-operations/index.md` for a full build walkthrough):
 
 ```python
-from DocsToKG.HybridSearch.retrieval import HybridSearchRequest
+from DocsToKG.HybridSearch.types import HybridSearchRequest
 
 service = build_hybrid_service()
 request = HybridSearchRequest(query="ontology mapping pipeline")
 response = service.search(request)
 ```
 
-Working examples of service assembly live in `tests/conftest.py` and `tests/test_hybrid_search.py`.
+Working examples of service assembly live in `tests/conftest.py` and `tests/hybrid_search/test_suite.py`.
 
 ## 7. Related Resources
 

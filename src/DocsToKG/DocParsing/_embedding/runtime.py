@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.DocParsing.embedding",
+#   "module": "DocsToKG.DocParsing.embedding.runtime",
 #   "purpose": "Embedding pipelines for DocParsing",
 #   "sections": [
+#     {
+#       "id": "get-sparse-encoder-cls",
+#       "name": "_get_sparse_encoder_cls",
+#       "anchor": "function-get-sparse-encoder-cls",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-vllm-components",
+#       "name": "_get_vllm_components",
+#       "anchor": "function-get-vllm-components",
+#       "kind": "function"
+#     },
 #     {
 #       "id": "shutdown-llm-instance",
 #       "name": "_shutdown_llm_instance",
@@ -63,12 +75,6 @@
 #       "name": "_percentile",
 #       "anchor": "function-percentile",
 #       "kind": "function"
-#     },
-#     {
-#       "id": "embedcfg",
-#       "name": "EmbedCfg",
-#       "anchor": "class-embedcfg",
-#       "kind": "class"
 #     },
 #     {
 #       "id": "ensure-splade-dependencies",
@@ -239,15 +245,9 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "build-parser",
-#       "name": "build_parser",
-#       "anchor": "function-build-parser",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "parse-args",
-#       "name": "parse_args",
-#       "anchor": "function-parse-args",
+#       "id": "main-inner",
+#       "name": "_main_inner",
+#       "anchor": "function-main-inner",
 #       "kind": "function"
 #     },
 #     {
@@ -339,9 +339,13 @@ except Exception:  # pragma: no cover - fallback when tqdm is unavailable
         """Lightweight iterator wrapper used when tqdm is unavailable."""
 
         def __init__(self, iterable=None, **kwargs):
+            """Store the iterable used to emulate tqdm's interface."""
+
             self._iterable = iterable
 
         def __iter__(self):
+            """Iterate over the wrapped iterable when present."""
+
             if self._iterable is None:
                 return iter(())
             return iter(self._iterable)
@@ -357,9 +361,13 @@ except Exception:  # pragma: no cover - fallback when tqdm is unavailable
             return None
 
         def __enter__(self):
+            """Support use as a context manager like tqdm."""
+
             return self
 
         def __exit__(self, exc_type, exc_value, traceback):
+            """Mirror tqdm's context manager cleanup without suppression."""
+
             self.close()
             return False
 
@@ -420,14 +428,7 @@ from DocsToKG.DocParsing.io import (
     resolve_attempts_path,
     resolve_manifest_path,
 )
-from DocsToKG.DocParsing.logging import (
-    get_logger,
-    log_event,
-    manifest_log_failure,
-    manifest_log_skip,
-    manifest_log_success,
-    telemetry_scope,
-)
+from DocsToKG.DocParsing.logging import get_logger, log_event, telemetry_scope
 from DocsToKG.DocParsing.cli_errors import EmbeddingCLIValidationError, format_cli_error
 from DocsToKG.DocParsing.schemas import (
     SchemaKind,
@@ -444,6 +445,14 @@ from .config import (
     SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
     EmbedCfg,
 )
+
+
+def _embedding_module():
+    """Return the embedding shim module to honour monkeypatching."""
+
+    import DocsToKG.DocParsing.embedding as embedding_shim
+
+    return embedding_shim
 
 # --- Globals ---
 
@@ -470,6 +479,11 @@ __all__ = (
     "write_vectors",
     "flush_llm_cache",
     "close_all_qwen",
+    "_QWEN_LLM_CACHE",
+    "_get_sparse_encoder_cls",
+    "_get_vllm_components",
+    "_qwen_cache_key",
+    "LLM",
 )
 
 
@@ -547,6 +561,8 @@ class _LRUCache:
         maxsize: int = 2,
         closer: Optional[Callable[[Any], None]] = None,
     ) -> None:
+        """Seed the cache configuration and underlying storage."""
+
         self.maxsize = max(1, maxsize)
         self._closer = closer
         self._store: OrderedDict[Any, Any] = OrderedDict()
@@ -586,11 +602,15 @@ class _LRUCache:
         return list(self._store.values())
 
     def _evict_if_needed(self) -> None:
+        """Trim the cache to the configured size, closing evicted entries."""
+
         while len(self._store) > self.maxsize:
             _, value = self._store.popitem(last=False)
             self._close(value)
 
     def _close(self, value: Any) -> None:
+        """Invoke the configured closer for ``value`` while swallowing errors."""
+
         if self._closer is None:
             return
         try:
@@ -1551,6 +1571,8 @@ def process_chunk_file_vectors(
             qwen_vectors_by_idx: List[Sequence[float]] = [()] * len(texts)
 
             def _embed_batch(batch_texts: List[str]) -> Sequence[Sequence[float]]:
+                """Run Qwen embeddings using either a queue or direct invocation."""
+
                 qwen_queue = getattr(args, "qwen_queue", None)
                 if qwen_queue is not None:
                     return qwen_queue.embed(batch_texts, int(args.batch_size_qwen))

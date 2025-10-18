@@ -28,6 +28,9 @@ from DocsToKG.ContentDownload.download import (
     DownloadOptions,
     DownloadState,
     _build_download_outcome,
+    _normalize_arxiv,
+    _normalize_pmid,
+    _collect_location_urls,
     build_download_outcome,
     create_artifact,
     download_candidate,
@@ -35,6 +38,7 @@ from DocsToKG.ContentDownload.download import (
     process_one_work,
 )
 from DocsToKG.ContentDownload.pipeline import (
+    ResolverPipeline,
     apply_config_overrides,
     default_resolvers,
     load_resolver_config,
@@ -52,7 +56,10 @@ from DocsToKG.ContentDownload.telemetry import (
     ManifestEntry,
     ManifestIndexSink,
     MultiSink,
+    RotatingJsonlSink,
     RunTelemetry,
+    SqliteSink,
+    SummarySink,
     load_previous_manifest,
 )
 
@@ -69,10 +76,14 @@ __all__ = (
     "RunTelemetry",
     "ManifestIndexSink",
     "MultiSink",
+    "RotatingJsonlSink",
+    "SqliteSink",
+    "SummarySink",
     "MANIFEST_SCHEMA_VERSION",
     "WorkArtifact",
     "WorkProvider",
     "OpenAlexWorkProvider",
+    "ResolverPipeline",
     "resolvers",
     "apply_config_overrides",
     "default_resolvers",
@@ -85,6 +96,9 @@ __all__ = (
     "iterate_openalex",
     "build_download_outcome",
     "_build_download_outcome",
+    "_collect_location_urls",
+    "_normalize_arxiv",
+    "_normalize_pmid",
     "load_previous_manifest",
     "load_resolver_config",
     "main",
@@ -108,6 +122,16 @@ def main(argv: Optional[Sequence[str]] = None) -> RunResult:
     resolved = resolve_config(args, parser)
     bootstrap_run_environment(resolved)
     download_run = DownloadRun(resolved)
+    # Allow tests and callers to monkeypatch sink implementations via cli module.
+    download_run.jsonl_sink_factory = JsonlSink
+    download_run.rotating_jsonl_sink_factory = RotatingJsonlSink
+    download_run.manifest_index_sink_factory = ManifestIndexSink
+    download_run.last_attempt_sink_factory = LastAttemptCsvSink
+    download_run.sqlite_sink_factory = SqliteSink
+    download_run.summary_sink_factory = SummarySink
+    download_run.csv_sink_factory = CsvSink
+    download_run.multi_sink_factory = MultiSink
+    download_run.run_telemetry_factory = RunTelemetry
     result = download_run.run()
     emit_console_summary(result, dry_run=args.dry_run)
     return result

@@ -639,6 +639,8 @@ def run_all(argv: Sequence[str] | None = None) -> int:
 
 
 def _command(handler: CommandHandler, help_text: str) -> "_Command":
+    """Package a handler and help text into a command descriptor."""
+
     return _Command(handler, help_text)
 
 
@@ -648,6 +650,8 @@ class _Command:
     __slots__ = ("handler", "help")
 
     def __init__(self, handler: CommandHandler, help: str) -> None:
+        """Store the callable ``handler`` and help text for the command."""
+
         self.handler = handler
         self.help = help
 

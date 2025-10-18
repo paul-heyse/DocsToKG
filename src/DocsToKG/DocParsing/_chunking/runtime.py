@@ -1,44 +1,14 @@
 #!/usr/bin/env python3
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.DocParsing.chunking",
+#   "module": "DocsToKG.DocParsing.chunking.runtime",
 #   "purpose": "CLI entry points for DocsToKG.DocParsing.chunking workflows",
 #   "sections": [
 #     {
-#       "id": "resolve-serializer-provider",
-#       "name": "_resolve_serializer_provider",
-#       "anchor": "function-resolve-serializer-provider",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "validate-chunk-files",
-#       "name": "_validate_chunk_files",
-#       "anchor": "function-validate-chunk-files",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "chunkercfg",
-#       "name": "ChunkerCfg",
-#       "anchor": "class-chunkercfg",
+#       "id": "rec",
+#       "name": "Rec",
+#       "anchor": "class-rec",
 #       "kind": "class"
-#     },
-#     {
-#       "id": "chunk-log-context",
-#       "name": "_chunk_log_context",
-#       "anchor": "function-chunk-log-context",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "log-chunk-metadata-issue",
-#       "name": "_log_chunk_metadata_issue",
-#       "anchor": "function-log-chunk-metadata-issue",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "collect-doc-items",
-#       "name": "_collect_doc_items",
-#       "anchor": "function-collect-doc-items",
-#       "kind": "function"
 #     },
 #     {
 #       "id": "read-utf8",
@@ -59,6 +29,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "is-structural-boundary",
+#       "name": "is_structural_boundary",
+#       "anchor": "function-is-structural-boundary",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "summarize-image-metadata",
 #       "name": "summarize_image_metadata",
 #       "anchor": "function-summarize-image-metadata",
@@ -71,10 +47,16 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "rec",
-#       "name": "Rec",
-#       "anchor": "class-rec",
-#       "kind": "class"
+#       "id": "merge-rec",
+#       "name": "merge_rec",
+#       "anchor": "function-merge-rec",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coalesce-small-runs",
+#       "name": "coalesce_small_runs",
+#       "anchor": "function-coalesce-small-runs",
+#       "kind": "function"
 #     },
 #     {
 #       "id": "chunk-worker-initializer",
@@ -89,45 +71,33 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "merge-rec",
-#       "name": "merge_rec",
-#       "anchor": "function-merge-rec",
+#       "id": "resolve-serializer-provider",
+#       "name": "_resolve_serializer_provider",
+#       "anchor": "function-resolve-serializer-provider",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "is-structural-boundary",
-#       "name": "is_structural_boundary",
-#       "anchor": "function-is-structural-boundary",
+#       "id": "validate-chunk-files",
+#       "name": "_validate_chunk_files",
+#       "anchor": "function-validate-chunk-files",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "coalesce-small-runs",
-#       "name": "coalesce_small_runs",
-#       "anchor": "function-coalesce-small-runs",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "build-parser",
-#       "name": "build_parser",
-#       "anchor": "function-build-parser",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "parse-args",
-#       "name": "parse_args",
-#       "anchor": "function-parse-args",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "function-main",
+#       "id": "main-inner",
+#       "name": "_main_inner",
+#       "anchor": "function-main-inner",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "run-validate-only",
 #       "name": "_run_validate_only",
 #       "anchor": "function-run-validate-only",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
 #       "kind": "function"
 #     }
 #   ]
@@ -238,10 +208,7 @@ from DocsToKG.DocParsing.core import (
     load_structural_marker_config,
     set_spawn_or_warn,
 )
-from DocsToKG.DocParsing.doctags import (
-    add_data_root_option,
-    add_resume_force_options,
-)
+from DocsToKG.DocParsing.doctags import add_data_root_option, add_resume_force_options
 from DocsToKG.DocParsing.env import (
     data_chunks,
     data_doctags,
@@ -270,11 +237,7 @@ from DocsToKG.DocParsing.io import (
     resolve_hash_algorithm,
     resolve_manifest_path,
 )
-from DocsToKG.DocParsing.logging import (
-    get_logger,
-    log_event,
-    telemetry_scope,
-)
+from DocsToKG.DocParsing.logging import get_logger, log_event, telemetry_scope
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
 from .cli import build_parser, parse_args
@@ -282,6 +245,16 @@ from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError, format_cl
 from .config import CHUNK_PROFILE_PRESETS, ChunkerCfg, SOFT_BARRIER_MARGIN
 
 CHUNK_STAGE = "chunking"
+
+_LOGGER = get_logger(__name__)
+
+
+def _chunking_module():
+    """Return the public chunking shim module (monkeypatch friendly)."""
+
+    import DocsToKG.DocParsing.chunking as chunking_shim
+
+    return chunking_shim
 
 
 @dataclass(slots=True)
@@ -291,14 +264,421 @@ class Rec:
     text: str
     n_tok: int
     src_idxs: List[int]
-    refs: List[Any]
-    pages: List[Any]
-    has_image_captions: bool
-    has_image_classification: bool
-    num_images: int
-    image_confidence: float
-    start_offset: int
-    picture_meta: Optional[Dict[str, Any]] = None
+    refs: List[str]
+    pages: List[int]
+    start_offset: Optional[int] = None
+    has_image_captions: bool = False
+    has_image_classification: bool = False
+    num_images: int = 0
+    image_confidence: Optional[float] = None
+    picture_meta: Optional[List[Dict[str, Any]]] = None
+
+
+def read_utf8(path: Path) -> str:
+    """Load UTF-8 text from ``path`` replacing undecodable bytes."""
+
+    return Path(path).read_text(encoding="utf-8", errors="replace")
+
+
+def build_doc(doc_name: str, doctags_text: str) -> DoclingDocument:
+    """Construct a Docling document from serialized DocTags markup."""
+
+    tags = DocTagsDocument.from_doctags_and_image_pairs([doctags_text], images=None)
+    return DoclingDocument.load_from_doctags(tags, document_name=doc_name)
+
+
+def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
+    """Extract inline references and page numbers from a Docling chunk."""
+
+    refs: List[str] = []
+    pages: List[int] = []
+    doc_id = getattr(getattr(chunk, "meta", None), "document_id", "__unknown__")
+
+    for item in getattr(getattr(chunk, "meta", None), "doc_items", []) or []:
+        if getattr(item, "self_ref", None):
+            if item.self_ref not in refs:
+                refs.append(item.self_ref)
+        for prov in getattr(item, "prov", []) or []:
+            page_value = getattr(prov, "page_no", None)
+            if page_value is None:
+                continue
+            try:
+                page_int = int(page_value)
+            except (TypeError, ValueError):
+                log_event(
+                    _LOGGER.logger,
+                    "warning",
+                    "Invalid page metadata encountered",
+                    stage=CHUNK_STAGE,
+                    doc_id=doc_id,
+                    error_code="CHUNK_PAGE_INVALID",
+                    page_value=page_value,
+                )
+                continue
+            if page_int > 0 and page_int not in pages:
+                pages.append(page_int)
+    pages.sort()
+    return refs, pages
+
+
+def is_structural_boundary(
+    record: Rec,
+    heading_markers: Tuple[str, ...] = DEFAULT_HEADING_MARKERS,
+    caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS,
+) -> bool:
+    """Return True when ``record`` begins with a structural marker."""
+
+    text = record.text.lstrip()
+    for marker in heading_markers:
+        if marker and text.startswith(marker):
+            return True
+    for marker in caption_markers:
+        if marker and text.startswith(marker):
+            return True
+    return False
+
+
+def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, int, Optional[float], List[Dict[str, Any]]]:
+    """Summarise image annotations associated with ``chunk``."""
+
+    has_caption = any(
+        marker and marker in text for marker in ("Figure caption:", "Table:", "Picture description:")
+    ) or text.strip().startswith("<!-- image -->")
+    has_classification = False
+    num_images = 0
+    confidence: Optional[float] = None
+    extras: List[Dict[str, Any]] = []
+    doc_id = getattr(getattr(chunk, "meta", None), "document_id", "__unknown__")
+
+    for entry in getattr(getattr(chunk, "meta", None), "doc_items", []) or []:
+        doc_item = getattr(entry, "doc_item", entry)
+        flags = getattr(doc_item, "_docstokg_flags", None) or {}
+        if flags:
+            num_images += 1
+            if flags.get("has_image_captions"):
+                has_caption = True
+            if flags.get("has_image_classification"):
+                has_classification = True
+            if flags.get("image_confidence") is not None:
+                try:
+                    score = float(flags["image_confidence"])
+                    confidence = score if confidence is None else max(confidence, score)
+                except (TypeError, ValueError):  # pragma: no cover - defensive
+                    pass
+
+        annotations = getattr(doc_item, "annotations", getattr(entry, "annotations", None))
+        if annotations is None:
+            continue
+        if not isinstance(annotations, (list, tuple)):
+            log_event(
+                _LOGGER.logger,
+                "warning",
+                "Chunk annotations not iterable",
+                stage=CHUNK_STAGE,
+                doc_id=doc_id,
+                error_code="CHUNK_ANNOTATIONS_NON_ITERABLE",
+            )
+            continue
+        for ann in annotations:
+            predicted = getattr(ann, "predicted_classes", None)
+            if predicted is None:
+                continue
+            if not isinstance(predicted, (list, tuple)):
+                log_event(
+                    _LOGGER.logger,
+                    "warning",
+                    "Predicted classes not iterable",
+                    stage=CHUNK_STAGE,
+                    doc_id=doc_id,
+                    error_code="CHUNK_PREDICTED_CLASSES_NON_ITERABLE",
+                )
+                continue
+            has_classification = True
+            for cls in predicted:
+                label = getattr(cls, "class_name", None)
+                conf = getattr(cls, "confidence", None)
+                if conf is not None:
+                    try:
+                        score = float(conf)
+                        confidence = score if confidence is None else max(confidence, score)
+                    except (TypeError, ValueError):  # pragma: no cover - defensive
+                        pass
+                if label:
+                    extras.append({"class": label, "confidence": conf})
+
+    return has_caption, has_classification, num_images, confidence, extras
+
+
+def _extract_chunk_start(chunk: BaseChunk) -> Optional[int]:
+    """Attempt to extract the starting character offset for ``chunk``."""
+
+    try:
+        doc_items = getattr(getattr(chunk, "meta", None), "doc_items", None) or []
+        if not doc_items:
+            return None
+        first = doc_items[0]
+        for attr in ("start_offset", "offset", "char_start"):
+            value = getattr(first, attr, None)
+            if isinstance(value, int) and value >= 0:
+                return value
+        char_range = getattr(first, "char_range", None)
+        if isinstance(char_range, (tuple, list)) and char_range:
+            maybe = char_range[0]
+            if isinstance(maybe, int) and maybe >= 0:
+                return maybe
+        start = getattr(getattr(first, "meta", None), "char_start", None)
+        if isinstance(start, int) and start >= 0:
+            return start
+    except Exception:  # pragma: no cover - defensive
+        return None
+    return None
+
+
+def merge_rec(a: Rec, b: Rec, tokenizer: Any) -> Rec:
+    """Merge two chunk records into a single aggregate record."""
+
+    text = (a.text.rstrip() + "\n\n" + b.text.lstrip()).strip("\n")
+    token_count = tokenizer.count_tokens(text=text)
+    refs = list(dict.fromkeys(a.refs + [ref for ref in b.refs if ref not in a.refs]))
+    pages = sorted(set(a.pages + b.pages))
+    start_offset_candidates = [offset for offset in (a.start_offset, b.start_offset) if isinstance(offset, int)]
+    start_offset = min(start_offset_candidates) if start_offset_candidates else None
+
+    picture_meta: List[Dict[str, Any]] = []
+    if a.picture_meta:
+        picture_meta.extend(a.picture_meta)
+    if b.picture_meta:
+        picture_meta.extend(b.picture_meta)
+
+    confidences = [score for score in (a.image_confidence, b.image_confidence) if isinstance(score, (int, float))]
+    image_confidence = max(confidences) if confidences else None
+
+    return Rec(
+        text=text,
+        n_tok=token_count,
+        src_idxs=a.src_idxs + b.src_idxs,
+        refs=refs,
+        pages=pages,
+        start_offset=start_offset,
+        has_image_captions=a.has_image_captions or b.has_image_captions,
+        has_image_classification=a.has_image_classification or b.has_image_classification,
+        num_images=a.num_images + b.num_images,
+        image_confidence=image_confidence,
+        picture_meta=picture_meta or None,
+    )
+
+
+def coalesce_small_runs(
+    records: List[Rec],
+    tokenizer: Any,
+    *,
+    min_tokens: int,
+    max_tokens: int | None = None,
+    soft_barrier_margin: int = 64,
+    heading_markers: Tuple[str, ...] = DEFAULT_HEADING_MARKERS,
+    caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS,
+) -> List[Rec]:
+    """Merge contiguous undersized chunks while respecting structural boundaries."""
+
+    if not records:
+        return []
+
+    max_threshold = max_tokens if max_tokens is not None else 512
+
+    output: List[Rec] = []
+    i = 0
+    total = len(records)
+    while i < total:
+        current = records[i]
+        if current.n_tok >= min_tokens:
+            output.append(current)
+            i += 1
+            continue
+
+        merged = current
+        j = i + 1
+        while j < total:
+            candidate = records[j]
+            boundary = is_structural_boundary(candidate, heading_markers, caption_markers)
+            if boundary and soft_barrier_margin > 0:
+                break
+            tentative = merge_rec(merged, candidate, tokenizer)
+            if tentative.n_tok > max_threshold:
+                break
+            merged = tentative
+            j += 1
+            if merged.n_tok >= min_tokens:
+                break
+
+        output.append(merged)
+        if j == i + 1 and merged is current:
+            i += 1
+        else:
+            i = j
+
+    return output
+
+
+_WORKER_STATE: Dict[str, Any] = {}
+
+
+def _chunk_worker_initializer(cfg: ChunkWorkerConfig) -> None:
+    """Initialise shared tokenizer/chunker state for worker processes."""
+
+    chunking_mod = _chunking_module()
+    tokenizer_cls = chunking_mod.HuggingFaceTokenizer
+    auto_tokenizer = chunking_mod.AutoTokenizer
+    tokenizer = tokenizer_cls(
+        tokenizer=auto_tokenizer.from_pretrained(cfg.tokenizer_model, use_fast=True),
+        max_tokens=cfg.max_tokens,
+    )
+    provider_cls = _resolve_serializer_provider(cfg.serializer_provider_spec)
+    provider = provider_cls()
+    chunker_cls = chunking_mod.HybridChunker
+    chunker = chunker_cls(
+        tokenizer=tokenizer,
+        merge_peers=True,
+        serializer_provider=provider,
+    )
+    global _WORKER_STATE
+    _WORKER_STATE = {
+        "config": cfg,
+        "tokenizer": tokenizer,
+        "chunker": chunker,
+        "heading_markers": tuple(cfg.heading_markers),
+        "caption_markers": tuple(cfg.caption_markers),
+    }
+
+
+def _process_chunk_task(task: ChunkTask) -> ChunkResult:
+    """Chunk a single DocTags file using worker-local state."""
+
+    if not _WORKER_STATE:
+        raise RuntimeError("Chunk worker initialiser was not executed")
+
+    cfg: ChunkWorkerConfig = _WORKER_STATE["config"]
+    tokenizer: HuggingFaceTokenizer = _WORKER_STATE["tokenizer"]
+    chunker: HybridChunker = _WORKER_STATE["chunker"]
+    heading_markers: Tuple[str, ...] = _WORKER_STATE["heading_markers"]
+    caption_markers: Tuple[str, ...] = _WORKER_STATE["caption_markers"]
+
+    start_time = time.perf_counter()
+    try:
+        text = read_utf8(task.doc_path)
+        doc = build_doc(task.doc_stem, text)
+        raw_chunks = list(chunker.chunk(dl_doc=doc))
+
+        records: List[Rec] = []
+        for idx, chunk in enumerate(raw_chunks):
+            chunk_text = chunker.contextualize(chunk)
+            token_count = tokenizer.count_tokens(text=chunk_text)
+            refs, pages = extract_refs_and_pages(chunk)
+            has_caption, has_classification, num_images, confidence, picture_meta = (
+                summarize_image_metadata(chunk, chunk_text)
+            )
+            records.append(
+                Rec(
+                    text=chunk_text,
+                    n_tok=token_count,
+                    src_idxs=[idx],
+                    refs=refs,
+                    pages=pages or [],
+                    start_offset=_extract_chunk_start(chunk),
+                    has_image_captions=has_caption,
+                    has_image_classification=has_classification,
+                    num_images=num_images,
+                    image_confidence=confidence,
+                    picture_meta=picture_meta or None,
+                )
+            )
+
+        merged = coalesce_small_runs(
+            records=records,
+            tokenizer=tokenizer,
+            min_tokens=cfg.min_tokens,
+            max_tokens=cfg.max_tokens,
+            soft_barrier_margin=cfg.soft_barrier_margin,
+            heading_markers=heading_markers,
+            caption_markers=caption_markers,
+        )
+
+        output_path = task.output_path
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        chunking_mod = _chunking_module()
+        provenance_cls = chunking_mod.ProvenanceMetadata
+        chunk_row_cls = chunking_mod.ChunkRow
+
+        with atomic_write(output_path) as handle:
+            for chunk_id, rec in enumerate(merged):
+                text_body = rec.text
+                if cfg.inject_anchors:
+                    anchor = f"<<chunk:{task.doc_id}:{chunk_id}>>"
+                    if not text_body.startswith(anchor):
+                        text_body = f"{anchor}\n{text_body}"
+
+                provenance = provenance_cls(
+                    parse_engine=task.parse_engine,
+                    docling_version=cfg.docling_version,
+                    has_image_captions=rec.has_image_captions,
+                    has_image_classification=rec.has_image_classification,
+                    num_images=rec.num_images,
+                    image_confidence=rec.image_confidence,
+                )
+
+                row = chunk_row_cls(
+                    doc_id=task.doc_id,
+                    source_path=relative_path(task.doc_path, cfg.data_root),
+                    chunk_id=chunk_id,
+                    source_chunk_idxs=rec.src_idxs,
+                    num_tokens=rec.n_tok,
+                    text=text_body,
+                    doc_items_refs=rec.refs,
+                    page_nos=rec.pages,
+                    schema_version=CHUNK_SCHEMA_VERSION,
+                    start_offset=rec.start_offset,
+                    has_image_captions=rec.has_image_captions,
+                    has_image_classification=rec.has_image_classification,
+                    num_images=rec.num_images,
+                    image_confidence=rec.image_confidence,
+                    provenance=provenance,
+                    uuid=compute_chunk_uuid(task.doc_id, rec.start_offset or 0, text_body),
+                ).model_dump(mode="python")
+
+                validate_chunk_row(row)
+                handle.write(json.dumps(row, ensure_ascii=False))
+                handle.write("\n")
+
+        duration = time.perf_counter() - start_time
+        return ChunkResult(
+            doc_id=task.doc_id,
+            doc_stem=task.doc_stem,
+            status="success",
+            duration_s=duration,
+            input_path=task.doc_path,
+            output_path=task.output_path,
+            input_hash=task.input_hash,
+            chunk_count=len(merged),
+            parse_engine=task.parse_engine,
+            sanitizer_profile=task.sanitizer_profile,
+            anchors_injected=cfg.inject_anchors,
+        )
+    except Exception as exc:  # pragma: no cover - exercised in failure paths
+        duration = time.perf_counter() - start_time
+        return ChunkResult(
+            doc_id=task.doc_id,
+            doc_stem=task.doc_stem,
+            status="error",
+            duration_s=duration,
+            input_path=task.doc_path,
+            output_path=task.output_path,
+            input_hash=task.input_hash,
+            chunk_count=0,
+            parse_engine=task.parse_engine,
+            sanitizer_profile=task.sanitizer_profile,
+            anchors_injected=cfg.inject_anchors,
+            error=str(exc),
+        )
 
 
 def _resolve_serializer_provider(spec: str) -> type[ChunkingSerializerProvider]:
@@ -792,6 +1172,7 @@ def _main_inner(
             docling_version=docling_version,
             serializer_provider_spec=str(args.serializer_provider),
             inject_anchors=bool(cfg.inject_anchors),
+            data_root=resolved_data_root,
         )
 
         if "bert" in tokenizer_model.lower():
@@ -998,144 +1379,148 @@ if __name__ == "__main__":
 
 
 def _run_validate_only(
-        *,
-        files: Sequence[Path],
-        logger,
-        cfg: ChunkerCfg,
-        tokenizer_model: str,
-        heading_markers: Tuple[str, ...],
-        caption_markers: Tuple[str, ...],
-        data_root: Optional[Path],
-        in_dir: Path,
-        out_dir: Path,
-        telemetry: StageTelemetry,
+    *,
+    files: Sequence[Path],
+    logger,
+    cfg: ChunkerCfg,
+    tokenizer_model: str,
+    heading_markers: Tuple[str, ...],
+    caption_markers: Tuple[str, ...],
+    data_root: Optional[Path],
+    in_dir: Path,
+    out_dir: Path,
+    telemetry: StageTelemetry,
 ) -> None:
-        """Validate chunk inputs and report statistics without writing outputs."""
+    """Validate chunk inputs and report statistics without writing outputs."""
 
-        stats = _validate_chunk_files(
-            files,
-            logger,
-            data_root=data_root,
-            telemetry=telemetry,
-        )
-        logger.bind(mode="validate-only")
+    stats = _validate_chunk_files(
+        files,
+        logger,
+        data_root=data_root,
+        telemetry=telemetry,
+    )
+    logger.bind(mode="validate-only")
 
-        if not stats["files"]:
-            log_event(
-                logger,
-                "info",
-                "No chunk files validated",
-                status="validate-only",
-                stage=CHUNK_STAGE,
-                doc_id="__aggregate__",
-                input_hash=None,
-                **stats,
-            )
-            return
-
+    if not stats["files"]:
         log_event(
             logger,
             "info",
-            "Chunk validation complete",
+            "No chunk files validated",
             status="validate-only",
             stage=CHUNK_STAGE,
             doc_id="__aggregate__",
             input_hash=None,
             **stats,
         )
+        return
 
-        ensure_model_environment()
-        hf = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
-        tokenizer = HuggingFaceTokenizer(tokenizer=hf, max_tokens=cfg.max_tokens)
-        provider_cls = _resolve_serializer_provider(str(cfg.serializer_provider))
-        provider = provider_cls()
-        chunker = HybridChunker(
+    log_event(
+        logger,
+        "info",
+        "Chunk validation complete",
+        status="validate-only",
+        stage=CHUNK_STAGE,
+        doc_id="__aggregate__",
+        input_hash=None,
+        **stats,
+    )
+
+    ensure_model_environment()
+    chunking_mod = _chunking_module()
+    auto_tokenizer = chunking_mod.AutoTokenizer
+    huggingface_tokenizer = chunking_mod.HuggingFaceTokenizer
+    hf = auto_tokenizer.from_pretrained(tokenizer_model, use_fast=True)
+    tokenizer = huggingface_tokenizer(tokenizer=hf, max_tokens=cfg.max_tokens)
+    provider_cls = _resolve_serializer_provider(str(cfg.serializer_provider))
+    provider = provider_cls()
+    chunker_cls = chunking_mod.HybridChunker
+    chunker = chunker_cls(
+        tokenizer=tokenizer,
+        merge_peers=True,
+        serializer_provider=provider,
+    )
+
+    total_chunks = 0
+    total_records = 0
+    token_counts: List[int] = []
+    boundary_violations = 0
+    heading_hits = 0
+    caption_hits = 0
+
+    for path in files:
+        if not path.exists():
+            continue
+        doctags_text = read_utf8(path)
+        doc = build_doc(doc_name=path.stem, doctags_text=doctags_text)
+        chunks = list(chunker.chunk(dl_doc=doc))
+        total_chunks += len(chunks)
+        recs: List[Rec] = []
+        for idx, ch in enumerate(chunks):
+            text = chunker.contextualize(ch)
+            n_tok = tokenizer.count_tokens(text=text)
+            has_caption, has_classification, num_images, image_confidence, picture_meta = (
+                summarize_image_metadata(ch, text)
+            )
+            recs.append(
+                Rec(
+                    text=text,
+                    n_tok=n_tok,
+                    src_idxs=[idx],
+                    refs=[],
+                    pages=[],
+                    has_image_captions=has_caption,
+                    has_image_classification=has_classification,
+                    num_images=num_images,
+                    image_confidence=image_confidence,
+                    start_offset=_extract_chunk_start(ch),
+                    picture_meta=picture_meta,
+                )
+            )
+        coalesced = coalesce_small_runs(
+            records=recs,
             tokenizer=tokenizer,
-            merge_peers=True,
-            serializer_provider=provider,
+            min_tokens=cfg.min_tokens,
+            max_tokens=cfg.max_tokens,
+            soft_barrier_margin=cfg.soft_barrier_margin,
+            heading_markers=heading_markers,
+            caption_markers=caption_markers,
+        )
+        total_records += len(coalesced)
+        token_counts.extend(rec.n_tok for rec in coalesced)
+        boundary_violations += sum(
+            1 for rec in coalesced if is_structural_boundary(rec, heading_markers, caption_markers)
+        )
+        heading_hits += sum(
+            1 for rec in coalesced if is_structural_boundary(rec, heading_markers, ())
+        )
+        caption_hits += sum(
+            1 for rec in coalesced if is_structural_boundary(rec, (), caption_markers)
         )
 
-        total_chunks = 0
-        total_records = 0
-        token_counts: List[int] = []
-        boundary_violations = 0
-        heading_hits = 0
-        caption_hits = 0
+    avg_tokens = statistics.mean(token_counts) if token_counts else 0.0
+    min_tokens = min(token_counts) if token_counts else 0
+    max_tokens = max(token_counts) if token_counts else 0
+    validated_files = stats["files"]
+    validated_rows = stats["rows"]
 
-        for path in files:
-            if not path.exists():
-                continue
-            doctags_text = read_utf8(path)
-            doc = build_doc(doc_name=path.stem, doctags_text=doctags_text)
-            chunks = list(chunker.chunk(dl_doc=doc))
-            total_chunks += len(chunks)
-            recs: List[Rec] = []
-            for idx, ch in enumerate(chunks):
-                text = chunker.contextualize(ch)
-                n_tok = tokenizer.count_tokens(text=text)
-                has_caption, has_classification, num_images, image_confidence, picture_meta = (
-                    summarize_image_metadata(ch, text)
-                )
-                recs.append(
-                    Rec(
-                        text=text,
-                        n_tok=n_tok,
-                        src_idxs=[idx],
-                        refs=[],
-                        pages=[],
-                        has_image_captions=has_caption,
-                        has_image_classification=has_classification,
-                        num_images=num_images,
-                        image_confidence=image_confidence,
-                        start_offset=_extract_chunk_start(ch),
-                        picture_meta=picture_meta,
-                    )
-                )
-            coalesced = coalesce_small_runs(
-                records=recs,
-                tokenizer=tokenizer,
-                min_tokens=cfg.min_tokens,
-                max_tokens=cfg.max_tokens,
-                soft_barrier_margin=cfg.soft_barrier_margin,
-                heading_markers=heading_markers,
-                caption_markers=caption_markers,
-            )
-            total_records += len(coalesced)
-            token_counts.extend(rec.n_tok for rec in coalesced)
-            boundary_violations += sum(
-                1 for rec in coalesced if rec.text.strip().startswith(heading_markers)
-            )
-            heading_hits += sum(1 for rec in coalesced if rec.text.strip().startswith(heading_markers))
-            caption_hits += sum(
-                1
-                for rec in coalesced
-                if any(marker in rec.text for marker in caption_markers if marker)
-            )
-
-        avg_tokens = statistics.mean(token_counts) if token_counts else 0.0
-        min_tokens = min(token_counts) if token_counts else 0
-        max_tokens = max(token_counts) if token_counts else 0
-        validated_files = stats["files"]
-        validated_rows = stats["rows"]
-
-        log_event(
-            logger,
-            "info",
-            "Validate-only summary",
-            status="validate-only-summary",
-            stage=CHUNK_STAGE,
-            validated_files=validated_files,
-            validated_rows=validated_rows,
-            generated_chunks=total_records,
-            avg_tokens=round(avg_tokens, 2),
-            min_tokens=min_tokens,
-            max_tokens=max_tokens,
-            heading_hits=heading_hits,
-            caption_hits=caption_hits,
-            boundary_violations=boundary_violations,
-            input_relpath=relative_path(in_dir, data_root),
-            output_relpath=relative_path(out_dir, data_root),
-        )
+    log_event(
+        logger,
+        "info",
+        "Validate-only summary",
+        status="validate-only-summary",
+        stage=CHUNK_STAGE,
+        validated_files=validated_files,
+        validated_rows=validated_rows,
+        generated_chunks=total_records,
+        avg_tokens=round(avg_tokens, 2),
+        min_tokens=min_tokens,
+        max_tokens=max_tokens,
+        heading_hits=heading_hits,
+        caption_hits=caption_hits,
+        boundary_violations=boundary_violations,
+        input_relpath=relative_path(in_dir, data_root),
+        output_relpath=relative_path(out_dir, data_root),
+    )
 
 def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = None) -> int:
     """Wrapper that normalises CLI validation failures for the chunk stage."""

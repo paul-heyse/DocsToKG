@@ -121,6 +121,7 @@ from DocsToKG.OntologyDownload import (
     ResolverCandidate,
 )
 from DocsToKG.OntologyDownload import api as cli
+import DocsToKG.OntologyDownload.cli as cli_module
 from DocsToKG.OntologyDownload.planning import FetchPlan
 
 
@@ -261,6 +262,31 @@ def test_cli_pull_concurrency_and_hosts(monkeypatch, stub_logger):
     assert exit_code == 0
     assert captured["downloads"] == 4
     assert set(captured["hosts"]) == {"example.org", "mirror.example.org", "cdn.example.com"}
+
+
+def test_cli_plan_disables_planner_probes():
+    config = _default_config()
+    args = SimpleNamespace(
+        concurrent_downloads=None,
+        concurrent_plans=None,
+        allowed_hosts=None,
+        planner_probes=False,
+    )
+    cli_module._apply_cli_overrides(config, args)
+    assert config.defaults.planner.probing_enabled is False
+
+
+def test_cli_plan_enables_planner_probes():
+    config = _default_config()
+    config.defaults.planner.probing_enabled = False
+    args = SimpleNamespace(
+        concurrent_downloads=None,
+        concurrent_plans=None,
+        allowed_hosts=None,
+        planner_probes=True,
+    )
+    cli_module._apply_cli_overrides(config, args)
+    assert config.defaults.planner.probing_enabled is True
 
 
 def test_cli_plan_json_output(monkeypatch, stub_logger, capsys):

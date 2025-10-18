@@ -203,7 +203,7 @@ class DownloadContext:
     list_only: bool = False
     extract_html_text: bool = False
     previous: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    global_manifest_index: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    global_manifest_index: Any = field(default_factory=dict)
     max_bytes: Optional[int] = None
     sniff_bytes: int = DEFAULT_SNIFF_BYTES
     min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
@@ -222,11 +222,13 @@ class DownloadContext:
     stream_retry_attempts: int = 0
     extra: Dict[str, Any] = field(default_factory=dict)
     provided_fields: Set[str] = field(default_factory=set, init=False, repr=False)
+    verify_cache_digest: bool = False
 
     def __post_init__(self) -> None:
         self.resolver_order = self._normalize_sequence(self.resolver_order)
         self.previous = self._normalize_mapping(self.previous)
-        self.global_manifest_index = self._normalize_mapping(self.global_manifest_index)
+        if not hasattr(self.global_manifest_index, "get"):
+            self.global_manifest_index = self._normalize_mapping(self.global_manifest_index)
         self.domain_content_rules = self._normalize_mapping(self.domain_content_rules)
         self.host_accept_overrides = self._normalize_mapping(self.host_accept_overrides)
         self.extra = self._normalize_mapping(self.extra)
@@ -239,6 +241,7 @@ class DownloadContext:
         self.head_precheck_passed = bool(self.head_precheck_passed)
         self.content_addressed = bool(self.content_addressed)
         self.skip_large_downloads = bool(self.skip_large_downloads)
+        self.verify_cache_digest = bool(self.verify_cache_digest)
 
         self.max_bytes = self._coerce_optional_positive(self.max_bytes)
         self.size_warning_threshold = self._coerce_optional_positive(self.size_warning_threshold)
@@ -297,6 +300,7 @@ class DownloadContext:
             head_precheck_passed=_pop("head_precheck_passed", False),
             content_addressed=_pop("content_addressed", False),
             skip_large_downloads=_pop("skip_large_downloads", False),
+            verify_cache_digest=_pop("verify_cache_digest", False),
             size_warning_threshold=_pop("size_warning_threshold", None),
             chunk_size=_pop("chunk_size", None),
             stream_retry_attempts=stream_attempts,
@@ -325,7 +329,6 @@ class DownloadContext:
             "list_only": self.list_only,
             "extract_html_text": self.extract_html_text,
             "previous": self.previous,
-            "global_manifest_index": self.global_manifest_index,
             "max_bytes": self.max_bytes,
             "sniff_bytes": self.sniff_bytes,
             "min_pdf_bytes": self.min_pdf_bytes,
@@ -341,6 +344,7 @@ class DownloadContext:
             "skip_large_downloads": self.skip_large_downloads,
             "size_warning_threshold": self.size_warning_threshold,
             "chunk_size": self.chunk_size,
+            "verify_cache_digest": self.verify_cache_digest,
         }
         if self.stream_retry_attempts:
             payload["stream_retry_attempts"] = self.stream_retry_attempts
@@ -354,6 +358,7 @@ class DownloadContext:
         clone = DownloadContext.from_mapping(self.to_dict())
         clone.stream_retry_attempts = 0
         clone.provided_fields = set(self.provided_fields)
+        clone.global_manifest_index = self.global_manifest_index
         return clone
 
     @staticmethod
@@ -479,6 +484,7 @@ class ReasonCode(Enum):
     DOMAIN_MAX_BYTES = "domain_max_bytes"
     DOMAIN_DISALLOWED_MIME = "domain_disallowed_mime"
     BUDGET_EXHAUSTED = "budget_exhausted"
+    SKIP_LARGE_DOWNLOAD = "skip_large_download"
 
     @classmethod
     def from_wire(cls, value: Union[str, "ReasonCode", None]) -> "ReasonCode":

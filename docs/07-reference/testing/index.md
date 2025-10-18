@@ -1,49 +1,64 @@
 # 1. Testing Strategies
 
-Testing spans DocsToKG ingestion utilities, ontology download workflows, and hybrid search
-correctness.
+DocsToKG ships an extensive pytest suite that spans content download resiliency, DocParsing pipelines, ontology workflows, and hybrid search quality. The sections below highlight the primary test packages, key markers, and supporting validation scripts.
 
-## 2. Test Suites
+## 2. Test Suite Map
 
-- `tests/test_hybrid_search.py` – Core unit coverage for HybridSearch service contracts.
-- `tests/test_hybrid_search_real_vectors.py` – Optional vector-backed tests (enable with `--real-vectors` marker).
-- `tests/test_pipeline_behaviour.py` – End-to-end validation of document processing pipelines.
-- `tests/ontology_download/` – Validates ontology resolver logic and manifest handling.
+| Path | Focus | Notes |
+|------|-------|-------|
+| `tests/content_download/` | Resolver pipeline, networking retries, manifest sinks. | Requires optional dependencies (`pyalex`, `beautifulsoup4`, `trafilatura`). Tests fall back to stubs where available. |
+| `tests/docparsing/` | Chunker CLI, embedding pipeline, docstring and NAVMAP validation. | Includes smoke tests for `DocsToKG.DocParsing.chunking` and `embedding` shims. |
+| `tests/hybrid_search/test_suite.py` | Hybrid search ranking, fusion, FAISS integration. | Uses custom markers `real_vectors` and `scale_vectors` for GPU-backed assertions. |
+| `tests/ontology_download/` | CLI, configuration, storage backends, validation flows. | Skips gracefully when `pydantic-settings` or fsspec extras are missing. |
+| `tests/pipeline/` | End-to-end orchestration and retry controllers. | Marked with `@pytest.mark.integration` for slower runs. |
 
-Run locally with:
-
-```bash
-pytest -q
-pytest -m real_vectors --real-vectors  # requires fixture data
-```
-
-## 3. Documentation Validation
-
-Integrate documentation checks into CI:
+Run the default unit suite with:
 
 ```bash
-python docs/scripts/validate_docs.py
-python docs/scripts/check_links.py --timeout 10
-python docs/scripts/generate_api_docs.py
+direnv exec . pytest -q
 ```
 
-Warnings should gate merges for documentation changes.
+Optional suites:
 
-## 4. Benchmark Datasets
+- `direnv exec . pytest -m real_vectors --real-vectors` – Loads FAISS-backed fixtures and real embeddings.
+- `direnv exec . pytest -m scale_vectors --scale-vectors` – Stress tests on large vector sets (GPU recommended).
+- `direnv exec . pytest -m "not integration"` – Skip network-heavy integration checks on pull requests.
 
-- `tests/data/hybrid_dataset.jsonl` – Reference dataset for recall/latency validation.
-- `tests/data/ontology/` – Fixture ontologies for deterministic download/validation tests.
+Markers are defined in `pyproject.toml` under `[tool.pytest.ini_options]`.
 
-Keep these datasets updated when schemas evolve, and document changes in `docs/05-development/index.md`.
+## 3. Documentation & Annotation Validation
 
-## 5. Continuous Integration
+Keep generated documentation in sync with the codebase before merging:
 
-Recommended steps for CI pipelines:
+```bash
+direnv exec . python docs/scripts/validate_docs.py
+direnv exec . python docs/scripts/generate_api_docs.py
+direnv exec . python docs/scripts/check_links.py --timeout 10
+direnv exec . python docs/scripts/validate_code_annotations.py
+```
 
-1. Install project dependencies (`pip install -e .`).
-2. Install GPU wheels conditionally (skip on CPU-only runners).
-3. Run `pytest` with markers to skip heavy suites on PR builds.
-4. Execute documentation validation scripts.
-5. Publish coverage reports or store as build artifacts.
+`validate_code_annotations.py` enforces NAVMAP ordering and docstring completeness, reducing surprises in `docs/04-api/` rebuilds.
 
-See `docs/06-operations/index.md` for pipeline templates and scheduler guidance.
+## 4. Benchmark & Fixture Data
+
+- `tests/data/hybrid_dataset.jsonl` – Baseline for hybrid search recall and latency comparisons.
+- `tests/data/ontology/` – Controlled ontologies for checksum, normalization, and storage tests.
+- `tests/fixtures/` – Synthetic DocTags, chunk manifests, and resolver payloads used across pipelines.
+
+When schemas evolve (for example new manifest fields), regenerate or update these fixtures and document the change in `docs/05-development/index.md`.
+
+## 5. Continuous Integration Recommendations
+
+1. `./scripts/bootstrap_env.sh` (installs `.venv` with bundled wheels).
+2. `direnv exec . python docs/scripts/validate_code_annotations.py`.
+3. `direnv exec . python docs/scripts/validate_docs.py`.
+4. `direnv exec . pytest -m "not (real_vectors or scale_vectors)"`.
+5. Publish coverage reports or store `pytest` JUnit XML for diagnostics.
+
+Nightly/weekly pipelines should additionally exercise:
+
+- `direnv exec . pytest -m real_vectors --real-vectors`.
+- `direnv exec . pytest -m scale_vectors --scale-vectors`.
+- `direnv exec . python -m DocsToKG.HybridSearch.validation` for regression dashboards.
+
+See `docs/06-operations/index.md` for scheduler templates and operational checklists.

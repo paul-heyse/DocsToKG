@@ -103,6 +103,8 @@ class StageTelemetry:
     """Lightweight helper binding a sink to a specific stage/run."""
 
     def __init__(self, sink: TelemetrySink, *, run_id: str, stage: str) -> None:
+        """Bind the telemetry sink to a specific run identifier and stage."""
+
         self._sink = sink
         self._run_id = run_id
         self._stage = stage

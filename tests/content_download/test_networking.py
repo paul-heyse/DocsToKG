@@ -640,8 +640,9 @@ from DocsToKG.ContentDownload.pipeline import (
 )
 from DocsToKG.ContentDownload.telemetry import (
     JsonlSink,
-    RunTelemetry,
     ManifestEntry,
+    ManifestUrlIndex,
+    RunTelemetry,
     SqliteSink,
     load_manifest_url_index,
 )
@@ -1108,6 +1109,66 @@ if HAS_REQUESTS and HAS_PYALEX:
         assert outcome.reason is ReasonCode.DOMAIN_MAX_BYTES
         assert outcome.path is None
         assert not any(pdf_dir.glob("*.pdf"))
+
+    def test_skip_large_downloads_emit_voluntary_reason(tmp_path: Path, monkeypatch) -> None:
+        artifact = _make_artifact(tmp_path)
+        url = "https://example.org/oversized.pdf"
+
+        class _Response:
+            def __init__(self) -> None:
+                self.status_code = 200
+                self.headers = {
+                    "Content-Type": "application/pdf",
+                    "Content-Length": str(25 * 1024 * 1024),
+                }
+
+            def __enter__(self) -> "_Response":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                self.close()
+
+            def iter_content(self, chunk_size: int = 1024):
+                yield b"%PDF-1.4\n"
+                yield b"data"
+                yield b"%%EOF"
+
+            def close(self) -> None:
+                return None
+
+        class _Session:
+            def request(self, *, method: str, url: str, **kwargs: Any) -> _Response:
+                assert method == "GET"
+                return _Response()
+
+        # Ensure range resume code paths use patched request helper
+        monkeypatch.setattr(
+            downloader, "request_with_retries", lambda *args, **kwargs: _Response(), raising=False
+        )
+        monkeypatch.setattr(
+            download_impl, "request_with_retries", lambda *args, **kwargs: _Response()
+        )
+
+        context = {
+            "previous": {},
+            "skip_head_precheck": True,
+            "skip_large_downloads": True,
+            "size_warning_threshold": 5 * 1024 * 1024,
+        }
+
+        outcome = download_candidate(
+            _Session(),
+            artifact,
+            url,
+            referer=None,
+            timeout=5.0,
+            context=context,
+        )
+
+        assert outcome.classification is Classification.SKIPPED
+        assert outcome.reason is ReasonCode.SKIP_LARGE_DOWNLOAD
+        assert outcome.reason_detail is not None
+        assert outcome.path is None
 
     def test_build_download_outcome_accepts_small_pdf_with_head_pass(tmp_path: Path) -> None:
         artifact = _make_artifact(tmp_path)
@@ -2373,7 +2434,7 @@ def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
     assert outcome.content_length == stored.stat().st_size
     assert outcome.etag == '"etag-123"'
     assert outcome.last_modified == "Mon, 01 Jan 2024 00:00:00 GMT"
-    assert outcome.reason is ReasonCode.CONDITIONAL_NOT_MODIFIED
+    assert outcome.reason is None
     assert outcome.extracted_text_path is None
     rehashed = hashlib.sha256(stored.read_bytes()).hexdigest()
     assert rehashed == expected_sha
@@ -2389,6 +2450,7 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
     cached_bytes = b"%PDF-1.4\n%EOF\n"
     cached_file.write_bytes(cached_bytes)
     cached_sha = hashlib.sha256(cached_bytes).hexdigest()
+    cached_mtime = cached_file.stat().st_mtime_ns
     context = {
         "previous": {
             url: {
@@ -2397,6 +2459,8 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
                 "content_length": len(cached_bytes),
                 "etag": '"etag-cached"',
                 "last_modified": "Tue, 02 Jan 2024 00:00:00 GMT",
+                "path_mtime_ns": cached_mtime,
+                "mtime_ns": cached_mtime,
             }
         }
     }
@@ -2421,9 +2485,245 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
     assert outcome.etag == '"etag-cached"'
     assert outcome.last_modified == "Tue, 02 Jan 2024 00:00:00 GMT"
     assert outcome.reason is ReasonCode.CONDITIONAL_NOT_MODIFIED
+    assert outcome.metadata.get("cache_validation_mode") == "fast_path"
 
 
 # --- test_download_outcomes.py ---
+
+
+def test_cache_validation_fast_path_skips_digest(tmp_path, monkeypatch):
+    artifact = make_artifact(tmp_path)
+    url = "https://example.org/cached-fast.pdf"
+    cached_path = artifact.pdf_dir / "cached.pdf"
+    cached_bytes = b"%PDF-1.4\nstream\n%%EOF\n"
+    cached_path.write_bytes(cached_bytes)
+    cached_sha = hashlib.sha256(cached_bytes).hexdigest()
+    cached_mtime = cached_path.stat().st_mtime_ns
+
+    mapping = {("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})}
+    stub_requests(monkeypatch, mapping)
+
+    def raise_if_digest(signature):
+        raise AssertionError("Digest computation should not run for fast-path validation")
+
+    monkeypatch.setattr(download_impl, "_cached_sha256", raise_if_digest)
+
+    context = {
+        "previous": {
+            url: {
+                "path": str(cached_path),
+                "sha256": cached_sha,
+                "content_length": len(cached_bytes),
+                "etag": '"etag-fast"',
+                "last_modified": "Wed, 03 Jan 2024 00:00:00 GMT",
+                "path_mtime_ns": cached_mtime,
+                "mtime_ns": cached_mtime,
+            }
+        }
+    }
+
+    session = requests.Session()
+    outcome = downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context=context,
+    )
+
+    assert outcome.classification is Classification.CACHED
+    assert outcome.reason is ReasonCode.CONDITIONAL_NOT_MODIFIED
+    assert outcome.metadata.get("cache_validation_mode") == "fast_path"
+
+
+def test_cache_validation_forced_digest(tmp_path, monkeypatch):
+    artifact = make_artifact(tmp_path)
+    url = "https://example.org/cached-digest.pdf"
+    cached_path = artifact.pdf_dir / "cached-digest.pdf"
+    cached_bytes = b"%PDF-1.4\nq\n%%EOF\n"
+    cached_path.write_bytes(cached_bytes)
+    cached_sha = hashlib.sha256(cached_bytes).hexdigest()
+    cached_mtime = cached_path.stat().st_mtime_ns
+
+    mapping = {("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})}
+    stub_requests(monkeypatch, mapping)
+
+    digest_calls: List[Tuple[str, int, int]] = []
+
+    def record_digest(signature: Tuple[str, int, int]) -> Optional[str]:
+        digest_calls.append(signature)
+        return cached_sha
+
+    monkeypatch.setattr(download_impl, "_cached_sha256", record_digest)
+
+    context = {
+        "previous": {
+            url: {
+                "path": str(cached_path),
+                "sha256": cached_sha,
+                "content_length": len(cached_bytes),
+                "etag": '"etag-digest"',
+                "last_modified": "Thu, 04 Jan 2024 00:00:00 GMT",
+                "path_mtime_ns": cached_mtime,
+                "mtime_ns": cached_mtime,
+            }
+        },
+        "verify_cache_digest": True,
+    }
+
+    session = requests.Session()
+    outcome = downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context=context,
+    )
+
+    assert digest_calls
+    assert outcome.classification is Classification.CACHED
+    assert outcome.metadata.get("cache_validation_mode") == "digest"
+
+
+def test_cache_validation_digest_mismatch_triggers_refetch(tmp_path, monkeypatch):
+    artifact = make_artifact(tmp_path)
+    url = "https://example.org/cached-mismatch.pdf"
+    cached_path = artifact.pdf_dir / "cached-mismatch.pdf"
+    cached_bytes = b"%PDF-1.4\n" + (b"0" * 2048) + b"\n%%EOF\n"
+    cached_path.write_bytes(cached_bytes)
+    cached_sha = hashlib.sha256(cached_bytes).hexdigest()
+    cached_mtime = cached_path.stat().st_mtime_ns
+
+    new_bytes = b"%PDF-1.4\n" + (b"1" * 2048) + b"\n%%EOF\n"
+
+    class _StreamingResponse:
+        def __init__(self, status_code: int, headers: Dict[str, str], chunks: List[bytes]):
+            self.status_code = status_code
+            self.headers = headers
+            self._chunks = list(chunks)
+
+        def __enter__(self) -> "_StreamingResponse":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            self.close()
+
+        def iter_content(self, chunk_size: int = 1024):
+            for chunk in self._chunks:
+                yield chunk
+
+        def close(self) -> None:
+            return None
+
+    responses: List[_StreamingResponse] = [
+        _StreamingResponse(304, {"Content-Type": "application/pdf"}, []),
+        _StreamingResponse(
+            200,
+            {"Content-Type": "application/pdf"},
+            [new_bytes],
+        ),
+    ]
+
+    def sequenced_request(*args, **kwargs):
+        if not responses:
+            raise AssertionError("Unexpected additional request")
+        return responses.pop(0)
+
+    monkeypatch.setattr(download_impl, "request_with_retries", sequenced_request)
+    monkeypatch.setattr(downloader, "request_with_retries", sequenced_request, raising=False)
+
+    def mismatched_digest(signature: Tuple[str, int, int]) -> Optional[str]:
+        return "deadbeef"
+
+    monkeypatch.setattr(download_impl, "_cached_sha256", mismatched_digest)
+
+    recorded_mtime = max(cached_mtime - 1, 0)
+    context = {
+        "previous": {
+            url: {
+                "path": str(cached_path),
+                "sha256": cached_sha,
+                "content_length": len(cached_bytes),
+                "etag": '"etag-mismatch"',
+                "last_modified": "Fri, 05 Jan 2024 00:00:00 GMT",
+                "path_mtime_ns": recorded_mtime,
+                "mtime_ns": recorded_mtime,
+            }
+        }
+    }
+
+    session = requests.Session()
+    outcome = downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context=context,
+    )
+
+    assert outcome.classification is Classification.PDF
+    assert outcome.reason is None
+    assert outcome.path is not None
+    downloaded = Path(outcome.path).read_bytes()
+    assert downloaded == new_bytes
+
+
+def test_cache_validation_digest_cache_reuse(tmp_path, monkeypatch):
+    artifact = make_artifact(tmp_path)
+    url = "https://example.org/cached-cache.pdf"
+    cached_path = artifact.pdf_dir / "cached-cache.pdf"
+    cached_bytes = b"%PDF-1.4\n2\n%%EOF\n"
+    cached_path.write_bytes(cached_bytes)
+    cached_sha = hashlib.sha256(cached_bytes).hexdigest()
+    cached_mtime = cached_path.stat().st_mtime_ns
+
+    mapping = {("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})}
+    stub_requests(monkeypatch, mapping)
+
+    download_impl._cached_sha256.cache_clear()
+
+    context = {
+        "previous": {
+            url: {
+                "path": str(cached_path),
+                "sha256": cached_sha,
+                "content_length": len(cached_bytes),
+                "etag": '"etag-cache"',
+                "last_modified": "Sat, 06 Jan 2024 00:00:00 GMT",
+                "path_mtime_ns": cached_mtime,
+                "mtime_ns": cached_mtime,
+            }
+        },
+        "verify_cache_digest": True,
+    }
+
+    session = requests.Session()
+    downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context=context,
+    )
+    first_info = download_impl._cached_sha256.cache_info()
+
+    downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context=context,
+    )
+    second_info = download_impl._cached_sha256.cache_info()
+
+    assert second_info.hits >= first_info.hits + 1
+
+    download_impl._cached_sha256.cache_clear()
 
 
 def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
@@ -2442,7 +2742,7 @@ def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
         url,
         None,
         timeout=10.0,
-        context={"min_pdf_bytes": 1, "previous": {}},
+        context={"min_pdf_bytes": 1, "previous": {}, "extract_html_text": True},
     )
 
     assert outcome.classification is Classification.HTTP_ERROR
@@ -2596,7 +2896,7 @@ def test_html_tail_in_pdf_marks_corruption(tmp_path, monkeypatch):
         url,
         None,
         timeout=10.0,
-        context={"min_pdf_bytes": 1, "previous": {}},
+        context={"min_pdf_bytes": 1, "previous": {}, "extract_html_text": True},
     )
 
     assert outcome.classification is Classification.MISS
@@ -2795,6 +3095,7 @@ def test_pipeline_records_resume_disabled_metadata(tmp_path):
     config = ResolverConfig()
     config.resolver_order = ["stub"]
     config.resolver_toggles["stub"] = True
+    config.enable_head_precheck = False
     metrics = ResolverMetrics()
     pipeline = ResolverPipeline(
         resolvers=[StubResolver()],
@@ -2814,6 +3115,82 @@ def test_pipeline_records_resume_disabled_metadata(tmp_path):
 
     assert logger.attempts
     assert logger.attempts[0].metadata.get("resume_disabled") is True
+
+
+def test_skip_large_downloads_metrics_do_not_consume_domain_budget(tmp_path):
+    class RecordingLogger:
+        def __init__(self) -> None:
+            self.attempts: List[AttemptRecord] = []
+
+        def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+            self.attempts.append(record)
+
+        def log_manifest(self, entry: ManifestEntry) -> None:  # pragma: no cover - not used
+            return None
+
+        def log_summary(self, summary: Dict[str, Any]) -> None:  # pragma: no cover - not used
+            return None
+
+    class StubResolver:
+        name = "stub"
+
+        def is_enabled(self, config: ResolverConfig, artifact: WorkArtifact) -> bool:
+            return True
+
+        def iter_urls(
+            self,
+            session: requests.Session,
+            config: ResolverConfig,
+            artifact: WorkArtifact,
+        ) -> Iterable[ResolverResult]:
+            yield ResolverResult(url="https://example.org/skip.pdf")
+
+    def stub_download(
+        session: requests.Session,
+        artifact: WorkArtifact,
+        url: str,
+        referer: Optional[str],
+        timeout: float,
+        context: DownloadContext,
+        **kwargs: Any,
+    ) -> DownloadOutcome:
+        return DownloadOutcome(
+            classification=Classification.SKIPPED,
+            path=None,
+            http_status=200,
+            content_type="application/pdf",
+            elapsed_ms=1.0,
+            reason=ReasonCode.SKIP_LARGE_DOWNLOAD,
+            reason_detail="user-skip",
+            content_length=25 * 1024 * 1024,
+        )
+
+    logger = RecordingLogger()
+    config = ResolverConfig()
+    config.resolver_order = ["stub"]
+    config.resolver_toggles["stub"] = True
+    config.enable_head_precheck = False
+    config.domain_bytes_budget = {"example.org": 50 * 1024 * 1024}
+    metrics = ResolverMetrics()
+    pipeline = ResolverPipeline(
+        resolvers=[StubResolver()],
+        config=config,
+        download_func=stub_download,
+        logger=logger,
+        metrics=metrics,
+    )
+
+    artifact = make_artifact(tmp_path)
+    session = requests.Session()
+    pipeline.run(
+        session,
+        artifact,
+        context=DownloadContext(skip_head_precheck=True, dry_run=False),
+    )
+
+    assert logger.attempts
+    assert metrics.error_reasons["stub"]["skip_large_download"] == 1
+    assert pipeline._domain_bytes_consumed.get("example.org", 0) == 0
 
 
 # --- test_download_outcomes.py ---
@@ -2843,7 +3220,7 @@ def test_rfc5987_filename_suffix(tmp_path, monkeypatch):
         url,
         None,
         timeout=10.0,
-        context={"min_pdf_bytes": 1, "previous": {}},
+        context={"min_pdf_bytes": 1, "previous": {}, "extract_html_text": True},
     )
 
     assert outcome.classification is Classification.PDF
@@ -2878,7 +3255,7 @@ def test_html_filename_suffix_from_disposition(tmp_path, monkeypatch):
         url,
         None,
         timeout=10.0,
-        context={"min_pdf_bytes": 1, "previous": {}},
+        context={"min_pdf_bytes": 1, "previous": {}, "extract_html_text": True},
     )
 
     assert outcome.classification is Classification.HTML
@@ -3187,7 +3564,7 @@ def test_html_classification_overrides_misleading_content_type(tmp_path: Path) -
         url,
         referer=None,
         timeout=10.0,
-        context={"dry_run": False, "extract_html_text": False, "previous": {}},
+        context={"dry_run": False, "extract_html_text": True, "previous": {}},
     )
 
     assert outcome.classification is Classification.HTML
@@ -3654,3 +4031,139 @@ def test_load_manifest_url_index_reads_sqlite(tmp_path: Path) -> None:
     assert record["sha256"] == entry.sha256
     assert record["etag"] == entry.etag
     assert record["content_length"] == entry.content_length
+
+
+def test_manifest_url_index_lazy_get_does_not_trigger_full_load(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "manifest.sqlite3"
+    sink = SqliteSink(db_path)
+    entry = ManifestEntry(
+        schema_version=downloader.MANIFEST_SCHEMA_VERSION,
+        timestamp="2025-01-02T00:00:00Z",
+        run_id="run-lazy",
+        work_id="W-lazy",
+        title="Lazy Load",
+        publication_year=2025,
+        resolver="resolver",
+        url="https://example.org/lazy.pdf",
+        path=str(tmp_path / "lazy.pdf"),
+        classification=Classification.PDF.value,
+        content_type="application/pdf",
+        reason=None,
+        html_paths=[],
+        sha256="lazyhash",
+        content_length=2048,
+        etag=None,
+        last_modified=None,
+        extracted_text_path=None,
+        dry_run=False,
+    )
+    sink.log_manifest(entry)
+    sink.close()
+
+    def _fail_loader(path):
+        raise AssertionError("ManifestUrlIndex should not eager-load via load_manifest_url_index")
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _fail_loader
+    )
+
+    index = ManifestUrlIndex(db_path, eager=False)
+    record = index.get(entry.url)
+    assert record is not None
+    assert record["sha256"] == entry.sha256
+
+    with pytest.raises(AssertionError):
+        index.as_dict()
+
+
+def test_manifest_url_index_iter_existing_filters_missing_paths(tmp_path: Path) -> None:
+    db_path = tmp_path / "manifest.sqlite3"
+    sink = SqliteSink(db_path)
+    existing_path = tmp_path / "present.pdf"
+    existing_path.write_bytes(b"%PDF-1.4\n")
+    present_entry = ManifestEntry(
+        schema_version=downloader.MANIFEST_SCHEMA_VERSION,
+        timestamp="2025-01-03T00:00:00Z",
+        run_id="run-present",
+        work_id="W-present",
+        title="Present",
+        publication_year=2023,
+        resolver="resolver",
+        url="https://example.org/present.pdf",
+        path=str(existing_path),
+        classification=Classification.PDF.value,
+        content_type="application/pdf",
+        reason=None,
+        html_paths=[],
+        sha256="presenthash",
+        content_length=existing_path.stat().st_size,
+        etag=None,
+        last_modified=None,
+        extracted_text_path=None,
+        dry_run=False,
+    )
+    missing_entry = ManifestEntry(
+        schema_version=downloader.MANIFEST_SCHEMA_VERSION,
+        timestamp="2025-01-03T00:05:00Z",
+        run_id="run-missing",
+        work_id="W-missing",
+        title="Missing",
+        publication_year=2023,
+        resolver="resolver",
+        url="https://example.org/missing.pdf",
+        path=str(tmp_path / "missing.pdf"),
+        classification=Classification.PDF.value,
+        content_type="application/pdf",
+        reason=None,
+        html_paths=[],
+        sha256="missinghash",
+        content_length=4096,
+        etag=None,
+        last_modified=None,
+        extracted_text_path=None,
+        dry_run=False,
+    )
+    sink.log_manifest(present_entry)
+    sink.log_manifest(missing_entry)
+    sink.close()
+
+    index = ManifestUrlIndex(db_path)
+    existing_items = list(index.iter_existing())
+    assert len(existing_items) == 1
+    key, payload = existing_items[0]
+    assert key == normalize_url(present_entry.url)
+    assert payload["path"] == str(existing_path)
+
+
+def test_manifest_url_index_eager_load_invokes_loader_once(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "manifest.sqlite3"
+    db_path.touch()
+    url = "https://example.org/eager.pdf"
+    normalized = normalize_url(url)
+    mapping = {
+        normalized: {
+            "url": url,
+            "path": str(tmp_path / "eager.pdf"),
+            "sha256": "eagerhash",
+            "classification": Classification.PDF.value,
+            "etag": None,
+            "last_modified": None,
+            "content_length": 1024,
+            "mtime_ns": None,
+        }
+    }
+    calls: List[Path] = []
+
+    def _tracking_loader(path: Path):
+        calls.append(path)
+        return mapping
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _tracking_loader
+    )
+
+    index = ManifestUrlIndex(db_path, eager=True)
+    assert calls == [db_path]
+    assert index.get(url) == mapping[normalized]
+    assert index.as_dict() == mapping
+    assert calls == [db_path]

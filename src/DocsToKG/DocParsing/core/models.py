@@ -73,6 +73,7 @@ class ChunkWorkerConfig:
     docling_version: str
     serializer_provider_spec: str = DEFAULT_SERIALIZER_PROVIDER
     inject_anchors: bool = False
+    data_root: Optional[Path] = None
 
 
 @dataclass(slots=True)

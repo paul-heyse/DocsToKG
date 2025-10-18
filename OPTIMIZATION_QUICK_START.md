@@ -55,14 +55,9 @@ session = create_session(
 )
 ```
 
-### 4. HTTP Range Resume (Experimental)
+### 4. HTTP Range Resume (Deprecated)
 
-```python
-context = {
-    "enable_range_resume": True,  # Resume partial downloads
-}
-# Note: Requires complete implementation (append mode)
-```
+Range resume previously relied on partially-written `.part` files. The feature is now hard-disabled to prevent data loss—setting `enable_range_resume` has no effect beyond emitting a warning in telemetry. Remove the option from custom contexts and rerun downloads from the beginning to guarantee integrity.
 
 ---
 

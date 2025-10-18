@@ -82,6 +82,13 @@ python -m DocsToKG.OntologyDownload.cli pull --spec configs/sources.yaml --force
 python -m DocsToKG.OntologyDownload.cli validate hp latest
 ```
 
+Planner metadata probes now validate URLs before issuing any network calls and
+reuse the polite networking stack (session pooling, headers, and rate limits)
+used by the download pipeline. Operators can opt out of planner probes via
+`defaults.planner.probing_enabled: false` or the CLI flag `--no-planner-probes`;
+URL validation still runs and planner logs record structured events for
+blocked, skipped, fallback, and retry scenarios.
+
 ## 5. Content Download Enhancements
 
 ### 5.1 Additional Open Access Resolvers
@@ -190,6 +197,7 @@ back to the original ``GET`` attempt to avoid false negatives.
 
 ```bash
 # Formatting and linting
+./scripts/run_precommit.sh  # runs pre-commit hooks with --hook-stage manual
 black src/ tests/
 isort src/ tests/
 ruff check src/ tests/

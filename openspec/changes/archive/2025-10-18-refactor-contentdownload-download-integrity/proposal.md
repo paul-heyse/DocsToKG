@@ -70,3 +70,39 @@ Left unaddressed, these issues undermine downstream analytics, corrupt artifacts
 - Are downstream analytics consumers prepared for a new reason code value, or do we need a migration playbook?
 - Which telemetry sinks (JSONL, SQLite, Prometheus) require schema/version updates to track the new reason?
 - How prominently should the resume deprecation warning appear in CLI output and documentation?
+
+## Resume Surface Audit
+
+- `DownloadOptions.allow_resume` no longer exists; the only remaining toggle is `DownloadContext.enable_range_resume`, which is defaulted to `False` and forcefully cleared inside `download_candidate`.
+- No CLI flag or configuration file sets `enable_range_resume`. Historical guidance (`OPTIMIZATION_QUICK_START.md`, `OPTIMIZATIONS_APPLIED.md`) has been updated to mark range resume as deprecated and ignored.
+- Resolver metadata previously used to advertise resume (keys prefixed with `resume_`) is now stripped before telemetry emission so downstream consumers never see stale hints.
+
+## Cache Validation Entry Points
+
+`_validate_cached_artifact` is invoked solely inside `download_candidate` when conditional requests succeed. There are no secondary call sites (manifest verification, CLI utilities), so the fast-path guarantees cover every cache validation in the system.
+
+## Benchmark Results
+
+| Scenario | Runtime | Peak Memory | Notes |
+| --- | --- | --- | --- |
+| Baseline `load_manifest_url_index` (250k rows) | 0.72 s | 151 MB | Materialises entire manifest into memory |
+| Lazy `ManifestUrlIndex` init | <1 ms | <0.01 MB | No rows loaded until first lookup |
+| 10 lazy lookups (250k rows) | 0.18 s | 0.01 MB | Fetches rows on demand without global cache |
+| `ManifestUrlIndex` eager mode | 0.71 s | 159 MB | Matches legacy behaviour via `--warm-manifest-cache` |
+| Cache fast-path (100 MB artifact, mtime match) | <0.1 ms | <0.01 MB | Size+mtime short-circuit, digest skipped |
+| Forced digest (same artifact) | 55 ms | 0.02 MB | SHA-256 recomputation when `verify_cache_digest=True` |
+
+## Manual Verification
+
+- Ran a synthetic end-to-end pipeline exercising fresh download, conditional hit, voluntary skip, and resume-requested flows (script in session history).
+- Telemetry JSONL (`tmp/manual_run/manifest.jsonl`) captures:
+  - Fresh download with `reason=null`.
+  - Conditional response tagged `reason=conditional_not_modified`.
+  - Voluntary skip tagged `reason=skip_large_download`.
+  - Resume request annotated with `metadata.resume_disabled=true`.
+- These runs confirm manifest persistence, attempt logging, and new reason codes behave as specified.
+
+## Analytics & Reporting Updates
+
+- Dashboard guidance now splits voluntary skips (`skip_large_download`) from domain quota enforcement and highlights the `resume_disabled` metadata tag for observability.
+- Operators consuming SQLite/JSONL exports should treat missing reason codes as successful downloads and adjust aggregations accordingly; updated instructions live in `docs/07-reference/monitoring/index.md` and `docs/03-architecture/content-download-resolver-architecture.md`.

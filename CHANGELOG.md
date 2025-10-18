@@ -27,6 +27,16 @@ All notable changes to DocsToKG are documented in this file.
 - Embedding runtime now defers imports of optional dependencies (SPLADE and
   vLLM) until required, raising actionable errors when packages are absent and
   supporting import without the heavy extras installed.
+- Ontology planner metadata probes now invoke `validate_url_security` before
+  issuing HTTP requests, reuse the shared polite networking stack
+  (`SessionPool`, token buckets, polite headers, retry/backoff), emit structured
+  telemetry for retries/fallbacks, support an opt-out flag
+  (`defaults.planner.probing_enabled` / `--no-planner-probes`), and coordinate
+  ontology index writes via an ontology-scoped lock with wait-time logging.
+- Content download outcomes now leave `reason` unset for fresh downloads, retain `conditional_not_modified` for genuine 304s, and tag voluntary skips with the dedicated `skip_large_download` code.
+- HTTP range resume is hard-disabled; resolver hints prefixed with `resume_` are stripped and telemetry annotates ignored requests via `resume_disabled=true`.
+- Manifest warm-up defaults to a lazy `ManifestUrlIndex`, with `--warm-manifest-cache` offered solely for small datasets.
+- `_validate_cached_artifact` short-circuits on matching size/mtime and only recomputes digests when `verify_cache_digest=True`, backed by an in-process LRU cache.
 
 ### Documentation
 - Migration notes outlining the removal of deprecated content download shims,
@@ -36,6 +46,10 @@ All notable changes to DocsToKG are documented in this file.
 - Updated content download architecture, review, and API reference documents to
   describe the resolver modularisation, `DownloadRun` orchestration, and
   strategy pattern.
+- Operations runbook and configuration reference now call out planner URL
+  validation, polite probe telemetry, ontology index locking, and the
+  `defaults.planner.probing_enabled` opt-out flag.
+- Migration and observability guides document the new reason code taxonomy, resume deprecation, lazy manifest warm-up behaviour, and updated dashboard expectations (`skip_large_download`, `resume_disabled`).
 
 ### Changed
 - Refactored `DocsToKG.OntologyDownload` into modular submodules (`config`, `io_safe`,

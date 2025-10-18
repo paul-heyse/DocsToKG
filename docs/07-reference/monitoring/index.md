@@ -13,6 +13,12 @@ Proactive monitoring keeps ingestion pipelines, ontology downloaders, and hybrid
 | `ontology.download_success_rate` | Ontology CLI logs | Successful fetch percentage |
 | `ingestion.documents_processed` | Content pipeline logs | Document throughput |
 
+### Content Download Telemetry
+
+- Aggregate reason codes from manifest/attempt logs to distinguish conditional hits (`conditional_not_modified`), voluntary skips (`skip_large_download`), and enforced quota exits (`domain_max_bytes`).
+- Surface the `resume_disabled` flag emitted in attempt metadata when callers still request HTTP range resume—the downloader now ignores the flag but the tag helps spot outdated automation.
+- Treat missing reason codes as successful downloads in dashboards and notebooks.
+
 ## 3. Dashboards
 
 - Create Grafana dashboards grouping latency, recall, and ingestion throughput.

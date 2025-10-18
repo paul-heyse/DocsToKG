@@ -17,7 +17,7 @@
     "record_type": "manifest",
     "resolver": "contract-resolver",
     "run_id": "run-contract",
-    "schema_version": 2,
+    "schema_version": 3,
     "sha256": "deadbeefcafebabe",
     "timestamp": "2025-01-01T00:00:00Z",
     "title": "Contract Test Work",
@@ -44,12 +44,14 @@
         "record_type": "manifest",
         "resolver": "contract-resolver",
         "run_id": "run-contract",
-        "schema_version": 2,
+        "schema_version": 3,
         "sha256": "deadbeefcafebabe",
         "timestamp": "2025-01-01T00:00:00Z",
         "title": "Contract Test Work",
         "url": "https://pub.example/paper.pdf",
-        "work_id": "W-contract"
+        "work_id": "W-contract",
+        "normalized_url": "https://pub.example/paper.pdf",
+        "mtime_ns": null
       }
     }
   },
@@ -64,7 +66,8 @@
       "last_modified": "Wed, 01 Jan 2025 00:00:00 GMT",
       "path": "/tmp/paper.pdf",
       "sha256": "deadbeefcafebabe",
-      "url": "https://pub.example/paper.pdf"
+      "url": "https://pub.example/paper.pdf",
+      "mtime_ns": null
     }
   }
 }

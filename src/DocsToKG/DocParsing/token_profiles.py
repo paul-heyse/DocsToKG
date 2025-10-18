@@ -254,6 +254,8 @@ def _mean(values: Sequence[int]) -> float:
 
 
 def _mean_ratio(candidate: Sequence[int], baseline: Sequence[int]) -> Optional[float]:
+    """Compute the average ratio between token counts for two tokenizers."""
+
     ratios = [cand / base for cand, base in zip(candidate, baseline) if base]
     if not ratios:
         return None
@@ -261,6 +263,8 @@ def _mean_ratio(candidate: Sequence[int], baseline: Sequence[int]) -> Optional[f
 
 
 def _scale(window: int, ratio: Optional[float]) -> str:
+    """Return the scaled token window as a string or ``'n/a'`` when absent."""
+
     return "n/a" if ratio is None else str(int(round(window * ratio)))
 
 

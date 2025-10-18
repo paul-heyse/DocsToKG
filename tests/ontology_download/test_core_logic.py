@@ -99,6 +99,7 @@ from typing import Dict, List, Optional
 
 import pytest
 import requests
+from requests.structures import CaseInsensitiveDict
 
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
@@ -108,7 +109,12 @@ from DocsToKG.OntologyDownload import api as core
 from DocsToKG.OntologyDownload import settings as settings_mod
 from DocsToKG.OntologyDownload.errors import PolicyError
 from DocsToKG.OntologyDownload.io import DownloadResult
-from DocsToKG.OntologyDownload.planning import RESOLVERS, FetchPlan, ResolverError
+from DocsToKG.OntologyDownload.planning import (
+    RESOLVERS,
+    FetchPlan,
+    PlannerProbeResult,
+    ResolverError,
+)
 from DocsToKG.OntologyDownload.settings import (
     ConfigError,
     DefaultsConfig,
@@ -142,24 +148,21 @@ def test_select_validators_for_rdf_includes_defaults():
 def stub_requests_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
     """Avoid real HTTP calls when planning augments metadata."""
 
-    class _Response:
-        def __init__(self) -> None:
-            self.status_code = 200
-            self.ok = True
-            self.headers = {
-                "Last-Modified": "Wed, 01 Jan 2024 00:00:00 GMT",
-                "Content-Length": "256",
-            }
+    def _fake_probe(**kwargs) -> PlannerProbeResult:
+        return PlannerProbeResult(
+            url=kwargs.get("url", "https://example.org/resource.owl"),
+            method=kwargs.get("method", "HEAD"),
+            status_code=200,
+            ok=True,
+            headers=CaseInsensitiveDict(
+                {
+                    "Last-Modified": "Wed, 01 Jan 2024 00:00:00 GMT",
+                    "Content-Length": "256",
+                }
+            ),
+        )
 
-        def close(self) -> None:
-            pass
-
-    monkeypatch.setattr(
-        pipeline_mod.requests, "head", lambda *args, **kwargs: _Response(), raising=False
-    )
-    monkeypatch.setattr(
-        pipeline_mod.requests, "get", lambda *args, **kwargs: _Response(), raising=False
-    )
+    monkeypatch.setattr(pipeline_mod, "planner_http_probe", _fake_probe, raising=False)
 
 
 # --- Helper Functions ---

@@ -177,6 +177,8 @@ def iter_chunks(directory: Path) -> Iterator[Path]:
     yielded_symlink_targets: set[Path] = set()
 
     def _walk(current: Path) -> Iterator[Path]:
+        """Yield chunk files beneath ``current`` depth-first with symlink guards."""
+
         try:
             entries = sorted(current.iterdir(), key=lambda p: p.name)
         except FileNotFoundError:  # pragma: no cover - defensive guard

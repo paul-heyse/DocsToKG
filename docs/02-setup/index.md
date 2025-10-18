@@ -4,120 +4,113 @@ Follow this guide to configure DocsToKG on a local workstation or development se
 
 ## 2. Overview
 
-- Provision a Python 3.12+ environment with optional CUDA support.
-- Install project dependencies (core, GPU, documentation tooling).
-- Configure environment variables and working directories.
+- Provision a Python 3.13 environment with optional CUDA 12.9 support.
+- Install the curated dependency set (core, GPU wheels, documentation tooling).
+- Configure environment variables and data directories.
 - Run smoke checks to confirm the installation.
 
 ## 3. Prerequisites
 
-- **Operating system**: Linux or macOS preferred (Windows users should use WSL2).
-- **Python**: 3.12 or newer (see `pyproject.toml`).
-- **Memory**: 16 GB RAM recommended for parsing and validation workloads.
-- **GPU (optional)**: CUDA 12.9+ for FAISS and PyTorch acceleration (required when installing `requirements.in`).
-- **Git**: 2.30 or newer.
-
-> ℹ️  Direnv is supported via `.envrc`, but optional. Install with `brew install direnv` or follow instructions at [direnv.net](https://direnv.net).
+- **Operating system**: Linux or macOS (Windows users should use WSL2).
+- **Git**: 2.30+ with Git LFS enabled (`git lfs install && git lfs pull` is required to fetch bundled wheels under `ci/wheels/`).
+- **Direnv** *(recommended)*: `brew install direnv` or follow [direnv.net](https://direnv.net/) instructions to let `.envrc` manage the virtualenv automatically.
+- **Memory**: 16 GB RAM recommended for Docling parsing workloads.
+- **GPU (optional)**: CUDA 12.9+ drivers for FAISS, PyTorch, vLLM, and CuPy acceleration.
 
 ## 4. Installation
 
-### 1. Clone the Repository
+### 4.1 Clone the Repository
 
 ```bash
 git clone https://github.com/paul-heyse/DocsToKG.git
 cd DocsToKG
+git lfs install
+git lfs pull
 ```
 
-### 2. Create a Virtual Environment
+### 4.2 Bootstrap the Environment (Recommended)
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+./scripts/bootstrap_env.sh
+direnv allow           # loads .envrc and activates .venv automatically
 ```
 
-If you use direnv, run `direnv allow` after activation so `.envrc` can automatically load the environment next time.
+The bootstrap script:
 
-> ✅ Prefer automation? Execute `./scripts/bootstrap_env.sh` from the repository root.<br>
-> The script creates `.venv`, installs DocsToKG in editable mode, and reminds you to run
-> `direnv allow`. The bundled `.envrc` automatically activates `.venv` and appends `src/`
-> to `PYTHONPATH`, so shells or agents that rely on direnv (for example
-> `direnv exec . …`) will always resolve the project package without extra flags.
+- Creates `.venv/` with CPython 3.13.
+- Installs DocsToKG in editable mode and applies the pinned `requirements.txt`.
+- Reuses local wheels (`torch`, `torchaudio`, `torchvision`, `faiss`, `vllm`, `cupy`) from `ci/wheels/`.
 
-### 3. Install Dependencies
+Use `./scripts/dev.sh exec <command>` in environments where `direnv` cannot be installed.
+
+### 4.3 Manual Setup (Alternative)
 
 ```bash
-# Core project dependencies (editable install for development)
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
 pip install -e .
-
-# Optional GPU/ML stack (requires CUDA 12.9 toolchain)
-pip install -r requirements.in
+pip install -r requirements.txt        # includes bundled wheels
 ```
 
-Install documentation tooling when you plan to regenerate docs:
+Install documentation tooling on-demand:
 
 ```bash
 pip install -r docs/build/sphinx/requirements.txt
 ```
 
-### 4. Configure Environment Variables
+### 4.4 Configure Environment Variables
 
-Create a `.env` file in the repository root (or export variables manually):
+Create a `.env` file (loaded by `.envrc`) or export variables through your secrets manager:
 
 ```bash
 cat > .env <<'EOF'
-# Storage locations
 DOCSTOKG_DATA_ROOT=./Data
 HYBRID_SEARCH_CONFIG=./config/hybrid_config.json
 ONTOLOGY_FETCHER_CONFIG=./configs/sources.yaml
 
-# Third-party credentials
 PA_ALEX_KEY=your-pyalex-api-key
 BIOPORTAL_API_KEY=optional-bioportal-token
 EOF
 ```
 
-Load the file with `source .env` or rely on direnv to ingest it automatically.
+Direnv automatically loads `.env`; otherwise run `source .env`.
 
-### 5. Prepare Local Directories
+### 4.5 Prepare Local Directories
 
 ```bash
 mkdir -p Data/DocTagsFiles Data/ChunkedDocTagFiles Data/Embeddings artifacts logs
 ```
 
-These directories store DocTags inputs, chunked outputs, embedding payloads, FAISS snapshots, and log output.
+These directories store DocTags inputs, chunked outputs, embeddings, FAISS snapshots, and telemetry.
 
-### 6. Verify the Installation
-
-Run the automated test suite:
+### 4.6 Smoke Checks
 
 ```bash
-pytest -q
+direnv exec . pytest -q
+direnv exec . python docs/scripts/generate_api_docs.py
+direnv exec . python docs/scripts/validate_docs.py
+direnv exec . python docs/scripts/validate_code_annotations.py
 ```
 
-Generate and validate documentation:
+Optional link check:
 
 ```bash
-python docs/scripts/generate_api_docs.py
-python docs/scripts/validate_docs.py
+direnv exec . python docs/scripts/check_links.py --timeout 10
 ```
 
-For asynchronous link checks (optional):
+### 4.7 Build Sphinx HTML Docs (Optional)
 
 ```bash
-python docs/scripts/check_links.py --timeout 10
+direnv exec . python docs/scripts/build_docs.py --format html
 ```
 
-### 7. Optional: Build Sphinx HTML Docs
-
-```bash
-python docs/scripts/build_docs.py --format html
-open docs/build/_build/html/index.html  # macOS
-```
+Open `docs/build/_build/html/index.html` in your browser once the build completes.
 
 ## 5. Next Steps
 
-- Ingest sample documents using the content downloaders (`DocsToKG.ContentDownload`).
-- Convert assets into chunked DocTags and embeddings (`DocsToKG.DocParsing`).
-- Populate a FAISS index and serve hybrid search queries (`DocsToKG.HybridSearch`).
+- Run content download pipelines via `python -m DocsToKG.ContentDownload.cli`.
+- Generate DocTags and embeddings (`python -m DocsToKG.DocParsing.chunking`, `python -m DocsToKG.DocParsing.embedding`).
+- Ingest data into the hybrid search service and expose APIs (`DocsToKG.HybridSearch`).
 
 Refer to the **Architecture Guide** (`docs/03-architecture/index.md`) for subsystem details and the **Operations Guide** (`docs/06-operations/index.md`) for day-two workflows.

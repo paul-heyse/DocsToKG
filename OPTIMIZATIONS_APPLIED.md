@@ -118,20 +118,19 @@ This document summarizes the performance and efficiency optimizations applied to
 
 ### 7. **HTTP Range Request Infrastructure** (cli.py)
 
-**Impact**: Foundation for resume support (disabled by default)
+**Impact**: Originally introduced as a foundation for resume support, now formally deprecated to avoid truncating artifacts.
 
 **Changes**:
 
-- Added `enable_range_resume` flag (default: False)
-- Detects partial downloads and adds `Range: bytes=X-` header
-- Handles HTTP 206 Partial Content responses
-- Infrastructure in place for future append-mode implementation
+- `enable_range_resume` flag remains in the context model for backward compatibility but is forced to `False` inside the downloader.
+- Resolver metadata advertising resume capability is stripped before telemetry emission so downstream systems are not misled.
+- Operators are instructed to re-fetch interrupted downloads instead of relying on partial file recovery.
 
 **Status**:
 
-- Range headers sent correctly
-- 206 responses handled
-- **Note**: Full resume requires atomic_write append mode (future enhancement)
+- Range requests are no longer issued even if callers specify the flag.
+- Telemetry annotates runs with `resume_disabled=true` when a resume request is ignored.
+- Resume will remain disabled until append-safe writes are implemented in a future change.
 
 ---
 
@@ -202,10 +201,10 @@ All optimizations are **backward compatible**:
 
 ### Recommended Next Steps
 
-1. **Full HTTP Range Resume Support**
-   - Implement append-mode in `atomic_write()`
-   - Add partial hash recovery
-   - Enable `enable_range_resume` by default
+1. **Append-Safe HTTP Resume (Future)**
+   - Requires append-mode support in `atomic_write()`
+   - Needs partial hash verification before re-enabling range requests
+   - Remains blocked until data-integrity safeguards are proven
 
 2. **Adaptive Chunk Sizing**
    - Auto-detect bandwidth and adjust chunk size

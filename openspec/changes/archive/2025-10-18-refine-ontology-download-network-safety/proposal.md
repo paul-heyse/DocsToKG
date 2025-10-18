@@ -54,10 +54,9 @@ Realigning planner behaviour with existing download safeguards and strengthening
 1. Planner metadata requests fail fast when `validate_url_security` rejects the URL; planners no longer contact unapproved hosts.
 2. Planner HTTP probes reuse `SessionPool`, `polite_http_headers`, and per-host rate limit buckets; automated tests verify header injection and throttle behaviour.
 3. Concurrent runs updating `index.json` for multiple versions preserve all entries with deterministic ordering; stress tests show no dropped records.
-4. Telemetry captures planner probe attempts using the same schema fields as download probes, including explicit markers when probing is disabled by configuration.
+4. Telemetry captures planner probe attempts using the same event type and schema fields as download probes, including explicit markers when probing is disabled by configuration so downstream analytics remain consistent.
 5. Documentation and operator guides describe the new behaviour and configuration knobs (rate limiter tuning, probe opt-out).
 
 ## Open Questions
 
-- Should planner probes use the exact same telemetry event type as download attempts, or a derivative one to distinguish planning vs. execution?
 - Will the new ontology-level lock introduce noticeable contention for large-scale backfills, and do we need metrics to monitor lock wait durations?

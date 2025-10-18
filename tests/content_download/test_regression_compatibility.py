@@ -105,6 +105,7 @@ def test_manifest_entry_schema_backward_compatible(tmp_path: Path):
         "resolver",
         "url",
         "path",
+        "path_mtime_ns",
         "classification",
         "content_type",
         "reason",

@@ -69,3 +69,7 @@ Manifest warm-up MUST scale to large datasets by deferring work until entries ar
 - **THEN** the system SHALL execute the legacy warm-up path
 - **AND** telemetry SHALL annotate the run with `manifest_warmup="eager"`
 - **AND** documentation SHALL warn that eager warm-up may impact large deployments
+
+## Notes
+
+- Existing telemetry schemas already expose `reason`, `reason_detail`, and metadata maps; no additional fields are required in `specs/telemetry`. Downstream consumers must interpret `skip_large_download` and the `resume_disabled` metadata tag using the updated documentation.

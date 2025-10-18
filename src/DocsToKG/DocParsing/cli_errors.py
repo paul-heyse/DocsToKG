@@ -22,7 +22,14 @@ class CLIValidationError(ValueError):
     hint: Optional[str] = None
     stage: str = "cli"
 
+    def __post_init__(self) -> None:  # pragma: no cover - simple wiring
+        """Initialise the ``ValueError`` base with the human-readable message."""
+
+        ValueError.__init__(self, self.message)
+
     def __str__(self) -> str:  # pragma: no cover - formatting handled in helper
+        """Return the underlying message for convenience."""
+
         return self.message
 
 
@@ -31,11 +38,23 @@ class ChunkingCLIValidationError(CLIValidationError):
 
     stage = "chunk"
 
+    def __post_init__(self) -> None:  # pragma: no cover - simple wiring
+        """Ensure the chunk stage marker is applied before chaining."""
+
+        self.stage = "chunk"
+        CLIValidationError.__post_init__(self)
+
 
 class EmbeddingCLIValidationError(CLIValidationError):
     """Validation error raised by embedding CLI helpers."""
 
     stage = "embed"
+
+    def __post_init__(self) -> None:  # pragma: no cover - simple wiring
+        """Ensure the embed stage marker is applied before chaining."""
+
+        self.stage = "embed"
+        CLIValidationError.__post_init__(self)
 
 
 def format_cli_error(error: CLIValidationError) -> str:

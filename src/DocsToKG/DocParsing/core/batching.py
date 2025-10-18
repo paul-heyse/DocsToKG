@@ -21,6 +21,8 @@ class Batcher(Iterable[List[T]]):
         policy: Optional[str] = None,
         lengths: Optional[Sequence[int]] = None,
     ) -> None:
+        """Materialise items and batching metadata for subsequent iteration."""
+
         if batch_size < 1:
             raise ValueError("batch_size must be >= 1")
         self._items: List[T] = list(iterable)
@@ -46,6 +48,8 @@ class Batcher(Iterable[List[T]]):
         return 1 << (int(math.log2(length - 1)) + 1)
 
     def _ordered_indices(self) -> List[int]:
+        """Return indices ordered by bucketed length and original position."""
+
         if not self._lengths:
             return list(range(len(self._items)))
         pairs = [(idx, self._length_bucket(self._lengths[idx])) for idx in range(len(self._items))]
@@ -53,6 +57,8 @@ class Batcher(Iterable[List[T]]):
         return [idx for idx, _ in pairs]
 
     def __iter__(self) -> Iterator[List[T]]:
+        """Yield successive batches respecting any active policy."""
+
         if not self._policy:
             for i in range(0, len(self._items), self._batch_size):
                 yield self._items[i : i + self._batch_size]

@@ -30,7 +30,7 @@ from DocsToKG.ContentDownload.core import (
 from DocsToKG.ContentDownload.download import RobotsCache, ensure_dir
 from DocsToKG.ContentDownload.pipeline import load_resolver_config
 from DocsToKG.ContentDownload.resolvers import DEFAULT_RESOLVER_ORDER, default_resolvers
-from DocsToKG.ContentDownload.telemetry import load_manifest_url_index
+from DocsToKG.ContentDownload.telemetry import ManifestUrlIndex
 
 __all__ = [
     "ResolvedConfig",
@@ -67,13 +67,14 @@ class ResolvedConfig:
     sqlite_path: Path
     resolver_instances: List[Any]
     resolver_config: Any
-    previous_url_index: Dict[str, Dict[str, Any]]
+    previous_url_index: ManifestUrlIndex
     persistent_seen_urls: Set[str]
     robots_checker: Optional[RobotsCache]
     budget_requests: Optional[int]
     budget_bytes: Optional[int]
     concurrency_product: int
     extract_html_text: bool
+    verify_cache_digest: bool
 
 
 def bootstrap_run_environment(resolved: ResolvedConfig) -> None:
@@ -119,6 +120,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--content-addressed",
         action="store_true",
         help="Store PDFs using content-addressed paths with friendly symlinks.",
+    )
+    parser.add_argument(
+        "--warm-manifest-cache",
+        action="store_true",
+        help="Eagerly load the manifest URL index into memory (legacy behaviour).",
+    )
+    parser.add_argument(
+        "--verify-cache-digest",
+        action="store_true",
+        help="Force cached artifact validation to recompute SHA-256 even when size/mtime match.",
     )
     parser.add_argument(
         "--manifest",
@@ -481,13 +492,11 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         csv_path = csv_path or manifest_path.with_suffix(".csv")
     sqlite_path = manifest_path.with_suffix(".sqlite3")
 
-    previous_url_index = load_manifest_url_index(sqlite_path)
+    previous_url_index = ManifestUrlIndex(sqlite_path, eager=args.warm_manifest_cache)
     persistent_seen_urls: Set[str] = {
         url
-        for url, meta in previous_url_index.items()
-        if meta.get("path")
-        and Path(str(meta["path"])).exists()
-        and str(meta.get("classification", "")).lower()
+        for url, meta in previous_url_index.iter_existing()
+        if str(meta.get("classification", "")).lower()
         in {Classification.PDF.value, Classification.CACHED.value, Classification.XML.value}
     }
 
@@ -526,6 +535,7 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         budget_bytes=budget_bytes,
         concurrency_product=concurrency_product,
         extract_html_text=extract_html_text,
+        verify_cache_digest=args.verify_cache_digest,
     )
 
 

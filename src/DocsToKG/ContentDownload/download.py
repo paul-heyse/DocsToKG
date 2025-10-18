@@ -16,6 +16,7 @@ import shutil
 import threading
 import time
 from dataclasses import dataclass, field
+from functools import lru_cache
 from enum import Enum
 from pathlib import Path
 from typing import (
@@ -28,6 +29,7 @@ from typing import (
     Optional,
     Protocol,
     Set,
+    Tuple,
     Union,
 )
 from urllib.parse import urlparse, urlsplit
@@ -136,6 +138,7 @@ class DownloadOptions:
     tail_check_bytes: int = DEFAULT_TAIL_CHECK_BYTES
     robots_checker: Optional["RobotsCache"] = None
     content_addressed: bool = False
+    verify_cache_digest: bool = False
 
 
 @dataclass(frozen=True)
@@ -194,21 +197,54 @@ class DownloadStrategy(Protocol):
         self,
         artifact: WorkArtifact,
         context: DownloadStrategyContext,
-    ) -> bool: ...
+    ) -> bool:
+        """Decide whether the current artifact warrants a fresh download attempt.
+
+        Args:
+            artifact: The work artifact under consideration.
+            context: Mutable state shared across download strategy phases.
+
+        Returns:
+            True when the strategy should perform a download, False when it should
+            short-circuit the workflow (for example, due to resume state).
+        """
+        ...
 
     def process_response(
         self,
         response: requests.Response,
         artifact: WorkArtifact,
         context: DownloadStrategyContext,
-    ) -> Classification: ...
+    ) -> Classification:
+        """Process the HTTP response to derive classification metadata.
+
+        Args:
+            response: Raw HTTP response returned by the download request.
+            artifact: Work artifact metadata associated with the response.
+            context: Shared strategy state that accumulates response details.
+
+        Returns:
+            The classification that should be assigned to the downloaded artifact.
+        """
+        ...
 
     def finalize_artifact(
         self,
         artifact: WorkArtifact,
         classification: Classification,
         context: DownloadStrategyContext,
-    ) -> DownloadOutcome: ...
+    ) -> DownloadOutcome:
+        """Assemble the final download outcome after all processing steps.
+
+        Args:
+            artifact: Work artifact being finalized.
+            classification: Final classification selected for the artifact.
+            context: Strategy context containing response metadata and paths.
+
+        Returns:
+            Structured outcome describing the finalized download results.
+        """
+        ...
 
 
 class _BaseDownloadStrategy:
@@ -219,6 +255,15 @@ class _BaseDownloadStrategy:
         artifact: WorkArtifact,
         context: DownloadStrategyContext,
     ) -> bool:
+        """Evaluate whether to start a download for the provided artifact.
+
+        Args:
+            artifact: Work artifact describing the requested content.
+            context: Mutable strategy context shared across download phases.
+
+        Returns:
+            False when the download is skipped due to configuration, True otherwise.
+        """
         if context.download_context.list_only:
             context.skip_outcome = DownloadOutcome(
                 classification=Classification.SKIPPED,
@@ -238,6 +283,16 @@ class _BaseDownloadStrategy:
         artifact: WorkArtifact,
         context: DownloadStrategyContext,
     ) -> Classification:
+        """Capture the response and select a classification if not already set.
+
+        Args:
+            response: HTTP response received for the download attempt.
+            artifact: Work artifact metadata being processed.
+            context: Strategy context that caches response metadata.
+
+        Returns:
+            Classification derived either from the response or preconfigured hints.
+        """
         context.response = response
         if context.classification_hint is None:
             context.classification_hint = self.classification
@@ -249,6 +304,16 @@ class _BaseDownloadStrategy:
         classification: Classification,
         context: DownloadStrategyContext,
     ) -> DownloadOutcome:
+        """Convert the accumulated strategy context into a download outcome.
+
+        Args:
+            artifact: Work artifact associated with the download.
+            classification: Final classification selected for the artifact.
+            context: Strategy context populated during prior phases.
+
+        Returns:
+            Structured `DownloadOutcome` describing results and metadata.
+        """
         return build_download_outcome(
             artifact=artifact,
             classification=classification,
@@ -272,14 +337,20 @@ class _BaseDownloadStrategy:
 
 
 class PdfDownloadStrategy(_BaseDownloadStrategy):
+    """Download strategy that enforces PDF-specific processing rules."""
+
     classification = Classification.PDF
 
 
 class HtmlDownloadStrategy(_BaseDownloadStrategy):
+    """Download strategy tailored for HTML artifacts."""
+
     classification = Classification.HTML
 
 
 class XmlDownloadStrategy(_BaseDownloadStrategy):
+    """Download strategy tailored for XML artifacts."""
+
     classification = Classification.XML
 
 
@@ -347,15 +418,40 @@ def _build_download_outcome(
     )
 
 
-def _validate_cached_artifact(result: CachedResult) -> bool:
-    """Return ``True`` when cached artefact metadata matches on-disk state."""
+_DIGEST_CACHE_MAXSIZE = 256
+
+
+@lru_cache(maxsize=_DIGEST_CACHE_MAXSIZE)
+def _cached_sha256(signature: Tuple[str, int, int]) -> Optional[str]:
+    """Compute and cache SHA-256 digests keyed by path, size, and mtime."""
+
+    path_str, _, _ = signature
+    cached_path = Path(path_str)
+    hasher = hashlib.sha256()
+    try:
+        with cached_path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(8192), b""):
+                hasher.update(chunk)
+    except OSError:
+        return None
+    return hasher.hexdigest()
+
+
+def _validate_cached_artifact(
+    result: CachedResult,
+    *,
+    verify_digest: bool = False,
+) -> Tuple[bool, str]:
+    """Return validation success flag and mode (``fast_path`` or ``digest``)."""
+
+    validation_mode = "fast_path"
 
     if not result.path:
         LOGGER.warning(
             "Cached artifact missing path; cannot validate cache entry.",
             extra={"reason": "cached-path-missing"},
         )
-        return False
+        return False, validation_mode
 
     cached_path = Path(result.path)
     if not cached_path.exists():
@@ -364,10 +460,10 @@ def _validate_cached_artifact(result: CachedResult) -> bool:
             cached_path,
             extra={"reason": "cached-missing", "path": result.path},
         )
-        return False
+        return False, validation_mode
 
     try:
-        actual_size = cached_path.stat().st_size
+        stat_result = cached_path.stat()
     except OSError as exc:
         LOGGER.warning(
             "Unable to stat cached artifact at %s: %s",
@@ -375,7 +471,13 @@ def _validate_cached_artifact(result: CachedResult) -> bool:
             exc,
             extra={"reason": "cached-stat-failed", "path": result.path},
         )
-        return False
+        return False, validation_mode
+
+    actual_size = stat_result.st_size
+    actual_mtime_ns = getattr(stat_result, "st_mtime_ns", None)
+    if actual_mtime_ns is None:
+        actual_mtime_ns = int(stat_result.st_mtime * 1_000_000_000)
+
     if result.content_length is not None and actual_size != result.content_length:
         LOGGER.warning(
             "Cached content length mismatch: expected %s got %s",
@@ -388,38 +490,56 @@ def _validate_cached_artifact(result: CachedResult) -> bool:
                 "path": result.path,
             },
         )
-        return False
+        return False, validation_mode
 
-    if result.sha256:
-        try:
-            hasher = hashlib.sha256()
-            with cached_path.open("rb") as handle:
-                for chunk in iter(lambda: handle.read(8192), b""):
-                    hasher.update(chunk)
-            digest = hasher.hexdigest()
-        except OSError as exc:
-            LOGGER.warning(
-                "Unable to read cached artifact at %s: %s",
-                cached_path,
-                exc,
-                extra={"reason": "cached-read-failed", "path": result.path},
-            )
-            return False
-        if digest != result.sha256:
-            LOGGER.warning(
-                "Cached SHA256 mismatch: expected %s got %s",
-                result.sha256,
-                digest,
-                extra={
-                    "reason": "cached-digest-mismatch",
-                    "expected": result.sha256,
-                    "actual": digest,
-                    "path": result.path,
-                },
-            )
-            return False
+    recorded_mtime_ns = getattr(result, "recorded_mtime_ns", None)
+    requires_digest = verify_digest
 
-    return True
+    if not requires_digest:
+        if recorded_mtime_ns is None:
+            requires_digest = True
+        elif actual_mtime_ns == recorded_mtime_ns:
+            return True, validation_mode
+        else:
+            requires_digest = True
+
+    if not requires_digest:
+        return True, validation_mode
+
+    validation_mode = "digest"
+
+    if not result.sha256:
+        LOGGER.warning(
+            "Cached artifact missing sha256; cannot verify digest for %s.",
+            cached_path,
+            extra={"reason": "cached-digest-missing", "path": result.path},
+        )
+        return False, validation_mode
+
+    digest = _cached_sha256((str(cached_path), actual_size, actual_mtime_ns))
+    if digest is None:
+        LOGGER.warning(
+            "Unable to read cached artifact at %s during digest verification.",
+            cached_path,
+            extra={"reason": "cached-read-failed", "path": result.path},
+        )
+        return False, validation_mode
+
+    if digest != result.sha256:
+        LOGGER.warning(
+            "Cached SHA256 mismatch: expected %s got %s",
+            result.sha256,
+            digest,
+            extra={
+                "reason": "cached-digest-mismatch",
+                "expected": result.sha256,
+                "actual": digest,
+                "path": result.path,
+            },
+        )
+        return False, validation_mode
+
+    return True, validation_mode
 
 
 class RobotsCache:
@@ -1153,6 +1273,12 @@ def download_candidate(
             previous_length = int(previous_length)
         except ValueError:
             previous_length = None
+    previous_mtime_ns = previous.get("mtime_ns")
+    if isinstance(previous_mtime_ns, str):
+        try:
+            previous_mtime_ns = int(previous_mtime_ns)
+        except ValueError:
+            previous_mtime_ns = None
 
     cond_helper = ConditionalRequestHelper(
         prior_etag=previous_etag,
@@ -1160,6 +1286,7 @@ def download_candidate(
         prior_sha256=previous_sha,
         prior_content_length=previous_length,
         prior_path=existing_path,
+        prior_mtime_ns=previous_mtime_ns,
     )
     content_type_hint = ""
     attempt_conditional = True
@@ -1333,7 +1460,11 @@ def download_candidate(
 
                     if not isinstance(cached, CachedResult):  # pragma: no cover - defensive
                         raise TypeError("Expected CachedResult for 304 response")
-                    if not _validate_cached_artifact(cached):
+                    is_valid_cache, validation_mode = _validate_cached_artifact(
+                        cached,
+                        verify_digest=ctx.verify_cache_digest,
+                    )
+                    if not is_valid_cache:
                         if not logged_conditional_downgrade:
                             LOGGER.warning(
                                 "Conditional cache invalid for %s; refetching without conditional headers.",
@@ -1348,7 +1479,7 @@ def download_candidate(
                         attempt_conditional = False
                         cond_helper = ConditionalRequestHelper()
                         continue
-                    return DownloadOutcome(
+                    outcome = DownloadOutcome(
                         classification=Classification.CACHED,
                         path=cached.path,
                         http_status=response.status_code,
@@ -1363,6 +1494,10 @@ def download_candidate(
                         extracted_text_path=None,
                         retry_after=retry_after_hint,
                     )
+                    outcome.metadata["cache_validation_mode"] = validation_mode
+                    if ctx.extra.get("resume_disabled"):
+                        outcome.metadata.setdefault("resume_disabled", True)
+                    return outcome
 
                 # Handle 206 Partial Content for resume support
                 if response.status_code == 206:
@@ -1480,7 +1615,7 @@ def download_candidate(
                             http_status=response.status_code,
                             content_type=content_type,
                             elapsed_ms=elapsed_ms,
-                            reason=ReasonCode.DOMAIN_MAX_BYTES,
+                            reason=ReasonCode.SKIP_LARGE_DOWNLOAD,
                             reason_detail=f"file-too-large: {size_mb:.1f}MB exceeds threshold {threshold_mb:.1f}MB",
                             sha256=None,
                             content_length=content_length_hint,
@@ -1974,6 +2109,8 @@ def process_one_work(
         tail_check_bytes=tail_check_bytes,
         robots_checker=robots_checker,
         content_addressed=content_addressed,
+        verify_cache_digest=options.verify_cache_digest,
+        global_manifest_index=getattr(pipeline, "_global_manifest_index", {}),
     )
     download_context.mark_explicit(
         "dry_run",

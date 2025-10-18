@@ -20,41 +20,36 @@ graph TD
 
 ### 1. Content Acquisition (`DocsToKG.ContentDownload`)
 
-- Fetches raw documents and metadata from upstream services (for example, Pyalex).
-- Utilities live under `src/DocsToKG/ContentDownload/` with resolvers for source-specific logic.
-- Outputs structured metadata and document artifacts to the `Data/` directory, ready for parsing.
+- Pulls documents and metadata from upstream services (Pyalex, Crossref, Zenodo, Figshare, PubMed Central).
+- `DocsToKG.ContentDownload.cli` orchestrates argument parsing, resolver configuration, telemetry sinks, and retries.
+- Resolver registry and pipeline control live in `src/DocsToKG/ContentDownload/pipeline.py`; individual resolvers, sinks, and runners sit alongside networking utilities.
+- Outputs JSONL manifests and staged artifacts under `$DOCSTOKG_DATA_ROOT`, ready for DocParsing.
 
 ### 2. Document Parsing (`DocsToKG.DocParsing`)
 
-- Converts PDFs/HTML into DocTags and chunked Markdown using Docling.
-- Pipelines such as `DoclingHybridChunkerPipelineWithMin.py` and `html_pipeline.py` normalise layout, extract captions, and produce chunk boundaries.
-- Embedding scripts (`EmbeddingV2.py`) generate dense representations consumed by the hybrid search ingest layer.
-- Chunk metadata includes provenance (pages, figure refs) used for highlights and diagnostics.
+- Converts DocTags into chunked text and embeddings using Docling-backed runtimes.
+- Unified CLI entry points (`python -m DocsToKG.DocParsing.chunking` / `python -m DocsToKG.DocParsing.embedding`) forward to `_chunking.runtime` and `_embedding.runtime`, maintaining backwards-compatible imports.
+- Shared infrastructure lives in `DocsToKG.DocParsing.core` (config loading, CLI orchestration, telemetry via `StageTelemetry` and `TelemetrySink`).
+- Chunk metadata preserves provenance (page numbers, references, figure captions) for accurate highlights and diagnostics downstream.
 
 ### 3. Hybrid Search (`DocsToKG.HybridSearch`)
 
-Core packages in `src/DocsToKG/HybridSearch/` provide:
-
-- **Configuration** (`config.py`): Dataclasses for chunking, dense indexing, fusion, and retrieval parameters. The `HybridSearchConfigManager` reloads configs at runtime.
-- **Ingest & Storage** (`ingest.py`, `storage.py`): Orchestrate chunk ingestion, maintain FAISS snapshots, and manage the OpenSearch simulator used in tests.
-- **Retrieval** (`retrieval.py`): Implements `HybridSearchService` and `HybridSearchRequest/Response` models combining BM25, SPLADE, and FAISS scores.
-- **Fusion** (`fusion.py`): Applies Reciprocal Rank Fusion (RRF) and Maximal Marginal Relevance (MMR) for final ranking.
-- **Observability** (`observability.py`): Exposes metrics snapshots for monitoring and rebuild decisions.
-- **API Layer** (`api.py`): Wraps the service in an HTTP-style interface used by REST deployments.
-
-Dense vectors are stored in FAISS (GPU-capable via the scaffold in `docs/07-reference/faiss/`), while sparse signals are backed by an OpenSearch-compatible registry used for local testing.
+- `config.py` provides dataclasses for dense/sparse weighting, namespace isolation, and fusion strategies, with `HybridSearchConfigManager` hot-reloading JSON configs.
+- `pipeline.py` and `store.py` manage ingestion of chunk payloads, FAISS state (`FaissVectorStore`), and sparse registries (OpenSearch simulator or pluggable adapters).
+- `service.py` contains `HybridSearchService`, Reciprocal Rank Fusion/MMR implementations, observability hooks, and the HTTP-style `HybridSearchAPI`.
+- `router.py` offers FastAPI/Starlette glue code; `types.py` and `interfaces.py` define request/response contracts.
 
 ### 4. Ontology Tooling (`DocsToKG.OntologyDownload`)
 
-- Command-line interface (`cli.py`) downloads ontologies from OBO, OLS, BioPortal, SKOS, and XBRL sources.
-- Configurations (`config.py`) describe resolver options, licensing rules, and validation policies.
-- Validators (`validators.py`) run rdflib, Pronto, Owlready2, ROBOT, and Arelle checks depending on flags.
-- Stored data supports knowledge enrichment and schema alignment in downstream pipelines.
+- CLI (`DocsToKG.OntologyDownload.cli`) plans, pulls, validates, and summarises ontologies sourced from OBO, OLS, BioPortal, and XBRL endpoints.
+- `settings.py` supplies Pydantic configuration models; `planning.py` handles fetch plan construction; `formatters.py` renders CLI tables.
+- Validation modules invoke rdflib, Owlready2, Pronto, ROBOT, and Arelle depending on CLI flags; storage adapters manage object stores and local caches.
+- Manifests and derived metadata enrich downstream search pipelines and schema alignment tasks.
 
 ### 5. Knowledge Graph & Vector Operations
 
-- The `VectorOperations/` package is reserved for future expansion of graph materialisation tasks.
-- Hybrid search currently operates over chunked text; graph exports can be layered on top as ontology assets mature.
+- Hybrid search currently serves chunked textual evidence while ontology assets lay groundwork for broader graph exports.
+- Emerging utilities reside in `DocsToKG.HybridSearch` modules (`features.py`, `pipeline.py`) with planned expansion under a dedicated `VectorOperations/` namespace.
 
 ## 3. Data Flow
 

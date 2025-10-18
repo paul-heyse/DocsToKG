@@ -82,16 +82,21 @@ def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
         message = "Multiprocessing start method is %s; CUDA workloads require 'spawn'." % (
             current or "unset"
         )
-        target_logger = logger or logging.getLogger(__name__)
+        current_method = current or "unset"
+        if logger is not None:
+            logger.warning(message)
+            structured_logger = get_logger(__name__)
+        else:
+            structured_logger = logging.getLogger(__name__)
         log_event(
-            target_logger,
+            structured_logger,
             "warning",
             message,
             stage="core",
             doc_id="__system__",
             input_hash=None,
             error_code="MP_SPAWN_REQUIRED",
-            current_method=current or "unset",
+            current_method=current_method,
         )
 
 
