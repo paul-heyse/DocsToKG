@@ -316,9 +316,13 @@ class StageConfigBase:
 
         mapping = load_config_mapping(cfg_path)
         base_dir = cfg_path.parent
+        unknown_keys = [key for key in mapping if not hasattr(self, key)]
+        if unknown_keys:
+            joined = ", ".join(sorted(unknown_keys))
+            raise ValueError(
+                f"Unknown configuration fields for {self.__class__.__name__}: {joined}"
+            )
         for key, value in mapping.items():
-            if not hasattr(self, key):
-                continue
             new_value = self._coerce_field(key, value, base_dir)
             current = getattr(self, key, None)
             if new_value == current:
@@ -342,6 +346,9 @@ class StageConfigBase:
                 continue
             value = getattr(args, name)
             if value is None:
+                if explicit is not None and name in explicit:
+                    setattr(self, name, None)
+                    self.overrides.add(name)
                 continue
             new_value = self._coerce_field(name, value, None)
             current = getattr(self, name, None)
