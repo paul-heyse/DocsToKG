@@ -35,6 +35,19 @@ from .planning import display_plan, plan_chunk, plan_doctags, plan_embed
 
 CommandHandler = Callable[[Sequence[str]], int]
 
+# NOTE: ``known_stages`` MUST remain in sync with the manifest filenames under
+# ``Data/Manifests``. The values are derived from the canonical filenames to
+# avoid drifting stage identifiers across the CLI and the pipeline writers.
+_MANIFEST_FILENAMES = (
+    "docparse.doctags.manifest.jsonl",
+    "docparse.doctags-html.manifest.jsonl",
+    "docparse.doctags-pdf.manifest.jsonl",
+    "docparse.chunks.manifest.jsonl",
+    "docparse.embeddings.manifest.jsonl",
+)
+known_stages = [filename.split(".")[1] for filename in _MANIFEST_FILENAMES]
+known_stage_set = frozenset(known_stages)
+
 CLI_DESCRIPTION = """\
 Unified DocParsing CLI
 
