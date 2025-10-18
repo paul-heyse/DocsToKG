@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import tracemalloc
 import sys
 import types
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
+
+from DocsToKG.DocParsing.env import data_manifests
+from DocsToKG.DocParsing.io import iter_manifest_entries
 
 from tests.docparsing.stubs import dependency_stubs
 
@@ -159,3 +166,42 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
 
     status_line = stdout[manifest_header_index + 2]
     assert status_line == "  statuses: failure=6, success=10044"
+
+
+def test_iter_manifest_entries_streams_large_manifest(tmp_path: Path) -> None:
+    """Iterating over large manifests should remain memory efficient."""
+
+    stages = ["doctags", "chunk", "embeddings"]
+    entries_per_stage = 60_000
+    base = datetime(2025, 1, 1, tzinfo=timezone.utc)
+
+    manifest_dir = data_manifests(tmp_path)
+    for offset, stage in enumerate(stages):
+        stage_path = manifest_dir / f"docparse.{stage}.manifest.jsonl"
+        with stage_path.open("w", encoding="utf-8") as handle:
+            for index in range(entries_per_stage):
+                timestamp = (base + timedelta(seconds=index + offset * entries_per_stage)).isoformat()
+                payload = {
+                    "timestamp": timestamp,
+                    "stage": stage,
+                    "doc_id": f"{stage}-doc-{index}",
+                    "status": "success",
+                    "duration_s": 0.1,
+                }
+                handle.write(json.dumps(payload) + "\n")
+
+    tracemalloc.start()
+    total_entries = 0
+    previous_timestamp = ""
+    for entry in iter_manifest_entries(stages, tmp_path):
+        assert entry["stage"] in stages
+        current_timestamp = entry.get("timestamp", "")
+        assert current_timestamp >= previous_timestamp
+        previous_timestamp = current_timestamp
+        total_entries += 1
+
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert total_entries == entries_per_stage * len(stages)
+    assert peak < 32_000_000
