@@ -219,7 +219,7 @@ def test_manifest_rejects_unknown_stage(monkeypatch: pytest.MonkeyPatch, tmp_pat
     )
 
     with pytest.raises(CLIValidationError) as excinfo:
-        cli.manifest([
+        cli._manifest_main([
             "--stage",
             "invalid",
             "--data-root",
