@@ -156,13 +156,16 @@ Usage:
 import hashlib
 import json
 import logging
+import os
 import shutil
 import sys
 import threading
 import time
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -186,6 +189,22 @@ from DocsToKG.OntologyDownload.validation import (
     validate_rdflib,
     validate_robot,
 )
+
+
+@contextmanager
+def temporary_env(**overrides: str):
+    previous = {}
+    try:
+        for key, value in overrides.items():
+            previous[key] = os.environ.get(key)
+            os.environ[key] = value
+        yield
+    finally:
+        for key, old in previous.items():
+            if old is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old
 
 
 def _reset_validator_state() -> None:
@@ -340,7 +359,7 @@ def test_normalize_streaming_edge_cases(tmp_path, config):
         assert result.details.get("streaming_prefix_sha256") == header_stream
 
 
-def test_run_validators_respects_concurrency(patch_stack, tmp_path, config):
+def test_run_validators_respects_concurrency(tmp_path, config):
     config = config.model_copy(deep=True)
     config.defaults.validation.max_concurrent_validators = 2
 
@@ -373,23 +392,22 @@ def test_run_validators_respects_concurrency(patch_stack, tmp_path, config):
         "two": _make_validator("two"),
         "three": _make_validator("three"),
     }
-    patch_stack.setattr(validation_mod, "VALIDATORS", validators)
-
-    requests = []
-    for name in validators:
-        file_path = tmp_path / f"{name}.ttl"
-        file_path.write_text("@prefix ex: <http://example.org/> .")
-        requests.append(
-            ValidationRequest(
-                name,
-                file_path,
-                tmp_path / f"norm-{name}",
-                tmp_path / f"val-{name}",
-                config,
+    with patch.object(validation_mod, "VALIDATORS", validators):
+        requests = []
+        for name in validators:
+            file_path = tmp_path / f"{name}.ttl"
+            file_path.write_text("@prefix ex: <http://example.org/> .")
+            requests.append(
+                ValidationRequest(
+                    name,
+                    file_path,
+                    tmp_path / f"norm-{name}",
+                    tmp_path / f"val-{name}",
+                    config,
+                )
             )
-        )
 
-    results = run_validators(requests, _noop_logger())
+        results = run_validators(requests, _noop_logger())
     assert set(results) == set(validators)
     assert state["max_active"] >= 2
     for name in validators:
@@ -397,7 +415,7 @@ def test_run_validators_respects_concurrency(patch_stack, tmp_path, config):
         assert artifact.exists()
 
 
-def test_run_validators_matches_sequential(patch_stack, tmp_path, config):
+def test_run_validators_matches_sequential(tmp_path, config):
     config_seq = config.model_copy(deep=True)
     config_seq.defaults.validation.max_concurrent_validators = 1
 
@@ -416,26 +434,25 @@ def test_run_validators_matches_sequential(patch_stack, tmp_path, config):
         "beta": _validator,
         "gamma": _validator,
     }
-    patch_stack.setattr(validation_mod, "VALIDATORS", validators)
-
-    def _build_requests(prefix: str, cfg: ResolvedConfig) -> list[ValidationRequest]:
-        requests = []
-        for name in validators:
-            file_path = tmp_path / f"{prefix}-{name}.ttl"
-            file_path.write_text("@prefix ex: <http://example.org/> .")
-            requests.append(
-                ValidationRequest(
-                    name,
-                    file_path,
-                    tmp_path / f"{prefix}-{name}-normalized",
-                    tmp_path / f"{prefix}-{name}-validation",
-                    cfg,
+    with patch.object(validation_mod, "VALIDATORS", validators):
+        def _build_requests(prefix: str, cfg: ResolvedConfig) -> list[ValidationRequest]:
+            requests = []
+            for name in validators:
+                file_path = tmp_path / f"{prefix}-{name}.ttl"
+                file_path.write_text("@prefix ex: <http://example.org/> .")
+                requests.append(
+                    ValidationRequest(
+                        name,
+                        file_path,
+                        tmp_path / f"{prefix}-{name}-normalized",
+                        tmp_path / f"{prefix}-{name}-validation",
+                        cfg,
+                    )
                 )
-            )
-        return requests
+            return requests
 
-    seq_results = run_validators(_build_requests("seq", config_seq), _noop_logger())
-    conc_results = run_validators(_build_requests("conc", config_conc), _noop_logger())
+        seq_results = run_validators(_build_requests("seq", config_seq), _noop_logger())
+        conc_results = run_validators(_build_requests("conc", config_conc), _noop_logger())
 
     assert set(seq_results) == set(conc_results) == set(validators)
     for name in validators:
@@ -448,107 +465,105 @@ def test_run_validators_matches_sequential(patch_stack, tmp_path, config):
         assert seq_details == conc_details
 
 
-def test_sort_triple_file_falls_back_without_sort(patch_stack, tmp_path):
+def test_sort_triple_file_falls_back_without_sort(tmp_path):
     unsorted = tmp_path / "triples.unsorted"
     unsorted.write_text("c\nA\nb\n", encoding="utf-8")
     destination = tmp_path / "triples.sorted"
 
-    patch_stack.setattr(shutil, "which", lambda _: None)
+    with patch.object(shutil, "which", lambda _: None):
+        _sort_triple_file(unsorted, destination)
 
-    _sort_triple_file(unsorted, destination)
     assert destination.read_text(encoding="utf-8") == "A\nb\nc\n"
 
 
-def test_validator_plugin_loader_registers_and_warns(patch_stack, caplog):
+def test_validator_plugin_loader_registers_and_warns(caplog):
     base = validation_mod.VALIDATORS.copy()
-    patch_stack.setattr(validation_mod, "VALIDATORS", base.copy())
-    _reset_validator_state(patch_stack)
+    with patch.object(validation_mod, "VALIDATORS", base.copy()):
+        _reset_validator_state()
 
-    def _plugin(request, logger):  # pragma: no cover - handler not executed here
-        return ValidationResult(ok=True, details={"ok": True}, output_files=[])
+        def _plugin(request, logger):  # pragma: no cover - handler not executed here
+            return ValidationResult(ok=True, details={"ok": True}, output_files=[])
 
-    class DummyEntry:
-        def __init__(self, name: str, target, fail: bool = False):
-            self.name = name
-            self._target = target
-            self._fail = fail
+        class DummyEntry:
+            def __init__(self, name: str, target, fail: bool = False):
+                self.name = name
+                self._target = target
+                self._fail = fail
 
-        def load(self):
-            if self._fail:
-                raise RuntimeError("boom")
-            return self._target
+            def load(self):
+                if self._fail:
+                    raise RuntimeError("boom")
+                return self._target
 
-    entries = [
-        DummyEntry("plugin_validator", _plugin),
-        DummyEntry("broken_validator", None, fail=True),
-    ]
+        entries = [
+            DummyEntry("plugin_validator", _plugin),
+            DummyEntry("broken_validator", None, fail=True),
+        ]
 
-    stub = SimpleNamespace(
-        select=lambda *, group=None: entries if group == "docstokg.ontofetch.validator" else []
-    )
-    patch_stack.setattr(plugins_mod.metadata, "entry_points", lambda: stub)
+        stub = SimpleNamespace(
+            select=lambda *, group=None: entries if group == "docstokg.ontofetch.validator" else []
+        )
+        with patch.object(plugins_mod.metadata, "entry_points", lambda: stub):
+            caplog.set_level(logging.INFO)
+            load_validator_plugins(validation_mod.VALIDATORS, logger=logging.getLogger("test"))
 
-    caplog.set_level(logging.INFO)
-    load_validator_plugins(validation_mod.VALIDATORS, logger=logging.getLogger("test"))
-
-    assert "plugin_validator" in validation_mod.VALIDATORS
-    assert validation_mod.VALIDATORS["plugin_validator"] is _plugin
-    assert any(record.message == "validator plugin failed" for record in caplog.records)
+        assert "plugin_validator" in validation_mod.VALIDATORS
+        assert validation_mod.VALIDATORS["plugin_validator"] is _plugin
+        assert any(record.message == "validator plugin failed" for record in caplog.records)
 
 
-def test_validate_pronto_success(patch_stack, obo_file, tmp_path, config):
+def test_validate_pronto_success(obo_file, tmp_path, config):
     pytest.importorskip("pronto")
     pytest.importorskip("ols_client")
-    patch_stack.setenv("PYSTOW_HOME", str(tmp_path / "pystow"))
-    request = ValidationRequest("pronto", obo_file, tmp_path / "norm", tmp_path / "val", config)
-    result = validate_pronto(request, _noop_logger())
-    if not result.ok:  # pragma: no cover - optional dependency pipeline misconfigured
-        pytest.skip(f"Pronto validator unavailable: {result.details.get('error')}")
-    payload = json.loads((request.validation_dir / "pronto_parse.json").read_text())
-    assert payload["ok"]
+    with temporary_env(PYSTOW_HOME=str(tmp_path / "pystow")):
+        request = ValidationRequest("pronto", obo_file, tmp_path / "norm", tmp_path / "val", config)
+        result = validate_pronto(request, _noop_logger())
+        if not result.ok:  # pragma: no cover - optional dependency pipeline misconfigured
+            pytest.skip(f"Pronto validator unavailable: {result.details.get('error')}")
+        payload = json.loads((request.validation_dir / "pronto_parse.json").read_text())
+        assert payload["ok"]
 
 
-def test_validate_pronto_handles_exception(patch_stack, obo_file, tmp_path, config):
+def test_validate_pronto_handles_exception(obo_file, tmp_path, config):
     request = ValidationRequest("pronto", obo_file, tmp_path / "norm", tmp_path / "val", config)
 
     def _boom(*_args, **_kwargs):  # pragma: no cover - deterministic failure path
         raise RuntimeError("boom")
 
-    patch_stack.setattr(
+    with patch(
         "DocsToKG.OntologyDownload.validation._run_validator_subprocess",
         _boom,
-    )
-
-    result = validate_pronto(request, _noop_logger())
+    ):
+        result = validate_pronto(request, _noop_logger())
     assert not result.ok
     payload = json.loads((request.validation_dir / "pronto_parse.json").read_text())
     assert payload["ok"] is False
     assert payload["error"] == "boom"
 
 
-def test_validate_owlready2_success(patch_stack, owl_file, tmp_path, config):
+def test_validate_owlready2_success(owl_file, tmp_path, config):
     try:
         pytest.importorskip("owlready2")
     except Exception as exc:  # pragma: no cover - optional dependency import failed
         pytest.skip(f"owlready2 unavailable: {exc}")
     pytest.importorskip("ols_client")
-    patch_stack.setenv("PYSTOW_HOME", str(tmp_path / "pystow"))
-    request = ValidationRequest("owlready2", owl_file, tmp_path / "norm", tmp_path / "val", config)
-    result = validate_owlready2(request, _noop_logger())
-    if not result.ok:  # pragma: no cover - optional dependency pipeline misconfigured
-        pytest.skip(f"Owlready2 validator unavailable: {result.details.get('error')}")
+    with temporary_env(PYSTOW_HOME=str(tmp_path / "pystow")):
+        request = ValidationRequest("owlready2", owl_file, tmp_path / "norm", tmp_path / "val", config)
+        result = validate_owlready2(request, _noop_logger())
+        if not result.ok:  # pragma: no cover - optional dependency pipeline misconfigured
+            pytest.skip(f"Owlready2 validator unavailable: {result.details.get('error')}")
 
 
-def test_validate_robot_skips_when_missing(patch_stack, ttl_file, tmp_path, config):
-    patch_stack.setattr(shutil, "which", lambda _: None)
-    request = ValidationRequest("robot", ttl_file, tmp_path / "norm", tmp_path / "val", config)
-    result = validate_robot(request, _noop_logger())
+def test_validate_robot_skips_when_missing(ttl_file, tmp_path, config):
+    with patch.object(shutil, "which", lambda _: None):
+        request = ValidationRequest("robot", ttl_file, tmp_path / "norm", tmp_path / "val", config)
+        result = validate_robot(request, _noop_logger())
     assert result.ok
     payload = json.loads((request.validation_dir / "robot_report.json").read_text())
     assert payload["skipped"]
 
 
-def test_validate_arelle_with_stub(patch_stack, xbrl_package, tmp_path, config):
+def test_validate_arelle_with_stub(xbrl_package, tmp_path, config):
     class DummyController:
         def __init__(self, **kwargs):
             self.kwargs = kwargs
@@ -557,26 +572,26 @@ def test_validate_arelle_with_stub(patch_stack, xbrl_package, tmp_path, config):
             self.args = args
 
     dummy_module = SimpleNamespace(Cntlr=SimpleNamespace(Cntlr=DummyController))
-    patch_stack.setitem(sys.modules, "arelle", dummy_module)
-    request = ValidationRequest("arelle", xbrl_package, tmp_path / "norm", tmp_path / "val", config)
-    result = validate_arelle(request, _noop_logger())
+    with patch.dict(sys.modules, {"arelle": dummy_module}, clear=False):
+        request = ValidationRequest("arelle", xbrl_package, tmp_path / "norm", tmp_path / "val", config)
+        result = validate_arelle(request, _noop_logger())
     assert result.ok
     payload = json.loads((request.validation_dir / "arelle_validation.json").read_text())
     assert payload["ok"]
     assert payload["log"].endswith("arelle.log")
 
 
-def test_validate_owlready2_memory_error(patch_stack, owl_file, tmp_path, config):
+def test_validate_owlready2_memory_error(owl_file, tmp_path, config):
     request = ValidationRequest("owlready2", owl_file, tmp_path / "norm", tmp_path / "val", config)
 
     def _raise(*args, **kwargs):  # pragma: no cover - exercised in test
         raise ValidatorSubprocessError("memory exceeded")
 
-    patch_stack.setattr(
+    with patch(
         "DocsToKG.OntologyDownload.validation._run_validator_subprocess",
         _raise,
-    )
-    result = validate_owlready2(request, _noop_logger())
+    ):
+        result = validate_owlready2(request, _noop_logger())
     assert not result.ok
     payload = json.loads((request.validation_dir / "owlready2_parse.json").read_text())
     assert "memory exceeded" in payload["error"].lower()

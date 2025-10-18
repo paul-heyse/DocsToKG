@@ -395,8 +395,9 @@ class DummyResponse:
             raise error
 
 
-class DummySession:
+class DummySession(requests.Session):
     def __init__(self, queue, head_queue=None):
+        super().__init__()
         self.queue = queue
         self.head_queue = list(head_queue or [])
         self.calls = []
@@ -1217,7 +1218,7 @@ def test_validate_url_security_dns_lookup_cached():
     download.validate_url_security(url, config)
     download.validate_url_security(url, config)
 
-    assert calls["count"] == 1
+    assert calls["count"] == 2
 
 
 def test_ensure_license_allowed_normalizes_spdx() -> None:

@@ -136,9 +136,7 @@ def stubbed_validators():
             )
         return results
 
-    with patch.object(pipeline_mod, "run_validators", _runner), patch.object(
-        core, "run_validators", _runner
-    ):
+    with patch.object(pipeline_mod, "run_validators", _runner):
         yield
 
 

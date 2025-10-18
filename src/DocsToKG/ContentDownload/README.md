@@ -18,59 +18,74 @@ sbom:
 # DocsToKG • ContentDownload
 
 Purpose: Coordinate resolver-driven acquisition of scholarly artifacts from OpenAlex metadata into local storage with manifest bookkeeping and telemetry.
-Scope boundary: Handles discovery, downloading, classification, and logging for PDFs/HTML/XML; it does not perform downstream KG ingestion, embedding, or ontology alignment (TODO: confirm).
+Scope boundary: In-scope—resolver orchestration, HTTP download pipeline, caching/resume semantics, manifest/telemetry emission. Out-of-scope—knowledge graph ingestion, chunking/embedding, ontology alignment, downstream analytics.
 
 ---
 
 ## Quickstart
 
-> One-shot setup, then run the main src/DocsToKG/HybridSearchworkflow.
-
 ```bash
 # Dev container (recommended)
-# See openspec/AGENTS.md for activation steps inside the managed environment.
+# See openspec/AGENTS.md for container activation steps.
 
 # Local
 python -m venv .venv
 source .venv/bin/activate
 pip install -U pip
 pip install -e ".[dev]"
+# Optional but polite for OpenAlex/Unpaywall
+export UNPAYWALL_EMAIL=you@example.org
 python -m DocsToKG.ContentDownload.cli \
   --topic "machine learning" \
-  --year-start 2022 \
+  --year-start 2023 \
   --year-end 2024 \
   --mailto you@example.org \
-  --out pdfs/runs
-# Append --dry-run to exercise resolver coverage without writing files.
+  --out runs/content \
+  --staging \
+  --resolver-preset fast \
+  --workers 4
+# Add --dry-run to exercise resolver coverage without writing files.
+# Add --list-only to log resolver candidates without fetching content.
 ```
 
-## Common commands
+## CLI Quick Reference
 
-```bash
-python -m DocsToKG.ContentDownload.cli --help
-python -m DocsToKG.ContentDownload.cli --topic "oncology" --year-start 2020 --year-end 2024 --dry-run --max 50
-python -m DocsToKG.ContentDownload.cli --resume-from pdfs/manifest.jsonl --workers 4
-python tools/manifest_to_index.py pdfs/manifest.jsonl pdfs/manifest.index.json
-python scripts/export_attempts_csv.py pdfs/manifest.jsonl reports/attempts.csv
-```
+- **Required selectors**: `--topic` or `--topic-id`, plus `--year-start` and `--year-end`. `resolve_topic_id_if_needed()` maps textual topics to OpenAlex IDs when possible.
+- **Output layout**: `--out` points at the PDF root. `--staging` creates timestamped `PDF/`, `HTML/`, and `XML/` folders. `--html-out` and `--xml-out` override defaults. `--content-addressed` enables hashed storage with friendly symlinks.
+- **Run controls**: `--max` caps processed works; `--dry-run` records resolver coverage only; `--list-only` skips HTTP downloads; `--workers` controls concurrency; `--sleep` throttles sequential runs; `--resume-from` reuses an existing manifest; `--verify-cache-digest` recomputes SHA-256 for cache hits.
+- **Resolver configuration**: `--resolver-config` loads YAML/JSON that mirrors `ResolverConfig`. `--resolver-order`, `--resolver-preset {fast,broad}`, `--enable-resolver`, `--disable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--concurrent-resolvers`, `--max-concurrent-per-host`, `--domain-min-interval`, `--domain-token-bucket`, `--head-precheck`/`--no-head-precheck`, and `--accept` map directly to `ResolverConfig` fields.
+- **Telemetry & logging**: `--manifest` overrides the manifest path; `--log-format {jsonl,csv}`, `--log-csv`, and `--log-rotate` tune sink behaviour; `--warm-manifest-cache` preloads the SQLite manifest index for fast resume checks.
+- **Classifier tuning**: `--sniff-bytes`, `--min-pdf-bytes`, and `--tail-check-bytes` adjust payload heuristics; HTML text extraction is enabled via `--extract-text html`.
 
-## Folder map (top N)
+## Run Outputs
 
-- `src/DocsToKG/ContentDownload/cli.py` - CLI entry that wires argument parsing, telemetry sinks, and the `DownloadRun` orchestrator.
-- `src/DocsToKG/ContentDownload/args.py` - Argparse surface, `ResolvedConfig`, and resolver bootstrapping helpers.
-- `src/DocsToKG/ContentDownload/pipeline.py` - Resolver orchestration, rate limiting, `ResolverConfig`, and pipeline execution primitives.
-- `src/DocsToKG/ContentDownload/download.py` - Streaming download strategies, robots enforcement, cache validation, and artifact writers.
-- `src/DocsToKG/ContentDownload/core.py` - Shared enums, classifiers, normalization helpers, and the `WorkArtifact` data structure.
-- `src/DocsToKG/ContentDownload/networking.py` - HTTP session factory, retry logic, token buckets, and circuit breaker utilities.
-- `src/DocsToKG/ContentDownload/runner.py` - `DownloadRun` lifecycle managing worker pools and summary emission.
-- `src/DocsToKG/ContentDownload/telemetry.py` - Manifest schema contracts (`MANIFEST_SCHEMA_VERSION`), sink interfaces, and SQLite manifest index helpers.
-- `src/DocsToKG/ContentDownload/providers.py` - `WorkProvider` protocol and the `OpenAlexWorkProvider` adapter around `pyalex`.
-- `src/DocsToKG/ContentDownload/summary.py` - Run summary dataclass plus console reporting helpers.
-- `src/DocsToKG/ContentDownload/statistics.py` - Optional runtime statistics and bandwidth tracking utilities consumed by examples.
-- `src/DocsToKG/ContentDownload/errors.py` - Structured download errors, actionable logging, and remediation messaging.
-- `src/DocsToKG/ContentDownload/resolvers/` - Resolver implementations (Unpaywall, Crossref, ArXiv, etc.) registered via `ResolverRegistry`.
+- `manifest.jsonl` (plus `.001`, `.002`, … when `--log-rotate` is active) — JSONL attempts and manifest entries with `record_type`.
+- `manifest.index.json` — incremental index keyed by URL for resolver dedupe.
+- `manifest.summary.json` — aggregated resolver counts and latency metrics.
+- `manifest.metrics.json` — human-readable summary produced by `summary.build_summary_record`.
+- `manifest.last.csv` — most recent attempt per work for quick inspection.
+- `manifest.sqlite3` — SQLite cache backing `ManifestUrlIndex` (`SQLITE_SCHEMA_VERSION = 4`).
+- `manifest.csv` — optional attempts CSV when `--log-format csv` or `--log-csv` is supplied.
+- Artifact directories (`PDF/`, `HTML/`, `XML/`) rooted under `--out` (or staging run directory); HTML extraction writes `.txt` sidecars when enabled.
+- Cached resume metadata (`sha256`, `etag`, `last_modified`) is embedded in manifest entries rather than separate files.
 
-## System overview
+## Folder Map (top N)
+
+- `src/DocsToKG/ContentDownload/cli.py` — CLI entry wiring argument parsing, telemetry setup, and the `DownloadRun` orchestrator.
+- `src/DocsToKG/ContentDownload/args.py` — Argparse surface, `ResolvedConfig`, resolver bootstrap helpers (`load_resolver_config`, `resolve_topic_id_if_needed`).
+- `src/DocsToKG/ContentDownload/runner.py` — `DownloadRun` lifecycle: sink initialisation, OpenAlex paging, worker orchestration, and summary emission.
+- `src/DocsToKG/ContentDownload/pipeline.py` — `ResolverPipeline`, `ResolverConfig`, rate limiting, concurrency, and manifest bookkeeping primitives.
+- `src/DocsToKG/ContentDownload/download.py` — Streaming download strategies, robots enforcement, resume handling, and artifact writers.
+- `src/DocsToKG/ContentDownload/networking.py` — HTTP session factories, retry helpers, token buckets, conditional request utilities, and circuit breakers.
+- `src/DocsToKG/ContentDownload/providers.py` — `WorkProvider` protocol and the `OpenAlexWorkProvider` adapter wrapping `pyalex.Works`.
+- `src/DocsToKG/ContentDownload/core.py` — Shared enums (`Classification`, `ReasonCode`), classifiers, normalisation helpers, and the `WorkArtifact` data structure.
+- `src/DocsToKG/ContentDownload/telemetry.py` — Manifest contracts (`MANIFEST_SCHEMA_VERSION = 3`), sink implementations, resume helpers (`load_previous_manifest`).
+- `src/DocsToKG/ContentDownload/summary.py` — Run summary dataclass plus console reporting helpers.
+- `src/DocsToKG/ContentDownload/statistics.py` — Optional runtime statistics and bandwidth sampling used by tests and diagnostics.
+- `src/DocsToKG/ContentDownload/errors.py` — Structured download errors, actionable logging, and remediation messaging.
+- `src/DocsToKG/ContentDownload/resolvers/` — Resolver implementations (Unpaywall, Crossref, ArXiv, Europe PMC, etc.) registered via `ResolverRegistry`.
+
+## System Overview
 
 ```mermaid
 flowchart LR
@@ -122,109 +137,84 @@ sequenceDiagram
   C-->>U: emit_console_summary()
 ```
 
-## Entry points & contracts
+## Run Lifecycle & Contracts
 
-- Entry points: `src/DocsToKG/ContentDownload/cli.py:main`, `python -m DocsToKG.ContentDownload.cli`.
-- `ResolvedConfig` (args.py) is immutable; mutate via helper functions (`bootstrap_run_environment`, `apply_config_overrides`) rather than altering dataclass fields.
-- `DownloadRun.setup_sinks()` must precede `setup_resolver_pipeline()` because the pipeline depends on telemetry sinks for attempt logging.
-- `ResolverPipeline` executes resolvers in configured order, respecting `ResolverConfig.resolver_toggles`, rate limits, and global URL deduplication.
-- Download strategies enforce classification invariants (`PDF_LIKE`, HTML, XML) and robots compliance before persisting artifacts.
-- Manifest outputs must remain JSONL with `record_type` markers (`attempt`, `manifest`, `summary`) to keep downstream analytics compatible.
+- Entry points: `DocsToKG.ContentDownload.cli:main()` and `python -m DocsToKG.ContentDownload.cli`.
+- `args.resolve_config()` constructs an immutable `ResolvedConfig`. Mutate state via helpers (`bootstrap_run_environment`, `apply_config_overrides`) rather than dataclass mutation.
+- `DownloadRun.run()` performs the orchestrated flow: `setup_sinks()` → `setup_resolver_pipeline()` → `setup_work_provider()` → `setup_download_state()` → per-work processing (sequential or threaded) followed by summary emission.
+- Each `WorkArtifact` originates from `OpenAlexWorkProvider.iter_artifacts()` and is processed by `process_one_work()` which calls `ResolverPipeline.run()`; successful downloads invoke `download_candidate()` and strategy helpers.
+- Telemetry sinks come from `telemetry.MultiSink`; every manifest record must include `record_type` and obey `MANIFEST_SCHEMA_VERSION`.
+- Resume flow uses `telemetry.load_previous_manifest()` plus `ManifestUrlIndex`. Ensure rotated manifest files keep the `record_type` field so resumes stay compatible.
 
-## Configuration
+## Configuration Surfaces
 
-- CLI flags defined in `args.py` cover topics, date windows, concurrency, resolver ordering, and telemetry sinks.
-- Resolver credentials load from `config/resolver_credentials.yaml` plus `--resolver-config` overrides; unknown fields raise `ValueError`.
+- CLI flags in `args.py` hydrate `ResolverConfig`, `DownloadOptions`, and `DownloadContext` helpers.
+- Resolver configuration files (`--resolver-config`) mirror `ResolverConfig` fields. Unknown keys raise `ValueError`; add new fields to `ResolverConfig` with defaults before accepting them via CLI.
 - Environment variables:
-  - `UNPAYWALL_EMAIL` (default: `None`) - polite contact for Unpaywall resolver; fallback to `--mailto`.
-  - `CORE_API_KEY` (default: `None`) - API key for the CORE resolver.
-  - `S2_API_KEY` (default: `None`) - Semantic Scholar Graph API key.
-  - `DOAJ_API_KEY` (default: `None`) - DOAJ resolver API key.
-- Configuration checks: run `python -m DocsToKG.ContentDownload.cli --topic "<term>" --year-start 2024 --year-end 2024 --dry-run --max 5 --manifest tmp/manifest.jsonl` to validate resolver bootstrap and telemetry writes (TODO: automate).
+  - `UNPAYWALL_EMAIL` — polite contact for Unpaywall resolver; fallback to `--mailto`.
+  - `CORE_API_KEY`, `S2_API_KEY`, `DOAJ_API_KEY` — credentials for Core, Semantic Scholar, and DOAJ resolvers.
+- Concurrency calculations derive from `workers * max_concurrent_resolvers`; high values (>32) log warnings but still honour token buckets and domain semaphores.
 
-## Data contracts & schemas
+## Telemetry & Data Contracts
 
-- Manifest and attempt records conform to `telemetry.ManifestEntry` (`MANIFEST_SCHEMA_VERSION = 3`); see `src/DocsToKG/ContentDownload/telemetry.py`.
-- Manifest SQLite index obeys `SQLITE_SCHEMA_VERSION = 4`; consumers should query via `ManifestUrlIndex`.
-- Metrics sidecar (`manifest.metrics.json`) serializes `summary.build_summary_record` output with resolver totals and aggregate counters.
-- CSV exports use `scripts/export_attempts_csv.py` header ordering to stay compatible with legacy analytics.
-- TODO: Document any formal schema artifacts if manifest schema is externalized (e.g., JSON Schema file).
+- Manifest and attempt records conform to `telemetry.ManifestEntry` (`MANIFEST_SCHEMA_VERSION = 3`); attempt payloads use `pipeline.AttemptRecord`.
+- SQLite manifests use `SQLITE_SCHEMA_VERSION = 4`; consumers should access through `ManifestUrlIndex`.
+- Summary payloads rely on `summary.build_summary_record()` and feed `manifest.summary.json` (machine-readable) and `manifest.metrics.json` (pretty-printed).
+- CSV exports stay consistent with `scripts/export_attempts_csv.py` header ordering; update both sides when adding manifest fields.
 
-## Interactions with other packages
+## Interactions with Other Packages
 
-- Upstream inputs: `pyalex.Works` and `pyalex.Topics` provide work metadata; CLI config ensures polite usage via `oa_config.email`.
-- Resolver implementations hit external services (Unpaywall, Crossref, Core, etc.) through `src/DocsToKG/ContentDownload/resolvers/`.
-- Downstream consumers:
-  - `tools/manifest_to_index.py` generates manifest index JSON for fast lookups.
-  - `tools/manifest_to_csv.py` and `scripts/export_attempts_csv.py` convert JSONL to CSV for analytics.
-  - Reports in `reports/` (TODO: audit) assume stable manifest columns.
-- Guarantees: directory layout (`PDF`, `HTML`, `XML`) and manifest SHA-256 fields remain stable to avoid breaking resume/retry logic.
+- Upstream: `pyalex.Works` and `pyalex.Topics` supply metadata; CLI sets `pyalex.config.email` for polite API usage.
+- Networking: all HTTP flows run through `requests` sessions configured in `networking.create_session()` with pooled adapters, circuit breakers, and token buckets.
+- Downstream: `tools/manifest_to_index.py`, `tools/manifest_to_csv.py`, and `scripts/export_attempts_csv.py` expect stable manifest fields and JSONL structure.
+- Guarantees: file naming (`slugify`) and SHA-256 digests remain stable to support resume semantics. Maintain robots compliance unless explicitly bypassed (`--ignore-robots`).
 
-## Observability
-
-- Telemetry: `telemetry.MultiSink` multiplexes JSONL manifests, `.index.json`, `.last.csv`, `.sqlite3`, `.summary.json`, and `.metrics.json`.
-- Logging: standard Python logging under the `DocsToKG.ContentDownload` namespace; configure verbosity via `LOGLEVEL` or logging config.
-- Dashboards: TODO: link dashboards that visualize resolver success and latency.
-- SLIs/SLOs:
-  - Download success rate (`saved / processed`). SLO: TODO define threshold (e.g., ≥0.95).
-  - Resolver P95 latency (ms) per `summary.latency_ms`. SLO: TODO cap (e.g., ≤5000 ms).
-  - Manifest write failure rate (errors / attempts). SLO: target 0 failures.
-- Health check: `python -m DocsToKG.ContentDownload.cli --topic "<term>" --year-start 2024 --year-end 2024 --dry-run --max 5` should exit 0 without writing artifacts.
-
-## Security & data handling
-
-- ASVS level: TODO (likely L1; confirm with security review).
-- Data classification: `no-pii`; module handles public scholarly metadata and documents.
-- Secrets handling: API keys are sourced from environment variables or secure config files—never commit secrets to the repo.
-- STRIDE threats & mitigations:
-  - Spoofing: enforce HTTPS endpoints and domain allowlists in resolver configs.
-  - Tampering: SHA-256 digests verified for cached artifacts (`download._cached_sha256`).
-  - Repudiation: JSONL manifest entries include timestamps, run IDs, and resolver names.
-  - Denial of service: token buckets and circuit breakers (`networking.TokenBucket`, `CircuitBreaker`) throttle abusive traffic.
-  - Information disclosure: logs avoid storing raw payloads; ensure manifests stay on trusted storage (TODO: document retention policy).
-- External input is untrusted; treat downloaded artifacts as unsafe and never execute them directly.
-
-## Development tasks
+## Development & Testing
 
 ```bash
-pytest -q tests/cli/test_cli_flows.py
-pytest -q tests/pipeline/test_execution.py -k ResolverPipeline
-ruff check src/DocsToKG/ContentDownload
-black src/DocsToKG/ContentDownload
+ruff check src/DocsToKG/ContentDownload tests/content_download
 mypy src/DocsToKG/ContentDownload
-# Inner loop: tweak resolver/pipeline code, run targeted pytest, then execute a --dry-run --max 10 CLI run to inspect telemetry outputs.
+pytest -q tests/cli/test_cli_flows.py
+pytest -q tests/content_download/test_runner_download_run.py
+pytest -q tests/content_download/test_download_strategy_helpers.py
+# Smoke test:
+python -m DocsToKG.ContentDownload.cli --topic "vision" --year-start 2024 --year-end 2024 --max 5 --dry-run --manifest tmp/manifest.jsonl
 ```
 
-## Agent guardrails
+## Agent Guardrails
 
 - Do:
-  - Preserve manifest schemas and update `MANIFEST_SCHEMA_VERSION` alongside downstream tooling.
-  - Register new resolvers through `resolvers/__init__.py` so toggles and ordering remain centralized.
-  - Maintain `ResolvedConfig` immutability; add helper methods for new fields instead of mutating instances.
+  - Preserve manifest schemas and bump `MANIFEST_SCHEMA_VERSION`/`SQLITE_SCHEMA_VERSION` in lockstep with downstream tooling.
+  - Register new resolvers via `resolvers/__init__.py` so toggles and ordering remain centralised.
+  - Maintain `ResolvedConfig` immutability; extend helper constructors when introducing fields.
+  - Keep token bucket and circuit breaker defaults polite; document any relaxation.
 - Do not:
-  - Disable robots enforcement or polite headers in committed code paths without legal approval.
   - Remove telemetry sinks or change `record_type` values without coordinating analytics consumers.
-  - Commit credentials or modify default limits to unsafe values.
+  - Disable robots enforcement or polite headers in committed code paths without explicit approval.
+  - Commit credentials or widen rate limits beyond provider policies.
 - Danger zone:
-  - `rm -rf pdfs html xml` deletes cached artifacts and resumes; keep backups before purging.
-  - `python -m DocsToKG.ContentDownload.cli --ignore-robots` bypasses robots.txt and should only run with explicit authorization.
+  - `rm -rf runs/content` (or similar) deletes cached artifacts and resume history—back up before purging.
+  - `python -m DocsToKG.ContentDownload.cli --ignore-robots` bypasses robots.txt and should only run with explicit authorisation.
 
 ## FAQ
 
 - Q: How do I resume a partially completed download run?
-  A: Re-run the CLI with `--resume-from <manifest.jsonl>`; the runner skips completed works using the SQLite manifest index.
+  A: Supply `--resume-from <manifest.jsonl>` (or the staging manifest path). The runner uses the SQLite index plus JSONL history (including rotated files) to skip completed works.
 
 - Q: How can I target only open-access works?
-  A: Add `--oa-only` so the Works query filters to open-access locations before resolver execution.
+  A: Add `--oa-only` so the Works query filters to open-access items before resolver execution.
 
 - Q: What is the safest way to test resolver changes?
-  A: Use `--dry-run --max <N>` to gather coverage without writing files, inspect JSONL attempts, then drop `--dry-run` once satisfied.
+  A: Use `--dry-run --max <N>` to gather coverage without writing files. Inspect JSONL attempts via `jq` or `scripts/export_attempts_csv.py`, then drop `--dry-run` once satisfied.
 
-- Q: Where do I find latency and success metrics after a run?
-  A: Check `manifest.metrics.json` for aggregate counters and `manifest.summary.json` for resolver-specific latency/attempt stats.
+- Q: How can I verify manifest integrity when reusing cached artifacts?
+  A: Run with `--verify-cache-digest` to recompute SHA-256 for cache hits; the manifest will include refreshed hashes and mtimes.
 
 - Q: How can I rotate telemetry logs for long sessions?
-  A: Supply `--log-rotate 250MB` (or similar) so `RotatingJsonlSink` handles rollover while preserving manifest schema.
+  A: Pass `--log-rotate 250MB` so `RotatingJsonlSink` handles rollover. Resumes read all rotated segments automatically.
+
+- Q: What if I only need resolver coverage without downloads?
+  A: Combine `--dry-run` with `--list-only` when you want manifest-level URL logging but no HTTP GETs.
 
 ```json x-agent-map
 {
@@ -241,12 +231,12 @@ mypy src/DocsToKG/ContentDownload
     { "kind": "jsonl", "path": "src/DocsToKG/ContentDownload/telemetry.py", "description": "ManifestEntry schema and MANIFEST_SCHEMA_VERSION" }
   ],
   "artifacts_out": [
-    { "path": "pdfs/**", "consumed_by": ["../reports", "../tools"] },
-    { "path": "pdfs/manifest.jsonl", "consumed_by": ["tools/manifest_to_index.py", "scripts/export_attempts_csv.py"] },
-    { "path": "pdfs/manifest.sqlite3", "consumed_by": ["src/DocsToKG/ContentDownload/telemetry.py"] }
+    { "path": "runs/content/**", "consumed_by": ["../reports", "../tools"] },
+    { "path": "runs/content/**/manifest.jsonl", "consumed_by": ["tools/manifest_to_index.py", "scripts/export_attempts_csv.py"] },
+    { "path": "runs/content/**/manifest.sqlite3", "consumed_by": ["src/DocsToKG/ContentDownload/telemetry.py"] }
   ],
   "danger_zone": [
-    { "command": "rm -rf pdfs html xml", "effect": "Deletes cached/downloaded artifacts" },
+    { "command": "rm -rf runs/content pdfs html xml", "effect": "Deletes cached/downloaded artifacts and resume data" },
     { "command": "python -m DocsToKG.ContentDownload.cli --ignore-robots", "effect": "Bypasses robots.txt protections" }
   ]
 }
