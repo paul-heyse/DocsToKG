@@ -5,6 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
+import re
+import shutil
+import subprocess
 import sys
 from collections import OrderedDict
 from datetime import datetime, timezone
@@ -17,7 +21,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
 from . import plugins as plugin_mod
-from .errors import ConfigError, OntologyDownloadError, PolicyError
+from .errors import ConfigError, OntologyDownloadError, PolicyError, UnsupportedPythonError
 from .formatters import (
     PLAN_TABLE_HEADERS,
     RESULT_TABLE_HEADERS,
@@ -26,6 +30,7 @@ from .formatters import (
     format_table,
     format_validation_summary,
 )
+from .api import _collect_plugin_details
 from .manifests import (
     DEFAULT_LOCKFILE_PATH,
     DEFAULT_PLAN_BASELINE,
@@ -64,7 +69,10 @@ from .planning import (
     validate_manifest_dict,
 )
 from .settings import (
+    CACHE_DIR,
     CONFIG_DIR,
+    LOCAL_ONTOLOGY_DIR,
+    LOG_DIR,
     STORAGE,
     ResolvedConfig,
     build_resolved_config,
@@ -92,6 +100,7 @@ from .validation import (
 )
 from .validation import main as validation_main
 from .io import format_bytes
+from .logging_utils import setup_logging
 def _build_parser() -> argparse.ArgumentParser:
     """Configure the top-level CLI parser and subcommands.
 
@@ -559,18 +568,18 @@ def _resolve_specs_from_args(
         config.defaults.resolver_fallback_enabled = False
         config.defaults.prefer_source = ["direct"]
         config.specs = specs
-        logging.getLogger(\"DocsToKG.OntologyDownload\").info(
-            \"using lockfile\",
+        logging.getLogger("DocsToKG.OntologyDownload").info(
+            "using lockfile",
             extra={
-                \"stage\": \"plan\",
-                \"lock_path\": str(lock_path.expanduser()),
-                \"entries\": len(specs),
+                "stage": "plan",
+                "lock_path": str(lock_path.expanduser()),
+                "entries": len(specs),
             },
         )
         return config, specs
 
     if ids:
-        resolver_name = getattr(args, \"resolver\", None) or config.defaults.prefer_source[0]
+        resolver_name = getattr(args, "resolver", None) or config.defaults.prefer_source[0]
         formats = target_formats or config.defaults.normalize_to
         specs = [
             FetchSpec(id=oid, resolver=resolver_name, extras={}, target_formats=formats)
@@ -584,7 +593,7 @@ def _resolve_specs_from_args(
     if allow_empty:
         return config, []
 
-    raise ConfigError(\"Please provide ontology IDs or --spec configuration\")
+    raise ConfigError("Please provide ontology IDs or --spec configuration")
 
 
 def _handle_pull(
