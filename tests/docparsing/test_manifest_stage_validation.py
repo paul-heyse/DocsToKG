@@ -217,6 +217,99 @@ def test_manifest_rejects_unknown_stage(monkeypatch: pytest.MonkeyPatch, tmp_pat
     error = excinfo.value
     assert error.option == "--stage"
     assert "invalid" in error.message
+    assert "Canonical stages:" in error.message
+    assert "Discovered stages:" in error.message
+
+
+def test_manifest_default_includes_discovered_stage(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Stages discovered from manifest filenames are selected by default."""
+
+    _prepare_runtime(monkeypatch)
+    from DocsToKG.DocParsing.core import cli
+
+    stage_name = "synthetic"
+    manifest_path = tmp_path / f"docparse.{stage_name}.manifest.jsonl"
+    manifest_path.write_text("{}\n", encoding="utf-8")
+
+    observed: dict[str, Any] = {}
+
+    def fake_iter_manifest_entries(stages: list[str], data_root: Path):
+        observed["stages"] = stages
+        observed["data_root"] = data_root
+        return _iter_stub(stages)
+
+    monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
+    monkeypatch.setattr(
+        cli, "data_manifests", lambda _root, *, ensure=True: tmp_path
+    )
+    monkeypatch.setattr(
+        cli,
+        "known_stages",
+        ["doctags", "chunk", "embeddings"],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli,
+        "known_stage_set",
+        {"doctags", "chunk", "embeddings"},
+        raising=False,
+    )
+
+    exit_code = cli.manifest(["--data-root", str(tmp_path)])
+
+    assert exit_code == 0
+    assert observed["stages"] == [stage_name]
+    assert observed["data_root"] == tmp_path
+
+
+def test_manifest_accepts_discovered_stage_filter(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A newly discovered stage name is accepted as a filter value."""
+
+    _prepare_runtime(monkeypatch)
+    from DocsToKG.DocParsing.core import cli
+
+    stage_name = "synthetic"
+    manifest_path = tmp_path / f"docparse.{stage_name}.manifest.jsonl"
+    manifest_path.write_text("{}\n", encoding="utf-8")
+
+    observed: dict[str, Any] = {}
+
+    def fake_iter_manifest_entries(stages: list[str], data_root: Path):
+        observed["stages"] = stages
+        observed["data_root"] = data_root
+        return _iter_stub(stages)
+
+    monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
+    monkeypatch.setattr(
+        cli, "data_manifests", lambda _root, *, ensure=True: tmp_path
+    )
+    monkeypatch.setattr(
+        cli,
+        "known_stages",
+        ["doctags", "chunk", "embeddings"],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli,
+        "known_stage_set",
+        {"doctags", "chunk", "embeddings"},
+        raising=False,
+    )
+
+    exit_code = cli.manifest([
+        "--stage",
+        stage_name,
+        "--data-root",
+        str(tmp_path),
+    ])
+
+    assert exit_code == 0
+    assert observed["stages"] == [stage_name]
+    assert observed["data_root"] == tmp_path
 
 
 def test_manifest_help_describes_stage_default(
