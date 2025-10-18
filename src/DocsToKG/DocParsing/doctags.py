@@ -2278,6 +2278,13 @@ def html_main(args: argparse.Namespace | None = None) -> int:
     else:
         namespace = html_parse_args(args)
 
+    bootstrap_root = detect_data_root()
+    try:
+        data_html(bootstrap_root)
+        data_doctags(bootstrap_root)
+    except Exception:
+        pass
+
     cfg = DoctagsCfg.from_args(namespace, mode="html")
     config_snapshot = cfg.to_manifest()
     for field_def in fields(DoctagsCfg):
