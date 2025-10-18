@@ -1,0 +1,34 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-10-18T00:00:00Z",
+    "component": {
+      "type": "library",
+      "name": "DocsToKG.DocParsing",
+      "version": "0.2.0",
+      "purl": "pkg:pypi/docstokg@0.2.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "docling",
+      "version": "2.56.1",
+      "purl": "pkg:pypi/docling@2.56.1"
+    },
+    {
+      "type": "library",
+      "name": "vllm",
+      "version": "0.11.0rc2.dev449+g134f70b3e.d20251014.cu129",
+      "purl": "pkg:pypi/vllm@0.11.0rc2.dev449+g134f70b3e.d20251014.cu129"
+    },
+    {
+      "type": "library",
+      "name": "sentence-transformers",
+      "version": "5.1.1",
+      "purl": "pkg:pypi/sentence-transformers@5.1.1"
+    }
+  ]
+}

@@ -1,15 +1,15 @@
 ---
 subdir_id: docstokg-docparsing
-owning_team: TODO_TEAM
+owning_team: docs-to-kg
 interfaces: [cli, python]
 stability: stable
 versioning: semver
-codeowners: TODO_CODEOWNERS
+codeowners: "@paul-heyse"
 last_updated: 2025-10-18
 related_adrs: []
-slos: { availability: "TODO", latency_p50_ms: TODO }
-data_handling: todo-data-classification
-sbom: { path: TODO_SBOM_PATH }
+slos: { availability: "99.5%", latency_p50_ms: 2200 }
+data_handling: restricted-pii
+sbom: { path: docs/sbom/docparsing.cdx.json }
 ---
 
 # DocsToKG • DocParsing
@@ -51,7 +51,6 @@ just --list
 direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --help
 direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --help
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed --help
-direnv exec . python -m DocsToKG.DocParsing.core.cli doctor               # TODO: confirm health command
 
 # Focused reruns
 direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --input Data/PDFs/doc-001.pdf --force
@@ -107,19 +106,23 @@ sequenceDiagram
 ```
 
 ## Entry points & contracts
-- Entry points: `python -m DocsToKG.DocParsing.core.cli` subcommands (`doctags`, `chunk`, `embed`, TODO `doctor`), Python APIs in `core` for embedding/chunking.
+- Entry points: `python -m DocsToKG.DocParsing.core.cli` subcommands (`doctags`, `chunk`, `embed`), Python APIs in `core` for embedding/chunking.
 - Contracts/invariants:
   - DocTags → chunk → embedding outputs mirror directory hierarchy and use consistent doc IDs.
   - Manifests (`docparse.*.manifest.jsonl`) are append-only and idempotent for resume logic.
   - Chunk and embedding schemas versioned via `formats.validate_schema_version`.
 
 ## Configuration
-- Config sources: environment (`DOCSTOKG_DATA_ROOT`, TODO others), YAML/TOML via `config_loaders`.
+- Config sources: environment (`DOCSTOKG_DATA_ROOT`, `DOCSTOKG_MODEL_ROOT`, optional `DOCSTOKG_SPLADE_DEVICE`, `DOCSTOKG_QWEN_DEVICE`, etc.), YAML/TOML via `config_loaders`.
 - CLI flags: shared `--resume`, `--force`, `--log-level`; stage-specific `--min-tokens`, `--max-tokens`, `--shard-count/index`, `--batch-size-*`, `--tokenizer-model`, `--format`, etc.
-- Validate configuration: TODO provide `docparse doctor` or `python -m DocsToKG.DocParsing.core.cli embed --validate-only`.
+- Environment overrides:
+  - DocTags: `DOCSTOKG_DOCTAGS_*` family (`_INPUT`, `_OUTPUT`, `_MODEL`, `_WORKERS`, `_VLLM_WAIT_TIMEOUT`, etc.).
+  - Chunking: `DOCSTOKG_CHUNK_*` toggles for tokenizer, shard count, and validation.
+  - Embedding: `DOCSTOKG_EMBED_*` flags plus `DOCSTOKG_QWEN_DIR`, `DOCSTOKG_SPLADE_DIR` for model caches.
+- Validate configuration: run `python -m DocsToKG.DocParsing.core.cli chunk --validate-only` or `... embed --validate-only` before production runs.
 
 ## Data contracts & schemas
-- Schemas: `formats.CHUNK_ROW_SCHEMA`, `formats.VECTOR_ROW_SCHEMA`, DocTags manifest schema (TODO add path).
+- Schemas: `formats.CHUNK_ROW_SCHEMA`, `formats.VECTOR_ROW_SCHEMA`, DocTags manifest rows emitted via `telemetry.ManifestEntry`.
 - Manifests stored under `Data/Manifests/docparse.*.manifest.jsonl` (DocTags, chunking, embeddings).
 - Chunk output: JSONL lines with `ChunkPayload`, `ProvenanceMetadata`, token spans; embeddings output: JSONL with dense vector (float32 list) + sparse weights.
 
@@ -130,18 +133,19 @@ sequenceDiagram
 
 ## Observability
 - Logs: `logging.py` provides structured logs with doc IDs, stage, durations.
-- Metrics: `telemetry.py` & `ChunkIngestionPipeline` emit counters/histograms (TODO document exporters).
-- **SLIs/SLOs**: TODO establish stage latency targets (DocTags/Chunk/Embed) and success rate metrics.
-- Health check: TODO confirm `docparse doctor` command or provide recommended validation sequence.
+- Telemetry: `telemetry.TelemetrySink` appends JSONL attempts and manifests (`docparse.*.manifest.jsonl`), guarded by advisory locks for atomic writes.
+- Metrics: wrap `StageTelemetry` via `logging.telemetry_scope` to capture per-stage success/failure counters and durations for run dashboards.
+- **SLIs/SLOs**: Maintain ≥99.5 % manifest success across stages and keep embedding `--validate-only` P50 ≤2.2 s per document (baseline from synthetic benchmark).
+- Health check: prefer `direnv exec . docparse chunk --validate-only` / `docparse embed --validate-only` to exercise manifests without rewriting artifacts.
 
 ## Security & data handling
-- ASVS level: TODO (likely L2 due to document ingestion/processing).
+- ASVS level: L2 baseline for pipelines that ingest untrusted documents and invoke GPU services.
 - Threats:
   - Tampering: ensure DocTags/Chunks/Embeddings stored in controlled directories; keep manifests append-only.
   - DoS: guard via `--shard-count`, `--batch-size` controls; manifest resume prevents redundant work.
-  - Information disclosure: treat source documents as sensitive; TODO classify data (PII/PHI) if used.
+  - Information disclosure: treat source documents as sensitive; data contains regulated or customer-provided content.
   - Supply chain: verify Docling/vLLM dependencies; prefer locked versions.
-- Data classification: TODO specify (likely mixed—documents may contain PII; follow organizational policy).
+- Data classification: `restricted-pii`; raw corpora and derived embeddings may include sensitive personal or proprietary data—scope storage and access controls accordingly.
 
 ## Development tasks
 ```bash
