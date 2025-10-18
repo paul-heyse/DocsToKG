@@ -357,13 +357,44 @@ def manifest(argv: Sequence[str] | None = None) -> int:
     )
 
     args = parser.parse_args([] if argv is None else list(argv))
-    manifest_dir = data_manifests(args.data_root)
+    manifest_dir = data_manifests(args.data_root, ensure=False)
+    logger = get_logger(__name__, base_fields={"stage": "manifest"})
+
+    if not manifest_dir.exists():
+        log_event(
+            logger,
+            "warning",
+            "Manifest directory is missing",
+            stage="manifest",
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="MANIFEST_DIR_MISSING",
+            manifest_dir=str(manifest_dir),
+            data_root=str(args.data_root) if args.data_root is not None else None,
+        )
+        print(
+            "No manifest directory found. Run a DocParsing stage to generate manifests.",
+        )
+        return 0
+
     if args.stages:
         seen: List[str] = []
-        for stage in args.stages:
-            trimmed = stage.strip()
-            if trimmed and trimmed not in seen:
-                seen.append(trimmed)
+        for raw_stage in args.stages:
+            trimmed = raw_stage.strip()
+            if not trimmed:
+                continue
+            normalized = trimmed.lower()
+            if normalized not in known_stage_set:
+                expected = ", ".join(known_stages)
+                raise CLIValidationError(
+                    option="--stage",
+                    message=(
+                        f"Unsupported stage '{trimmed}'. Expected one of: {expected}"
+                    ),
+                    hint="Choose a supported manifest stage.",
+                )
+            if normalized not in seen:
+                seen.append(normalized)
         stages = seen
     else:
         discovered: List[str] = []
@@ -376,8 +407,6 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         stages = discovered
     if not stages:
         stages = ["embeddings"]
-
-    logger = get_logger(__name__, base_fields={"stage": "manifest"})
 
     tail_count = max(0, int(args.tail))
     need_summary = bool(args.summarize or not tail_count)
@@ -420,13 +449,12 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if tail_count:
-        entries_to_print = list(tail_entries)
-        print(f"docparse manifest tail (last {len(entries_to_print)} entries)")
+        print(f"docparse manifest tail (last {len(tail_entries)} entries)")
         if args.raw:
-            for entry in entries_to_print:
+            for entry in tail_entries:
                 print(json.dumps(entry, ensure_ascii=False))
         else:
-            for entry in entries_to_print:
+            for entry in tail_entries:
                 timestamp = entry.get("timestamp", "")
                 stage = entry.get("stage", "unknown")
                 doc_id = entry.get("doc_id", "unknown")

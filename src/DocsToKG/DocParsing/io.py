@@ -10,6 +10,7 @@ dependencies.
 from __future__ import annotations
 
 import contextlib
+import heapq
 import hashlib
 import json
 import logging
@@ -19,6 +20,7 @@ import uuid
 import warnings
 from datetime import datetime, timezone
 from pathlib import Path
+from itertools import count
 from typing import (
     Callable,
     Dict,
@@ -581,30 +583,77 @@ def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, di
     return index
 
 
+def _manifest_timestamp_key(entry: Mapping[str, object]) -> str:
+    """Return a sortable timestamp key for manifest entries."""
+
+    raw = entry.get("timestamp")
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, datetime):
+        return raw.isoformat()
+    if raw is None:
+        return ""
+    return str(raw)
+
+
+def _iter_manifest_file(path: Path, stage: str) -> Iterator[dict]:
+    """Yield manifest entries for a single stage file."""
+
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            entry.setdefault("stage", stage)
+            yield entry
+
+
 def iter_manifest_entries(stages: Sequence[str], root: Optional[Path] = None) -> Iterator[dict]:
     """Yield manifest entries for the requested ``stages`` sorted by timestamp."""
 
     manifest_dir = data_manifests(root)
-    combined: List[dict] = []
+    heap: List[Tuple[str, int, dict, Iterator[dict]]] = []
+    unique = count()
+
     for stage in stages:
         stage_path = manifest_dir / _manifest_filename(stage)
         if not stage_path.exists():
             continue
-        with stage_path.open("r", encoding="utf-8") as handle:
-            for line in handle:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                entry.setdefault("stage", stage)
-                combined.append(entry)
+        stream = _iter_manifest_file(stage_path, stage)
+        try:
+            first_entry = next(stream)
+        except StopIteration:
+            continue
+        heapq.heappush(
+            heap,
+            (
+                _manifest_timestamp_key(first_entry),
+                next(unique),
+                first_entry,
+                stream,
+            ),
+        )
 
-    combined.sort(key=lambda item: item.get("timestamp", ""))
-    for entry in combined:
+    while heap:
+        _, _, entry, stream = heapq.heappop(heap)
         yield entry
+        try:
+            next_entry = next(stream)
+        except StopIteration:
+            continue
+        heapq.heappush(
+            heap,
+            (
+                _manifest_timestamp_key(next_entry),
+                next(unique),
+                next_entry,
+                stream,
+            ),
+        )
 
 
 __all__ = [

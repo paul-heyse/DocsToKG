@@ -188,3 +188,65 @@ def test_docparse_doctags_auto_detection_with_mixed_input(
         "found both PDF and HTML files. Hint: Specify --mode html or --mode pdf to override auto-detection"
     )
     assert captured.err.strip() == expected
+
+
+@pytest.mark.parametrize(
+    ("layout", "message_factory", "hint"),
+    [
+        (
+            "mixed",
+            lambda html_dir, pdf_dir: (
+                "Cannot auto-detect mode: found HTML sources in "
+                f"{html_dir} and PDF sources in {pdf_dir}"
+            ),
+            "Specify --mode html or --mode pdf to disambiguate the sources",
+        ),
+        (
+            "missing",
+            lambda html_dir, pdf_dir: (
+                "Cannot auto-detect mode: expected HTML files in "
+                f"{html_dir} or PDF files in {pdf_dir}"
+            ),
+            "Provide --input or set --mode html/--mode pdf explicitly",
+        ),
+    ],
+)
+def test_doctags_cli_structured_auto_detection_errors(
+    tmp_path: Path,
+    layout: str,
+    message_factory,
+    hint: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`core.cli.doctags` emits structured errors for auto-detection failures."""
+
+    _prepare_runtime(tmp_path, monkeypatch)
+
+    data_root = tmp_path / "data-root"
+    html_dir = data_root / "HTML"
+    pdf_dir = data_root / "PDFs"
+
+    if layout == "mixed":
+        html_dir.mkdir(parents=True, exist_ok=True)
+        (html_dir / "sample.html").write_text("<html></html>", encoding="utf-8")
+        pdf_dir.mkdir(parents=True, exist_ok=True)
+        (pdf_dir / "sample.pdf").write_bytes(b"%PDF-1.4")
+    elif layout == "missing":
+        html_dir.mkdir(parents=True, exist_ok=True)
+        pdf_dir.mkdir(parents=True, exist_ok=True)
+    else:  # pragma: no cover - defensive branch for unexpected parametrisations
+        raise AssertionError(f"Unexpected layout {layout}")
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+
+    core_cli = importlib.import_module("DocsToKG.DocParsing.core.cli")
+
+    exit_code = core_cli.doctags([])
+    assert exit_code == 2
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    expected_message = message_factory(html_dir.resolve(), pdf_dir.resolve())
+    expected = f"[doctags] --mode: {expected_message}. Hint: {hint}"
+    assert captured.err.strip() == expected

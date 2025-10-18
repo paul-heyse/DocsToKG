@@ -28,6 +28,53 @@ from .discovery import (
 )
 from .manifest import ResumeController
 
+PLAN_PREVIEW_LIMIT = 5
+
+
+def _new_bucket() -> Dict[str, Any]:
+    """Return a new mutable bucket for tracking plan membership."""
+
+    return {"count": 0, "preview": []}
+
+
+def _record_bucket(bucket: Dict[str, Any], doc_id: str) -> None:
+    """Update ``bucket`` with ``doc_id`` while respecting preview bounds."""
+
+    preview: List[str] = bucket.setdefault("preview", [])
+    if len(preview) < PLAN_PREVIEW_LIMIT:
+        preview.append(doc_id)
+    bucket["count"] = bucket.get("count", 0) + 1
+
+
+def _bucket_counts(entry: Dict[str, Any], key: str) -> Tuple[int, List[str]]:
+    """Return ``(count, preview)`` for ``key`` within ``entry``."""
+
+    value = entry.get(key)
+    if isinstance(value, dict):
+        count = int(value.get("count", 0))
+        preview_list_value = value.get("preview", [])
+        if isinstance(preview_list_value, (list, tuple)):
+            preview = list(preview_list_value[:PLAN_PREVIEW_LIMIT])
+        else:
+            preview = []
+        return count, preview
+    if not value:
+        return 0, []
+    items = list(value)
+    count = len(items)
+    preview = items[:PLAN_PREVIEW_LIMIT]
+    return count, preview
+
+
+def _render_preview(preview: List[str], count: int) -> str:
+    """Render a preview string that includes remainder hints when applicable."""
+
+    items = list(preview)
+    remainder = max(0, count - len(preview))
+    if remainder:
+        items.append(f"... (+{remainder} more)")
+    return ", ".join(items)
+
 __all__ = [
     "display_plan",
     "plan_chunk",
@@ -74,8 +121,8 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
             "mode": mode,
             "input_dir": str(input_dir),
             "output_dir": str(output_dir),
-            "process": [],
-            "skip": [],
+            "process": _new_bucket(),
+            "skip": _new_bucket(),
             "notes": ["Input directory missing"],
         }
 
@@ -92,8 +139,8 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
         load_manifest_index(manifest_stage, resolved_root) if args.resume else {}
     )
     resume_controller = ResumeController(args.resume, args.force, manifest_index)
-    planned: List[str] = []
-    skipped: List[str] = []
+    planned = _new_bucket()
+    skipped = _new_bucket()
 
     for path in files:
         doc_id, out_path = derive_doc_id_and_doctags_path(path, input_dir, output_dir)
@@ -102,9 +149,9 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
         if mode == "html" and overwrite:
             skip = False
         if skip:
-            skipped.append(doc_id)
+            _record_bucket(skipped, doc_id)
         else:
-            planned.append(doc_id)
+            _record_bucket(planned, doc_id)
 
     return {
         "stage": "doctags",
@@ -152,8 +199,8 @@ def plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
             "stage": "chunk",
             "input_dir": str(in_dir),
             "output_dir": str(out_dir),
-            "process": [],
-            "skip": [],
+            "process": _new_bucket(),
+            "skip": _new_bucket(),
             "notes": ["DocTags directory missing"],
         }
 
@@ -162,17 +209,17 @@ def plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
         load_manifest_index(chunk_module.MANIFEST_STAGE, resolved_root) if args.resume else {}
     )
     resume_controller = ResumeController(args.resume, args.force, manifest_index)
-    planned: List[str] = []
-    skipped: List[str] = []
+    planned = _new_bucket()
+    skipped = _new_bucket()
 
     for path in files:
         rel_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
         input_hash = compute_content_hash(path)
         skip, _ = resume_controller.should_skip(rel_id, out_path, input_hash)
         if skip:
-            skipped.append(rel_id)
+            _record_bucket(skipped, rel_id)
         else:
-            planned.append(rel_id)
+            _record_bucket(planned, rel_id)
 
     return {
         "stage": "chunk",
@@ -215,23 +262,23 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     ).resolve()
 
     if args.validate_only:
-        validate: List[str] = []
-        missing: List[str] = []
+        validate_bucket = _new_bucket()
+        missing_bucket = _new_bucket()
         for chunk_path in iter_chunks(chunks_dir):
             doc_id, vector_path = derive_doc_id_and_vectors_path(
                 chunk_path, chunks_dir, vectors_dir
             )
             if vector_path.exists():
-                validate.append(doc_id)
+                _record_bucket(validate_bucket, doc_id)
             else:
-                missing.append(doc_id)
+                _record_bucket(missing_bucket, doc_id)
         return {
             "stage": "embed",
             "action": "validate",
             "chunks_dir": str(chunks_dir),
             "vectors_dir": str(vectors_dir),
-            "validate": validate,
-            "missing": missing,
+            "validate": validate_bucket,
+            "missing": missing_bucket,
             "notes": [],
         }
 
@@ -240,17 +287,17 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         load_manifest_index(embedding_module.MANIFEST_STAGE, resolved_root) if args.resume else {}
     )
     resume_controller = ResumeController(args.resume, args.force, manifest_index)
-    planned: List[str] = []
-    skipped: List[str] = []
+    planned = _new_bucket()
+    skipped = _new_bucket()
 
     for chunk_path in files:
         doc_id, vector_path = derive_doc_id_and_vectors_path(chunk_path, chunks_dir, vectors_dir)
         input_hash = compute_content_hash(chunk_path)
         skip, _ = resume_controller.should_skip(doc_id, vector_path, input_hash)
         if skip:
-            skipped.append(doc_id)
+            _record_bucket(skipped, doc_id)
         else:
-            planned.append(doc_id)
+            _record_bucket(planned, doc_id)
 
     return {
         "stage": "embed",
@@ -272,47 +319,69 @@ def display_plan(plans: Sequence[Dict[str, Any]], stream: Optional[TextIO] = Non
         notes = entry.get("notes", [])
         if stage == "doctags":
             desc = f"doctags (mode={entry.get('mode')})"
-            process = entry.get("process", [])
-            skip = entry.get("skip", [])
-            lines.append(f"- {desc}: process {len(process)}, skip {len(skip)}")
+            process_count, process_preview = _bucket_counts(entry, "process")
+            skip_count, skip_preview = _bucket_counts(entry, "skip")
+            lines.append(f"- {desc}: process {process_count}, skip {skip_count}")
             lines.append(f"  input:  {entry.get('input_dir')}")
             lines.append(f"  output: {entry.get('output_dir')}")
-            if process:
-                lines.append("  process preview: " + ", ".join(preview_list(process)))
-            if skip:
-                lines.append("  skip preview: " + ", ".join(preview_list(skip)))
+            if process_count:
+                lines.append(
+                    "  process preview: "
+                    + _render_preview(process_preview, process_count)
+                )
+            if skip_count:
+                lines.append(
+                    "  skip preview: " + _render_preview(skip_preview, skip_count)
+                )
         elif stage == "chunk":
-            process = entry.get("process", [])
-            skip = entry.get("skip", [])
-            lines.append(f"- chunk: process {len(process)}, skip {len(skip)}")
+            process_count, process_preview = _bucket_counts(entry, "process")
+            skip_count, skip_preview = _bucket_counts(entry, "skip")
+            lines.append(f"- chunk: process {process_count}, skip {skip_count}")
             lines.append(f"  input:  {entry.get('input_dir')}")
             lines.append(f"  output: {entry.get('output_dir')}")
-            if process:
-                lines.append("  process preview: " + ", ".join(preview_list(process)))
-            if skip:
-                lines.append("  skip preview: " + ", ".join(preview_list(skip)))
+            if process_count:
+                lines.append(
+                    "  process preview: "
+                    + _render_preview(process_preview, process_count)
+                )
+            if skip_count:
+                lines.append(
+                    "  skip preview: " + _render_preview(skip_preview, skip_count)
+                )
         elif stage == "embed" and entry.get("action") == "validate":
-            validate = entry.get("validate", [])
-            missing = entry.get("missing", [])
+            validate_count, validate_preview = _bucket_counts(entry, "validate")
+            missing_count, missing_preview = _bucket_counts(entry, "missing")
             lines.append(
-                f"- embed (validate-only): validate {len(validate)}, missing vectors {len(missing)}"
+                "- embed (validate-only): validate"
+                f" {validate_count}, missing vectors {missing_count}"
             )
             lines.append(f"  chunks:  {entry.get('chunks_dir')}")
             lines.append(f"  vectors: {entry.get('vectors_dir')}")
-            if validate:
-                lines.append("  validate preview: " + ", ".join(preview_list(validate)))
-            if missing:
-                lines.append("  missing preview: " + ", ".join(preview_list(missing)))
+            if validate_count:
+                lines.append(
+                    "  validate preview: "
+                    + _render_preview(validate_preview, validate_count)
+                )
+            if missing_count:
+                lines.append(
+                    "  missing preview: "
+                    + _render_preview(missing_preview, missing_count)
+                )
         elif stage == "embed":
-            process = entry.get("process", [])
-            skip = entry.get("skip", [])
-            lines.append(f"- embed: process {len(process)}, skip {len(skip)}")
+            process_count, process_preview = _bucket_counts(entry, "process")
+            skip_count, skip_preview = _bucket_counts(entry, "skip")
+            lines.append(f"- embed: process {process_count}, skip {skip_count}")
             lines.append(f"  chunks:  {entry.get('chunks_dir')}")
             lines.append(f"  vectors: {entry.get('vectors_dir')}")
-            if process:
-                lines.append("  process preview: " + ", ".join(preview_list(process)))
-            if skip:
-                lines.append("  skip preview: " + ", ".join(preview_list(skip)))
+            if process_count:
+                lines.append(
+                    "  process preview: "
+                    + _render_preview(process_preview, process_count)
+                )
+            if skip_count:
+                lines.append(
+                    "  skip preview: " + _render_preview(skip_preview, skip_count)
+                )
         else:
             lines.append(f"- {stage}: no actionable items")
         if notes:
