@@ -158,6 +158,7 @@ class DenseIndexConfig:
     enable_reserve_memory: bool = True
     use_pinned_memory: bool = True
     ingest_dedupe_threshold: float = 0.0
+    force_remove_ids_fallback: bool = False
     # Persistence: "cpu_bytes" (default, serialize via CPU), or "disabled"
     persist_mode: Literal["cpu_bytes", "disabled"] = "cpu_bytes"
     # Controls training sample size for IVF: min(total, max(1024, nlist * ivf_train_factor))

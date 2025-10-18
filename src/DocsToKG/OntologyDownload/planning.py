@@ -897,7 +897,11 @@ def planner_http_probe(
 
     delay_attr = "_retry_after_delay"
 
-    with SESSION_POOL.lease(service=service, host=host) as session:
+    with SESSION_POOL.lease(
+        service=service,
+        host=host,
+        http_config=http_config,
+    ) as session:
 
         def _issue(current_method: str) -> requests.Response:
             def _perform_once() -> requests.Response:

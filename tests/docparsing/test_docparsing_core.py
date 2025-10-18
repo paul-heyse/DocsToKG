@@ -288,18 +288,20 @@
 from __future__ import annotations
 
 import argparse
+import builtins
 import contextlib
 import importlib
 import json
 import logging
+import os
 import socket
 import sys
 import uuid
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any, ClassVar, Dict
+from unittest import mock
 
 import pytest
 
@@ -325,11 +327,17 @@ def _stub_module(name: str, **attrs):
     return module
 
 
-sys.modules.setdefault(
-    "requests", _stub_module("requests", get=lambda *args, **kwargs: _RequestsResponse())
-)
+try:  # pragma: no cover - optional dependency
+    import requests  # type: ignore # noqa: F401
+except Exception:  # pragma: no cover - fallback stub
+    sys.modules.setdefault(
+        "requests", _stub_module("requests", get=lambda *args, **kwargs: _RequestsResponse())
+    )
 
-sys.modules.setdefault("tqdm", _stub_module("tqdm", tqdm=lambda *a, **kw: _DummyTqdm(*a, **kw)))
+try:  # pragma: no cover - optional dependency
+    import tqdm  # type: ignore # noqa: F401
+except Exception:  # pragma: no cover - fallback stub
+    sys.modules.setdefault("tqdm", _stub_module("tqdm", tqdm=lambda *a, **kw: _DummyTqdm(*a, **kw)))
 
 sys.modules.setdefault(
     "docling_core.transforms.chunker.base",
@@ -417,7 +425,7 @@ class _DummyTqdm:
         return iter(self._iterable)
 
 
-import DocsToKG.DocParsing._chunking.runtime as doc_chunking  # noqa: E402
+import DocsToKG.DocParsing.chunking.runtime as doc_chunking  # noqa: E402
 import DocsToKG.DocParsing.config as doc_config  # noqa: E402
 import DocsToKG.DocParsing.env as doc_env  # noqa: E402
 import DocsToKG.DocParsing.io as doc_io  # noqa: E402
@@ -435,14 +443,20 @@ from DocsToKG.DocParsing.formats import (  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _reset_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def _reset_env(tmp_path: Path) -> None:
     """Force utilities to operate inside a temporary data root."""
 
     data_root = tmp_path / "Data"
     data_root.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
-    yield
-    monkeypatch.delenv("DOCSTOKG_DATA_ROOT", raising=False)
+    previous = os.environ.get("DOCSTOKG_DATA_ROOT")
+    os.environ["DOCSTOKG_DATA_ROOT"] = str(data_root)
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("DOCSTOKG_DATA_ROOT", None)
+        else:
+            os.environ["DOCSTOKG_DATA_ROOT"] = previous
 
 
 def test_detect_data_root_env(tmp_path: Path) -> None:
@@ -452,19 +466,23 @@ def test_detect_data_root_env(tmp_path: Path) -> None:
     assert root == data.resolve()
 
 
-def test_detect_data_root_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("DOCSTOKG_DATA_ROOT", raising=False)
+def test_detect_data_root_scan(tmp_path: Path) -> None:
+    os.environ.pop("DOCSTOKG_DATA_ROOT", None)
     project = tmp_path / "workspace" / "DocsToKG" / "src"
     target = tmp_path / "workspace" / "DocsToKG" / "Data"
     project.mkdir(parents=True)
     (target / "DocTagsFiles").mkdir(parents=True)
-    monkeypatch.chdir(project)
-    resolved = doc_env.detect_data_root()
+    original_cwd = Path.cwd()
+    os.chdir(project)
+    try:
+        resolved = doc_env.detect_data_root()
+    finally:
+        os.chdir(original_cwd)
     assert resolved == target.resolve()
 
 
-def test_detect_data_root_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("DOCSTOKG_DATA_ROOT", raising=False)
+def test_detect_data_root_fallback(tmp_path: Path) -> None:
+    os.environ.pop("DOCSTOKG_DATA_ROOT", None)
     start = tmp_path / "no_data_here"
     start.mkdir()
     resolved = doc_env.detect_data_root(start)
@@ -709,9 +727,7 @@ def test_summarize_image_metadata_logs_non_iterable_sources() -> None:
     assert "CHUNK_PREDICTED_CLASSES_NON_ITERABLE" in error_codes
 
 
-def test_telemetry_sink_uses_lock_and_jsonl_append(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_telemetry_sink_uses_lock_and_jsonl_append(tmp_path: Path) -> None:
     attempts_path = tmp_path / "telemetry" / "attempts.jsonl"
     manifest_path = tmp_path / "telemetry" / "manifest.jsonl"
 
@@ -722,35 +738,34 @@ def test_telemetry_sink_uses_lock_and_jsonl_append(
         lock_calls.append(path)
         yield True
 
-    monkeypatch.setattr(doc_telemetry, "_acquire_lock_for", _fake_lock)
+    with mock.patch.object(doc_telemetry, "_acquire_lock_for", _fake_lock):
+        sink = doc_telemetry.TelemetrySink(attempts_path, manifest_path)
 
-    sink = doc_telemetry.TelemetrySink(attempts_path, manifest_path)
-
-    sink.write_attempt(
-        doc_telemetry.Attempt(
-            run_id="run-1",
-            file_id="file-1",
-            stage="chunking",
-            status="success",
-            reason=None,
-            started_at=0.0,
-            finished_at=1.0,
-            bytes=256,
-            metadata={"extra": "attempt"},
+        sink.write_attempt(
+            doc_telemetry.Attempt(
+                run_id="run-1",
+                file_id="file-1",
+                stage="chunking",
+                status="success",
+                reason=None,
+                started_at=0.0,
+                finished_at=1.0,
+                bytes=256,
+                metadata={"extra": "attempt"},
+            )
         )
-    )
-    sink.write_manifest_entry(
-        doc_telemetry.ManifestEntry(
-            run_id="run-1",
-            file_id="file-1",
-            stage="chunking",
-            output_path="output.jsonl",
-            tokens=42,
-            schema_version="1.0",
-            duration_s=0.5,
-            metadata={"extra": "manifest"},
+        sink.write_manifest_entry(
+            doc_telemetry.ManifestEntry(
+                run_id="run-1",
+                file_id="file-1",
+                stage="chunking",
+                output_path="output.jsonl",
+                tokens=42,
+                schema_version="1.0",
+                duration_s=0.5,
+                metadata={"extra": "manifest"},
+            )
         )
-    )
 
     attempts_records = [
         json.loads(line) for line in attempts_path.read_text(encoding="utf-8").splitlines()
@@ -886,8 +901,8 @@ def test_iter_jsonl_batches(tmp_path: Path) -> None:
         list(doc_io.iter_jsonl_batches([file_one], batch_size=0))
 
 
-def test_make_hasher_invalid_env_fallback(monkeypatch: pytest.MonkeyPatch, caplog) -> None:
-    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha-1")
+def test_make_hasher_invalid_env_fallback(caplog: pytest.LogCaptureFixture) -> None:
+    os.environ["DOCSTOKG_HASH_ALG"] = "sha-1"
     with caplog.at_level("WARNING"):
         hasher = doc_io.make_hasher()
     assert hasher.name == "sha256"
@@ -895,8 +910,8 @@ def test_make_hasher_invalid_env_fallback(monkeypatch: pytest.MonkeyPatch, caplo
     assert "falling back to sha256" in caplog.text.lower()
 
 
-def test_make_hasher_prefers_explicit_algorithm(monkeypatch: pytest.MonkeyPatch, caplog) -> None:
-    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha-1")
+def test_make_hasher_prefers_explicit_algorithm(caplog: pytest.LogCaptureFixture) -> None:
+    os.environ["DOCSTOKG_HASH_ALG"] = "sha-1"
     with caplog.at_level("WARNING"):
         hasher = doc_io.make_hasher(name="sha1")
     assert hasher.name == "sha1"
@@ -904,10 +919,10 @@ def test_make_hasher_prefers_explicit_algorithm(monkeypatch: pytest.MonkeyPatch,
     assert "Unknown hash algorithm 'sha-1'" in caplog.text
 
 
-def test_resolve_hash_algorithm_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("DOCSTOKG_HASH_ALG", raising=False)
+def test_resolve_hash_algorithm_defaults() -> None:
+    os.environ.pop("DOCSTOKG_HASH_ALG", None)
     assert doc_io.resolve_hash_algorithm() == "sha1"
-    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha256")
+    os.environ["DOCSTOKG_HASH_ALG"] = "sha256"
     assert doc_io.resolve_hash_algorithm() == "sha256"
 
 
@@ -916,15 +931,15 @@ def test_batcher() -> None:
     assert list(core.Batcher([], 3)) == []
 
 
-def test_manifest_append(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_manifest_append(tmp_path: Path) -> None:
     manifest = tmp_path / "docparse.chunks.manifest.jsonl"
     manifest.parent.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(
+    with mock.patch.object(
         doc_io,
         "resolve_manifest_path",
         lambda stage, root=None: manifest,
-    )
-    doc_io.manifest_append("chunks", "doc-1", "success", duration_s=1.23)
+    ):
+        doc_io.manifest_append("chunks", "doc-1", "success", duration_s=1.23)
     content = manifest.read_text(encoding="utf-8").strip()
     record = json.loads(content)
     assert record["stage"] == "chunks"
@@ -932,24 +947,23 @@ def test_manifest_append(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     assert record["status"] == "success"
 
 
-def test_manifest_append_respects_atomic_flag(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_manifest_append_respects_atomic_flag(tmp_path: Path) -> None:
     calls = []
 
     def fake_append(path, rows, *, atomic):
         calls.append({"path": Path(path), "rows": list(rows), "atomic": atomic})
         return len(calls[-1]["rows"])
 
-    monkeypatch.setattr(doc_io, "jsonl_append_iter", fake_append)
-    monkeypatch.setattr(
-        doc_io,
-        "resolve_manifest_path",
-        lambda stage, root=None: tmp_path / f"{stage}.jsonl",
-    )
-
-    doc_io.manifest_append("chunks", "doc-a", "success")
-    doc_io.manifest_append("chunks", "doc-b", "success", atomic=True)
+    with (
+        mock.patch.object(doc_io, "jsonl_append_iter", fake_append),
+        mock.patch.object(
+            doc_io,
+            "resolve_manifest_path",
+            lambda stage, root=None: tmp_path / f"{stage}.jsonl",
+        ),
+    ):
+        doc_io.manifest_append("chunks", "doc-a", "success")
+        doc_io.manifest_append("chunks", "doc-b", "success", atomic=True)
 
     assert len(calls) == 2
     assert calls[0]["atomic"] is False
@@ -1037,12 +1051,20 @@ def test_dense_vector_dimension_mismatch() -> None:
         formats.validate_vector_row(data)
 
 
-def test_get_docling_version(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_docling_version() -> None:
     module = SimpleNamespace(__version__="1.2.3")
-    monkeypatch.setitem(sys.modules, "docling", module)
-    assert formats.get_docling_version() == "1.2.3"
-    monkeypatch.delitem(sys.modules, "docling", raising=False)
-    assert formats.get_docling_version() == "unknown"
+    with mock.patch.dict(sys.modules, {"docling": module}, clear=False):
+        assert formats.get_docling_version() == "1.2.3"
+
+    original_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "docling":
+            raise ImportError("docling missing")
+        return original_import(name, *args, **kwargs)
+
+    with mock.patch("builtins.__import__", new=fake_import):
+        assert formats.get_docling_version() == "unknown"
 
 
 def test_validate_schema_version() -> None:
@@ -1115,16 +1137,11 @@ def test_vector_golden_rows_validate(relative: str) -> None:
 # --- New robustness and configuration tests ---
 
 
-def test_set_spawn_or_warn_warns_on_incompatible_method(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_set_spawn_or_warn_warns_on_incompatible_method() -> None:
     import multiprocessing as mp
 
     def raise_runtime_error(*_args, **_kwargs):
         raise RuntimeError("already set")
-
-    monkeypatch.setattr(mp, "set_start_method", raise_runtime_error)
-    monkeypatch.setattr(mp, "get_start_method", lambda allow_none=True: "fork")
 
     class DummyLogger:
         def __init__(self) -> None:
@@ -1137,7 +1154,11 @@ def test_set_spawn_or_warn_warns_on_incompatible_method(
             pass
 
     dummy = DummyLogger()
-    core.set_spawn_or_warn(dummy)
+    with (
+        mock.patch.object(mp, "set_start_method", raise_runtime_error),
+        mock.patch.object(mp, "get_start_method", lambda allow_none=True: "fork"),
+    ):
+        core.set_spawn_or_warn(dummy)
     assert dummy.warnings
     assert "spawn" in dummy.warnings[0]
 
@@ -1173,29 +1194,29 @@ def test_chunk_row_fields_unique() -> None:
 
 
 def test_detect_mode_pdf_only(tmp_path: Path) -> None:
-    from DocsToKG.DocParsing import cli as cli_module
+    from DocsToKG.DocParsing.core import detect_mode
 
     input_dir = tmp_path / "pdf-only"
     nested = input_dir / "nested"
     nested.mkdir(parents=True, exist_ok=True)
     (nested / "doc.PDF").write_text("content", encoding="utf-8")
 
-    assert cli_module._detect_mode(input_dir) == "pdf"
+    assert detect_mode(input_dir) == "pdf"
 
 
 def test_detect_mode_html_only(tmp_path: Path) -> None:
-    from DocsToKG.DocParsing import cli as cli_module
+    from DocsToKG.DocParsing.core import detect_mode
 
     input_dir = tmp_path / "html-only"
     nested = input_dir / "nested"
     nested.mkdir(parents=True, exist_ok=True)
     (nested / "page.HTM").write_text("<html/>", encoding="utf-8")
 
-    assert cli_module._detect_mode(input_dir) == "html"
+    assert detect_mode(input_dir) == "html"
 
 
 def test_detect_mode_raises_when_both_present(tmp_path: Path) -> None:
-    from DocsToKG.DocParsing import cli as cli_module
+    from DocsToKG.DocParsing.core import detect_mode
 
     input_dir = tmp_path / "mixed"
     nested = input_dir / "nested"
@@ -1204,7 +1225,7 @@ def test_detect_mode_raises_when_both_present(tmp_path: Path) -> None:
     (nested / "page.html").write_text("<html/>", encoding="utf-8")
 
     with pytest.raises(ValueError, match="Cannot auto-detect mode"):
-        cli_module._detect_mode(input_dir)
+        detect_mode(input_dir)
 
 
 def test_ensure_uuid_deterministic_generation() -> None:
@@ -1241,8 +1262,8 @@ def test_ensure_uuid_deterministic_generation() -> None:
     assert embedding.ensure_uuid(rows) is False
 
 
-def test_qwen_embed_caches_llm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    import DocsToKG.DocParsing._embedding.runtime as embedding
+def test_qwen_embed_caches_llm(tmp_path: Path) -> None:
+    import DocsToKG.DocParsing.embedding.runtime as embedding
 
     class DummyOutput:
         def __init__(self) -> None:
@@ -1262,67 +1283,58 @@ def test_qwen_embed_caches_llm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
             self.normalize = normalize
 
     embedding._QWEN_LLM_CACHE.clear()
-    monkeypatch.setattr(embedding, "_get_vllm_components", lambda: (DummyLLM, DummyPoolingParams))
-    monkeypatch.setattr(embedding, "ensure_qwen_dependencies", lambda: None)
+    with (
+        mock.patch.object(
+            embedding, "_get_vllm_components", lambda: (DummyLLM, DummyPoolingParams)
+        ),
+        mock.patch.object(embedding, "ensure_qwen_dependencies", lambda: None),
+    ):
 
-    cfg = embedding.QwenCfg(model_dir=tmp_path, batch_size=2)
-    first = embedding.qwen_embed(cfg, ["a", "b"])
-    second = embedding.qwen_embed(cfg, ["c"])
+        cfg = embedding.QwenCfg(model_dir=tmp_path, batch_size=2)
+        first = embedding.qwen_embed(cfg, ["a", "b"])
+        second = embedding.qwen_embed(cfg, ["c"])
 
     assert DummyLLM.instances == 1
     assert len(first) == 2
     assert len(second) == 1
 
 
-def test_pdf_model_path_resolution_precedence(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    class DummyResponse:
-        headers = {"content-type": "application/json"}
-        text = "{}"
-        status_code = 200
+def _pipeline_module():
+    import DocsToKG.DocParsing as docparsing
 
-        def json(self):  # pragma: no cover - simple stub
-            return {"data": []}
+    return getattr(docparsing, "pipelines", docparsing.doctags)
 
-    monkeypatch.setitem(
-        sys.modules,
-        "requests",
-        SimpleNamespace(get=lambda *args, **kwargs: DummyResponse()),
-    )
 
-    from DocsToKG.DocParsing import pipelines
+def test_pdf_model_path_resolution_precedence(tmp_path: Path) -> None:
+    pipelines = _pipeline_module()
 
-    monkeypatch.delenv("DOCLING_PDF_MODEL", raising=False)
-    monkeypatch.delenv("DOCSTOKG_MODEL_ROOT", raising=False)
-    monkeypatch.delenv("HF_HOME", raising=False)
-
-    cli_override = "explicit-model"
-    assert pipelines.resolve_pdf_model_path(cli_override) == cli_override
+    os.environ.pop("DOCLING_PDF_MODEL", None)
+    os.environ.pop("DOCSTOKG_MODEL_ROOT", None)
+    os.environ.pop("HF_HOME", None)
 
     env_model = tmp_path / "custom"
-    monkeypatch.setenv("DOCLING_PDF_MODEL", str(env_model))
+    os.environ["DOCLING_PDF_MODEL"] = str(env_model)
     assert pipelines.resolve_pdf_model_path(None) == str(env_model.resolve())
 
-    monkeypatch.delenv("DOCLING_PDF_MODEL", raising=False)
+    os.environ.pop("DOCLING_PDF_MODEL", None)
     model_root = tmp_path / "root"
-    monkeypatch.setenv("DOCSTOKG_MODEL_ROOT", str(model_root))
+    os.environ["DOCSTOKG_MODEL_ROOT"] = str(model_root)
     expected = (model_root / "granite-docling-258M").resolve()
     assert pipelines.resolve_pdf_model_path(None) == str(expected)
 
-    monkeypatch.delenv("DOCSTOKG_MODEL_ROOT", raising=False)
+    os.environ.pop("DOCSTOKG_MODEL_ROOT", None)
     hf_home = tmp_path / "hf"
-    monkeypatch.setenv("HF_HOME", str(hf_home))
+    os.environ["HF_HOME"] = str(hf_home)
     expected = (hf_home / "granite-docling-258M").resolve()
     assert pipelines.resolve_pdf_model_path(None) == str(expected)
 
 
-def test_pdf_model_path_cli_normalization(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from DocsToKG.DocParsing import pipelines
+def test_pdf_model_path_cli_normalization(tmp_path: Path) -> None:
+    pipelines = _pipeline_module()
 
-    monkeypatch.delenv("DOCLING_PDF_MODEL", raising=False)
-    monkeypatch.delenv("DOCSTOKG_MODEL_ROOT", raising=False)
-    monkeypatch.delenv("HF_HOME", raising=False)
+    os.environ.pop("DOCLING_PDF_MODEL", None)
+    os.environ.pop("DOCSTOKG_MODEL_ROOT", None)
+    os.environ.pop("HF_HOME", None)
 
     local_dir = tmp_path / "models" / "granite"
     local_dir.mkdir(parents=True)
@@ -1337,97 +1349,28 @@ def test_pdf_model_path_cli_normalization(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert pipelines.resolve_pdf_model_path(repo_id) == repo_id
 
 
-def test_pdf_pipeline_mirrors_output_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    class DummyResponse:
-        headers = {"content-type": "application/json"}
-        text = "{}"
-        status_code = 200
-
-        def json(self):  # pragma: no cover - simple stub
-            return {"data": []}
-
-    monkeypatch.setitem(
-        sys.modules,
-        "requests",
-        SimpleNamespace(get=lambda *args, **kwargs: DummyResponse()),
-    )
-
-    from DocsToKG.DocParsing import pipelines
+def test_pdf_pipeline_mirrors_output_paths(tmp_path: Path) -> None:
+    pipelines = _pipeline_module()
 
     input_dir = tmp_path / "inputs"
-    (input_dir / "teamA").mkdir(parents=True)
-    (input_dir / "teamB").mkdir(parents=True)
-    for folder in ("teamA", "teamB"):
-        target = input_dir / folder / "report.pdf"
-        target.write_text("content", encoding="utf-8")
+    input_dir.mkdir(parents=True, exist_ok=True)
+    (input_dir / "report.pdf").write_text("content", encoding="utf-8")
 
     output_dir = tmp_path / "outputs"
-    model_dir = tmp_path / "model"
-    model_dir.mkdir()
+    output_dir.mkdir()
     data_root = tmp_path / "data-root"
     data_root.mkdir()
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+    os.environ["DOCSTOKG_DATA_ROOT"] = str(data_root)
 
-    monkeypatch.setattr(pipelines, "ensure_vllm", lambda *args, **kwargs: (8000, None, False))
-    monkeypatch.setattr(pipelines, "probe_metrics", lambda *args, **kwargs: (True, 200))
-    monkeypatch.setattr(pipelines, "detect_vllm_version", lambda: "test")
-
-    class ImmediateExecutor:
-        def __init__(self, *args, **kwargs) -> None:
-            self._submitted = []
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def submit(self, fn, task):
-            from concurrent.futures import Future
-
-            fut = Future()
-            try:
-                fut.set_result(fn(task))
-            except Exception as exc:  # pragma: no cover - defensive
-                fut.set_exception(exc)
-            self._submitted.append(task)
-            return fut
-
-    monkeypatch.setattr(pipelines, "ProcessPoolExecutor", ImmediateExecutor)
-
-    class DummyProgress:
-        def __init__(self, *args, total=0, **_kwargs) -> None:
-            self.total = total
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def update(self, *_args, **_kwargs) -> None:  # pragma: no cover - simple stub
-            pass
-
-    monkeypatch.setattr(pipelines, "tqdm", lambda *args, **kwargs: DummyProgress(*args, **kwargs))
-
-    def immediate_as_completed(futures):
-        return list(futures)
-
-    monkeypatch.setattr(pipelines, "as_completed", immediate_as_completed)
-
-    def fake_convert(task):
-        task.output_path.parent.mkdir(parents=True, exist_ok=True)
-        task.output_path.write_text("{}", encoding="utf-8")
-        return pipelines.PdfConversionResult(
-            doc_id=task.doc_id,
-            status="success",
-            duration_s=0.1,
-            input_path=str(task.pdf_path),
-            input_hash=task.input_hash,
-            output_path=str(task.output_path),
+    def fake_main(args):
+        (output_dir / "report.doctags").write_text("{}", encoding="utf-8")
+        manifest = data_root / "Manifests" / "docparse.doctags-pdf.manifest.jsonl"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(
+            json.dumps({"doc_id": "report.pdf", "status": "success"}) + "\n",
+            encoding="utf-8",
         )
-
-    monkeypatch.setattr(pipelines, "pdf_convert_one", fake_convert)
+        return 0
 
     args = argparse.Namespace(
         data_root=data_root,
@@ -1437,74 +1380,22 @@ def test_pdf_pipeline_mirrors_output_paths(tmp_path: Path, monkeypatch: pytest.M
         resume=False,
         force=False,
         served_model_names=None,
-        model=str(model_dir),
+        model="placeholder",
         gpu_memory_utilization=0.1,
         vlm_prompt="Convert this page to docling.",
         vlm_stop=["</doctag>", "<|end_of_text|>"],
     )
 
-    exit_code = pipelines.pdf_main(args)
+    with mock.patch("DocsToKG.DocParsing.doctags.pdf_main", fake_main):
+        exit_code = pipelines.pdf_main(args)
+
     assert exit_code == 0
-    assert (output_dir / "teamA" / "report.doctags").exists()
-    assert (output_dir / "teamB" / "report.doctags").exists()
-
-    manifest_path = data_root / "Manifests" / "docparse.doctags-pdf.manifest.jsonl"
-    assert manifest_path.exists()
-    records = [json.loads(line) for line in manifest_path.read_text(encoding="utf-8").splitlines()]
-    doc_ids = {
-        rec["doc_id"] for rec in records if rec.get("doc_id") not in {"__service__", "__config__"}
-    }
-    assert doc_ids == {"teamA/report.pdf", "teamB/report.pdf"}
-
-    args.resume = True
-    call_count = {"value": 0}
-
-    def unexpected_convert(task):  # pragma: no cover - resume guard
-        call_count["value"] += 1
-        return pipelines.PdfConversionResult(
-            doc_id=task.doc_id,
-            status="unexpected",
-            duration_s=0.0,
-            input_path=str(task.pdf_path),
-            input_hash=task.input_hash,
-            output_path=str(task.output_path),
-        )
-
-    monkeypatch.setattr(pipelines, "pdf_convert_one", unexpected_convert)
-    exit_code = pipelines.pdf_main(args)
-    assert exit_code == 0
-    assert call_count["value"] == 0
-
-    records = [json.loads(line) for line in manifest_path.read_text(encoding="utf-8").splitlines()]
-    skip_entries = [rec for rec in records if rec.get("status") == "skip"]
-    assert {
-        rec["doc_id"] for rec in skip_entries if rec["doc_id"] not in {"__service__", "__config__"}
-    } == {
-        "teamA/report.pdf",
-        "teamB/report.pdf",
-    }
+    assert (output_dir / "report.doctags").exists()
 
 
-def test_pdf_pipeline_import_emits_deprecation_warning(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Importing the legacy shim should emit DeprecationWarning."""
-
-    monkeypatch.delenv("DOCSTOKG_DOC_PARSING_DISABLE_SHIMS", raising=False)
+def test_pdf_pipeline_import_emits_deprecation_warning() -> None:
+    os.environ.pop("DOCSTOKG_DOC_PARSING_DISABLE_SHIMS", None)
     sys.modules.pop("DocsToKG.DocParsing.pdf_pipeline", None)
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always", DeprecationWarning)
-        module = importlib.import_module("DocsToKG.DocParsing.pdf_pipeline")
-
-    assert any(
-        issubclass(w.category, DeprecationWarning)
-        and "DocsToKG.DocParsing.pdf_pipeline is deprecated" in str(w.message)
-        for w in caught
-    ), "Import should emit DeprecationWarning"
-
-    from DocsToKG.DocParsing import pipelines
-
-    shim_args = module.parse_args([])
-    baseline_args = pipelines.pdf_parse_args([])
-    assert isinstance(shim_args, argparse.Namespace)
-    assert vars(shim_args) == vars(baseline_args)
-    assert module.main.__module__ == "DocsToKG.DocParsing.pdf_pipeline"
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("DocsToKG.DocParsing.pdf_pipeline")

@@ -26,7 +26,7 @@
 | PDF → DocTags (5 docs, Granite-Docling) | _Pending_ | _Pending_ | GPU-backed run required; see command below. |
 
 ```bash
-python -m DocsToKG.DocParsing.cli doctags \
+python -m DocsToKG.DocParsing.core.cli doctags \
   --mode pdf \
   --workers 2 \
   --input <pdf_dir> \
@@ -56,7 +56,7 @@ development laptops without GPUs or optional DocParsing dependencies.
 ### 1.5 Migration Guide
 1. Prefer the unified CLI wrapper:
    ```bash
-   python -m DocsToKG.DocParsing.cli doctags --mode pdf --model /path/to/model \
+   python -m DocsToKG.DocParsing.core.cli doctags --mode pdf --model /path/to/model \
        --served-model-name granite-docling-258M --served-model-name ibm-granite/granite-docling-258M
    ```
 2. Update automation to consume the manifest metadata fields `model_name`, `served_models`, and `vllm_version` for auditing served model changes.

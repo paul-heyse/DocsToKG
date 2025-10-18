@@ -1,295 +1,199 @@
-# DocParsing Pipeline
+---
+subdir_id: docstokg-docparsing
+owning_team: TODO_TEAM
+interfaces: [cli, python]
+stability: stable
+versioning: semver
+codeowners: TODO_CODEOWNERS
+last_updated: 2025-10-18
+related_adrs: []
+slos: { availability: "TODO", latency_p50_ms: TODO }
+data_handling: todo-data-classification
+sbom: { path: TODO_SBOM_PATH }
+---
 
-The DocParsing subsystem converts heterogeneous documents into structured data
-that downstream knowledge-graph stages can ingest.  The default workflow relies
-on the [Docling](https://github.com/IBM/docling) hybrid conversion stack and
-preserves DocTags semantics end-to-end so we remain compatible with existing
-metadata and image annotations.
+# DocsToKG • DocParsing
 
-## Architecture Overview
+Purpose: Convert raw documents (PDF/HTML/etc.) into DocTags, topic-aware chunks, and embeddings with resumable manifests.  
+Scope boundary: Handles conversion, chunking, embedding, and telemetry; does not persist vectors to external stores or orchestrate downstream ingestion.
 
-The pipeline is composed of three coarse stages that operate on shared storage:
+---
 
-1. **DocTags conversion** – HTML and PDF inputs are rendered to DocTags using
-   Docling engines (`docling-html` and `docling-vlm`).
-2. **Chunking & coalescence** – DocTags payloads are segmented into
-   topic-aligned text chunks using the hybrid chunker with structural
-   boundary detection.
-3. **Embedding generation** – The two-pass embedding runner produces dense
-   (Qwen3-Embedding-4B) and sparse (SPLADE v3, BM25) vectors while validating
-   invariants and emitting manifest telemetry.
-
-Each stage records append-only manifest entries under
-`Data/Manifests/docparse.<stage>.manifest.jsonl` (for example,
-`docparse.embeddings.manifest.jsonl`), enabling resumable execution and auditing
-across the toolchain.
-
-## Stage Descriptions
-
-### 1. DocTags Conversion
-
-* **Entry point**: `python -m DocsToKG.DocParsing.cli doctags`
-* **Output**: `Data/DocTagsFiles/<doc_id>.doctags`
-* **Highlights**:
-  * HTML and PDF pipelines use Docling as the default renderer.  PDF conversion
-    bootstraps a vLLM-backed visual language model for captioning and picture
-    classification.
-  * Conversion metadata (parse engine, content hashes, warnings) flows into the
-    manifest for provenance tracking.
-  * `--vllm-wait-timeout` lets operators accommodate slow model cold starts
-    before marking the DocTags stage unhealthy.
-
-### 2. Chunking & Coalescence
-
-* **Entry point**: `python -m DocsToKG.DocParsing.cli chunk`
-* **Output**: `Data/ChunkedDocTagFiles/<relative_path>.chunks.jsonl` (mirrors the DocTags hierarchy)
-* **Highlights**:
-  * The hybrid chunker honors Docling structural annotations and only merges
-    across sections when soft-boundary thresholds permit.
-  * Chunk rows embed `ProvenanceMetadata` (parse engine, Docling version, image
-    flags) to preserve the source context of every span.
-  * Declarative extensions let operators load JSON/YAML/TOML structural markers and
-    swap serializer providers (`--structural-markers`, `--serializer-provider`)
-    without touching the chunking logic.
-  * Document identifiers mirror the relative path within the input directory so
-    nested hierarchies never collide on basename alone.
-  * Supports deterministic sharding via `--shard-count` / `--shard-index` so
-    large corpora can be processed across machines without external tooling.
-
-### 3. Embedding Generation
-
-* **Entry point**: `python -m DocsToKG.DocParsing.cli embed`
-* **Output**: `Data/Embeddings/<relative_path>.vectors.jsonl` (mirrors the chunk directory layout)
-* **Highlights**:
-  * Streaming two-pass architecture bounds memory usage while collecting BM25
-    statistics.
-  * Extensive validation guards Qwen vector dimensions, SPLADE sparsity, and
-    schema compatibility.
-  * Vector writers are pluggable (`--format`), and caching controls (`--no-cache`)
-    make it easy to debug embedding behaviour without reusing long-lived vLLM
-    instances.
-
-## Configuration
-
-All CLI entry points share a consistent configuration surface.  Key options
-include:
-
-| Flag | Stage | Description |
-| --- | --- | --- |
-| `--data-root` | All | Override the detected `Data/` directory. Defaults to `DOCSTOKG_DATA_ROOT` or ancestor discovery. |
-| `--resume` | All | Skip inputs whose outputs exist with matching content hash. |
-| `--force` | All | Reprocess all inputs regardless of manifest state. |
-| `--log-level` | All | Adjust structured log verbosity (`DEBUG`, `INFO`, etc.). |
-| `--workers` | DocTags | Parallel PDF worker count (spawn start method enforced). |
-| `--vllm-wait-timeout` | DocTags | Seconds to wait for the auxiliary vLLM server before aborting. |
-| `--min-tokens` / `--max-tokens` | Chunker | Token window boundaries for chunk coalescence. |
-| `--tokenizer-model` | Chunker | HuggingFace tokenizer aligning chunk lengths with the dense embedder. |
-| `--structural-markers` | Chunker | Load additional heading/caption prefixes from JSON/YAML/TOML configuration files. |
-| `--serializer-provider` | Chunker | Swap in a custom Docling serializer via an import path (`module:Class`). |
-| `--shard-count` / `--shard-index` | Chunker, Embedder | Deterministically partition inputs for distributed processing. |
-| `--validate-only` | Chunker, Embedder | Validate existing chunk or vector JSONL outputs and exit without writing. |
-| `--qwen-dim` | Embedder | Expected Qwen output dimension (use with multi-resolution models). |
-| `--batch-size-*` | Embedder | Independent batch sizing for SPLADE and Qwen passes. |
-| `--format` | Embedder | Vector output format (`jsonl` today; `parquet` in progress). |
-| `--no-cache` | Embedder | Disable Qwen LLM reuse between batches (helpful for debugging). |
-
-### Programmatic configuration loading
-
-The `DocsToKG.DocParsing.config` module exposes public helpers for teams that
-manage structural-marker inventories outside the CLI. Use
-`load_yaml_markers` / `load_toml_markers` (raising `ConfigLoadError` on malformed
-input) to deserialize marker documents before passing the resulting dictionaries
-into `load_structural_marker_profile`.
-
-### Core module layout
-
-The legacy `DocsToKG.DocParsing.core` monolith has been decomposed into
-focused modules under `DocsToKG.DocParsing.core.*` (for example,
-`core.discovery`, `core.http`, `core.manifest`, `core.planning`,
-`core.cli_utils`). Importers should continue to rely on
-`DocsToKG.DocParsing.core` which re-exports the stable surface while the
-submodules carry cohesive implementations.
-
-### CLI validation behaviour
-
-All DocParsing CLIs normalise invalid argument handling through
-`CLIValidationError`. When a stage rejects input, the process exits with code `2`
-and prints a single `[stage] --option: message` line on stderr instead of a
-Python traceback. Automation scripts can rely on this format when surfacing
-operator guidance.
-
-### Environment Variables
-
-| Variable | Purpose |
-| --- | --- |
-| `DOCSTOKG_DATA_ROOT` | Overrides automatic data-root detection for all stages. |
-| `HF_HOME` | Preferred HuggingFace cache directory used for model discovery when stage-specific overrides are not supplied. |
-| `DOCSTOKG_MODEL_ROOT` | Base directory that houses DocParsing models when `DOCLING_PDF_MODEL` is unset. |
-| `DOCLING_PDF_MODEL` | Explicit path to the Granite Docling model used by the PDF pipeline. Overrides all other model-location environment variables. |
-| `DOCLING_CUDA_USE_FLASH_ATTENTION2` | Enables Flash Attention optimizations within Docling VLM workers. |
-| `DOCLING_ARTIFACTS_PATH` | Custom cache directory for Docling-rendered artifacts (bitmaps, intermediate assets). |
-| `DOCSTOKG_HASH_ALG` | Forces content hashing algorithm (`sha1` default, set to `sha256`, `sha512`, etc. when compliance requires). Changing this invalidates resume caches created with a different algorithm. |
-
-### PDF model resolution
-
-The PDF DocTags converter resolves its model path using the following
-precedence order:
-
-1. `--model` CLI argument
-2. `DOCLING_PDF_MODEL` environment variable
-3. `DOCSTOKG_MODEL_ROOT/granite-docling-258M`
-4. `HF_HOME/granite-docling-258M`
-5. `~/.cache/huggingface/granite-docling-258M`
-
-The resolved path is logged at startup so operators can confirm the
-expected model directory before conversion begins.
-
-### Serializer Providers
-
-The chunker loads its Markdown-aware serializer via the `--serializer-provider`
-flag. Providers are referenced using the import path syntax
-`module_path:ClassName` (for example,
-`DocsToKG.DocParsing.formats:RichSerializerProvider`, which is the default).
-
-To provide a custom implementation:
-
-1. Subclass :class:`docling_core.transforms.chunker.hierarchical_chunker.ChunkingSerializerProvider`.
-2. Implement :meth:`get_serializer(self, doc: DoclingDocument) -> ChunkingDocSerializer`
-   and return a serializer that understands your domain-specific markup.
-3. Package the provider on `PYTHONPATH` and point `--serializer-provider` at
-   the fully-qualified import path.
-
-If a provider cannot be imported, the chunker now logs a warning with a sample
-path so operators can quickly diagnose missing packages. Custom providers should
-remain stateless—when a non-default provider is configured, the chunker falls
-back to a single worker to avoid sharing mutable state across processes.
-
-## Schema Versioning Strategy
-
-JSONL outputs embed deterministic schema identifiers (`docparse/1.1.0` for
-chunks, `embeddings/1.0.0` for vectors). Reader utilities now enforce these
-identifiers via ``validate_schema_version`` which raises a ``ValueError`` when a
-row is missing the field or advertises an unsupported version. This fail-fast
-behaviour allows us to introduce future schema revisions without corrupting
-downstream consumers. When incrementing a schema version:
-
-1. Extend the compatibility matrix in `DocsToKG.DocParsing.formats`.
-2. Preserve validation helpers for older versions until consumers are migrated.
-3. Document migration guidance (see below) to keep operators informed.
-
-### Supported Schema Versions
-
-| Stage | Schema Identifier | Supported Versions | Validation Snippet |
-| --- | --- | --- | --- |
-| Chunking | `docparse` | `docparse/1.0.0`, `docparse/1.1.0` | `validate_schema_version("docparse/1.1.0", COMPATIBLE_CHUNK_VERSIONS)` |
-| Embeddings | `embeddings` | `embeddings/1.0.0` | `validate_schema_version("embeddings/1.0.0", COMPATIBLE_VECTOR_VERSIONS)` |
-
-```python
-from DocsToKG.DocParsing.formats import (
-    COMPATIBLE_CHUNK_VERSIONS,
-    COMPATIBLE_VECTOR_VERSIONS,
-    validate_schema_version,
-)
-
-# Chunk row check
-validate_schema_version("docparse/1.1.0", COMPATIBLE_CHUNK_VERSIONS)
-
-# Vector row check
-validate_schema_version("embeddings/1.0.0", COMPATIBLE_VECTOR_VERSIONS)
-```
-
-## CLI Reference & Usage Examples
-
-Typical end-to-end workflow on a small corpus:
-
+## Quickstart
+> Bootstrap environment, run DocTags → chunking → embedding on a sample corpus.
 ```bash
-# 1) Convert PDFs to DocTags using the visual language pipeline
-python -m DocsToKG.DocParsing.cli doctags \
+./scripts/bootstrap_env.sh
+direnv allow                                     # or source .venv/bin/activate
+
+# Convert PDFs/HTML to DocTags
+direnv exec . python -m DocsToKG.DocParsing.core.cli doctags \
   --mode pdf \
   --input Data/PDFs \
-  --output Data/DocTagsFiles \
-  --resume
+  --output Data/DocTagsFiles
 
-# 2) Chunk the DocTags with tokenizer-aligned boundaries
-python -m DocsToKG.DocParsing.cli chunk \
+# Chunk DocTags
+direnv exec . python -m DocsToKG.DocParsing.core.cli chunk \
   --in-dir Data/DocTagsFiles \
-  --out-dir Data/ChunkedDocTagFiles \
-  --min-tokens 256 \
-  --max-tokens 512
+  --out-dir Data/ChunkedDocTagFiles
 
-# 3) Generate embeddings with streaming batches
-python -m DocsToKG.DocParsing.cli embed \
+# Generate embeddings
+direnv exec . python -m DocsToKG.DocParsing.core.cli embed \
   --chunks-dir Data/ChunkedDocTagFiles \
-  --out-dir Data/Embeddings \
-  --batch-size-qwen 24 \
-  --batch-size-splade 256
+  --out-dir Data/Embeddings
 ```
 
-Additional tips:
-
-* Use `--resume` across stages for large reruns—skips are recorded with
-  explicit manifest entries and summary logging.
-* Combine `--force` with focused `--input` / `--in-dir` selectors when
-  reprocessing a known-bad document.
-
-## Troubleshooting Guide
-
-| Symptom | Likely Cause | Resolution |
-| --- | --- | --- |
-| CUDA error: re-initialization of context | Process forked before CUDA init | Ensure the PDF converter runs with spawn mode (default) or export `CUDA_VISIBLE_DEVICES` to limit visible GPUs. |
-| Out-of-memory during embedding | Batch size too large | Reduce `--batch-size-qwen` / `--batch-size-splade` or enable gradient checkpointing on the serving side. |
-| vLLM server fails to start | Port conflict or missing model weights | Use `--served-model-name` when launching vLLM and verify the port is free via `lsof -i :8000`. |
-| Schema validation errors | Mixed schema versions in output directories | Run the validation CLI (`python -m DocsToKG.DocParsing.cli embed --validate-only`) after cleaning stale shards. |
-| Missing DocTags | Input hashes mismatch resume manifest | Re-run the converter with `--force` or delete the stale DocTags file to trigger regeneration. |
-| `sentence-transformers` / `vllm` ImportError | Optional embedding dependencies not installed | Install the extras (`pip install sentence-transformers vllm`) or run `pytest tests/docparsing/test_synthetic_benchmark.py` to verify stubbed dependencies before provisioning GPUs. |
-
-## Manifest Query Examples
-
-Run these commands from the repository root to inspect manifest telemetry:
-
+## Common commands
 ```bash
-# List failed documents with error messages
-jq 'select(.status == "failure") | {doc_id, stage, error}' Data/Manifests/docparse.*.manifest.jsonl
+# Discover tasks (TODO add justfile entry if available)
+just --list
 
-# Average duration by stage
-jq -s 'group_by(.stage) | map({stage: .[0].stage, avg_duration: (map(.duration_s) | add / length)})' \
-  Data/Manifests/docparse.*.manifest.jsonl
+# Table stakes CLI flows
+direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --help
+direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --help
+direnv exec . python -m DocsToKG.DocParsing.core.cli embed --help
+direnv exec . python -m DocsToKG.DocParsing.core.cli doctor               # TODO: confirm health command
 
-# Count of skipped documents per stage
-jq 'select(.status == "skip") | .stage' Data/Manifests/docparse.*.manifest.jsonl \
-  | sort | uniq -c
+# Focused reruns
+direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --input Data/PDFs/doc-001.pdf --force
+direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --resume
+direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only
 ```
 
-## Migration Guidance
+## Folder map
+- `cli_errors.py` – Structured CLI exception types.
+- `config.py` / `config_loaders.py` – Pydantic-style configuration loaders (YAML/JSON/TOML) for chunking/embedding.
+- `core/` – Pipeline orchestration (DocTags converters, chunk coalescence, embedding runners).
+- `chunking/` – Hybrid chunker implementation and heuristics.
+- `embedding/` – Dense/sparse embedding wrappers (Qwen, SPLADE, BM25).
+- `formats/` – Schemas and JSON codecs for DocTags/chunk/vector manifests.
+- `interfaces.py` – Protocol definitions for converters, chunkers, embedder backends.
+- `io.py` – Filesystem helpers, manifest writers, doc discovery.
+- `logging.py` / `telemetry.py` – Structured logging and telemetry sinks.
+- `schemas.py` – Pydantic models and schema introspection utilities.
+- `token_profiles.py` – Tokenizer profiles/presets shared across stages.
+- `tests/docparsing/` – Unit/integration tests and synthetic benchmarks (with stubs).
 
-When upgrading schema versions or changing tokenizer defaults, update the
-OpenSpec change proposal with explicit migration steps.  Provide before/after
-examples and recommend recalculating affected manifolds so downstream consumers
-can reason about historical data sets.
+## System overview
+```mermaid
+flowchart LR
+  A[Raw documents (PDF/HTML/ZIP)] --> B[DocTags conversion]
+  B --> C[Chunking & coalescence]
+  C --> D[Embedding generation]
+  B -.-> MB[DocTags manifest]
+  C -.-> MC[Chunk manifest]
+  D -.-> ME[Embedding manifest]
+  classDef boundary stroke:#f00;
+  B:::boundary
+  C:::boundary
+  D:::boundary
+```
+```mermaid
+sequenceDiagram
+  participant U as Operator/Agent
+  participant CLI as DocParsing CLI
+  participant Tags as DocTagsConverter
+  participant Chunk as ChunkIngestionPipeline
+  participant Embed as EmbeddingRunner
+  U->>CLI: doctags --mode pdf --input …
+  CLI->>Tags: render_to_doctags()
+  Tags-->>CLI: DocTags + manifest row
+  U->>CLI: chunk --in-dir …
+  CLI->>Chunk: generate_chunks()
+  Chunk-->>CLI: chunk JSONL + manifest row
+  U->>CLI: embed --chunks-dir …
+  CLI->>Embed: build_vectors()
+  Embed-->>CLI: embeddings + manifest row
+  CLI-->>U: command exit / telemetry
+```
 
-* Embedding outputs now write to `Data/Embeddings/` so deployments with legacy
-  `Data/Vectors/` directories should rename them to keep manifests and resumable
-  processing aligned with the canonical layout.
+## Entry points & contracts
+- Entry points: `python -m DocsToKG.DocParsing.core.cli` subcommands (`doctags`, `chunk`, `embed`, TODO `doctor`), Python APIs in `core` for embedding/chunking.
+- Contracts/invariants:
+  - DocTags → chunk → embedding outputs mirror directory hierarchy and use consistent doc IDs.
+  - Manifests (`docparse.*.manifest.jsonl`) are append-only and idempotent for resume logic.
+  - Chunk and embedding schemas versioned via `formats.validate_schema_version`.
 
+## Configuration
+- Config sources: environment (`DOCSTOKG_DATA_ROOT`, TODO others), YAML/TOML via `config_loaders`.
+- CLI flags: shared `--resume`, `--force`, `--log-level`; stage-specific `--min-tokens`, `--max-tokens`, `--shard-count/index`, `--batch-size-*`, `--tokenizer-model`, `--format`, etc.
+- Validate configuration: TODO provide `docparse doctor` or `python -m DocsToKG.DocParsing.core.cli embed --validate-only`.
 
-### Deprecations
+## Data contracts & schemas
+- Schemas: `formats.CHUNK_ROW_SCHEMA`, `formats.VECTOR_ROW_SCHEMA`, DocTags manifest schema (TODO add path).
+- Manifests stored under `Data/Manifests/docparse.*.manifest.jsonl` (DocTags, chunking, embeddings).
+- Chunk output: JSONL lines with `ChunkPayload`, `ProvenanceMetadata`, token spans; embeddings output: JSONL with dense vector (float32 list) + sparse weights.
 
-> **Deprecated**  
-> `DocsToKG.DocParsing.pdf_pipeline` remains temporarily available as a compatibility shim.
-> Importing it emits a :class:`DeprecationWarning` and a structured log pointing to the
-> :mod:`DocsToKG.DocParsing.doctags` replacement. The shim will be removed in
-> **DocsToKG 2.0.0**. Migrate now to the CLI (`python -m DocsToKG.DocParsing.cli doctags
-> --mode pdf`) or call the ``Doctags`` APIs directly to avoid last-minute surprises.
+## Interactions with other packages
+- Upstream: consumes raw documents, optional DocTags produced by external systems.
+- Downstream: supplies chunked text and embeddings to `HybridSearch`, `OntologyDownload` is independent.
+- Guarantees: stable doc IDs across stages; chunk/embedding outputs designed for direct ingestion by hybrid search pipeline.
 
-## Synthetic Benchmarking & Test Utilities
+## Observability
+- Logs: `logging.py` provides structured logs with doc IDs, stage, durations.
+- Metrics: `telemetry.py` & `ChunkIngestionPipeline` emit counters/histograms (TODO document exporters).
+- **SLIs/SLOs**: TODO establish stage latency targets (DocTags/Chunk/Embed) and success rate metrics.
+- Health check: TODO confirm `docparse doctor` command or provide recommended validation sequence.
 
-The test suite ships lightweight fixtures that allow end-to-end validation
-without installing heavyweight dependencies:
+## Security & data handling
+- ASVS level: TODO (likely L2 due to document ingestion/processing).
+- Threats:
+  - Tampering: ensure DocTags/Chunks/Embeddings stored in controlled directories; keep manifests append-only.
+  - DoS: guard via `--shard-count`, `--batch-size` controls; manifest resume prevents redundant work.
+  - Information disclosure: treat source documents as sensitive; TODO classify data (PII/PHI) if used.
+  - Supply chain: verify Docling/vLLM dependencies; prefer locked versions.
+- Data classification: TODO specify (likely mixed—documents may contain PII; follow organizational policy).
 
-* `tests.docparsing.stubs.dependency_stubs()` installs stub implementations of
-  Docling, vLLM, and sentence-transformers so the CLI wrappers can be exercised
-  on laptops without GPUs. The integration tests reuse these stubs to verify
-  manifest updates and schema compliance.
-* `tests/docparsing/synthetic.py` contains deterministic factories and a
-  synthetic benchmark model. `tests/docparsing/test_synthetic_benchmark.py`
-  asserts the expected throughput and memory characteristics as part of CI.
+## Development tasks
+```bash
+direnv exec . ruff check src/DocsToKG/DocParsing tests/docparsing
+direnv exec . mypy src/DocsToKG/DocParsing
+direnv exec . pytest tests/docparsing -q
+direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # optional perf check
+```
+- Format / lint: TODO add `just fmt` or `python -m ruff format`.
+- Use dependency stubs in tests (`tests.docparsing.stubs`) to run without GPUs.
+
+## Agent guardrails
+- Do:
+  - Extend chunking/embedding via interfaces and keep manifests consistent.
+  - Document new schema fields and migrate manifest validators.
+- Do not:
+  - Break directory layout or doc ID conventions without downstream coordination.
+  - Bypass manifests or resume logic (tools depend on accurate entries).
+- Danger zone:
+  - `rm -rf Data/DocTagsFiles` or manually editing manifests may break resume; use CLI `--force` and allow pipeline to rebuild artifacts.
+  - Changing embedding formats (`--format`) requires updating `formats` validators and downstream loaders.
+
+## FAQ
+- Q: How do I resume after a failure?  
+  A: Use `--resume` on the affected stage; manifests mark completed docs. Combine with `--force` for targeted reruns.
+
+- Q: How do I validate outputs without writing new files?  
+  A: Run `chunk` or `embed` with `--validate-only` to check existing JSONL artifacts and exit with status.
+
+<!-- Machine-readable appendix -->
+```json x-agent-map
+{
+  "entry_points":[
+    {"type":"cli","module":"DocsToKG.DocParsing.core.cli","commands":["doctags","chunk","embed"]},
+    {"type":"python","module":"DocsToKG.DocParsing.core","symbols":["ChunkIngestionPipeline","EmbeddingRunner"]},
+    {"type":"python","module":"DocsToKG.DocParsing.chunking","symbols":["HybridChunker"]},
+    {"type":"python","module":"DocsToKG.DocParsing.embedding","symbols":["EmbeddingRunner","SPLADEAdapter","QwenAdapter"]}
+  ],
+  "env":[
+    {"name":"DOCSTOKG_DATA_ROOT","default":"<repo>/Data","required":false}
+  ],
+  "schemas":[
+    {"kind":"python","path":"src/DocsToKG/DocParsing/formats.py"},
+    {"kind":"pydantic","path":"src/DocsToKG/DocParsing/config.py"}
+  ],
+  "artifacts_out":[
+    {"path":"Data/DocTagsFiles/**/*.doctags","consumed_by":["chunk stage"]},
+    {"path":"Data/ChunkedDocTagFiles/**/*.chunks.jsonl","consumed_by":["embedding stage","hybrid search"]},
+    {"path":"Data/Embeddings/**/*.vectors.jsonl","consumed_by":["hybrid search"]}
+  ],
+  "danger_zone":[
+    {"command":"direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --force --input Data/PDFs","effect":"Reprocesses entire corpus; can overwrite manifests"}
+  ]
+}
+```

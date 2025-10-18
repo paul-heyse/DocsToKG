@@ -24,7 +24,7 @@ Scope boundary: Handles discovery, downloading, classification, and logging for 
 
 ## Quickstart
 
-> One-shot setup, then run the main workflow.
+> One-shot setup, then run the main src/DocsToKG/HybridSearchworkflow.
 
 ```bash
 # Dev container (recommended)
@@ -211,19 +211,19 @@ mypy src/DocsToKG/ContentDownload
 
 ## FAQ
 
-- Q: How do I resume a partially completed download run?  
+- Q: How do I resume a partially completed download run?
   A: Re-run the CLI with `--resume-from <manifest.jsonl>`; the runner skips completed works using the SQLite manifest index.
 
-- Q: How can I target only open-access works?  
+- Q: How can I target only open-access works?
   A: Add `--oa-only` so the Works query filters to open-access locations before resolver execution.
 
-- Q: What is the safest way to test resolver changes?  
+- Q: What is the safest way to test resolver changes?
   A: Use `--dry-run --max <N>` to gather coverage without writing files, inspect JSONL attempts, then drop `--dry-run` once satisfied.
 
-- Q: Where do I find latency and success metrics after a run?  
+- Q: Where do I find latency and success metrics after a run?
   A: Check `manifest.metrics.json` for aggregate counters and `manifest.summary.json` for resolver-specific latency/attempt stats.
 
-- Q: How can I rotate telemetry logs for long sessions?  
+- Q: How can I rotate telemetry logs for long sessions?
   A: Supply `--log-rotate 250MB` (or similar) so `RotatingJsonlSink` handles rollover while preserving manifest schema.
 
 ```json x-agent-map

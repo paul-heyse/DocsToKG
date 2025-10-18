@@ -34,13 +34,13 @@ CLI_DESCRIPTION = """\
 Unified DocParsing CLI
 
 Examples:
-  python -m DocsToKG.DocParsing.cli all --resume
-  python -m DocsToKG.DocParsing.cli chunk --data-root Data
-  python -m DocsToKG.DocParsing.cli embed --resume
-  python -m DocsToKG.DocParsing.cli doctags --mode pdf --workers 2
-  python -m DocsToKG.DocParsing.cli token-profiles --doctags-dir Data/DocTagsFiles
-  python -m DocsToKG.DocParsing.cli manifest --stage chunk --tail 10
-  python -m DocsToKG.DocParsing.cli plan --data-root Data --mode auto
+  python -m DocsToKG.DocParsing.core.cli all --resume
+  python -m DocsToKG.DocParsing.core.cli chunk --data-root Data
+  python -m DocsToKG.DocParsing.core.cli embed --resume
+  python -m DocsToKG.DocParsing.core.cli doctags --mode pdf --workers 2
+  python -m DocsToKG.DocParsing.core.cli token-profiles --doctags-dir Data/DocTagsFiles
+  python -m DocsToKG.DocParsing.core.cli manifest --stage chunk --tail 10
+  python -m DocsToKG.DocParsing.core.cli plan --data-root Data --mode auto
 """
 
 __all__ = [
@@ -149,7 +149,6 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
 
 def _resolve_doctags_paths(args: argparse.Namespace) -> tuple[str, Path, Path, str]:
     """Resolve DocTags input/output directories and mode."""
-
 
     resolved_root = (
         detect_data_root(args.data_root) if args.data_root is not None else detect_data_root()

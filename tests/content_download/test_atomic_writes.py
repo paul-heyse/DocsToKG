@@ -346,8 +346,8 @@ _stub_module(
     attrs={"AutoTokenizer": SimpleNamespace(from_pretrained=lambda *_, **__: object())},
 )
 _stub_module("tqdm", attrs={"tqdm": lambda iterable=None, **_: iterable})
-import DocsToKG.DocParsing._chunking as chunker  # noqa: E402
-import DocsToKG.DocParsing._embedding as embeddings  # noqa: E402
+import DocsToKG.DocParsing.chunking as chunker  # noqa: E402
+import DocsToKG.DocParsing.embedding as embeddings  # noqa: E402
 
 if not hasattr(chunker, "manifest_append"):
     chunker.manifest_append = lambda *args, **kwargs: None
@@ -388,19 +388,17 @@ class DummyHybridChunker:
 
 
 def configure_chunker_stubs(
-    monkeypatch, texts_map: Dict[str, List[str]], image_metadata_fn=None
+    patcher, texts_map: Dict[str, List[str]], image_metadata_fn=None
 ) -> None:
     chunking_runtime = chunker.runtime
 
     def _patch(name: str, value, *, package: bool = True, runtime: bool = True) -> None:
         if package:
-            monkeypatch.setattr(chunker, name, value, raising=False)
+            patcher.setattr(chunker, name, value, raising=False)
         if runtime:
-            monkeypatch.setattr(chunking_runtime, name, value, raising=False)
+            patcher.setattr(chunking_runtime, name, value, raising=False)
 
-    _patch(
-        "AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object())
-    )
+    _patch("AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object()))
     _patch("HuggingFaceTokenizer", DummyTokenizer)
     _patch("HybridChunker", DummyHybridChunker)
 
@@ -439,7 +437,7 @@ def configure_chunker_stubs(
             )
         return original_chunk_log_event(logger, level, message, **metadata)
 
-    monkeypatch.setattr(chunking_runtime, "log_event", _log_event_wrapper)
+    patcher.setattr(chunking_runtime, "log_event", _log_event_wrapper)
 
     def _record(status: str, original):
         def wrapper(*, stage, doc_id, **metadata):
@@ -653,12 +651,12 @@ def write_dummy_chunks(env: SimpleNamespace, name: str, rows: Iterable[dict]) ->
             handle.write(json.dumps(row) + "\n")
 
 
-def configure_embeddings_stubs(monkeypatch):
+def configure_embeddings_stubs(patcher):
     embedding_runtime = embeddings.runtime
 
     def _patch_all(name: str, value) -> None:
-        monkeypatch.setattr(embeddings, name, value, raising=False)
-        monkeypatch.setattr(embedding_runtime, name, value, raising=False)
+        patcher.setattr(embeddings, name, value, raising=False)
+        patcher.setattr(embedding_runtime, name, value, raising=False)
 
     _patch_all("_ensure_splade_dependencies", lambda: None)
     _patch_all("_ensure_qwen_dependencies", lambda: None)
@@ -711,7 +709,7 @@ def configure_embeddings_stubs(monkeypatch):
             )
         return original_embed_log_event(logger, level, message, **metadata)
 
-    monkeypatch.setattr(embedding_runtime, "log_event", _embed_log_event)
+    patcher.setattr(embedding_runtime, "log_event", _embed_log_event)
 
     def _embed_record(status: str, original):
         def wrapper(*, stage, doc_id, **metadata):
@@ -802,13 +800,13 @@ def configure_embeddings_stubs(monkeypatch):
     _patch_all("qwen_embed", fake_qwen)
 
 
-@pytest.mark.usefixtures("monkeypatch")
+@pytest.mark.usefixtures("patcher")
 # --- Test Cases ---
 
 
-def test_chunker_failure_leaves_no_partial_files(tmp_path, monkeypatch):
+def test_chunker_failure_leaves_no_partial_files(tmp_path, patcher):
     env = prepare_data_root(tmp_path)
-    configure_chunker_stubs(monkeypatch, {"sample": ["alpha beta", "gamma delta"]})
+    configure_chunker_stubs(patcher, {"sample": ["alpha beta", "gamma delta"]})
     write_dummy_doctags(env, "sample")
 
     args = chunker_args(env)
@@ -823,10 +821,10 @@ def test_chunker_failure_leaves_no_partial_files(tmp_path, monkeypatch):
     assert chunker_manifest_log[-1]["status"] == "failure"
 
 
-@pytest.mark.usefixtures("monkeypatch")
-def test_embeddings_failure_cleans_temporary_files(tmp_path, monkeypatch):
+@pytest.mark.usefixtures("patcher")
+def test_embeddings_failure_cleans_temporary_files(tmp_path, patcher):
     env = prepare_data_root(tmp_path)
-    configure_embeddings_stubs(monkeypatch)
+    configure_embeddings_stubs(patcher)
     rows = [
         {
             "uuid": "u1",
@@ -857,10 +855,10 @@ def test_embeddings_failure_cleans_temporary_files(tmp_path, monkeypatch):
     assert embeddings_manifest_log[-1]["status"] == "failure"
 
 
-@pytest.mark.usefixtures("monkeypatch")
-def test_chunker_success_outputs_readable_file(tmp_path, monkeypatch):
+@pytest.mark.usefixtures("patcher")
+def test_chunker_success_outputs_readable_file(tmp_path, patcher):
     env = prepare_data_root(tmp_path)
-    configure_chunker_stubs(monkeypatch, {"sample": ["alpha beta", "gamma delta"]})
+    configure_chunker_stubs(patcher, {"sample": ["alpha beta", "gamma delta"]})
     write_dummy_doctags(env, "sample")
 
     args = chunker_args(env)
@@ -873,8 +871,8 @@ def test_chunker_success_outputs_readable_file(tmp_path, monkeypatch):
     assert {row["chunk_id"] for row in rows} == {0, 1}
 
 
-@pytest.mark.usefixtures("monkeypatch")
-def test_chunker_promotes_image_metadata(tmp_path, monkeypatch):
+@pytest.mark.usefixtures("patcher")
+def test_chunker_promotes_image_metadata(tmp_path, patcher):
     env = prepare_data_root(tmp_path)
 
     def image_meta(chunk, text):
@@ -883,9 +881,7 @@ def test_chunker_promotes_image_metadata(tmp_path, monkeypatch):
             return True, False, 1, 0.9
         return False, True, 3, 0.1
 
-    configure_chunker_stubs(
-        monkeypatch, {"sample": ["alpha", "beta"]}, image_metadata_fn=image_meta
-    )
+    configure_chunker_stubs(patcher, {"sample": ["alpha", "beta"]}, image_metadata_fn=image_meta)
     write_dummy_doctags(env, "sample")
 
     args = chunker_args(env)
@@ -900,10 +896,10 @@ def test_chunker_promotes_image_metadata(tmp_path, monkeypatch):
     assert rows[1]["num_images"] == 3
 
 
-@pytest.mark.usefixtures("monkeypatch")
-def test_chunker_resume_after_failure(tmp_path, monkeypatch):
+@pytest.mark.usefixtures("patcher")
+def test_chunker_resume_after_failure(tmp_path, patcher):
     env = prepare_data_root(tmp_path)
-    configure_chunker_stubs(monkeypatch, {"sample": ["alpha beta", "gamma delta"]})
+    configure_chunker_stubs(patcher, {"sample": ["alpha beta", "gamma delta"]})
     write_dummy_doctags(env, "sample")
 
     failing_args = chunker_args(env, resume=False)
@@ -924,14 +920,14 @@ def test_chunker_resume_after_failure(tmp_path, monkeypatch):
     assert statuses.count("success") == 1
 
 
-@pytest.mark.usefixtures("monkeypatch")
-def test_chunker_concurrent_writes_isolated(tmp_path, monkeypatch):
+@pytest.mark.usefixtures("patcher")
+def test_chunker_concurrent_writes_isolated(tmp_path, patcher):
     env = prepare_data_root(tmp_path)
     texts_map = {
         "doc1": ["one two", "three four"],
         "doc2": ["five six", "seven eight"],
     }
-    configure_chunker_stubs(monkeypatch, texts_map)
+    configure_chunker_stubs(patcher, texts_map)
 
     dir1 = env.doctags_dir / "a"
     dir2 = env.doctags_dir / "b"

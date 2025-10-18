@@ -252,6 +252,7 @@ from DocsToKG.ContentDownload.pipeline import (
     ResolverResult,
     default_resolvers,
 )
+from tests.conftest import PatchManager
 
 # --- test_bounded_concurrency.py ---
 
@@ -634,8 +635,8 @@ def _download_stub(session, artifact, url, referer, timeout, context=None):
 # --- test_parallel_execution.py ---
 
 
-def test_concurrent_pipeline_reduces_wall_time(monkeypatch):
-    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline.random.random", lambda: 0.0)
+def test_concurrent_pipeline_reduces_wall_time(patcher):
+    patcher.setattr("DocsToKG.ContentDownload.pipeline.random.random", lambda: 0.0)
     resolver_count = 4
     delay = 0.1
     resolvers = [_SlowResolver(f"slow-{idx}", delay) for idx in range(resolver_count)]
@@ -896,7 +897,7 @@ def test_pipeline_collects_html_paths(tmp_path):
 # --- test_pipeline_behaviour.py ---
 
 
-def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
+def test_pipeline_rate_limit_enforced(patcher, tmp_path):
     artifact = make_artifact(tmp_path)
     timeline = [0.0, 0.2, 0.2, 1.2, 2.0, 2.8]
 
@@ -908,8 +909,8 @@ def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
     def fake_sleep(duration):
         sleeps.append(duration)
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline._time.monotonic", fake_monotonic)
-    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline._time.sleep", fake_sleep)
+    patcher.setattr("DocsToKG.ContentDownload.pipeline._time.monotonic", fake_monotonic)
+    patcher.setattr("DocsToKG.ContentDownload.pipeline._time.sleep", fake_sleep)
 
     def downloader_fn(session, art, url, referer, timeout):
         return build_outcome("pdf", path=str(art.pdf_dir / "out.pdf"))
@@ -981,7 +982,7 @@ def test_openalex_resolver_executes_first(tmp_path):
 # --- test_pipeline_behaviour.py ---
 
 
-def test_openalex_respects_rate_limit(monkeypatch, tmp_path):
+def test_openalex_respects_rate_limit(patcher, tmp_path):
     artifact = make_artifact(tmp_path)
     artifact.pdf_urls = ["https://openalex.org/pdf-one"]
 
@@ -995,8 +996,8 @@ def test_openalex_respects_rate_limit(monkeypatch, tmp_path):
     def fake_sleep(duration):
         sleeps.append(duration)
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline._time.monotonic", fake_monotonic)
-    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline._time.sleep", fake_sleep)
+    patcher.setattr("DocsToKG.ContentDownload.pipeline._time.monotonic", fake_monotonic)
+    patcher.setattr("DocsToKG.ContentDownload.pipeline._time.sleep", fake_sleep)
 
     def downloader_fn(session, art, url, referer, timeout):
         return build_outcome("pdf", path=str(art.pdf_dir / "result.pdf"))
@@ -1083,7 +1084,7 @@ def _make_artifact(tmp_path: Path) -> WorkArtifact:  # noqa: F811
 
 
 def test_pipeline_executes_resolvers_in_expected_order(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    patcher: PatchManager, tmp_path: Path
 ) -> None:
     artifact = _make_artifact(tmp_path)
     artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
@@ -1102,7 +1103,7 @@ def test_pipeline_executes_resolvers_in_expected_order(
         return _stub
 
     for resolver in resolvers:
-        monkeypatch.setattr(
+        patcher.setattr(
             resolver,
             "iter_urls",
             MethodType(_make_stub(resolver.name), resolver),
@@ -1163,7 +1164,7 @@ def test_pipeline_executes_resolvers_in_expected_order(
 
 
 @pytest.mark.integration
-def test_real_network_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_real_network_download(patcher: PatchManager, tmp_path: Path) -> None:
     if not os.environ.get("DOCSTOKG_RUN_NETWORK_TESTS"):
         pytest.skip("set DOCSTOKG_RUN_NETWORK_TESTS=1 to enable network integration test")
 

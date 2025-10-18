@@ -343,8 +343,8 @@ import DocsToKG.OntologyDownload.io as download
 import DocsToKG.OntologyDownload.planning as pipeline_mod
 from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.io import sanitize_filename
-from DocsToKG.OntologyDownload.planning import ConfigurationError, FetchPlan, FetchSpec
 from DocsToKG.OntologyDownload.migrations import migrate_manifest
+from DocsToKG.OntologyDownload.planning import ConfigurationError, FetchPlan, FetchSpec
 from DocsToKG.OntologyDownload.settings import (
     CACHE_DIR,
     ConfigError,
@@ -421,14 +421,14 @@ class DummySession:
         return None
 
 
-def make_session(monkeypatch, responses, head_responses=None):
+def make_session(patch_stack, responses, head_responses=None):
     session = DummySession(list(responses), head_responses)
 
     def _factory():
         return session
 
-    monkeypatch.setattr(requests, "Session", _factory)
-    monkeypatch.setattr(network_mod.requests, "Session", _factory, raising=False)
+    patch_stack.setattr(requests, "Session", _factory)
+    patch_stack.setattr(network_mod.requests, "Session", _factory, raising=False)
     return session
 
 
@@ -446,10 +446,10 @@ def clear_token_buckets():
 # --- Test Cases ---
 
 
-def test_download_stream_success(monkeypatch, tmp_path):
+def test_download_stream_success(patch_stack, tmp_path):
     content = b"ontology"
     response = DummyResponse(200, content, {"ETag": "abc", "Last-Modified": "yesterday"})
-    make_session(monkeypatch, [response])
+    make_session(patch_stack, [response])
     destination = tmp_path / "file.owl"
     result = download.download_stream(
         url="https://example.org/file.owl",
@@ -465,11 +465,11 @@ def test_download_stream_success(monkeypatch, tmp_path):
     assert result.etag == "abc"
 
 
-def test_download_stream_uses_cache_on_304(monkeypatch, tmp_path):
+def test_download_stream_uses_cache_on_304(patch_stack, tmp_path):
     destination = tmp_path / "file.owl"
     destination.write_bytes(b"cached")
     response = DummyResponse(304, b"", {"ETag": "abc"})
-    session = make_session(monkeypatch, [response])
+    session = make_session(patch_stack, [response])
     result = download.download_stream(
         url="https://example.org/file.owl",
         destination=destination,
@@ -483,13 +483,13 @@ def test_download_stream_uses_cache_on_304(monkeypatch, tmp_path):
     assert session.calls[0]["If-None-Match"] == "abc"
 
 
-def test_download_stream_resumes_from_partial(monkeypatch, tmp_path):
+def test_download_stream_resumes_from_partial(patch_stack, tmp_path):
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     part = cache_dir / "file.owl.part"
     part.write_bytes(b"hello")
     response = DummyResponse(206, b" world", {"ETag": "abc"})
-    make_session(monkeypatch, [response])
+    make_session(patch_stack, [response])
     destination = tmp_path / "file.owl"
     result = download.download_stream(
         url="https://example.org/file.owl",
@@ -505,7 +505,7 @@ def test_download_stream_resumes_from_partial(monkeypatch, tmp_path):
     assert result.status == "updated"
 
 
-def test_streaming_downloader_handles_cached_response(monkeypatch, tmp_path):
+def test_streaming_downloader_handles_cached_response(patch_stack, tmp_path):
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     output_file = cache_dir / "cache_entry"
@@ -523,7 +523,7 @@ def test_streaming_downloader_handles_cached_response(monkeypatch, tmp_path):
         b"",
         {"ETag": "new-tag", "Last-Modified": "Thu, 02 Jan 2024 00:00:00 GMT"},
     )
-    session = make_session(monkeypatch, [response])
+    session = make_session(patch_stack, [response])
     downloader = download.StreamingDownloader(
         destination=destination,
         headers={},
@@ -546,14 +546,14 @@ def test_streaming_downloader_handles_cached_response(monkeypatch, tmp_path):
     assert session.calls[0]["Range"] == f"bytes={len(initial)}-"
 
 
-def test_streaming_downloader_skips_invalid_conditional_headers(monkeypatch, tmp_path):
+def test_streaming_downloader_skips_invalid_conditional_headers(patch_stack, tmp_path):
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     output_file = cache_dir / "conditional_entry"
     destination = tmp_path / "destination.owl"
     previous_manifest = {"etag": None, "last_modified": "   "}
     response = DummyResponse(200, b"fresh", {})
-    session = make_session(monkeypatch, [response])
+    session = make_session(patch_stack, [response])
     downloader = download.StreamingDownloader(
         destination=destination,
         headers={},
@@ -571,7 +571,7 @@ def test_streaming_downloader_skips_invalid_conditional_headers(monkeypatch, tmp
     assert session.calls[0].get("If-Modified-Since") is None
 
 
-def test_streaming_downloader_resumes_range_request(monkeypatch, tmp_path):
+def test_streaming_downloader_resumes_range_request(patch_stack, tmp_path):
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     output_file = cache_dir / "resume_entry"
@@ -583,7 +583,7 @@ def test_streaming_downloader_resumes_range_request(monkeypatch, tmp_path):
         b"data",
         {"ETag": "etag-206", "Last-Modified": "Fri, 03 Jan 2024 00:00:00 GMT"},
     )
-    session = make_session(monkeypatch, [response])
+    session = make_session(patch_stack, [response])
     downloader = download.StreamingDownloader(
         destination=tmp_path / "destination.owl",
         headers={},
@@ -605,7 +605,7 @@ def test_streaming_downloader_resumes_range_request(monkeypatch, tmp_path):
     assert session.calls[0]["Range"] == f"bytes={len(initial)}-"
 
 
-def test_streaming_downloader_records_fresh_response_metadata(monkeypatch, tmp_path):
+def test_streaming_downloader_records_fresh_response_metadata(patch_stack, tmp_path):
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     output_file = cache_dir / "fresh_entry"
@@ -614,7 +614,7 @@ def test_streaming_downloader_records_fresh_response_metadata(monkeypatch, tmp_p
         b"fresh-data",
         {"ETag": "fresh-tag", "Last-Modified": "Sat, 04 Jan 2024 00:00:00 GMT"},
     )
-    session = make_session(monkeypatch, [response])
+    session = make_session(patch_stack, [response])
     downloader = download.StreamingDownloader(
         destination=tmp_path / "destination.owl",
         headers={},
@@ -636,11 +636,11 @@ def test_streaming_downloader_records_fresh_response_metadata(monkeypatch, tmp_p
     assert session.calls[0].get("If-None-Match") is None
 
 
-def test_download_stream_retries(monkeypatch, tmp_path):
+def test_download_stream_retries(patch_stack, tmp_path):
     error_response = DummyResponse(500, b"", {}, raise_error=True)
     success_response = DummyResponse(200, b"data", {})
-    make_session(monkeypatch, [error_response, success_response])
-    monkeypatch.setattr(network_mod.time, "sleep", lambda _: None)
+    make_session(patch_stack, [error_response, success_response])
+    patch_stack.setattr(network_mod.time, "sleep", lambda _: None)
     destination = tmp_path / "file.owl"
     result = download.download_stream(
         url="https://example.org/file.owl",
@@ -655,17 +655,17 @@ def test_download_stream_retries(monkeypatch, tmp_path):
     assert destination.read_bytes() == b"data"
 
 
-def test_download_stream_rate_limiting(monkeypatch, tmp_path):
+def test_download_stream_rate_limiting(patch_stack, tmp_path):
     response = DummyResponse(200, b"data", {})
-    make_session(monkeypatch, [response])
+    make_session(patch_stack, [response])
     consumed = []
 
     class StubBucket:
         def consume(self):
             consumed.append(True)
 
-    monkeypatch.setattr(download, "get_bucket", lambda **_kwargs: StubBucket())
-    monkeypatch.setattr(network_mod, "get_bucket", lambda **_kwargs: StubBucket(), raising=False)
+    patch_stack.setattr(download, "get_bucket", lambda **_kwargs: StubBucket())
+    patch_stack.setattr(network_mod, "get_bucket", lambda **_kwargs: StubBucket(), raising=False)
     destination = tmp_path / "file.owl"
     download.download_stream(
         url="https://example.org/file.owl",
@@ -679,7 +679,7 @@ def test_download_stream_rate_limiting(monkeypatch, tmp_path):
     assert consumed
 
 
-def test_download_stream_sets_known_hash(monkeypatch, tmp_path):
+def test_download_stream_sets_known_hash(patch_stack, tmp_path):
     recorded = {}
 
     def fake_retrieve(url, path, fname, known_hash, downloader, progressbar):
@@ -689,7 +689,7 @@ def test_download_stream_sets_known_hash(monkeypatch, tmp_path):
         cache_path.write_bytes(b"payload")
         return cache_path
 
-    monkeypatch.setattr(network_mod.pooch, "retrieve", fake_retrieve)
+    patch_stack.setattr(network_mod.pooch, "retrieve", fake_retrieve)
     destination = tmp_path / "file.owl"
 
     expected_digest = "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5"
@@ -767,13 +767,13 @@ def test_shared_token_bucket_persists_state(tmp_path):
     assert expected_path.exists()
 
 
-def test_head_check_success(monkeypatch, tmp_path):
+def test_head_check_success(patch_stack, tmp_path):
     head_response = DummyResponse(
         200,
         b"",
         {"Content-Type": "application/rdf+xml", "Content-Length": "1024"},
     )
-    session = make_session(monkeypatch, [], head_responses=[head_response])
+    session = make_session(patch_stack, [], head_responses=[head_response])
     downloader = download.StreamingDownloader(
         destination=tmp_path / "file.owl",
         headers={},
@@ -790,9 +790,9 @@ def test_head_check_success(monkeypatch, tmp_path):
     assert content_length == 1024
 
 
-def test_head_check_graceful_on_405(monkeypatch, tmp_path):
+def test_head_check_graceful_on_405(patch_stack, tmp_path):
     head_response = DummyResponse(405, b"", {})
-    session = make_session(monkeypatch, [], head_responses=[head_response])
+    session = make_session(patch_stack, [], head_responses=[head_response])
     downloader = download.StreamingDownloader(
         destination=tmp_path / "file.owl",
         headers={},
@@ -808,14 +808,14 @@ def test_head_check_graceful_on_405(monkeypatch, tmp_path):
     assert content_length is None
 
 
-def test_head_check_raises_on_oversized(monkeypatch, tmp_path):
+def test_head_check_raises_on_oversized(patch_stack, tmp_path):
     oversize_bytes = 6 * 1024 * 1024 * 1024
     head_response = DummyResponse(
         200,
         b"",
         {"Content-Length": str(oversize_bytes)},
     )
-    session = make_session(monkeypatch, [], head_responses=[head_response])
+    session = make_session(patch_stack, [], head_responses=[head_response])
     downloader = download.StreamingDownloader(
         destination=tmp_path / "file.owl",
         headers={},
@@ -1059,9 +1059,9 @@ def test_extract_tar_detects_compression_bomb(tmp_path):
     assert "compression ratio" in str(exc_info.value)
 
 
-def test_download_stream_http_error(monkeypatch, tmp_path):
+def test_download_stream_http_error(patch_stack, tmp_path):
     response = DummyResponse(500, b"", {}, raise_error=True)
-    make_session(monkeypatch, [response])
+    make_session(patch_stack, [response])
     with pytest.raises(DownloadFailure):
         download.download_stream(
             url="https://example.org/file.owl",
@@ -1074,9 +1074,9 @@ def test_download_stream_http_error(monkeypatch, tmp_path):
         )
 
 
-def test_download_stream_no_space(monkeypatch, tmp_path):
+def test_download_stream_no_space(patch_stack, tmp_path):
     response = DummyResponse(200, b"data", {})
-    make_session(monkeypatch, [response])
+    make_session(patch_stack, [response])
     original_open = Path.open
 
     def failing_open(self, mode="r", *args, **kwargs):
@@ -1084,7 +1084,7 @@ def test_download_stream_no_space(monkeypatch, tmp_path):
             raise OSError("No space left on device")
         return original_open(self, mode, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "open", failing_open)
+    patch_stack.setattr(Path, "open", failing_open)
     with pytest.raises(OntologyDownloadError):
         download.download_stream(
             url="https://example.org/file.owl",
@@ -1097,12 +1097,12 @@ def test_download_stream_no_space(monkeypatch, tmp_path):
         )
 
 
-def test_download_stream_hash_mismatch_triggers_retry(monkeypatch, tmp_path):
+def test_download_stream_hash_mismatch_triggers_retry(patch_stack, tmp_path):
     responses = [
         DummyResponse(200, b"first", {}),
         DummyResponse(200, b"second", {}),
     ]
-    session = make_session(monkeypatch, responses)
+    session = make_session(patch_stack, responses)
     destination = tmp_path / "file.owl"
     result = download.download_stream(
         url="https://example.org/file.owl",
@@ -1123,9 +1123,9 @@ def test_validate_url_security_rejects_private_ip():
         download.validate_url_security("https://127.0.0.1/ontology.owl")
 
 
-def test_validate_url_security_upgrades_http(monkeypatch):
+def test_validate_url_security_upgrades_http(patch_stack):
     network_mod._DNS_CACHE.clear()
-    monkeypatch.setattr(
+    patch_stack.setattr(
         network_mod.socket,
         "getaddrinfo",
         lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
@@ -1134,7 +1134,7 @@ def test_validate_url_security_upgrades_http(monkeypatch):
     assert secure_url.startswith("https://example.org")
 
 
-def test_validate_url_security_respects_allowlist(monkeypatch):
+def test_validate_url_security_respects_allowlist(patch_stack):
     network_mod._DNS_CACHE.clear()
     looked_up = {}
 
@@ -1142,7 +1142,7 @@ def test_validate_url_security_respects_allowlist(monkeypatch):
         looked_up["host"] = host
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
+    patch_stack.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
     config = DownloadConfiguration(allowed_hosts=["example.org", "purl.obolibrary.org"])
 
     secure_url = download.validate_url_security("https://purl.obolibrary.org/ontology.owl", config)
@@ -1158,7 +1158,7 @@ def test_validate_url_security_blocks_disallowed_host():
         download.validate_url_security("https://malicious.com/evil.owl", config)
 
 
-def test_validate_url_security_normalizes_idn(monkeypatch):
+def test_validate_url_security_normalizes_idn(patch_stack):
     network_mod._DNS_CACHE.clear()
     looked_up = {}
 
@@ -1166,7 +1166,7 @@ def test_validate_url_security_normalizes_idn(monkeypatch):
         looked_up["host"] = host
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
+    patch_stack.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
 
     config = DownloadConfiguration()
     secure_url = download.validate_url_security("https://münchen.example.org/ontology.owl", config)
@@ -1180,13 +1180,13 @@ def test_validate_url_security_rejects_mixed_script_idn():
         download.validate_url_security("https://раураl.com/ontology.owl")
 
 
-def test_validate_url_security_respects_wildcard_allowlist(monkeypatch):
+def test_validate_url_security_respects_wildcard_allowlist(patch_stack):
     network_mod._DNS_CACHE.clear()
 
     def fake_getaddrinfo(host, *_args, **_kwargs):
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
+    patch_stack.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
     config = DownloadConfiguration(allowed_hosts=["*.example.org"])
 
     secure_url = download.validate_url_security("https://sub.example.org/ontology.owl", config)
@@ -1204,10 +1204,10 @@ def test_validate_url_security_enforces_default_ports() -> None:
         download.validate_url_security("https://example.org:8443/ontology.owl")
 
 
-def test_validate_url_security_allows_configured_port(monkeypatch):
+def test_validate_url_security_allows_configured_port(patch_stack):
     network_mod._DNS_CACHE.clear()
 
-    monkeypatch.setattr(
+    patch_stack.setattr(
         network_mod.socket,
         "getaddrinfo",
         lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
@@ -1219,10 +1219,10 @@ def test_validate_url_security_allows_configured_port(monkeypatch):
     assert secure_url.startswith("https://example.org:8443")
 
 
-def test_validate_url_security_allows_host_specific_port(monkeypatch):
+def test_validate_url_security_allows_host_specific_port(patch_stack):
     network_mod._DNS_CACHE.clear()
 
-    monkeypatch.setattr(
+    patch_stack.setattr(
         network_mod.socket,
         "getaddrinfo",
         lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
@@ -1234,7 +1234,7 @@ def test_validate_url_security_allows_host_specific_port(monkeypatch):
     assert secure_url.startswith("https://example.org:8443")
 
 
-def test_validate_url_security_dns_lookup_cached(monkeypatch):
+def test_validate_url_security_dns_lookup_cached(patch_stack):
     network_mod._DNS_CACHE.clear()
     calls = {"count": 0}
 
@@ -1242,7 +1242,7 @@ def test_validate_url_security_dns_lookup_cached(monkeypatch):
         calls["count"] += 1
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
+    patch_stack.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
 
     config = DownloadConfiguration()
     url = "https://example.org/ontology.owl"
@@ -1321,7 +1321,7 @@ def test_migrate_manifest_warns_unknown_version(caplog):
     assert any("unknown manifest schema version" in record.getMessage() for record in captured)
 
 
-def test_read_manifest_applies_migration(tmp_path, monkeypatch):
+def test_read_manifest_applies_migration(tmp_path, patch_stack):
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps({"schema_version": "0.9"}))
 
@@ -1331,7 +1331,7 @@ def test_read_manifest_applies_migration(tmp_path, monkeypatch):
         observed["schema_version"] = payload.get("schema_version")
         observed["resolver_attempts"] = payload.get("resolver_attempts")
 
-    monkeypatch.setattr(pipeline_mod, "validate_manifest_dict", _validate)
+    patch_stack.setattr(pipeline_mod, "validate_manifest_dict", _validate)
 
     payload = pipeline_mod._read_manifest(manifest_path)
     assert payload["schema_version"] == "1.0"
@@ -1339,9 +1339,9 @@ def test_read_manifest_applies_migration(tmp_path, monkeypatch):
     assert observed == {"schema_version": "1.0", "resolver_attempts": []}
 
 
-def test_download_stream_rejects_large_content(monkeypatch, tmp_path):
+def test_download_stream_rejects_large_content(patch_stack, tmp_path):
     response = DummyResponse(200, b"data", {"Content-Length": str(10 * 1024 * 1024 * 1024)})
-    make_session(monkeypatch, [response])
+    make_session(patch_stack, [response])
     with pytest.raises(OntologyDownloadError):
         download.download_stream(
             url="https://example.org/file.owl",

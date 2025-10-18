@@ -137,14 +137,14 @@ def test_setup_work_provider_returns_provider(tmp_path):
     download_run.close()
 
 
-def test_setup_download_state_records_manifest_data(monkeypatch, tmp_path):
+def test_setup_download_state_records_manifest_data(patcher, tmp_path):
     resolved = make_resolved_config(tmp_path, csv=False)
     bootstrap_run_environment(resolved)
     download_run = DownloadRun(resolved)
 
     dummy_lookup = {"W1": {"path": "foo"}}
     dummy_completed = {"W2"}
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.runner.load_previous_manifest",
         lambda _: (dummy_lookup, dummy_completed),
     )
@@ -196,7 +196,7 @@ def test_check_budget_limits_detects_limits(tmp_path):
     download_run.close()
 
 
-def test_download_run_run_processes_artifacts(monkeypatch, tmp_path):
+def test_download_run_run_processes_artifacts(patcher, tmp_path):
     resolved = make_resolved_config(tmp_path, csv=False)
     bootstrap_run_environment(resolved)
 
@@ -244,7 +244,7 @@ def test_download_run_run_processes_artifacts(monkeypatch, tmp_path):
         def iter_artifacts(self) -> Iterable[WorkArtifact]:
             yield from self._batch
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.runner.load_previous_manifest",
         lambda _: ({}, set()),
     )
@@ -254,7 +254,7 @@ def test_download_run_run_processes_artifacts(monkeypatch, tmp_path):
         self.provider = provider
         return provider
 
-    monkeypatch.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
 
     def fake_process_one_work(
         work: WorkArtifact,
@@ -271,7 +271,7 @@ def test_download_run_run_processes_artifacts(monkeypatch, tmp_path):
     ) -> Dict[str, Any]:
         return {"saved": True, "downloaded_bytes": 42}
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.runner.process_one_work",
         fake_process_one_work,
     )

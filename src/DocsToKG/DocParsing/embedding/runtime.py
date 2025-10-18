@@ -5,36 +5,6 @@
 #   "purpose": "Embedding pipelines for DocParsing",
 #   "sections": [
 #     {
-#       "id": "embedding-module",
-#       "name": "_embedding_module",
-#       "anchor": "function-embedding-module",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "embedding-attr",
-#       "name": "_embedding_attr",
-#       "anchor": "function-embedding-attr",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "manifest-log-failure",
-#       "name": "_manifest_log_failure",
-#       "anchor": "function-manifest-log-failure",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "manifest-log-success",
-#       "name": "_manifest_log_success",
-#       "anchor": "function-manifest-log-success",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "manifest-log-skip",
-#       "name": "_manifest_log_skip",
-#       "anchor": "function-manifest-log-skip",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "build-bm25-vector",
 #       "name": "_build_bm25_vector",
 #       "anchor": "function-build-bm25-vector",
@@ -463,19 +433,43 @@ from DocsToKG.DocParsing.env import (
 from DocsToKG.DocParsing.formats import (
     VECTOR_SCHEMA_VERSION,
 )
+from DocsToKG.DocParsing.formats import (
+    BM25Vector as _BM25Vector,
+)
+from DocsToKG.DocParsing.formats import (
+    DenseVector as _DenseVector,
+)
+from DocsToKG.DocParsing.formats import (
+    SPLADEVector as _SPLADEVector,
+)
+from DocsToKG.DocParsing.formats import (
+    VectorRow as _VectorRow,
+)
 from DocsToKG.DocParsing.io import (
     atomic_write,
     compute_chunk_uuid,
     compute_content_hash,
     iter_jsonl,
     load_manifest_index,
-    manifest_append,
     quarantine_artifact,
     relative_path,
     resolve_attempts_path,
     resolve_manifest_path,
 )
-from DocsToKG.DocParsing.logging import get_logger, log_event, telemetry_scope
+from DocsToKG.DocParsing.logging import (
+    get_logger,
+    log_event,
+    telemetry_scope,
+)
+from DocsToKG.DocParsing.logging import (
+    manifest_log_failure as _logging_manifest_log_failure,
+)
+from DocsToKG.DocParsing.logging import (
+    manifest_log_skip as _logging_manifest_log_skip,
+)
+from DocsToKG.DocParsing.logging import (
+    manifest_log_success as _logging_manifest_log_success,
+)
 from DocsToKG.DocParsing.schemas import (
     SchemaKind,
     ensure_chunk_schema,
@@ -486,7 +480,8 @@ from DocsToKG.DocParsing.schemas import (
 )
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
-from .cli import build_parser, parse_args as _cli_parse_args
+from .cli import build_parser
+from .cli import parse_args as _cli_parse_args
 from .config import (
     EMBED_PROFILE_PRESETS,
     SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
@@ -495,66 +490,38 @@ from .config import (
 
 parse_args = _cli_parse_args
 
+BM25Vector = _BM25Vector
+SPLADEVector = _SPLADEVector
+DenseVector = _DenseVector
+VectorRow = _VectorRow
 
-def _embedding_module():
-    """Return the embedding package to honour monkeypatching."""
-
-    import DocsToKG.DocParsing._embedding as embedding_pkg
-
-    return embedding_pkg
-
-
-def _embedding_attr(name: str):
-    """Fetch ``name`` from the public embedding shim module."""
-
-    return getattr(_embedding_module(), name)
-
-
-def _manifest_log_failure(*args, **kwargs):
-    """Delegate manifest failure logging to the embedding shim."""
-
-    return _embedding_attr("manifest_log_failure")(*args, **kwargs)
-
-
-def _manifest_log_success(*args, **kwargs):
-    """Delegate manifest success logging to the embedding shim."""
-
-    return _embedding_attr("manifest_log_success")(*args, **kwargs)
-
-
-def _manifest_log_skip(*args, **kwargs):
-    """Delegate manifest skip logging to the embedding shim."""
-
-    return _embedding_attr("manifest_log_skip")(*args, **kwargs)
-
-
-manifest_log_failure = _manifest_log_failure
-manifest_log_success = _manifest_log_success
-manifest_log_skip = _manifest_log_skip
+manifest_log_failure = _logging_manifest_log_failure
+manifest_log_success = _logging_manifest_log_success
+manifest_log_skip = _logging_manifest_log_skip
 
 
 def _build_bm25_vector(**kwargs):
-    """Construct a BM25 vector using the embedding shim."""
+    """Construct a BM25 vector."""
 
-    return _embedding_attr("BM25Vector")(**kwargs)
+    return BM25Vector(**kwargs)
 
 
 def _build_splade_vector(**kwargs):
-    """Construct a SPLADE vector using the embedding shim."""
+    """Construct a SPLADE vector."""
 
-    return _embedding_attr("SPLADEVector")(**kwargs)
+    return SPLADEVector(**kwargs)
 
 
 def _build_dense_vector(**kwargs):
-    """Construct a dense vector using the embedding shim."""
+    """Construct a dense vector."""
 
-    return _embedding_attr("DenseVector")(**kwargs)
+    return DenseVector(**kwargs)
 
 
 def _build_vector_row(**kwargs):
-    """Construct a VectorRow using the embedding shim."""
+    """Construct a VectorRow."""
 
-    return _embedding_attr("VectorRow")(**kwargs)
+    return VectorRow(**kwargs)
 
 
 # --- Globals ---
@@ -1870,7 +1837,7 @@ def write_vectors(
                 uuid=uuid_value,
                 error=str(exc),
             )
-            _manifest_log_failure(
+            manifest_log_failure(
                 stage="embeddings",
                 doc_id=doc_id,
                 duration_s=0.0,
@@ -1919,7 +1886,7 @@ def _handle_embedding_quarantine(
         )
         input_path = chunk_path
 
-    _manifest_log_failure(
+    manifest_log_failure(
         stage=MANIFEST_STAGE,
         doc_id=doc_id,
         duration_s=0.0,
@@ -1984,7 +1951,7 @@ def _validate_vectors_for_chunks(
             except Exception:
                 input_hash = ""
             quarantine_path = quarantine_artifact(vector_path, reason=reason, logger=logger)
-            _manifest_log_failure(
+            manifest_log_failure(
                 stage=MANIFEST_STAGE,
                 doc_id=doc_id,
                 duration_s=0.0,
@@ -2565,7 +2532,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         input_relpath=relative_path(chunk_file, resolved_root),
                         output_relpath=relative_path(out_path, resolved_root),
                     )
-                    _manifest_log_skip(
+                    manifest_log_skip(
                         stage=MANIFEST_STAGE,
                         doc_id=doc_id,
                         input_path=chunk_file,
@@ -2674,7 +2641,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         try:
                             count, nnz, norms, duration, quarantined = future.result()
                         except EmbeddingProcessingError as exc:
-                            _manifest_log_failure(
+                            manifest_log_failure(
                                 stage=MANIFEST_STAGE,
                                 doc_id=doc_id,
                                 duration_s=round(exc.duration, 3),
@@ -2687,7 +2654,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                             bar.update(1)
                             raise exc.original from exc
                         except Exception as exc:
-                            _manifest_log_failure(
+                            manifest_log_failure(
                                 stage=MANIFEST_STAGE,
                                 doc_id=doc_id,
                                 duration_s=0.0,
@@ -2706,7 +2673,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         total_vectors += count
                         splade_nnz_all.extend(nnz)
                         qwen_norms_all.extend(norms)
-                        _manifest_log_success(
+                        manifest_log_success(
                             stage=MANIFEST_STAGE,
                             doc_id=doc_id,
                             duration_s=round(duration, 3),
@@ -2739,7 +2706,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                     try:
                         count, nnz, norms, duration, quarantined = _process_entry(entry)
                     except EmbeddingProcessingError as exc:
-                        _manifest_log_failure(
+                        manifest_log_failure(
                             stage=MANIFEST_STAGE,
                             doc_id=doc_id,
                             duration_s=round(exc.duration, 3),
@@ -2751,7 +2718,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         )
                         raise exc.original from exc
                     except Exception as exc:
-                        _manifest_log_failure(
+                        manifest_log_failure(
                             stage=MANIFEST_STAGE,
                             doc_id=doc_id,
                             duration_s=0.0,

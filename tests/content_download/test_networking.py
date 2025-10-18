@@ -1112,7 +1112,7 @@ if HAS_REQUESTS and HAS_PYALEX:
         assert outcome.path is None
         assert not any(pdf_dir.glob("*.pdf"))
 
-    def test_skip_large_downloads_emit_voluntary_reason(tmp_path: Path, monkeypatch) -> None:
+    def test_skip_large_downloads_emit_voluntary_reason(tmp_path: Path, patcher) -> None:
         artifact = _make_artifact(tmp_path)
         url = "https://example.org/oversized.pdf"
 
@@ -1144,12 +1144,10 @@ if HAS_REQUESTS and HAS_PYALEX:
                 return _Response()
 
         # Ensure range resume code paths use patched request helper
-        monkeypatch.setattr(
+        patcher.setattr(
             downloader, "request_with_retries", lambda *args, **kwargs: _Response(), raising=False
         )
-        monkeypatch.setattr(
-            download_impl, "request_with_retries", lambda *args, **kwargs: _Response()
-        )
+        patcher.setattr(download_impl, "request_with_retries", lambda *args, **kwargs: _Response())
 
         context = {
             "previous": {},
@@ -1640,7 +1638,7 @@ def test_download_candidate_retries_on_transient_errors(http_server, tmp_path, s
 # --- test_download_retries.py ---
 
 
-def test_retry_after_header_respected(monkeypatch, http_server, tmp_path):
+def test_retry_after_header_respected(patcher, http_server, tmp_path):
     handler, server = http_server
     handler.statuses = [429, 200]
     handler.retry_after = 2
@@ -1650,7 +1648,7 @@ def test_retry_after_header_respected(monkeypatch, http_server, tmp_path):
     def fake_sleep(seconds: float) -> None:
         sleep_calls.append(seconds)
 
-    monkeypatch.setattr(time, "sleep", fake_sleep)
+    patcher.setattr(time, "sleep", fake_sleep)
     url = f"http://127.0.0.1:{server.server_address[1]}/test.pdf"
 
     artifact, session, context, outcome = _download(url, tmp_path)
@@ -1712,11 +1710,11 @@ def test_download_candidate_avoids_per_request_head(http_server, tmp_path):
 # --- test_head_precheck.py ---
 
 
-def test_head_precheck_allows_pdf(monkeypatch):
+def test_head_precheck_allows_pdf(patcher):
     head_response = Mock(status_code=200, headers={"Content-Type": "application/pdf"})
     head_response.close = Mock()
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.networking.request_with_retries",
         lambda *args, **kwargs: head_response,
     )
@@ -1725,11 +1723,11 @@ def test_head_precheck_allows_pdf(monkeypatch):
     head_response.close.assert_called_once()
 
 
-def test_head_precheck_rejects_html(monkeypatch):
+def test_head_precheck_rejects_html(patcher):
     head_response = Mock(status_code=200, headers={"Content-Type": "text/html"})
     head_response.close = Mock()
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.networking.request_with_retries",
         lambda *args, **kwargs: head_response,
     )
@@ -1739,7 +1737,7 @@ def test_head_precheck_rejects_html(monkeypatch):
 
 
 @pytest.mark.parametrize("status", [405, 501])
-def test_head_precheck_degrades_to_get_pdf(monkeypatch, status):
+def test_head_precheck_degrades_to_get_pdf(patcher, status):
     class _StreamResponse:
         def __init__(self) -> None:
             self.status_code = 200
@@ -1767,7 +1765,7 @@ def test_head_precheck_degrades_to_get_pdf(monkeypatch, status):
     def fake_request(*args, **kwargs):
         return responses.pop(0)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
@@ -1777,7 +1775,7 @@ def test_head_precheck_degrades_to_get_pdf(monkeypatch, status):
 
 
 @pytest.mark.parametrize("status", [405, 501])
-def test_head_precheck_degrades_to_get_html(monkeypatch, status):
+def test_head_precheck_degrades_to_get_html(patcher, status):
     class _StreamResponse:
         def __init__(self) -> None:
             self.status_code = 200
@@ -1804,7 +1802,7 @@ def test_head_precheck_degrades_to_get_html(monkeypatch, status):
     def fake_request(*args, **kwargs):
         return responses.pop(0)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
@@ -1816,8 +1814,8 @@ def test_head_precheck_degrades_to_get_html(monkeypatch, status):
     "exc",
     [requests.Timeout("boom"), requests.ConnectionError("boom")],
 )
-def test_head_precheck_returns_true_on_exception(monkeypatch, exc):
-    monkeypatch.setattr(
+def test_head_precheck_returns_true_on_exception(patcher, exc):
+    patcher.setattr(
         "DocsToKG.ContentDownload.networking.request_with_retries",
         Mock(side_effect=exc),
     )
@@ -1851,21 +1849,21 @@ def test_conditional_request_build_headers_accepts_complete_metadata() -> None:
 # --- test_download_retries.py ---
 
 
-def test_retry_determinism_matches_request_with_retries(monkeypatch, http_server, tmp_path):
+def test_retry_determinism_matches_request_with_retries(patcher, http_server, tmp_path):
     """Verify retry budget and timing are governed exclusively by the helper."""
 
     handler, server = http_server
     handler.statuses = [429, 429, 200]
     url = f"http://127.0.0.1:{server.server_address[1]}/rate-limited.pdf"
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.networking.random.random", lambda: 0.0)
+    patcher.setattr("DocsToKG.ContentDownload.networking.random.random", lambda: 0.0)
 
     sleep_durations: list[float] = []
 
     def _capture_sleep(delay: float) -> None:
         sleep_durations.append(delay)
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.networking.time.sleep", _capture_sleep)
+    patcher.setattr("DocsToKG.ContentDownload.networking.time.sleep", _capture_sleep)
 
     _, session, _, outcome = _download(url, tmp_path)
     try:
@@ -2294,11 +2292,11 @@ def test_parse_retry_after_header_naive_datetime() -> None:
 # --- test_http_retry.py ---
 
 
-def test_parse_retry_after_header_handles_parse_errors(monkeypatch) -> None:
+def test_parse_retry_after_header_handles_parse_errors(patcher) -> None:
     response = requests.Response()
     response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.networking.parsedate_to_datetime",
         Mock(side_effect=TypeError("boom")),
     )
@@ -2309,11 +2307,11 @@ def test_parse_retry_after_header_handles_parse_errors(monkeypatch) -> None:
 # --- test_http_retry.py ---
 
 
-def test_parse_retry_after_header_returns_none_when_parser_returns_none(monkeypatch) -> None:
+def test_parse_retry_after_header_returns_none_when_parser_returns_none(patcher) -> None:
     response = requests.Response()
     response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.networking.parsedate_to_datetime",
         Mock(return_value=None),
     )
@@ -2389,7 +2387,7 @@ def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
 
 
 def stub_requests(
-    monkeypatch, mapping: Dict[Tuple[str, str], Callable[[], FakeResponse] | FakeResponse]
+    patcher, mapping: Dict[Tuple[str, str], Callable[[], FakeResponse] | FakeResponse]
 ):
     def fake_request(session, method, url, **kwargs):
         key = (method.upper(), url)
@@ -2398,14 +2396,14 @@ def stub_requests(
         response = mapping[key]
         return response() if callable(response) else response
 
-    monkeypatch.setattr(downloader, "request_with_retries", fake_request, raising=False)
-    monkeypatch.setattr(download_impl, "request_with_retries", fake_request)
+    patcher.setattr(downloader, "request_with_retries", fake_request, raising=False)
+    patcher.setattr(download_impl, "request_with_retries", fake_request)
 
 
 # --- test_download_outcomes.py ---
 
 
-def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
+def test_successful_pdf_download_populates_metadata(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/paper.pdf"
     pdf_bytes = b"%PDF-1.4\n" + (b"x" * 2048) + b"\n%%EOF"
@@ -2422,7 +2420,7 @@ def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
             chunks=[pdf_bytes],
         ),
     }
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     session = requests.Session()
     outcome = downloader.download_candidate(
@@ -2451,7 +2449,7 @@ def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
 # --- test_download_outcomes.py ---
 
 
-def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
+def test_cached_response_preserves_prior_metadata(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/paper.pdf"
     cached_file = artifact.pdf_dir / "cached.pdf"
@@ -2479,7 +2477,7 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
             headers={"Content-Type": "application/pdf"},
         ),
     }
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     session = requests.Session()
     outcome = downloader.download_candidate(
@@ -2499,7 +2497,7 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
 # --- test_download_outcomes.py ---
 
 
-def test_cache_validation_fast_path_skips_digest(tmp_path, monkeypatch):
+def test_cache_validation_fast_path_skips_digest(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/cached-fast.pdf"
     cached_path = artifact.pdf_dir / "cached.pdf"
@@ -2509,12 +2507,12 @@ def test_cache_validation_fast_path_skips_digest(tmp_path, monkeypatch):
     cached_mtime = cached_path.stat().st_mtime_ns
 
     mapping = {("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})}
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     def raise_if_digest(signature):
         raise AssertionError("Digest computation should not run for fast-path validation")
 
-    monkeypatch.setattr(download_impl, "_cached_sha256", raise_if_digest)
+    patcher.setattr(download_impl, "_cached_sha256", raise_if_digest)
 
     context = {
         "previous": {
@@ -2545,7 +2543,7 @@ def test_cache_validation_fast_path_skips_digest(tmp_path, monkeypatch):
     assert outcome.metadata.get("cache_validation_mode") == "fast_path"
 
 
-def test_cache_validation_forced_digest(tmp_path, monkeypatch):
+def test_cache_validation_forced_digest(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/cached-digest.pdf"
     cached_path = artifact.pdf_dir / "cached-digest.pdf"
@@ -2555,7 +2553,7 @@ def test_cache_validation_forced_digest(tmp_path, monkeypatch):
     cached_mtime = cached_path.stat().st_mtime_ns
 
     mapping = {("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})}
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     digest_calls: List[Tuple[str, int, int]] = []
 
@@ -2563,7 +2561,7 @@ def test_cache_validation_forced_digest(tmp_path, monkeypatch):
         digest_calls.append(signature)
         return cached_sha
 
-    monkeypatch.setattr(download_impl, "_cached_sha256", record_digest)
+    patcher.setattr(download_impl, "_cached_sha256", record_digest)
 
     context = {
         "previous": {
@@ -2595,7 +2593,7 @@ def test_cache_validation_forced_digest(tmp_path, monkeypatch):
     assert outcome.metadata.get("cache_validation_mode") == "digest"
 
 
-def test_cache_validation_digest_mismatch_triggers_refetch(tmp_path, monkeypatch):
+def test_cache_validation_digest_mismatch_triggers_refetch(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/cached-mismatch.pdf"
     cached_path = artifact.pdf_dir / "cached-mismatch.pdf"
@@ -2639,13 +2637,13 @@ def test_cache_validation_digest_mismatch_triggers_refetch(tmp_path, monkeypatch
             raise AssertionError("Unexpected additional request")
         return responses.pop(0)
 
-    monkeypatch.setattr(download_impl, "request_with_retries", sequenced_request)
-    monkeypatch.setattr(downloader, "request_with_retries", sequenced_request, raising=False)
+    patcher.setattr(download_impl, "request_with_retries", sequenced_request)
+    patcher.setattr(downloader, "request_with_retries", sequenced_request, raising=False)
 
     def mismatched_digest(signature: Tuple[str, int, int]) -> Optional[str]:
         return "deadbeef"
 
-    monkeypatch.setattr(download_impl, "_cached_sha256", mismatched_digest)
+    patcher.setattr(download_impl, "_cached_sha256", mismatched_digest)
 
     recorded_mtime = max(cached_mtime - 1, 0)
     context = {
@@ -2679,7 +2677,7 @@ def test_cache_validation_digest_mismatch_triggers_refetch(tmp_path, monkeypatch
     assert downloaded == new_bytes
 
 
-def test_cache_validation_digest_cache_reuse(tmp_path, monkeypatch):
+def test_cache_validation_digest_cache_reuse(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/cached-cache.pdf"
     cached_path = artifact.pdf_dir / "cached-cache.pdf"
@@ -2689,7 +2687,7 @@ def test_cache_validation_digest_cache_reuse(tmp_path, monkeypatch):
     cached_mtime = cached_path.stat().st_mtime_ns
 
     mapping = {("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})}
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     download_impl._cached_sha256.cache_clear()
 
@@ -2734,14 +2732,14 @@ def test_cache_validation_digest_cache_reuse(tmp_path, monkeypatch):
     download_impl._cached_sha256.cache_clear()
 
 
-def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
+def test_http_error_sets_metadata_to_none(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/paper.pdf"
 
     mapping = {
         ("GET", url): lambda: FakeResponse(404, headers={"Content-Type": "text/html"}),
     }
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     session = requests.Session()
     outcome = downloader.download_candidate(
@@ -2765,13 +2763,13 @@ def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
 # --- test_download_outcomes.py ---
 
 
-def test_html_download_with_text_extraction(tmp_path, monkeypatch):
+def test_html_download_with_text_extraction(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/page.html"
     html_bytes = b"<!DOCTYPE html><html><body><p>Hello</p></body></html>"
 
     html_extractor = types.SimpleNamespace(extract=lambda text: "Hello")
-    monkeypatch.setitem(sys.modules, "trafilatura", html_extractor)
+    patcher.setitem(sys.modules, "trafilatura", html_extractor)
 
     mapping = {
         ("GET", url): lambda: FakeResponse(
@@ -2784,7 +2782,7 @@ def test_html_download_with_text_extraction(tmp_path, monkeypatch):
             chunks=[html_bytes],
         ),
     }
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     session = requests.Session()
     outcome = downloader.download_candidate(
@@ -2810,7 +2808,7 @@ def test_html_download_with_text_extraction(tmp_path, monkeypatch):
 # --- test_download_outcomes.py ---
 
 
-def test_dry_run_preserves_metadata_without_files(tmp_path, monkeypatch):
+def test_dry_run_preserves_metadata_without_files(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/paper.pdf"
     pdf_bytes = b"%PDF-1.4\n" + (b"y" * 2048) + b"\n%%EOF"
@@ -2826,7 +2824,7 @@ def test_dry_run_preserves_metadata_without_files(tmp_path, monkeypatch):
             chunks=[pdf_bytes],
         ),
     }
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     session = requests.Session()
     outcome = downloader.download_candidate(
@@ -2850,7 +2848,7 @@ def test_dry_run_preserves_metadata_without_files(tmp_path, monkeypatch):
 # --- test_download_outcomes.py ---
 
 
-def test_small_pdf_detected_as_corrupt(tmp_path, monkeypatch):
+def test_small_pdf_detected_as_corrupt(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/tiny.pdf"
     tiny_pdf = b"%PDF-1.4\n1 0 obj<<>>\nendobj\n%%EOF"
@@ -2862,7 +2860,7 @@ def test_small_pdf_detected_as_corrupt(tmp_path, monkeypatch):
             chunks=[tiny_pdf],
         )
     }
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     session = requests.Session()
     outcome = downloader.download_candidate(
@@ -2883,7 +2881,7 @@ def test_small_pdf_detected_as_corrupt(tmp_path, monkeypatch):
 # --- test_download_outcomes.py ---
 
 
-def test_html_tail_in_pdf_marks_corruption(tmp_path, monkeypatch):
+def test_html_tail_in_pdf_marks_corruption(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/error.pdf"
     payload = b"%PDF-1.4\nstream\n<html>Error page</html>"
@@ -2895,7 +2893,7 @@ def test_html_tail_in_pdf_marks_corruption(tmp_path, monkeypatch):
             chunks=[payload],
         )
     }
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     session = requests.Session()
     outcome = downloader.download_candidate(
@@ -2993,7 +2991,7 @@ def test_manifest_entry_serializes_null_reason(tmp_path):
         conn.close()
 
 
-def test_resume_requested_triggers_full_download(tmp_path, monkeypatch):
+def test_resume_requested_triggers_full_download(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/resume.pdf"
     dest_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
@@ -3013,8 +3011,8 @@ def test_resume_requested_triggers_full_download(tmp_path, monkeypatch):
             chunks=[full_bytes[:2048], full_bytes[2048:]],
         )
 
-    monkeypatch.setattr(downloader, "request_with_retries", fake_request, raising=False)
-    monkeypatch.setattr(download_impl, "request_with_retries", fake_request)
+    patcher.setattr(downloader, "request_with_retries", fake_request, raising=False)
+    patcher.setattr(download_impl, "request_with_retries", fake_request)
 
     ctx = DownloadContext.from_mapping(
         {
@@ -3204,7 +3202,7 @@ def test_skip_large_downloads_metrics_do_not_consume_domain_budget(tmp_path):
 # --- test_download_outcomes.py ---
 
 
-def test_rfc5987_filename_suffix(tmp_path, monkeypatch):
+def test_rfc5987_filename_suffix(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/no-extension"
     pdf_bytes = b"%PDF-1.4\n" + (b"z" * 2048) + b"\n%%EOF"
@@ -3219,7 +3217,7 @@ def test_rfc5987_filename_suffix(tmp_path, monkeypatch):
             chunks=[pdf_bytes],
         )
     }
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     session = requests.Session()
     outcome = downloader.download_candidate(
@@ -3239,7 +3237,7 @@ def test_rfc5987_filename_suffix(tmp_path, monkeypatch):
 # --- test_download_outcomes.py ---
 
 
-def test_html_filename_suffix_from_disposition(tmp_path, monkeypatch):
+def test_html_filename_suffix_from_disposition(tmp_path, patcher):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/content"
     html_bytes = b"<html><body>Hi</body></html>"
@@ -3254,7 +3252,7 @@ def test_html_filename_suffix_from_disposition(tmp_path, monkeypatch):
             chunks=[html_bytes],
         )
     }
-    stub_requests(monkeypatch, mapping)
+    stub_requests(patcher, mapping)
 
     session = requests.Session()
     outcome = downloader.download_candidate(
@@ -4047,7 +4045,7 @@ def test_load_manifest_url_index_reads_sqlite(tmp_path: Path) -> None:
     assert record["content_length"] == entry.content_length
 
 
-def test_manifest_url_index_lazy_get_does_not_trigger_full_load(tmp_path: Path, monkeypatch):
+def test_manifest_url_index_lazy_get_does_not_trigger_full_load(tmp_path: Path, patcher):
     db_path = tmp_path / "manifest.sqlite3"
     sink = SqliteSink(db_path)
     entry = ManifestEntry(
@@ -4077,7 +4075,7 @@ def test_manifest_url_index_lazy_get_does_not_trigger_full_load(tmp_path: Path, 
     def _fail_loader(path):
         raise AssertionError("ManifestUrlIndex should not eager-load via load_manifest_url_index")
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _fail_loader)
+    patcher.setattr("DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _fail_loader)
 
     index = ManifestUrlIndex(db_path, eager=False)
     record = index.get(entry.url)
@@ -4147,7 +4145,7 @@ def test_manifest_url_index_iter_existing_filters_missing_paths(tmp_path: Path) 
     assert payload["path"] == str(existing_path)
 
 
-def test_manifest_url_index_eager_load_invokes_loader_once(tmp_path: Path, monkeypatch) -> None:
+def test_manifest_url_index_eager_load_invokes_loader_once(tmp_path: Path, patcher) -> None:
     db_path = tmp_path / "manifest.sqlite3"
     db_path.touch()
     url = "https://example.org/eager.pdf"
@@ -4170,9 +4168,7 @@ def test_manifest_url_index_eager_load_invokes_loader_once(tmp_path: Path, monke
         calls.append(path)
         return mapping
 
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _tracking_loader
-    )
+    patcher.setattr("DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _tracking_loader)
 
     index = ManifestUrlIndex(db_path, eager=True)
     assert calls == [db_path]

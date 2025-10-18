@@ -74,6 +74,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import os
 import warnings
 from pathlib import Path
 
@@ -90,7 +91,7 @@ pytest.importorskip("transformers")
 pytestmark = pytest.mark.filterwarnings("ignore:.*SwigPy.*__module__ attribute:DeprecationWarning")
 
 import DocsToKG.DocParsing.env as doc_env  # noqa: E402
-from DocsToKG.DocParsing._chunking.runtime import (  # noqa: E402
+from DocsToKG.DocParsing.chunking.runtime import (  # noqa: E402
     Rec,
     coalesce_small_runs,
 )
@@ -150,8 +151,8 @@ def _reload_core_cli():
     """Reload CLI modules so newly installed stubs are honoured."""
 
     module_names = [
-        "DocsToKG.DocParsing._chunking.runtime",
-        "DocsToKG.DocParsing._embedding.runtime",
+        "DocsToKG.DocParsing.chunking.runtime",
+        "DocsToKG.DocParsing.embedding.runtime",
         "DocsToKG.DocParsing.core",
     ]
     reloaded = None
@@ -162,9 +163,7 @@ def _reload_core_cli():
     return reloaded
 
 
-def test_chunk_and_embed_cli_with_dependency_stubs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_chunk_and_embed_cli_with_dependency_stubs(tmp_path: Path) -> None:
     """Run the chunking and embedding CLIs end-to-end with synthetic stubs."""
 
     data_root = tmp_path / "data"
@@ -177,10 +176,10 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
     )
 
     dependency_stubs()
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
-    monkeypatch.setenv("DOCSTOKG_SPLADE_DIR", str(tmp_path / "splade"))
-    monkeypatch.setenv("DOCSTOKG_QWEN_DIR", str(tmp_path / "qwen"))
-    monkeypatch.setenv("DOCSTOKG_MODEL_ROOT", str(tmp_path / "models"))
+    os.environ["DOCSTOKG_DATA_ROOT"] = str(data_root)
+    os.environ["DOCSTOKG_SPLADE_DIR"] = str(tmp_path / "splade")
+    os.environ["DOCSTOKG_QWEN_DIR"] = str(tmp_path / "qwen")
+    os.environ["DOCSTOKG_MODEL_ROOT"] = str(tmp_path / "models")
     (tmp_path / "splade").mkdir()
     (tmp_path / "qwen").mkdir()
     (tmp_path / "models").mkdir()
@@ -225,12 +224,12 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
 # --- CLI path smoke tests ---
 
 
-def test_scripts_respect_data_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_scripts_respect_data_root(tmp_path: Path) -> None:
     """CLIs should honor DOCSTOKG_DATA_ROOT when resolving defaults."""
 
     data_root = tmp_path / "DataRoot"
     data_root.mkdir()
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+    os.environ["DOCSTOKG_DATA_ROOT"] = str(data_root)
 
     for argv in CLI_COMMANDS:
         core_module = _reload_core_cli()

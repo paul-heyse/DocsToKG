@@ -51,7 +51,7 @@ from pathlib import Path
 
 import pytest
 
-from DocsToKG.DocParsing._embedding.runtime import iter_rows_in_batches
+from DocsToKG.DocParsing.embedding.runtime import iter_rows_in_batches
 
 # --- Test Cases ---
 

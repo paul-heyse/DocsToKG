@@ -93,10 +93,109 @@ import logging
 import os
 import sys
 import types
+from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
+
+
+class PatchManager:
+    """Lightweight replacement for pytest.MonkeyPatch using unittest.mock."""
+
+    def __init__(self) -> None:
+        self._stack = ExitStack()
+
+    def close(self) -> None:
+        self._stack.close()
+
+    def setattr(self, target, *args, raising: bool = True):
+        """Patch an attribute either by object/name or dotted path string."""
+
+        if isinstance(target, str):
+            if len(args) != 1:
+                raise TypeError("setattr string target expects exactly one positional argument")
+            (value,) = args
+            patcher = patch(target, value, create=not raising)
+        else:
+            if len(args) != 2:
+                raise TypeError("setattr object target expects name and value")
+            name, value = args
+            patcher = patch.object(target, name, value, create=not raising)
+
+        self._stack.enter_context(patcher)
+        return value if isinstance(target, str) else value
+
+    def setitem(self, mapping, key, value):
+        """Patch a mapping entry and restore the original value afterwards."""
+
+        sentinel = object()
+        original = mapping.get(key, sentinel)
+        mapping[key] = value
+
+        def restore():
+            if original is sentinel:
+                mapping.pop(key, None)
+            else:
+                mapping[key] = original
+
+        self._stack.callback(restore)
+        return value
+
+    def setenv(self, key: str, value: str) -> str:
+        """Temporarily set an environment variable."""
+
+        sentinel = object()
+        original = os.environ.get(key, sentinel)
+        os.environ[key] = value
+
+        def restore():
+            if original is sentinel:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = original
+
+        self._stack.callback(restore)
+        return value
+
+    def delenv(self, key: str, *, raising: bool = True) -> None:
+        """Temporarily delete an environment variable."""
+
+        sentinel = object()
+        if key in os.environ:
+            original = os.environ.pop(key)
+        else:
+            if raising:
+                raise KeyError(key)
+            original = sentinel
+
+        def restore():
+            if original is not sentinel:
+                os.environ[key] = original
+
+        self._stack.callback(restore)
+
+    def enter_context(self, context_manager):
+        """Proxy to ExitStack.enter_context for custom patchers."""
+
+        return self._stack.enter_context(context_manager)
+
+    def callback(self, func):
+        """Register a cleanup callback."""
+
+        self._stack.callback(func)
+
+
+@pytest.fixture
+def patch_stack():
+    """Fixture exposing PatchManager for tests."""
+
+    manager = PatchManager()
+    try:
+        yield manager
+    finally:
+        manager.close()
 
 
 class _StubRequestsModule(SimpleNamespace):
@@ -127,7 +226,7 @@ class _SSLError(_RequestException):
 
 class _StubSession:
     def get(self, *args, **kwargs):  # pragma: no cover - patched in tests
-        raise RuntimeError("requests.Session stub used without monkeypatching")
+        raise RuntimeError("requests.Session stub used without patching")
 
 
 class _StubResponse:
@@ -227,22 +326,21 @@ if "pooch" not in sys.modules:
     _stub_pooch.retrieve = _retrieve  # type: ignore[attr-defined]
     sys.modules["pooch"] = _stub_pooch
 
-from DocsToKG.OntologyDownload import api as core  # noqa: E402  (after stubs)
-import DocsToKG.OntologyDownload.planning as planning_mod
+planning_mod = importlib.import_module("DocsToKG.OntologyDownload.planning")
 
 # --- Globals ---
 
 _ORIGINAL_BUILD_DESTINATION = planning_mod._build_destination
 
 
-@pytest.fixture(autouse=True)
 # --- Helper Functions ---
 
 
-def _reset_build_destination(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.fixture(autouse=True)
+def _reset_build_destination(patch_stack: PatchManager) -> None:
     """Ensure tests see the canonical _build_destination implementation."""
 
-    monkeypatch.setattr(
+    patch_stack.setattr(
         planning_mod,
         "_build_destination",
         _ORIGINAL_BUILD_DESTINATION,
@@ -251,9 +349,9 @@ def _reset_build_destination(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _ontology_env(tmp_path_factory, monkeypatch: pytest.MonkeyPatch) -> None:
+def _ontology_env(tmp_path_factory, patch_stack: PatchManager) -> None:
     """Provide deterministic environment variables expected by validators."""
 
     pystow_home = tmp_path_factory.mktemp("pystow-home")
-    monkeypatch.setenv("PYSTOW_HOME", str(pystow_home))
-    monkeypatch.setenv("BIOPORTAL_API_KEY", "test-bioportal-key")
+    patch_stack.setenv("PYSTOW_HOME", str(pystow_home))
+    patch_stack.setenv("BIOPORTAL_API_KEY", "test-bioportal-key")

@@ -94,24 +94,24 @@ def _session_for_response(response: _DummyResponse, *, method: str = "HEAD") -> 
 # --- Test Cases ---
 
 
-def test_head_precheck_accepts_pdf_content(monkeypatch):
+def test_head_precheck_accepts_pdf_content(patcher):
     response = _DummyResponse(200, {"Content-Type": "application/pdf"})
     session, helper = _session_for_response(response)
-    monkeypatch.setattr("DocsToKG.ContentDownload.networking.request_with_retries", helper)
+    patcher.setattr("DocsToKG.ContentDownload.networking.request_with_retries", helper)
 
     assert head_precheck(session, "https://example.org/file.pdf", timeout=10.0)
     assert response.closed
 
 
-def test_head_precheck_rejects_html_payload(monkeypatch):
+def test_head_precheck_rejects_html_payload(patcher):
     response = _DummyResponse(200, {"Content-Type": "text/html"})
     session, helper = _session_for_response(response)
-    monkeypatch.setattr("DocsToKG.ContentDownload.networking.request_with_retries", helper)
+    patcher.setattr("DocsToKG.ContentDownload.networking.request_with_retries", helper)
 
     assert not head_precheck(session, "https://example.org/page", timeout=2.0)
 
 
-def test_head_precheck_degrades_to_get(monkeypatch):
+def test_head_precheck_degrades_to_get(patcher):
     head_response = _DummyResponse(405, {})
     get_response = _DummyResponse(200, {"Content-Type": "application/pdf"})
 
@@ -138,7 +138,7 @@ def test_head_precheck_degrades_to_get(monkeypatch):
 
         return _Stream()
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.networking.request_with_retries", _request_with_retries
     )
 
@@ -192,13 +192,13 @@ def test_token_bucket_enforces_capacity():
     assert bucket.acquire() == 0.0
 
 
-def test_circuit_breaker_open_and_cooldown(monkeypatch):
+def test_circuit_breaker_open_and_cooldown(patcher):
     current = [0.0]
 
     def fake_monotonic():
         return current[0]
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.networking.time.monotonic", fake_monotonic)
+    patcher.setattr("DocsToKG.ContentDownload.networking.time.monotonic", fake_monotonic)
     breaker = CircuitBreaker(failure_threshold=2, cooldown_seconds=5.0)
     assert breaker.allow()
     breaker.record_failure()

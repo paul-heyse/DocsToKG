@@ -1,0 +1,41 @@
+{
+  "spec_version": "2025-10-18",
+  "required_sections": [
+    {"title":"Mission and Scope","pattern":"^## Mission and Scope","min_lines":3},
+    {"title":"High-Level Architecture & Data Flow","pattern":"^## High-Level Architecture & Data Flow","min_lines":4},
+    {"title":"Hot Paths & Data Shapes","pattern":"^## Hot Paths & Data Shapes","min_lines":3},
+    {"title":"Performance Objectives & Baselines","pattern":"^## Performance Objectives & Baselines","min_lines":3},
+    {"title":"Profiling & Optimization Playbook","pattern":"^## Profiling & Optimization Playbook","min_lines":4},
+    {"title":"Complexity & Scalability Guidance","pattern":"^## Complexity & Scalability Guidance","min_lines":3},
+    {"title":"I/O, Caching & Concurrency","pattern":"^## I/O, Caching & Concurrency","min_lines":3},
+    {"title":"Invariants to Preserve \(change with caution\)","pattern":"^## Invariants to Preserve \(change with caution\)","min_lines":3},
+    {"title":"Preferred Refactor Surfaces","pattern":"^## Preferred Refactor Surfaces","min_lines":3},
+    {"title":"Code Documentation Requirements","pattern":"^## Code Documentation Requirements","min_lines":4},
+    {"title":"Test Matrix & Quality Gates","pattern":"^## Test Matrix & Quality Gates","min_lines":4},
+    {"title":"Failure Modes & Debug Hints","pattern":"^## Failure Modes & Debug Hints","min_lines":3},
+    {"title":"Canonical Commands","pattern":"^## Canonical Commands","min_lines":3},
+    {"title":"Indexing Hints","pattern":"^## Indexing Hints","min_lines":2},
+    {"title":"Ownership & Documentation Links","pattern":"^## Ownership & Documentation Links","min_lines":2},
+    {"title":"Changelog and Update Procedure","pattern":"^## Changelog and Update Procedure","min_lines":2}
+  ],
+  "order": [
+    "Mission and Scope",
+    "High-Level Architecture & Data Flow",
+    "Hot Paths & Data Shapes",
+    "Performance Objectives & Baselines",
+    "Profiling & Optimization Playbook",
+    "Complexity & Scalability Guidance",
+    "I/O, Caching & Concurrency",
+    "Invariants to Preserve (change with caution)",
+    "Preferred Refactor Surfaces",
+    "Code Documentation Requirements",
+    "Test Matrix & Quality Gates",
+    "Failure Modes & Debug Hints",
+    "Canonical Commands",
+    "Indexing Hints",
+    "Ownership & Documentation Links",
+    "Changelog and Update Procedure"
+  ],
+  "mermaid_minimum": 1,
+  "placeholders_required": true
+}

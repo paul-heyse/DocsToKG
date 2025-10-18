@@ -5,12 +5,6 @@
 #   "purpose": "CLI entry points for DocsToKG.DocParsing.chunking workflows",
 #   "sections": [
 #     {
-#       "id": "chunking-module",
-#       "name": "_chunking_module",
-#       "anchor": "function-chunking-module",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "rec",
 #       "name": "Rec",
 #       "anchor": "class-rec",
@@ -174,6 +168,7 @@ from docling_core.transforms.chunker.base import BaseChunk
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
+from transformers import AutoTokenizer
 
 # --- Globals ---
 
@@ -222,6 +217,8 @@ from DocsToKG.DocParsing.env import (
 )
 from DocsToKG.DocParsing.formats import (
     CHUNK_SCHEMA_VERSION,
+    ChunkRow,
+    ProvenanceMetadata,
     get_docling_version,
     validate_chunk_row,
 )
@@ -247,14 +244,6 @@ from .config import CHUNK_PROFILE_PRESETS, ChunkerCfg
 CHUNK_STAGE = "chunking"
 
 _LOGGER = get_logger(__name__)
-
-
-def _chunking_module():
-    """Return the public chunking package (monkeypatch friendly)."""
-
-    import DocsToKG.DocParsing._chunking as chunking_pkg
-
-    return chunking_pkg
 
 
 @dataclass(slots=True)
@@ -534,16 +523,15 @@ _WORKER_STATE: Dict[str, Any] = {}
 def _chunk_worker_initializer(cfg: ChunkWorkerConfig) -> None:
     """Initialise shared tokenizer/chunker state for worker processes."""
 
-    chunking_mod = _chunking_module()
-    tokenizer_cls = chunking_mod.HuggingFaceTokenizer
-    auto_tokenizer = chunking_mod.AutoTokenizer
+    tokenizer_cls = HuggingFaceTokenizer
+    auto_tokenizer = AutoTokenizer
     tokenizer = tokenizer_cls(
         tokenizer=auto_tokenizer.from_pretrained(cfg.tokenizer_model, use_fast=True),
         max_tokens=cfg.max_tokens,
     )
     provider_cls = _resolve_serializer_provider(cfg.serializer_provider_spec)
     provider = provider_cls()
-    chunker_cls = chunking_mod.HybridChunker
+    chunker_cls = HybridChunker
     chunker = chunker_cls(
         tokenizer=tokenizer,
         merge_peers=True,
@@ -614,10 +602,6 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
         output_path = task.output_path
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        chunking_mod = _chunking_module()
-        provenance_cls = chunking_mod.ProvenanceMetadata
-        chunk_row_cls = chunking_mod.ChunkRow
-
         with atomic_write(output_path) as handle:
             for chunk_id, rec in enumerate(merged):
                 text_body = rec.text
@@ -626,7 +610,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
                     if not text_body.startswith(anchor):
                         text_body = f"{anchor}\n{text_body}"
 
-                provenance = provenance_cls(
+                provenance = ProvenanceMetadata(
                     parse_engine=task.parse_engine,
                     docling_version=cfg.docling_version,
                     has_image_captions=rec.has_image_captions,
@@ -635,7 +619,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
                     image_confidence=rec.image_confidence,
                 )
 
-                row = chunk_row_cls(
+                row = ChunkRow(
                     doc_id=task.doc_id,
                     source_path=relative_path(task.doc_path, cfg.data_root),
                     chunk_id=chunk_id,
@@ -1429,15 +1413,11 @@ def _run_validate_only(
     )
 
     ensure_model_environment()
-    chunking_mod = _chunking_module()
-    auto_tokenizer = chunking_mod.AutoTokenizer
-    huggingface_tokenizer = chunking_mod.HuggingFaceTokenizer
-    hf = auto_tokenizer.from_pretrained(tokenizer_model, use_fast=True)
-    tokenizer = huggingface_tokenizer(tokenizer=hf, max_tokens=cfg.max_tokens)
+    hf = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
+    tokenizer = HuggingFaceTokenizer(tokenizer=hf, max_tokens=cfg.max_tokens)
     provider_cls = _resolve_serializer_provider(str(cfg.serializer_provider))
     provider = provider_cls()
-    chunker_cls = chunking_mod.HybridChunker
-    chunker = chunker_cls(
+    chunker = HybridChunker(
         tokenizer=tokenizer,
         merge_peers=True,
         serializer_provider=provider,

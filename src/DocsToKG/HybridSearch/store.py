@@ -384,6 +384,7 @@ class FaissVectorStore(DenseVectorStore):
         self._expected_ntotal = int(getattr(config, "expected_ntotal", 0))
         self._rebuild_delete_threshold = int(getattr(config, "rebuild_delete_threshold", 10000))
         self._force_64bit_ids = bool(getattr(config, "force_64bit_ids", False))
+        self._force_remove_ids_fallback = bool(getattr(config, "force_remove_ids_fallback", False))
         self._replication_enabled = bool(getattr(config, "enable_replication", True))
         self._reserve_memory_enabled = bool(getattr(config, "enable_reserve_memory", True))
         self._replicated = False
@@ -399,6 +400,7 @@ class FaissVectorStore(DenseVectorStore):
             )
         self._id_resolver: Optional[Callable[[int], Optional[str]]] = None
         self._remove_fallbacks = 0
+        self._rebuilds = 0
         self._tombstones: set[int] = set()
         self._dirty_deletes = 0
         self._needs_rebuild = False
@@ -1171,6 +1173,7 @@ class FaissVectorStore(DenseVectorStore):
             "pq_bits": float(getattr(self._config, "pq_bits", 0)),
             "ingest_dedupe_threshold": float(getattr(self._config, "ingest_dedupe_threshold", 0.0)),
             "gpu_remove_fallbacks": float(self._remove_fallbacks),
+            "total_rebuilds": float(self._rebuilds),
             "multi_gpu_mode": self._multi_gpu_mode,
             "gpu_indices_32_bit": bool(self._indices_32_bit and not self._force_64bit_ids),
             "gpu_device": str(getattr(self._config, "device", 0)),
@@ -1509,6 +1512,8 @@ class FaissVectorStore(DenseVectorStore):
         raise RuntimeError(f"Unsupported or unimplemented FAISS index type: {index_type}")
 
     def _probe_remove_support(self) -> bool:
+        if self._force_remove_ids_fallback:
+            return False
         selector = faiss.IDSelectorBatch(np.empty(0, dtype=np.int64))
         try:
             self._index.remove_ids(selector)
@@ -1521,27 +1526,31 @@ class FaissVectorStore(DenseVectorStore):
     def _remove_ids(self, ids: np.ndarray) -> None:
         if ids.size == 0:
             return
-        selector = faiss.IDSelectorBatch(ids.astype(np.int64))
-        try:
-            removed = int(self._index.remove_ids(selector))
-            if self._supports_remove_ids is None:
-                self._supports_remove_ids = True
-        except RuntimeError as exc:
-            if "remove_ids not implemented" not in str(exc).lower():
-                raise
+        if self._force_remove_ids_fallback:
             self._supports_remove_ids = False
-            logger.warning(
-                "FAISS remove_ids not implemented on GPU index; scheduling rebuild.",
-                extra={"event": {"ntotal": self.ntotal, "error": str(exc)}},
-            )
             remaining = ids
         else:
-            if removed >= int(ids.size):
-                return
-            current = self._current_index_ids()
-            remaining = ids[np.isin(ids, current)]
-            if remaining.size == 0:
-                return
+            selector = faiss.IDSelectorBatch(ids.astype(np.int64))
+            try:
+                removed = int(self._index.remove_ids(selector))
+                if self._supports_remove_ids is None:
+                    self._supports_remove_ids = True
+            except RuntimeError as exc:
+                if "remove_ids not implemented" not in str(exc).lower():
+                    raise
+                self._supports_remove_ids = False
+                logger.warning(
+                    "FAISS remove_ids not implemented on GPU index; scheduling rebuild.",
+                    extra={"event": {"ntotal": self.ntotal, "error": str(exc)}},
+                )
+                remaining = ids
+            else:
+                if removed >= int(ids.size):
+                    return
+                current = self._current_index_ids()
+                remaining = ids[np.isin(ids, current)]
+                if remaining.size == 0:
+                    return
         self._remove_fallbacks += 1
         self._tombstones.update(int(v) for v in remaining.tolist())
         self._dirty_deletes += int(remaining.size)
@@ -1567,6 +1576,7 @@ class FaissVectorStore(DenseVectorStore):
             self._needs_rebuild = False
 
     def _rebuild_index(self) -> None:
+        self._rebuilds += 1
         old_index = self._index
         base = old_index.index if hasattr(old_index, "index") else old_index
         current_ids = self._current_index_ids()
@@ -1709,6 +1719,7 @@ def cosine_against_corpus_gpu(
     *,
     device: int = 0,
     resources: Optional["faiss.StandardGpuResources"] = None,
+    pairwise_fn: Optional[Callable[..., np.ndarray]] = None,
 ) -> np.ndarray:
     """Compute cosine similarity between ``query`` and each vector in ``corpus`` on GPU.
 
@@ -1717,6 +1728,7 @@ def cosine_against_corpus_gpu(
         corpus: Matrix representing the corpus (``M x D``).
         device: CUDA device id used for the computation.
         resources: FAISS GPU resources to execute the kernel.
+        pairwise_fn: Optional kernel override for ``faiss.pairwise_distance_gpu``.
 
     Returns:
         numpy.ndarray: Matrix of cosine similarities with shape ``(N, M)``.
@@ -1731,7 +1743,13 @@ def cosine_against_corpus_gpu(
         query = query.reshape(1, -1)
     if query.shape[1] != corpus.shape[1]:
         raise ValueError("Query and corpus dimensionality must match")
-    sims = cosine_batch(query, corpus, device=device, resources=resources)
+    sims = cosine_batch(
+        query,
+        corpus,
+        device=device,
+        resources=resources,
+        pairwise_fn=pairwise_fn,
+    )
     return np.asarray(sims, dtype=np.float32)
 
 
@@ -1806,6 +1824,7 @@ def cosine_batch(
     *,
     device: int,
     resources: "faiss.StandardGpuResources",
+    pairwise_fn: Optional[Callable[..., np.ndarray]] = None,
 ) -> np.ndarray:
     """Helper that normalises and computes cosine similarities on GPU.
 
@@ -1814,6 +1833,7 @@ def cosine_batch(
         C: Corpus matrix (``M x D``).
         device: CUDA device id used for computation.
         resources: FAISS GPU resources backing the kernel.
+        pairwise_fn: Optional kernel override for ``faiss.pairwise_distance_gpu``.
 
     Returns:
         numpy.ndarray: Pairwise cosine similarities with shape ``(N, M)``.
@@ -1824,7 +1844,8 @@ def cosine_batch(
     C = np.ascontiguousarray(C, dtype=np.float32)
     faiss.normalize_L2(q)
     faiss.normalize_L2(C)
-    return faiss.pairwise_distance_gpu(
+    kernel = pairwise_fn or faiss.pairwise_distance_gpu
+    return kernel(
         resources,
         q,
         C,

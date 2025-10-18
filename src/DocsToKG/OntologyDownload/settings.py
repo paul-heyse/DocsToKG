@@ -26,6 +26,7 @@ from typing import (
     Protocol,
     Set,
     Tuple,
+    Callable,
 )
 
 try:  # pragma: no cover - dependency check
@@ -35,7 +36,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - explicit guidance for u
         "PyYAML is required for configuration parsing. Install it with: pip install pyyaml"
     ) from exc
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic import ValidationError as PydanticValidationError
 from pydantic_core import ValidationError as CoreValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -145,6 +146,11 @@ class ValidationConfig(BaseModel):
 
 class DownloadConfiguration(BaseModel):
     """HTTP download, retry, and politeness settings for resolvers."""
+
+    _session_factory: Optional[Callable[[], Any]] = PrivateAttr(default=None)
+    _bucket_provider: Optional[
+        Callable[[Optional[str], "DownloadConfiguration", Optional[str]], Any]
+    ] = PrivateAttr(default=None)
 
     max_retries: int = Field(default=5, ge=0, le=20)
     timeout_sec: int = Field(default=30, gt=0, le=300)
@@ -371,6 +377,44 @@ class DownloadConfiguration(BaseModel):
             headers.setdefault("From", headers["mailto"])
 
         return headers
+
+    def set_session_factory(self, factory: Optional[Callable[[], Any]]) -> None:
+        """Set a custom factory used to construct HTTP sessions."""
+
+        self._session_factory = factory
+
+    def get_session_factory(self) -> Optional[Callable[[], Any]]:
+        """Return the custom session factory, if one has been configured."""
+
+        return self._session_factory
+
+    def set_bucket_provider(
+        self,
+        provider: Optional[Callable[[Optional[str], "DownloadConfiguration", Optional[str]], Any]],
+    ) -> None:
+        """Set a custom provider responsible for returning token buckets."""
+
+        self._bucket_provider = provider
+
+    def get_bucket_provider(
+        self,
+    ) -> Optional[Callable[[Optional[str], "DownloadConfiguration", Optional[str]], Any]]:
+        """Return the configured token bucket provider, if present."""
+
+        return self._bucket_provider
+
+    def model_copy(
+        self,
+        *,
+        deep: bool = False,
+        update: Optional[Mapping[str, Any]] = None,
+    ) -> "DownloadConfiguration":
+        """Copy the model ensuring private attributes propagate."""
+
+        copied = super().model_copy(deep=deep, update=update)
+        copied._session_factory = self._session_factory
+        copied._bucket_provider = self._bucket_provider
+        return copied
 
     model_config = {"validate_assignment": True}
 

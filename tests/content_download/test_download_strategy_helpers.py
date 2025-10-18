@@ -313,7 +313,7 @@ def test_xml_strategy_finalize_handles_xml(tmp_path: Path, artifact: WorkArtifac
     assert outcome.classification is Classification.XML
 
 
-def test_strategy_selection_invoked(monkeypatch, artifact: WorkArtifact) -> None:
+def test_strategy_selection_invoked(patcher, artifact: WorkArtifact) -> None:
     calls: Dict[str, Classification] = {}
 
     class RecordingStrategy(downloader.PdfDownloadStrategy):
@@ -324,13 +324,13 @@ def test_strategy_selection_invoked(monkeypatch, artifact: WorkArtifact) -> None
     def fake_get_strategy(classification: Classification) -> downloader.DownloadStrategy:
         return RecordingStrategy()
 
-    monkeypatch.setattr(downloader, "get_strategy_for_classification", fake_get_strategy)
+    patcher.setattr(downloader, "get_strategy_for_classification", fake_get_strategy)
 
     @contextlib.contextmanager
     def fake_request(*args, **kwargs):
         yield _FakeResponse(b"%PDF-1.4\n%EOF")
 
-    monkeypatch.setattr(downloader, "request_with_retries", fake_request)
+    patcher.setattr(downloader, "request_with_retries", fake_request)
     session = requests.Session()
     artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
     artifact.html_dir.mkdir(parents=True, exist_ok=True)

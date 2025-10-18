@@ -137,24 +137,22 @@ def _single_work() -> Dict[str, Any]:
 # --- Test Cases ---
 
 
-def test_main_closes_sinks_when_pipeline_raises(monkeypatch, tmp_path):
+def test_main_closes_sinks_when_pipeline_raises(patcher, tmp_path):
     _RecordingSink.instances = []
 
-    monkeypatch.setattr(downloader, "JsonlSink", _RecordingSink)
-    monkeypatch.setattr(downloader, "CsvSink", _RecordingCsvSink)
+    patcher.setattr(downloader, "JsonlSink", _RecordingSink)
+    patcher.setattr(downloader, "CsvSink", _RecordingCsvSink)
 
     def boom(*_args, **_kwargs):
         raise RuntimeError("resolver boom")
 
-    monkeypatch.setattr(downloader, "process_one_work", boom)
-    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
-    monkeypatch.setattr(
-        downloader, "iterate_openalex", lambda *args, **kwargs: iter([_single_work()])
-    )
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda topic: topic)
+    patcher.setattr(downloader, "process_one_work", boom)
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([_single_work()]))
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda topic: topic)
 
     argv = _base_args(tmp_path)
-    monkeypatch.setattr("sys.argv", argv)
+    patcher.setattr("sys.argv", argv)
 
     with pytest.raises(RuntimeError) as excinfo:
         downloader.main()
@@ -165,12 +163,10 @@ def test_main_closes_sinks_when_pipeline_raises(monkeypatch, tmp_path):
     assert all(inst.closed for inst in _RecordingSink.instances)
 
 
-def test_main_with_csv_releases_attempt_files(monkeypatch, tmp_path):
-    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
-    monkeypatch.setattr(
-        downloader, "iterate_openalex", lambda *args, **kwargs: iter([_single_work()])
-    )
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda topic: topic)
+def test_main_with_csv_releases_attempt_files(patcher, tmp_path):
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([_single_work()]))
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda topic: topic)
 
     pdf_dir = tmp_path / "out" / "pdfs"
     pdf_dir.mkdir(parents=True)
@@ -214,11 +210,11 @@ def test_main_with_csv_releases_attempt_files(monkeypatch, tmp_path):
                 failed_urls=[],
             )
 
-    monkeypatch.setattr(downloader, "ResolverPipeline", StubPipeline)
+    patcher.setattr(downloader, "ResolverPipeline", StubPipeline)
 
     argv = _base_args(tmp_path)
     argv.extend(["--log-format", "csv"])
-    monkeypatch.setattr("sys.argv", argv)
+    patcher.setattr("sys.argv", argv)
 
     downloader.main()
 

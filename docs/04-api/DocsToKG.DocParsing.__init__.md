@@ -1,55 +1,29 @@
 # 1. Module: __init__
 
-This reference documents the DocsToKG module ``DocsToKG.DocParsing.__init__``.
+This reference documents the DocsToKG module ``DocsToKG.DocParsing``.
 
 ## 1. Overview
 
-High-level facade exposing consolidated DocParsing modules and compatibility shims.
+High-level facade exposing consolidated DocParsing modules. The package now
+provides direct imports for the canonical implementations without dynamically
+registered compatibility shims.
 
-## 2. Functions
+## 2. Re-exported Modules
 
-### `_populate_forwarding_module(module, target)`
+- ``core`` – unified helpers for DocTags conversion, chunking, embedding, and CLI tooling.
+- ``formats`` – Pydantic models and validation helpers for chunk/vector payloads.
+- ``doctags`` – PDF/HTML DocTags conversion pipeline and CLI parser builders.
+- ``chunking`` – Runtime utilities for Docling chunk generation.
+- ``embedding`` – Embedding runtime, configuration, and pooling helpers.
+- ``token_profiles`` – Token profile analysis for DocTags corpora.
 
-Populate ``module`` so that it forwards attributes to ``target``.
+## 3. Convenience Functions
 
-### `_populate_cli_module(module)`
+The package surfaces frequently used entry points from :mod:`DocsToKG.DocParsing.doctags`:
 
-Populate the legacy ``cli`` module shim.
+- ``pdf_build_parser`` / ``html_build_parser`` – construct CLI parsers.
+- ``pdf_parse_args`` / ``html_parse_args`` – parse CLI arguments for DocTags conversion.
+- ``pdf_main`` / ``html_main`` – run DocTags conversion in PDF or HTML mode.
 
-### `_populate_pdf_pipeline_module(module)`
-
-Populate the legacy ``pdf_pipeline`` module shim with a deprecation warning.
-
-### `__getattr__(attr)`
-
-Delegate attribute lookups to the replacement module populated above.
-
-### `parse_args(argv)`
-
-Legacy CLI argument parser for backwards-compatible imports.
-
-### `main(args)`
-
-Legacy entry point delegating to :mod:`DocsToKG.DocParsing.doctags`.
-
-### `create_module(self, spec)`
-
-Create a new module instance that will be populated by the shim.
-
-### `exec_module(self, module)`
-
-Execute the shim builder to populate ``module``.
-
-### `find_spec(self, fullname, path, target)`
-
-Return a module spec when ``fullname`` matches a supported shim.
-
-## 3. Classes
-
-### `_DocParsingShimLoader`
-
-Loader that populates deprecated DocParsing modules on demand.
-
-### `_DocParsingShimFinder`
-
-Meta-path finder that serves the compatibility shims defined above.
+The ``plan`` and ``manifest`` helpers from :mod:`DocsToKG.DocParsing.core` remain
+available as top-level attributes for convenience.

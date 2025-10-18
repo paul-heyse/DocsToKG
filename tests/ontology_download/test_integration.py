@@ -62,7 +62,7 @@ Key Scenarios:
 - Confirms versioned storage structure and progress logging
 
 Dependencies:
-- pytest: Fixtures and monkeypatching
+- pytest: Fixtures and patch helpers
 - DocsToKG.OntologyDownload: Core orchestration under test
 
 Usage:
@@ -84,15 +84,15 @@ pytest.importorskip("pydantic_settings")
 import DocsToKG.OntologyDownload.planning as pipeline_mod
 from DocsToKG.OntologyDownload import api as core
 from DocsToKG.OntologyDownload import io as io_mod
-from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload import settings as settings_mod
+from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.planning import RESOLVERS, FetchPlan
 from DocsToKG.OntologyDownload.settings import DefaultsConfig, ResolvedConfig
 from DocsToKG.OntologyDownload.validation import ValidationResult
 
 
 @pytest.fixture()
-def patched_dirs(monkeypatch, tmp_path):
+def patched_dirs(patch_stack, tmp_path):
     cache = tmp_path / "cache"
     configs = tmp_path / "configs"
     logs = tmp_path / "logs"
@@ -106,10 +106,10 @@ def patched_dirs(monkeypatch, tmp_path):
         "LOCAL_ONTOLOGY_DIR": ontologies,
     }
     for attr, value in overrides.items():
-        monkeypatch.setattr(settings_mod, attr, value, raising=False)
-        monkeypatch.setattr(pipeline_mod, attr, value, raising=False)
-        monkeypatch.setattr(core, attr, value, raising=False)
-    monkeypatch.setattr(core, "ONTOLOGY_DIR", ontologies, raising=False)
+        patch_stack.setattr(settings_mod, attr, value, raising=False)
+        patch_stack.setattr(pipeline_mod, attr, value, raising=False)
+        patch_stack.setattr(core, attr, value, raising=False)
+    patch_stack.setattr(core, "ONTOLOGY_DIR", ontologies, raising=False)
 
     class _StubStorage:
         def ensure_local_version(self, ontology_id: str, version: str) -> Path:
@@ -137,9 +137,9 @@ def patched_dirs(monkeypatch, tmp_path):
             return source
 
     stub_storage = _StubStorage()
-    monkeypatch.setattr(settings_mod, "STORAGE", stub_storage, raising=False)
-    monkeypatch.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
-    monkeypatch.setattr(core, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(settings_mod, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(core, "STORAGE", stub_storage, raising=False)
     return ontologies
 
 
@@ -161,7 +161,7 @@ class _StubResolver:
 
 
 @pytest.fixture()
-def stubbed_validators(monkeypatch):
+def stubbed_validators(patch_stack):
     def _runner(requests, logger):
         results = {}
         for req in requests:
@@ -180,21 +180,21 @@ def stubbed_validators(monkeypatch):
             )
         return results
 
-    monkeypatch.setattr(pipeline_mod, "run_validators", _runner, raising=False)
-    monkeypatch.setattr(core, "run_validators", _runner, raising=False)
+    patch_stack.setattr(pipeline_mod, "run_validators", _runner, raising=False)
+    patch_stack.setattr(core, "run_validators", _runner, raising=False)
 
 
 @pytest.fixture(autouse=True)
-def _allow_download_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
+def _allow_download_hosts(patch_stack) -> None:
     """Permit test resolvers to use example.org without URL policy failures."""
 
-    monkeypatch.setattr(
+    patch_stack.setattr(
         pipeline_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
     )
-    monkeypatch.setattr(
+    patch_stack.setattr(
         network_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
     )
-    monkeypatch.setattr(
+    patch_stack.setattr(
         core, "validate_url_security", lambda url, http_config=None: url, raising=False
     )
 
@@ -202,13 +202,13 @@ def _allow_download_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
 # --- Test Cases ---
 
 
-def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validators):
+def test_fetch_all_writes_manifests(patch_stack, patched_dirs, stubbed_validators):
     fixture_dir = Path("tests/data/ontology_fixtures")
     pato_fixture = fixture_dir / "mini.ttl"
     bfo_fixture = fixture_dir / "mini.obo"
 
-    monkeypatch.setitem(RESOLVERS, "obo", _StubResolver(pato_fixture, "2024-01-01"))
-    monkeypatch.setitem(RESOLVERS, "ols", _StubResolver(bfo_fixture, "2024-02-01"))
+    patch_stack.setitem(RESOLVERS, "obo", _StubResolver(pato_fixture, "2024-01-01"))
+    patch_stack.setitem(RESOLVERS, "ols", _StubResolver(bfo_fixture, "2024-02-01"))
 
     def _download_with_fixture(**kwargs):
         headers = dict(kwargs["headers"])
@@ -232,8 +232,8 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
             content_length=content_length,
         )
 
-    monkeypatch.setattr(pipeline_mod, "download_stream", _download_with_fixture, raising=False)
-    monkeypatch.setattr(core, "download_stream", _download_with_fixture, raising=False)
+    patch_stack.setattr(pipeline_mod, "download_stream", _download_with_fixture, raising=False)
+    patch_stack.setattr(core, "download_stream", _download_with_fixture, raising=False)
 
     results = core.fetch_all(
         [
@@ -263,7 +263,7 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         assert any(normalized_dir.glob("*.json"))
 
 
-def test_force_download_bypasses_manifest(monkeypatch, patched_dirs, stubbed_validators):
+def test_force_download_bypasses_manifest(patch_stack, patched_dirs, stubbed_validators):
     fixture = Path("tests/data/ontology_fixtures/mini.ttl")
     captured = {"previous": None}
 
@@ -281,10 +281,10 @@ def test_force_download_bypasses_manifest(monkeypatch, patched_dirs, stubbed_val
             content_length=content_length,
         )
 
-    monkeypatch.setattr(pipeline_mod, "download_stream", _download, raising=False)
-    monkeypatch.setattr(core, "download_stream", _download, raising=False)
+    patch_stack.setattr(pipeline_mod, "download_stream", _download, raising=False)
+    patch_stack.setattr(core, "download_stream", _download, raising=False)
     spec = core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])
-    monkeypatch.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
+    patch_stack.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
     manifest_path = patched_dirs / "pato" / "2024-01-01" / "manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps({"sha256": "old"}))
@@ -292,9 +292,9 @@ def test_force_download_bypasses_manifest(monkeypatch, patched_dirs, stubbed_val
     assert captured["previous"] is None
 
 
-def test_multi_version_storage(monkeypatch, patched_dirs, stubbed_validators):
+def test_multi_version_storage(patch_stack, patched_dirs, stubbed_validators):
     fixture = Path("tests/data/ontology_fixtures/mini.ttl")
-    monkeypatch.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
+    patch_stack.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
 
     def _download(**kwargs):
         kwargs["destination"].write_bytes(fixture.read_bytes())
@@ -309,19 +309,19 @@ def test_multi_version_storage(monkeypatch, patched_dirs, stubbed_validators):
             content_length=content_length,
         )
 
-    monkeypatch.setattr(pipeline_mod, "download_stream", _download, raising=False)
-    monkeypatch.setattr(core, "download_stream", _download, raising=False)
+    patch_stack.setattr(pipeline_mod, "download_stream", _download, raising=False)
+    patch_stack.setattr(core, "download_stream", _download, raising=False)
     spec = core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])
     config = ResolvedConfig(defaults=DefaultsConfig(), specs=[])
     core.fetch_one(spec, config=config, force=True)
-    monkeypatch.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-02-01"))
+    patch_stack.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-02-01"))
     core.fetch_one(spec, config=config, force=True)
     versions = sorted((patched_dirs / "pato").iterdir())
     dir_names = {v.name for v in versions if v.is_dir()}
     assert dir_names == {"2024-01-01", "2024-02-01"}
 
 
-def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, caplog):
+def test_fetch_all_logs_progress(patch_stack, patched_dirs, stubbed_validators, caplog):
     fixture = Path("tests/data/ontology_fixtures/mini.ttl")
 
     def _download(**kwargs):
@@ -337,9 +337,9 @@ def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, 
             content_length=content_length,
         )
 
-    monkeypatch.setattr(pipeline_mod, "download_stream", _download, raising=False)
-    monkeypatch.setattr(core, "download_stream", _download, raising=False)
-    monkeypatch.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
+    patch_stack.setattr(pipeline_mod, "download_stream", _download, raising=False)
+    patch_stack.setattr(core, "download_stream", _download, raising=False)
+    patch_stack.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
     config = ResolvedConfig(defaults=DefaultsConfig(), specs=[])
     caplog.set_level(logging.INFO, logger="DocsToKG.OntologyDownload")
     logger = logging.getLogger("DocsToKG.OntologyDownload")

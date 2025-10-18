@@ -239,13 +239,13 @@ of the pipeline. The legacy scripts remain available but emit a
 
 ```bash
 # Convert HTML or PDF corpora to DocTags (auto-detects mode when possible)
-python -m DocsToKG.DocParsing.cli doctags --input Data/HTML
+python -m DocsToKG.DocParsing.core.cli doctags --input Data/HTML
 
 # Chunk DocTags with topic-aware coalescence
-python -m DocsToKG.DocParsing.cli chunk --min-tokens 256 --max-tokens 512
+python -m DocsToKG.DocParsing.core.cli chunk --min-tokens 256 --max-tokens 512
 
 # Generate hybrid embeddings (BM25 + SPLADE + Qwen)
-python -m DocsToKG.DocParsing.cli embed --resume
+python -m DocsToKG.DocParsing.core.cli embed --resume
 
 ```
 

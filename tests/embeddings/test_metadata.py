@@ -213,7 +213,7 @@ def test_process_pass_a_returns_stats_only(tmp_path: Path, monkeypatch: pytest.M
     """`process_pass_a` should return BM25 statistics without chunk caches."""
 
     _install_minimal_stubs(monkeypatch)
-    import DocsToKG.DocParsing._embedding.runtime as embed_module
+    import DocsToKG.DocParsing.embedding.runtime as embed_module
 
     chunk_file = tmp_path / "sample.chunks.jsonl"
     chunk_file.write_text('{"text": "Example text"}\n', encoding="utf-8")
@@ -231,7 +231,7 @@ def test_process_chunk_file_vectors_reads_texts(
     """Chunk texts should be sourced directly from file rows when encoding."""
 
     _install_minimal_stubs(monkeypatch)
-    import DocsToKG.DocParsing._embedding.runtime as embed_module
+    import DocsToKG.DocParsing.embedding.runtime as embed_module
 
     chunk_file = tmp_path / "doc.chunks.jsonl"
     chunk_file.write_text(
@@ -315,8 +315,8 @@ def test_cli_path_overrides_take_precedence(
 
     _install_minimal_stubs(monkeypatch)
     dependency_stubs()
-    sys.modules.pop("DocsToKG.DocParsing._embedding.runtime", None)
-    import DocsToKG.DocParsing._embedding.runtime as embed_module
+    sys.modules.pop("DocsToKG.DocParsing.embedding.runtime", None)
+    import DocsToKG.DocParsing.embedding.runtime as embed_module
 
     env_splade = tmp_path / "env-splade"
     env_qwen = tmp_path / "env-qwen"
@@ -381,7 +381,7 @@ def test_offline_mode_requires_local_models(
     """Offline mode should raise when required models are absent."""
 
     _install_minimal_stubs(monkeypatch)
-    import DocsToKG.DocParsing._embedding.runtime as embed_module
+    import DocsToKG.DocParsing.embedding.runtime as embed_module
 
     missing = tmp_path / "missing"
 
@@ -799,7 +799,7 @@ def _reload_embedding_module(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(Path, "write_text", _write_text)
 
-    import DocsToKG.DocParsing._embedding.runtime as embed_module
+    import DocsToKG.DocParsing.embedding.runtime as embed_module
 
     return importlib.reload(embed_module)
 

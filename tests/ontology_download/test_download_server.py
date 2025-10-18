@@ -280,7 +280,7 @@ def _reset_token_buckets():
 
 
 @pytest.fixture(autouse=True)
-def _allow_local_addresses(monkeypatch):
+def _allow_local_addresses(patch_stack):
     from types import SimpleNamespace
     from urllib import error as urllib_error
     from urllib import request as urllib_request
@@ -288,9 +288,9 @@ def _allow_local_addresses(monkeypatch):
     def _validate(url: str, http_config=None):  # noqa: ANN001 - test helper
         return url
 
-    monkeypatch.setattr(download, "validate_url_security", _validate, raising=False)
-    monkeypatch.setattr(io_mod, "validate_url_security", _validate, raising=False)
-    monkeypatch.setattr(network_mod, "validate_url_security", _validate, raising=False)
+    patch_stack.setattr(download, "validate_url_security", _validate, raising=False)
+    patch_stack.setattr(io_mod, "validate_url_security", _validate, raising=False)
+    patch_stack.setattr(network_mod, "validate_url_security", _validate, raising=False)
 
     class _LocalResponse:
         def __init__(self, url: str, method: str, headers: Dict[str, str], timeout: Optional[int]):
@@ -348,7 +348,7 @@ def _allow_local_addresses(monkeypatch):
                 merged = {**self.headers, **(headers or {})}
                 return _LocalResponse(url, "GET", merged, timeout)
 
-        monkeypatch.setattr(network_mod.requests, "Session", _LocalSession, raising=False)
+        patch_stack.setattr(network_mod.requests, "Session", _LocalSession, raising=False)
 
 
 def _download_to_tmp(
@@ -486,7 +486,7 @@ def test_etag_flip_updates_etag(http_server, tmp_path):
     assert second_dest.read_bytes() == first_dest.read_bytes()
 
 
-def test_token_bucket_limits_concurrency(monkeypatch, http_server, tmp_path):
+def test_token_bucket_limits_concurrency(patch_stack, http_server, tmp_path):
     base_url, state = http_server
     state.concurrent_max = 0
 
@@ -513,9 +513,9 @@ def test_token_bucket_limits_concurrency(monkeypatch, http_server, tmp_path):
     def _get_bucket(host, http_config, service=None):  # noqa: ARG001
         return bucket
 
-    monkeypatch.setattr(download, "get_bucket", _get_bucket, raising=False)
-    monkeypatch.setattr(io_mod, "get_bucket", _get_bucket, raising=False)
-    monkeypatch.setattr(network_mod, "get_bucket", _get_bucket, raising=False)
+    patch_stack.setattr(download, "get_bucket", _get_bucket, raising=False)
+    patch_stack.setattr(io_mod, "get_bucket", _get_bucket, raising=False)
+    patch_stack.setattr(network_mod, "get_bucket", _get_bucket, raising=False)
 
     def _run(idx: int) -> Path:
         path = tmp_path / f"concurrent-{idx}.owl"
@@ -538,7 +538,7 @@ def test_token_bucket_limits_concurrency(monkeypatch, http_server, tmp_path):
     assert bucket.max_active == 1
 
 
-def test_concurrent_hosts_do_not_block(monkeypatch, http_server, tmp_path):
+def test_concurrent_hosts_do_not_block(patch_stack, http_server, tmp_path):
     base_url, _ = http_server
     bucket_calls: Dict[str, int] = {}
 
@@ -552,9 +552,9 @@ def test_concurrent_hosts_do_not_block(monkeypatch, http_server, tmp_path):
     def _bucket_for_host(host, http_config, service=None):  # noqa: ARG001
         return _PassthroughBucket(host)
 
-    monkeypatch.setattr(download, "get_bucket", _bucket_for_host, raising=False)
-    monkeypatch.setattr(io_mod, "get_bucket", _bucket_for_host, raising=False)
-    monkeypatch.setattr(network_mod, "get_bucket", _bucket_for_host, raising=False)
+    patch_stack.setattr(download, "get_bucket", _bucket_for_host, raising=False)
+    patch_stack.setattr(io_mod, "get_bucket", _bucket_for_host, raising=False)
+    patch_stack.setattr(network_mod, "get_bucket", _bucket_for_host, raising=False)
 
     def _run(url: str, output: Path) -> None:
         download.download_stream(

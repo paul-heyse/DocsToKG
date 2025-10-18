@@ -60,7 +60,7 @@ direnv exec . docparse chunk \
   --workers 4
 ```
 
-- This forwards into `DocsToKG.DocParsing._chunking.runtime.main`, so CLI flags match the module documented in `docs/06-operations/index.md`.
+- This forwards into `DocsToKG.DocParsing.chunking.runtime.main`, so CLI flags match the module documented in `docs/06-operations/index.md`.
 - Telemetry for chunking runs through `DocsToKG.DocParsing.telemetry.StageTelemetry`; ensure `$DOCSTOKG_DATA_ROOT/logs/chunking` is writable.
 
 ### 4.3 Embedding Pipeline

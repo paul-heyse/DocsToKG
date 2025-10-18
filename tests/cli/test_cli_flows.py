@@ -141,7 +141,7 @@ import csv
 import json
 import os
 from collections import defaultdict
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List
@@ -154,6 +154,8 @@ from DocsToKG.ContentDownload.core import Classification, DownloadContext
 from DocsToKG.ContentDownload.telemetry import MANIFEST_SCHEMA_VERSION, build_manifest_entry
 from tools.manifest_to_index import convert_manifest_to_index
 
+print("[MODULE IMPORT] tests.cli.test_cli_flows loaded", flush=True)
+
 # --- Globals ---
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -164,6 +166,16 @@ DOCS_SETUP = REPO_ROOT / "docs" / "02-setup" / "index.md"
 AGENTS = REPO_ROOT / "openspec" / "AGENTS.md"
 
 
+@pytest.fixture(autouse=True)
+def _print_test_boundary(request):
+    """Emit markers so hangs surface in CI output."""
+
+    test_name = request.node.name
+    print(f"[TEST BEGIN] {test_name}", flush=True)
+    yield
+    print(f"[TEST END] {test_name}", flush=True)
+
+
 @pytest.fixture
 # --- Test Fixtures ---
 
@@ -171,15 +183,20 @@ AGENTS = REPO_ROOT / "openspec" / "AGENTS.md"
 def download_modules():
     """Provide downloader/resolver modules guarded by optional dependencies."""
 
+    print("[FIXTURE BEGIN] download_modules", flush=True)
+    print("  importing pyalex", flush=True)
     pytest.importorskip("pyalex")
+    print("  importing requests", flush=True)
     requests = pytest.importorskip("requests")
+    print("  fixture ready", flush=True)
+    print("[FIXTURE END] download_modules", flush=True)
     return SimpleNamespace(downloader=downloader, resolvers=resolvers, requests=requests)
 
 
 # --- Test Cases ---
 
 
-def test_read_resolver_config_yaml_requires_pyyaml(download_modules, monkeypatch, tmp_path):
+def test_read_resolver_config_yaml_requires_pyyaml(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     config_path = tmp_path / "config.yaml"
     config_path.write_text("resolver_order: ['a']", encoding="utf-8")
@@ -191,7 +208,7 @@ def test_read_resolver_config_yaml_requires_pyyaml(download_modules, monkeypatch
             raise ImportError("No module named 'yaml'")
         return original_import(name, *args, **kwargs)
 
-    monkeypatch.setattr("builtins.__import__", fake_import)
+    patcher.setattr("builtins.__import__", fake_import)
     with pytest.raises(RuntimeError):
         downloader.read_resolver_config(config_path)
 
@@ -222,7 +239,7 @@ def test_load_resolver_config_applies_mailto(download_modules):
     assert config.resolver_order == ["beta", "alpha", "gamma"]
 
 
-def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp_path):
+def test_main_writes_manifest_and_sets_mailto(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
 
@@ -253,15 +270,19 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
     )
     (pdf_dir / "out.pdf").write_bytes(b"%PDF-1.4\n...%%EOF")
 
-    monkeypatch.setattr(downloader, "iterate_openalex", fake_iterate)
+    patcher.setattr(downloader, "iterate_openalex", fake_iterate)
+    patcher.setattr("DocsToKG.ContentDownload.runner.iterate_openalex", fake_iterate)
     calls = []
 
     def fake_resolve(topic):
         calls.append(topic)
         return "https://openalex.org/T1"
 
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", fake_resolve)
-    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", fake_resolve)
+    patcher.setattr("DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", fake_resolve)
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.args.default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.resolvers.default_resolvers", lambda: [])
 
     class StubPipeline:
         def __init__(
@@ -305,7 +326,8 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
                 failed_urls=[],
             )
 
-    monkeypatch.setattr(downloader, "ResolverPipeline", StubPipeline)
+    patcher.setattr(downloader, "ResolverPipeline", StubPipeline)
+    patcher.setattr("DocsToKG.ContentDownload.runner.ResolverPipeline", StubPipeline)
 
     argv = [
         "download_pyalex_pdfs.py",
@@ -322,7 +344,7 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
         "--mailto",
         "team@example.org",
     ]
-    monkeypatch.setattr("sys.argv", argv)
+    patcher.setattr("sys.argv", value=argv)
 
     downloader.main()
     entries = [
@@ -352,7 +374,7 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
     assert index_payload[manifest["work_id"]]["pdf_path"].endswith("out.pdf")
 
 
-def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tmp_path):
+def test_main_with_csv_writes_last_attempt_csv(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
 
@@ -372,9 +394,17 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
         "locations": [],
     }
 
-    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([work]))
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
-    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([work]))
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.iterate_openalex", lambda *args, **kwargs: iter([work])
+    )
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", lambda value, *_: value
+    )
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.resolvers.default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.args.default_resolvers", lambda: [])
 
     outcome = resolvers.DownloadOutcome(
         classification="pdf",
@@ -422,7 +452,8 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
                 failed_urls=[],
             )
 
-    monkeypatch.setattr(downloader, "ResolverPipeline", StubPipeline)
+    patcher.setattr(downloader, "ResolverPipeline", StubPipeline)
+    patcher.setattr("DocsToKG.ContentDownload.runner.ResolverPipeline", StubPipeline)
 
     argv = [
         "download_pyalex_pdfs.py",
@@ -441,7 +472,7 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
         "--log-csv",
         str(csv_path),
     ]
-    monkeypatch.setattr("sys.argv", argv)
+    patcher.setattr("sys.argv", value=argv)
 
     downloader.main()
 
@@ -469,7 +500,7 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
     }
 
 
-def test_main_with_staging_creates_timestamped_directories(download_modules, monkeypatch, tmp_path):
+def test_main_with_staging_creates_timestamped_directories(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
 
@@ -486,17 +517,25 @@ def test_main_with_staging_creates_timestamped_directories(download_modules, mon
         "locations": [],
     }
 
-    fixed_timestamp = datetime(2024, 5, 6, 7, 8, tzinfo=downloader.UTC)
+    fixed_timestamp = datetime(2024, 5, 6, 7, 8, tzinfo=UTC)
 
     class _FixedDateTime:
         @classmethod
         def now(cls, tz=None):
             return fixed_timestamp
 
-    monkeypatch.setattr(downloader, "datetime", _FixedDateTime)
-    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([work]))
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
-    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.args.datetime", _FixedDateTime)
+    patcher.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([work]))
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.iterate_openalex", lambda *args, **kwargs: iter([work])
+    )
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", lambda value, *_: value
+    )
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.resolvers.default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.args.default_resolvers", lambda: [])
 
     run_dir = base_out / fixed_timestamp.strftime("%Y%m%d_%H%M")
     pdf_path = run_dir / "PDF" / "out.pdf"
@@ -546,7 +585,9 @@ def test_main_with_staging_creates_timestamped_directories(download_modules, mon
                 failed_urls=[],
             )
 
-    monkeypatch.setattr(downloader, "ResolverPipeline", StubPipeline)
+    patcher.setattr(downloader, "ResolverPipeline", StubPipeline)
+
+    patcher.setattr("DocsToKG.ContentDownload.runner.ResolverPipeline", StubPipeline)
 
     argv = [
         "download_pyalex_pdfs.py",
@@ -562,7 +603,7 @@ def test_main_with_staging_creates_timestamped_directories(download_modules, mon
         str(manifest_override),
         "--staging",
     ]
-    monkeypatch.setattr("sys.argv", argv)
+    patcher.setattr("sys.argv", value=argv)
 
     downloader.main()
 
@@ -582,7 +623,7 @@ def test_main_with_staging_creates_timestamped_directories(download_modules, mon
     assert payload["WSTAGING"]["pdf_path"].endswith("out.pdf")
 
 
-def test_main_dry_run_skips_writing_files(download_modules, monkeypatch, tmp_path):
+def test_main_dry_run_skips_writing_files(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
 
@@ -604,9 +645,17 @@ def test_main_dry_run_skips_writing_files(download_modules, monkeypatch, tmp_pat
         for i in range(3)
     ]
 
-    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter(works))
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
-    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter(works))
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.iterate_openalex", lambda *args, **kwargs: iter(works)
+    )
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", lambda value, *_: value
+    )
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.resolvers.default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.args.default_resolvers", lambda: [])
 
     outcome = resolvers.DownloadOutcome(
         classification="pdf",
@@ -648,7 +697,9 @@ def test_main_dry_run_skips_writing_files(download_modules, monkeypatch, tmp_pat
                 failed_urls=[],
             )
 
-    monkeypatch.setattr(downloader, "ResolverPipeline", StubPipeline)
+    patcher.setattr(downloader, "ResolverPipeline", StubPipeline)
+
+    patcher.setattr("DocsToKG.ContentDownload.runner.ResolverPipeline", StubPipeline)
 
     argv = [
         "download_pyalex_pdfs.py",
@@ -664,7 +715,7 @@ def test_main_dry_run_skips_writing_files(download_modules, monkeypatch, tmp_pat
         str(manifest_path),
         "--dry-run",
     ]
-    monkeypatch.setattr("sys.argv", argv)
+    patcher.setattr("sys.argv", value=argv)
 
     downloader.main()
 
@@ -675,25 +726,33 @@ def test_main_dry_run_skips_writing_files(download_modules, monkeypatch, tmp_pat
     assert all(row["dry_run"] is True for row in manifest_rows)
 
 
-def test_main_requires_topic_or_topic_id(download_modules, monkeypatch):
+def test_main_requires_topic_or_topic_id(download_modules, patcher):
     downloader = download_modules.downloader
-    monkeypatch.setattr(
-        "sys.argv", ["download_pyalex_pdfs.py", "--year-start", "2020", "--year-end", "2020"]
+    patcher.setattr(
+        "sys.argv", value=["download_pyalex_pdfs.py", "--year-start", "2020", "--year-end", "2020"]
     )
     with pytest.raises(SystemExit):
         downloader.main()
 
 
-def test_cli_flag_propagation_and_metrics_export(download_modules, monkeypatch, tmp_path):
+def test_cli_flag_propagation_and_metrics_export(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
 
     manifest_path = tmp_path / "manifest.jsonl"
     out_dir = tmp_path / "output"
     out_dir.mkdir()
 
-    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter(()))
-    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter(()))
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.iterate_openalex", lambda *args, **kwargs: iter(())
+    )
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.resolvers.default_resolvers", lambda: [])
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", lambda value, *_: value
+    )
+    patcher.setattr("DocsToKG.ContentDownload.args.default_resolvers", lambda: [])
 
     captured: Dict[str, object] = {}
 
@@ -713,11 +772,13 @@ def test_cli_flag_propagation_and_metrics_export(download_modules, monkeypatch, 
                 failed_urls=[],
             )
 
-    monkeypatch.setattr(downloader, "ResolverPipeline", _StubPipeline)
+    patcher.setattr(downloader, "ResolverPipeline", _StubPipeline)
 
-    monkeypatch.setattr(
+    patcher.setattr("DocsToKG.ContentDownload.runner.ResolverPipeline", _StubPipeline)
+
+    patcher.setattr(
         "sys.argv",
-        [
+        value=[
             "download_pyalex_pdfs.py",
             "--topic",
             "graphs",
@@ -974,7 +1035,7 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
     assert manifest["dry_run"] is False
 
 
-def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_path):
+def test_cli_resume_from_partial_metadata(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
 
@@ -1011,9 +1072,17 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
 
     contexts: List[Dict[str, Any]] = []
 
-    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([work]))
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
-    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([work]))
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.iterate_openalex", lambda *args, **kwargs: iter([work])
+    )
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", lambda value, *_: value
+    )
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.resolvers.default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.args.default_resolvers", lambda: [])
 
     class RecordingPipeline:
         def __init__(self, *_, logger=None, metrics=None, **kwargs):
@@ -1023,7 +1092,8 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
 
         def run(self, session, artifact, context=None, session_factory=None):
             assert context is not None
-            contexts.append(context)
+            payload = context.to_dict() if hasattr(context, "to_dict") else context
+            contexts.append(payload)
             pdf_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
             pdf_path.parent.mkdir(parents=True, exist_ok=True)
             pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
@@ -1061,15 +1131,17 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
                 failed_urls=[],
             )
 
-    monkeypatch.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+    patcher.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+
+    patcher.setattr("DocsToKG.ContentDownload.runner.ResolverPipeline", RecordingPipeline)
 
     manifest_path = tmp_path / "manifest.jsonl"
     out_dir = tmp_path / "out"
     out_dir.mkdir()
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "sys.argv",
-        [
+        value=[
             "download_pyalex_pdfs.py",
             "--topic",
             "resume test",
@@ -1103,7 +1175,7 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
     assert any(record.get("resolver") == "stub" for record in manifest_records)
 
 
-def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path):
+def test_cli_workers_apply_domain_jitter(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
 
@@ -1121,9 +1193,21 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
         for i in range(2)
     ]
 
-    monkeypatch.setattr(downloader, "iterate_openalex", lambda *a, **k: iter(works))
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
-    monkeypatch.setattr(downloader, "default_resolvers", lambda: [SimpleNamespace(name="stub")])
+    patcher.setattr(downloader, "iterate_openalex", lambda *a, **k: iter(works))
+    patcher.setattr("DocsToKG.ContentDownload.runner.iterate_openalex", lambda *a, **k: iter(works))
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", lambda value, *_: value
+    )
+    patcher.setattr(downloader, "default_resolvers", lambda: [SimpleNamespace(name="stub")])
+    patcher.setattr(
+        "DocsToKG.ContentDownload.resolvers.default_resolvers",
+        lambda: [SimpleNamespace(name="stub")],
+    )
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.default_resolvers",
+        lambda: [SimpleNamespace(name="stub")],
+    )
 
     sleep_calls: List[float] = []
 
@@ -1139,9 +1223,9 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
         except StopIteration:
             return 0.02
 
-    monkeypatch.setattr(resolvers._time, "sleep", fake_sleep)
-    monkeypatch.setattr(resolvers._time, "monotonic", fake_monotonic)
-    monkeypatch.setattr(resolvers.random, "random", lambda: 0.5)
+    patcher.setattr(resolvers._time, "sleep", fake_sleep)
+    patcher.setattr(resolvers._time, "monotonic", fake_monotonic)
+    patcher.setattr(resolvers.random, "random", lambda: 0.5)
 
     executor_meta: Dict[str, Any] = {}
 
@@ -1155,12 +1239,19 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
         def __exit__(self, exc_type, exc, tb):
             return False
 
-        def submit(self, fn):
-            result = fn()
-            return SimpleNamespace(result=lambda: result)
+        class _RecordingFuture:
+            def __init__(self, value):
+                self._value = value
 
-    monkeypatch.setattr(downloader, "ThreadPoolExecutor", RecordingExecutor)
-    monkeypatch.setattr(downloader, "as_completed", lambda futures: futures)
+            def result(self):
+                return self._value
+
+        def submit(self, fn, *args, **kwargs):
+            result = fn(*args, **kwargs)
+            return self._RecordingFuture(result)
+
+    patcher.setattr("DocsToKG.ContentDownload.runner.ThreadPoolExecutor", RecordingExecutor)
+    patcher.setattr("DocsToKG.ContentDownload.runner.as_completed", lambda futures: futures)
 
     class DummyThrottle:
         def __init__(self, config):
@@ -1242,15 +1333,17 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
                 failed_urls=[],
             )
 
-    monkeypatch.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+    patcher.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+
+    patcher.setattr("DocsToKG.ContentDownload.runner.ResolverPipeline", RecordingPipeline)
 
     manifest_path = tmp_path / "manifest.jsonl"
     out_dir = tmp_path / "out"
     out_dir.mkdir()
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "sys.argv",
-        [
+        value=[
             "download_pyalex_pdfs.py",
             "--topic",
             "jitter",
@@ -1277,7 +1370,7 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
     assert sleep_calls[0] == pytest.approx(expected_wait)
 
 
-def test_cli_head_precheck_handles_head_hostile(download_modules, monkeypatch, tmp_path):
+def test_cli_head_precheck_handles_head_hostile(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
     from DocsToKG.ContentDownload import networking as network_module
@@ -1293,9 +1386,17 @@ def test_cli_head_precheck_handles_head_hostile(download_modules, monkeypatch, t
         "locations": [],
     }
 
-    monkeypatch.setattr(downloader, "iterate_openalex", lambda *a, **k: iter([work]))
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
-    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr(downloader, "iterate_openalex", lambda *a, **k: iter([work]))
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.iterate_openalex", lambda *a, **k: iter([work])
+    )
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", lambda value, *_: value
+    )
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.resolvers.default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.args.default_resolvers", lambda: [])
 
     head_calls: List[str] = []
 
@@ -1330,7 +1431,7 @@ def test_cli_head_precheck_handles_head_hostile(download_modules, monkeypatch, t
         head_calls.append(method)
         return responses.pop(0)
 
-    monkeypatch.setattr(network_module, "request_with_retries", fake_request)
+    patcher.setattr(network_module, "request_with_retries", fake_request)
 
     class RecordingPipeline:
         def __init__(self, *_, logger=None, metrics=None, **kwargs):
@@ -1378,15 +1479,17 @@ def test_cli_head_precheck_handles_head_hostile(download_modules, monkeypatch, t
                 failed_urls=[],
             )
 
-    monkeypatch.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+    patcher.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+
+    patcher.setattr("DocsToKG.ContentDownload.runner.ResolverPipeline", RecordingPipeline)
 
     manifest_path = tmp_path / "manifest.jsonl"
     out_dir = tmp_path / "out"
     out_dir.mkdir()
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "sys.argv",
-        [
+        value=[
             "download_pyalex_pdfs.py",
             "--topic",
             "head hostile",
@@ -1406,7 +1509,7 @@ def test_cli_head_precheck_handles_head_hostile(download_modules, monkeypatch, t
     assert head_calls == ["HEAD", "GET"]
 
 
-def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, tmp_path):
+def test_cli_attempt_records_cover_all_resolvers(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
 
@@ -1429,10 +1532,18 @@ def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, 
         def __init__(self, name: str) -> None:
             self.name = name
 
-    monkeypatch.setattr(downloader, "iterate_openalex", lambda *a, **k: iter(works))
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
-    monkeypatch.setattr(
+    patcher.setattr(downloader, "iterate_openalex", lambda *a, **k: iter(works))
+    patcher.setattr("DocsToKG.ContentDownload.runner.iterate_openalex", lambda *a, **k: iter(works))
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", lambda value, *_: value
+    )
+    patcher.setattr(
         downloader, "default_resolvers", lambda: [StubResolver(name) for name in resolver_order]
+    )
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.default_resolvers",
+        lambda: [StubResolver(name) for name in resolver_order],
     )
 
     class RecordingPipeline:
@@ -1499,15 +1610,17 @@ def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, 
                 failed_urls=[],
             )
 
-    monkeypatch.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+    patcher.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+
+    patcher.setattr("DocsToKG.ContentDownload.runner.ResolverPipeline", RecordingPipeline)
 
     manifest_path = tmp_path / "manifest.jsonl"
     out_dir = tmp_path / "out"
     out_dir.mkdir()
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "sys.argv",
-        [
+        value=[
             "download_pyalex_pdfs.py",
             "--topic",
             "attempt records",
@@ -1532,7 +1645,7 @@ def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, 
     assert [entry["resolver_order"] for entry in attempt_entries] == [1, 2, 3]
 
 
-def test_cli_dry_run_metrics_align(download_modules, monkeypatch, tmp_path):
+def test_cli_dry_run_metrics_align(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
 
@@ -1550,9 +1663,15 @@ def test_cli_dry_run_metrics_align(download_modules, monkeypatch, tmp_path):
         for i in range(2)
     ]
 
-    monkeypatch.setattr(downloader, "iterate_openalex", lambda *a, **k: iter(works))
-    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
-    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr(downloader, "iterate_openalex", lambda *a, **k: iter(works))
+    patcher.setattr("DocsToKG.ContentDownload.runner.iterate_openalex", lambda *a, **k: iter(works))
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", lambda value, *_: value
+    )
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.resolvers.default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.args.default_resolvers", lambda: [])
 
     class RecordingPipeline:
         def __init__(self, *_, logger=None, metrics=None, **kwargs):
@@ -1582,15 +1701,17 @@ def test_cli_dry_run_metrics_align(download_modules, monkeypatch, tmp_path):
                 failed_urls=[],
             )
 
-    monkeypatch.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+    patcher.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+
+    patcher.setattr("DocsToKG.ContentDownload.runner.ResolverPipeline", RecordingPipeline)
 
     manifest_path = tmp_path / "manifest.jsonl"
     out_dir = tmp_path / "out"
     out_dir.mkdir()
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "sys.argv",
-        [
+        value=[
             "download_pyalex_pdfs.py",
             "--topic",
             "dry metrics",
@@ -1630,7 +1751,7 @@ def test_envrc_configures_virtualenv_and_pythonpath() -> None:
 
 def test_bootstrap_script_installs_project() -> None:
     text = BOOTSTRAP.read_text(encoding="utf-8")
-    assert 'python -m venv "$VENV_PATH"' in text
+    assert ' -m venv "$VENV_PATH"' in text
     assert '"$VENV_PATH/bin/pip" install -e .' in text
     assert os.access(BOOTSTRAP, os.X_OK), "bootstrap script must be executable"
 

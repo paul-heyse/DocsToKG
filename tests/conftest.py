@@ -49,12 +49,17 @@ Usage:
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 import types
 import warnings
+from collections.abc import MutableMapping
+from contextlib import ExitStack
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
+from unittest import mock
 
 import pytest
 
@@ -156,6 +161,89 @@ def _install_pyalex_stub() -> None:
 
 
 _install_pyalex_stub()
+
+
+_UNSET = object()
+
+
+class PatchManager:
+    """Lightweight patch helper that mirrors pytest's monkeypatch API."""
+
+    def __init__(self) -> None:
+        self._stack = ExitStack()
+
+    def setattr(
+        self,
+        target: Any,
+        name: str | None = None,
+        value: Any = _UNSET,
+        *,
+        raising: bool = True,
+    ) -> Any:
+        if isinstance(target, str):
+            new_value = value if value is not _UNSET else name
+            if new_value is _UNSET:
+                raise TypeError("value must be provided when patching by dotted path")
+            context = mock.patch(target, new=new_value, create=not raising)
+        else:
+            if name is None:
+                raise TypeError("name must be provided when patching objects")
+            if value is _UNSET:
+                raise TypeError("value must be provided when patching objects")
+            context = mock.patch.object(target, name, value, create=not raising)
+        return self._stack.enter_context(context)
+
+    def setitem(
+        self,
+        mapping: MutableMapping[Any, Any],
+        key: Any,
+        value: Any,
+    ) -> Any:
+        original = mapping.get(key, _UNSET)
+        mapping[key] = value
+
+        def restore() -> None:
+            if original is _UNSET:
+                mapping.pop(key, None)
+            else:
+                mapping[key] = original
+
+        self._stack.callback(restore)
+        return value
+
+    def setenv(
+        self,
+        name: str,
+        value: str,
+        *,
+        env: MutableMapping[str, str] | None = None,
+    ) -> str:
+        target_env = env or os.environ
+        original = target_env.get(name, _UNSET)
+        target_env[name] = value
+
+        def restore() -> None:
+            if original is _UNSET:
+                target_env.pop(name, None)
+            else:
+                target_env[name] = original
+
+        self._stack.callback(restore)
+        return value
+
+    def close(self) -> None:
+        self._stack.close()
+
+
+@pytest.fixture
+def patcher() -> PatchManager:
+    """Auto-reverting patch helper based on unittest.mock."""
+
+    manager = PatchManager()
+    try:
+        yield manager
+    finally:
+        manager.close()
 
 
 warnings.filterwarnings(

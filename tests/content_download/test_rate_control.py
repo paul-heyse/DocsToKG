@@ -22,7 +22,7 @@ class _DummyLogger:
         return None
 
 
-def test_respect_domain_limit_enforces_bucket_and_interval(monkeypatch):
+def test_respect_domain_limit_enforces_bucket_and_interval(patcher):
     sleep_calls: list[float] = []
     fake_time = [0.0]
 
@@ -33,9 +33,9 @@ def test_respect_domain_limit_enforces_bucket_and_interval(monkeypatch):
     def fake_monotonic() -> float:
         return fake_time[0]
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline._time.sleep", fake_sleep)
-    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline._time.monotonic", fake_monotonic)
-    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline.random.random", lambda: 0.0)
+    patcher.setattr("DocsToKG.ContentDownload.pipeline._time.sleep", fake_sleep)
+    patcher.setattr("DocsToKG.ContentDownload.pipeline._time.monotonic", fake_monotonic)
+    patcher.setattr("DocsToKG.ContentDownload.pipeline.random.random", lambda: 0.0)
 
     config = ResolverConfig(
         domain_min_interval_s={"example.com": 1.0},
@@ -54,13 +54,13 @@ def test_respect_domain_limit_enforces_bucket_and_interval(monkeypatch):
     assert pytest.approx(sleep_calls[0], rel=1e-2) == 1.0
 
 
-def test_circuit_breaker_cooldown(monkeypatch):
+def test_circuit_breaker_cooldown(patcher):
     fake_time = [0.0]
 
     def fake_monotonic() -> float:
         return fake_time[0]
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.networking.time.monotonic", fake_monotonic)
+    patcher.setattr("DocsToKG.ContentDownload.networking.time.monotonic", fake_monotonic)
 
     breaker = CircuitBreaker(failure_threshold=1, cooldown_seconds=5.0, name="test")
     assert breaker.allow() is True

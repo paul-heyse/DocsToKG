@@ -21,6 +21,10 @@ __all__ = [
     "get_validator_registry",
     "list_registered_plugins",
     "get_registered_plugin_meta",
+    "register_resolver",
+    "unregister_resolver",
+    "register_validator",
+    "unregister_validator",
 ]
 
 
@@ -283,3 +287,79 @@ def get_registered_plugin_meta(kind: str) -> Dict[str, Dict[str, str]]:
     if kind == "validator":
         return dict(_VALIDATOR_ENTRY_META)
     raise ValueError(f"Unknown plugin kind: {kind}")
+
+
+def _store_plugin_metadata(kind: str, name: str, plugin: object) -> None:
+    entry = {
+        "qualified": _describe_plugin(plugin),
+        "version": "local",
+    }
+    if kind == "resolver":
+        _RESOLVER_ENTRY_META[name] = entry
+    elif kind == "validator":
+        _VALIDATOR_ENTRY_META[name] = entry
+
+
+def _clear_plugin_metadata(kind: str, name: str) -> None:
+    if kind == "resolver":
+        _RESOLVER_ENTRY_META.pop(name, None)
+    elif kind == "validator":
+        _VALIDATOR_ENTRY_META.pop(name, None)
+
+
+def register_resolver(name: str, resolver: ResolverPlugin, *, overwrite: bool = False) -> None:
+    """Register or replace a resolver in the global registry."""
+
+    if not isinstance(name, str) or not name:
+        raise ValueError("resolver name must be a non-empty string")
+
+    with _PLUGINS_LOCK:
+        if not overwrite and name in _RESOLVER_REGISTRY:
+            raise ValueError(f"resolver '{name}' is already registered")
+        _RESOLVER_REGISTRY[name] = resolver  # type: ignore[assignment]
+        if "resolver" in _PLUGIN_REGISTRIES:
+            _PLUGIN_REGISTRIES["resolver"][name] = resolver
+        _store_plugin_metadata("resolver", name, resolver)
+
+
+def unregister_resolver(name: str) -> ResolverPlugin:
+    """Remove a resolver from the global registry and return it."""
+
+    with _PLUGINS_LOCK:
+        try:
+            resolver = _RESOLVER_REGISTRY.pop(name)
+        except KeyError as exc:
+            raise KeyError(f"resolver '{name}' is not registered") from exc
+        if "resolver" in _PLUGIN_REGISTRIES:
+            _PLUGIN_REGISTRIES["resolver"].pop(name, None)
+        _clear_plugin_metadata("resolver", name)
+        return resolver  # type: ignore[return-value]
+
+
+def register_validator(name: str, validator: ValidatorPlugin, *, overwrite: bool = False) -> None:
+    """Register or replace a validator in the global registry."""
+
+    if not isinstance(name, str) or not name:
+        raise ValueError("validator name must be a non-empty string")
+
+    with _PLUGINS_LOCK:
+        if not overwrite and name in _VALIDATOR_REGISTRY:
+            raise ValueError(f"validator '{name}' is already registered")
+        _VALIDATOR_REGISTRY[name] = validator  # type: ignore[assignment]
+        if "validator" in _PLUGIN_REGISTRIES:
+            _PLUGIN_REGISTRIES["validator"][name] = validator
+        _store_plugin_metadata("validator", name, validator)
+
+
+def unregister_validator(name: str) -> ValidatorPlugin:
+    """Remove a validator from the global registry and return it."""
+
+    with _PLUGINS_LOCK:
+        try:
+            validator = _VALIDATOR_REGISTRY.pop(name)
+        except KeyError as exc:
+            raise KeyError(f"validator '{name}' is not registered") from exc
+        if "validator" in _PLUGIN_REGISTRIES:
+            _PLUGIN_REGISTRIES["validator"].pop(name, None)
+        _clear_plugin_metadata("validator", name)
+        return validator  # type: ignore[return-value]

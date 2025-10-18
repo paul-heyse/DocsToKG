@@ -16,7 +16,7 @@ Usage: ./scripts/dev.sh exec <command> [args...]
 
 Examples:
   ./scripts/dev.sh exec pytest -q
-  ./scripts/dev.sh python -m DocsToKG.DocParsing.cli --help
+  ./scripts/dev.sh python -m DocsToKG.DocParsing.core.cli --help
   ./scripts/dev.sh pip install some-package
 EOF
 }

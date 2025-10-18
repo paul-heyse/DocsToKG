@@ -32,11 +32,11 @@ from DocsToKG.OntologyDownload import settings as storage
 # --- Test Cases ---
 
 
-def test_fsspec_storage_roundtrip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_fsspec_storage_roundtrip(patch_stack, tmp_path: Path) -> None:
     """Remote storage should mirror uploads and allow subsequent retrievals."""
 
-    monkeypatch.setenv("PYSTOW_HOME", str(tmp_path))
-    monkeypatch.setenv("ONTOFETCH_STORAGE_URL", "memory://ontologies")
+    patch_stack.setenv("PYSTOW_HOME", str(tmp_path))
+    patch_stack.setenv("ONTOFETCH_STORAGE_URL", "memory://ontologies")
 
     mod = importlib.reload(storage)
     backend = mod.STORAGE
@@ -60,5 +60,5 @@ def test_fsspec_storage_roundtrip(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     backend.fs.get_file(str(remote_manifest), str(manifest))
     assert manifest.exists()
 
-    monkeypatch.delenv("ONTOFETCH_STORAGE_URL", raising=False)
+    patch_stack.delenv("ONTOFETCH_STORAGE_URL", raising=False)
     importlib.reload(storage)

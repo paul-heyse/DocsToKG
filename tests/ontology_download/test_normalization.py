@@ -162,7 +162,7 @@ def test_streaming_edge_cases(tmp_path: Path, content: str) -> None:
     assert streaming.get("streaming_nt_sha256") == stream_hash
 
 
-def test_streaming_flushes_chunks(monkeypatch, tmp_path: Path) -> None:
+def test_streaming_flushes_chunks(patch_stack, tmp_path: Path) -> None:
     class _Tracker:
         def __init__(self) -> None:
             self.updates: list[int] = []
@@ -182,7 +182,7 @@ def test_streaming_flushes_chunks(monkeypatch, tmp_path: Path) -> None:
             return real_sha256(*args, **kwargs)
         return tracker
 
-    monkeypatch.setattr("DocsToKG.OntologyDownload.validation.hashlib.sha256", fake_sha256)
+    patch_stack.setattr("DocsToKG.OntologyDownload.validation.hashlib.sha256", fake_sha256)
 
     destination = tmp_path / "chunked.ttl"
     digest = normalize_streaming(_COMPLEX_FIXTURE, output_path=destination, chunk_bytes=64)

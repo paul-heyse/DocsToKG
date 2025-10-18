@@ -176,12 +176,12 @@ import requests
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
+import DocsToKG.OntologyDownload.plugins as plugins_mod
 from DocsToKG.OntologyDownload import FetchSpec, resolvers
 from DocsToKG.OntologyDownload import api as core
 from DocsToKG.OntologyDownload import io as io_mod
-from DocsToKG.OntologyDownload.io import network as network_mod
-import DocsToKG.OntologyDownload.plugins as plugins_mod
 from DocsToKG.OntologyDownload.api import ConfigError
+from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.settings import DefaultsConfig, ResolvedConfig
 
 
@@ -201,8 +201,8 @@ def load_cassette():
     return _load
 
 
-def _reset_plugin_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(plugins_mod, "_PLUGINS_INITIALIZED", False, raising=False)
+def _reset_plugin_state(patch_stack) -> None:
+    patch_stack.setattr(plugins_mod, "_PLUGINS_INITIALIZED", False, raising=False)
     plugins_mod._PLUGIN_REGISTRIES.clear()
     plugins_mod._RESOLVER_REGISTRY.clear()
     plugins_mod._VALIDATOR_REGISTRY.clear()
@@ -213,26 +213,26 @@ def _reset_plugin_state(monkeypatch: pytest.MonkeyPatch) -> None:
 # --- Test Cases ---
 
 
-def test_obo_resolver_prefers_requested_format(monkeypatch, resolved_config):
-    monkeypatch.setattr(
+def test_obo_resolver_prefers_requested_format(patch_stack, resolved_config):
+    patch_stack.setattr(
         resolvers, "get_owl_download", lambda prefix: f"https://example.org/{prefix}.owl"
     )
-    monkeypatch.setattr(
+    patch_stack.setattr(
         resolvers, "get_obo_download", lambda prefix: f"https://example.org/{prefix}.obo"
     )
-    monkeypatch.setattr(resolvers, "get_rdf_download", lambda prefix: None)
+    patch_stack.setattr(resolvers, "get_rdf_download", lambda prefix: None)
     spec = FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl", "obo"])
     plan = resolvers.OBOResolver().plan(spec, resolved_config, logging.getLogger(__name__))
     assert plan.url.endswith("hp.owl")
     assert plan.service == "obo"
 
 
-def test_obo_resolver_contract(load_cassette, monkeypatch, resolved_config):
+def test_obo_resolver_contract(load_cassette, patch_stack, resolved_config):
     cassette = load_cassette("obo_chebi")
 
-    monkeypatch.setattr(resolvers, "get_owl_download", lambda prefix: cassette.get("owl"))
-    monkeypatch.setattr(resolvers, "get_obo_download", lambda prefix: cassette.get("obo"))
-    monkeypatch.setattr(resolvers, "get_rdf_download", lambda prefix: None)
+    patch_stack.setattr(resolvers, "get_owl_download", lambda prefix: cassette.get("owl"))
+    patch_stack.setattr(resolvers, "get_obo_download", lambda prefix: cassette.get("obo"))
+    patch_stack.setattr(resolvers, "get_rdf_download", lambda prefix: None)
 
     spec = FetchSpec(id=cassette["id"], resolver="obo", extras={}, target_formats=["owl"])
     plan = resolvers.OBOResolver().plan(spec, resolved_config, logging.getLogger(__name__))
@@ -242,8 +242,8 @@ def test_obo_resolver_contract(load_cassette, monkeypatch, resolved_config):
     assert plan.service == "obo"
 
 
-def test_ols_resolver_uses_download_link(monkeypatch, resolved_config):
-    monkeypatch.setattr(
+def test_ols_resolver_uses_download_link(patch_stack, resolved_config):
+    patch_stack.setattr(
         resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func()
     )
     record = {
@@ -253,8 +253,8 @@ def test_ols_resolver_uses_download_link(monkeypatch, resolved_config):
         "preferredPrefix": "EFO",
     }
     client = SimpleNamespace(get_ontology=lambda _: record, get_ontology_versions=lambda _: [])
-    monkeypatch.setattr(resolvers, "OlsClient", lambda: client)
-    monkeypatch.setattr(resolvers, "_OlsClient", lambda: client)
+    patch_stack.setattr(resolvers, "OlsClient", lambda: client)
+    patch_stack.setattr(resolvers, "_OlsClient", lambda: client)
     resolver = resolvers.OLSResolver()
     spec = FetchSpec(id="efo", resolver="ols", extras={}, target_formats=["owl"])
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
@@ -264,10 +264,10 @@ def test_ols_resolver_uses_download_link(monkeypatch, resolved_config):
     assert plan.service == "ols"
 
 
-def test_ols_resolver_contract(load_cassette, monkeypatch, resolved_config):
+def test_ols_resolver_contract(load_cassette, patch_stack, resolved_config):
     payload = load_cassette("ols_hp")
 
-    monkeypatch.setattr(
+    patch_stack.setattr(
         resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func()
     )
 
@@ -283,8 +283,8 @@ def test_ols_resolver_contract(load_cassette, monkeypatch, resolved_config):
             return self.data.get("versions", [])
 
     client = StubClient(payload)
-    monkeypatch.setattr(resolvers, "OlsClient", lambda: client)
-    monkeypatch.setattr(resolvers, "_OlsClient", lambda: client)
+    patch_stack.setattr(resolvers, "OlsClient", lambda: client)
+    patch_stack.setattr(resolvers, "_OlsClient", lambda: client)
 
     resolver = resolvers.OLSResolver()
     spec = FetchSpec(id="hp", resolver="ols", extras={}, target_formats=["owl"])
@@ -296,7 +296,7 @@ def test_ols_resolver_contract(load_cassette, monkeypatch, resolved_config):
     assert plan.service == "ols"
 
 
-def test_ols_resolver_applies_polite_headers(monkeypatch, resolved_config):
+def test_ols_resolver_applies_polite_headers(patch_stack, resolved_config):
     session_headers = {}
 
     class StubSession:
@@ -311,8 +311,8 @@ def test_ols_resolver_applies_polite_headers(monkeypatch, resolved_config):
         get_ontology_versions=lambda _: [],
         session=StubSession(),
     )
-    monkeypatch.setattr(resolvers, "OlsClient", lambda: client)
-    monkeypatch.setattr(resolvers, "_OlsClient", lambda: client)
+    patch_stack.setattr(resolvers, "OlsClient", lambda: client)
+    patch_stack.setattr(resolvers, "_OlsClient", lambda: client)
 
     resolver = resolvers.OLSResolver()
     logger = logging.LoggerAdapter(logging.getLogger(__name__), {"correlation_id": "corr123"})
@@ -323,8 +323,8 @@ def test_ols_resolver_applies_polite_headers(monkeypatch, resolved_config):
     assert session_headers["X-Request-ID"].startswith("corr123-")
 
 
-def test_bioportal_resolver_includes_api_key(monkeypatch, resolved_config, tmp_path):
-    monkeypatch.setattr(
+def test_bioportal_resolver_includes_api_key(patch_stack, resolved_config, tmp_path):
+    patch_stack.setattr(
         resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func()
     )
     ontology = {"license": "CC-BY"}
@@ -332,10 +332,10 @@ def test_bioportal_resolver_includes_api_key(monkeypatch, resolved_config, tmp_p
     client = SimpleNamespace(
         get_ontology=lambda _: ontology, get_latest_submission=lambda _: submission
     )
-    monkeypatch.setattr(resolvers, "BioPortalClient", lambda: client)
+    patch_stack.setattr(resolvers, "BioPortalClient", lambda: client)
     api_key_path = tmp_path / "bioportal_api_key.txt"
     api_key_path.write_text("secret")
-    monkeypatch.setattr(resolvers.pystow, "join", lambda *parts: tmp_path)
+    patch_stack.setattr(resolvers.pystow, "join", lambda *parts: tmp_path)
     resolver = resolvers.BioPortalResolver()
     spec = FetchSpec(
         id="ncit", resolver="bioportal", extras={"acronym": "NCIT"}, target_formats=["owl"]
@@ -346,9 +346,9 @@ def test_bioportal_resolver_includes_api_key(monkeypatch, resolved_config, tmp_p
     assert plan.service == "bioportal"
 
 
-def test_bioportal_resolver_contract(load_cassette, monkeypatch, resolved_config, tmp_path):
+def test_bioportal_resolver_contract(load_cassette, patch_stack, resolved_config, tmp_path):
     cassette = load_cassette("bioportal_ncit")
-    monkeypatch.setattr(
+    patch_stack.setattr(
         resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func()
     )
     client = SimpleNamespace(
@@ -356,8 +356,8 @@ def test_bioportal_resolver_contract(load_cassette, monkeypatch, resolved_config
         get_latest_submission=lambda acronym: cassette["submission"],
         session=SimpleNamespace(headers={}),
     )
-    monkeypatch.setattr(resolvers, "BioPortalClient", lambda: client)
-    monkeypatch.setattr(resolvers.pystow, "join", lambda *parts: tmp_path)
+    patch_stack.setattr(resolvers, "BioPortalClient", lambda: client)
+    patch_stack.setattr(resolvers.pystow, "join", lambda *parts: tmp_path)
     api_key_path = tmp_path / "bioportal_api_key.txt"
     api_key_path.write_text(cassette["api_key"])
 
@@ -373,7 +373,7 @@ def test_bioportal_resolver_contract(load_cassette, monkeypatch, resolved_config
     assert plan.license == "CC-BY-4.0"
 
 
-def test_bioportal_resolver_applies_polite_headers(monkeypatch, resolved_config, tmp_path):
+def test_bioportal_resolver_applies_polite_headers(patch_stack, resolved_config, tmp_path):
     session_headers = {}
 
     class StubSession:
@@ -389,8 +389,8 @@ def test_bioportal_resolver_applies_polite_headers(monkeypatch, resolved_config,
         get_latest_submission=lambda _: submission,
         session=StubSession(),
     )
-    monkeypatch.setattr(resolvers, "BioPortalClient", lambda: client)
-    monkeypatch.setattr(resolvers.pystow, "join", lambda *parts: tmp_path)
+    patch_stack.setattr(resolvers, "BioPortalClient", lambda: client)
+    patch_stack.setattr(resolvers.pystow, "join", lambda *parts: tmp_path)
 
     resolver = resolvers.BioPortalResolver()
     resolver.client = client
@@ -404,7 +404,7 @@ def test_bioportal_resolver_applies_polite_headers(monkeypatch, resolved_config,
     assert session_headers["From"] == "team@example.org"
 
 
-def test_lov_resolver_contract(load_cassette, monkeypatch, resolved_config):
+def test_lov_resolver_contract(load_cassette, patch_stack, resolved_config):
     cassette = load_cassette("lov_schema")
     response_payload = cassette["response"]
 
@@ -426,7 +426,7 @@ def test_lov_resolver_contract(load_cassette, monkeypatch, resolved_config):
         return StubResponse(response_payload)
 
     session = SimpleNamespace(headers={}, get=_get)
-    monkeypatch.setattr(
+    patch_stack.setattr(
         resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func()
     )
     resolver = resolvers.LOVResolver(session=session)
@@ -462,7 +462,7 @@ def test_xbrl_resolver_success(resolved_config):
     assert plan.service == "xbrl"
 
 
-def test_bioportal_resolver_auth_error(load_cassette, monkeypatch, resolved_config):
+def test_bioportal_resolver_auth_error(load_cassette, patch_stack, resolved_config):
     failure = load_cassette("bioportal_auth_failure")
     response = requests.Response()
     response.status_code = failure["status"]
@@ -471,7 +471,7 @@ def test_bioportal_resolver_auth_error(load_cassette, monkeypatch, resolved_conf
     def failing_call():
         raise error
 
-    monkeypatch.setattr(
+    patch_stack.setattr(
         resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func()
     )
     resolver = resolvers.BioPortalResolver()
@@ -486,7 +486,7 @@ def test_bioportal_resolver_auth_error(load_cassette, monkeypatch, resolved_conf
     assert "status 401" in str(exc_info.value).lower()
 
 
-def test_ols_resolver_timeout_retry(monkeypatch, resolved_config):
+def test_ols_resolver_timeout_retry(patch_stack, resolved_config):
     attempts = {"count": 0}
 
     def get_ontology(_):
@@ -516,7 +516,7 @@ def test_ontobee_resolver_contract(load_cassette, resolved_config):
     assert plan.service == "ontobee"
 
 
-def test_resolver_uses_service_rate_limit(monkeypatch, resolved_config):
+def test_resolver_uses_service_rate_limit(patch_stack, resolved_config):
     calls = {"count": 0}
 
     class DummyBucket:
@@ -530,15 +530,15 @@ def test_resolver_uses_service_rate_limit(monkeypatch, resolved_config):
         calls["requests"] += 1
         return bucket
 
-    monkeypatch.setattr(io_mod, "get_bucket", _capture_bucket, raising=False)
-    monkeypatch.setattr(network_mod, "get_bucket", _capture_bucket, raising=False)
-    monkeypatch.setattr(resolvers, "get_bucket", _capture_bucket, raising=False)
-    monkeypatch.setattr(resolvers, "retry_with_backoff", lambda func, **kwargs: func())
+    patch_stack.setattr(io_mod, "get_bucket", _capture_bucket, raising=False)
+    patch_stack.setattr(network_mod, "get_bucket", _capture_bucket, raising=False)
+    patch_stack.setattr(resolvers, "get_bucket", _capture_bucket, raising=False)
+    patch_stack.setattr(resolvers, "retry_with_backoff", lambda func, **kwargs: func())
 
     record = {"download": "https://example.org/efo.owl"}
     client = SimpleNamespace(get_ontology=lambda _: record, get_ontology_versions=lambda _: [])
-    monkeypatch.setattr(resolvers, "OlsClient", lambda: client)
-    monkeypatch.setattr(resolvers, "_OlsClient", lambda: client)
+    patch_stack.setattr(resolvers, "OlsClient", lambda: client)
+    patch_stack.setattr(resolvers, "_OlsClient", lambda: client)
 
     resolver = resolvers.OLSResolver()
     spec = FetchSpec(id="efo", resolver="obo", extras={}, target_formats=["owl"])
@@ -549,7 +549,7 @@ def test_resolver_uses_service_rate_limit(monkeypatch, resolved_config):
     assert calls["count"] >= 1
 
 
-def test_lov_resolver_respects_timeout_and_rate_limit(monkeypatch, resolved_config):
+def test_lov_resolver_respects_timeout_and_rate_limit(patch_stack, resolved_config):
     captured = {"timeout": None, "service": None, "consumes": 0}
 
     class StubResponse:
@@ -585,10 +585,10 @@ def test_lov_resolver_respects_timeout_and_rate_limit(monkeypatch, resolved_conf
         captured["service"] = service
         return bucket
 
-    monkeypatch.setattr(io_mod, "get_bucket", _fake_get_bucket, raising=False)
-    monkeypatch.setattr(network_mod, "get_bucket", _fake_get_bucket, raising=False)
-    monkeypatch.setattr(resolvers, "get_bucket", _fake_get_bucket, raising=False)
-    monkeypatch.setattr(resolvers, "retry_with_backoff", lambda func, **kwargs: func())
+    patch_stack.setattr(io_mod, "get_bucket", _fake_get_bucket, raising=False)
+    patch_stack.setattr(network_mod, "get_bucket", _fake_get_bucket, raising=False)
+    patch_stack.setattr(resolvers, "get_bucket", _fake_get_bucket, raising=False)
+    patch_stack.setattr(resolvers, "retry_with_backoff", lambda func, **kwargs: func())
 
     resolver = resolvers.LOVResolver(session=StubSession())
     resolved_config.defaults.http.timeout_sec = 9
@@ -692,7 +692,7 @@ def test_resolver_registry_includes_new_entries():
     assert "ontobee" in resolvers.RESOLVERS
 
 
-def test_resolver_fallback_chain_on_failure(monkeypatch, resolved_config):
+def test_resolver_fallback_chain_on_failure(patch_stack, resolved_config):
     class PrimaryResolver:
         def plan(self, spec, config, logger):
             raise ConfigError("primary unavailable")
@@ -714,13 +714,13 @@ def test_resolver_fallback_chain_on_failure(monkeypatch, resolved_config):
         def plan(self, spec, config, logger):
             return fallback_plan
 
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", PrimaryResolver())
-    monkeypatch.setitem(resolvers.RESOLVERS, "lov", SecondaryResolver())
+    patch_stack.setitem(resolvers.RESOLVERS, "obo", PrimaryResolver())
+    patch_stack.setitem(resolvers.RESOLVERS, "lov", SecondaryResolver())
 
     resolved_config.defaults.prefer_source = ["obo", "lov"]
     spec = FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
 
-    monkeypatch.setattr(
+    patch_stack.setattr(
         core,
         "setup_logging",
         lambda level=None, retention_days=None, max_log_size_mb=None: logging.getLogger(
@@ -732,19 +732,19 @@ def test_resolver_fallback_chain_on_failure(monkeypatch, resolved_config):
         planned = core.plan_one(spec, config=resolved_config)
     finally:
         if original_primary is not None:
-            monkeypatch.setitem(resolvers.RESOLVERS, "obo", original_primary)
+            patch_stack.setitem(resolvers.RESOLVERS, "obo", original_primary)
         if original_secondary is not None:
-            monkeypatch.setitem(resolvers.RESOLVERS, "lov", original_secondary)
+            patch_stack.setitem(resolvers.RESOLVERS, "lov", original_secondary)
 
     assert planned.resolver == "lov"
     assert [candidate.resolver for candidate in planned.candidates] == ["lov"]
     assert planned.plan.url == "https://fallback.example.org/hp.owl"
 
 
-def test_resolver_plugin_loader_registers_and_warns(monkeypatch, caplog):
+def test_resolver_plugin_loader_registers_and_warns(patch_stack, caplog):
     base = resolvers.RESOLVERS.copy()
-    monkeypatch.setattr(resolvers, "RESOLVERS", base.copy())
-    _reset_plugin_state(monkeypatch)
+    patch_stack.setattr(resolvers, "RESOLVERS", base.copy())
+    _reset_plugin_state(patch_stack)
 
     class DummyResolver:
         NAME = "plugin"
@@ -771,7 +771,7 @@ def test_resolver_plugin_loader_registers_and_warns(monkeypatch, caplog):
     stub = SimpleNamespace(
         select=lambda *, group=None: entries if group == "docstokg.ontofetch.resolver" else []
     )
-    monkeypatch.setattr(plugins_mod.metadata, "entry_points", lambda: stub)
+    patch_stack.setattr(plugins_mod.metadata, "entry_points", lambda: stub)
 
     caplog.set_level(logging.INFO)
     plugins_mod.load_resolver_plugins(
@@ -784,15 +784,15 @@ def test_resolver_plugin_loader_registers_and_warns(monkeypatch, caplog):
     assert any(record.message == "resolver plugin failed" for record in caplog.records)
 
 
-def test_resolver_plugin_guard_is_idempotent(monkeypatch):
+def test_resolver_plugin_guard_is_idempotent(patch_stack):
     calls = {"count": 0}
 
     def fake_entry_points():
         calls["count"] += 1
         return SimpleNamespace(select=lambda *, group=None: [])
 
-    monkeypatch.setattr(plugins_mod.metadata, "entry_points", fake_entry_points)
-    _reset_plugin_state(monkeypatch)
+    patch_stack.setattr(plugins_mod.metadata, "entry_points", fake_entry_points)
+    _reset_plugin_state(patch_stack)
 
     plugins_mod.ensure_resolver_plugins(resolvers.RESOLVERS, logger=logging.getLogger("test"))
     plugins_mod.ensure_resolver_plugins(resolvers.RESOLVERS, logger=logging.getLogger("test"))

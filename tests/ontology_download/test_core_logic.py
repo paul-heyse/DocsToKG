@@ -145,7 +145,7 @@ def test_select_validators_for_rdf_includes_defaults():
 
 
 @pytest.fixture(autouse=True)
-def stub_requests_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+def stub_requests_metadata(patch_stack) -> None:
     """Avoid real HTTP calls when planning augments metadata."""
 
     def _fake_probe(**kwargs) -> PlannerProbeResult:
@@ -162,7 +162,7 @@ def stub_requests_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
             ),
         )
 
-    monkeypatch.setattr(pipeline_mod, "planner_http_probe", _fake_probe, raising=False)
+    patch_stack.setattr(pipeline_mod, "planner_http_probe", _fake_probe, raising=False)
 
 
 # --- Helper Functions ---
@@ -181,7 +181,7 @@ def _make_plan() -> FetchPlan:
 
 
 def _run_fetch(
-    monkeypatch: pytest.MonkeyPatch,
+    patch_stack,
     tmp_path: Path,
     target_formats,
     normalization_mode: str,
@@ -201,7 +201,7 @@ def _run_fetch(
         def plan(self, spec, config, logger):
             return plan
 
-    monkeypatch.setitem(RESOLVERS, "obo", Resolver())
+    patch_stack.setitem(RESOLVERS, "obo", Resolver())
 
     defaults = DefaultsConfig(prefer_source=["obo"])
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -214,10 +214,10 @@ def _run_fetch(
         "LOCAL_ONTOLOGY_DIR": ontology_dir,
     }
     for attr, value in overrides.items():
-        monkeypatch.setattr(storage_mod, attr, value, raising=False)
-        monkeypatch.setattr(pipeline_mod, attr, value, raising=False)
-        monkeypatch.setattr(core, attr, value, raising=False)
-    monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
+        patch_stack.setattr(storage_mod, attr, value, raising=False)
+        patch_stack.setattr(pipeline_mod, attr, value, raising=False)
+        patch_stack.setattr(core, attr, value, raising=False)
+    patch_stack.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
 
     class _StubStorage:
         def finalize_version(
@@ -240,9 +240,9 @@ def _run_fetch(
             return path
 
     stub_storage = _StubStorage()
-    monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
-    monkeypatch.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
-    monkeypatch.setattr(core, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(core, "STORAGE", stub_storage, raising=False)
 
     def _fake_run_validators(requests, logger):
         results = {}
@@ -259,12 +259,12 @@ def _run_fetch(
             results[request.name] = ValidationResult(ok=True, details=details, output_files=[])
         return results
 
-    monkeypatch.setattr(pipeline_mod, "run_validators", _fake_run_validators, raising=False)
-    monkeypatch.setattr(core, "run_validators", _fake_run_validators, raising=False)
-    monkeypatch.setattr(
+    patch_stack.setattr(pipeline_mod, "run_validators", _fake_run_validators, raising=False)
+    patch_stack.setattr(core, "run_validators", _fake_run_validators, raising=False)
+    patch_stack.setattr(
         pipeline_mod, "validate_url_security", lambda url, config=None: url, raising=False
     )
-    monkeypatch.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
+    patch_stack.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
 
     def _fake_download_stream(**kwargs):
         destination: Path = kwargs["destination"]
@@ -282,8 +282,8 @@ def _run_fetch(
             content_length=len(payload),
         )
 
-    monkeypatch.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
-    monkeypatch.setattr(core, "download_stream", _fake_download_stream, raising=False)
+    patch_stack.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
+    patch_stack.setattr(core, "download_stream", _fake_download_stream, raising=False)
 
     logger = logging.getLogger("ontology-download-test")
     logger.setLevel(logging.INFO)
@@ -294,7 +294,7 @@ def _run_fetch(
 # --- Test Cases ---
 
 
-def test_populate_plan_metadata_uses_http_config(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_populate_plan_metadata_uses_http_config(patch_stack) -> None:
     defaults = DefaultsConfig()
     defaults.http.allowed_hosts = ["example.org"]
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -313,7 +313,7 @@ def test_populate_plan_metadata_uses_http_config(monkeypatch: pytest.MonkeyPatch
     assert enriched.metadata.get("content_length") == 256
 
 
-def test_plan_all_rejects_disallowed_host(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_plan_all_rejects_disallowed_host(patch_stack) -> None:
     defaults = DefaultsConfig()
     defaults.http.allowed_hosts = ["allowed.example"]
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -330,7 +330,7 @@ def test_plan_all_rejects_disallowed_host(monkeypatch: pytest.MonkeyPatch) -> No
                 service="obo",
             )
 
-    monkeypatch.setitem(RESOLVERS, "blocked", _Resolver())
+    patch_stack.setitem(RESOLVERS, "blocked", _Resolver())
 
     spec = core.FetchSpec(id="hp", resolver="blocked", extras={}, target_formats=("owl",))
 
@@ -354,7 +354,7 @@ class _ImmediateFuture:
         self._error = RuntimeError("cancelled")
 
 
-def test_plan_all_honors_concurrent_plan_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_plan_all_honors_concurrent_plan_limit(patch_stack) -> None:
     """plan_all should use configured concurrent_plans when submitting workers."""
 
     defaults = DefaultsConfig()
@@ -398,12 +398,12 @@ def test_plan_all_honors_concurrent_plan_limit(monkeypatch: pytest.MonkeyPatch) 
             self._futures.append(future)
             return future
 
-    monkeypatch.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
-    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
-    monkeypatch.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
-    monkeypatch.setattr(core, "as_completed", fake_as_completed, raising=False)
-    monkeypatch.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
-    monkeypatch.setattr(core, "plan_one", fake_plan_one, raising=False)
+    patch_stack.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    patch_stack.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    patch_stack.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
+    patch_stack.setattr(core, "as_completed", fake_as_completed, raising=False)
+    patch_stack.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
+    patch_stack.setattr(core, "plan_one", fake_plan_one, raising=False)
 
     plans = core.plan_all(specs, config=config)
 
@@ -411,7 +411,7 @@ def test_plan_all_honors_concurrent_plan_limit(monkeypatch: pytest.MonkeyPatch) 
     assert [plan.spec.id for plan in plans] == [spec.id for spec in specs]
 
 
-def test_plan_all_aborts_on_first_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_plan_all_aborts_on_first_failure(patch_stack) -> None:
     """plan_all cancels outstanding work when a resolver fails."""
 
     defaults = DefaultsConfig()
@@ -456,12 +456,12 @@ def test_plan_all_aborts_on_first_failure(monkeypatch: pytest.MonkeyPatch) -> No
             self._futures.append(future)
             return future
 
-    monkeypatch.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
-    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
-    monkeypatch.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
-    monkeypatch.setattr(core, "as_completed", fake_as_completed, raising=False)
-    monkeypatch.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
-    monkeypatch.setattr(core, "plan_one", fake_plan_one, raising=False)
+    patch_stack.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    patch_stack.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    patch_stack.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
+    patch_stack.setattr(core, "as_completed", fake_as_completed, raising=False)
+    patch_stack.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
+    patch_stack.setattr(core, "plan_one", fake_plan_one, raising=False)
 
     with pytest.raises(core.BatchPlanningError) as excinfo:
         core.plan_all(specs, config=config)
@@ -470,7 +470,7 @@ def test_plan_all_aborts_on_first_failure(monkeypatch: pytest.MonkeyPatch) -> No
     assert [plan.spec.id for plan in excinfo.value.completed] == ["good"]
 
 
-def test_plan_all_since_filters_outdated_plans(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_plan_all_since_filters_outdated_plans(patch_stack) -> None:
     defaults = DefaultsConfig()
     config = ResolvedConfig(defaults=defaults, specs=[])
     spec = core.FetchSpec(id="hp", resolver="direct", extras={}, target_formats=("owl",))
@@ -525,20 +525,20 @@ def test_plan_all_since_filters_outdated_plans(monkeypatch: pytest.MonkeyPatch) 
         logger.propagate = False
         return logger
 
-    monkeypatch.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
-    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
-    monkeypatch.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
-    monkeypatch.setattr(core, "as_completed", fake_as_completed, raising=False)
-    monkeypatch.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
-    monkeypatch.setattr(core, "plan_one", fake_plan_one, raising=False)
-    monkeypatch.setattr(pipeline_mod, "setup_logging", fake_setup_logging, raising=False)
-    monkeypatch.setattr(core, "setup_logging", fake_setup_logging, raising=False)
-    monkeypatch.setattr(pipeline_mod, "ensure_python_version", lambda: None, raising=False)
-    monkeypatch.setattr(core, "ensure_python_version", lambda: None, raising=False)
-    monkeypatch.setattr(
+    patch_stack.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    patch_stack.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    patch_stack.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
+    patch_stack.setattr(core, "as_completed", fake_as_completed, raising=False)
+    patch_stack.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
+    patch_stack.setattr(core, "plan_one", fake_plan_one, raising=False)
+    patch_stack.setattr(pipeline_mod, "setup_logging", fake_setup_logging, raising=False)
+    patch_stack.setattr(core, "setup_logging", fake_setup_logging, raising=False)
+    patch_stack.setattr(pipeline_mod, "ensure_python_version", lambda: None, raising=False)
+    patch_stack.setattr(core, "ensure_python_version", lambda: None, raising=False)
+    patch_stack.setattr(
         pipeline_mod, "generate_correlation_id", lambda: "fixed-correlation", raising=False
     )
-    monkeypatch.setattr(core, "generate_correlation_id", lambda: "fixed-correlation", raising=False)
+    patch_stack.setattr(core, "generate_correlation_id", lambda: "fixed-correlation", raising=False)
 
     cutoff = datetime(2021, 1, 1, tzinfo=timezone.utc)
     plans = core.plan_all([spec], config=config, since=cutoff)
@@ -546,7 +546,7 @@ def test_plan_all_since_filters_outdated_plans(monkeypatch: pytest.MonkeyPatch) 
     assert plans == []
 
 
-def test_plan_all_since_fetches_missing_last_modified(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_plan_all_since_fetches_missing_last_modified(patch_stack) -> None:
     defaults = DefaultsConfig()
     config = ResolvedConfig(defaults=defaults, specs=[])
     spec = core.FetchSpec(id="go", resolver="direct", extras={}, target_formats=("owl",))
@@ -608,24 +608,24 @@ def test_plan_all_since_fetches_missing_last_modified(monkeypatch: pytest.Monkey
         logger.propagate = False
         return logger
 
-    monkeypatch.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
-    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
-    monkeypatch.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
-    monkeypatch.setattr(core, "as_completed", fake_as_completed, raising=False)
-    monkeypatch.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
-    monkeypatch.setattr(core, "plan_one", fake_plan_one, raising=False)
-    monkeypatch.setattr(
+    patch_stack.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    patch_stack.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    patch_stack.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
+    patch_stack.setattr(core, "as_completed", fake_as_completed, raising=False)
+    patch_stack.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
+    patch_stack.setattr(core, "plan_one", fake_plan_one, raising=False)
+    patch_stack.setattr(
         pipeline_mod, "_fetch_last_modified", fake_fetch_last_modified, raising=False
     )
-    monkeypatch.setattr(core, "_fetch_last_modified", fake_fetch_last_modified, raising=False)
-    monkeypatch.setattr(pipeline_mod, "setup_logging", fake_setup_logging, raising=False)
-    monkeypatch.setattr(core, "setup_logging", fake_setup_logging, raising=False)
-    monkeypatch.setattr(pipeline_mod, "ensure_python_version", lambda: None, raising=False)
-    monkeypatch.setattr(core, "ensure_python_version", lambda: None, raising=False)
-    monkeypatch.setattr(
+    patch_stack.setattr(core, "_fetch_last_modified", fake_fetch_last_modified, raising=False)
+    patch_stack.setattr(pipeline_mod, "setup_logging", fake_setup_logging, raising=False)
+    patch_stack.setattr(core, "setup_logging", fake_setup_logging, raising=False)
+    patch_stack.setattr(pipeline_mod, "ensure_python_version", lambda: None, raising=False)
+    patch_stack.setattr(core, "ensure_python_version", lambda: None, raising=False)
+    patch_stack.setattr(
         pipeline_mod, "generate_correlation_id", lambda: "fixed-correlation", raising=False
     )
-    monkeypatch.setattr(core, "generate_correlation_id", lambda: "fixed-correlation", raising=False)
+    patch_stack.setattr(core, "generate_correlation_id", lambda: "fixed-correlation", raising=False)
 
     cutoff = datetime(2024, 1, 1, tzinfo=timezone.utc)
     plans = core.plan_all([spec], config=config, since=cutoff)
@@ -638,7 +638,7 @@ def test_plan_all_since_fetches_missing_last_modified(monkeypatch: pytest.Monkey
     assert plan.last_modified_at == datetime(2025, 2, 5, tzinfo=timezone.utc)
 
 
-def test_plan_one_uses_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_plan_one_uses_fallback(patch_stack) -> None:
     """When the primary resolver fails, plan_one should fall back to the next option."""
 
     class FailingResolver:
@@ -649,8 +649,8 @@ def test_plan_one_uses_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
         def plan(self, spec, config, logger):
             return _make_plan()
 
-    monkeypatch.setitem(RESOLVERS, "obo", FailingResolver())
-    monkeypatch.setitem(RESOLVERS, "lov", SuccessfulResolver())
+    patch_stack.setitem(RESOLVERS, "obo", FailingResolver())
+    patch_stack.setitem(RESOLVERS, "lov", SuccessfulResolver())
 
     defaults = DefaultsConfig(prefer_source=["obo", "lov"])
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -663,14 +663,14 @@ def test_plan_one_uses_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     assert [candidate.resolver for candidate in planned.candidates] == ["lov"]
 
 
-def test_plan_one_respects_disabled_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_plan_one_respects_disabled_fallback(patch_stack) -> None:
     """Fallback should be skipped when resolver_fallback_enabled is False."""
 
     class FailingResolver:
         def plan(self, spec, config, logger):
             raise ConfigError("boom")
 
-    monkeypatch.setitem(RESOLVERS, "obo", FailingResolver())
+    patch_stack.setitem(RESOLVERS, "obo", FailingResolver())
 
     defaults = DefaultsConfig(
         prefer_source=["obo", "lov"],
@@ -683,7 +683,7 @@ def test_plan_one_respects_disabled_fallback(monkeypatch: pytest.MonkeyPatch) ->
         core.plan_one(spec, config=config)
 
 
-def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_fetch_one_download_fallback(patch_stack, tmp_path: Path) -> None:
     """Download should fall back to the next resolver on retryable failure."""
 
     primary_plan = FetchPlan(
@@ -713,8 +713,8 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
         def plan(self, spec, config, logger):
             return fallback_plan
 
-    monkeypatch.setitem(RESOLVERS, "obo", PrimaryResolver())
-    monkeypatch.setitem(RESOLVERS, "lov", SecondaryResolver())
+    patch_stack.setitem(RESOLVERS, "obo", PrimaryResolver())
+    patch_stack.setitem(RESOLVERS, "lov", SecondaryResolver())
 
     defaults = DefaultsConfig(prefer_source=["lov"])
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -727,10 +727,10 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
         "LOCAL_ONTOLOGY_DIR": ontology_dir,
     }
     for attr, value in overrides.items():
-        monkeypatch.setattr(storage_mod, attr, value, raising=False)
-        monkeypatch.setattr(pipeline_mod, attr, value, raising=False)
-        monkeypatch.setattr(core, attr, value, raising=False)
-    monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
+        patch_stack.setattr(storage_mod, attr, value, raising=False)
+        patch_stack.setattr(pipeline_mod, attr, value, raising=False)
+        patch_stack.setattr(core, attr, value, raising=False)
+    patch_stack.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
 
     class _StubStorage:
         def finalize_version(
@@ -753,9 +753,9 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
             return source
 
     stub_storage = _StubStorage()
-    monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
-    monkeypatch.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
-    monkeypatch.setattr(core, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(core, "STORAGE", stub_storage, raising=False)
 
     def _fake_run_validators(requests, logger):
         results = {}
@@ -768,12 +768,12 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
             results[request.name] = ValidationResult(ok=True, details=details, output_files=[])
         return results
 
-    monkeypatch.setattr(pipeline_mod, "run_validators", _fake_run_validators, raising=False)
-    monkeypatch.setattr(core, "run_validators", _fake_run_validators, raising=False)
-    monkeypatch.setattr(
+    patch_stack.setattr(pipeline_mod, "run_validators", _fake_run_validators, raising=False)
+    patch_stack.setattr(core, "run_validators", _fake_run_validators, raising=False)
+    patch_stack.setattr(
         pipeline_mod, "validate_url_security", lambda url, config=None: url, raising=False
     )
-    monkeypatch.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
+    patch_stack.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
 
     attempts = {"count": 0}
 
@@ -796,8 +796,8 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
             content_length=len(payload),
         )
 
-    monkeypatch.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
-    monkeypatch.setattr(core, "download_stream", _fake_download_stream, raising=False)
+    patch_stack.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
+    patch_stack.setattr(core, "download_stream", _fake_download_stream, raising=False)
 
     logger = logging.getLogger("ontology-download-test")
     logger.setLevel(logging.INFO)
@@ -820,9 +820,7 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert chain[1]["status"] == "success"
 
 
-def test_fetch_records_expected_checksum_and_index(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_fetch_records_expected_checksum_and_index(patch_stack, tmp_path: Path) -> None:
     payload = b"ontology-data"
     expected_digest = hashlib.sha256(payload).hexdigest()
 
@@ -842,7 +840,7 @@ def test_fetch_records_expected_checksum_and_index(
         def plan(self, spec, config, logger):
             return checksum_plan
 
-    monkeypatch.setitem(RESOLVERS, "obo", ChecksumResolver())
+    patch_stack.setitem(RESOLVERS, "obo", ChecksumResolver())
 
     defaults = DefaultsConfig(prefer_source=["obo"])
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -854,10 +852,10 @@ def test_fetch_records_expected_checksum_and_index(
         "CACHE_DIR": cache_dir,
         "LOCAL_ONTOLOGY_DIR": ontology_dir,
     }.items():
-        monkeypatch.setattr(storage_mod, attr, value, raising=False)
-        monkeypatch.setattr(pipeline_mod, attr, value, raising=False)
-        monkeypatch.setattr(core, attr, value, raising=False)
-    monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
+        patch_stack.setattr(storage_mod, attr, value, raising=False)
+        patch_stack.setattr(pipeline_mod, attr, value, raising=False)
+        patch_stack.setattr(core, attr, value, raising=False)
+    patch_stack.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
 
     class _StubStorage:
         def finalize_version(
@@ -880,9 +878,9 @@ def test_fetch_records_expected_checksum_and_index(
             return source
 
     stub_storage = _StubStorage()
-    monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
-    monkeypatch.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
-    monkeypatch.setattr(core, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(core, "STORAGE", stub_storage, raising=False)
 
     captured: Dict[str, Optional[str]] = {"expected_hash": None}
 
@@ -901,8 +899,8 @@ def test_fetch_records_expected_checksum_and_index(
             content_length=len(payload),
         )
 
-    monkeypatch.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
-    monkeypatch.setattr(core, "download_stream", _fake_download_stream, raising=False)
+    patch_stack.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
+    patch_stack.setattr(core, "download_stream", _fake_download_stream, raising=False)
 
     def _fake_run_validators(requests, logger):
         return {
@@ -914,12 +912,12 @@ def test_fetch_records_expected_checksum_and_index(
             for request in requests
         }
 
-    monkeypatch.setattr(pipeline_mod, "run_validators", _fake_run_validators, raising=False)
-    monkeypatch.setattr(core, "run_validators", _fake_run_validators, raising=False)
-    monkeypatch.setattr(
+    patch_stack.setattr(pipeline_mod, "run_validators", _fake_run_validators, raising=False)
+    patch_stack.setattr(core, "run_validators", _fake_run_validators, raising=False)
+    patch_stack.setattr(
         pipeline_mod, "validate_url_security", lambda url, config=None: url, raising=False
     )
-    monkeypatch.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
+    patch_stack.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
 
     results = core.fetch_all([spec], config=config, force=True)
     assert captured["expected_hash"] == f"sha256:{expected_digest}"
@@ -947,7 +945,7 @@ def test_fetch_records_expected_checksum_and_index(
     assert first_entry["size"] == len(payload)
 
 
-def test_fetch_mirrors_cas_when_enabled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_fetch_mirrors_cas_when_enabled(patch_stack, tmp_path: Path) -> None:
     payload = b"ontology"
     digest = hashlib.sha256(payload).hexdigest()
 
@@ -977,10 +975,10 @@ def test_fetch_mirrors_cas_when_enabled(monkeypatch: pytest.MonkeyPatch, tmp_pat
     cas_dir = tmp_path / "cas"
     overrides = {"CACHE_DIR": cache_dir, "LOCAL_ONTOLOGY_DIR": ontology_dir}
     for attr, value in overrides.items():
-        monkeypatch.setattr(storage_mod, attr, value, raising=False)
-        monkeypatch.setattr(pipeline_mod, attr, value, raising=False)
-        monkeypatch.setattr(core, attr, value, raising=False)
-    monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
+        patch_stack.setattr(storage_mod, attr, value, raising=False)
+        patch_stack.setattr(pipeline_mod, attr, value, raising=False)
+        patch_stack.setattr(core, attr, value, raising=False)
+    patch_stack.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
 
     class _StubStorage:
         def finalize_version(
@@ -1008,9 +1006,9 @@ def test_fetch_mirrors_cas_when_enabled(monkeypatch: pytest.MonkeyPatch, tmp_pat
             return cas_path
 
     stub_storage = _StubStorage()
-    monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
-    monkeypatch.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
-    monkeypatch.setattr(core, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
+    patch_stack.setattr(core, "STORAGE", stub_storage, raising=False)
 
     def _fake_download_stream(**kwargs):
         destination: Path = kwargs["destination"]
@@ -1026,14 +1024,14 @@ def test_fetch_mirrors_cas_when_enabled(monkeypatch: pytest.MonkeyPatch, tmp_pat
             content_length=len(payload),
         )
 
-    monkeypatch.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
-    monkeypatch.setattr(core, "download_stream", _fake_download_stream, raising=False)
-    monkeypatch.setattr(pipeline_mod, "run_validators", lambda requests, logger: {}, raising=False)
-    monkeypatch.setattr(core, "run_validators", lambda requests, logger: {}, raising=False)
-    monkeypatch.setattr(
+    patch_stack.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
+    patch_stack.setattr(core, "download_stream", _fake_download_stream, raising=False)
+    patch_stack.setattr(pipeline_mod, "run_validators", lambda requests, logger: {}, raising=False)
+    patch_stack.setattr(core, "run_validators", lambda requests, logger: {}, raising=False)
+    patch_stack.setattr(
         pipeline_mod, "validate_url_security", lambda url, config=None: url, raising=False
     )
-    monkeypatch.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
+    patch_stack.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
 
     try:
         results = core.fetch_all([spec], config=config, force=True)
@@ -1054,7 +1052,7 @@ def test_fetch_mirrors_cas_when_enabled(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert index_payload[0]["cas_path"].endswith(f"{digest}.owl")
 
 
-def test_resolve_expected_checksum_fetches_url(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_expected_checksum_fetches_url(patch_stack) -> None:
     expected_digest = "a" * 64
     spec = core.FetchSpec(
         id="hp",
@@ -1089,12 +1087,12 @@ def test_resolve_expected_checksum_fetches_url(monkeypatch: pytest.MonkeyPatch) 
         def iter_content(self, chunk_size: int):
             yield self.text.encode("utf-8")
 
-    monkeypatch.setattr(
+    patch_stack.setattr(
         requests,
         "get",
         lambda url, timeout, **kwargs: DummyResponse(),
     )
-    monkeypatch.setattr(
+    patch_stack.setattr(
         pipeline_mod,
         "validate_url_security",
         lambda url, config=None: url,
@@ -1114,18 +1112,16 @@ def test_resolve_expected_checksum_fetches_url(monkeypatch: pytest.MonkeyPatch) 
     assert checksum.to_known_hash() == f"sha256:{expected_digest}"
 
 
-def test_manifest_fingerprint_ignores_target_format_order(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_manifest_fingerprint_ignores_target_format_order(patch_stack, tmp_path: Path) -> None:
     manifest_a = _run_fetch(
-        monkeypatch,
+        patch_stack,
         tmp_path,
         ["owl", "obo"],
         normalization_mode="in-memory",
         normalized_hash="hash",
     )
     manifest_b = _run_fetch(
-        monkeypatch,
+        patch_stack,
         tmp_path,
         ["obo", "owl"],
         normalization_mode="in-memory",
@@ -1137,18 +1133,16 @@ def test_manifest_fingerprint_ignores_target_format_order(
     assert manifest_a["streaming_prefix_sha256"] == "prefix-in-memory"
 
 
-def test_manifest_fingerprint_changes_with_normalization_mode(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_manifest_fingerprint_changes_with_normalization_mode(patch_stack, tmp_path: Path) -> None:
     manifest_in_memory = _run_fetch(
-        monkeypatch,
+        patch_stack,
         tmp_path,
         ["owl"],
         normalization_mode="in-memory",
         normalized_hash="hash",
     )
     manifest_streaming = _run_fetch(
-        monkeypatch,
+        patch_stack,
         tmp_path,
         ["owl"],
         normalization_mode="streaming",

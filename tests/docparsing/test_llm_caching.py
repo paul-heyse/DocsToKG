@@ -39,7 +39,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from DocsToKG.DocParsing._embedding.runtime import _QWEN_LLM_CACHE, QwenCfg, _qwen_cache_key
+from DocsToKG.DocParsing.embedding.runtime import _QWEN_LLM_CACHE, QwenCfg, _qwen_cache_key
 
 # --- Test Cases ---
 

@@ -291,10 +291,20 @@ class SessionPool:
         *,
         service: Optional[str],
         host: Optional[str],
+        http_config: Optional["DownloadConfiguration"] = None,
     ) -> Iterator[requests.Session]:
         """Yield a session associated with ``service``/``host`` and return it to the pool."""
 
         key = self._normalize(service, host)
+        factory: Optional[Callable[[], requests.Session]] = None
+        if http_config is not None:
+            getter = getattr(http_config, "get_session_factory", None)
+            if callable(getter):
+                candidate = getter()
+                if candidate is not None and not callable(candidate):
+                    raise TypeError("session_factory getter must return a callable or None")
+                factory = candidate
+
         with self._lock:
             stack = self._pool.get(key)
             if stack:
@@ -302,7 +312,16 @@ class SessionPool:
                 if not stack:
                     self._pool.pop(key, None)
             else:
-                session = requests.Session()
+                if factory is not None:
+                    session = factory()
+                    if session is None:
+                        session = requests.Session()
+                    elif not isinstance(session, requests.Session):
+                        raise TypeError(
+                            "session_factory must return a requests.Session instance or None"
+                        )
+                else:
+                    session = requests.Session()
         try:
             yield session
         finally:
@@ -741,7 +760,11 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self.response_content_type = None
         self.response_content_length = None
 
-        with SESSION_POOL.lease(service=self.service, host=self.origin_host) as session:
+        with SESSION_POOL.lease(
+            service=self.service,
+            host=self.origin_host,
+            http_config=self.http_config,
+        ) as session:
             head_content_type, head_content_length = self._preliminary_head_check(url, session)
             self.head_content_type = head_content_type
             self.head_content_length = head_content_length

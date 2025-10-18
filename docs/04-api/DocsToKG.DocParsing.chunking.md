@@ -1,6 +1,6 @@
-# 1. Module: _chunking.runtime
+# 1. Module: chunking.runtime
 
-This reference documents the DocsToKG module ``DocsToKG.DocParsing._chunking.runtime``.
+This reference documents the DocsToKG module ``DocsToKG.DocParsing.chunking.runtime``.
 
 ## 1. Overview
 

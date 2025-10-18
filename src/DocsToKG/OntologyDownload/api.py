@@ -53,36 +53,18 @@
 
 from __future__ import annotations
 
-import argparse
 import hashlib as _hashlib
-import importlib.util
-import json
-import logging
-import os
-import re
-import shutil
-import subprocess
 import sys
-import tempfile
 from collections import OrderedDict
-from datetime import datetime, timezone
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
-
-import requests
-import yaml
-from jsonschema import Draft202012Validator
-from jsonschema.exceptions import SchemaError
+from typing import Dict, Optional, Sequence
 
 from . import plugins as plugin_mod
 from .errors import (
-    ConfigurationError,
-    OntologyDownloadError,
     PolicyError,
-    UnsupportedPythonError,
 )
-from .exports import PUBLIC_API_MANIFEST as EXPORT_MANIFEST, PUBLIC_EXPORT_NAMES
+from .exports import PUBLIC_EXPORT_NAMES
 from .formatters import (
     PLAN_TABLE_HEADERS,
     RESULT_TABLE_HEADERS,
@@ -94,31 +76,17 @@ from .formatters import (
 )
 from .io import (
     mask_sensitive_data,
+)
+from .io import (
     validate_url_security as _validate_url_security,
 )
-from .logging_utils import setup_logging
+from .manifests import results_to_dict as _manifest_results_to_dict
 from .planning import (
     MANIFEST_SCHEMA_VERSION,
-    _build_destination,
     FetchResult,
-    FetchSpec,
-    PlannedFetch,
-    ResolverCandidate,
-    fetch_all,
-    fetch_one,
-    get_manifest_schema,
-    infer_version_timestamp,
-    parse_iso_datetime,
-    parse_version_timestamp,
-    plan_all,
-    plan_one,
-    validate_manifest_dict,
-    BatchPlanningError,
 )
-from .manifests import results_to_dict as _manifest_results_to_dict
 from .settings import (
     CACHE_DIR,
-    CONFIG_DIR,
     LOCAL_ONTOLOGY_DIR,
     LOG_DIR,
     STORAGE,
@@ -126,16 +94,8 @@ from .settings import (
     DefaultsConfig,
     DownloadConfiguration,
     LoggingConfiguration,
-    ResolvedConfig,
     ValidationConfig,
     get_default_config,
-    load_config,
-    parse_rate_limit_to_rps,
-    validate_config,
-)
-from .validation import (
-    ValidationRequest,
-    run_validators,
 )
 from .validation import (
     main as validation_main,
@@ -301,12 +261,10 @@ def about() -> Dict[str, object]:
     }
 
 
-
-
-
 # --- Globals ---
 
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
+
 
 def cli_main(argv: Optional[Sequence[str]] = None) -> int:
     """Entry point for the ontology downloader CLI."""
@@ -314,7 +272,6 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
     from .cli import cli_main as _cli_main
 
     return _cli_main(argv)
-
 
 
 if __name__ == "__main__":  # pragma: no cover

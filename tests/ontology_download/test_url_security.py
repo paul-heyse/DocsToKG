@@ -8,9 +8,8 @@ from typing import List, Tuple
 import pytest
 
 from DocsToKG.OntologyDownload import api as api_mod
-from DocsToKG.OntologyDownload import io as io_mod
-from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.errors import ConfigError
+from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.settings import DownloadConfiguration
 
 
@@ -18,18 +17,18 @@ def _fake_getaddrinfo(address: str) -> List[Tuple]:
     return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("93.184.216.34", 0))]
 
 
-def test_validate_url_security_rejects_mixed_script_idn(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validate_url_security_rejects_mixed_script_idn(patch_stack) -> None:
     """IDNs mixing confusable scripts should raise ConfigError."""
 
-    monkeypatch.setattr(network_mod, "_cached_getaddrinfo", _fake_getaddrinfo)
+    patch_stack.setattr(network_mod, "_cached_getaddrinfo", _fake_getaddrinfo)
     with pytest.raises(ConfigError):
         api_mod.validate_url_security("https://раypal.com/resource")
 
 
-def test_validate_url_security_requires_port_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validate_url_security_requires_port_allowlist(patch_stack) -> None:
     """Non-default ports require the host to be explicitly allowlisted."""
 
-    monkeypatch.setattr(network_mod, "_cached_getaddrinfo", _fake_getaddrinfo)
+    patch_stack.setattr(network_mod, "_cached_getaddrinfo", _fake_getaddrinfo)
     url = "https://example.org:8443/data"
 
     with pytest.raises(ConfigError):
@@ -40,7 +39,7 @@ def test_validate_url_security_requires_port_allowlist(monkeypatch: pytest.Monke
     assert validated.endswith(":8443/data")
 
 
-def test_validate_url_security_blocks_private_cidr(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validate_url_security_blocks_private_cidr(patch_stack) -> None:
     """Private IP literals should be rejected unless explicitly allowed."""
 
     url = "https://10.0.0.5/file.owl"
@@ -51,7 +50,7 @@ def test_validate_url_security_blocks_private_cidr(monkeypatch: pytest.MonkeyPat
     def _private_getaddrinfo(host: str) -> List[Tuple]:
         return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("10.1.2.3", 0))]
 
-    monkeypatch.setattr(network_mod, "_cached_getaddrinfo", _private_getaddrinfo)
+    patch_stack.setattr(network_mod, "_cached_getaddrinfo", _private_getaddrinfo)
     with pytest.raises(ConfigError):
         api_mod.validate_url_security("https://internal.example.org/data", DownloadConfiguration())
 
@@ -60,13 +59,13 @@ def test_validate_url_security_blocks_private_cidr(monkeypatch: pytest.MonkeyPat
     assert validated.startswith("https://internal.example.org")
 
 
-def test_validate_url_security_dns_failure_strict_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validate_url_security_dns_failure_strict_mode(patch_stack) -> None:
     """DNS lookups should raise when strict_dns is enabled."""
 
     def _failing_getaddrinfo(host: str):
         raise socket.gaierror("host not found")
 
-    monkeypatch.setattr(network_mod, "_cached_getaddrinfo", _failing_getaddrinfo)
+    patch_stack.setattr(network_mod, "_cached_getaddrinfo", _failing_getaddrinfo)
 
     strict_config = DownloadConfiguration(strict_dns=True)
     with pytest.raises(ConfigError):

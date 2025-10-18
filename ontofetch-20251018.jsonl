@@ -1206,3 +1206,251 @@
 {"timestamp": "2025-10-18T10:48:52.788833Z", "level": "WARNING", "message": "planner probe failed", "correlation_id": "cd2caebf9b8c", "ontology_id": "hp", "stage": "plan"}
 {"timestamp": "2025-10-18T10:48:53.112075Z", "level": "WARNING", "message": "dns resolution failed", "correlation_id": null, "ontology_id": null, "stage": "download"}
 {"timestamp": "2025-10-18T10:48:53.112143Z", "level": "WARNING", "message": "dns resolution failed", "correlation_id": null, "ontology_id": null, "stage": "download"}
+{"timestamp": "2025-10-18T11:48:57.898824Z", "level": "INFO", "message": "Config overridden: max_retries=3", "correlation_id": null, "ontology_id": null, "stage": "config"}
+{"timestamp": "2025-10-18T11:48:57.899179Z", "level": "INFO", "message": "Config overridden: timeout_sec=45", "correlation_id": null, "ontology_id": null, "stage": "config"}
+{"timestamp": "2025-10-18T11:48:57.899532Z", "level": "INFO", "message": "Config overridden: shared_rate_limit_dir=/tmp/pytest-of-paul/pytest-996/test_env_override_applies_sett0", "correlation_id": null, "ontology_id": null, "stage": "config"}
+{"timestamp": "2025-10-18T11:48:57.899794Z", "level": "INFO", "message": "Config overridden: max_uncompressed_size_gb=12.5", "correlation_id": null, "ontology_id": null, "stage": "config"}
+{"timestamp": "2025-10-18T11:48:57.920233Z", "level": "INFO", "message": "planning batch", "correlation_id": "45ca7a86f7f9", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:48:57.920520Z", "level": "INFO", "message": "planning fetch", "correlation_id": "45ca7a86f7f9", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.920570Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "45ca7a86f7f9", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.920598Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "45ca7a86f7f9", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.920628Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "45ca7a86f7f9", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.920650Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "45ca7a86f7f9", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.920693Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "45ca7a86f7f9", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.920715Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "45ca7a86f7f9", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.920743Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "45ca7a86f7f9", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.920762Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "45ca7a86f7f9", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.921159Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "45ca7a86f7f9", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.921265Z", "level": "ERROR", "message": "metadata probe blocked by URL policy", "correlation_id": "45ca7a86f7f9", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T11:48:57.921365Z", "level": "ERROR", "message": "planning failed", "correlation_id": "45ca7a86f7f9", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:48:57.922178Z", "level": "INFO", "message": "planning batch", "correlation_id": "bdeddba87915", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:48:57.922891Z", "level": "INFO", "message": "planning batch", "correlation_id": "1b386a92f9a5", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:48:57.922939Z", "level": "ERROR", "message": "planning failed", "correlation_id": "1b386a92f9a5", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:48:57.924648Z", "level": "INFO", "message": "planning fetch", "correlation_id": "38d9a37ca54a", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.924684Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "38d9a37ca54a", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.924713Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "38d9a37ca54a", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.924737Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "38d9a37ca54a", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.924765Z", "level": "INFO", "message": "resolver fallback success", "correlation_id": "38d9a37ca54a", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.925616Z", "level": "INFO", "message": "planning fetch", "correlation_id": "a51dbed6be6c", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.925650Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "a51dbed6be6c", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.925679Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "a51dbed6be6c", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.933559Z", "level": "INFO", "message": "starting batch", "correlation_id": "fe0dae1c0a3b", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:48:57.933606Z", "level": "INFO", "message": "starting ontology fetch", "correlation_id": "fe0dae1c0a3b", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:48:57.933801Z", "level": "INFO", "message": "planning fetch", "correlation_id": "fe0dae1c0a3b", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.933844Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "fe0dae1c0a3b", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.934097Z", "level": "INFO", "message": "downloading", "correlation_id": "fe0dae1c0a3b", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.934144Z", "level": "INFO", "message": "expected checksum resolved", "correlation_id": "fe0dae1c0a3b", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.937013Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "fe0dae1c0a3b", "ontology_id": "hp", "stage": "download"}
+{"timestamp": "2025-10-18T11:48:57.939480Z", "level": "INFO", "message": "fetch complete", "correlation_id": "fe0dae1c0a3b", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.939581Z", "level": "INFO", "message": "progress update", "correlation_id": "fe0dae1c0a3b", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:48:57.940519Z", "level": "INFO", "message": "starting batch", "correlation_id": "921382daf214", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:48:57.940557Z", "level": "INFO", "message": "starting ontology fetch", "correlation_id": "921382daf214", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:48:57.940760Z", "level": "INFO", "message": "planning fetch", "correlation_id": "921382daf214", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.940793Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "921382daf214", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.941092Z", "level": "INFO", "message": "downloading", "correlation_id": "921382daf214", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.943997Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "921382daf214", "ontology_id": "hp", "stage": "download"}
+{"timestamp": "2025-10-18T11:48:57.946447Z", "level": "INFO", "message": "fetch complete", "correlation_id": "921382daf214", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:48:57.946557Z", "level": "INFO", "message": "progress update", "correlation_id": "921382daf214", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:48:58.261585Z", "level": "WARNING", "message": "upgrading http url to https", "correlation_id": null, "ontology_id": null, "stage": "download"}
+{"timestamp": "2025-10-18T11:48:58.267046Z", "level": "WARNING", "message": "sanitized unsafe filename", "correlation_id": null, "ontology_id": null, "stage": "sanitize"}
+{"timestamp": "2025-10-18T11:48:58.268359Z", "level": "WARNING", "message": "unknown manifest schema version", "correlation_id": null, "ontology_id": null, "stage": "manifest"}
+{"timestamp": "2025-10-18T11:49:15.274683Z", "level": "INFO", "message": "starting batch", "correlation_id": "9634d305054c", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:49:15.274738Z", "level": "INFO", "message": "starting ontology fetch", "correlation_id": "9634d305054c", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:49:15.274951Z", "level": "INFO", "message": "planning fetch", "correlation_id": "9634d305054c", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.275014Z", "level": "INFO", "message": "starting ontology fetch", "correlation_id": "9634d305054c", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:49:15.275075Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "9634d305054c", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.275314Z", "level": "INFO", "message": "downloading", "correlation_id": "9634d305054c", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.287730Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "9634d305054c", "ontology_id": "pato", "stage": "download"}
+{"timestamp": "2025-10-18T11:49:15.290234Z", "level": "INFO", "message": "fetch complete", "correlation_id": "9634d305054c", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.290292Z", "level": "INFO", "message": "planning fetch", "correlation_id": "9634d305054c", "ontology_id": "bfo", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.290415Z", "level": "INFO", "message": "progress update", "correlation_id": "9634d305054c", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:49:15.290457Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "9634d305054c", "ontology_id": "bfo", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.290636Z", "level": "INFO", "message": "downloading", "correlation_id": "9634d305054c", "ontology_id": "bfo", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.293596Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "9634d305054c", "ontology_id": "bfo", "stage": "download"}
+{"timestamp": "2025-10-18T11:49:15.296046Z", "level": "INFO", "message": "fetch complete", "correlation_id": "9634d305054c", "ontology_id": "bfo", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.296145Z", "level": "INFO", "message": "progress update", "correlation_id": "9634d305054c", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:49:15.298162Z", "level": "INFO", "message": "planning fetch", "correlation_id": "e4157d290f8a", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.298199Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "e4157d290f8a", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.298233Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "e4157d290f8a", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.298277Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "e4157d290f8a", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.298299Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "e4157d290f8a", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.298330Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "e4157d290f8a", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.298350Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "e4157d290f8a", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.298376Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "e4157d290f8a", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.298533Z", "level": "INFO", "message": "downloading", "correlation_id": "e4157d290f8a", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.301604Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "e4157d290f8a", "ontology_id": "pato", "stage": "download"}
+{"timestamp": "2025-10-18T11:49:15.303968Z", "level": "INFO", "message": "fetch complete", "correlation_id": "e4157d290f8a", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.305099Z", "level": "INFO", "message": "planning fetch", "correlation_id": "1dac7ee6a265", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.305134Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "1dac7ee6a265", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.305165Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "1dac7ee6a265", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.305204Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "1dac7ee6a265", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.305227Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "1dac7ee6a265", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.305253Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "1dac7ee6a265", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.305274Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "1dac7ee6a265", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.305297Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "1dac7ee6a265", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.305752Z", "level": "INFO", "message": "downloading", "correlation_id": "1dac7ee6a265", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.308687Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "1dac7ee6a265", "ontology_id": "pato", "stage": "download"}
+{"timestamp": "2025-10-18T11:49:15.311122Z", "level": "INFO", "message": "fetch complete", "correlation_id": "1dac7ee6a265", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.311317Z", "level": "INFO", "message": "planning fetch", "correlation_id": "be5b9fffd2e1", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.311347Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "be5b9fffd2e1", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.311371Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "be5b9fffd2e1", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.311405Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "be5b9fffd2e1", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.311427Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "be5b9fffd2e1", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.311453Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "be5b9fffd2e1", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.311473Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "be5b9fffd2e1", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.311495Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "be5b9fffd2e1", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.311642Z", "level": "INFO", "message": "downloading", "correlation_id": "be5b9fffd2e1", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.314542Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "be5b9fffd2e1", "ontology_id": "pato", "stage": "download"}
+{"timestamp": "2025-10-18T11:49:15.316993Z", "level": "INFO", "message": "fetch complete", "correlation_id": "be5b9fffd2e1", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.318103Z", "level": "INFO", "message": "starting batch", "correlation_id": "5c1e678da897", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:49:15.318149Z", "level": "INFO", "message": "starting ontology fetch", "correlation_id": "5c1e678da897", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:49:15.318329Z", "level": "INFO", "message": "planning fetch", "correlation_id": "5c1e678da897", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.318375Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "5c1e678da897", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.318412Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "5c1e678da897", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.318471Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "5c1e678da897", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.318500Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "5c1e678da897", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.318536Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "5c1e678da897", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.318564Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "5c1e678da897", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.318597Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "5c1e678da897", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.318872Z", "level": "INFO", "message": "downloading", "correlation_id": "5c1e678da897", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.321951Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "5c1e678da897", "ontology_id": "pato", "stage": "download"}
+{"timestamp": "2025-10-18T11:49:15.324394Z", "level": "INFO", "message": "fetch complete", "correlation_id": "5c1e678da897", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T11:49:15.324479Z", "level": "INFO", "message": "progress update", "correlation_id": "5c1e678da897", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T11:49:24.073237Z", "level": "INFO", "message": "planning fetch", "correlation_id": "dedf6b390e7e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:49:24.073282Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "dedf6b390e7e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:49:24.073311Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "dedf6b390e7e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:49:24.073334Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "dedf6b390e7e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:49:24.073357Z", "level": "INFO", "message": "resolver fallback success", "correlation_id": "dedf6b390e7e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T11:49:24.088756Z", "level": "WARNING", "message": "dns resolution failed", "correlation_id": null, "ontology_id": null, "stage": "download"}
+{"timestamp": "2025-10-18T11:49:24.088835Z", "level": "INFO", "message": "planner probe start", "correlation_id": "dedf6b390e7e", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T11:49:24.089989Z", "level": "WARNING", "message": "planner probe retrying", "correlation_id": "dedf6b390e7e", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T11:49:24.645453Z", "level": "WARNING", "message": "planner probe retrying", "correlation_id": "dedf6b390e7e", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T11:49:25.909600Z", "level": "WARNING", "message": "planner probe retrying", "correlation_id": "dedf6b390e7e", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T11:49:28.267689Z", "level": "WARNING", "message": "planner probe retrying", "correlation_id": "dedf6b390e7e", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T11:49:32.445756Z", "level": "WARNING", "message": "planner probe failed", "correlation_id": "dedf6b390e7e", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T11:49:32.742774Z", "level": "WARNING", "message": "dns resolution failed", "correlation_id": null, "ontology_id": null, "stage": "download"}
+{"timestamp": "2025-10-18T11:49:32.742837Z", "level": "WARNING", "message": "dns resolution failed", "correlation_id": null, "ontology_id": null, "stage": "download"}
+{"timestamp": "2025-10-18T12:44:30.499377Z", "level": "INFO", "message": "Config overridden: max_retries=3", "correlation_id": null, "ontology_id": null, "stage": "config"}
+{"timestamp": "2025-10-18T12:44:30.499701Z", "level": "INFO", "message": "Config overridden: timeout_sec=45", "correlation_id": null, "ontology_id": null, "stage": "config"}
+{"timestamp": "2025-10-18T12:44:30.500071Z", "level": "INFO", "message": "Config overridden: shared_rate_limit_dir=/tmp/pytest-of-paul/pytest-1023/test_env_override_applies_sett0", "correlation_id": null, "ontology_id": null, "stage": "config"}
+{"timestamp": "2025-10-18T12:44:30.500338Z", "level": "INFO", "message": "Config overridden: max_uncompressed_size_gb=12.5", "correlation_id": null, "ontology_id": null, "stage": "config"}
+{"timestamp": "2025-10-18T12:44:30.514105Z", "level": "INFO", "message": "planning batch", "correlation_id": "cb17d063077e", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:30.514333Z", "level": "INFO", "message": "planning fetch", "correlation_id": "cb17d063077e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.514384Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "cb17d063077e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.514415Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "cb17d063077e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.514446Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "cb17d063077e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.514467Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "cb17d063077e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.514515Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "cb17d063077e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.514538Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "cb17d063077e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.514568Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "cb17d063077e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.514590Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "cb17d063077e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.514617Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "cb17d063077e", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.514731Z", "level": "ERROR", "message": "metadata probe blocked by URL policy", "correlation_id": "cb17d063077e", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T12:44:30.514822Z", "level": "ERROR", "message": "planning failed", "correlation_id": "cb17d063077e", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:30.516088Z", "level": "INFO", "message": "planning batch", "correlation_id": "e76c731f0559", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:30.516986Z", "level": "INFO", "message": "planning batch", "correlation_id": "471ebbc6f6c8", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:30.517032Z", "level": "ERROR", "message": "planning failed", "correlation_id": "471ebbc6f6c8", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:30.519334Z", "level": "INFO", "message": "planning fetch", "correlation_id": "0681cc7e70cb", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.519372Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "0681cc7e70cb", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.519403Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "0681cc7e70cb", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.519427Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "0681cc7e70cb", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.519451Z", "level": "INFO", "message": "resolver fallback success", "correlation_id": "0681cc7e70cb", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.520505Z", "level": "INFO", "message": "planning fetch", "correlation_id": "d6d03b7e2470", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.520540Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "d6d03b7e2470", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.520568Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "d6d03b7e2470", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.529018Z", "level": "INFO", "message": "starting batch", "correlation_id": "fa0fc54f6bc6", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:30.529063Z", "level": "INFO", "message": "starting ontology fetch", "correlation_id": "fa0fc54f6bc6", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:30.529253Z", "level": "INFO", "message": "planning fetch", "correlation_id": "fa0fc54f6bc6", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.529296Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "fa0fc54f6bc6", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.529551Z", "level": "INFO", "message": "downloading", "correlation_id": "fa0fc54f6bc6", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.529599Z", "level": "INFO", "message": "expected checksum resolved", "correlation_id": "fa0fc54f6bc6", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.532556Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "fa0fc54f6bc6", "ontology_id": "hp", "stage": "download"}
+{"timestamp": "2025-10-18T12:44:30.535018Z", "level": "INFO", "message": "fetch complete", "correlation_id": "fa0fc54f6bc6", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.535134Z", "level": "INFO", "message": "progress update", "correlation_id": "fa0fc54f6bc6", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:30.536326Z", "level": "INFO", "message": "starting batch", "correlation_id": "cd299cf0789a", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:30.536367Z", "level": "INFO", "message": "starting ontology fetch", "correlation_id": "cd299cf0789a", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:30.536537Z", "level": "INFO", "message": "planning fetch", "correlation_id": "cd299cf0789a", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.536580Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "cd299cf0789a", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.536812Z", "level": "INFO", "message": "downloading", "correlation_id": "cd299cf0789a", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.539741Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "cd299cf0789a", "ontology_id": "hp", "stage": "download"}
+{"timestamp": "2025-10-18T12:44:30.542196Z", "level": "INFO", "message": "fetch complete", "correlation_id": "cd299cf0789a", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:30.542314Z", "level": "INFO", "message": "progress update", "correlation_id": "cd299cf0789a", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:30.785549Z", "level": "WARNING", "message": "upgrading http url to https", "correlation_id": null, "ontology_id": null, "stage": "download"}
+{"timestamp": "2025-10-18T12:44:30.792894Z", "level": "WARNING", "message": "sanitized unsafe filename", "correlation_id": null, "ontology_id": null, "stage": "sanitize"}
+{"timestamp": "2025-10-18T12:44:30.794700Z", "level": "WARNING", "message": "unknown manifest schema version", "correlation_id": null, "ontology_id": null, "stage": "manifest"}
+{"timestamp": "2025-10-18T12:44:47.162935Z", "level": "INFO", "message": "starting batch", "correlation_id": "b9b868454796", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:47.163016Z", "level": "INFO", "message": "starting ontology fetch", "correlation_id": "b9b868454796", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:47.163180Z", "level": "INFO", "message": "planning fetch", "correlation_id": "b9b868454796", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.163233Z", "level": "INFO", "message": "starting ontology fetch", "correlation_id": "b9b868454796", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:47.163273Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "b9b868454796", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.163522Z", "level": "INFO", "message": "downloading", "correlation_id": "b9b868454796", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.175955Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "b9b868454796", "ontology_id": "pato", "stage": "download"}
+{"timestamp": "2025-10-18T12:44:47.178486Z", "level": "INFO", "message": "fetch complete", "correlation_id": "b9b868454796", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.178556Z", "level": "INFO", "message": "planning fetch", "correlation_id": "b9b868454796", "ontology_id": "bfo", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.178697Z", "level": "INFO", "message": "progress update", "correlation_id": "b9b868454796", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:47.178747Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "b9b868454796", "ontology_id": "bfo", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.178990Z", "level": "INFO", "message": "downloading", "correlation_id": "b9b868454796", "ontology_id": "bfo", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.182165Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "b9b868454796", "ontology_id": "bfo", "stage": "download"}
+{"timestamp": "2025-10-18T12:44:47.184603Z", "level": "INFO", "message": "fetch complete", "correlation_id": "b9b868454796", "ontology_id": "bfo", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.184704Z", "level": "INFO", "message": "progress update", "correlation_id": "b9b868454796", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:47.187105Z", "level": "INFO", "message": "planning fetch", "correlation_id": "32273ec12c47", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.187141Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "32273ec12c47", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.187174Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "32273ec12c47", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.187217Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "32273ec12c47", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.187240Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "32273ec12c47", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.187268Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "32273ec12c47", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.187289Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "32273ec12c47", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.187314Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "32273ec12c47", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.187468Z", "level": "INFO", "message": "downloading", "correlation_id": "32273ec12c47", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.190470Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "32273ec12c47", "ontology_id": "pato", "stage": "download"}
+{"timestamp": "2025-10-18T12:44:47.192874Z", "level": "INFO", "message": "fetch complete", "correlation_id": "32273ec12c47", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.194349Z", "level": "INFO", "message": "planning fetch", "correlation_id": "13d6170a5221", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.194385Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "13d6170a5221", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.194415Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "13d6170a5221", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.194453Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "13d6170a5221", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.194475Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "13d6170a5221", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.194502Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "13d6170a5221", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.194522Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "13d6170a5221", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.194546Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "13d6170a5221", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.194706Z", "level": "INFO", "message": "downloading", "correlation_id": "13d6170a5221", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.197618Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "13d6170a5221", "ontology_id": "pato", "stage": "download"}
+{"timestamp": "2025-10-18T12:44:47.200136Z", "level": "INFO", "message": "fetch complete", "correlation_id": "13d6170a5221", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.200365Z", "level": "INFO", "message": "planning fetch", "correlation_id": "224527eef5ad", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.200397Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "224527eef5ad", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.200422Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "224527eef5ad", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.200457Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "224527eef5ad", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.200478Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "224527eef5ad", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.200505Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "224527eef5ad", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.200525Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "224527eef5ad", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.200549Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "224527eef5ad", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.200702Z", "level": "INFO", "message": "downloading", "correlation_id": "224527eef5ad", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.203695Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "224527eef5ad", "ontology_id": "pato", "stage": "download"}
+{"timestamp": "2025-10-18T12:44:47.206334Z", "level": "INFO", "message": "fetch complete", "correlation_id": "224527eef5ad", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.208184Z", "level": "INFO", "message": "starting batch", "correlation_id": "0e322d4093ef", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:47.208244Z", "level": "INFO", "message": "starting ontology fetch", "correlation_id": "0e322d4093ef", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:47.209037Z", "level": "INFO", "message": "planning fetch", "correlation_id": "0e322d4093ef", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.209158Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "0e322d4093ef", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.209211Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "0e322d4093ef", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.209274Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "0e322d4093ef", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.209298Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "0e322d4093ef", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.209325Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "0e322d4093ef", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.209346Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "0e322d4093ef", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.209372Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "0e322d4093ef", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.209732Z", "level": "INFO", "message": "downloading", "correlation_id": "0e322d4093ef", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.213025Z", "level": "INFO", "message": "ontology index lock acquired", "correlation_id": "0e322d4093ef", "ontology_id": "pato", "stage": "download"}
+{"timestamp": "2025-10-18T12:44:47.216493Z", "level": "INFO", "message": "fetch complete", "correlation_id": "0e322d4093ef", "ontology_id": "pato", "stage": null}
+{"timestamp": "2025-10-18T12:44:47.216615Z", "level": "INFO", "message": "progress update", "correlation_id": "0e322d4093ef", "ontology_id": null, "stage": null}
+{"timestamp": "2025-10-18T12:44:56.455352Z", "level": "INFO", "message": "planning fetch", "correlation_id": "d35652a16e12", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:56.455398Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "d35652a16e12", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:56.455427Z", "level": "WARNING", "message": "resolver failed", "correlation_id": "d35652a16e12", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:56.455450Z", "level": "INFO", "message": "resolver attempt", "correlation_id": "d35652a16e12", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:56.455473Z", "level": "INFO", "message": "resolver fallback success", "correlation_id": "d35652a16e12", "ontology_id": "hp", "stage": null}
+{"timestamp": "2025-10-18T12:44:56.456603Z", "level": "WARNING", "message": "dns resolution failed", "correlation_id": null, "ontology_id": null, "stage": "download"}
+{"timestamp": "2025-10-18T12:44:56.456683Z", "level": "INFO", "message": "planner probe start", "correlation_id": "d35652a16e12", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T12:44:56.457782Z", "level": "WARNING", "message": "planner probe retrying", "correlation_id": "d35652a16e12", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T12:44:57.263665Z", "level": "WARNING", "message": "planner probe retrying", "correlation_id": "d35652a16e12", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T12:44:58.540610Z", "level": "WARNING", "message": "planner probe retrying", "correlation_id": "d35652a16e12", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T12:45:00.859337Z", "level": "WARNING", "message": "planner probe retrying", "correlation_id": "d35652a16e12", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T12:45:05.293071Z", "level": "WARNING", "message": "planner probe failed", "correlation_id": "d35652a16e12", "ontology_id": "hp", "stage": "plan"}
+{"timestamp": "2025-10-18T12:45:05.593984Z", "level": "WARNING", "message": "dns resolution failed", "correlation_id": null, "ontology_id": null, "stage": "download"}
+{"timestamp": "2025-10-18T12:45:05.594051Z", "level": "WARNING", "message": "dns resolution failed", "correlation_id": null, "ontology_id": null, "stage": "download"}

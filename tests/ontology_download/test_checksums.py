@@ -64,14 +64,14 @@ def test_resolve_expected_checksum_matrix(
     spec_extras: Dict[str, object],
     fetched_digest: Optional[str],
     expected: Optional[tuple[str, str]],
-    monkeypatch: pytest.MonkeyPatch,
+    patch_stack,
 ) -> None:
     """Ensure checksum parsing/resolution is consistent across planner surfaces."""
 
     import DocsToKG.OntologyDownload.checksums as checksums_mod
 
     # Prevent network and URL security side effects during testing.
-    monkeypatch.setattr(checksums_mod, "validate_url_security", lambda url, config=None: url)
+    patch_stack.setattr(checksums_mod, "validate_url_security", lambda url, config=None: url)
 
     if fetched_digest is not None:
 
@@ -91,13 +91,13 @@ def test_resolve_expected_checksum_matrix(
             def iter_content(self, chunk_size: int):
                 yield self._payload
 
-        monkeypatch.setattr(
+        patch_stack.setattr(
             checksums_mod.requests,
             "get",
             lambda url, timeout, **kwargs: _DummyResponse(),
         )
     else:
-        monkeypatch.setattr(
+        patch_stack.setattr(
             checksums_mod.requests,
             "get",
             lambda url, timeout, **kwargs: pytest.fail(

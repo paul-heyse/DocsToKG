@@ -6,9 +6,9 @@ import json
 import re
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Tuple
-from dataclasses import dataclass
 
 from ..settings import DownloadConfiguration
 
@@ -242,6 +242,11 @@ def get_bucket(
 ) -> TokenBucket:
     """Return a registry-managed bucket."""
 
+    provider = getattr(http_config, "get_bucket_provider", None)
+    if callable(provider):
+        custom = provider(service, http_config, host)
+        if custom is not None:
+            return custom
     return REGISTRY.get_bucket(http_config=http_config, service=service, host=host)
 
 

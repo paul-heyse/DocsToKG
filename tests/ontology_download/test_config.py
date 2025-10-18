@@ -429,13 +429,13 @@ def test_defaults_config_prefer_source_validation() -> None:
         DefaultsConfig(prefer_source=["obo", "invalid-resolver"])
 
 
-def test_env_override_applies_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_env_override_applies_settings(patch_stack, tmp_path: Path) -> None:
     """Environment overrides should be merged into defaults via Pydantic settings."""
 
-    monkeypatch.setenv("ONTOFETCH_MAX_RETRIES", "3")
-    monkeypatch.setenv("ONTOFETCH_TIMEOUT_SEC", "45")
-    monkeypatch.setenv("ONTOFETCH_SHARED_RATE_LIMIT_DIR", str(tmp_path))
-    monkeypatch.setenv("ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB", "12.5")
+    patch_stack.setenv("ONTOFETCH_MAX_RETRIES", "3")
+    patch_stack.setenv("ONTOFETCH_TIMEOUT_SEC", "45")
+    patch_stack.setenv("ONTOFETCH_SHARED_RATE_LIMIT_DIR", str(tmp_path))
+    patch_stack.setenv("ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB", "12.5")
     raw_config: Dict[str, object] = {"ontologies": []}
 
     resolved = build_resolved_config(raw_config)
@@ -445,14 +445,12 @@ def test_env_override_applies_settings(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert resolved.defaults.http.max_uncompressed_size_gb == pytest.approx(12.5)
 
 
-def test_get_env_overrides_backwards_compatible(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_get_env_overrides_backwards_compatible(patch_stack, tmp_path: Path) -> None:
     """get_env_overrides should expose overrides for legacy code paths."""
 
-    monkeypatch.setenv("ONTOFETCH_BACKOFF_FACTOR", "1.5")
-    monkeypatch.setenv("ONTOFETCH_SHARED_RATE_LIMIT_DIR", str(tmp_path))
-    monkeypatch.setenv("ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB", "15")
+    patch_stack.setenv("ONTOFETCH_BACKOFF_FACTOR", "1.5")
+    patch_stack.setenv("ONTOFETCH_SHARED_RATE_LIMIT_DIR", str(tmp_path))
+    patch_stack.setenv("ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB", "15")
     overrides = get_env_overrides()
     assert overrides["backoff_factor"] == "1.5"
     assert overrides["shared_rate_limit_dir"] == str(tmp_path)
@@ -520,12 +518,12 @@ def test_validate_config_rejects_non_mapping_extras(tmp_path: Path) -> None:
     assert "extras" in str(exc_info.value)
 
 
-def test_load_raw_yaml_missing_file_exits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_raw_yaml_missing_file_exits(tmp_path: Path, patch_stack) -> None:
     """Missing YAML files should exit with status code 2 and helpful message."""
 
     path = tmp_path / "missing.yaml"
     stderr = io.StringIO()
-    monkeypatch.setattr(sys, "stderr", stderr)
+    patch_stack.setattr(sys, "stderr", stderr)
     with pytest.raises(SystemExit) as exc_info:
         load_raw_yaml(path)
     assert exc_info.value.code == 2
@@ -541,7 +539,7 @@ def test_load_config_invalid_yaml(tmp_path: Path) -> None:
         load_config(config_path)
 
 
-def test_fetch_one_rejects_disallowed_license(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_one_rejects_disallowed_license(patch_stack) -> None:
     """fetch_one should reject ontologies with disallowed licenses."""
 
     class StubResolver:
@@ -556,7 +554,7 @@ def test_fetch_one_rejects_disallowed_license(monkeypatch: pytest.MonkeyPatch) -
                 service=spec.resolver,
             )
 
-    monkeypatch.setitem(RESOLVERS, "stub", StubResolver())
+    patch_stack.setitem(RESOLVERS, "stub", StubResolver())
     config = ResolvedConfig(defaults=DefaultsConfig(accept_licenses=["CC0-1.0"]), specs=[])
     spec = core.FetchSpec(id="example", resolver="stub", extras={}, target_formats=["owl"])
 
@@ -574,7 +572,7 @@ def test_fetch_one_unknown_resolver() -> None:
         )
 
 
-def test_fetch_one_download_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_one_download_error(patch_stack) -> None:
     """Download failures should be wrapped in OntologyDownloadError."""
 
     spec = core.FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
@@ -591,8 +589,8 @@ def test_fetch_one_download_error(monkeypatch: pytest.MonkeyPatch) -> None:
                 service=spec.resolver,
             )
 
-    monkeypatch.setitem(RESOLVERS, "obo", StubResolver())
-    monkeypatch.setattr(
+    patch_stack.setitem(RESOLVERS, "obo", StubResolver())
+    patch_stack.setattr(
         pipeline_mod,
         "download_stream",
         lambda **_: (_ for _ in ()).throw(ConfigError("boom")),

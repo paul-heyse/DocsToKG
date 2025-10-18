@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import io
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -36,20 +37,21 @@ def test_normalize_http_timeout_scalar_and_iterables() -> None:
     assert normalize_http_timeout([2, 3]) == (2.0, 3.0)
 
 
-def test_get_http_session_reuses_singleton(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_http_session_reuses_singleton() -> None:
     """Shared HTTP session is memoised and merges headers."""
 
-    monkeypatch.setattr(core_http, "_HTTP_SESSION", None)
-    monkeypatch.setattr(core_http, "_HTTP_SESSION_TIMEOUT", core_http.DEFAULT_HTTP_TIMEOUT)
+    with (
+        mock.patch.object(core_http, "_HTTP_SESSION", None),
+        mock.patch.object(core_http, "_HTTP_SESSION_TIMEOUT", core_http.DEFAULT_HTTP_TIMEOUT),
+    ):
+        session_a, timeout_a = get_http_session(timeout=10, base_headers={"X-Test": "one"})
+        session_b, timeout_b = get_http_session(base_headers={"X-Other": "two"})
 
-    session_a, timeout_a = get_http_session(timeout=10, base_headers={"X-Test": "one"})
-    session_b, timeout_b = get_http_session(base_headers={"X-Other": "two"})
-
-    assert session_a is session_b
-    assert timeout_a == (5.0, 10.0)
-    assert timeout_b == (5.0, 30.0)
-    assert session_b.headers["X-Test"] == "one"
-    assert session_b.headers["X-Other"] == "two"
+        assert session_a is session_b
+        assert timeout_a == (5.0, 10.0)
+        assert timeout_b == (5.0, 30.0)
+        assert session_b.headers["X-Test"] == "one"
+        assert session_b.headers["X-Other"] == "two"
 
 
 def test_manifest_resume_controller(tmp_path: Path) -> None:
@@ -163,7 +165,7 @@ def test_load_toml_markers_success() -> None:
     assert data == {"headings": ["#"], "captions": []}
 
 
-def test_load_toml_markers_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_toml_markers_failure() -> None:
     """Malformed TOML surfaces ConfigLoadError with context."""
 
     with pytest.raises(ConfigLoadError) as excinfo:

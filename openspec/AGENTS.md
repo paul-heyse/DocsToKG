@@ -38,7 +38,7 @@ AI assistants **must** operate inside the project virtual environment; otherwise
 
 3. **Run commands through direnv (preferred)**
    ```bash
-   direnv exec . python -m DocsToKG.DocParsing.cli embed --help
+  direnv exec . python -m DocsToKG.DocParsing.core.cli embed --help
    ```
    Use this pattern for tests, docs, and CLIs to guarantee the proper interpreter.
 

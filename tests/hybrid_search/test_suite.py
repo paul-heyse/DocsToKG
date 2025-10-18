@@ -274,9 +274,10 @@ import json
 import os
 import sys
 import uuid
+from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
-from typing import Callable, Dict, List, Mapping, Sequence
+from typing import Callable, List, Mapping, Sequence
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import numpy as np
@@ -310,6 +311,7 @@ from DocsToKG.HybridSearch.service import (
 from DocsToKG.HybridSearch.store import (
     ChunkRegistry,
     FaissVectorStore,
+    ManagedFaissAdapter,
     cosine_against_corpus_gpu,
     restore_state,
     serialize_state,
@@ -341,6 +343,7 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
             "mmr_lambda": 0.7,
             "cosine_dedupe_threshold": 0.95,
             "max_chunks_per_doc": 2,
+            "strict_highlights": False,
         },
         "retrieval": {"bm25_top_k": 20, "splade_top_k": 20, "dense_top_k": 20},
     }
@@ -364,7 +367,7 @@ def dataset() -> Sequence[Mapping[str, object]]:
 def stack(
     tmp_path: Path,
 ) -> Callable[
-    [],
+    ...,
     tuple[
         ChunkIngestionPipeline,
         HybridSearchService,
@@ -374,7 +377,10 @@ def stack(
         OpenSearchSimulator,
     ],
 ]:
-    def factory() -> tuple[
+    def factory(
+        *,
+        force_remove_ids_fallback: bool = False,
+    ) -> tuple[
         ChunkIngestionPipeline,
         HybridSearchService,
         ChunkRegistry,
@@ -385,7 +391,8 @@ def stack(
         manager = _build_config(tmp_path)
         config = manager.get()
         feature_generator = FeatureGenerator()
-        faiss_index = FaissVectorStore(dim=feature_generator.embedding_dim, config=config.dense)
+        dense_config = replace(config.dense, force_remove_ids_fallback=force_remove_ids_fallback)
+        faiss_index = FaissVectorStore(dim=feature_generator.embedding_dim, config=dense_config)
         assert (
             faiss_index.dim == feature_generator.embedding_dim
         ), "Faiss index dimensionality must match feature generator"
@@ -401,7 +408,7 @@ def stack(
         service = HybridSearchService(
             config_manager=manager,
             feature_generator=feature_generator,
-            faiss_index=faiss_index,
+            faiss_index=ManagedFaissAdapter(faiss_index),
             opensearch=opensearch,
             registry=registry,
             observability=observability,
@@ -512,7 +519,7 @@ def _write_document_artifacts(
 
 def test_hybrid_retrieval_end_to_end(
     stack: Callable[
-        [],
+        ...,
         tuple[
             ChunkIngestionPipeline,
             HybridSearchService,
@@ -547,7 +554,7 @@ def test_hybrid_retrieval_end_to_end(
 
 def test_reingest_updates_dense_and_sparse_channels(
     stack: Callable[
-        [],
+        ...,
         tuple[
             ChunkIngestionPipeline,
             HybridSearchService,
@@ -597,7 +604,7 @@ def test_reingest_updates_dense_and_sparse_channels(
 
 def test_validation_harness_reports(
     stack: Callable[
-        [],
+        ...,
         tuple[
             ChunkIngestionPipeline,
             HybridSearchService,
@@ -644,7 +651,7 @@ def test_schema_manager_bootstrap_and_registration() -> None:
 
 def test_api_post_hybrid_search_success_and_validation(
     stack: Callable[
-        [],
+        ...,
         tuple[
             ChunkIngestionPipeline,
             HybridSearchService,
@@ -682,7 +689,7 @@ def test_api_post_hybrid_search_success_and_validation(
 
 def test_operations_snapshot_and_restore_roundtrip(
     stack: Callable[
-        [],
+        ...,
         tuple[
             ChunkIngestionPipeline,
             HybridSearchService,
@@ -718,7 +725,7 @@ def test_operations_snapshot_and_restore_roundtrip(
 
 def test_ingest_missing_vector_raises(
     stack: Callable[
-        [],
+        ...,
         tuple[
             ChunkIngestionPipeline,
             HybridSearchService,
@@ -802,6 +809,7 @@ def _build_config(tmp_path: Path, *, oversample: int = 3) -> HybridSearchConfigM
             "mmr_lambda": 0.6,
             "cosine_dedupe_threshold": 0.95,
             "max_chunks_per_doc": 3,
+            "strict_highlights": False,
         },
         "retrieval": {"bm25_top_k": 40, "splade_top_k": 40, "dense_top_k": 40},
     }
@@ -846,7 +854,7 @@ def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput
 @REAL_VECTOR_MARK
 @pytest.fixture
 def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Callable[  # noqa: F811
-    [],
+    ...,
     tuple[
         ChunkIngestionPipeline,
         HybridSearchService,
@@ -856,7 +864,10 @@ def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Calla
         OpenSearchSimulator,
     ],
 ]:
-    def factory() -> tuple[
+    def factory(
+        *,
+        force_remove_ids_fallback: bool = False,
+    ) -> tuple[
         ChunkIngestionPipeline,
         HybridSearchService,
         ChunkRegistry,
@@ -868,7 +879,8 @@ def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Calla
         config = manager.get()
         embedding_dim = infer_embedding_dim(real_dataset)
         feature_generator = FeatureGenerator(embedding_dim=embedding_dim)
-        faiss_index = FaissVectorStore(dim=embedding_dim, config=config.dense)
+        dense_config = replace(config.dense, force_remove_ids_fallback=force_remove_ids_fallback)
+        faiss_index = FaissVectorStore(dim=embedding_dim, config=dense_config)
         opensearch = OpenSearchSimulator()
         registry = ChunkRegistry()
         observability = Observability()
@@ -881,7 +893,7 @@ def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Calla
         service = HybridSearchService(
             config_manager=manager,
             feature_generator=feature_generator,
-            faiss_index=faiss_index,
+            faiss_index=ManagedFaissAdapter(faiss_index),
             opensearch=opensearch,
             registry=registry,
             observability=observability,
@@ -903,7 +915,7 @@ def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Calla
 @REAL_VECTOR_MARK
 def test_real_fixture_ingest_and_search(
     stack: Callable[
-        [],
+        ...,
         tuple[
             ChunkIngestionPipeline,
             HybridSearchService,
@@ -943,7 +955,7 @@ def test_real_fixture_ingest_and_search(
 @REAL_VECTOR_MARK
 def test_real_fixture_reingest_and_reports(
     stack: Callable[
-        [],
+        ...,
         tuple[
             ChunkIngestionPipeline,
             HybridSearchService,
@@ -955,24 +967,13 @@ def test_real_fixture_reingest_and_reports(
     ],
     real_dataset: Sequence[Mapping[str, object]],
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    ingestion, service, registry, validator, faiss_index, opensearch = stack()
+    ingestion, service, registry, validator, faiss_index, opensearch = stack(
+        force_remove_ids_fallback=True
+    )
     documents = _to_documents(real_dataset)
     ingestion.upsert_documents(documents)
     baseline_total = registry.count()
-
-    if faiss_index._index is not None:
-        original_remove_ids = faiss_index._index.remove_ids
-
-        def side_effect(selector: object) -> None:
-            side_effect.calls += 1
-            if side_effect.calls == 1:
-                raise RuntimeError("remove_ids not implemented for this type of index")
-            original_remove_ids(selector)
-
-        side_effect.calls = 0
-        monkeypatch.setattr(faiss_index._index, "remove_ids", side_effect, raising=False)
 
     ingestion.upsert_documents(documents)
     assert registry.count() == baseline_total
@@ -1028,7 +1029,7 @@ def test_real_fixture_reingest_and_reports(
 @REAL_VECTOR_MARK
 def test_real_fixture_api_roundtrip(
     stack: Callable[
-        [],
+        ...,
         tuple[
             ChunkIngestionPipeline,
             HybridSearchService,
@@ -1061,28 +1062,17 @@ def test_real_fixture_api_roundtrip(
 # --- test_hybrid_search_real_vectors.py ---
 
 
-def test_remove_ids_cpu_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
-    manager = FaissVectorStore(dim=8, config=DenseIndexConfig())
+def test_remove_ids_cpu_fallback() -> None:
+    manager = FaissVectorStore(dim=8, config=DenseIndexConfig(force_remove_ids_fallback=True))
     vector = np.ones(8, dtype=np.float32)
     manager.add([vector], ["00000000-0000-4000-8000-000000000001"])
 
-    rebuilds: Dict[str, int] = {"count": 0}
-    original_create_index = manager._create_index
-
-    def tracking_create_index() -> object:
-        rebuilds["count"] += 1
-        return original_create_index()
-
-    monkeypatch.setattr(manager, "_create_index", tracking_create_index)
-
-    def failing_remove_ids(selector: object) -> None:
-        raise RuntimeError("remove_ids not implemented for this type of index")
-
-    monkeypatch.setattr(manager._index, "remove_ids", failing_remove_ids, raising=False)
+    baseline_stats = manager.stats()
     manager.remove(["00000000-0000-4000-8000-000000000001"])
 
-    assert manager._remove_fallbacks == 1
-    assert rebuilds["count"] == 1
+    stats = manager.stats()
+    assert int(stats["gpu_remove_fallbacks"]) == int(baseline_stats["gpu_remove_fallbacks"]) + 1
+    assert int(stats["total_rebuilds"]) == int(baseline_stats["total_rebuilds"]) + 1
     assert manager.ntotal == 0
 
 
@@ -1112,6 +1102,7 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
             "mmr_lambda": 0.6,
             "cosine_dedupe_threshold": 0.95,
             "max_chunks_per_doc": 3,
+            "strict_highlights": False,
         },
         "retrieval": {"bm25_top_k": 50, "splade_top_k": 50, "dense_top_k": 50},
     }
@@ -1125,7 +1116,7 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
 
 @pytest.fixture
 def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -> Callable[
-    [],
+    ...,
     tuple[
         ChunkIngestionPipeline,
         HybridSearchService,
@@ -1135,7 +1126,10 @@ def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -
         OpenSearchSimulator,
     ],
 ]:
-    def factory() -> tuple[
+    def factory(
+        *,
+        force_remove_ids_fallback: bool = False,
+    ) -> tuple[
         ChunkIngestionPipeline,
         HybridSearchService,
         ChunkRegistry,
@@ -1147,7 +1141,8 @@ def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -
         config = manager.get()
         embedding_dim = infer_embedding_dim(scale_dataset)
         feature_generator = FeatureGenerator(embedding_dim=embedding_dim)
-        faiss_index = FaissVectorStore(dim=embedding_dim, config=config.dense)
+        dense_config = replace(config.dense, force_remove_ids_fallback=force_remove_ids_fallback)
+        faiss_index = FaissVectorStore(dim=embedding_dim, config=dense_config)
         opensearch = OpenSearchSimulator()
         registry = ChunkRegistry()
         observability = Observability()
@@ -1160,7 +1155,7 @@ def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -
         service = HybridSearchService(
             config_manager=manager,
             feature_generator=feature_generator,
-            faiss_index=faiss_index,
+            faiss_index=ManagedFaissAdapter(faiss_index),
             opensearch=opensearch,
             registry=registry,
             observability=observability,
@@ -1183,7 +1178,7 @@ def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -
 @pytest.mark.scale_vectors
 def test_hybrid_scale_suite(
     scale_stack: Callable[
-        [],
+        ...,
         tuple[
             ChunkIngestionPipeline,
             HybridSearchService,
@@ -1302,7 +1297,12 @@ def _assert_gpu_index(manager: FaissVectorStore) -> None:
 @GPU_MARK
 def test_gpu_flat_end_to_end() -> None:
     xb, xq = _toy_data()
-    cfg = DenseIndexConfig(index_type="flat", nprobe=1, device=_target_device())
+    cfg = DenseIndexConfig(
+        index_type="flat",
+        nprobe=1,
+        device=_target_device(),
+        persist_mode="disabled",
+    )
     manager = FaissVectorStore(dim=xb.shape[1], config=cfg)
     vectors, vector_ids = _emit_vectors(xb)
     manager.set_id_resolver(_make_id_resolver(vector_ids))
@@ -1318,7 +1318,13 @@ def test_gpu_flat_end_to_end() -> None:
 @GPU_MARK
 def test_gpu_ivf_flat_build_and_search() -> None:
     xb, xq = _toy_data()
-    cfg = DenseIndexConfig(index_type="ivf_flat", nlist=256, nprobe=8, device=_target_device())
+    cfg = DenseIndexConfig(
+        index_type="ivf_flat",
+        nlist=256,
+        nprobe=8,
+        device=_target_device(),
+        persist_mode="disabled",
+    )
     manager = FaissVectorStore(dim=xb.shape[1], config=cfg)
     vectors, vector_ids = _emit_vectors(xb)
     manager.set_id_resolver(_make_id_resolver(vector_ids))
@@ -1341,6 +1347,7 @@ def test_gpu_ivfpq_build_and_search() -> None:
         pq_m=16,
         pq_bits=8,
         device=_target_device(),
+        persist_mode="disabled",
     )
     manager = FaissVectorStore(dim=xb.shape[1], config=cfg)
     vectors, vector_ids = _emit_vectors(xb)
@@ -1376,7 +1383,11 @@ def test_gpu_cosine_against_corpus() -> None:
 
 
 def test_gpu_clone_strict_coarse_quantizer() -> None:
-    cfg = DenseIndexConfig(index_type="flat", device=_target_device())
+    cfg = DenseIndexConfig(
+        index_type="flat",
+        device=_target_device(),
+        persist_mode="disabled",
+    )
     manager = FaissVectorStore(dim=32, config=cfg)
     cpu_index = faiss.IndexFlatIP(32)
     mapped = faiss.IndexIDMap2(cpu_index)
@@ -1509,7 +1520,13 @@ def test_result_shaper_enforces_global_budgets() -> None:
 
 def test_gpu_nprobe_applied_during_search() -> None:
     xb, xq = _toy_data(n=512, d=64)
-    cfg = DenseIndexConfig(index_type="ivf_flat", nlist=64, nprobe=32, device=_target_device())
+    cfg = DenseIndexConfig(
+        index_type="ivf_flat",
+        nlist=64,
+        nprobe=32,
+        device=_target_device(),
+        persist_mode="disabled",
+    )
     manager = FaissVectorStore(dim=xb.shape[1], config=cfg)
     vectors, vector_ids = _emit_vectors(xb)
     manager.set_id_resolver(_make_id_resolver(vector_ids))
@@ -1525,8 +1542,12 @@ def test_gpu_nprobe_applied_during_search() -> None:
 # --- test_hybridsearch_gpu_only.py ---
 
 
-def test_gpu_similarity_uses_supplied_device(monkeypatch: pytest.MonkeyPatch) -> None:
-    cfg = DenseIndexConfig(index_type="flat", device=_target_device())
+def test_gpu_similarity_uses_supplied_device() -> None:
+    cfg = DenseIndexConfig(
+        index_type="flat",
+        device=_target_device(),
+        persist_mode="disabled",
+    )
     manager = FaissVectorStore(dim=32, config=cfg)
 
     captured: dict[str, object] = {}
@@ -1536,11 +1557,15 @@ def test_gpu_similarity_uses_supplied_device(monkeypatch: pytest.MonkeyPatch) ->
         captured["device"] = device
         return np.zeros((A.shape[0], B.shape[0]), dtype=np.float32)
 
-    monkeypatch.setattr(faiss, "pairwise_distance_gpu", fake_pairwise)
-
     q = np.ones(32, dtype=np.float32)
     corpus = np.ones((3, 32), dtype=np.float32)
-    cosine_against_corpus_gpu(q, corpus, device=manager.device, resources=manager.gpu_resources)
+    cosine_against_corpus_gpu(
+        q,
+        corpus,
+        device=manager.device,
+        resources=manager.gpu_resources,
+        pairwise_fn=fake_pairwise,
+    )
 
     assert captured.get("device") == manager.device
     assert captured.get("resources") is manager.gpu_resources

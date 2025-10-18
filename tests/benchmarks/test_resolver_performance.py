@@ -80,6 +80,7 @@ from DocsToKG.ContentDownload.pipeline import (
     ResolverPipeline,
     ResolverResult,
 )
+from tests.conftest import PatchManager
 
 
 @dataclass
@@ -179,7 +180,7 @@ def test_head_precheck_overhead_vs_savings() -> None:
     assert precheck_time < no_precheck_time * 0.9
 
 
-def test_retry_backoff_timing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_retry_backoff_timing(patcher: PatchManager) -> None:
     from DocsToKG.ContentDownload.networking import request_with_retries
 
     sleeps: List[float] = []
@@ -187,8 +188,8 @@ def test_retry_backoff_timing(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_sleep(value: float) -> None:
         sleeps.append(value)
 
-    monkeypatch.setattr(time, "sleep", fake_sleep)
-    monkeypatch.setattr("DocsToKG.ContentDownload.networking.random.random", lambda: 0.0)
+    patcher.setattr(time, "sleep", fake_sleep)
+    patcher.setattr("DocsToKG.ContentDownload.networking.random.random", lambda: 0.0)
 
     class FakeResponse:
         def __init__(self, status_code: int):

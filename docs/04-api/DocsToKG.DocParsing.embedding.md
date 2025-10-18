@@ -1,6 +1,6 @@
-# 1. Module: _embedding.runtime
+# 1. Module: embedding.runtime
 
-This reference documents the DocsToKG module ``DocsToKG.DocParsing._embedding.runtime``.
+This reference documents the DocsToKG module ``DocsToKG.DocParsing.embedding.runtime``.
 
 ## 1. Overview
 

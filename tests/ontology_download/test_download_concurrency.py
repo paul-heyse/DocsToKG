@@ -116,11 +116,11 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import FetchResult, FetchSpec
 import DocsToKG.OntologyDownload.planning as pipeline_mod
+from DocsToKG.OntologyDownload import FetchResult, FetchSpec
 from DocsToKG.OntologyDownload import io as io_mod
-from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.api import _results_to_dict, format_results_table
+from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.settings import DownloadConfiguration
 
 
@@ -328,14 +328,14 @@ def _make_http_config(**overrides) -> DownloadConfiguration:
 
 
 @pytest.fixture(autouse=True)
-def _allow_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
+def _allow_localhost(patch_stack) -> None:
+    patch_stack.setattr(
         io_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
     )
-    monkeypatch.setattr(
+    patch_stack.setattr(
         pipeline_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
     )
-    monkeypatch.setattr(
+    patch_stack.setattr(
         network_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
     )
 

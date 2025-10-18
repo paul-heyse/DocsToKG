@@ -146,7 +146,7 @@ Key Scenarios:
 - Exercises failure paths such as Owlready2 memory exhaustion
 
 Dependencies:
-- pytest: Fixtures and monkeypatching
+- pytest: Fixtures and patch helpers
 - DocsToKG.OntologyDownload.ontology_download: Validation entry points under test
 
 Usage:
@@ -188,8 +188,8 @@ from DocsToKG.OntologyDownload.validation import (
 )
 
 
-def _reset_validator_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(plugins_mod, "_PLUGINS_INITIALIZED", False, raising=False)
+def _reset_validator_state(patch_stack) -> None:
+    patch_stack.setattr(plugins_mod, "_PLUGINS_INITIALIZED", False, raising=False)
     plugins_mod._PLUGIN_REGISTRIES.clear()
     plugins_mod._RESOLVER_REGISTRY.clear()
     plugins_mod._VALIDATOR_REGISTRY.clear()
@@ -340,7 +340,7 @@ def test_normalize_streaming_edge_cases(tmp_path, config):
         assert result.details.get("streaming_prefix_sha256") == header_stream
 
 
-def test_run_validators_respects_concurrency(monkeypatch, tmp_path, config):
+def test_run_validators_respects_concurrency(patch_stack, tmp_path, config):
     config = config.model_copy(deep=True)
     config.defaults.validation.max_concurrent_validators = 2
 
@@ -373,7 +373,7 @@ def test_run_validators_respects_concurrency(monkeypatch, tmp_path, config):
         "two": _make_validator("two"),
         "three": _make_validator("three"),
     }
-    monkeypatch.setattr(validation_mod, "VALIDATORS", validators)
+    patch_stack.setattr(validation_mod, "VALIDATORS", validators)
 
     requests = []
     for name in validators:
@@ -397,7 +397,7 @@ def test_run_validators_respects_concurrency(monkeypatch, tmp_path, config):
         assert artifact.exists()
 
 
-def test_run_validators_matches_sequential(monkeypatch, tmp_path, config):
+def test_run_validators_matches_sequential(patch_stack, tmp_path, config):
     config_seq = config.model_copy(deep=True)
     config_seq.defaults.validation.max_concurrent_validators = 1
 
@@ -416,7 +416,7 @@ def test_run_validators_matches_sequential(monkeypatch, tmp_path, config):
         "beta": _validator,
         "gamma": _validator,
     }
-    monkeypatch.setattr(validation_mod, "VALIDATORS", validators)
+    patch_stack.setattr(validation_mod, "VALIDATORS", validators)
 
     def _build_requests(prefix: str, cfg: ResolvedConfig) -> list[ValidationRequest]:
         requests = []
@@ -448,21 +448,21 @@ def test_run_validators_matches_sequential(monkeypatch, tmp_path, config):
         assert seq_details == conc_details
 
 
-def test_sort_triple_file_falls_back_without_sort(monkeypatch, tmp_path):
+def test_sort_triple_file_falls_back_without_sort(patch_stack, tmp_path):
     unsorted = tmp_path / "triples.unsorted"
     unsorted.write_text("c\nA\nb\n", encoding="utf-8")
     destination = tmp_path / "triples.sorted"
 
-    monkeypatch.setattr(shutil, "which", lambda _: None)
+    patch_stack.setattr(shutil, "which", lambda _: None)
 
     _sort_triple_file(unsorted, destination)
     assert destination.read_text(encoding="utf-8") == "A\nb\nc\n"
 
 
-def test_validator_plugin_loader_registers_and_warns(monkeypatch, caplog):
+def test_validator_plugin_loader_registers_and_warns(patch_stack, caplog):
     base = validation_mod.VALIDATORS.copy()
-    monkeypatch.setattr(validation_mod, "VALIDATORS", base.copy())
-    _reset_validator_state(monkeypatch)
+    patch_stack.setattr(validation_mod, "VALIDATORS", base.copy())
+    _reset_validator_state(patch_stack)
 
     def _plugin(request, logger):  # pragma: no cover - handler not executed here
         return ValidationResult(ok=True, details={"ok": True}, output_files=[])
@@ -486,7 +486,7 @@ def test_validator_plugin_loader_registers_and_warns(monkeypatch, caplog):
     stub = SimpleNamespace(
         select=lambda *, group=None: entries if group == "docstokg.ontofetch.validator" else []
     )
-    monkeypatch.setattr(plugins_mod.metadata, "entry_points", lambda: stub)
+    patch_stack.setattr(plugins_mod.metadata, "entry_points", lambda: stub)
 
     caplog.set_level(logging.INFO)
     load_validator_plugins(validation_mod.VALIDATORS, logger=logging.getLogger("test"))
@@ -496,10 +496,10 @@ def test_validator_plugin_loader_registers_and_warns(monkeypatch, caplog):
     assert any(record.message == "validator plugin failed" for record in caplog.records)
 
 
-def test_validate_pronto_success(monkeypatch, obo_file, tmp_path, config):
+def test_validate_pronto_success(patch_stack, obo_file, tmp_path, config):
     pytest.importorskip("pronto")
     pytest.importorskip("ols_client")
-    monkeypatch.setenv("PYSTOW_HOME", str(tmp_path / "pystow"))
+    patch_stack.setenv("PYSTOW_HOME", str(tmp_path / "pystow"))
     request = ValidationRequest("pronto", obo_file, tmp_path / "norm", tmp_path / "val", config)
     result = validate_pronto(request, _noop_logger())
     if not result.ok:  # pragma: no cover - optional dependency pipeline misconfigured
@@ -508,13 +508,13 @@ def test_validate_pronto_success(monkeypatch, obo_file, tmp_path, config):
     assert payload["ok"]
 
 
-def test_validate_pronto_handles_exception(monkeypatch, obo_file, tmp_path, config):
+def test_validate_pronto_handles_exception(patch_stack, obo_file, tmp_path, config):
     request = ValidationRequest("pronto", obo_file, tmp_path / "norm", tmp_path / "val", config)
 
     def _boom(*_args, **_kwargs):  # pragma: no cover - deterministic failure path
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(
+    patch_stack.setattr(
         "DocsToKG.OntologyDownload.validation._run_validator_subprocess",
         _boom,
     )
@@ -526,21 +526,21 @@ def test_validate_pronto_handles_exception(monkeypatch, obo_file, tmp_path, conf
     assert payload["error"] == "boom"
 
 
-def test_validate_owlready2_success(monkeypatch, owl_file, tmp_path, config):
+def test_validate_owlready2_success(patch_stack, owl_file, tmp_path, config):
     try:
         pytest.importorskip("owlready2")
     except Exception as exc:  # pragma: no cover - optional dependency import failed
         pytest.skip(f"owlready2 unavailable: {exc}")
     pytest.importorskip("ols_client")
-    monkeypatch.setenv("PYSTOW_HOME", str(tmp_path / "pystow"))
+    patch_stack.setenv("PYSTOW_HOME", str(tmp_path / "pystow"))
     request = ValidationRequest("owlready2", owl_file, tmp_path / "norm", tmp_path / "val", config)
     result = validate_owlready2(request, _noop_logger())
     if not result.ok:  # pragma: no cover - optional dependency pipeline misconfigured
         pytest.skip(f"Owlready2 validator unavailable: {result.details.get('error')}")
 
 
-def test_validate_robot_skips_when_missing(monkeypatch, ttl_file, tmp_path, config):
-    monkeypatch.setattr(shutil, "which", lambda _: None)
+def test_validate_robot_skips_when_missing(patch_stack, ttl_file, tmp_path, config):
+    patch_stack.setattr(shutil, "which", lambda _: None)
     request = ValidationRequest("robot", ttl_file, tmp_path / "norm", tmp_path / "val", config)
     result = validate_robot(request, _noop_logger())
     assert result.ok
@@ -548,7 +548,7 @@ def test_validate_robot_skips_when_missing(monkeypatch, ttl_file, tmp_path, conf
     assert payload["skipped"]
 
 
-def test_validate_arelle_with_stub(monkeypatch, xbrl_package, tmp_path, config):
+def test_validate_arelle_with_stub(patch_stack, xbrl_package, tmp_path, config):
     class DummyController:
         def __init__(self, **kwargs):
             self.kwargs = kwargs
@@ -557,7 +557,7 @@ def test_validate_arelle_with_stub(monkeypatch, xbrl_package, tmp_path, config):
             self.args = args
 
     dummy_module = SimpleNamespace(Cntlr=SimpleNamespace(Cntlr=DummyController))
-    monkeypatch.setitem(sys.modules, "arelle", dummy_module)
+    patch_stack.setitem(sys.modules, "arelle", dummy_module)
     request = ValidationRequest("arelle", xbrl_package, tmp_path / "norm", tmp_path / "val", config)
     result = validate_arelle(request, _noop_logger())
     assert result.ok
@@ -566,13 +566,13 @@ def test_validate_arelle_with_stub(monkeypatch, xbrl_package, tmp_path, config):
     assert payload["log"].endswith("arelle.log")
 
 
-def test_validate_owlready2_memory_error(monkeypatch, owl_file, tmp_path, config):
+def test_validate_owlready2_memory_error(patch_stack, owl_file, tmp_path, config):
     request = ValidationRequest("owlready2", owl_file, tmp_path / "norm", tmp_path / "val", config)
 
     def _raise(*args, **kwargs):  # pragma: no cover - exercised in test
         raise ValidatorSubprocessError("memory exceeded")
 
-    monkeypatch.setattr(
+    patch_stack.setattr(
         "DocsToKG.OntologyDownload.validation._run_validator_subprocess",
         _raise,
     )

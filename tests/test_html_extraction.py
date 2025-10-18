@@ -50,6 +50,7 @@ pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.cli import download_candidate
 from DocsToKG.ContentDownload.core import Classification, WorkArtifact
+from tests.conftest import PatchManager
 
 # --- Globals ---
 
@@ -67,7 +68,7 @@ class _FakeTrafilatura:
 # --- Test Cases ---
 
 
-def test_html_extraction_creates_text_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_html_extraction_creates_text_file(tmp_path: Path, patcher: PatchManager) -> None:
     artifact = WorkArtifact(
         work_id="WHTML",
         title="HTML Example",
@@ -90,7 +91,7 @@ def test_html_extraction_creates_text_file(tmp_path: Path, monkeypatch: pytest.M
     responses.add(responses.HEAD, url, status=200, headers={"Content-Type": "text/html"})
     responses.add(responses.GET, url, status=200, body="<html><body>Hello</body></html>")
 
-    monkeypatch.setitem(sys.modules, "trafilatura", _FakeTrafilatura())
+    patcher.setitem(sys.modules, "trafilatura", _FakeTrafilatura())
 
     session = requests.Session()
     context = {"dry_run": False, "extract_html_text": True, "previous": {}}
