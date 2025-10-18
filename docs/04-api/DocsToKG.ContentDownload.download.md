@@ -26,9 +26,57 @@ None
 Raises:
 OSError: If the directory cannot be created because of permissions.
 
-### `_build_download_outcome()`
+### `validate_classification(classification, artifact, options)`
 
-*No documentation available.*
+Validate a detected classification against expectations and size rules.
+
+Args:
+classification: Reported :class:`Classification` for the candidate payload.
+artifact: Work artifact metadata under evaluation.
+options: :class:`DownloadOptions` (or mapping) controlling validation toggles.
+
+Returns:
+``ValidationResult`` describing success, reason codes, and telemetry payloads.
+
+### `handle_resume_logic(artifact, previous_index, options)`
+
+Check prior manifest entries to determine whether a work should be skipped.
+
+Args:
+artifact: Work artifact representing the current OpenAlex record.
+previous_index: Mapping of work IDs and resolver results from prior runs.
+options: :class:`DownloadOptions` describing resume and force-download toggles.
+
+Returns:
+``ResumeDecision`` capturing skip status, reuse metadata, and prior outcomes.
+
+### `cleanup_sidecar_files(artifact, classification, options)`
+
+Remove partial downloads and mismatched sidecar files following classification.
+
+Args:
+artifact: Work artifact describing file destinations.
+classification: Final :class:`Classification` returned by a strategy.
+options: :class:`DownloadOptions` controlling dry-run and HTML extraction flags.
+
+Returns:
+None
+
+### `build_download_outcome(...)`
+
+Compose a :class:`DownloadOutcome` with shared validation logic for artifacts.
+
+The helper enforces PDF heuristics (minimum byte threshold, HTML tail detection,
+``%%EOF`` marker validation) and clears corrupted files before returning a
+normalized outcome structure. It records SHA-256 digests, HTTP metadata, retry
+headers, and extracted-text paths when available. Callers supply the
+``DownloadContext`` options via the ``options`` keyword to ensure dry-run and
+content-addressable storage preferences are honoured.
+
+### `_build_download_outcome(...)`
+
+Compatibility wrapper invoking :func:`build_download_outcome` with legacy
+parameters used by historical call sites.
 
 ### `_validate_cached_artifact(result)`
 
@@ -90,6 +138,11 @@ Returns:
 DownloadOutcome describing the result of the download attempt including
 streaming hash metadata when available.
 
+Strategies implementing :class:`DownloadStrategy` are used to specialise
+validation and finalisation for PDF, HTML, and XML artifacts. The strategy is
+selected based on the detected classification before the response body is
+persisted.
+
 Notes:
 A lightweight HEAD preflight is issued when the caller has not already
 validated the URL. This mirrors the resolver pipeline behaviour and
@@ -102,7 +155,7 @@ Raises:
 OSError: If writing the downloaded payload to disk fails.
 TypeError: If conditional response parsing returns unexpected objects.
 
-### `process_one_work(work, session, pdf_dir, html_dir, xml_dir, pipeline, logger, metrics)`
+### `process_one_work(work, session, pdf_dir, html_dir, xml_dir, pipeline, logger, metrics, *, options, session_factory, strategy_selector)`
 
 Process a single work artifact through the resolver pipeline.
 
@@ -118,7 +171,9 @@ logger: Structured attempt logger capturing manifest records.
 metrics: Resolver metrics collector.
 options: :class:`DownloadOptions` describing download behaviour for the work.
 session_factory: Optional callable returning a thread-local session for
-resolver execution when concurrency is enabled.
+    resolver execution when concurrency is enabled.
+strategy_selector: Optional callable returning a :class:`DownloadStrategy`
+    implementation for a detected :class:`Classification`.
 
 Returns:
 Dictionary summarizing the outcome (saved/html_only/skipped flags).
@@ -127,6 +182,15 @@ Raises:
 requests.RequestException: Propagated if resolver HTTP requests fail
 unexpectedly outside guarded sections.
 Exception: Bubbling from resolver pipeline internals when not handled.
+
+### `get_strategy_for_classification(classification)`
+
+Return the registered :class:`DownloadStrategy` for a detected classification.
+
+Strategies for PDF-like payloads collapse onto :class:`PdfDownloadStrategy`
+while HTML and XML classifiers map to their dedicated implementations. Unknown
+or legacy classifications reuse the PDF strategy to preserve historical
+behaviour.
 
 ### `is_allowed(self, session, url, timeout)`
 
@@ -160,6 +224,36 @@ Stable collection of per-run download settings applied to each work item.
 ### `DownloadState`
 
 State machine for streaming downloads.
+
+### `DownloadStrategy`
+
+Protocol describing the shared interface implemented by artifact-specific
+download strategies. Each strategy decides whether work should proceed,
+interprets HTTP responses, and constructs the final :class:`DownloadOutcome`.
+
+### `DownloadStrategyContext`
+
+Mutable state container passed between strategy phases. It captures the active
+response object, destination path, derived telemetry, and configuration used by
+strategy implementations.
+
+### `PdfDownloadStrategy`
+
+Concrete :class:`DownloadStrategy` handling PDF artifacts. It validates the
+trailing ``%%EOF`` marker, enforces minimum byte thresholds, and builds outcomes
+that include SHA-256 metadata when available.
+
+### `HtmlDownloadStrategy`
+
+Concrete :class:`DownloadStrategy` for HTML artifacts. It honours text extraction
+preferences, preserves existing downloads when list-only mode is active, and
+ensures outcomes capture HTML classification metadata.
+
+### `XmlDownloadStrategy`
+
+Concrete :class:`DownloadStrategy` used for XML artifacts. It shares the common
+finalisation flow while deferring classification-specific behaviour to the
+strategy protocol.
 
 ### `_MaxBytesExceeded`
 

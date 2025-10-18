@@ -195,12 +195,28 @@ from DocsToKG.ContentDownload.resolvers import (
     DEFAULT_RESOLVER_ORDER,
     DEFAULT_RESOLVER_TOGGLES,
     ApiResolverBase,
+    ArxivResolver,
+    CoreResolver,
+    CrossrefResolver,
+    DoajResolver,
+    EuropePmcResolver,
+    FigshareResolver,
+    HalResolver,
+    LandingPageResolver,
+    OpenAireResolver,
+    OpenAlexResolver,
+    OsfResolver,
+    PmcResolver,
     RegisteredResolver,
     Resolver,
     ResolverEvent,
     ResolverEventReason,
     ResolverRegistry,
     ResolverResult,
+    SemanticScholarResolver,
+    UnpaywallResolver,
+    WaybackResolver,
+    ZenodoResolver,
     default_resolvers,
 )
 from DocsToKG.ContentDownload.telemetry import AttemptSink
@@ -218,11 +234,19 @@ DEFAULT_RESOLVER_CREDENTIALS_PATH = PROJECT_ROOT / "config" / "resolver_credenti
 
 __all__ = [
     "ApiResolverBase",
+    "ArxivResolver",
     "AttemptRecord",
     "AttemptSink",
+    "CoreResolver",
+    "CrossrefResolver",
     "DownloadFunc",
     "DownloadOutcome",
+    "DoajResolver",
+    "EuropePmcResolver",
+    "FigshareResolver",
+    "HalResolver",
     "PipelineResult",
+    "LandingPageResolver",
     "Resolver",
     "ResolverConfig",
     "ResolverMetrics",
@@ -232,6 +256,14 @@ __all__ = [
     "ResolverEvent",
     "ResolverEventReason",
     "RegisteredResolver",
+    "OpenAireResolver",
+    "OpenAlexResolver",
+    "OsfResolver",
+    "PmcResolver",
+    "SemanticScholarResolver",
+    "UnpaywallResolver",
+    "WaybackResolver",
+    "ZenodoResolver",
     "apply_config_overrides",
     "default_resolvers",
     "load_resolver_config",
@@ -1286,7 +1318,8 @@ class ResolverPipeline:
         self._domain_bytes_consumed: Dict[str, int] = defaultdict(int)
         self._domain_bytes_lock = threading.Lock()
         self._resolver_breakers: Dict[str, CircuitBreaker] = {}
-        for name, spec in self.config.resolver_circuit_breakers.items():
+        circuit_breakers = getattr(self.config, "resolver_circuit_breakers", {}) or {}
+        for name, spec in circuit_breakers.items():
             threshold = int(spec.get("failure_threshold", 5))
             cooldown = float(spec.get("cooldown_seconds", 60.0))
             self._resolver_breakers[name] = CircuitBreaker(

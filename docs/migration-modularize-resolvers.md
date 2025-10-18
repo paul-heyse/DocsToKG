@@ -1,50 +1,48 @@
-# 1. Migration Guide: Unified Content Download Resolvers
+# 1. Migration Guide: Resolver Modularisation
 
-The resolver subsystem has been recomposed into a single module,
-`DocsToKG.ContentDownload.pipeline`. This guide explains how to migrate code
-that previously relied on the intermediate submodules (`.types`, `.pipeline`,
-`.providers`, `.headers`, `.cache`).
+The resolver subsystem now lives under ``DocsToKG.ContentDownload.resolvers``.
+Each resolver sits in its own module and registers with ``ResolverRegistry`` on
+import. ``pipeline.py`` continues to re-export the resolver classes for backwards
+compatibility. This guide summarises the changes needed when upgrading.
 
 ## 1. Update Import Paths
 
 | Replace | With |
 | --- | --- |
-| `from DocsToKG.ContentDownload.pipeline.types import …` | `from DocsToKG.ContentDownload.pipeline import …` |
-| `from DocsToKG.ContentDownload.pipeline.pipeline import …` | `from DocsToKG.ContentDownload.pipeline import …` |
-| `from DocsToKG.ContentDownload.pipeline.providers import …` | `from DocsToKG.ContentDownload.pipeline import …` |
-| `from DocsToKG.ContentDownload.pipeline.headers import headers_cache_key` | `from DocsToKG.ContentDownload.pipeline import headers_cache_key` |
+| ``from DocsToKG.ContentDownload.pipeline import OpenAlexResolver`` | ``from DocsToKG.ContentDownload.resolvers import OpenAlexResolver`` (or retain the pipeline import for compatibility) |
+| ``from DocsToKG.ContentDownload.pipeline import default_resolvers`` | ``from DocsToKG.ContentDownload.resolvers import default_resolvers`` |
+| ``from DocsToKG.ContentDownload.pipeline import RegisteredResolver`` | ``from DocsToKG.ContentDownload.resolvers import RegisteredResolver`` |
 
-All resolver-related dataclasses (`ResolverResult`, `AttemptRecord`, etc.),
-pipeline helpers, and provider implementations are now re-exported directly
-from the top-level module.
-
-> **Tip:** Legacy import paths will raise `ImportError`. Update your imports to
-> ensure compatibility with the unified module.
+Existing imports from ``pipeline`` keep working because the module now
+re-exports the resolver classes. New code should prefer importing from the
+``resolvers`` package to make dependencies explicit.
 
 ## 2. Registering Custom Resolvers
 
-Subclass `DocsToKG.ContentDownload.pipeline.RegisteredResolver` and make sure
-the subclass is imported during start-up so it registers with the resolver
-registry. To take part in the default order, append instances to
-`default_resolvers()` inside `resolvers.py` or extend the returned list within
-your application.
+Place new resolvers in ``ContentDownload/resolvers/`` and inherit from
+``RegisteredResolver`` or ``ApiResolverBase``. Import the module from
+``resolvers/__init__.py`` (mirroring the built-in resolvers) so registration runs
+at start-up. To participate in the default order, append an instance to the list
+returned by ``default_resolvers()`` in your own entry point.
 
-## 3. Configuration & Behaviour
+## 3. Behaviour Changes
 
-No configuration keys changed during the consolidation. Existing YAML files
-that reference `ResolverConfig` fields remain valid. Behaviour such as
-centralised retries, HEAD preflight checks, and structured logging carries
-over unchanged.
+- ``ResolverRegistry`` owns discovery and ordering. ``default_resolvers()`` now
+  simply instantiates the registry.
+- ``pipeline.py`` focuses on orchestration and telemetry. Resolver-specific code
+  (parsing helpers, HTML scrapers, etc.) moved into ``resolvers/base.py``.
+- Strategy helpers in ``download.py`` now handle classification validation,
+  resume logic, and corruption heuristics, so custom resolvers no longer need to
+  duplicate that logic.
 
 ## 4. Testing Checklist
 
-1. Run `pytest tests/` to confirm your integration still passes the resolver
-   suite.
-2. If you maintain custom resolvers, verify they are imported so registration
-   occurs.
-3. Review logs for unexpected warnings after the import changes.
+1. Run ``pytest tests/content_download`` to ensure resolver coverage passes.
+2. Verify custom resolvers appear in ``ResolverRegistry.all()`` during
+   application start-up.
+3. Inspect manifests to confirm resolver names and metadata remain unchanged.
 
 ## 5. Support
 
-Reach out in `#docs-to-kg` with stack traces, configuration snippets, and
-resolver names if you encounter migration issues.
+Open a discussion in ``#docs-to-kg`` with resolver names, stack traces, and
+configuration snippets if migration issues arise.
