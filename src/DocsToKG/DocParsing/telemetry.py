@@ -49,6 +49,8 @@ class TelemetrySink:
     """Persistence helper for attempt and manifest telemetry."""
 
     def __init__(self, attempts_path: Path, manifest_path: Path) -> None:
+        """Initialise sink paths and ensure parent directories exist."""
+
         self._attempts_path = attempts_path
         self._manifest_path = manifest_path
         self._attempts_path.parent.mkdir(parents=True, exist_ok=True)
@@ -74,6 +76,8 @@ class TelemetrySink:
 
 
 def _input_bytes(path: Path | str) -> int:
+    """Best-effort size lookup for ``path`` returning zero on failure."""
+
     try:
         return Path(path).stat().st_size
     except (OSError, ValueError):

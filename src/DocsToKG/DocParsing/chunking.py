@@ -1244,6 +1244,8 @@ def coalesce_small_runs(
         return records[idx].n_tok < min_tokens
 
     def merge_without_recount(left: Rec, right: Rec) -> Rec:
+        """Merge two chunk records without recomputing token counts."""
+
         merged = merge_rec(left, right, tokenizer, recount=False)
         changed_ids.add(id(merged))
         return merged

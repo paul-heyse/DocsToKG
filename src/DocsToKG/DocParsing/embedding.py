@@ -311,6 +311,8 @@ try:
     from tqdm import tqdm  # type: ignore
 except Exception:  # pragma: no cover - fallback when tqdm is unavailable
     class _TqdmFallback:
+        """Lightweight iterator wrapper used when tqdm is unavailable."""
+
         def __init__(self, iterable=None, **kwargs):
             self._iterable = iterable
 

@@ -50,6 +50,7 @@ ContentDownload/
 ```
 
 **Changes**:
+
 - Extract each `*Resolver` class into a dedicated module under `resolvers/`
 - Keep shared base classes (`RegisteredResolver`, `ApiResolverBase`) in `resolvers/base.py`
 - Move `ResolverRegistry` to `resolvers/__init__.py` with public exports
@@ -58,6 +59,7 @@ ContentDownload/
 - Retain resolver configuration loading (`load_resolver_config`, `read_resolver_config`) in `pipeline.py`
 
 **Benefits**:
+
 - New resolvers can be added without touching existing implementations
 - Each resolver can be tested in isolation
 - Easier to share common patterns (API polling, rate limiting, retry logic)
@@ -109,6 +111,7 @@ def bootstrap_run_environment(resolved: ResolvedConfig) -> None:
 ```
 
 **Changes**:
+
 - Make `ResolvedConfig` immutable (`@dataclass(frozen=True)`)
 - Remove directory creation from `resolve_config`
 - Remove `args` mutation (e.g., `args.extract_html_text = ...`)
@@ -117,6 +120,7 @@ def bootstrap_run_environment(resolved: ResolvedConfig) -> None:
 - Update `cli.py` to call `bootstrap_run_environment` before `run(resolved)`
 
 **Benefits**:
+
 - Configuration can be tested without filesystem mocks
 - Configuration can be reused across multiple runs
 - Configuration can be serialized/deserialized for distributed execution
@@ -177,6 +181,7 @@ class DownloadRun:
 ```
 
 **Changes**:
+
 - Create `DownloadRun` class in `runner.py`
 - Extract sink wiring into `setup_sinks`
 - Extract resolver pipeline creation into `setup_resolver_pipeline`
@@ -187,6 +192,7 @@ class DownloadRun:
 - Update `cli.py` to instantiate `DownloadRun` and call `.run()`
 
 **Benefits**:
+
 - Each stage can be tested independently
 - Concurrency policies can be adjusted without touching business logic
 - Telemetry backends can be swapped easily
@@ -245,6 +251,7 @@ class XmlDownloadStrategy(DownloadStrategy):
 ```
 
 **Changes**:
+
 - Extract `_build_download_outcome` logic into `build_download_outcome` function
 - Extract resume logic into `handle_resume_logic` function
 - Extract sidecar cleanup into `cleanup_sidecar_files` function
@@ -255,6 +262,7 @@ class XmlDownloadStrategy(DownloadStrategy):
 - Reduce `download_candidate` complexity by delegating to strategies
 
 **Benefits**:
+
 - Each concern can be tested in isolation
 - New artifact types can be added without modifying existing code
 - Extraction flows can be customized per classification
@@ -271,20 +279,24 @@ This change introduces a new capability:
 ### Affected Code
 
 **Modules requiring significant refactoring**:
+
 - `src/DocsToKG/ContentDownload/pipeline.py` (4,710 lines → ~800 lines + 17 resolver modules)
 - `src/DocsToKG/ContentDownload/args.py` (689 lines → ~600 lines, `resolve_config` becomes pure)
 - `src/DocsToKG/ContentDownload/runner.py` (359 lines → ~400 lines with `DownloadRun` class)
 - `src/DocsToKG/ContentDownload/download.py` (1,770 lines → ~1,200 lines + strategy classes)
 
 **New modules**:
+
 - `src/DocsToKG/ContentDownload/resolvers/__init__.py`
 - `src/DocsToKG/ContentDownload/resolvers/base.py`
 - `src/DocsToKG/ContentDownload/resolvers/*.py` (17 resolver modules)
 
 **Breaking changes**:
+
 - None (internal refactoring only, public CLI interface unchanged)
 
 **Compatibility**:
+
 - Existing CLI usage remains unchanged
 - Existing configuration files remain compatible
 - Existing telemetry formats unchanged
@@ -324,18 +336,22 @@ This change introduces a new capability:
 ### Risks and Mitigations
 
 **Risk: Breaking existing integrations**
+
 - *Mitigation*: Maintain backward-compatible public API (CLI, entry points)
 - *Mitigation*: Comprehensive integration test suite before merge
 
 **Risk: Performance regression**
+
 - *Mitigation*: Benchmark critical paths before and after refactoring
 - *Mitigation*: Optimize hot paths identified during profiling
 
 **Risk: Incomplete resolver migration**
+
 - *Mitigation*: Use resolver registry auto-discovery to catch missing resolvers
 - *Mitigation*: Add tests to verify all resolvers are registered
 
 **Risk: Configuration deserialization failures**
+
 - *Mitigation*: Add validation tests for configuration serialization/deserialization
 - *Mitigation*: Document immutable field constraints
 
@@ -350,4 +366,3 @@ This change introduces a new capability:
 7. Integration test coverage >= 85%
 8. Performance within 5% of baseline
 9. Documentation updated to reflect new architecture
-

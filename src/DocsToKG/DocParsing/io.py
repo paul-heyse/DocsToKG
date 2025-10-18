@@ -229,6 +229,8 @@ def _iter_jsonl_records(
     skip_invalid: bool,
     max_errors: int,
 ) -> Iterator[dict]:
+    """Yield JSON-decoded records between optional byte offsets."""
+
     logger = logging.getLogger(__name__)
     errors = 0
     with path.open("rb") as handle:

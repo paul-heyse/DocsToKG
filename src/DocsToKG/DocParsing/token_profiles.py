@@ -232,6 +232,8 @@ def _count_tokens(name: str, texts: Sequence[str]) -> List[int]:
 
 
 def _mean(values: Sequence[int]) -> float:
+    """Return the average of ``values`` or ``0.0`` when empty."""
+
     return sum(values) / len(values) if values else 0.0
 
 

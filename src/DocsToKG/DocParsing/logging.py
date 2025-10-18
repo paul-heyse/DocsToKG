@@ -22,6 +22,8 @@ class StructuredLogger(logging.LoggerAdapter):
     """Logger adapter that enriches structured logs with shared context."""
 
     def __init__(self, logger: logging.Logger, base_fields: Optional[Dict[str, Any]] = None) -> None:
+        """Store underlying logger and initial structured ``base_fields``."""
+
         super().__init__(logger, {})
         self.base_fields: Dict[str, Any] = dict(base_fields or {})
 

@@ -45,6 +45,8 @@ __all__ = [
 
 
 def _coerce_kind(kind: SchemaKind | str) -> SchemaKind:
+    """Normalise raw schema identifiers to ``SchemaKind`` enums."""
+
     if isinstance(kind, SchemaKind):
         return kind
     try:

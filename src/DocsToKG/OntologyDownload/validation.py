@@ -53,6 +53,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 _PROCESS = psutil.Process()
 _VALIDATOR_SEMAPHORE_CACHE: Dict[int, BoundedSemaphore] = {}
+_VALIDATOR_PLUGINS_LOADED = False
 
 
 def _current_memory_mb() -> float:
@@ -80,6 +81,20 @@ def _acquire_validator_slot(config: ResolvedConfig) -> BoundedSemaphore:
 rdflib = get_rdflib()
 pronto = get_pronto()
 owlready2 = get_owlready2()
+
+
+def load_validator_plugins(
+    registry: MutableMapping[str, "ValidatorPlugin"],
+    *,
+    logger: Optional[logging.Logger] = None,
+    reload: bool = False,
+) -> None:
+    """Load validator plugins while tracking module-level load state."""
+
+    global _VALIDATOR_PLUGINS_LOADED
+    should_reload = reload or not _VALIDATOR_PLUGINS_LOADED
+    _plugins.load_validator_plugins(registry, logger=logger, reload=should_reload)
+    _VALIDATOR_PLUGINS_LOADED = True
 
 
 @dataclass(slots=True)
@@ -1050,6 +1065,7 @@ VALIDATORS = {
 
 _plugins.register_plugin_registry("validator", VALIDATORS)
 get_validator_registry()
+_VALIDATOR_PLUGINS_LOADED = True
 
 
 def _run_validator_task(
@@ -1276,14 +1292,15 @@ __all__ = [
     "ValidationResult",
     "ValidationTimeout",
     "ValidatorSubprocessError",
+    "load_validator_plugins",
     "normalize_streaming",
     "run_validators",
     "validate_rdflib",
     "validate_pronto",
     "validate_owlready2",
-   "validate_robot",
-   "validate_arelle",
-   "VALIDATORS",
+    "validate_robot",
+    "validate_arelle",
+    "VALIDATORS",
     "main",
 ]
 

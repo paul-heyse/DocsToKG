@@ -1550,19 +1550,19 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         ValueError: If required configuration (such as auto-detected mode) is invalid.
     """
 
-    if args is None:
-        namespace = pdf_parse_args()
-    elif isinstance(args, argparse.Namespace):
-        namespace = args
-    else:
-        namespace = pdf_parse_args(args)
-
     bootstrap_root = detect_data_root()
     try:
         data_pdfs(bootstrap_root)
         data_doctags(bootstrap_root)
     except Exception:
         pass
+
+    if args is None:
+        namespace = pdf_parse_args()
+    elif isinstance(args, argparse.Namespace):
+        namespace = args
+    else:
+        namespace = pdf_parse_args(args)
 
     profile = getattr(namespace, "profile", None)
     defaults = PROFILE_PRESETS.get(profile or "", {})
@@ -2271,19 +2271,19 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         Process exit code, where ``0`` denotes success.
     """
 
-    if args is None:
-        namespace = html_parse_args()
-    elif isinstance(args, argparse.Namespace):
-        namespace = args
-    else:
-        namespace = html_parse_args(args)
-
     bootstrap_root = detect_data_root()
     try:
         data_html(bootstrap_root)
         data_doctags(bootstrap_root)
     except Exception:
         pass
+
+    if args is None:
+        namespace = html_parse_args()
+    elif isinstance(args, argparse.Namespace):
+        namespace = args
+    else:
+        namespace = html_parse_args(args)
 
     cfg = DoctagsCfg.from_args(namespace, mode="html")
     config_snapshot = cfg.to_manifest()
