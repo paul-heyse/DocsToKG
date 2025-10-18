@@ -5,8 +5,8 @@
 - [x] 1.4 Add `src/DocsToKG/OntologyDownload/exports.py` capturing the public export manifest and have both `api.py` and `__init__.py` derive `PUBLIC_API_MANIFEST`/`__all__`/`__getattr__` wiring from that manifest.
 - [x] 1.5 Replace `_VALIDATOR_PLUGINS_LOADED` in `validation.py` with a loader that uses a module-level `threading.RLock`, defers to `plugins.ensure_plugins_loaded(reload=...)`, and keeps the registry consistent across reloads.
 - [x] 1.6 Implement a cached accessor such as `settings.get_default_config()` backed by `ResolvedConfig.from_defaults()`, add `invalidate_default_config_cache()`, and move all callers (API, planning, IO, validation) to the new helper.
-- [ ] 1.7 Adjust imports, typing exports, and unit/integration tests to respect the new module boundaries (CLI smoke tests, download pipeline tests, validator plugin tests).
-- [ ] 1.8 Update developer documentation or docstrings referencing the old monolithic modules to point at the new structure.
+- [x] 1.7 Adjust imports, typing exports, and unit/integration tests to respect the new module boundaries (CLI smoke tests, download pipeline tests, validator plugin tests).
+- [x] 1.8 Update developer documentation or docstrings referencing the old monolithic modules to point at the new structure.
 
 ## 2. Validation
-- [ ] 2.1 Run targeted unit tests covering CLI, IO, and validation modules plus `direnv exec . openspec validate refactor-ontology-download-architecture --strict`.
+- [x] 2.1 Run targeted unit tests covering CLI, IO, and validation modules plus `direnv exec . openspec validate refactor-ontology-download-architecture --strict`.
