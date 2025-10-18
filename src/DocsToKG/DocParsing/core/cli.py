@@ -5,8 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import Counter, defaultdict, deque
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Sequence
+from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
 
 from DocsToKG.DocParsing.cli_errors import CLIValidationError, format_cli_error
 from DocsToKG.DocParsing.env import (
@@ -17,7 +18,7 @@ from DocsToKG.DocParsing.env import (
     detect_data_root,
 )
 from DocsToKG.DocParsing.io import iter_manifest_entries
-from DocsToKG.DocParsing.logging import get_logger, log_event, summarize_manifest
+from DocsToKG.DocParsing.logging import get_logger, log_event
 
 from .cli_utils import (
     HTML_SUFFIXES,
@@ -347,8 +348,33 @@ def manifest(argv: Sequence[str] | None = None) -> int:
 
     logger = get_logger(__name__, base_fields={"stage": "manifest"})
 
-    entries = list(iter_manifest_entries(stages, args.data_root))
-    if not entries:
+    tail_count = max(0, int(args.tail))
+    need_summary = bool(args.summarize or not tail_count)
+    tail_entries: Deque[Dict[str, Any]] = deque(maxlen=tail_count or None)
+    status_counter: Optional[Dict[str, Counter]] = None
+    duration_totals: Optional[Dict[str, float]] = None
+    total_entries: Optional[Dict[str, int]] = None
+    if need_summary:
+        status_counter = defaultdict(Counter)
+        duration_totals = defaultdict(float)
+        total_entries = defaultdict(int)
+
+    entry_found = False
+    for entry in iter_manifest_entries(stages, args.data_root):
+        entry_found = True
+        if tail_count:
+            tail_entries.append(entry)
+        if need_summary and total_entries is not None and status_counter is not None and duration_totals is not None:
+            stage = entry.get("stage", "unknown")
+            status = entry.get("status", "unknown")
+            total_entries[stage] += 1
+            status_counter[stage][status] += 1
+            try:
+                duration_totals[stage] += float(entry.get("duration_s", 0.0))
+            except (TypeError, ValueError):
+                continue
+
+    if not entry_found:
         log_event(
             logger,
             "warning",
@@ -362,16 +388,14 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         print("No manifest entries found for the requested stages.")
         return 0
 
-    tail_count = max(0, int(args.tail))
-    tail_entries = entries[-tail_count:] if tail_count else []
-
     if tail_count:
-        print(f"docparse manifest tail (last {len(tail_entries)} entries)")
+        entries_to_print = list(tail_entries)
+        print(f"docparse manifest tail (last {len(entries_to_print)} entries)")
         if args.raw:
-            for entry in tail_entries:
+            for entry in entries_to_print:
                 print(json.dumps(entry, ensure_ascii=False))
         else:
-            for entry in tail_entries:
+            for entry in entries_to_print:
                 timestamp = entry.get("timestamp", "")
                 stage = entry.get("stage", "unknown")
                 doc_id = entry.get("doc_id", "unknown")
@@ -385,8 +409,15 @@ def manifest(argv: Sequence[str] | None = None) -> int:
                     line += f" error={error}"
                 print(line)
 
-    if args.summarize or not tail_count:
-        summary = summarize_manifest(entries)
+    if need_summary and total_entries is not None and status_counter is not None and duration_totals is not None:
+        summary = {
+            stage: {
+                "total": total_entries[stage],
+                "statuses": dict(status_counter[stage]),
+                "duration_s": round(duration_totals[stage], 3),
+            }
+            for stage in total_entries
+        }
         print("\nManifest summary")
         for stage in sorted(summary):
             data = summary[stage]
