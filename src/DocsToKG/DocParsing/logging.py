@@ -8,6 +8,8 @@ record structured manifest entries. By isolating the functionality here we keep
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import logging
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -137,7 +139,8 @@ def manifest_log_skip(
 ) -> None:
     """Record a manifest entry indicating the pipeline skipped work."""
 
-    if _STAGE_TELEMETRY is not None:
+    telemetry = _STAGE_TELEMETRY_VAR.get()
+    if telemetry is not None:
         metadata: Dict[str, Any] = {
             "stage": stage,
             "status": "skip",
@@ -150,7 +153,7 @@ def manifest_log_skip(
         }
         metadata.update(extra)
         reason = metadata.get("reason")
-        _STAGE_TELEMETRY.log_skip(
+        telemetry.log_skip(
             doc_id=doc_id,
             input_path=input_path,
             reason=str(reason) if reason is not None else None,
@@ -187,7 +190,8 @@ def manifest_log_success(
 ) -> None:
     """Record a manifest entry marking successful pipeline output."""
 
-    if _STAGE_TELEMETRY is not None:
+    telemetry = _STAGE_TELEMETRY_VAR.get()
+    if telemetry is not None:
         metadata: Dict[str, Any] = {
             "stage": stage,
             "status": "success",
@@ -205,7 +209,7 @@ def manifest_log_success(
             if isinstance(value, int):
                 tokens = value
                 break
-        _STAGE_TELEMETRY.log_success(
+        telemetry.log_success(
             doc_id=doc_id,
             input_path=input_path,
             output_path=output_path,
@@ -246,7 +250,8 @@ def manifest_log_failure(
 ) -> None:
     """Record a manifest entry describing a failed pipeline attempt."""
 
-    if _STAGE_TELEMETRY is not None:
+    telemetry = _STAGE_TELEMETRY_VAR.get()
+    if telemetry is not None:
         metadata: Dict[str, Any] = {
             "stage": stage,
             "status": "failure",
@@ -259,7 +264,7 @@ def manifest_log_failure(
             "error": error,
         }
         metadata.update(extra)
-        _STAGE_TELEMETRY.log_failure(
+        telemetry.log_failure(
             doc_id=doc_id,
             input_path=input_path,
             duration_s=duration_s,
@@ -319,15 +324,28 @@ __all__ = [
     "manifest_log_skip",
     "manifest_log_success",
     "set_stage_telemetry",
+    "telemetry_scope",
     "summarize_manifest",
 ]
 
 
-_STAGE_TELEMETRY: Optional[StageTelemetry] = None
+_STAGE_TELEMETRY_VAR: contextvars.ContextVar[Optional[StageTelemetry]] = (
+    contextvars.ContextVar("docparse_stage_telemetry", default=None)
+)
 
 
 def set_stage_telemetry(stage_telemetry: Optional[StageTelemetry]) -> None:
     """Register ``stage_telemetry`` for manifest logging helpers."""
 
-    global _STAGE_TELEMETRY
-    _STAGE_TELEMETRY = stage_telemetry
+    _STAGE_TELEMETRY_VAR.set(stage_telemetry)
+
+
+@contextlib.contextmanager
+def telemetry_scope(stage_telemetry: Optional[StageTelemetry]):
+    """Context manager that temporarily installs ``stage_telemetry``."""
+
+    token = _STAGE_TELEMETRY_VAR.set(stage_telemetry)
+    try:
+        yield stage_telemetry
+    finally:
+        _STAGE_TELEMETRY_VAR.reset(token)

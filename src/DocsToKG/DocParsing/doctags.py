@@ -338,7 +338,7 @@ from DocsToKG.DocParsing.logging import (
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
-    set_stage_telemetry,
+    telemetry_scope,
 )
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
@@ -1653,255 +1653,254 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         resolve_manifest_path(MANIFEST_STAGE, resolved_root),
     )
     stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=MANIFEST_STAGE)
-    set_stage_telemetry(stage_telemetry)
-
-    manifest_log_success(
-        stage=MANIFEST_STAGE,
-        doc_id="__config__",
-        duration_s=0.0,
-        schema_version="docparse/1.1.0",
-        input_path=input_dir,
-        input_hash="",
-        output_path=output_dir,
-        config=config_snapshot,
-    )
-
-    logger.info(
-        "I/O configuration",
-        extra={
-            "extra_fields": {
-                "data_root": str(resolved_root),
-                "input_dir": str(input_dir),
-                "output_dir": str(output_dir),
-                "artifacts_cache": ARTIFACTS or "",
-                "model_path": model_path,
-                "served_models": list(served_model_names),
-                "gpu_memory_utilization": gpu_memory_utilization,
-                "vllm_version": vllm_version,
-                "vllm_wait_timeout": int(cfg.vllm_wait_timeout),
-                "port": int(cfg.port),
-                "profile": profile,
-                "http_timeout": [float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
-            }
-        },
-    )
-
-    if cfg.force:
-        logger.info("Force mode: reprocessing all documents")
-    elif cfg.resume:
-        logger.info("Resume mode enabled: unchanged outputs will be skipped")
-
-    preflight_start = time.perf_counter()
-    port, proc, owns = ensure_vllm(
-        int(cfg.port),
-        model_path,
-        served_model_names,
-        gpu_memory_utilization,
-        wait_timeout_s=int(cfg.vllm_wait_timeout),
-        http_timeout=cfg.http_timeout,
-    )
-    metrics_healthy, metrics_status = probe_metrics(port, timeout=cfg.http_timeout)
-    manifest_log_success(
-        stage=MANIFEST_STAGE,
-        doc_id="__service__",
-        duration_s=round(time.perf_counter() - preflight_start, 3),
-        schema_version="docparse/1.1.0",
-        input_path=model_path,
-        input_hash="",
-        output_path=output_dir,
-        served_models=list(served_model_names),
-        vllm_version=vllm_version,
-        port=port,
-        owns_process=owns,
-        metrics_healthy=metrics_healthy,
-        metrics_status_code=metrics_status,
-        http_timeout=[float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
-    )
-    logger.info(
-        "vLLM server ready",
-        extra={
-            "extra_fields": {
-                "port": port,
-                "owns_process": owns,
-                "http_timeout": [float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
-            }
-        },
-    )
-
-    try:
-        pdfs = list_pdfs(input_dir)
-        if not pdfs:
-            log_event(
-                logger,
-                "warning",
-                "No PDFs found",
-                stage=MANIFEST_STAGE,
-                doc_id="__aggregate__",
-                input_hash=None,
-                error_code="NO_INPUT_FILES",
-                input_dir=str(input_dir),
-            )
-            return 0
-
-        manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
-        resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
-
-        workers = max(1, int(cfg.workers))
+    with telemetry_scope(stage_telemetry):
+        
+        manifest_log_success(
+            stage=MANIFEST_STAGE,
+            doc_id="__config__",
+            duration_s=0.0,
+            schema_version="docparse/1.1.0",
+            input_path=input_dir,
+            input_hash="",
+            output_path=output_dir,
+            config=config_snapshot,
+        )
+        
         logger.info(
-            "Launching workers",
+            "I/O configuration",
             extra={
                 "extra_fields": {
-                    "pdf_count": len(pdfs),
-                    "workers": workers,
+                    "data_root": str(resolved_root),
+                    "input_dir": str(input_dir),
+                    "output_dir": str(output_dir),
+                    "artifacts_cache": ARTIFACTS or "",
+                    "model_path": model_path,
+                    "served_models": list(served_model_names),
+                    "gpu_memory_utilization": gpu_memory_utilization,
+                    "vllm_version": vllm_version,
+                    "vllm_wait_timeout": int(cfg.vllm_wait_timeout),
+                    "port": int(cfg.port),
+                    "profile": profile,
+                    "http_timeout": [float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
                 }
             },
         )
-
-        tasks: List[PdfTask] = []
-        ok = fail = skip = 0
-        for pdf_path in pdfs:
-            doc_id, out_path = derive_doc_id_and_doctags_path(pdf_path, input_dir, output_dir)
-            input_hash = compute_content_hash(pdf_path)
-            skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
-            if skip_doc:
+        
+        if cfg.force:
+            logger.info("Force mode: reprocessing all documents")
+        elif cfg.resume:
+            logger.info("Resume mode enabled: unchanged outputs will be skipped")
+        
+        preflight_start = time.perf_counter()
+        port, proc, owns = ensure_vllm(
+            int(cfg.port),
+            model_path,
+            served_model_names,
+            gpu_memory_utilization,
+            wait_timeout_s=int(cfg.vllm_wait_timeout),
+            http_timeout=cfg.http_timeout,
+        )
+        metrics_healthy, metrics_status = probe_metrics(port, timeout=cfg.http_timeout)
+        manifest_log_success(
+            stage=MANIFEST_STAGE,
+            doc_id="__service__",
+            duration_s=round(time.perf_counter() - preflight_start, 3),
+            schema_version="docparse/1.1.0",
+            input_path=model_path,
+            input_hash="",
+            output_path=output_dir,
+            served_models=list(served_model_names),
+            vllm_version=vllm_version,
+            port=port,
+            owns_process=owns,
+            metrics_healthy=metrics_healthy,
+            metrics_status_code=metrics_status,
+            http_timeout=[float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
+        )
+        logger.info(
+            "vLLM server ready",
+            extra={
+                "extra_fields": {
+                    "port": port,
+                    "owns_process": owns,
+                    "http_timeout": [float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
+                }
+            },
+        )
+        
+        try:
+            pdfs = list_pdfs(input_dir)
+            if not pdfs:
+                log_event(
+                    logger,
+                    "warning",
+                    "No PDFs found",
+                    stage=MANIFEST_STAGE,
+                    doc_id="__aggregate__",
+                    input_hash=None,
+                    error_code="NO_INPUT_FILES",
+                    input_dir=str(input_dir),
+                )
+                return 0
+        
+            manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
+            resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
+        
+            workers = max(1, int(cfg.workers))
+            logger.info(
+                "Launching workers",
+                extra={
+                    "extra_fields": {
+                        "pdf_count": len(pdfs),
+                        "workers": workers,
+                    }
+                },
+            )
+        
+            tasks: List[PdfTask] = []
+            ok = fail = skip = 0
+            for pdf_path in pdfs:
+                doc_id, out_path = derive_doc_id_and_doctags_path(pdf_path, input_dir, output_dir)
+                input_hash = compute_content_hash(pdf_path)
+                skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+                if skip_doc:
+                    logger.info(
+                        "Skipping document: output exists and input unchanged",
+                        extra={
+                            "extra_fields": {
+                                "doc_id": doc_id,
+                                "output_path": str(out_path),
+                            }
+                        },
+                    )
+                    manifest_log_skip(
+                        stage=MANIFEST_STAGE,
+                        doc_id=doc_id,
+                        input_path=pdf_path,
+                        input_hash=input_hash,
+                        output_path=out_path,
+                        schema_version="docparse/1.1.0",
+                        parse_engine="docling-vlm",
+                        model_name=inference_model,
+                        served_models=list(served_model_names),
+                        vllm_version=vllm_version,
+                    )
+                    skip += 1
+                    continue
+        
+                tasks.append(
+                    PdfTask(
+                        pdf_path=pdf_path,
+                        output_dir=output_dir,
+                        port=port,
+                        input_hash=input_hash,
+                        doc_id=doc_id,
+                        output_path=out_path,
+                        served_model_names=served_model_names,
+                        inference_model=inference_model,
+                        vlm_prompt=str(args.vlm_prompt),
+                        vlm_stop=tuple(args.vlm_stop or []),
+                    )
+                )
+        
+            if not tasks:
                 logger.info(
-                    "Skipping document: output exists and input unchanged",
+                    "Conversion summary",
                     extra={
                         "extra_fields": {
-                            "doc_id": doc_id,
-                            "output_path": str(out_path),
+                            "ok": 0,
+                            "skip": skip,
+                            "fail": 0,
                         }
                     },
                 )
-                manifest_log_skip(
-                    stage=MANIFEST_STAGE,
-                    doc_id=doc_id,
-                    input_path=pdf_path,
-                    input_hash=input_hash,
-                    output_path=out_path,
-                    schema_version="docparse/1.1.0",
-                    parse_engine="docling-vlm",
-                    model_name=inference_model,
-                    served_models=list(served_model_names),
-                    vllm_version=vllm_version,
-                )
-                skip += 1
-                continue
-
-            tasks.append(
-                PdfTask(
-                    pdf_path=pdf_path,
-                    output_dir=output_dir,
-                    port=port,
-                    input_hash=input_hash,
-                    doc_id=doc_id,
-                    output_path=out_path,
-                    served_model_names=served_model_names,
-                    inference_model=inference_model,
-                    vlm_prompt=str(args.vlm_prompt),
-                    vlm_stop=tuple(args.vlm_stop or []),
-                )
-            )
-
-        if not tasks:
+                return 0
+        
+            with ProcessPoolExecutor(max_workers=workers) as ex:
+                future_map = {ex.submit(pdf_convert_one, task): task for task in tasks}
+                with tqdm(total=len(future_map), desc="Converting PDFs", unit="file") as pbar:
+                    for fut in as_completed(future_map):
+                        task = future_map[fut]
+                        raw_result = fut.result()
+                        result = normalize_conversion_result(raw_result, task)
+                        if result.status == "success":
+                            ok += 1
+                        elif result.status == "skip":
+                            skip += 1
+                        else:
+                            fail += 1
+                            log_event(
+                                logger,
+                                "error",
+                                "Conversion failed",
+                                stage=MANIFEST_STAGE,
+                                doc_id=result.doc_id,
+                                input_hash=result.input_hash,
+                                error_code="PDF_CONVERSION_FAILED",
+                                error=result.error or "unknown",
+                            )
+        
+                        duration = round(result.duration_s, 3)
+                        common_extra = {
+                            "parse_engine": "docling-vlm",
+                            "model_name": task.inference_model,
+                            "served_models": list(task.served_model_names),
+                            "vllm_version": vllm_version,
+                        }
+                        if result.status == "success":
+                            manifest_log_success(
+                                stage=MANIFEST_STAGE,
+                                doc_id=result.doc_id,
+                                duration_s=duration,
+                                schema_version="docparse/1.1.0",
+                                input_path=result.input_path,
+                                input_hash=result.input_hash,
+                                output_path=result.output_path,
+                                **common_extra,
+                            )
+                        elif result.status == "skip":
+                            manifest_log_skip(
+                                stage=MANIFEST_STAGE,
+                                doc_id=result.doc_id,
+                                input_path=result.input_path,
+                                input_hash=result.input_hash,
+                                output_path=result.output_path,
+                                schema_version="docparse/1.1.0",
+                                duration_s=duration,
+                                **common_extra,
+                            )
+                        else:
+                            manifest_log_failure(
+                                stage=MANIFEST_STAGE,
+                                doc_id=result.doc_id,
+                                duration_s=duration,
+                                schema_version="docparse/1.1.0",
+                                input_path=result.input_path,
+                                input_hash=result.input_hash,
+                                output_path=result.output_path,
+                                error=result.error or "unknown",
+                                **common_extra,
+                            )
+        
+                        pbar.update(1)
+        
             logger.info(
                 "Conversion summary",
                 extra={
                     "extra_fields": {
-                        "ok": 0,
+                        "ok": ok,
                         "skip": skip,
-                        "fail": 0,
+                        "fail": fail,
                     }
                 },
             )
-            return 0
-
-        with ProcessPoolExecutor(max_workers=workers) as ex:
-            future_map = {ex.submit(pdf_convert_one, task): task for task in tasks}
-            with tqdm(total=len(future_map), desc="Converting PDFs", unit="file") as pbar:
-                for fut in as_completed(future_map):
-                    task = future_map[fut]
-                    raw_result = fut.result()
-                    result = normalize_conversion_result(raw_result, task)
-                    if result.status == "success":
-                        ok += 1
-                    elif result.status == "skip":
-                        skip += 1
-                    else:
-                        fail += 1
-                        log_event(
-                            logger,
-                            "error",
-                            "Conversion failed",
-                            stage=MANIFEST_STAGE,
-                            doc_id=result.doc_id,
-                            input_hash=result.input_hash,
-                            error_code="PDF_CONVERSION_FAILED",
-                            error=result.error or "unknown",
-                        )
-
-                    duration = round(result.duration_s, 3)
-                    common_extra = {
-                        "parse_engine": "docling-vlm",
-                        "model_name": task.inference_model,
-                        "served_models": list(task.served_model_names),
-                        "vllm_version": vllm_version,
-                    }
-                    if result.status == "success":
-                        manifest_log_success(
-                            stage=MANIFEST_STAGE,
-                            doc_id=result.doc_id,
-                            duration_s=duration,
-                            schema_version="docparse/1.1.0",
-                            input_path=result.input_path,
-                            input_hash=result.input_hash,
-                            output_path=result.output_path,
-                            **common_extra,
-                        )
-                    elif result.status == "skip":
-                        manifest_log_skip(
-                            stage=MANIFEST_STAGE,
-                            doc_id=result.doc_id,
-                            input_path=result.input_path,
-                            input_hash=result.input_hash,
-                            output_path=result.output_path,
-                            schema_version="docparse/1.1.0",
-                            duration_s=duration,
-                            **common_extra,
-                        )
-                    else:
-                        manifest_log_failure(
-                            stage=MANIFEST_STAGE,
-                            doc_id=result.doc_id,
-                            duration_s=duration,
-                            schema_version="docparse/1.1.0",
-                            input_path=result.input_path,
-                            input_hash=result.input_hash,
-                            output_path=result.output_path,
-                            error=result.error or "unknown",
-                            **common_extra,
-                        )
-
-                    pbar.update(1)
-
-        logger.info(
-            "Conversion summary",
-            extra={
-                "extra_fields": {
-                    "ok": ok,
-                    "skip": skip,
-                    "fail": fail,
-                }
-            },
-        )
-    finally:
-        stop_vllm(proc, owns, grace=10)
-        logger.info("All done")
-        set_stage_telemetry(None)
-
-    return 0
-
-
+        finally:
+            stop_vllm(proc, owns, grace=10)
+            logger.info("All done")
+        
+        return 0
+        
+        
 # --- HTML Pipeline ---
 
 HTML_MANIFEST_STAGE = "doctags-html"
@@ -2364,176 +2363,173 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         resolve_manifest_path(HTML_MANIFEST_STAGE, resolved_root),
     )
     stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=HTML_MANIFEST_STAGE)
-    set_stage_telemetry(stage_telemetry)
-
-    manifest_log_success(
-        stage=HTML_MANIFEST_STAGE,
-        doc_id="__config__",
-        duration_s=0.0,
-        schema_version="docparse/1.1.0",
-        input_path=input_dir,
-        input_hash="",
-        output_path=output_dir,
-        config=config_snapshot,
-    )
-
-    if cfg.force:
-        logger.info(
-            "Force mode: reprocessing all documents",
-            extra={"extra_fields": {"mode": "force"}},
-        )
-    elif cfg.resume:
-        logger.info(
-            "Resume mode enabled: unchanged outputs will be skipped",
-            extra={"extra_fields": {"mode": "resume"}},
-        )
-
-    files = list_htmls(input_dir)
-    if not files:
-        log_event(
-            logger,
-            "warning",
-            "No HTML files found",
+    with telemetry_scope(stage_telemetry):
+        
+        manifest_log_success(
             stage=HTML_MANIFEST_STAGE,
-            doc_id="__aggregate__",
-            input_hash=None,
-            error_code="NO_INPUT_FILES",
-            input_dir=str(input_dir),
+            doc_id="__config__",
+            duration_s=0.0,
+            schema_version="docparse/1.1.0",
+            input_path=input_dir,
+            input_hash="",
+            output_path=output_dir,
+            config=config_snapshot,
         )
-        set_stage_telemetry(None)
-        return 0
-
-    manifest_index = load_manifest_index(HTML_MANIFEST_STAGE, resolved_root) if cfg.resume else {}
-    resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
-
-    tasks: List[HtmlTask] = []
-    ok = fail = skip = 0
-    for path in files:
-        rel_path = path.relative_to(input_dir)
-        doc_id = rel_path.as_posix()
-        out_path = (output_dir / rel_path).with_suffix(".doctags")
-        input_hash = compute_content_hash(path)
-        skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
-        if skip_doc and not cfg.overwrite:
+        
+        if cfg.force:
+            logger.info(
+                "Force mode: reprocessing all documents",
+                extra={"extra_fields": {"mode": "force"}},
+            )
+        elif cfg.resume:
+            logger.info(
+                "Resume mode enabled: unchanged outputs will be skipped",
+                extra={"extra_fields": {"mode": "resume"}},
+            )
+        
+        files = list_htmls(input_dir)
+        if not files:
             log_event(
                 logger,
-                "info",
-                "Skipping HTML document",
+                "warning",
+                "No HTML files found",
                 stage=HTML_MANIFEST_STAGE,
-                doc_id=doc_id,
-                input_hash=input_hash,
-                output_path=str(out_path),
+                doc_id="__aggregate__",
+                input_hash=None,
+                error_code="NO_INPUT_FILES",
+                input_dir=str(input_dir),
             )
-            manifest_log_skip(
-                stage=HTML_MANIFEST_STAGE,
-                doc_id=doc_id,
-                input_path=path,
-                input_hash=input_hash,
-                output_path=out_path,
-                schema_version="docparse/1.1.0",
-                parse_engine="docling-html",
-                html_sanitizer=cfg.html_sanitizer,
+            return 0
+        
+        manifest_index = load_manifest_index(HTML_MANIFEST_STAGE, resolved_root) if cfg.resume else {}
+        resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
+        
+        tasks: List[HtmlTask] = []
+        ok = fail = skip = 0
+        for path in files:
+            rel_path = path.relative_to(input_dir)
+            doc_id = rel_path.as_posix()
+            out_path = (output_dir / rel_path).with_suffix(".doctags")
+            input_hash = compute_content_hash(path)
+            skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+            if skip_doc and not cfg.overwrite:
+                log_event(
+                    logger,
+                    "info",
+                    "Skipping HTML document",
+                    stage=HTML_MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    input_hash=input_hash,
+                    output_path=str(out_path),
+                )
+                manifest_log_skip(
+                    stage=HTML_MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    input_path=path,
+                    input_hash=input_hash,
+                    output_path=out_path,
+                    schema_version="docparse/1.1.0",
+                    parse_engine="docling-html",
+                    html_sanitizer=cfg.html_sanitizer,
+                )
+                skip += 1
+                continue
+            tasks.append(
+                HtmlTask(
+                    html_path=path,
+                    relative_id=doc_id,
+                    output_path=out_path,
+                    input_hash=input_hash,
+                    overwrite=cfg.overwrite,
+                    sanitizer_profile=cfg.html_sanitizer,
+                )
             )
-            skip += 1
-            continue
-        tasks.append(
-            HtmlTask(
-                html_path=path,
-                relative_id=doc_id,
-                output_path=out_path,
-                input_hash=input_hash,
-                overwrite=cfg.overwrite,
-                sanitizer_profile=cfg.html_sanitizer,
+        
+        if not tasks:
+            logger.info(
+                "HTML conversion summary",
+                extra={
+                    "extra_fields": {
+                        "ok": 0,
+                        "skip": skip,
+                        "fail": 0,
+                    }
+                },
             )
-        )
-
-    if not tasks:
+            return 0
+        
+        with ProcessPoolExecutor(max_workers=cfg.workers) as ex:
+            futures = [ex.submit(html_convert_one, task) for task in tasks]
+            for fut in tqdm(
+                as_completed(futures), total=len(futures), unit="file", desc="HTML → DocTags"
+            ):
+                result = fut.result()
+                duration = round(result.duration_s, 3)
+                if result.status == "success":
+                    ok += 1
+                    manifest_log_success(
+                        stage=HTML_MANIFEST_STAGE,
+                        doc_id=result.doc_id,
+                        duration_s=duration,
+                        schema_version="docparse/1.1.0",
+                        input_path=result.input_path,
+                        input_hash=result.input_hash,
+                        output_path=result.output_path,
+                        parse_engine="docling-html",
+                        html_sanitizer=result.sanitizer_profile,
+                    )
+                elif result.status == "skip":
+                    skip += 1
+                    manifest_log_skip(
+                        stage=HTML_MANIFEST_STAGE,
+                        doc_id=result.doc_id,
+                        input_path=result.input_path,
+                        input_hash=result.input_hash,
+                        output_path=result.output_path,
+                        schema_version="docparse/1.1.0",
+                        duration_s=duration,
+                        parse_engine="docling-html",
+                        html_sanitizer=result.sanitizer_profile,
+                    )
+                else:
+                    fail += 1
+                    log_event(
+                        logger,
+                        "error",
+                        "HTML conversion failure",
+                        stage=HTML_MANIFEST_STAGE,
+                        doc_id=result.doc_id,
+                        input_hash=result.input_hash,
+                        error_code="HTML_CONVERSION_FAILED",
+                        error=result.error or "conversion failed",
+                    )
+                    manifest_log_failure(
+                        stage=HTML_MANIFEST_STAGE,
+                        doc_id=result.doc_id,
+                        duration_s=duration,
+                        schema_version="docparse/1.1.0",
+                        input_path=result.input_path,
+                        input_hash=result.input_hash,
+                        output_path=result.output_path,
+                        error=result.error or "conversion failed",
+                        parse_engine="docling-html",
+                        html_sanitizer=result.sanitizer_profile,
+                    )
+        
         logger.info(
             "HTML conversion summary",
             extra={
                 "extra_fields": {
-                    "ok": 0,
+                    "ok": ok,
                     "skip": skip,
-                    "fail": 0,
+                    "fail": fail,
                 }
             },
         )
-        set_stage_telemetry(None)
+        
         return 0
-
-    with ProcessPoolExecutor(max_workers=cfg.workers) as ex:
-        futures = [ex.submit(html_convert_one, task) for task in tasks]
-        for fut in tqdm(
-            as_completed(futures), total=len(futures), unit="file", desc="HTML → DocTags"
-        ):
-            result = fut.result()
-            duration = round(result.duration_s, 3)
-            if result.status == "success":
-                ok += 1
-                manifest_log_success(
-                    stage=HTML_MANIFEST_STAGE,
-                    doc_id=result.doc_id,
-                    duration_s=duration,
-                    schema_version="docparse/1.1.0",
-                    input_path=result.input_path,
-                    input_hash=result.input_hash,
-                    output_path=result.output_path,
-                    parse_engine="docling-html",
-                    html_sanitizer=result.sanitizer_profile,
-                )
-            elif result.status == "skip":
-                skip += 1
-                manifest_log_skip(
-                    stage=HTML_MANIFEST_STAGE,
-                    doc_id=result.doc_id,
-                    input_path=result.input_path,
-                    input_hash=result.input_hash,
-                    output_path=result.output_path,
-                    schema_version="docparse/1.1.0",
-                    duration_s=duration,
-                    parse_engine="docling-html",
-                    html_sanitizer=result.sanitizer_profile,
-                )
-            else:
-                fail += 1
-                log_event(
-                    logger,
-                    "error",
-                    "HTML conversion failure",
-                    stage=HTML_MANIFEST_STAGE,
-                    doc_id=result.doc_id,
-                    input_hash=result.input_hash,
-                    error_code="HTML_CONVERSION_FAILED",
-                    error=result.error or "conversion failed",
-                )
-                manifest_log_failure(
-                    stage=HTML_MANIFEST_STAGE,
-                    doc_id=result.doc_id,
-                    duration_s=duration,
-                    schema_version="docparse/1.1.0",
-                    input_path=result.input_path,
-                    input_hash=result.input_hash,
-                    output_path=result.output_path,
-                    error=result.error or "conversion failed",
-                    parse_engine="docling-html",
-                    html_sanitizer=result.sanitizer_profile,
-                )
-
-    logger.info(
-        "HTML conversion summary",
-        extra={
-            "extra_fields": {
-                "ok": ok,
-                "skip": skip,
-                "fail": fail,
-            }
-        },
-    )
-
-    set_stage_telemetry(None)
-    return 0
-
-
+        
+        
 # --- Docling Test Stubs ---
 
 _DOCLING_STUB_INSTALLED = False
