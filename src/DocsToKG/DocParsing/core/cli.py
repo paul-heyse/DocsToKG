@@ -410,6 +410,8 @@ def manifest(argv: Sequence[str] | None = None) -> int:
                 discovered.append(stage)
 
     allowed_stage_set = set(known_stage_set).union(discovered)
+    canonical_list = ", ".join(sorted(known_stage_set))
+    discovered_list = ", ".join(sorted(discovered)) or "none"
 
     if args.stages:
         seen: List[str] = []
@@ -419,7 +421,7 @@ def manifest(argv: Sequence[str] | None = None) -> int:
                 continue
             normalized = trimmed.lower()
             resolved = STAGE_ALIASES.get(normalized, (normalized,))
-            invalid = [stage for stage in resolved if stage not in known_stage_set]
+            invalid = [stage for stage in resolved if stage not in allowed_stage_set]
             if invalid:
                 expected = ", ".join(_expected_stage_choices)
                 raise CLIValidationError(
