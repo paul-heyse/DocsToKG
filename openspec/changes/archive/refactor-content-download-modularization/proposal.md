@@ -8,7 +8,7 @@ The `ContentDownload` module currently suffers from significant architectural de
 
 2. **Configuration side-effects**: The `resolve_config` function in `args.py` mutates the parsed argument namespace, writes directories to disk, and pulls credentials from the environment—all within a single pass. This tight coupling prevents lightweight unit testing and makes configuration reuse difficult for alternative entry points (notebooks, programmatic APIs, batch jobs).
 
-3. **Runner loop coupling**: The `run` function in `runner.py` coordinates sink setup, manifest rotation, OpenAlex pagination, resolver metrics, worker pools, and budget enforcement within a single 359-line function. Operational concerns are tightly coupled with business logic, making it difficult to adjust concurrency policies, swap telemetry backends, or test individual stages independently.
+3. **Runner loop coupling**: The `run` function in `runner.py` coordinates sink setup, manifest rotation, OpenAlex pagination, resolver metrics, and worker pools within a single 359-line function. Operational concerns are tightly coupled with business logic, making it difficult to adjust concurrency policies, swap telemetry backends, or test individual stages independently.
 
 4. **Download processing complexity**: The `download.py` module contains very large helper functions (1,770 lines total) that combine classification validation, resume handling, sidecar cleanup, and manifest logging. This increases the cognitive load for contributors and raises the risk of regressions when introducing new artifact types (XML, DOCX) or extraction flows (OCR, semantic parsing).
 
@@ -89,8 +89,6 @@ class ResolvedConfig:
     previous_url_index: Dict[str, Dict[str, Any]]
     persistent_seen_urls: Set[str]
     robots_checker: Optional[RobotsCache]
-    budget_requests: Optional[int]
-    budget_bytes: Optional[int]
     concurrency_product: int
 
 
@@ -128,7 +126,7 @@ def bootstrap_run_environment(resolved: ResolvedConfig) -> None:
 
 ### 3. Refactor Runner Loop into Composable Stages
 
-**Current state**: The `run` function in `runner.py` coordinates sink setup, manifest rotation, OpenAlex pagination, resolver metrics, worker pools, and budget enforcement in a single 359-line function.
+**Current state**: The `run` function in `runner.py` coordinates sink setup, manifest rotation, OpenAlex pagination, resolver metrics, and worker pools in a single 359-line function.
 
 **Target state**: Decompose into dedicated helpers and a `DownloadRun` class:
 
@@ -168,10 +166,6 @@ class DownloadRun:
         """Process a single work item through the pipeline."""
         ...
 
-    def check_budget_limits(self) -> bool:
-        """Evaluate budget constraints and determine if run should stop."""
-        ...
-
     def run(self) -> RunResult:
         """Execute the download pipeline."""
         self.telemetry = self.setup_sinks()
@@ -187,7 +181,6 @@ class DownloadRun:
 - Extract resolver pipeline creation into `setup_resolver_pipeline`
 - Extract OpenAlex provider creation into `setup_work_provider`
 - Extract worker pool management into `setup_worker_pool`
-- Extract budget enforcement into `check_budget_limits`
 - Keep main orchestration in `DownloadRun.run()`
 - Update `cli.py` to instantiate `DownloadRun` and call `.run()`
 
@@ -196,7 +189,6 @@ class DownloadRun:
 - Each stage can be tested independently
 - Concurrency policies can be adjusted without touching business logic
 - Telemetry backends can be swapped easily
-- Budget enforcement can be customized per deployment
 
 ### 4. Decompose Download Processing into Smaller, Testable Units
 

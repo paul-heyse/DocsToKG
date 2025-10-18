@@ -148,12 +148,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Sleep seconds between works (sequential mode).",
     )
     parser.add_argument(
-        "--max-bytes",
-        type=int,
-        default=None,
-        help="Maximum bytes to download per request before aborting (default: unlimited).",
-    )
-    parser.add_argument(
         "--ignore-robots",
         action="store_true",
         help="Bypass robots.txt checks (defaults to respecting policies).",
@@ -371,8 +365,6 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         parser.error("--max-concurrent-per-host must be >= 0")
     if not args.topic and not args.topic_id:
         parser.error("Provide --topic or --topic-id.")
-    if args.max_bytes is not None and args.max_bytes <= 0:
-        parser.error("--max-bytes must be a positive integer")
     for field_name in ("sniff_bytes", "min_pdf_bytes", "tail_check_bytes"):
         value = getattr(args, field_name, None)
         if value is not None and value < 0:

@@ -55,20 +55,20 @@
 - [x] 3.6 Implement `setup_download_state(self, session_factory, robots_cache) -> DownloadState` method
 - [x] 3.7 Implement `setup_worker_pool(self) -> ThreadPoolExecutor` method
 - [x] 3.8 Implement `process_work_item(self, work, options) -> ProcessResult` method
-- [x] 3.9 Implement `check_budget_limits(self) -> bool` method
+- [x] 3.9 Remove legacy stop-limit helper from `DownloadRun`
 - [x] 3.10 Implement `DownloadRun.run(self) -> RunResult` orchestration method
 - [x] 3.11 Migrate sink wiring logic from `run()` to `setup_sinks()`
 - [x] 3.12 Migrate resolver pipeline creation from `run()` to `setup_resolver_pipeline()`
 - [x] 3.13 Migrate OpenAlex provider creation from `run()` to `setup_work_provider()`
 - [x] 3.14 Migrate worker pool management from `run()` to `setup_worker_pool()`
-- [x] 3.15 Migrate budget enforcement from `run()` to `check_budget_limits()`
+- [x] 3.15 Prune the run-limit branch from `run()` orchestration
 - [x] 3.16 Update `cli.py` to instantiate `DownloadRun` and call `.run()`
 - [x] 3.17 Add unit tests for `setup_sinks()`
 - [x] 3.18 Add unit tests for `setup_resolver_pipeline()`
 - [x] 3.19 Add unit tests for `setup_work_provider()`
 - [x] 3.20 Add unit tests for `setup_download_state()`
 - [x] 3.21 Add unit tests for `setup_worker_pool()`
-- [x] 3.22 Add unit tests for `check_budget_limits()`
+- [x] 3.22 Remove unit tests covering the legacy run-limit helper
 - [x] 3.23 Add integration test for `DownloadRun.run()`
 - [x] 3.24 Remove old `run()` function
 - [x] 3.25 Update documentation to reference `DownloadRun` class

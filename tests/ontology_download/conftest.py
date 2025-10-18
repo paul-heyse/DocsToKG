@@ -1,108 +1,21 @@
-# === NAVMAP v1 ===
-# {
-#   "module": "tests.ontology_download.conftest",
-#   "purpose": "Shared pytest fixtures for ontology_download",
-#   "sections": [
-#     {
-#       "id": "stubrequestsmodule",
-#       "name": "_StubRequestsModule",
-#       "anchor": "class-stubrequestsmodule",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "requestexception",
-#       "name": "_RequestException",
-#       "anchor": "class-requestexception",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "httperror",
-#       "name": "_HTTPError",
-#       "anchor": "class-httperror",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "timeout",
-#       "name": "_Timeout",
-#       "anchor": "class-timeout",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "connectionerror",
-#       "name": "_ConnectionError",
-#       "anchor": "class-connectionerror",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "sslerror",
-#       "name": "_SSLError",
-#       "anchor": "class-sslerror",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "stubsession",
-#       "name": "_StubSession",
-#       "anchor": "class-stubsession",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "stubresponse",
-#       "name": "_StubResponse",
-#       "anchor": "class-stubresponse",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "placeholderclient",
-#       "name": "_PlaceholderClient",
-#       "anchor": "class-placeholderclient",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "reset-build-destination",
-#       "name": "_reset_build_destination",
-#       "anchor": "function-reset-build-destination",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ontology-env",
-#       "name": "_ontology_env",
-#       "anchor": "function-ontology-env",
-#       "kind": "function"
-#     }
-#   ]
-# }
-# === /NAVMAP ===
+"""Shared fixtures for ontology_download test suite."""
 
-"""
-Ontology Test Environment Stubs
+from __future__ import annotations
 
-This module wires lightweight stubs for optional dependencies used in the
-ontology download suite so tests can run without network access or heavy
-third-party packages.
-
-Key Scenarios:
-- Provides fallback implementations for requests, BioPortal, OLS, and Pystow
-- Supplies stubbed telemetry/logging clients for validator invocation
-
-Usage:
-    pytest tests/ontology_download -k ontology_download
-"""
-
-import importlib.machinery
-import logging
 import os
 import sys
 import types
 from contextlib import ExitStack
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
+from DocsToKG.OntologyDownload.testing import TestingEnvironment
+
 
 class PatchManager:
-    """Lightweight replacement for pytest.MonkeyPatch using unittest.mock."""
+    """Temporary patch helper to support legacy tests during migration."""
 
     def __init__(self) -> None:
         self._stack = ExitStack()
@@ -111,11 +24,9 @@ class PatchManager:
         self._stack.close()
 
     def setattr(self, target, *args, raising: bool = True):
-        """Patch an attribute either by object/name or dotted path string."""
-
         if isinstance(target, str):
             if len(args) != 1:
-                raise TypeError("setattr string target expects exactly one positional argument")
+                raise TypeError("setattr string target expects exactly one value")
             (value,) = args
             patcher = patch(target, value, create=not raising)
         else:
@@ -123,13 +34,10 @@ class PatchManager:
                 raise TypeError("setattr object target expects name and value")
             name, value = args
             patcher = patch.object(target, name, value, create=not raising)
-
         self._stack.enter_context(patcher)
-        return value if isinstance(target, str) else value
+        return value
 
     def setitem(self, mapping, key, value):
-        """Patch a mapping entry and restore the original value afterwards."""
-
         sentinel = object()
         original = mapping.get(key, sentinel)
         mapping[key] = value
@@ -144,8 +52,6 @@ class PatchManager:
         return value
 
     def setenv(self, key: str, value: str) -> str:
-        """Temporarily set an environment variable."""
-
         sentinel = object()
         original = os.environ.get(key, sentinel)
         os.environ[key] = value
@@ -160,8 +66,6 @@ class PatchManager:
         return value
 
     def delenv(self, key: str, *, raising: bool = True) -> None:
-        """Temporarily delete an environment variable."""
-
         sentinel = object()
         if key in os.environ:
             original = os.environ.pop(key)
@@ -176,21 +80,48 @@ class PatchManager:
 
         self._stack.callback(restore)
 
-    def enter_context(self, context_manager):
-        """Proxy to ExitStack.enter_context for custom patchers."""
-
-        return self._stack.enter_context(context_manager)
+    def enter_context(self, ctx):
+        return self._stack.enter_context(ctx)
 
     def callback(self, func):
-        """Register a cleanup callback."""
-
         self._stack.callback(func)
+
+
+def _ensure_optional_dependency_stubs() -> None:
+    """Provide lightweight stubs for optional packages used by resolvers."""
+
+    if "bioregistry" not in sys.modules:
+        bioregistry = types.ModuleType("bioregistry")
+        bioregistry.get_obo_download = lambda prefix: None  # type: ignore[attr-defined]
+        bioregistry.get_owl_download = lambda prefix: None  # type: ignore[attr-defined]
+        bioregistry.get_rdf_download = lambda prefix: None  # type: ignore[attr-defined]
+        sys.modules["bioregistry"] = bioregistry
+
+    if "ols_client" not in sys.modules:
+        ols_client = types.ModuleType("ols_client")
+        ols_client.OlsClient = lambda *args, **kwargs: types.SimpleNamespace()  # type: ignore[attr-defined]
+        sys.modules["ols_client"] = ols_client
+
+    if "ontoportal_client" not in sys.modules:
+        onto_client = types.ModuleType("ontoportal_client")
+        onto_client.BioPortalClient = lambda *args, **kwargs: types.SimpleNamespace()  # type: ignore[attr-defined]
+        sys.modules["ontoportal_client"] = onto_client
+
+    if "pystow" not in sys.modules:
+        def _pystow_join(*segments):
+            root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
+            return root.joinpath(*segments)
+
+        pystow_mod = types.ModuleType("pystow")
+        pystow_mod.join = _pystow_join  # type: ignore[attr-defined]
+        sys.modules["pystow"] = pystow_mod
+
+
+_ensure_optional_dependency_stubs()
 
 
 @pytest.fixture
 def patch_stack():
-    """Fixture exposing PatchManager for tests."""
-
     manager = PatchManager()
     try:
         yield manager
@@ -198,160 +129,19 @@ def patch_stack():
         manager.close()
 
 
-class _StubRequestsModule(SimpleNamespace):
-    """Lightweight stand-in for the requests module used in tests."""
+@pytest.fixture(scope="function")
+def ontology_env():
+    """Provision an isolated ontology download environment for tests."""
+
+    with TestingEnvironment() as env:
+        yield env
 
 
-class _RequestException(Exception):
-    pass
+@pytest.fixture(scope="function")
+def download_config(ontology_env):
+    return ontology_env.build_download_config()
 
 
-class _HTTPError(_RequestException):
-    def __init__(self, message: str = "", response=None) -> None:
-        super().__init__(message)
-        self.response = response
-
-
-class _Timeout(_RequestException):
-    pass
-
-
-class _ConnectionError(_RequestException):
-    pass
-
-
-class _SSLError(_RequestException):
-    pass
-
-
-class _StubSession:
-    def get(self, *args, **kwargs):  # pragma: no cover - patched in tests
-        raise RuntimeError("requests.Session stub used without patching")
-
-
-class _StubResponse:
-    def __init__(self) -> None:
-        self.status_code = None
-        self.headers = {}
-        self.url = ""
-
-
-class _PlaceholderClient:
-    def __init__(self, *args, **kwargs):  # pragma: no cover - should be patched in tests
-        pass
-
-    def __getattr__(self, item):  # pragma: no cover - should be replaced in tests
-        raise RuntimeError(f"Accessed placeholder client attribute '{item}' without patching")
-
-
-if "bioregistry" not in sys.modules:
-    _stub_bioregistry = types.ModuleType("bioregistry")
-    _stub_bioregistry.get_obo_download = lambda prefix: None  # type: ignore[attr-defined]
-    _stub_bioregistry.get_owl_download = lambda prefix: None  # type: ignore[attr-defined]
-    _stub_bioregistry.get_rdf_download = lambda prefix: None  # type: ignore[attr-defined]
-    sys.modules["bioregistry"] = _stub_bioregistry
-
-if "ols_client" not in sys.modules:
-    _stub_ols = types.ModuleType("ols_client")
-    _stub_ols.OlsClient = _PlaceholderClient  # type: ignore[attr-defined]
-    sys.modules["ols_client"] = _stub_ols
-
-if "ontoportal_client" not in sys.modules:
-    _stub_ontoportal = types.ModuleType("ontoportal_client")
-    _stub_ontoportal.BioPortalClient = _PlaceholderClient  # type: ignore[attr-defined]
-    sys.modules["ontoportal_client"] = _stub_ontoportal
-
-if "requests" not in sys.modules:
-    try:  # Prefer the real requests library if available
-        import requests as _real_requests  # type: ignore
-    except ModuleNotFoundError:
-        sys.modules["requests"] = _StubRequestsModule(
-            Session=_StubSession,
-            HTTPError=_HTTPError,
-            Timeout=_Timeout,
-            ConnectionError=_ConnectionError,
-            RequestException=_RequestException,
-            Response=_StubResponse,
-            exceptions=SimpleNamespace(SSLError=_SSLError),
-        )
-    else:
-        sys.modules["requests"] = _real_requests
-
-if "pystow" not in sys.modules:
-
-    def _pystow_join(*segments):
-        root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
-        return root.joinpath(*segments)
-
-    _stub_pystow = types.ModuleType("pystow")
-    _stub_pystow.join = _pystow_join  # type: ignore[attr-defined]
-    sys.modules["pystow"] = _stub_pystow
-
-if "psutil" not in sys.modules:
-    try:
-        import psutil as _real_psutil  # type: ignore
-    except ModuleNotFoundError:
-
-        class _StubProcess:
-            def memory_info(self):
-                return SimpleNamespace(rss=0)
-
-        _stub_psutil = types.ModuleType("psutil")
-        _stub_psutil.Process = lambda: _StubProcess()  # type: ignore[attr-defined]
-        _stub_psutil.__spec__ = importlib.machinery.ModuleSpec("psutil", loader=None)
-        sys.modules["psutil"] = _stub_psutil
-    else:
-        sys.modules["psutil"] = _real_psutil
-
-if "pooch" not in sys.modules:
-
-    class _HTTPDownloader:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def __call__(
-            self, url, output_file, pooch_logger
-        ):  # pragma: no cover - overridden in tests
-            raise NotImplementedError("pooch downloader stub should be overridden")
-
-    def _retrieve(url, *, path, fname, downloader, **kwargs):
-        cache_dir = Path(path)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        output = cache_dir / fname
-        downloader(url, str(output), logging.getLogger("pooch"))
-        return str(output)
-
-    _stub_pooch = types.ModuleType("pooch")
-    _stub_pooch.HTTPDownloader = _HTTPDownloader  # type: ignore[attr-defined]
-    _stub_pooch.retrieve = _retrieve  # type: ignore[attr-defined]
-    sys.modules["pooch"] = _stub_pooch
-
-planning_mod = importlib.import_module("DocsToKG.OntologyDownload.planning")
-
-# --- Globals ---
-
-_ORIGINAL_BUILD_DESTINATION = planning_mod._build_destination
-
-
-# --- Helper Functions ---
-
-
-@pytest.fixture(autouse=True)
-def _reset_build_destination(patch_stack: PatchManager) -> None:
-    """Ensure tests see the canonical _build_destination implementation."""
-
-    patch_stack.setattr(
-        planning_mod,
-        "_build_destination",
-        _ORIGINAL_BUILD_DESTINATION,
-        raising=False,
-    )
-
-
-@pytest.fixture(autouse=True)
-def _ontology_env(tmp_path_factory, patch_stack: PatchManager) -> None:
-    """Provide deterministic environment variables expected by validators."""
-
-    pystow_home = tmp_path_factory.mktemp("pystow-home")
-    patch_stack.setenv("PYSTOW_HOME", str(pystow_home))
-    patch_stack.setenv("BIOPORTAL_API_KEY", "test-bioportal-key")
+@pytest.fixture(scope="function")
+def resolved_config(ontology_env):
+    return ontology_env.build_resolved_config()

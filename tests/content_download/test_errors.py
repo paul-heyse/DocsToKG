@@ -175,18 +175,6 @@ class TestGetActionableErrorMessage:
         assert "robots.txt" in msg.lower()
         assert "robots.txt" in suggestion.lower()
 
-    def test_max_bytes_header(self):
-        """Test max bytes exceeded error."""
-        msg, suggestion = get_actionable_error_message(None, "max_bytes_header")
-        assert "maximum size limit" in msg.lower()
-        assert "max_bytes" in suggestion.lower()
-
-    def test_domain_max_bytes(self):
-        """Test domain max-bytes limit exceeded."""
-        msg, suggestion = get_actionable_error_message(None, "domain_max_bytes")
-        assert "size limit" in msg.lower()
-        assert "domain_content_rules" in suggestion.lower()
-
     def test_request_exception(self):
         """Test general request exception."""
         msg, suggestion = get_actionable_error_message(None, "request_exception")

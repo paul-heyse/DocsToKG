@@ -17,7 +17,7 @@ staging and production environments.
 
 1. Merge implementation PRs to `main`; deploy to canary worker pool only.
 2. Clear resolver caches on canary nodes (`python -m DocsToKG.ContentDownload.resolvers.cache clear`).
-3. Monitor resolver error rate and retry budget exhaustion for 24 hours.
+3. Monitor resolver error rate and retry cap exhaustion for 24 hours.
 4. If stable, roll out to remaining workers; no configuration migration required.
 5. Post-rollout, archive validator screenshots/metrics to `reports/content-download/2025-10-16/`.
 
@@ -25,12 +25,12 @@ staging and production environments.
 
 - Dashboard widgets:
   - Success rate vs baseline (`resolver_hit_rate_delta`).
-  - Retry budget exhaustion count and median backoff delay.
+  - Retry cap exhaustion count and median backoff delay.
   - Duplicate URL skip rate (global dedupe).
   - Domain rate limiting wait time percentiles.
 - Alert thresholds:
   - Success rate drops by >5 percentage points for any resolver.
-  - Retry budget exhaustion exceeds 2 % of downloads.
+  - Retry cap exhaustion exceeds 2 % of downloads.
   - `.metrics.json` ingestion lag >10 minutes.
 - Operator feedback: gather notes in the weekly Ops sync; file follow-up issues
   for any regressions encountered.

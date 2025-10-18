@@ -224,7 +224,6 @@ class DownloadRun:
             run_id=self.resolved.run_id,
             previous_lookup=resume_lookup,
             resume_completed=resume_completed,
-            max_bytes=self.args.max_bytes,
             sniff_bytes=self.args.sniff_bytes,
             min_pdf_bytes=self.args.min_pdf_bytes,
             tail_check_bytes=self.args.tail_check_bytes,

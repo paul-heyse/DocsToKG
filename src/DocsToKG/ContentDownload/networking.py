@@ -416,7 +416,6 @@ def _enforce_content_policy(
         return
     headers = getattr(response, "headers", {}) or {}
     allowed_types = content_policy.get("allowed_types")
-    max_bytes = content_policy.get("max_bytes")
 
     content_type_header = headers.get("Content-Type")
     content_type = _normalise_content_type(content_type_header or "")
@@ -434,26 +433,6 @@ def _enforce_content_policy(
                 content_type=content_type,
             )
 
-    if max_bytes:
-        raw_length = (headers.get("Content-Length") or "").strip()
-        if raw_length:
-            try:
-                content_length = int(raw_length)
-            except ValueError:
-                content_length = None
-            else:
-                if content_length > int(max_bytes):
-                    with contextlib.suppress(Exception):
-                        response.close()
-                    detail = f"content-length {content_length} > limit {int(max_bytes)}"
-                    raise ContentPolicyViolation(
-                        f"{method} {url} exceeds content policy max_bytes",
-                        violation="max-bytes",
-                        policy=content_policy,
-                        detail=detail,
-                        content_type=content_type or None,
-                        content_length=content_length,
-                    )
 
 
 def request_with_retries(
@@ -482,7 +461,7 @@ def request_with_retries(
             ``{429, 500, 502, 503, 504}``.
         backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to ``0.75``.
         respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
-        content_policy: Optional mapping describing max-bytes and allowed MIME types for the target host.
+        content_policy: Optional mapping describing allowed MIME types for the target host.
         max_retry_duration: Maximum total time to spend on retries in seconds. If exceeded, raises
             immediately. Defaults to ``None`` (no limit).
         backoff_max: Maximum delay between retries in seconds. Prevents excessive wait times.

@@ -450,7 +450,7 @@
 - [x] 14.2 Add test for Wayback resolver when `archived_snapshots.closest.available == False`, verify skip
 - [x] 14.3 Add test verifying manifest and attempts have exactly one success row per saved PDF with matching work_id and path
 - [x] 14.4 Add test for polite headers propagation: verify OpenAlex candidate attempts use same headers as pipeline
-- [x] 14.5 Add test for retry budget exhaustion: mock 10 URLs all returning 503, verify max_attempts_per_work honored
+- [x] 14.5 Add test for retry cap exhaustion: mock 10 URLs all returning 503, verify max_attempts_per_work honored
 
 ## 15. Documentation and Migration
 

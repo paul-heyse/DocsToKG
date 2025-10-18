@@ -142,16 +142,6 @@ def get_actionable_error_message(
             "Download blocked by robots.txt",
             "Respect the site's robots.txt. Consider disabling robot checking if you have permission.",
         )
-    elif reason_code == "max_bytes_header" or reason_code == "max_bytes_stream":
-        return (
-            "File exceeds maximum size limit",
-            "Increase max_bytes configuration or skip large files with skip_large_downloads flag",
-        )
-    elif reason_code == "domain_max_bytes":
-        return (
-            "Domain download size limit exceeded",
-            "Increase or remove the max_bytes setting in domain_content_rules for this host.",
-        )
     elif reason_code == "domain_disallowed_mime":
         return (
             "Content type not allowed by domain policy",

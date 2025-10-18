@@ -6,7 +6,7 @@ A recent code review of `src/DocsToKG/ContentDownload` highlighted multiple defe
 
 1. `_build_download_outcome` marks every successful PDF-like download as `conditional_not_modified`, causing success metrics to masquerade as cache hits.
 2. The range-resume pathway advertises HTTP range support, yet still writes resumed payloads via `atomic_write`, producing truncated artifacts that drop the already persisted prefix.
-3. User-triggered `skip_large_downloads` events are logged as `DOMAIN_MAX_BYTES`, blending voluntary skips with enforced budget caps.
+3. User-triggered `skip_large_downloads` events are logged as `DOMAIN_MAX_BYTES`, blending voluntary skips with enforced max-byte caps.
 4. `resolve_config` eagerly materializes the entire manifest SQLite index, which does not scale when manifests hold hundreds of thousands of rows.
 5. `_validate_cached_artifact` recomputes a full SHA-256 digest for every 304 validation, even when size and mtime already guarantee freshness.
 
@@ -28,12 +28,12 @@ Left unaddressed, these issues undermine downstream analytics, corrupt artifacts
 - Remove/disable any resolver hints that advertise partial content support.
 - Add regression coverage that simulates interrupted downloads and confirms artifacts are re-fetched in full with matching hashes.
 
-### 3. Separate voluntary skips from domain budget enforcement
+### 3. Separate voluntary skips from enforced max-byte limits
 
 - Introduce a dedicated reason classification (e.g., `ReasonCode.SKIP_LARGE_DOWNLOAD`) for user-initiated skips.
-- Adjust download loop logic so `skip_large_downloads` surfaces the new reason, while genuine domain budget exceedances retain `DOMAIN_MAX_BYTES`.
+- Adjust download loop logic so `skip_large_downloads` surfaces the new reason, while genuine host-level byte caps continue to emit `DOMAIN_MAX_BYTES`.
 - Update telemetry serialization, manifest logging, and downstream consumers to recognize the new reason value.
-- Add reporting tests asserting that voluntary skip counts no longer increment domain budget metrics.
+- Add reporting tests asserting that voluntary skip counts no longer increment host-level limit metrics.
 
 ### 4. Avoid manifest warm-up blowups
 
@@ -61,7 +61,7 @@ Left unaddressed, these issues undermine downstream analytics, corrupt artifacts
 
 1. Successful downloads emit `reason_code=None`, while 304/conditional flows emit `ReasonCode.CONDITIONAL_NOT_MODIFIED`.
 2. Resume mode remains disabled regardless of flag settings; no truncated files in regression suite.
-3. Voluntary skips log `ReasonCode.SKIP_LARGE_DOWNLOAD` (or equivalent) without incrementing domain budget counters.
+3. Voluntary skips log `ReasonCode.SKIP_LARGE_DOWNLOAD` (or equivalent) without emitting `DOMAIN_MAX_BYTES`.
 4. Startup memory footprint and runtime remain bounded when manifest tables exceed 250k rows.
 5. Cache validation benchmarks show avoided SHA-256 recomputation on repeated 304 hits while preserving opt-in verification.
 

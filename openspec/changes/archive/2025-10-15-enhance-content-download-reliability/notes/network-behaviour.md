@@ -2,7 +2,7 @@
 
 Runbook guidance distilled from the retry refactor regression tests.
 
-## Retry Budget
+## Retry Envelope
 
 - Total attempts equal `max_retries + 1`. Verified via
   `tests/test_download_retries.py::test_retry_determinism_matches_request_with_retries`
@@ -28,7 +28,7 @@ Runbook guidance distilled from the retry refactor regression tests.
 
 ## Operator Checklist
 
-- Inspect `.metrics.json` files for the `retry_budget_exhausted` counter when
+- Inspect `.metrics.json` files for counters such as `retry_attempts_exhausted` when
   diagnosing slowdowns.
 - Use structured retry logs (`retry_attempt` events) to correlate delays with
   Retry-After guidance versus backoff.

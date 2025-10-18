@@ -186,7 +186,6 @@ class DownloadContext:
     extract_html_text: bool = False
     previous: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     global_manifest_index: Any = field(default_factory=dict)
-    max_bytes: Optional[int] = None
     sniff_bytes: int = DEFAULT_SNIFF_BYTES
     min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
     tail_check_bytes: int = DEFAULT_TAIL_CHECK_BYTES
@@ -225,7 +224,6 @@ class DownloadContext:
         self.skip_large_downloads = bool(self.skip_large_downloads)
         self.verify_cache_digest = bool(self.verify_cache_digest)
 
-        self.max_bytes = self._coerce_optional_positive(self.max_bytes)
         self.size_warning_threshold = self._coerce_optional_positive(self.size_warning_threshold)
         self.chunk_size = self._coerce_optional_positive(self.chunk_size)
         self.stream_retry_attempts = max(int(self.stream_retry_attempts or 0), 0)
@@ -269,7 +267,6 @@ class DownloadContext:
             extract_html_text=_pop("extract_html_text", False),
             previous=_pop("previous", {}),
             global_manifest_index=_pop("global_manifest_index", {}),
-            max_bytes=_pop("max_bytes", None),
             sniff_bytes=_pop("sniff_bytes", DEFAULT_SNIFF_BYTES),
             min_pdf_bytes=_pop("min_pdf_bytes", DEFAULT_MIN_PDF_BYTES),
             tail_check_bytes=_pop("tail_check_bytes", DEFAULT_TAIL_CHECK_BYTES),
@@ -311,7 +308,6 @@ class DownloadContext:
             "list_only": self.list_only,
             "extract_html_text": self.extract_html_text,
             "previous": self.previous,
-            "max_bytes": self.max_bytes,
             "sniff_bytes": self.sniff_bytes,
             "min_pdf_bytes": self.min_pdf_bytes,
             "tail_check_bytes": self.tail_check_bytes,
@@ -448,8 +444,6 @@ class ReasonCode(Enum):
     ALREADY_DOWNLOADED = "already_downloaded"
     CONDITIONAL_CACHE_INVALID = "conditional_cache_invalid"
     CONDITIONAL_NOT_MODIFIED = "conditional_not_modified"
-    MAX_BYTES_HEADER = "max_bytes_header"
-    MAX_BYTES_STREAM = "max_bytes_stream"
     HEAD_PRECHECK_FAILED = "head_precheck_failed"
     HTTP_STATUS = "http_status"
     REQUEST_EXCEPTION = "request_exception"
@@ -462,7 +456,6 @@ class ReasonCode(Enum):
     MAX_ATTEMPTS_REACHED = "max_attempts_reached"
     RESOLVER_BREAKER_OPEN = "resolver_breaker_open"
     DOMAIN_BREAKER_OPEN = "domain_breaker_open"
-    DOMAIN_MAX_BYTES = "domain_max_bytes"
     DOMAIN_DISALLOWED_MIME = "domain_disallowed_mime"
     SKIP_LARGE_DOWNLOAD = "skip_large_download"
 

@@ -90,14 +90,6 @@ The system SHALL decompose the download pipeline into composable stages managed 
 - **AND** the stage SHALL return its configured component (sink, pipeline, provider, etc.)
 - **AND** the stage SHALL be mockable for integration tests
 
-#### Scenario: Budget enforcement isolation
-
-- **WHEN** the runner evaluates budget limits via `check_budget_limits()`
-- **THEN** the method SHALL return `True` if budget is exceeded
-- **AND** the method SHALL return `False` if budget is available
-- **AND** the method SHALL NOT modify download state
-- **AND** the method SHALL be testable without executing downloads
-
 #### Scenario: Run orchestration
 
 - **WHEN** `DownloadRun.run()` is invoked
@@ -107,7 +99,6 @@ The system SHALL decompose the download pipeline into composable stages managed 
 - **AND** the runner SHALL call `setup_download_state()` to initialize tracking
 - **AND** the runner SHALL call `setup_worker_pool()` to create workers
 - **AND** the runner SHALL iterate over work items, calling `process_work_item()` for each
-- **AND** the runner SHALL call `check_budget_limits()` after each batch
 - **AND** the runner SHALL return a `RunResult` summarizing outcomes
 
 ### Requirement: Strategy-Based Download Processing
@@ -266,7 +257,7 @@ The system SHALL maintain integration test coverage at >= 85% across the refacto
 
 - **WHEN** the `DownloadRun` class is tested
 - **THEN** integration tests SHALL verify end-to-end download pipeline execution
-- **AND** integration tests SHALL verify budget enforcement
+- **AND** integration tests SHALL verify resumable downloads, telemetry emission, and throttling behaviour
 - **AND** integration tests SHALL verify telemetry logging
 - **AND** integration tests SHALL verify worker pool concurrency
 

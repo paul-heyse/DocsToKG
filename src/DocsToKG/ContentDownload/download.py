@@ -132,7 +132,6 @@ class DownloadOptions:
     run_id: str
     previous_lookup: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     resume_completed: Set[str] = field(default_factory=set)
-    max_bytes: Optional[int] = None
     sniff_bytes: int = DEFAULT_SNIFF_BYTES
     min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
     tail_check_bytes: int = DEFAULT_TAIL_CHECK_BYTES
@@ -371,10 +370,6 @@ class DownloadState(Enum):
 
     PENDING = "pending"
     WRITING = "writing"
-
-
-class _MaxBytesExceeded(RuntimeError):
-    """Internal signal raised when the stream exceeds the configured byte limit."""
 
 
 _DIGEST_CACHE_MAXSIZE = 256
@@ -1136,7 +1131,6 @@ def download_candidate(
     progress_callback = ctx.progress_callback
     progress_update_interval = 128 * 1024  # Update progress every 128KB
 
-    max_bytes: Optional[int] = ctx.max_bytes
     parsed_url = urlsplit(url)
     domain_policies: Dict[str, Dict[str, Any]] = ctx.domain_content_rules
     host_key = (parsed_url.hostname or parsed_url.netloc or "").lower()
@@ -1145,13 +1139,6 @@ def download_candidate(
         content_policy = domain_policies.get(host_key)
         if content_policy is None and host_key.startswith("www."):
             content_policy = domain_policies.get(host_key[4:])
-    policy_max_bytes: Optional[int] = None
-    if content_policy:
-        raw_policy_limit = content_policy.get("max_bytes")
-        if isinstance(raw_policy_limit, int) and raw_policy_limit > 0:
-            policy_max_bytes = raw_policy_limit
-            if max_bytes is None or raw_policy_limit < max_bytes:
-                max_bytes = raw_policy_limit
     headers: Dict[str, str] = {}
     if referer:
         headers["Referer"] = referer
@@ -1311,7 +1298,7 @@ def download_candidate(
                 reason_code = (
                     ReasonCode.DOMAIN_DISALLOWED_MIME
                     if violation == "content-type"
-                    else ReasonCode.DOMAIN_MAX_BYTES
+                    else ReasonCode.UNKNOWN
                 )
                 LOGGER.info(
                     "domain-content-policy-blocked",
@@ -1583,56 +1570,6 @@ def download_candidate(
                             extracted_text_path=None,
                             retry_after=retry_after_hint,
                         )
-                if (
-                    max_bytes is not None
-                    and content_length_hint is not None
-                    and content_length_hint > max_bytes
-                ):
-                    LOGGER.warning(
-                        "Aborting download due to max-bytes limit",
-                        extra={
-                            "extra_fields": {
-                                "url": url,
-                                "work_id": artifact.work_id,
-                                "content_length": content_length_hint,
-                                "max_bytes": max_bytes,
-                            }
-                        },
-                    )
-                    elapsed_now = (time.monotonic() - start) * 1000.0
-                    classification_limit = (
-                        Classification.HTML_TOO_LARGE
-                        if "html" in content_type_lower
-                        else Classification.PAYLOAD_TOO_LARGE
-                    )
-                    policy_triggered = (
-                        policy_max_bytes is not None and max_bytes == policy_max_bytes
-                    )
-                    reason_code = (
-                        ReasonCode.DOMAIN_MAX_BYTES
-                        if policy_triggered
-                        else ReasonCode.MAX_BYTES_HEADER
-                    )
-                    reason_detail = (
-                        f"content-length {content_length_hint} exceeds domain max_bytes {policy_max_bytes}"
-                        if policy_triggered and policy_max_bytes is not None
-                        else f"content-length {content_length_hint} exceeds max_bytes {max_bytes}"
-                    )
-                    return DownloadOutcome(
-                        classification=classification_limit,
-                        path=None,
-                        http_status=response.status_code,
-                        content_type=content_type,
-                        elapsed_ms=elapsed_now,
-                        reason=reason_code,
-                        reason_detail=reason_detail,
-                        sha256=None,
-                        content_length=content_length_hint,
-                        etag=modified_result.etag,
-                        last_modified=modified_result.last_modified,
-                        extracted_text_path=None,
-                        retry_after=retry_after_hint,
-                    )
                 hasher = hashlib.sha256() if not dry_run else None
                 byte_count = 0
                 # Get configurable chunk size, defaulting to 32KB
@@ -1773,9 +1710,6 @@ def download_candidate(
                     # Only update tail buffer for PDFs
                     if is_pdf and tail_buffer is not None:
                         update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
-                    if max_bytes is not None and byte_count > max_bytes:
-                        raise _MaxBytesExceeded()
-
                     # Progress tracking: update every 128KB to balance overhead
                     if (
                         progress_callback
@@ -1798,9 +1732,6 @@ def download_candidate(
                     # Only update tail buffer for PDFs
                     if is_pdf and tail_buffer is not None:
                         update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
-                    if max_bytes is not None and byte_count > max_bytes:
-                        raise _MaxBytesExceeded()
-
                     # Progress tracking: update every 128KB
                     if (
                         progress_callback
@@ -1828,52 +1759,6 @@ def download_candidate(
                     _stream_chunks(),
                     hasher=hasher,
                     keep_partial_on_error=True,
-                )
-            except _MaxBytesExceeded:
-                LOGGER.warning(
-                    "Aborting download during stream due to max-bytes limit",
-                    extra={
-                        "extra_fields": {
-                            "url": url,
-                            "work_id": artifact.work_id,
-                            "bytes_downloaded": byte_count,
-                            "max_bytes": max_bytes,
-                        }
-                    },
-                )
-                classification_limit = (
-                    Classification.HTML_TOO_LARGE
-                    if detected is Classification.HTML
-                    else Classification.PAYLOAD_TOO_LARGE
-                )
-                elapsed_limit = (time.monotonic() - start) * 1000.0
-                policy_triggered = (
-                    policy_max_bytes is not None
-                    and max_bytes is not None
-                    and max_bytes == policy_max_bytes
-                )
-                reason_code = (
-                    ReasonCode.DOMAIN_MAX_BYTES if policy_triggered else ReasonCode.MAX_BYTES_STREAM
-                )
-                reason_detail = (
-                    f"download exceeded domain max_bytes {policy_max_bytes}"
-                    if policy_triggered and policy_max_bytes is not None
-                    else f"download exceeded max_bytes {max_bytes}"
-                )
-                return DownloadOutcome(
-                    classification=classification_limit,
-                    path=None,
-                    http_status=response.status_code,
-                    content_type=content_type,
-                    elapsed_ms=elapsed_limit,
-                    reason=reason_code,
-                    reason_detail=reason_detail,
-                    sha256=None,
-                    content_length=byte_count,
-                    etag=modified_result.etag,
-                    last_modified=modified_result.last_modified,
-                    extracted_text_path=None,
-                    retry_after=retry_after_hint,
                 )
             except (requests.exceptions.ChunkedEncodingError, AttributeError) as exc:
                 LOGGER.warning(
@@ -2035,7 +1920,6 @@ def process_one_work(
     list_only = options.list_only
     extract_html_text = options.extract_html_text
     previous_lookup = options.previous_lookup
-    max_bytes = options.max_bytes
     sniff_bytes = options.sniff_bytes
     min_pdf_bytes = options.min_pdf_bytes
     tail_check_bytes = options.tail_check_bytes
@@ -2062,7 +1946,6 @@ def process_one_work(
         extract_html_text=extract_html_text,
         previous=previous_map,
         list_only=list_only,
-        max_bytes=max_bytes,
         sniff_bytes=sniff_bytes,
         min_pdf_bytes=min_pdf_bytes,
         tail_check_bytes=tail_check_bytes,
@@ -2076,7 +1959,6 @@ def process_one_work(
         "extract_html_text",
         "previous",
         "list_only",
-        "max_bytes",
         "sniff_bytes",
         "min_pdf_bytes",
         "tail_check_bytes",

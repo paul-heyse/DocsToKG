@@ -16,7 +16,7 @@ The refactoring addresses these issues while maintaining backward compatibility 
 ### Stakeholders
 
 - **Contributors**: Need clear boundaries to add new resolvers or artifact types
-- **Operators**: Need configurable concurrency, budget enforcement, and telemetry
+- **Operators**: Need configurable concurrency, resilient throttling, and telemetry
 - **Researchers**: Need reliable content acquisition with resume capabilities
 - **Maintainers**: Need testable, modular code with low cognitive load
 

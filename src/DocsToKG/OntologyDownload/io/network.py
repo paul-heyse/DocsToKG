@@ -57,6 +57,8 @@ _DNS_CACHE_TTL = 120.0
 _DNS_CACHE_MAX_ENTRIES = 4096
 _DNS_CACHE_LOCK = threading.Lock()
 _DNS_CACHE: "OrderedDict[str, Tuple[float, List[Tuple]]]" = OrderedDict()
+_DNS_STUB_LOCK = threading.Lock()
+_DNS_STUBS: Dict[str, Callable[[str], List[Tuple]]] = {}
 
 _RDF_FORMAT_LABELS = {
     "application/rdf+xml": "RDF/XML",
@@ -131,23 +133,29 @@ def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
 def _cached_getaddrinfo(host: str) -> List[Tuple]:
     """Resolve *host* using an expiring LRU cache to avoid repeated DNS lookups."""
 
+    ascii_host = host.lower()
+    with _DNS_STUB_LOCK:
+        stub = _DNS_STUBS.get(ascii_host)
+    if stub is not None:
+        return stub(host)
+
     now = time.monotonic()
     with _DNS_CACHE_LOCK:
-        cached = _DNS_CACHE.get(host)
+        cached = _DNS_CACHE.get(ascii_host)
         if cached is not None:
             expires_at, results = cached
             if expires_at > now:
-                _DNS_CACHE.move_to_end(host)
+                _DNS_CACHE.move_to_end(ascii_host)
                 _prune_dns_cache(now)
                 return results
-            _DNS_CACHE.pop(host, None)
+            _DNS_CACHE.pop(ascii_host, None)
         _prune_dns_cache(now)
 
     results = socket.getaddrinfo(host, None)
     expires_at = now + _DNS_CACHE_TTL
     with _DNS_CACHE_LOCK:
-        _DNS_CACHE[host] = (expires_at, results)
-        _DNS_CACHE.move_to_end(host)
+        _DNS_CACHE[ascii_host] = (expires_at, results)
+        _DNS_CACHE.move_to_end(ascii_host)
         _prune_dns_cache(now)
     return results
 
@@ -163,6 +171,23 @@ def _prune_dns_cache(current_time: float) -> None:
 
     while len(_DNS_CACHE) > _DNS_CACHE_MAX_ENTRIES:
         _DNS_CACHE.popitem(last=False)
+
+
+def register_dns_stub(host: str, handler: Callable[[str], List[Tuple]]) -> None:
+    """Register a DNS stub callable for ``host`` used during testing."""
+
+    ascii_host = host.lower()
+    with _DNS_STUB_LOCK:
+        _DNS_STUBS[ascii_host] = handler
+    with _DNS_CACHE_LOCK:
+        _DNS_CACHE.pop(ascii_host, None)
+
+
+def clear_dns_stubs() -> None:
+    """Remove all registered DNS stubs."""
+
+    with _DNS_STUB_LOCK:
+        _DNS_STUBS.clear()
 
 
 def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:

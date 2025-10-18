@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Dict, Optional
 
+from urllib.parse import urlparse
+
 import pytest
 
 from DocsToKG.OntologyDownload.checksums import (
@@ -15,7 +17,6 @@ from DocsToKG.OntologyDownload.checksums import (
 )
 from DocsToKG.OntologyDownload.planning import FetchSpec
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
-from DocsToKG.OntologyDownload.settings import DownloadConfiguration
 
 
 @pytest.mark.parametrize(
@@ -64,46 +65,45 @@ def test_resolve_expected_checksum_matrix(
     spec_extras: Dict[str, object],
     fetched_digest: Optional[str],
     expected: Optional[tuple[str, str]],
-    patch_stack,
+    ontology_env,
+    download_config,
 ) -> None:
     """Ensure checksum parsing/resolution is consistent across planner surfaces."""
 
-    import DocsToKG.OntologyDownload.checksums as checksums_mod
+    config = download_config.model_copy()
 
-    # Prevent network and URL security side effects during testing.
-    patch_stack.setattr(checksums_mod, "validate_url_security", lambda url, config=None: url)
+    plan_kwargs = dict(plan_kwargs)
+    spec_extras = dict(spec_extras)
 
     if fetched_digest is not None:
-
-        class _DummyResponse:
-            def __init__(self) -> None:
-                self._payload = f"{fetched_digest} ontology.owl".encode("utf-8")
-
-            def __enter__(self) -> "_DummyResponse":
-                return self
-
-            def __exit__(self, exc_type, exc, tb) -> bool:
-                return False
-
-            def raise_for_status(self) -> None:
-                return None
-
-            def iter_content(self, chunk_size: int):
-                yield self._payload
-
-        patch_stack.setattr(
-            checksums_mod.requests,
-            "get",
-            lambda url, timeout, **kwargs: _DummyResponse(),
+        body = f"{fetched_digest} ontology.owl\n".encode("utf-8")
+        checksum_url = ontology_env.register_fixture(
+            "checksum.txt",
+            body,
+            media_type="text/plain",
+            repeats=3,
         )
-    else:
-        patch_stack.setattr(
-            checksums_mod.requests,
-            "get",
-            lambda url, timeout, **kwargs: pytest.fail(
-                "unexpected network call for checksum fetch"
-            ),
-        )
+        parsed = urlparse(checksum_url)
+        host = parsed.hostname
+        if host:
+            allowed_entries = [host]
+            if parsed.port is not None:
+                allowed_entries.append(f"{host}:{parsed.port}")
+            config.allowed_hosts = allowed_entries
+
+        if "checksum_url" in spec_extras:
+            value = spec_extras["checksum_url"]
+            if isinstance(value, dict):
+                spec_extras["checksum_url"] = {**value, "url": checksum_url}
+            else:
+                spec_extras["checksum_url"] = checksum_url
+
+        if "checksum_url" in plan_kwargs:
+            value = plan_kwargs["checksum_url"]
+            if isinstance(value, dict):
+                plan_kwargs["checksum_url"] = {**value, "url": checksum_url}
+            else:
+                plan_kwargs["checksum_url"] = checksum_url
 
     spec = FetchSpec(
         id="hp",
@@ -125,15 +125,21 @@ def test_resolve_expected_checksum_matrix(
     result = resolve_expected_checksum(
         spec=spec,
         plan=plan,
-        download_config=DownloadConfiguration(),
+        download_config=config,
         logger=logging.getLogger("checksum-test"),
     )
+    if fetched_digest is None:
+        assert ontology_env.requests == []
     if expected is None:
         assert result is None
+        if fetched_digest is not None:
+            assert any(req.method == "GET" for req in ontology_env.requests)
         return
 
     assert isinstance(result, ExpectedChecksum)
     assert (result.algorithm, result.value) == expected
+    if fetched_digest is not None:
+        assert any(req.method == "GET" for req in ontology_env.requests)
 
     checksum_extra = spec_extras.get("checksum") if isinstance(spec_extras, dict) else None
     if checksum_extra is not None:
@@ -146,4 +152,4 @@ def test_resolve_expected_checksum_matrix(
             assert algorithm is None
         else:
             assert algorithm == expected[0]
-        assert url_value.startswith("https://")
+        assert url_value.startswith("http://") or url_value.startswith("https://")

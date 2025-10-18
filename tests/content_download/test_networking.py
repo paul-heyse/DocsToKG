@@ -944,91 +944,6 @@ if HAS_REQUESTS and HAS_PYALEX:
         assert outcome.classification is Classification.PDF
         assert "resume-metadata-incomplete" in caplog.text
 
-    def test_download_candidate_respects_max_bytes_header(tmp_path: Path) -> None:
-        artifact = _make_artifact(tmp_path)
-        url = "https://example.org/big.html"
-
-        class _Response:
-            def __init__(self) -> None:
-                self.status_code = 200
-                self.headers = {
-                    "Content-Type": "text/html; charset=utf-8",
-                    "Content-Length": str(5 * 1024 * 1024),
-                }
-
-            def __enter__(self) -> "_Response":
-                return self
-
-            def __exit__(self, exc_type, exc, tb) -> None:
-                self.close()
-
-            def iter_content(self, chunk_size: int = 1024):
-                yield b"<html><body>large</body></html>"
-
-            def close(self) -> None:
-                return None
-
-        class _Session:
-            def request(self, *, method: str, url: str, **kwargs: Any) -> _Response:
-                assert method == "GET"
-                return _Response()
-
-        outcome = download_candidate(
-            _Session(),
-            artifact,
-            url,
-            referer=None,
-            timeout=5.0,
-            context={"max_bytes": 10_000, "previous": {}},
-        )
-
-        assert outcome.classification is Classification.HTML_TOO_LARGE
-        assert outcome.path is None
-        assert outcome.reason is ReasonCode.MAX_BYTES_HEADER
-
-    def test_download_candidate_respects_max_bytes_streaming(tmp_path: Path) -> None:
-        artifact = _make_artifact(tmp_path)
-        pdf_dir = artifact.pdf_dir
-        pdf_dir.mkdir(parents=True, exist_ok=True)
-
-        class _StreamingResponse:
-            def __init__(self) -> None:
-                self.status_code = 200
-                self.headers = {"Content-Type": "application/pdf"}
-
-            def __enter__(self) -> "_StreamingResponse":
-                return self
-
-            def __exit__(self, exc_type, exc, tb) -> None:
-                self.close()
-
-            def iter_content(self, chunk_size: int = 1024):
-                chunks = [b"%PDF-1.4\n", b"0" * 80, b"0" * 80, b"%%EOF"]
-                for chunk in chunks:
-                    yield chunk
-
-            def close(self) -> None:
-                return None
-
-        class _Session:
-            def request(self, *, method: str, url: str, **kwargs: Any) -> _StreamingResponse:
-                assert method == "GET"
-                return _StreamingResponse()
-
-        outcome = download_candidate(
-            _Session(),
-            artifact,
-            "https://example.org/big.pdf",
-            referer=None,
-            timeout=5.0,
-            context={"max_bytes": 100, "previous": {}},
-        )
-
-        assert outcome.classification is Classification.PAYLOAD_TOO_LARGE
-        assert outcome.path is None
-        assert outcome.reason is ReasonCode.MAX_BYTES_STREAM
-        assert not any(pdf_dir.glob("*.pdf"))
-
     def test_download_candidate_blocks_disallowed_mime_policy(tmp_path: Path) -> None:
         artifact = _make_artifact(tmp_path)
 
@@ -1062,55 +977,6 @@ if HAS_REQUESTS and HAS_PYALEX:
 
         assert outcome.classification is Classification.SKIPPED
         assert outcome.reason is ReasonCode.DOMAIN_DISALLOWED_MIME
-
-    def test_download_candidate_applies_domain_max_bytes_streaming(tmp_path: Path) -> None:
-        artifact = _make_artifact(tmp_path)
-        pdf_dir = artifact.pdf_dir
-        pdf_dir.mkdir(parents=True, exist_ok=True)
-
-        class _Response:
-            def __init__(self) -> None:
-                self.status_code = 200
-                self.headers = {"Content-Type": "application/pdf"}
-
-            def __enter__(self) -> "_Response":
-                return self
-
-            def __exit__(self, exc_type, exc, tb) -> None:
-                self.close()
-
-            def iter_content(self, chunk_size: int = 1024):
-                yield b"%PDF-1.4\n"
-                yield b"x" * 128
-                yield b"%%EOF"
-
-            def close(self) -> None:
-                return None
-
-        class _Session:
-            def request(self, *, method: str, url: str, **kwargs: Any) -> _Response:
-                assert method == "GET"
-                return _Response()
-
-        context = {
-            "previous": {},
-            "head_precheck_passed": True,
-            "domain_content_rules": {"example.org": {"max_bytes": 32}},
-        }
-
-        outcome = download_candidate(
-            _Session(),
-            artifact,
-            "https://example.org/payload.pdf",
-            referer=None,
-            timeout=5.0,
-            context=context,
-        )
-
-        assert outcome.classification is Classification.PAYLOAD_TOO_LARGE
-        assert outcome.reason is ReasonCode.DOMAIN_MAX_BYTES
-        assert outcome.path is None
-        assert not any(pdf_dir.glob("*.pdf"))
 
     def test_skip_large_downloads_emit_voluntary_reason(tmp_path: Path, patcher) -> None:
         artifact = _make_artifact(tmp_path)
@@ -3594,7 +3460,6 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
         run_id="test-run",
         previous_lookup={},
         resume_completed=set(),
-        max_bytes=None,
         sniff_bytes=DEFAULT_SNIFF_BYTES,
         min_pdf_bytes=DEFAULT_MIN_PDF_BYTES,
         tail_check_bytes=DEFAULT_TAIL_CHECK_BYTES,

@@ -20,8 +20,8 @@ Download outcomes MUST accurately encode reason codes and telemetry classificati
 #### Scenario: Voluntary skip reason code
 - **WHEN** a user-configured `skip_large_downloads` threshold prevents a fetch
 - **THEN** the download outcome SHALL set `ReasonCode.SKIP_LARGE_DOWNLOAD`
-- **AND** the domain budget counter SHALL remain unchanged
-- **AND** telemetry dashboards SHALL report voluntary skips separately from budget violations
+- **AND** the download SHALL avoid emitting `ReasonCode.DOMAIN_MAX_BYTES`
+- **AND** telemetry dashboards SHALL report voluntary skips separately from enforced max-byte limits
 
 ### Requirement: Cached artifact validation
 Cached artifact validation MUST avoid unnecessary full-file hashing while preserving correctness guarantees.

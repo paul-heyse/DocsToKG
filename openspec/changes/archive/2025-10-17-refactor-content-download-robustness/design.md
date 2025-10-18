@@ -62,7 +62,7 @@ The refactoring focuses on consolidating duplicate implementations, removing dea
 **Rationale**:
 
 - Network layer already centralizes retry and session logic
-- Both existing implementations use identical timeout budgets and status code checks
+- Both existing implementations use identical timeout thresholds and status code checks
 - Single implementation enables consistent testing and behavior
 - Natural layering: network helpers serve both CLI and pipeline
 

@@ -27,7 +27,7 @@
 - [x] 3.1 Introduce new enum entry `ReasonCode.SKIP_LARGE_DOWNLOAD` (or agreed name) in `ContentDownload/download.py`.
 - [x] 3.2 Update the branches enforcing `skip_large_downloads` to emit the new reason while keeping `DOMAIN_MAX_BYTES` for host-level thresholds.
 - [x] 3.3 Adjust manifest logging, telemetry sinks, and metrics aggregation code to recognize the new reason value.
-- [x] 3.4 Add unit test verifying skip events increment `SKIP_LARGE_DOWNLOAD` metrics but leave domain budget counters unchanged.
+- [x] 3.4 Add unit test verifying skip events increment `SKIP_LARGE_DOWNLOAD` metrics without emitting `DOMAIN_MAX_BYTES`.
 - [x] 3.5 Update dashboards or analytics queries (documented in repo) to report voluntary skips separately.
 - [x] 3.6 Document the behavioral change in release notes and CLI reference.
 

@@ -78,7 +78,7 @@ The network layer SHALL provide a single `head_precheck()` function implementing
 - **THEN** the function returns True for conservative pass-through
 - **AND** no exceptions propagate to caller
 
-#### Scenario: Timeout budget
+#### Scenario: Timeout guard
 
 - **WHEN** head_precheck() issues HEAD or GET request
 - **THEN** timeout is limited to minimum of provided timeout and 5.0 seconds

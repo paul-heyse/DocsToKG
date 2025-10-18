@@ -13,22 +13,28 @@ from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.settings import DownloadConfiguration
 
 
+@pytest.fixture(autouse=True)
+def _clear_dns_stubs():
+    network_mod.clear_dns_stubs()
+    yield
+    network_mod.clear_dns_stubs()
+
+
 def _fake_getaddrinfo(address: str) -> List[Tuple]:
     return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("93.184.216.34", 0))]
 
 
-def test_validate_url_security_rejects_mixed_script_idn(patch_stack) -> None:
+def test_validate_url_security_rejects_mixed_script_idn() -> None:
     """IDNs mixing confusable scripts should raise ConfigError."""
 
-    patch_stack.setattr(network_mod, "_cached_getaddrinfo", _fake_getaddrinfo)
     with pytest.raises(ConfigError):
         api_mod.validate_url_security("https://раypal.com/resource")
 
 
-def test_validate_url_security_requires_port_allowlist(patch_stack) -> None:
+def test_validate_url_security_requires_port_allowlist() -> None:
     """Non-default ports require the host to be explicitly allowlisted."""
 
-    patch_stack.setattr(network_mod, "_cached_getaddrinfo", _fake_getaddrinfo)
+    network_mod.register_dns_stub("example.org", lambda host: _fake_getaddrinfo(host))
     url = "https://example.org:8443/data"
 
     with pytest.raises(ConfigError):
@@ -39,7 +45,7 @@ def test_validate_url_security_requires_port_allowlist(patch_stack) -> None:
     assert validated.endswith(":8443/data")
 
 
-def test_validate_url_security_blocks_private_cidr(patch_stack) -> None:
+def test_validate_url_security_blocks_private_cidr() -> None:
     """Private IP literals should be rejected unless explicitly allowed."""
 
     url = "https://10.0.0.5/file.owl"
@@ -50,7 +56,7 @@ def test_validate_url_security_blocks_private_cidr(patch_stack) -> None:
     def _private_getaddrinfo(host: str) -> List[Tuple]:
         return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("10.1.2.3", 0))]
 
-    patch_stack.setattr(network_mod, "_cached_getaddrinfo", _private_getaddrinfo)
+    network_mod.register_dns_stub("internal.example.org", _private_getaddrinfo)
     with pytest.raises(ConfigError):
         api_mod.validate_url_security("https://internal.example.org/data", DownloadConfiguration())
 
@@ -59,13 +65,13 @@ def test_validate_url_security_blocks_private_cidr(patch_stack) -> None:
     assert validated.startswith("https://internal.example.org")
 
 
-def test_validate_url_security_dns_failure_strict_mode(patch_stack) -> None:
+def test_validate_url_security_dns_failure_strict_mode() -> None:
     """DNS lookups should raise when strict_dns is enabled."""
 
     def _failing_getaddrinfo(host: str):
         raise socket.gaierror("host not found")
 
-    patch_stack.setattr(network_mod, "_cached_getaddrinfo", _failing_getaddrinfo)
+    network_mod.register_dns_stub("missing.example.org", _failing_getaddrinfo)
 
     strict_config = DownloadConfiguration(strict_dns=True)
     with pytest.raises(ConfigError):

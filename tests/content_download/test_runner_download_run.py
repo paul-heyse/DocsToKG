@@ -39,7 +39,6 @@ def _build_args(**overrides: object) -> argparse.Namespace:
         "resume_from": None,
         "dry_run": False,
         "list_only": False,
-        "max_bytes": None,
         "sniff_bytes": 4096,
         "min_pdf_bytes": 1024,
         "tail_check_bytes": 2048,

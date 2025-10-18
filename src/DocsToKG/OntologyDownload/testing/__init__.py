@@ -31,6 +31,8 @@ from typing import (
 )
 from urllib.parse import urljoin
 
+import requests
+
 from ..plugins import (
     register_resolver,
     register_validator,
@@ -51,6 +53,8 @@ from ..settings import (
     invalidate_default_config_cache,
 )
 from ..settings import StorageBackend as _StorageBackend
+from ..io import rate_limit as rate_mod
+from ..io import sanitize_filename
 
 __all__ = [
     "ResponseSpec",
@@ -179,6 +183,8 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         self._http_root: Optional[str] = None
         self._original_paths: Dict[str, Dict[str, object]] = {}
         self._storage: Optional[_StorageBackend] = None
+        self._bucket_state: Dict[Tuple[Optional[str], Optional[str]], rate_mod.TokenBucket] = {}
+        self._env_overrides: Dict[str, Optional[str]] = {}
         self._registered = False
 
     # --- Context manager protocol -------------------------------------------------
@@ -186,6 +192,8 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
     def __enter__(self) -> "TestingEnvironment":
         self._install_runtime_paths()
         self._start_http_server()
+        self._reset_network_primitives()
+        self._apply_environment_overrides()
         invalidate_default_config_cache()
         self._registered = True
         return self
@@ -193,6 +201,8 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
     def __exit__(self, exc_type, exc, tb) -> None:
         self._stop_http_server()
         self._restore_runtime_paths()
+        self._reset_network_primitives()
+        self._restore_environment_overrides()
         invalidate_default_config_cache()
         self._registered = False
         self._tmp.cleanup()
@@ -229,6 +239,9 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
             "LOG_DIR": self.log_dir,
             "LOCAL_ONTOLOGY_DIR": self.ontology_dir,
         }
+        storage_shim = _StorageShim(self.ontology_dir)
+        self._storage = storage_shim
+
         for module_name, attrs in self._PATH_TARGETS.items():
             module = import_module(module_name)
             store = self._original_paths.setdefault(module_name, {})
@@ -236,11 +249,8 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
                 if attr == "STORAGE":
                     original = getattr(module, attr, None)
                     store[attr] = original
-                    # Recreate storage backend pointing at new ontology dir
-                    storage = _StorageShim(self.ontology_dir)
-                    setattr(module, attr, storage)
-                    if module_name == "DocsToKG.OntologyDownload.settings":
-                                    continue
+                    setattr(module, attr, storage_shim)
+                    continue
                 value = mapping.get(attr)
                 if value is None and hasattr(module, attr):
                     value = getattr(module, attr)
@@ -256,6 +266,40 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
                 setattr(module, attr, value)
         self._original_paths.clear()
         self._storage = None
+        self._bucket_state.clear()
+
+    def _reset_network_primitives(self) -> None:
+        from ..io import network as network_mod  # Local import to avoid cycles
+        from ..io import rate_limit as rate_mod
+
+        network_mod.SESSION_POOL.clear()
+        rate_mod.reset()
+        network_mod.clear_dns_stubs()
+        self._bucket_state.clear()
+
+    def _apply_environment_overrides(self) -> None:
+        env_root = self.root / "env"
+        env_root.mkdir(parents=True, exist_ok=True)
+        pystow_home = env_root / "pystow"
+        pystow_home.mkdir(parents=True, exist_ok=True)
+
+        desired = {
+            "PYSTOW_HOME": str(pystow_home),
+            "BIOPORTAL_API_KEY": "test-bioportal-key",
+        }
+
+        for key, value in desired.items():
+            if key not in self._env_overrides:
+                self._env_overrides[key] = os.environ.get(key)
+            os.environ[key] = value
+
+    def _restore_environment_overrides(self) -> None:
+        for key, previous in self._env_overrides.items():
+            if previous is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = previous
+        self._env_overrides.clear()
 
     # --- HTTP server --------------------------------------------------------------
 
@@ -310,16 +354,17 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         media_type: str = "application/octet-stream",
         etag: Optional[str] = None,
         last_modified: Optional[str] = None,
+        repeats: int = 1,
     ) -> str:
         """Register a fixture served over HTTP and return its URL."""
 
-        path = Path(data)
         if isinstance(data, (bytes, str)):
             path = self.root / "fixtures" / name
             path.parent.mkdir(parents=True, exist_ok=True)
             content = data.encode("utf-8") if isinstance(data, str) else data
             path.write_bytes(content)
         else:
+            path = Path(data)
             content = path.read_bytes()
 
         headers = {
@@ -329,14 +374,11 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         }
 
         rel_path = f"fixtures/{name}"
-        self.queue_response(
-            rel_path,
-            ResponseSpec(status=200, body=content, headers=headers, method="GET"),
-        )
-        self.queue_response(
-            rel_path,
-            ResponseSpec(status=200, body=b"", headers=headers, method="HEAD"),
-        )
+        head_spec = ResponseSpec(status=200, body=b"", headers=headers, method="HEAD")
+        get_spec = ResponseSpec(status=200, body=content, headers=headers, method="GET")
+        for _ in range(max(1, repeats)):
+            self.queue_response(rel_path, head_spec)
+            self.queue_response(rel_path, get_spec)
         return self.http_url(rel_path)
 
     # --- Configuration helpers ----------------------------------------------------
@@ -345,17 +387,41 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         """Return a download configuration bound to this harness."""
 
         config = DownloadConfiguration()
-        config.set_session_factory(None)
-        config.set_bucket_provider(None)
+        config.set_session_factory(self._session_factory)
+        config.set_bucket_provider(self._bucket_provider)
         return config
 
     def build_resolved_config(self) -> ResolvedConfig:
         """Return a resolved config using defaults rooted at the harness directories."""
 
         defaults = DefaultsConfig()
-        defaults.http = defaults.http.model_copy()
+        defaults.http = self.build_download_config()
         config = ResolvedConfig(defaults=defaults, specs=[])
         return config
+
+    def seed_manifest(
+        self,
+        *,
+        ontology_id: str,
+        version: str,
+        manifest: Optional[Mapping[str, object]] = None,
+    ) -> Path:
+        """Create a manifest on disk for ``ontology_id``/``version`` and return its path."""
+
+        safe_id = sanitize_filename(ontology_id)
+        safe_version = sanitize_filename(version)
+        manifest_dir = self.ontology_dir / safe_id / safe_version
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        manifest_path = manifest_dir / "manifest.json"
+        payload = dict(manifest or {})
+        if "id" not in payload:
+            payload["id"] = ontology_id
+        if "version" not in payload:
+            payload["version"] = version
+        if "schema_version" not in payload:
+            payload["schema_version"] = "1.0"
+        manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+        return manifest_path
 
     # --- Resolver helpers ---------------------------------------------------------
 
@@ -394,6 +460,26 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         """Return the list of captured requests."""
 
         return list(self._request_log)
+
+    # --- Custom session/bucket providers -----------------------------------------
+
+    def _session_factory(self) -> requests.Session:
+        session = requests.Session()
+        session.headers.update({"User-Agent": "DocsToKG-TestHarness/1.0"})
+        return session
+
+    def _bucket_provider(
+        self,
+        service: Optional[str],
+        config: DownloadConfiguration,
+        host: Optional[str],
+    ) -> rate_mod.TokenBucket:
+        key = (service, host)
+        bucket = self._bucket_state.get(key)
+        if bucket is None:
+            bucket = rate_mod.TokenBucket(rate_per_sec=10.0, capacity=10.0)
+            self._bucket_state[key] = bucket
+        return bucket
 
 
 class _StorageShim(_StorageBackend):

@@ -213,22 +213,6 @@ def test_circuit_breaker_open_and_cooldown(patcher):
     assert breaker.allow()
 
 
-def test_request_with_retries_enforces_max_bytes_policy():
-    session = Mock()
-    response = _DummyResponse(200, {"Content-Length": "2048"})
-    session.request = Mock(return_value=response)
-
-    with pytest.raises(ContentPolicyViolation) as excinfo:
-        request_with_retries(
-            session,
-            "GET",
-            "https://example.org/file.pdf",
-            content_policy={"max_bytes": 1024},
-        )
-
-    assert response.closed
-    assert excinfo.value.violation == "max-bytes"
-
 
 @st.composite
 def _token_bucket_scenarios(draw):

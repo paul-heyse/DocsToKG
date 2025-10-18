@@ -275,27 +275,6 @@ def _normalise_domain_content_rules(data: Mapping[str, Any]) -> Dict[str, Dict[s
             continue
 
         policy: Dict[str, Any] = {}
-        if "max_bytes" in raw_spec and raw_spec["max_bytes"] is not None:
-            raw_limit = raw_spec["max_bytes"]
-            try:
-                limit_value = (
-                    parse_size(raw_limit) if isinstance(raw_limit, str) else int(raw_limit)
-                )
-            except (TypeError, ValueError) as exc:
-                raise ValueError(
-                    (
-                        "domain_content_rules['{name}'].max_bytes must be an integer or size string,"
-                        " got {value!r}"
-                    ).format(name=host, value=raw_limit)
-                ) from exc
-            if limit_value <= 0:
-                raise ValueError(
-                    (
-                        "domain_content_rules['{name}'].max_bytes must be positive, got {value}"
-                    ).format(name=host, value=limit_value)
-                )
-            policy["max_bytes"] = int(limit_value)
-
         allowed_raw = raw_spec.get("allowed_types")
         if allowed_raw:
             candidates: List[str] = []
@@ -363,7 +342,7 @@ class ResolverConfig:
         max_concurrent_per_host: Upper bound on simultaneous downloads per hostname.
         enable_global_url_dedup: Enable global URL deduplication across works when True.
         domain_token_buckets: Mapping of hostname to token bucket parameters.
-        domain_content_rules: Mapping of hostname to MIME allow-lists and max-bytes caps.
+        domain_content_rules: Mapping of hostname to MIME allow-lists.
         resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
 
     Notes:

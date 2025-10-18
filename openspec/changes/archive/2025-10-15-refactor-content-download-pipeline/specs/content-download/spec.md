@@ -19,7 +19,7 @@ The system SHALL automatically retry HTTP requests that fail due to transient er
 - **WHEN** a download URL returns 404
 - **THEN** the system logs permanent failure immediately, does not retry, moves to next candidate
 
-#### Scenario: Maximum retry budget exhausted
+#### Scenario: Maximum retry attempts exhausted
 
 - **WHEN** a URL returns 503 on all 5 retry attempts
 - **THEN** the system logs final failure with reason "max-retries-exhausted" and moves to next resolver
