@@ -420,13 +420,12 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if tail_count:
-        entries_to_print = list(tail_entries)
-        print(f"docparse manifest tail (last {len(entries_to_print)} entries)")
+        print(f"docparse manifest tail (last {len(tail_entries)} entries)")
         if args.raw:
-            for entry in entries_to_print:
+            for entry in tail_entries:
                 print(json.dumps(entry, ensure_ascii=False))
         else:
-            for entry in entries_to_print:
+            for entry in tail_entries:
                 timestamp = entry.get("timestamp", "")
                 stage = entry.get("stage", "unknown")
                 doc_id = entry.get("doc_id", "unknown")
