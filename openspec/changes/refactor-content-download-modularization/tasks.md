@@ -32,18 +32,18 @@
 
 ## 2. Configuration Purity
 
-- [ ] 2.1 Add `frozen=True` to `ResolvedConfig` dataclass
-- [ ] 2.2 Create `bootstrap_run_environment(resolved: ResolvedConfig) -> None` function
-- [ ] 2.3 Move `ensure_dir(pdf_dir)` from `resolve_config` to `bootstrap_run_environment`
-- [ ] 2.4 Move `ensure_dir(html_dir)` from `resolve_config` to `bootstrap_run_environment`
-- [ ] 2.5 Move `ensure_dir(xml_dir)` from `resolve_config` to `bootstrap_run_environment`
-- [ ] 2.6 Remove `args.extract_html_text = ...` mutation from `resolve_config`
-- [ ] 2.7 Compute `extract_html_text` derived field in `ResolvedConfig` dataclass
-- [ ] 2.8 Update `cli.py` to call `bootstrap_run_environment(resolved)` before `run(resolved)`
-- [ ] 2.9 Update tests to remove filesystem mocks from `resolve_config` tests
-- [ ] 2.10 Add test for `resolve_config` purity (no side effects)
-- [ ] 2.11 Add test for `bootstrap_run_environment` directory creation
-- [ ] 2.12 Document immutability contract in `ResolvedConfig` docstring
+- [x] 2.1 Add `frozen=True` to `ResolvedConfig` dataclass
+- [x] 2.2 Create `bootstrap_run_environment(resolved: ResolvedConfig) -> None` function
+- [x] 2.3 Move `ensure_dir(pdf_dir)` from `resolve_config` to `bootstrap_run_environment`
+- [x] 2.4 Move `ensure_dir(html_dir)` from `resolve_config` to `bootstrap_run_environment`
+- [x] 2.5 Move `ensure_dir(xml_dir)` from `resolve_config` to `bootstrap_run_environment`
+- [x] 2.6 Remove `args.extract_html_text = ...` mutation from `resolve_config`
+- [x] 2.7 Compute `extract_html_text` derived field in `ResolvedConfig` dataclass
+- [x] 2.8 Update `cli.py` to call `bootstrap_run_environment(resolved)` before `run(resolved)`
+- [x] 2.9 Update tests to remove filesystem mocks from `resolve_config` tests
+- [x] 2.10 Add test for `resolve_config` purity (no side effects)
+- [x] 2.11 Add test for `bootstrap_run_environment` directory creation
+- [x] 2.12 Document immutability contract in `ResolvedConfig` docstring
 
 ## 3. Runner Decomposition
 
