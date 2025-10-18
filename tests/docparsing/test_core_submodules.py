@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import io
+import sys
+import types
 from pathlib import Path
 from unittest import mock
 
@@ -25,7 +27,106 @@ from DocsToKG.DocParsing.core import (
 from DocsToKG.DocParsing.core import cli as core_cli
 from DocsToKG.DocParsing.core.cli_utils import merge_args, preview_list
 from DocsToKG.DocParsing.core.http import get_http_session
-from DocsToKG.DocParsing.core.planning import display_plan, plan_doctags
+from DocsToKG.DocParsing.core.planning import (
+    display_plan,
+    plan_chunk,
+    plan_doctags,
+    plan_embed,
+)
+
+
+@pytest.fixture
+def planning_module_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provide lightweight DocParsing submodules for planning tests."""
+
+    import DocsToKG.DocParsing as docparsing_pkg
+
+    stub_doctags = types.ModuleType("DocsToKG.DocParsing.doctags")
+    stub_doctags.HTML_MANIFEST_STAGE = "doctags-html"
+    stub_doctags.MANIFEST_STAGE = "doctags-pdf"
+
+    def add_data_root_option(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--data-root", type=Path, default=None)
+
+    def add_resume_force_options(
+        parser: argparse.ArgumentParser, *, resume_help: str = "", force_help: str = ""
+    ) -> None:
+        parser.add_argument("--resume", action="store_true")
+        parser.add_argument("--force", action="store_true")
+
+    def list_htmls(directory: Path) -> list[Path]:
+        return sorted(Path(directory).rglob("*.html"))
+
+    def list_pdfs(directory: Path) -> list[Path]:
+        return sorted(Path(directory).rglob("*.pdf"))
+
+    def prepare_data_root(data_root: Path | None, detected: Path) -> Path:
+        if data_root is not None:
+            return Path(data_root).expanduser().resolve()
+        return Path(detected).expanduser().resolve()
+
+    def resolve_pipeline_path(
+        *,
+        cli_value: Path | None,
+        default_path: Path,
+        resolved_data_root: Path,
+        data_root_overridden: bool,
+        resolver,
+    ) -> Path:
+        if cli_value is not None:
+            return Path(cli_value).expanduser().resolve()
+        if default_path is not None:
+            return Path(default_path).expanduser().resolve()
+        resolved_root = Path(resolved_data_root).expanduser().resolve()
+        return Path(resolver(resolved_root)).expanduser().resolve()
+
+    stub_doctags.add_data_root_option = add_data_root_option
+    stub_doctags.add_resume_force_options = add_resume_force_options
+    stub_doctags.list_htmls = list_htmls
+    stub_doctags.list_pdfs = list_pdfs
+    stub_doctags.prepare_data_root = prepare_data_root
+    stub_doctags.resolve_pipeline_path = resolve_pipeline_path
+
+    stub_chunking = types.ModuleType("DocsToKG.DocParsing.chunking")
+    stub_chunking.MANIFEST_STAGE = "chunks"
+
+    def build_chunk_parser() -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument("--data-root", type=Path, default=None)
+        parser.add_argument("--in-dir", type=Path, default=None)
+        parser.add_argument("--out-dir", type=Path, default=None)
+        parser.add_argument("--resume", action="store_true")
+        parser.add_argument("--force", action="store_true")
+        return parser
+
+    stub_chunking.build_parser = build_chunk_parser
+
+    stub_embedding = types.ModuleType("DocsToKG.DocParsing.embedding")
+    stub_embedding.MANIFEST_STAGE = "embeddings"
+
+    def build_embed_parser() -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument("--data-root", type=Path, default=None)
+        parser.add_argument("--chunks-dir", type=Path, default=None)
+        parser.add_argument("--out-dir", type=Path, default=None)
+        parser.add_argument("--resume", action="store_true")
+        parser.add_argument("--force", action="store_true")
+        parser.add_argument("--validate-only", action="store_true")
+        return parser
+
+    stub_embedding.build_parser = build_embed_parser
+
+    monkeypatch.setitem(sys.modules, "DocsToKG.DocParsing.doctags", stub_doctags)
+    monkeypatch.setitem(sys.modules, "DocsToKG.DocParsing.chunking", stub_chunking)
+    monkeypatch.setitem(sys.modules, "DocsToKG.DocParsing.embedding", stub_embedding)
+
+    monkeypatch.setitem(docparsing_pkg._MODULE_CACHE, "doctags", stub_doctags)
+    monkeypatch.setitem(docparsing_pkg._MODULE_CACHE, "chunking", stub_chunking)
+    monkeypatch.setitem(docparsing_pkg._MODULE_CACHE, "embedding", stub_embedding)
+
+    monkeypatch.setattr(docparsing_pkg, "doctags", stub_doctags, raising=False)
+    monkeypatch.setattr(docparsing_pkg, "chunking", stub_chunking, raising=False)
+    monkeypatch.setattr(docparsing_pkg, "embedding", stub_embedding, raising=False)
 
 
 def test_normalize_http_timeout_scalar_and_iterables() -> None:
@@ -246,7 +347,9 @@ def test_display_plan_stream_output() -> None:
 
 
 def test_plan_doctags_auto_detection_conflict(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
 ) -> None:
     """DocTags planner surfaces auto-detection conflicts as friendly notes."""
 
@@ -268,3 +371,120 @@ def test_plan_doctags_auto_detection_conflict(
     note = plan["notes"][0]
     assert "Cannot auto-detect mode" in note
     assert "Hint:" in note
+
+
+def test_plan_doctags_without_resume_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """DocTags planner avoids hashing inputs when resume is disabled."""
+
+    html_dir = tmp_path / "html"
+    output_dir = tmp_path / "doctags"
+    html_dir.mkdir()
+    output_dir.mkdir()
+    (html_dir / "doc.html").write_text("<html></html>", encoding="utf-8")
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+
+    def _raise_hash(_path: Path) -> str:
+        raise AssertionError("compute_content_hash should not run without resume")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash
+    )
+
+    plan = plan_doctags(
+        [
+            "--mode",
+            "html",
+            "--in-dir",
+            str(html_dir),
+            "--out-dir",
+            str(output_dir),
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
+
+
+def test_plan_chunk_resume_missing_manifest_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Chunk planner does not hash when resume entry is absent."""
+
+    data_root = tmp_path / "data"
+    in_dir = data_root / "DocTagsFiles"
+    out_dir = data_root / "ChunkedDocTagFiles"
+    in_dir.mkdir(parents=True)
+    out_dir.mkdir(parents=True)
+    (in_dir / "doc1.doctags").write_text("{}", encoding="utf-8")
+
+    def _raise_hash(_path: Path) -> str:
+        raise AssertionError("compute_content_hash should not run without manifest entry")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index", lambda *_args, **_kwargs: {}
+    )
+
+    plan = plan_chunk(
+        [
+            "--data-root",
+            str(data_root),
+            "--in-dir",
+            str(in_dir),
+            "--out-dir",
+            str(out_dir),
+            "--resume",
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
+
+
+def test_plan_embed_resume_missing_manifest_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Embedding planner avoids hashing when resume entry is absent."""
+
+    data_root = tmp_path / "data"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    vectors_dir = data_root / "Embeddings"
+    chunks_dir.mkdir(parents=True)
+    vectors_dir.mkdir(parents=True)
+    (chunks_dir / "doc1.chunks.jsonl").write_text("{}\n", encoding="utf-8")
+
+    def _raise_hash(_path: Path) -> str:
+        raise AssertionError("compute_content_hash should not run without manifest entry")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index", lambda *_args, **_kwargs: {}
+    )
+
+    plan = plan_embed(
+        [
+            "--data-root",
+            str(data_root),
+            "--chunks-dir",
+            str(chunks_dir),
+            "--out-dir",
+            str(vectors_dir),
+            "--resume",
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
