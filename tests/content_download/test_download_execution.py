@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 import pytest
 
@@ -35,7 +35,7 @@ class _FakeResponse(requests.Response):
         self.status_code = status
         self.headers = CaseInsensitiveDict({"Content-Type": content_type})
 
-    def iter_content(self, chunk_size: int) -> Iterable[bytes]:
+    def iter_content(self, chunk_size: int) -> Iterator[bytes]:
         yield self._content
 
 
@@ -212,7 +212,7 @@ def test_download_candidate_retries_and_cleans_partial(
 
     def flaky_atomic_write(
         dest_path: Path,
-        chunks: Iterable[bytes],
+        chunks: Iterator[bytes],
         *,
         hasher: Optional[Any] = None,
         keep_partial_on_error: bool = False,

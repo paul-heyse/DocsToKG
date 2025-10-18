@@ -45,10 +45,11 @@
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Any, Callable, Dict, Tuple
 from unittest.mock import Mock, patch
 
 import pytest
+import requests
 
 try:
     from hypothesis import given
@@ -66,25 +67,34 @@ from DocsToKG.ContentDownload.networking import (
 )
 
 
-class _DummyResponse:
+class _DummyResponse(requests.Response):
     def __init__(self, status_code: int, headers: Dict[str, str]):
+        super().__init__()
         self.status_code = status_code
         self.headers = headers
         self.closed = False
 
     def close(self) -> None:  # noqa: D401
         self.closed = True
+        super().close()
 
 
 # --- Helper Functions ---
 
 
-def _session_for_response(response: _DummyResponse, *, method: str = "HEAD") -> Mock:
-    session = Mock()
+def _session_for_response(
+    response: _DummyResponse, *, method: str = "HEAD"
+) -> Tuple[Mock, Callable[[requests.Session, str, str], requests.Response]]:
+    session = Mock(spec=requests.Session)
     session_request = Mock(return_value=response)
     setattr(session, "request", session_request)
 
-    def _request_with_retries(_session, _method, url, **kwargs):
+    def _request_with_retries(
+        _session: requests.Session,
+        _method: str,
+        url: str,
+        **kwargs: Any,
+    ) -> requests.Response:
         assert _method == method
         return response
 
