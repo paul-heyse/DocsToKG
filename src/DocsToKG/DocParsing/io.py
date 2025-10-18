@@ -559,7 +559,7 @@ def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
 def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, dict]:
     """Load the latest manifest entries for a specific pipeline stage."""
 
-    manifest_dir = data_manifests(root)
+    manifest_dir = data_manifests(root, ensure=False)
     stage_path = manifest_dir / _manifest_filename(stage)
     index: Dict[str, dict] = {}
     if not stage_path.exists():
@@ -612,10 +612,12 @@ def _iter_manifest_file(path: Path, stage: str) -> Iterator[dict]:
             yield entry
 
 
-def iter_manifest_entries(stages: Sequence[str], root: Optional[Path] = None) -> Iterator[dict]:
+def iter_manifest_entries(
+    stages: Sequence[str], root: Optional[Path] = None
+) -> Iterator[dict]:
     """Yield manifest entries for the requested ``stages`` sorted by timestamp."""
 
-    manifest_dir = data_manifests(root)
+    manifest_dir = data_manifests(root, ensure=False)
     heap: List[Tuple[str, int, dict, Iterator[dict]]] = []
     unique = count()
 
