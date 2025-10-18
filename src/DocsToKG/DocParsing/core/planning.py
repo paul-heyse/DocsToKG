@@ -26,7 +26,7 @@ from .discovery import (
     derive_doc_id_and_vectors_path,
     iter_chunks,
 )
-from .manifest import ResumeController
+from .manifest import ResumeController, should_skip_output
 
 PLAN_PREVIEW_LIMIT = 5
 
@@ -144,8 +144,18 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
 
     for path in files:
         doc_id, out_path = derive_doc_id_and_doctags_path(path, input_dir, output_dir)
-        input_hash = compute_content_hash(path)
-        skip, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+        manifest_entry = resume_controller.entry(doc_id)
+        should_hash = bool(args.resume and not args.force and manifest_entry)
+        skip = False
+        if should_hash:
+            input_hash = compute_content_hash(path)
+            skip = should_skip_output(
+                out_path,
+                manifest_entry,
+                input_hash,
+                resume_controller.resume,
+                resume_controller.force,
+            )
         if mode == "html" and overwrite:
             skip = False
         if skip:
@@ -213,8 +223,18 @@ def plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
 
     for path in iter_doctags(in_dir):
         rel_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
-        input_hash = compute_content_hash(path)
-        skip, _ = resume_controller.should_skip(rel_id, out_path, input_hash)
+        manifest_entry = resume_controller.entry(rel_id)
+        should_hash = bool(args.resume and not args.force and manifest_entry)
+        skip = False
+        if should_hash:
+            input_hash = compute_content_hash(path)
+            skip = should_skip_output(
+                out_path,
+                manifest_entry,
+                input_hash,
+                resume_controller.resume,
+                resume_controller.force,
+            )
         if skip:
             _record_bucket(skipped, rel_id)
         else:
@@ -288,10 +308,22 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     planned = _new_bucket()
     skipped = _new_bucket()
 
-    for chunk_path in iter_chunks(chunks_dir):
-        doc_id, vector_path = derive_doc_id_and_vectors_path(chunk_path, chunks_dir, vectors_dir)
-        input_hash = compute_content_hash(chunk_path)
-        skip, _ = resume_controller.should_skip(doc_id, vector_path, input_hash)
+    for chunk_path in files:
+        doc_id, vector_path = derive_doc_id_and_vectors_path(
+            chunk_path, chunks_dir, vectors_dir
+        )
+        manifest_entry = resume_controller.entry(doc_id)
+        should_hash = bool(args.resume and not args.force and manifest_entry)
+        skip = False
+        if should_hash:
+            input_hash = compute_content_hash(chunk_path)
+            skip = should_skip_output(
+                vector_path,
+                manifest_entry,
+                input_hash,
+                resume_controller.resume,
+                resume_controller.force,
+            )
         if skip:
             _record_bucket(skipped, doc_id)
         else:
