@@ -25,7 +25,7 @@ from DocsToKG.DocParsing.core import (
 from DocsToKG.DocParsing.core import cli as core_cli
 from DocsToKG.DocParsing.core.cli_utils import merge_args, preview_list
 from DocsToKG.DocParsing.core.http import get_http_session
-from DocsToKG.DocParsing.core.planning import display_plan
+from DocsToKG.DocParsing.core.planning import display_plan, plan_doctags
 
 
 def test_normalize_http_timeout_scalar_and_iterables() -> None:
@@ -37,21 +37,38 @@ def test_normalize_http_timeout_scalar_and_iterables() -> None:
     assert normalize_http_timeout([2, 3]) == (2.0, 3.0)
 
 
-def test_get_http_session_reuses_singleton() -> None:
-    """Shared HTTP session is memoised and merges headers."""
+def test_get_http_session_reuses_singleton_without_base_headers() -> None:
+    """Shared HTTP session is memoised when not requesting transient headers."""
 
     with (
         mock.patch.object(core_http, "_HTTP_SESSION", None),
         mock.patch.object(core_http, "_HTTP_SESSION_TIMEOUT", core_http.DEFAULT_HTTP_TIMEOUT),
     ):
-        session_a, timeout_a = get_http_session(timeout=10, base_headers={"X-Test": "one"})
-        session_b, timeout_b = get_http_session(base_headers={"X-Other": "two"})
+        session_a, timeout_a = get_http_session(timeout=10)
+        session_b, timeout_b = get_http_session()
 
         assert session_a is session_b
         assert timeout_a == (5.0, 10.0)
         assert timeout_b == (5.0, 30.0)
-        assert session_b.headers["X-Test"] == "one"
-        assert session_b.headers["X-Other"] == "two"
+
+
+def test_get_http_session_transient_headers_do_not_leak() -> None:
+    """Transient base headers return isolated sessions without contaminating shared state."""
+
+    with (
+        mock.patch.object(core_http, "_HTTP_SESSION", None),
+        mock.patch.object(core_http, "_HTTP_SESSION_TIMEOUT", core_http.DEFAULT_HTTP_TIMEOUT),
+    ):
+        session_a, _ = get_http_session(base_headers={"Authorization": "Token A"})
+        session_b, _ = get_http_session(base_headers={"Authorization": "Token B"})
+        shared_session, _ = get_http_session()
+
+        assert session_a is not session_b
+        assert session_a.headers["Authorization"] == "Token A"
+        assert session_b.headers["Authorization"] == "Token B"
+        assert shared_session is not session_a
+        assert shared_session is not session_b
+        assert "Authorization" not in shared_session.headers
 
 
 def test_manifest_resume_controller(tmp_path: Path) -> None:
@@ -201,8 +218,8 @@ def test_display_plan_stream_output() -> None:
         {
             "stage": "doctags",
             "mode": "html",
-            "process": ["a"],
-            "skip": [],
+            "process": {"count": 1, "preview": ["a"]},
+            "skip": {"count": 0, "preview": []},
             "input_dir": "/input/doc",
             "output_dir": "/output/doc",
             "notes": ["Ready"],
@@ -210,8 +227,8 @@ def test_display_plan_stream_output() -> None:
         {
             "stage": "embed",
             "action": "validate",
-            "validate": ["x"],
-            "missing": [],
+            "validate": {"count": 1, "preview": ["x"]},
+            "missing": {"count": 0, "preview": []},
             "chunks_dir": "/chunks",
             "vectors_dir": "/vectors",
             "notes": [],
@@ -224,4 +241,30 @@ def test_display_plan_stream_output() -> None:
     assert lines[-1] == ""
     assert "docparse all plan" in rendered[0]
     assert any("doctags" in line for line in rendered)
+    assert any("process 1" in line for line in rendered)
     assert any("embed (validate-only)" in line for line in rendered)
+
+
+def test_plan_doctags_auto_detection_conflict(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """DocTags planner surfaces auto-detection conflicts as friendly notes."""
+
+    data_root = tmp_path / "Data"
+    html_dir = data_root / "HTML"
+    pdf_dir = data_root / "PDFs"
+    html_dir.mkdir(parents=True)
+    pdf_dir.mkdir(parents=True)
+    (html_dir / "doc.html").write_text("<html></html>", encoding="utf-8")
+    (pdf_dir / "doc.pdf").write_bytes(b"%PDF-1.4\n")
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+
+    plan = plan_doctags(["--mode", "auto"])
+
+    assert plan["stage"] == "doctags"
+    assert plan["process"] == [] and plan["skip"] == []
+    assert plan["notes"], "Expected an explanatory note when mode detection fails"
+    note = plan["notes"][0]
+    assert "Cannot auto-detect mode" in note
+    assert "Hint:" in note

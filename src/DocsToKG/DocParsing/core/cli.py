@@ -5,10 +5,15 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import Counter, defaultdict, deque
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Sequence
+from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
 
-from DocsToKG.DocParsing.cli_errors import CLIValidationError, format_cli_error
+from DocsToKG.DocParsing.cli_errors import (
+    CLIValidationError,
+    DoctagsCLIValidationError,
+    format_cli_error,
+)
 from DocsToKG.DocParsing.env import (
     data_doctags,
     data_html,
@@ -17,7 +22,7 @@ from DocsToKG.DocParsing.env import (
     detect_data_root,
 )
 from DocsToKG.DocParsing.io import iter_manifest_entries
-from DocsToKG.DocParsing.logging import get_logger, log_event, summarize_manifest
+from DocsToKG.DocParsing.logging import get_logger, log_event
 
 from .cli_utils import (
     HTML_SUFFIXES,
@@ -160,9 +165,16 @@ def _resolve_doctags_paths(args: argparse.Namespace) -> tuple[str, Path, Path, s
 
     mode = args.mode
     if args.in_dir is not None:
-        input_dir = args.in_dir.resolve()
+        input_dir = args.in_dir.expanduser().resolve()
         if mode == "auto":
-            mode = detect_mode(input_dir)
+            try:
+                mode = detect_mode(input_dir)
+            except ValueError as exc:
+                raise DoctagsCLIValidationError(
+                    option="--mode",
+                    message=str(exc),
+                    hint="Specify --mode html or --mode pdf to override auto-detection",
+                ) from exc
     else:
         if mode == "auto":
             html_present = directory_contains_suffixes(html_default_in, HTML_SUFFIXES)
@@ -171,11 +183,27 @@ def _resolve_doctags_paths(args: argparse.Namespace) -> tuple[str, Path, Path, s
                 mode = "html"
             elif pdf_present and not html_present:
                 mode = "pdf"
+            elif html_present and pdf_present:
+                raise DoctagsCLIValidationError(
+                    option="--mode",
+                    message=(
+                        "Cannot auto-detect mode: found HTML sources in "
+                        f"{html_default_in} and PDF sources in {pdf_default_in}"
+                    ),
+                    hint="Specify --mode html or --mode pdf to disambiguate the sources",
+                )
             else:
-                raise ValueError("Cannot auto-detect mode: specify --mode or --input explicitly")
+                raise DoctagsCLIValidationError(
+                    option="--mode",
+                    message=(
+                        "Cannot auto-detect mode: expected HTML files in "
+                        f"{html_default_in} or PDF files in {pdf_default_in}"
+                    ),
+                    hint="Provide --input or set --mode html/--mode pdf explicitly",
+                )
         input_dir = html_default_in if mode == "html" else pdf_default_in
 
-    output_dir = args.out_dir.resolve() if args.out_dir is not None else doctags_default_out
+    output_dir = args.out_dir.expanduser().resolve() if args.out_dir is not None else doctags_default_out
     return mode, input_dir, output_dir, str(resolved_root)
 
 
@@ -188,7 +216,11 @@ def doctags(argv: Sequence[str] | None = None) -> int:
     parsed = parser.parse_args([] if argv is None else list(argv))
     logger = get_logger(__name__)
 
-    mode, input_dir, output_dir, resolved_root = _resolve_doctags_paths(parsed)
+    try:
+        mode, input_dir, output_dir, resolved_root = _resolve_doctags_paths(parsed)
+    except CLIValidationError as exc:
+        print(format_cli_error(exc), file=sys.stderr)
+        return 2
 
     parsed.in_dir = input_dir
     parsed.out_dir = output_dir
@@ -325,13 +357,44 @@ def manifest(argv: Sequence[str] | None = None) -> int:
     )
 
     args = parser.parse_args([] if argv is None else list(argv))
-    manifest_dir = data_manifests(args.data_root)
+    manifest_dir = data_manifests(args.data_root, ensure=False)
+    logger = get_logger(__name__, base_fields={"stage": "manifest"})
+
+    if not manifest_dir.exists():
+        log_event(
+            logger,
+            "warning",
+            "Manifest directory is missing",
+            stage="manifest",
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="MANIFEST_DIR_MISSING",
+            manifest_dir=str(manifest_dir),
+            data_root=str(args.data_root) if args.data_root is not None else None,
+        )
+        print(
+            "No manifest directory found. Run a DocParsing stage to generate manifests.",
+        )
+        return 0
+
     if args.stages:
         seen: List[str] = []
-        for stage in args.stages:
-            trimmed = stage.strip()
-            if trimmed and trimmed not in seen:
-                seen.append(trimmed)
+        for raw_stage in args.stages:
+            trimmed = raw_stage.strip()
+            if not trimmed:
+                continue
+            normalized = trimmed.lower()
+            if normalized not in known_stage_set:
+                expected = ", ".join(known_stages)
+                raise CLIValidationError(
+                    option="--stage",
+                    message=(
+                        f"Unsupported stage '{trimmed}'. Expected one of: {expected}"
+                    ),
+                    hint="Choose a supported manifest stage.",
+                )
+            if normalized not in seen:
+                seen.append(normalized)
         stages = seen
     else:
         discovered: List[str] = []
@@ -345,10 +408,33 @@ def manifest(argv: Sequence[str] | None = None) -> int:
     if not stages:
         stages = ["embeddings"]
 
-    logger = get_logger(__name__, base_fields={"stage": "manifest"})
+    tail_count = max(0, int(args.tail))
+    need_summary = bool(args.summarize or not tail_count)
+    tail_entries: Deque[Dict[str, Any]] = deque(maxlen=tail_count or None)
+    status_counter: Optional[Dict[str, Counter]] = None
+    duration_totals: Optional[Dict[str, float]] = None
+    total_entries: Optional[Dict[str, int]] = None
+    if need_summary:
+        status_counter = defaultdict(Counter)
+        duration_totals = defaultdict(float)
+        total_entries = defaultdict(int)
 
-    entries = list(iter_manifest_entries(stages, args.data_root))
-    if not entries:
+    entry_found = False
+    for entry in iter_manifest_entries(stages, args.data_root):
+        entry_found = True
+        if tail_count:
+            tail_entries.append(entry)
+        if need_summary and total_entries is not None and status_counter is not None and duration_totals is not None:
+            stage = entry.get("stage", "unknown")
+            status = entry.get("status", "unknown")
+            total_entries[stage] += 1
+            status_counter[stage][status] += 1
+            try:
+                duration_totals[stage] += float(entry.get("duration_s", 0.0))
+            except (TypeError, ValueError):
+                continue
+
+    if not entry_found:
         log_event(
             logger,
             "warning",
@@ -361,9 +447,6 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         )
         print("No manifest entries found for the requested stages.")
         return 0
-
-    tail_count = max(0, int(args.tail))
-    tail_entries = entries[-tail_count:] if tail_count else []
 
     if tail_count:
         print(f"docparse manifest tail (last {len(tail_entries)} entries)")
@@ -385,8 +468,15 @@ def manifest(argv: Sequence[str] | None = None) -> int:
                     line += f" error={error}"
                 print(line)
 
-    if args.summarize or not tail_count:
-        summary = summarize_manifest(entries)
+    if need_summary and total_entries is not None and status_counter is not None and duration_totals is not None:
+        summary = {
+            stage: {
+                "total": total_entries[stage],
+                "statuses": dict(status_counter[stage]),
+                "duration_s": round(duration_totals[stage], 3),
+            }
+            for stage in total_entries
+        }
         print("\nManifest summary")
         for stage in sorted(summary):
             data = summary[stage]

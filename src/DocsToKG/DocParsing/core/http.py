@@ -102,10 +102,41 @@ def get_http_session(
                 },
             )
 
+        session_to_return = _HTTP_SESSION
         if base_headers:
-            _HTTP_SESSION.headers.update(
+            session_to_return = _clone_http_session(_HTTP_SESSION)
+            session_to_return.headers.update(
                 {key: value for key, value in base_headers.items() if value is not None}
             )
 
         _HTTP_SESSION_TIMEOUT = effective_timeout
-        return _HTTP_SESSION, _HTTP_SESSION_TIMEOUT
+        return session_to_return, _HTTP_SESSION_TIMEOUT
+
+
+def _clone_http_session(session: requests.Session) -> requests.Session:
+    """Create a shallow copy of a :class:`requests.Session` for transient headers."""
+
+    clone = requests.Session()
+
+    # Preserve base configuration while isolating header mutations.
+    clone.headers.clear()
+    clone.headers.update(session.headers)
+    clone.auth = session.auth
+    clone.cookies = session.cookies
+    clone.params = session.params.copy()
+    clone.proxies = session.proxies.copy()
+    clone.verify = session.verify
+    clone.cert = session.cert
+    clone.trust_env = session.trust_env
+    clone.max_redirects = session.max_redirects
+    clone.stream = session.stream
+
+    clone.hooks.clear()
+    for event, hooks in session.hooks.items():
+        clone.hooks[event] = hooks[:]
+
+    clone.adapters.clear()
+    for prefix, adapter in session.adapters.items():
+        clone.mount(prefix, adapter)
+
+    return clone

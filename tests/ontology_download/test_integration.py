@@ -76,6 +76,8 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+from unittest.mock import patch
+
 import pytest
 
 pytest.importorskip("pydantic")
@@ -88,59 +90,13 @@ from DocsToKG.OntologyDownload import settings as settings_mod
 from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.planning import RESOLVERS, FetchPlan
 from DocsToKG.OntologyDownload.settings import DefaultsConfig, ResolvedConfig
+from DocsToKG.OntologyDownload.testing import temporary_resolver
 from DocsToKG.OntologyDownload.validation import ValidationResult
 
 
 @pytest.fixture()
-def patched_dirs(patch_stack, tmp_path):
-    cache = tmp_path / "cache"
-    configs = tmp_path / "configs"
-    logs = tmp_path / "logs"
-    ontologies = tmp_path / "ontologies"
-    for directory in (cache, configs, logs, ontologies):
-        directory.mkdir(parents=True, exist_ok=True)
-    overrides = {
-        "CACHE_DIR": cache,
-        "CONFIG_DIR": configs,
-        "LOG_DIR": logs,
-        "LOCAL_ONTOLOGY_DIR": ontologies,
-    }
-    for attr, value in overrides.items():
-        patch_stack.setattr(settings_mod, attr, value, raising=False)
-        patch_stack.setattr(pipeline_mod, attr, value, raising=False)
-        patch_stack.setattr(core, attr, value, raising=False)
-    patch_stack.setattr(core, "ONTOLOGY_DIR", ontologies, raising=False)
-
-    class _StubStorage:
-        def ensure_local_version(self, ontology_id: str, version: str) -> Path:
-            path = ontologies / ontology_id / version
-            path.mkdir(parents=True, exist_ok=True)
-            return path
-
-        def finalize_version(
-            self,
-            ontology_id: str,
-            version: str,
-            base_dir: Path,
-            *,
-            artifact_path: Optional[Path] = None,
-            artifact_sha256: Optional[str] = None,
-        ) -> None:
-            pass
-
-        def set_latest_version(
-            self, ontology_id: str, path: Path
-        ) -> None:  # pragma: no cover - not used
-            pass
-
-        def mirror_cas_artifact(self, algorithm: str, digest: str, source: Path) -> Path:
-            return source
-
-    stub_storage = _StubStorage()
-    patch_stack.setattr(settings_mod, "STORAGE", stub_storage, raising=False)
-    patch_stack.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
-    patch_stack.setattr(core, "STORAGE", stub_storage, raising=False)
-    return ontologies
+def patched_dirs(ontology_env):
+    return ontology_env.ontology_dir
 
 
 class _StubResolver:
@@ -161,7 +117,7 @@ class _StubResolver:
 
 
 @pytest.fixture()
-def stubbed_validators(patch_stack):
+def stubbed_validators():
     def _runner(requests, logger):
         results = {}
         for req in requests:
@@ -180,35 +136,21 @@ def stubbed_validators(patch_stack):
             )
         return results
 
-    patch_stack.setattr(pipeline_mod, "run_validators", _runner, raising=False)
-    patch_stack.setattr(core, "run_validators", _runner, raising=False)
+    with patch.object(pipeline_mod, "run_validators", _runner):
+        yield
 
-
-@pytest.fixture(autouse=True)
-def _allow_download_hosts(patch_stack) -> None:
-    """Permit test resolvers to use example.org without URL policy failures."""
-
-    patch_stack.setattr(
-        pipeline_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
-    )
-    patch_stack.setattr(
-        network_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
-    )
-    patch_stack.setattr(
-        core, "validate_url_security", lambda url, http_config=None: url, raising=False
-    )
 
 
 # --- Test Cases ---
 
 
-def test_fetch_all_writes_manifests(patch_stack, patched_dirs, stubbed_validators):
+def test_fetch_all_writes_manifests(ontology_env, patched_dirs, stubbed_validators):
     fixture_dir = Path("tests/data/ontology_fixtures")
     pato_fixture = fixture_dir / "mini.ttl"
     bfo_fixture = fixture_dir / "mini.obo"
 
-    patch_stack.setitem(RESOLVERS, "obo", _StubResolver(pato_fixture, "2024-01-01"))
-    patch_stack.setitem(RESOLVERS, "ols", _StubResolver(bfo_fixture, "2024-02-01"))
+    config = ontology_env.build_resolved_config()
+    config.defaults.http.allowed_hosts = ["example.org"]
 
     def _download_with_fixture(**kwargs):
         headers = dict(kwargs["headers"])
@@ -232,20 +174,23 @@ def test_fetch_all_writes_manifests(patch_stack, patched_dirs, stubbed_validator
             content_length=content_length,
         )
 
-    patch_stack.setattr(pipeline_mod, "download_stream", _download_with_fixture, raising=False)
-    patch_stack.setattr(core, "download_stream", _download_with_fixture, raising=False)
+    pato_resolver = _StubResolver(pato_fixture, "2024-01-01")
+    bfo_resolver = _StubResolver(bfo_fixture, "2024-02-01")
 
-    results = core.fetch_all(
-        [
-            core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"]),
-            core.FetchSpec(id="bfo", resolver="ols", extras={}, target_formats=["owl"]),
-        ],
-        config=ResolvedConfig(
-            defaults=DefaultsConfig(prefer_source=["obo", "ols"], resolver_fallback_enabled=False),
-            specs=[],
-        ),
-        force=True,
-    )
+    specs = [
+        pipeline_mod.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=("owl",)),
+        pipeline_mod.FetchSpec(id="bfo", resolver="ols", extras={}, target_formats=("owl",)),
+    ]
+
+    with temporary_resolver("obo", pato_resolver), temporary_resolver("ols", bfo_resolver):
+        with patch.object(pipeline_mod, "download_stream", _download_with_fixture), patch.object(
+            core, "download_stream", _download_with_fixture
+        ):
+            results = core.fetch_all(
+                specs,
+                config=config,
+                force=True,
+            )
     assert len(results) == 2
     for result in results:
         manifest = json.loads(result.manifest_path.read_text())
@@ -263,7 +208,7 @@ def test_fetch_all_writes_manifests(patch_stack, patched_dirs, stubbed_validator
         assert any(normalized_dir.glob("*.json"))
 
 
-def test_force_download_bypasses_manifest(patch_stack, patched_dirs, stubbed_validators):
+def test_force_download_bypasses_manifest(ontology_env, patched_dirs, stubbed_validators):
     fixture = Path("tests/data/ontology_fixtures/mini.ttl")
     captured = {"previous": None}
 
@@ -281,20 +226,26 @@ def test_force_download_bypasses_manifest(patch_stack, patched_dirs, stubbed_val
             content_length=content_length,
         )
 
-    patch_stack.setattr(pipeline_mod, "download_stream", _download, raising=False)
-    patch_stack.setattr(core, "download_stream", _download, raising=False)
-    spec = core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])
-    patch_stack.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
-    manifest_path = patched_dirs / "pato" / "2024-01-01" / "manifest.json"
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({"sha256": "old"}))
-    core.fetch_one(spec, config=ResolvedConfig.from_defaults(), force=True)
+    config = ontology_env.build_resolved_config()
+    config.defaults.http.allowed_hosts = ["example.org"]
+    spec = pipeline_mod.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=("owl",))
+
+    with temporary_resolver("obo", _StubResolver(fixture, "2024-01-01")):
+        with patch.object(pipeline_mod, "download_stream", _download), patch.object(
+            core, "download_stream", _download
+        ):
+            manifest_path = patched_dirs / "pato" / "2024-01-01" / "manifest.json"
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest_path.write_text(json.dumps({"sha256": "old"}))
+            core.fetch_one(spec, config=config, force=True)
+
     assert captured["previous"] is None
 
 
-def test_multi_version_storage(patch_stack, patched_dirs, stubbed_validators):
+def test_multi_version_storage(ontology_env, patched_dirs, stubbed_validators):
     fixture = Path("tests/data/ontology_fixtures/mini.ttl")
-    patch_stack.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
+    config = ontology_env.build_resolved_config()
+    config.defaults.http.allowed_hosts = ["example.org"]
 
     def _download(**kwargs):
         kwargs["destination"].write_bytes(fixture.read_bytes())
@@ -309,19 +260,25 @@ def test_multi_version_storage(patch_stack, patched_dirs, stubbed_validators):
             content_length=content_length,
         )
 
-    patch_stack.setattr(pipeline_mod, "download_stream", _download, raising=False)
-    patch_stack.setattr(core, "download_stream", _download, raising=False)
-    spec = core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])
-    config = ResolvedConfig(defaults=DefaultsConfig(), specs=[])
-    core.fetch_one(spec, config=config, force=True)
-    patch_stack.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-02-01"))
-    core.fetch_one(spec, config=config, force=True)
+    spec = pipeline_mod.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=("owl",))
+
+    with temporary_resolver("obo", _StubResolver(fixture, "2024-01-01")):
+        with patch.object(pipeline_mod, "download_stream", _download), patch.object(
+            core, "download_stream", _download
+        ):
+            core.fetch_one(spec, config=config, force=True)
+
+    with temporary_resolver("obo", _StubResolver(fixture, "2024-02-01")):
+        with patch.object(pipeline_mod, "download_stream", _download), patch.object(
+            core, "download_stream", _download
+        ):
+            core.fetch_one(spec, config=config, force=True)
     versions = sorted((patched_dirs / "pato").iterdir())
     dir_names = {v.name for v in versions if v.is_dir()}
     assert dir_names == {"2024-01-01", "2024-02-01"}
 
 
-def test_fetch_all_logs_progress(patch_stack, patched_dirs, stubbed_validators, caplog):
+def test_fetch_all_logs_progress(ontology_env, patched_dirs, stubbed_validators, caplog):
     fixture = Path("tests/data/ontology_fixtures/mini.ttl")
 
     def _download(**kwargs):
@@ -337,10 +294,8 @@ def test_fetch_all_logs_progress(patch_stack, patched_dirs, stubbed_validators, 
             content_length=content_length,
         )
 
-    patch_stack.setattr(pipeline_mod, "download_stream", _download, raising=False)
-    patch_stack.setattr(core, "download_stream", _download, raising=False)
-    patch_stack.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
-    config = ResolvedConfig(defaults=DefaultsConfig(), specs=[])
+    config = ontology_env.build_resolved_config()
+    config.defaults.http.allowed_hosts = ["example.org"]
     caplog.set_level(logging.INFO, logger="DocsToKG.OntologyDownload")
     logger = logging.getLogger("DocsToKG.OntologyDownload")
     recorded = []
@@ -352,10 +307,12 @@ def test_fetch_all_logs_progress(patch_stack, patched_dirs, stubbed_validators, 
     handler = _RecordingHandler()
     logger.addHandler(handler)
     try:
-        core.fetch_all(
-            [core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])],
-            config=config,
-        )
+        spec = pipeline_mod.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=("owl",))
+        with temporary_resolver("obo", _StubResolver(fixture, "2024-01-01")):
+            with patch.object(pipeline_mod, "download_stream", _download), patch.object(
+                core, "download_stream", _download
+            ):
+                core.fetch_all([spec], config=config)
     finally:
         logger.removeHandler(handler)
 

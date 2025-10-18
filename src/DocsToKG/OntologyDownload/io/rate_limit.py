@@ -242,11 +242,11 @@ def get_bucket(
 ) -> TokenBucket:
     """Return a registry-managed bucket."""
 
-    provider = getattr(http_config, "get_bucket_provider", None)
-    if callable(provider):
-        custom = provider(service, http_config, host)
-        if custom is not None:
-            return custom
+    provider_getter = getattr(http_config, "get_bucket_provider", None)
+    if callable(provider_getter):
+        candidate = provider_getter()
+        if candidate is not None:
+            return candidate(service, http_config, host)
     return REGISTRY.get_bucket(http_config=http_config, service=service, host=host)
 
 

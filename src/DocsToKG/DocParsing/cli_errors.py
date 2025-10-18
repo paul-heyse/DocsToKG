@@ -8,6 +8,7 @@ from typing import Optional
 __all__ = [
     "CLIValidationError",
     "ChunkingCLIValidationError",
+    "DoctagsCLIValidationError",
     "EmbeddingCLIValidationError",
     "format_cli_error",
 ]
@@ -42,6 +43,18 @@ class ChunkingCLIValidationError(CLIValidationError):
         """Ensure the chunk stage marker is applied before chaining."""
 
         self.stage = "chunk"
+        CLIValidationError.__post_init__(self)
+
+
+class DoctagsCLIValidationError(CLIValidationError):
+    """Validation error raised by DocTags CLI helpers."""
+
+    stage = "doctags"
+
+    def __post_init__(self) -> None:  # pragma: no cover - simple wiring
+        """Ensure the doctags stage marker is applied before chaining."""
+
+        self.stage = "doctags"
         CLIValidationError.__post_init__(self)
 
 

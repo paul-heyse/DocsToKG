@@ -137,7 +137,14 @@ def _cached_getaddrinfo(host: str) -> List[Tuple]:
     with _DNS_STUB_LOCK:
         stub = _DNS_STUBS.get(ascii_host)
     if stub is not None:
-        return stub(host)
+        results = stub(host)
+        now = time.monotonic()
+        expires_at = now + _DNS_CACHE_TTL
+        with _DNS_CACHE_LOCK:
+            _DNS_CACHE[ascii_host] = (expires_at, results)
+            _DNS_CACHE.move_to_end(ascii_host)
+            _prune_dns_cache(now)
+        return results
 
     now = time.monotonic()
     with _DNS_CACHE_LOCK:
