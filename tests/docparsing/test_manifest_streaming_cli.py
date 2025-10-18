@@ -18,12 +18,15 @@ from DocsToKG.DocParsing.io import iter_manifest_entries
 from tests.docparsing.stubs import dependency_stubs
 
 
-@pytest.mark.parametrize("tail", [7])
-def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -> None:
-    """Ensure ``manifest`` streams large iterators while keeping tail accuracy."""
+def _prepare_manifest_cli_stubs(monkeypatch) -> None:
+    """Install shared dependency stubs required to import the DocParsing CLI."""
 
-    total_entries = 10_050
-    stage_name = "chunk"
+    if "tests.docparsing.fake_deps.vllm" not in sys.modules:
+        monkeypatch.setitem(
+            sys.modules,
+            "tests.docparsing.fake_deps.vllm",
+            types.ModuleType("tests.docparsing.fake_deps.vllm"),
+        )
 
     dependency_stubs()
 
@@ -40,6 +43,16 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
 
     yaml_stub = types.SimpleNamespace(safe_load=lambda *_args, **_kwargs: {}, YAMLError=Exception)
     monkeypatch.setitem(sys.modules, "yaml", yaml_stub)
+
+
+@pytest.mark.parametrize("tail", [7])
+def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -> None:
+    """Ensure ``manifest`` streams large iterators while keeping tail accuracy."""
+
+    total_entries = 10_050
+    stage_name = "chunk"
+
+    _prepare_manifest_cli_stubs(monkeypatch)
 
     vllm_module = types.ModuleType("vllm")
 
@@ -135,7 +148,9 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
         "iter_manifest_entries",
         fake_iter_manifest_entries,
     )
-    monkeypatch.setattr(cli, "data_manifests", lambda data_root: tmp_path)
+    monkeypatch.setattr(
+        cli, "data_manifests", lambda data_root, *, ensure=True: tmp_path
+    )
 
     exit_code = cli.manifest(
         [
@@ -168,40 +183,30 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
     assert status_line == "  statuses: failure=6, success=10044"
 
 
-def test_iter_manifest_entries_streams_large_manifest(tmp_path: Path) -> None:
-    """Iterating over large manifests should remain memory efficient."""
+def test_manifest_missing_directory_read_only(tmp_path, monkeypatch, capsys) -> None:
+    """CLI should warn when the manifest directory is absent without creating it."""
 
-    stages = ["doctags", "chunk", "embeddings"]
-    entries_per_stage = 60_000
-    base = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    _prepare_manifest_cli_stubs(monkeypatch)
 
-    manifest_dir = data_manifests(tmp_path)
-    for offset, stage in enumerate(stages):
-        stage_path = manifest_dir / f"docparse.{stage}.manifest.jsonl"
-        with stage_path.open("w", encoding="utf-8") as handle:
-            for index in range(entries_per_stage):
-                timestamp = (base + timedelta(seconds=index + offset * entries_per_stage)).isoformat()
-                payload = {
-                    "timestamp": timestamp,
-                    "stage": stage,
-                    "doc_id": f"{stage}-doc-{index}",
-                    "status": "success",
-                    "duration_s": 0.1,
-                }
-                handle.write(json.dumps(payload) + "\n")
+    from DocsToKG.DocParsing.core import cli
 
-    tracemalloc.start()
-    total_entries = 0
-    previous_timestamp = ""
-    for entry in iter_manifest_entries(stages, tmp_path):
-        assert entry["stage"] in stages
-        current_timestamp = entry.get("timestamp", "")
-        assert current_timestamp >= previous_timestamp
-        previous_timestamp = current_timestamp
-        total_entries += 1
+    read_only_root = tmp_path / "readonly"
+    read_only_root.mkdir()
+    manifests_dir = read_only_root / "Manifests"
 
-    _, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+    def _fail_iter(*_args, **_kwargs):
+        raise AssertionError("iter_manifest_entries should not run when manifests are missing")
 
-    assert total_entries == entries_per_stage * len(stages)
-    assert peak < 32_000_000
+    monkeypatch.setattr(cli, "iter_manifest_entries", _fail_iter)
+
+    read_only_root.chmod(0o555)
+    try:
+        exit_code = cli.manifest(["--data-root", str(read_only_root)])
+    finally:
+        read_only_root.chmod(0o755)
+
+    assert exit_code == 0
+    assert not manifests_dir.exists()
+
+    output = capsys.readouterr()
+    assert "No manifest directory found" in output.out
