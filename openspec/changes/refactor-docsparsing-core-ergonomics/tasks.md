@@ -24,12 +24,12 @@
 
 ## 3. CLI Validation UX
 
-- [ ] 3.1 Identify all `ValueError`/`assert`-based validation in chunking and embedding CLI builders.
-- [ ] 3.2 Create `DocParsing/cli_errors.py` defining `CLIValidationError` base class and stage-specific subclasses.
-- [ ] 3.3 Refactor validation helpers to raise the shared exceptions, capturing option names and helpful messages.
-- [ ] 3.4 Update CLI entrypoints to catch `CLIValidationError`, format messages via a common helper, and exit non-zero.
-- [ ] 3.5 Add regression tests invoking CLIs with invalid options (token thresholds, mutually exclusive flags, shard configs) and assert on exit codes/stderr + exception class.
-- [ ] 3.6 Update CLI documentation/help text to mention validation behavior, provide example messages, and describe the shared error hierarchy.
+- [x] 3.1 Identify all `ValueError`/`assert`-based validation in chunking and embedding CLI builders.
+- [x] 3.2 Create `DocParsing/cli_errors.py` defining `CLIValidationError` base class and stage-specific subclasses.
+- [x] 3.3 Refactor validation helpers to raise the shared exceptions, capturing option names and helpful messages.
+- [x] 3.4 Update CLI entrypoints to catch `CLIValidationError`, format messages via a common helper, and exit non-zero.
+- [x] 3.5 Add regression tests invoking CLIs with invalid options (token thresholds, mutually exclusive flags, shard configs) and assert on exit codes/stderr + exception class.
+- [x] 3.6 Update CLI documentation/help text to mention validation behavior, provide example messages, and describe the shared error hierarchy.
 
 ## 4. Optional Dependency Deferral
 

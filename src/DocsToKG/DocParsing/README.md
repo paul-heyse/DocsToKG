@@ -101,6 +101,14 @@ manage structural-marker inventories outside the CLI. Use
 input) to deserialize marker documents before passing the resulting dictionaries
 into `load_structural_marker_profile`.
 
+### CLI validation behaviour
+
+All DocParsing CLIs normalise invalid argument handling through
+`CLIValidationError`. When a stage rejects input, the process exits with code `2`
+and prints a single `[stage] --option: message` line on stderr instead of a
+Python traceback. Automation scripts can rely on this format when surfacing
+operator guidance.
+
 ### Environment Variables
 
 | Variable | Purpose |

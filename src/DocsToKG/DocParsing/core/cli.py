@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Sequence
 
+from DocsToKG.DocParsing.cli_errors import CLIValidationError, format_cli_error
 from DocsToKG.DocParsing.env import data_doctags, data_html, data_manifests, data_pdfs, detect_data_root
 from DocsToKG.DocParsing.io import iter_manifest_entries
 from DocsToKG.DocParsing.logging import get_logger, log_event, summarize_manifest
@@ -49,6 +51,16 @@ __all__ = [
     "run_all",
     "token_profiles",
 ]
+
+
+def _run_stage(handler: Callable[[Sequence[str]], int], argv: Sequence[str] | None = None) -> int:
+    """Execute a stage handler while normalising CLI validation errors."""
+
+    try:
+        return handler([] if argv is None else list(argv))
+    except CLIValidationError as exc:
+        print(format_cli_error(exc), file=sys.stderr)
+        return 2
 
 
 def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentParser:
@@ -228,7 +240,11 @@ def chunk(argv: Sequence[str] | None = None) -> int:
     parser = chunk_module.build_parser()
     parser.prog = "docparse chunk"
     args = parser.parse_args([] if argv is None else list(argv))
-    return chunk_module.main(args)
+    try:
+        return chunk_module.main(args)
+    except CLIValidationError as exc:
+        print(format_cli_error(exc), file=sys.stderr)
+        return 2
 
 
 def embed(argv: Sequence[str] | None = None) -> int:
@@ -239,7 +255,11 @@ def embed(argv: Sequence[str] | None = None) -> int:
     parser = embedding_module.build_parser()
     parser.prog = "docparse embed"
     args = parser.parse_args([] if argv is None else list(argv))
-    return embedding_module.main(args)
+    try:
+        return embedding_module.main(args)
+    except CLIValidationError as exc:
+        print(format_cli_error(exc), file=sys.stderr)
+        return 2
 
 
 def token_profiles(argv: Sequence[str] | None = None) -> int:

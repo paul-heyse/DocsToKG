@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Dict, Optional
 
+from DocsToKG.DocParsing.cli_errors import EmbeddingCLIValidationError
 from DocsToKG.DocParsing.config import StageConfigBase
 from DocsToKG.DocParsing.env import data_chunks, data_vectors, detect_data_root
 
@@ -220,19 +221,34 @@ class EmbedCfg(StageConfigBase):
         self.no_cache = bool(self.no_cache)
 
         if self.batch_size_splade < 1:
-            raise ValueError("batch_size_splade must be >= 1")
+            raise EmbeddingCLIValidationError(
+                option="--batch-size-splade",
+                message="must be >= 1",
+            )
         if self.batch_size_qwen < 1:
-            raise ValueError("batch_size_qwen must be >= 1")
+            raise EmbeddingCLIValidationError(
+                option="--batch-size-qwen",
+                message="must be >= 1",
+            )
         if self.files_parallel < 1:
-            raise ValueError("files_parallel must be >= 1")
+            raise EmbeddingCLIValidationError(
+                option="--files-parallel",
+                message="must be >= 1",
+            )
         if self.tp < 1:
-            raise ValueError("tp must be >= 1")
+            raise EmbeddingCLIValidationError(option="--tp", message="must be >= 1")
         if self.shard_count < 1:
-            raise ValueError("shard_count must be >= 1")
+            raise EmbeddingCLIValidationError(option="--shard-count", message="must be >= 1")
         if not (0 <= self.shard_index < self.shard_count):
-            raise ValueError("shard_index must be in [0, shard_count)")
+            raise EmbeddingCLIValidationError(
+                option="--shard-index",
+                message="must be between 0 and shard-count-1",
+            )
         if self.splade_max_active_dims is not None and self.splade_max_active_dims < 1:
-            raise ValueError("splade_max_active_dims must be >= 1 when provided")
+            raise EmbeddingCLIValidationError(
+                option="--splade-max-active-dims",
+                message="must be >= 1 when provided",
+            )
 
 
 __all__ = ["EmbedCfg", "EMBED_PROFILE_PRESETS", "SPLADE_SPARSITY_WARN_THRESHOLD_PCT"]

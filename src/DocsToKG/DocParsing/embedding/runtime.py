@@ -327,6 +327,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    TYPE_CHECKING,
 )
 
 # Third-party imports
@@ -427,6 +428,7 @@ from DocsToKG.DocParsing.logging import (
     manifest_log_success,
     telemetry_scope,
 )
+from DocsToKG.DocParsing.cli_errors import EmbeddingCLIValidationError, format_cli_error
 from DocsToKG.DocParsing.schemas import (
     SchemaKind,
     ensure_chunk_schema,
@@ -473,27 +475,52 @@ __all__ = (
 
 # --- Public Functions ---
 
-try:  # Optional dependency used for SPLADE sparse embeddings
-    from sentence_transformers import (
-        SparseEncoder,
-    )  # loads from local dir if given (cache_folder supported)
+if TYPE_CHECKING:  # pragma: no cover - type checking only
+    from sentence_transformers import SparseEncoder  # type: ignore
+    from vllm import LLM, PoolingParams
+else:  # pragma: no cover - runtime fallback when optional deps absent
+    SparseEncoder = Any  # type: ignore[assignment]
+    LLM = Any  # type: ignore[assignment]
+    PoolingParams = Any  # type: ignore[assignment]
 
-    _SENTENCE_TRANSFORMERS_IMPORT_ERROR: Exception | None = None
-except Exception as exc:  # pragma: no cover - exercised via tests with stubs
-    SparseEncoder = None  # type: ignore[assignment]
-    _SENTENCE_TRANSFORMERS_IMPORT_ERROR = exc
 
-try:  # Optional dependency used for Qwen dense embeddings
-    from vllm import (
-        LLM,
-        PoolingParams,
-    )  # PoolingParams(dimensions=...) selects output dim if model supports MRL
+_SPARSE_ENCODER_CLS: type | None = None
+_VLLM_COMPONENTS: Tuple[type, type] | None = None
 
-    _VLLM_IMPORT_ERROR: Exception | None = None
-except Exception as exc:  # pragma: no cover - exercised via tests with stubs
-    LLM = None  # type: ignore[assignment]
-    PoolingParams = None  # type: ignore[assignment]
-    _VLLM_IMPORT_ERROR = exc
+
+def _get_sparse_encoder_cls() -> type:
+    """Import and cache the sentence-transformers SparseEncoder class."""
+
+    global _SPARSE_ENCODER_CLS
+    if _SPARSE_ENCODER_CLS is not None:
+        return _SPARSE_ENCODER_CLS
+    ensure_splade_dependencies()
+    try:
+        from sentence_transformers import SparseEncoder as cls  # type: ignore
+    except ImportError as exc:  # pragma: no cover - optional dependency missing
+        raise RuntimeError(
+            "sentence-transformers is required for SPLADE embeddings. "
+            "Install it with `pip install sentence-transformers`."
+        ) from exc
+    _SPARSE_ENCODER_CLS = cls
+    return cls
+
+
+def _get_vllm_components() -> Tuple[type, type]:
+    """Import and cache vLLM components used by the embedding runtime."""
+
+    global _VLLM_COMPONENTS
+    if _VLLM_COMPONENTS is not None:
+        return _VLLM_COMPONENTS
+    ensure_qwen_dependencies()
+    try:
+        from vllm import LLM as llm_cls, PoolingParams as pooling_cls  # type: ignore
+    except ImportError as exc:  # pragma: no cover - optional dependency missing
+        raise RuntimeError(
+            "vLLM is required for Qwen embeddings. Install it with `pip install vllm`."
+        ) from exc
+    _VLLM_COMPONENTS = (llm_cls, pooling_cls)
+    return _VLLM_COMPONENTS
 
 
 def _shutdown_llm_instance(llm) -> None:
@@ -693,17 +720,13 @@ MANIFEST_STAGE = "embeddings"
 def _ensure_splade_dependencies() -> None:
     """Backward-compatible shim that delegates to core.ensure_splade_dependencies."""
 
-    if SparseEncoder is not None:
-        return
-    ensure_splade_dependencies(_SENTENCE_TRANSFORMERS_IMPORT_ERROR)
+    _get_sparse_encoder_cls()
 
 
 def _ensure_qwen_dependencies() -> None:
     """Backward-compatible shim that delegates to core.ensure_qwen_dependencies."""
 
-    if LLM is not None and PoolingParams is not None:
-        return
-    ensure_qwen_dependencies(_VLLM_IMPORT_ERROR)
+    _get_vllm_components()
 
 
 # --- BM25 Tokenizer ---
@@ -970,7 +993,7 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
         ImportError: If required SPLADE dependencies are unavailable.
     """
 
-    _ensure_splade_dependencies()
+    encoder_cls = _get_sparse_encoder_cls()
 
     key = (str(cfg.model_dir), cfg.device, cfg.attn_impl, cfg.max_active_dims)
     if key in _SPLADE_ENCODER_CACHE:
@@ -986,7 +1009,7 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
 
     backend_used: str | None = cfg.attn_impl
     try:
-        encoder = SparseEncoder(
+        encoder = encoder_cls(
             str(cfg.model_dir),
             device=cfg.device,
             cache_folder=str(cfg.cache_folder),
@@ -999,7 +1022,7 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
             print("[SPLADE] FlashAttention 2 unavailable; retrying with standard attention.")
             fallback_kwargs = dict(model_kwargs)
             fallback_kwargs["attn_implementation"] = "sdpa"
-            encoder = SparseEncoder(
+            encoder = encoder_cls(
                 str(cfg.model_dir),
                 device=cfg.device,
                 cache_folder=str(cfg.cache_folder),
@@ -1152,14 +1175,13 @@ def _qwen_embed_direct(
     Returns:
         List of embedding vectors, one per input text.
     """
-    _ensure_qwen_dependencies()
-
     effective_batch = batch_size or cfg.batch_size
     use_cache = bool(getattr(cfg, "cache_enabled", True))
     cache_key = _qwen_cache_key(cfg)
+    llm_cls, pooling_cls = _get_vllm_components()
     llm = _QWEN_LLM_CACHE.get(cache_key) if use_cache else None
     if llm is None:
-        llm = LLM(
+        llm = llm_cls(
             model=str(cfg.model_dir),  # local path
             task="embed",
             dtype=cfg.dtype,
@@ -1173,7 +1195,7 @@ def _qwen_embed_direct(
                 _QWEN_LLM_CACHE.put(cache_key, llm)
             else:  # pragma: no cover - compatibility with dict-like caches in tests
                 _QWEN_LLM_CACHE[cache_key] = llm
-    pool = PoolingParams(normalize=True, dimensions=int(cfg.dim))
+    pool = pooling_cls(normalize=True, dimensions=int(cfg.dim))
     out: List[List[float]] = []
     try:
         for i in range(0, len(texts), effective_batch):
@@ -1907,7 +1929,7 @@ def _validate_vectors_for_chunks(
     return files_checked, rows_validated
 
 
-def main(args: argparse.Namespace | None = None) -> int:
+def _main_inner(args: argparse.Namespace | None = None) -> int:
     """CLI entrypoint for chunk UUID cleanup and embedding generation.
 
     Args:
@@ -1949,7 +1971,10 @@ def main(args: argparse.Namespace | None = None) -> int:
         namespace = parse_args_with_overrides(parser, args)
 
     if getattr(namespace, "plan_only", False) and getattr(namespace, "validate_only", False):
-        raise ValueError("--plan-only cannot be combined with --validate-only")
+        raise EmbeddingCLIValidationError(
+            option="--plan-only/--validate-only",
+            message="flags cannot be combined",
+        )
 
     profile = getattr(namespace, "profile", None)
     defaults = EMBED_PROFILE_PRESETS.get(profile or "", {})
@@ -1988,17 +2013,26 @@ def main(args: argparse.Namespace | None = None) -> int:
         shard_count = int(cfg.shard_count)
         shard_index = int(cfg.shard_index)
     except (TypeError, ValueError) as exc:
-        raise ValueError("--shard-count and --shard-index must be integers") from exc
+        raise EmbeddingCLIValidationError(
+            option="--shard-count/--shard-index",
+            message="must be integers",
+        ) from exc
     if shard_count < 1:
-        raise ValueError("--shard-count must be >= 1")
+        raise EmbeddingCLIValidationError(option="--shard-count", message="must be >= 1")
     if not 0 <= shard_index < shard_count:
-        raise ValueError("--shard-index must be between 0 and shard-count-1")
+        raise EmbeddingCLIValidationError(
+            option="--shard-index",
+            message="must be between 0 and shard-count-1",
+        )
     args.shard_count = shard_count
     args.shard_index = shard_index
 
     vector_format = str(cfg.vector_format or "jsonl").lower()
     if vector_format not in {"jsonl", "parquet"}:
-        raise ValueError("--format must be one of: jsonl, parquet")
+        raise EmbeddingCLIValidationError(
+            option="--format",
+            message="must be one of: jsonl, parquet",
+        )
     if vector_format != "jsonl":
         log_event(
             logger,
@@ -2051,7 +2085,10 @@ def main(args: argparse.Namespace | None = None) -> int:
     qwen_env = ensure_qwen_environment(dtype=cfg.qwen_dtype, model_dir=qwen_model_dir)
 
     if args.batch_size_splade < 1 or args.batch_size_qwen < 1:
-        raise ValueError("Batch sizes must be >= 1")
+        raise EmbeddingCLIValidationError(
+            option="--batch-size-splade/--batch-size-qwen",
+            message="must be >= 1",
+        )
 
     overall_start = time.perf_counter()
 
@@ -2737,3 +2774,12 @@ def main(args: argparse.Namespace | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+def main(args: argparse.Namespace | None = None) -> int:
+    """Wrapper that normalises CLI validation failures for the embedding stage."""
+
+    try:
+        return _main_inner(args)
+    except EmbeddingCLIValidationError as exc:
+        print(format_cli_error(exc), file=sys.stderr)
+        return 2

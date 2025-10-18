@@ -9,12 +9,74 @@ from pathlib import Path
 
 import pytest
 
-if "DocsToKG.DocParsing.chunking" not in sys.modules:
-    chunk_stub = types.ModuleType("DocsToKG.DocParsing.chunking")
-    chunk_stub.__all__ = []
-    sys.modules["DocsToKG.DocParsing.chunking"] = chunk_stub
+def _install_stub(fullname: str) -> types.ModuleType:
+    module = types.ModuleType(fullname)
+    module.__all__ = []
+    sys.modules[fullname] = module
+    return module
+
+
+chunk_stub = sys.modules.get("DocsToKG.DocParsing.chunking") or _install_stub(
+    "DocsToKG.DocParsing.chunking"
+)
+embedding_stub = sys.modules.get("DocsToKG.DocParsing.embedding") or _install_stub(
+    "DocsToKG.DocParsing.embedding"
+)
+
+
+from DocsToKG.DocParsing.cli_errors import (
+    ChunkingCLIValidationError,
+    EmbeddingCLIValidationError,
+)
+
+
+def _configure_chunking_stub() -> None:
+    def build_parser() -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(prog="docparse chunk")
+        parser.add_argument("--min-tokens", type=int, default=1)
+        parser.add_argument("--max-tokens", type=int, default=1)
+        return parser
+
+    def main(args: argparse.Namespace) -> int:
+        if args.min_tokens < 0 or args.max_tokens < 0:
+            raise ChunkingCLIValidationError(
+                option="--min-tokens/--max-tokens",
+                message="values must be non-negative",
+            )
+        return 0
+
+    chunk_stub.build_parser = build_parser
+    chunk_stub.main = main
+    chunk_stub.MANIFEST_STAGE = "chunk"
+    chunk_stub.__all__ = ["build_parser", "main", "MANIFEST_STAGE"]
+
+
+def _configure_embedding_stub() -> None:
+    def build_parser() -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(prog="docparse embed")
+        parser.add_argument("--plan-only", action="store_true")
+        parser.add_argument("--validate-only", action="store_true")
+        return parser
+
+    def main(args: argparse.Namespace) -> int:
+        if getattr(args, "plan_only", False) and getattr(args, "validate_only", False):
+            raise EmbeddingCLIValidationError(
+                option="--plan-only/--validate-only",
+                message="flags cannot be combined",
+            )
+        return 0
+
+    embedding_stub.build_parser = build_parser
+    embedding_stub.main = main
+    embedding_stub.MANIFEST_STAGE = "embed"
+    embedding_stub.__all__ = ["build_parser", "main", "MANIFEST_STAGE"]
+
+
+_configure_chunking_stub()
+_configure_embedding_stub()
 
 import DocsToKG.DocParsing.core.http as core_http
+from DocsToKG.DocParsing.core import cli as core_cli
 from DocsToKG.DocParsing.core import (
     ResumeController,
     compute_relative_doc_id,
@@ -173,3 +235,22 @@ def test_load_toml_markers_success() -> None:
 
     data = load_toml_markers('headings = ["#"]\ncaptions = []')
     assert data == {"headings": ["#"], "captions": []}
+
+def test_chunk_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> None:
+    """Chunk CLI surfaces validation errors without tracebacks."""
+
+    exit_code = core_cli.chunk(["--min-tokens", "-1"])
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "--min-tokens" in captured.err
+    assert "non-negative" in captured.err
+
+
+def test_embed_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> None:
+    """Embedding CLI reports conflicting flag usage cleanly."""
+
+    exit_code = core_cli.embed(["--plan-only", "--validate-only"])
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "--plan-only" in captured.err
+    assert "cannot be combined" in captured.err

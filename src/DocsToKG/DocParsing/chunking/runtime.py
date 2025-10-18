@@ -278,7 +278,7 @@ from DocsToKG.DocParsing.logging import (
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
 from .cli import build_parser, parse_args
-from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
+from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError, format_cli_error
 from .config import CHUNK_PROFILE_PRESETS, ChunkerCfg, SOFT_BARRIER_MARGIN
 
 CHUNK_STAGE = "chunking"
@@ -446,7 +446,9 @@ def _validate_chunk_files(
 MANIFEST_STAGE = "chunks"
 
 
-def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = None) -> int:
+def _main_inner(
+    args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = None,
+) -> int:
     """CLI driver that chunks DocTags files and enforces minimum token thresholds.
 
     Args:
@@ -1134,3 +1136,12 @@ def _run_validate_only(
             input_relpath=relative_path(in_dir, data_root),
             output_relpath=relative_path(out_dir, data_root),
         )
+
+def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = None) -> int:
+    """Wrapper that normalises CLI validation failures for the chunk stage."""
+
+    try:
+        return _main_inner(args)
+    except ChunkingCLIValidationError as exc:
+        print(format_cli_error(exc), file=sys.stderr)
+        return 2
