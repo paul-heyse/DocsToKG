@@ -27,6 +27,8 @@ from DocsToKG.ContentDownload.core import (
 from DocsToKG.ContentDownload.download import (
     DownloadOptions,
     DownloadState,
+    _build_download_outcome,
+    build_download_outcome,
     create_artifact,
     download_candidate,
     ensure_dir,
@@ -81,6 +83,8 @@ __all__ = (
     "ensure_dir",
     "DownloadRun",
     "iterate_openalex",
+    "build_download_outcome",
+    "_build_download_outcome",
     "load_previous_manifest",
     "load_resolver_config",
     "main",

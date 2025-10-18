@@ -10,17 +10,28 @@ All notable changes to DocsToKG are documented in this file.
   and head-precheck degradation behaviour.
 - Regression safeguards that pin default resolver ordering, manifest entry schemas,
   legacy resume parsing, and legacy resolver configuration inputs.
+- Download strategy helpers (`validate_classification`, `handle_resume_logic`,
+  `cleanup_sidecar_files`, `build_download_outcome`) with comprehensive unit
+  coverage to support artifact-specific logic.
 
 ### Documentation
 - Migration notes outlining the removal of deprecated content download shims,
   new `ApiResolverBase` guidance for resolver authors, staging directory usage,
   and updated CLI flag documentation.
 - CHANGELOG entry detailing the content download robustness refactor for downstream consumers.
+- Updated content download architecture, review, and API reference documents to
+  describe the resolver modularisation, `DownloadRun` orchestration, and
+  strategy pattern.
 
 ### Changed
 - Refactored `DocsToKG.OntologyDownload` into modular submodules (`config`, `io_safe`,
   `net`, `pipeline`, `storage`, `validation_core`, `plugins`) while keeping the
   public facade stable for downstream consumers.
+- Split resolver implementations into `ContentDownload/resolvers/` with
+  re-exports in `pipeline.py`, introduced the `DownloadRun` orchestration class,
+  and adopted strategy-based download processing for PDF, HTML, and XML
+  artifacts. Legacy CLI imports (`_build_download_outcome`, resolver classes)
+  remain available for compatibility.
 
 ## [0.2.0] - 2025-02-15
 

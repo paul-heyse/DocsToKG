@@ -18,7 +18,18 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Protocol,
+    Set,
+    Union,
+)
 from urllib.parse import urlparse, urlsplit
 from urllib.robotparser import RobotFileParser
 
@@ -73,6 +84,18 @@ __all__ = [
     "ensure_dir",
     "DownloadOptions",
     "DownloadState",
+    "ValidationResult",
+    "ResumeDecision",
+    "DownloadStrategy",
+    "DownloadStrategyContext",
+    "PdfDownloadStrategy",
+    "HtmlDownloadStrategy",
+    "XmlDownloadStrategy",
+    "get_strategy_for_classification",
+    "validate_classification",
+    "handle_resume_logic",
+    "cleanup_sidecar_files",
+    "build_download_outcome",
     "RobotsCache",
     "create_artifact",
     "download_candidate",
@@ -115,6 +138,163 @@ class DownloadOptions:
     content_addressed: bool = False
 
 
+@dataclass(frozen=True)
+class ValidationResult:
+    """Outcome of validating an artifact classification."""
+
+    is_valid: bool
+    classification: Classification
+    expected: Optional[Classification] = None
+    reason: Optional[ReasonCode | str] = None
+    detail: Optional[str] = None
+
+
+@dataclass
+class ResumeDecision:
+    """Decision container describing resume handling for a work artifact."""
+
+    should_skip: bool
+    previous_map: Dict[str, Dict[str, Any]]
+    outcome: Optional[DownloadOutcome] = None
+    resolver: Optional[str] = None
+    reason: Optional[ReasonCode | str] = None
+    reason_detail: Optional[str] = None
+    html_paths: List[str] = field(default_factory=list)
+
+
+@dataclass
+class DownloadStrategyContext:
+    """Mutable state shared between strategy phases for a single download."""
+
+    download_context: DownloadContext
+    dest_path: Optional[Path] = None
+    content_type: Optional[str] = None
+    disposition: Optional[str] = None
+    elapsed_ms: float = 0.0
+    flagged_unknown: bool = False
+    sha256: Optional[str] = None
+    content_length: Optional[int] = None
+    etag: Optional[str] = None
+    last_modified: Optional[str] = None
+    extracted_text_path: Optional[str] = None
+    tail_bytes: Optional[bytes] = None
+    head_precheck_passed: bool = False
+    min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
+    tail_check_bytes: int = DEFAULT_TAIL_CHECK_BYTES
+    retry_after: Optional[float] = None
+    classification_hint: Optional[Classification] = None
+    response: Optional[requests.Response] = None
+    skip_outcome: Optional[DownloadOutcome] = None
+
+
+class DownloadStrategy(Protocol):
+    """Protocol implemented by artifact-specific download strategies."""
+
+    def should_download(
+        self,
+        artifact: WorkArtifact,
+        context: DownloadStrategyContext,
+    ) -> bool: ...
+
+    def process_response(
+        self,
+        response: requests.Response,
+        artifact: WorkArtifact,
+        context: DownloadStrategyContext,
+    ) -> Classification: ...
+
+    def finalize_artifact(
+        self,
+        artifact: WorkArtifact,
+        classification: Classification,
+        context: DownloadStrategyContext,
+    ) -> DownloadOutcome: ...
+
+
+class _BaseDownloadStrategy:
+    classification: Classification
+
+    def should_download(
+        self,
+        artifact: WorkArtifact,
+        context: DownloadStrategyContext,
+    ) -> bool:
+        if context.download_context.list_only:
+            context.skip_outcome = DownloadOutcome(
+                classification=Classification.SKIPPED,
+                path=None,
+                http_status=None,
+                content_type=None,
+                elapsed_ms=0.0,
+                reason=ReasonCode.LIST_ONLY,
+                reason_detail="list-only",
+            )
+            return False
+        return True
+
+    def process_response(
+        self,
+        response: requests.Response,
+        artifact: WorkArtifact,
+        context: DownloadStrategyContext,
+    ) -> Classification:
+        context.response = response
+        if context.classification_hint is None:
+            context.classification_hint = self.classification
+        return context.classification_hint
+
+    def finalize_artifact(
+        self,
+        artifact: WorkArtifact,
+        classification: Classification,
+        context: DownloadStrategyContext,
+    ) -> DownloadOutcome:
+        return build_download_outcome(
+            artifact=artifact,
+            classification=classification,
+            dest_path=context.dest_path,
+            response=context.response or requests.Response(),
+            elapsed_ms=context.elapsed_ms,
+            flagged_unknown=context.flagged_unknown,
+            sha256=context.sha256,
+            content_length=context.content_length,
+            etag=context.etag,
+            last_modified=context.last_modified,
+            extracted_text_path=context.extracted_text_path,
+            dry_run=context.download_context.dry_run,
+            tail_bytes=context.tail_bytes,
+            head_precheck_passed=context.head_precheck_passed,
+            min_pdf_bytes=context.min_pdf_bytes,
+            tail_check_bytes=context.tail_check_bytes,
+            retry_after=context.retry_after,
+            options=context.download_context,
+        )
+
+
+class PdfDownloadStrategy(_BaseDownloadStrategy):
+    classification = Classification.PDF
+
+
+class HtmlDownloadStrategy(_BaseDownloadStrategy):
+    classification = Classification.HTML
+
+
+class XmlDownloadStrategy(_BaseDownloadStrategy):
+    classification = Classification.XML
+
+
+def get_strategy_for_classification(classification: Classification) -> DownloadStrategy:
+    """Return a strategy implementation for the provided classification."""
+
+    if classification in PDF_LIKE:
+        return PdfDownloadStrategy()
+    if classification is Classification.HTML:
+        return HtmlDownloadStrategy()
+    if classification is Classification.XML:
+        return XmlDownloadStrategy()
+    return PdfDownloadStrategy()
+
+
 class DownloadState(Enum):
     """State machine for streaming downloads."""
 
@@ -146,102 +326,23 @@ def _build_download_outcome(
     tail_check_bytes: int = 2048,
     retry_after: Optional[float] = None,
 ) -> DownloadOutcome:
-    if isinstance(classification, Classification):
-        classification_code = classification
-    else:
-        classification_code = Classification.from_wire(classification)
-
-    reason_code: Optional[ReasonCode] = None
-    reason_detail: Optional[str] = None
-    if flagged_unknown and classification_code is Classification.PDF:
-        reason_code = ReasonCode.PDF_SNIFF_UNKNOWN
-        reason_detail = "pdf-sniff-unknown"
-
-    if reason_code is None and classification_code in PDF_LIKE:
-        reason_code = ReasonCode.CONDITIONAL_NOT_MODIFIED
-
-    path_str = str(dest_path) if dest_path else None
-
-    if classification_code in PDF_LIKE and not dry_run and dest_path is not None:
-        size_hint = content_length
-        if size_hint is None:
-            with contextlib.suppress(OSError):
-                size_hint = dest_path.stat().st_size
-        if (
-            size_hint is not None
-            and min_pdf_bytes > 0
-            and size_hint < min_pdf_bytes
-            and not head_precheck_passed
-        ):
-            with contextlib.suppress(OSError):
-                dest_path.unlink()
-            return DownloadOutcome(
-                classification=Classification.MISS,
-                path=None,
-                http_status=response.status_code,
-                content_type=response.headers.get("Content-Type"),
-                elapsed_ms=elapsed_ms,
-                reason=ReasonCode.PDF_TOO_SMALL,
-                reason_detail="pdf-too-small",
-                sha256=None,
-                content_length=None,
-                etag=etag,
-                last_modified=last_modified,
-                extracted_text_path=extracted_text_path,
-                retry_after=retry_after,
-            )
-
-        if tail_contains_html(tail_bytes):
-            with contextlib.suppress(OSError):
-                dest_path.unlink()
-            return DownloadOutcome(
-                classification=Classification.MISS,
-                path=None,
-                http_status=response.status_code,
-                content_type=response.headers.get("Content-Type"),
-                elapsed_ms=elapsed_ms,
-                reason=ReasonCode.HTML_TAIL_DETECTED,
-                reason_detail="html-tail-detected",
-                sha256=None,
-                content_length=None,
-                etag=etag,
-                last_modified=last_modified,
-                extracted_text_path=extracted_text_path,
-                retry_after=retry_after,
-            )
-
-        if not has_pdf_eof(dest_path, window_bytes=tail_check_bytes):
-            with contextlib.suppress(OSError):
-                dest_path.unlink()
-            return DownloadOutcome(
-                classification=Classification.MISS,
-                path=None,
-                http_status=response.status_code,
-                content_type=response.headers.get("Content-Type"),
-                elapsed_ms=elapsed_ms,
-                reason=ReasonCode.PDF_EOF_MISSING,
-                reason_detail="pdf-eof-missing",
-                sha256=None,
-                content_length=None,
-                etag=etag,
-                last_modified=last_modified,
-                extracted_text_path=extracted_text_path,
-                retry_after=retry_after,
-            )
-
-    return DownloadOutcome(
-        classification=classification_code,
-        path=path_str,
-        http_status=response.status_code,
-        content_type=response.headers.get("Content-Type"),
+    return build_download_outcome(
+        artifact=artifact,
+        classification=classification,
+        dest_path=dest_path,
+        response=response,
         elapsed_ms=elapsed_ms,
-        reason=reason_code,
-        reason_detail=reason_detail,
+        flagged_unknown=flagged_unknown,
         sha256=sha256,
         content_length=content_length,
         etag=etag,
         last_modified=last_modified,
         extracted_text_path=extracted_text_path,
+        dry_run=dry_run,
+        tail_bytes=tail_bytes,
+        head_precheck_passed=head_precheck_passed,
+        min_pdf_bytes=min_pdf_bytes,
+        tail_check_bytes=tail_check_bytes,
         retry_after=retry_after,
     )
 
@@ -418,6 +519,321 @@ def _apply_content_addressed_storage(dest_path: Path, sha256: str) -> Path:
                 dest_path.unlink()
         shutil.copy2(hashed_path, dest_path)
     return hashed_path
+
+
+def validate_classification(
+    classification: Union[Classification, str, None],
+    artifact: WorkArtifact,
+    options: Union[DownloadOptions, DownloadContext],
+) -> ValidationResult:
+    """Validate resolver classification against configured expectations."""
+
+    normalized = Classification.from_wire(classification)
+    expected: Optional[Classification] = Classification.PDF
+    html_allowed = getattr(options, "extract_html_text", False)
+    xml_dir = getattr(artifact, "xml_dir", None)
+
+    if normalized in PDF_LIKE:
+        expected = Classification.PDF
+    elif normalized is Classification.HTML:
+        expected = Classification.HTML
+        if not html_allowed:
+            return ValidationResult(
+                is_valid=False,
+                classification=normalized,
+                expected=Classification.PDF,
+                reason=ReasonCode.UNKNOWN,
+                detail="html-disabled",
+            )
+    elif normalized is Classification.XML:
+        expected = Classification.XML if xml_dir else Classification.PDF
+    else:
+        return ValidationResult(
+            is_valid=False,
+            classification=normalized,
+            expected=expected,
+            reason=ReasonCode.UNKNOWN,
+            detail=f"unexpected-{normalized.value}",
+        )
+
+    return ValidationResult(
+        is_valid=True,
+        classification=normalized,
+        expected=expected,
+    )
+
+
+def handle_resume_logic(
+    artifact: WorkArtifact,
+    previous_index: Mapping[str, Dict[str, Any]],
+    options: DownloadOptions,
+) -> ResumeDecision:
+    """Normalise previous attempts and detect early skip conditions."""
+
+    previous_map: Dict[str, Dict[str, Any]] = {}
+    for previous_url, entry in previous_index.items():
+        if not isinstance(entry, dict):
+            continue
+        normalized_url = normalize_url(previous_url)
+        etag = entry.get("etag")
+        last_modified = entry.get("last_modified")
+        path = entry.get("path")
+        sha256 = entry.get("sha256")
+        content_length = entry.get("content_length")
+        content_length_value: Optional[int]
+        if isinstance(content_length, str):
+            try:
+                content_length_value = int(content_length)
+            except ValueError:
+                content_length_value = None
+        else:
+            content_length_value = content_length
+
+        if etag or last_modified:
+            missing_fields = []
+            if not path:
+                missing_fields.append("path")
+            if not sha256:
+                missing_fields.append("sha256")
+            if content_length_value is None:
+                missing_fields.append("content_length")
+            if missing_fields:
+                LOGGER.warning(
+                    "resume-metadata-incomplete: dropping cached metadata",
+                    extra={
+                        "extra_fields": {
+                            "work_id": artifact.work_id,
+                            "url": previous_url,
+                            "missing_fields": missing_fields,
+                        }
+                    },
+                )
+                continue
+
+        previous_map[normalized_url] = {
+            "etag": etag,
+            "last_modified": last_modified,
+            "path": path,
+            "sha256": sha256,
+            "content_length": content_length_value,
+        }
+
+    if artifact.work_id in options.resume_completed:
+        LOGGER.info("Skipping %s (already completed)", artifact.work_id)
+        skipped_outcome = DownloadOutcome(
+            classification=Classification.SKIPPED,
+            path=None,
+            http_status=None,
+            content_type=None,
+            elapsed_ms=None,
+            reason=ReasonCode.RESUME_COMPLETE,
+            reason_detail="resume-complete",
+        )
+        return ResumeDecision(
+            should_skip=True,
+            previous_map=previous_map,
+            outcome=skipped_outcome,
+            resolver="resume",
+            reason=ReasonCode.RESUME_COMPLETE,
+            reason_detail="resume-complete",
+        )
+
+    if not options.dry_run:
+        existing_pdf = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
+        existing_xml = artifact.xml_dir / f"{artifact.base_stem}.xml"
+        cached_path = existing_pdf if existing_pdf.exists() else existing_xml
+        if cached_path.exists():
+            outcome = DownloadOutcome(
+                classification=Classification.CACHED,
+                path=str(cached_path),
+                http_status=None,
+                content_type=None,
+                elapsed_ms=None,
+                reason=ReasonCode.ALREADY_DOWNLOADED,
+                reason_detail="already-downloaded",
+            )
+            return ResumeDecision(
+                should_skip=True,
+                previous_map=previous_map,
+                outcome=outcome,
+                resolver="existing",
+                reason=ReasonCode.ALREADY_DOWNLOADED,
+                reason_detail="already-downloaded",
+            )
+
+    return ResumeDecision(should_skip=False, previous_map=previous_map)
+
+
+def cleanup_sidecar_files(
+    artifact: WorkArtifact,
+    classification: Classification,
+    options: Union[DownloadOptions, DownloadContext],
+) -> None:
+    """Remove temporary sidecar files for the given artifact classification."""
+
+    if classification in PDF_LIKE:
+        dest_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
+    elif classification is Classification.HTML:
+        dest_path = artifact.html_dir / f"{artifact.base_stem}.html"
+    elif classification is Classification.XML:
+        dest_path = artifact.xml_dir / f"{artifact.base_stem}.xml"
+    else:
+        return
+
+    part_path = dest_path.with_suffix(dest_path.suffix + ".part")
+    with contextlib.suppress(FileNotFoundError):
+        part_path.unlink()
+
+    dry_run = getattr(options, "dry_run", False)
+    if dry_run:
+        return
+
+    with contextlib.suppress(FileNotFoundError):
+        dest_path.unlink()
+
+
+def build_download_outcome(
+    *,
+    artifact: WorkArtifact,
+    classification: Optional[Classification | str],
+    dest_path: Optional[Path],
+    response: requests.Response,
+    elapsed_ms: float,
+    flagged_unknown: bool,
+    sha256: Optional[str],
+    content_length: Optional[int],
+    etag: Optional[str],
+    last_modified: Optional[str],
+    extracted_text_path: Optional[str],
+    dry_run: bool,
+    tail_bytes: Optional[bytes],
+    head_precheck_passed: bool,
+    min_pdf_bytes: int,
+    tail_check_bytes: int,
+    retry_after: Optional[float],
+    options: Optional[Union[DownloadOptions, DownloadContext]] = None,
+) -> DownloadOutcome:
+    """Compose a :class:`DownloadOutcome` with shared validation logic."""
+
+    classification_code = (
+        classification
+        if isinstance(classification, Classification)
+        else Classification.from_wire(classification)
+    )
+
+    if classification_code in PDF_LIKE and not dry_run and dest_path is not None:
+        size_hint = content_length
+        if size_hint is None:
+            with contextlib.suppress(OSError):
+                size_hint = dest_path.stat().st_size
+        if (
+            size_hint is not None
+            and min_pdf_bytes > 0
+            and size_hint < min_pdf_bytes
+            and not head_precheck_passed
+        ):
+            with contextlib.suppress(OSError):
+                dest_path.unlink()
+            return DownloadOutcome(
+                classification=Classification.MISS,
+                path=None,
+                http_status=response.status_code,
+                content_type=response.headers.get("Content-Type"),
+                elapsed_ms=elapsed_ms,
+                reason=ReasonCode.PDF_TOO_SMALL,
+                reason_detail="pdf-too-small",
+                sha256=None,
+                content_length=None,
+                etag=etag,
+                last_modified=last_modified,
+                extracted_text_path=extracted_text_path,
+                retry_after=retry_after,
+            )
+
+        if tail_contains_html(tail_bytes):
+            with contextlib.suppress(OSError):
+                dest_path.unlink()
+            return DownloadOutcome(
+                classification=Classification.MISS,
+                path=None,
+                http_status=response.status_code,
+                content_type=response.headers.get("Content-Type"),
+                elapsed_ms=elapsed_ms,
+                reason=ReasonCode.HTML_TAIL_DETECTED,
+                reason_detail="html-tail-detected",
+                sha256=None,
+                content_length=None,
+                etag=etag,
+                last_modified=last_modified,
+                extracted_text_path=extracted_text_path,
+                retry_after=retry_after,
+            )
+
+        if not has_pdf_eof(dest_path, window_bytes=tail_check_bytes):
+            with contextlib.suppress(OSError):
+                dest_path.unlink()
+            return DownloadOutcome(
+                classification=Classification.MISS,
+                path=None,
+                http_status=response.status_code,
+                content_type=response.headers.get("Content-Type"),
+                elapsed_ms=elapsed_ms,
+                reason=ReasonCode.PDF_EOF_MISSING,
+                reason_detail="pdf-eof-missing",
+                sha256=None,
+                content_length=None,
+                etag=etag,
+                last_modified=last_modified,
+                extracted_text_path=extracted_text_path,
+                retry_after=retry_after,
+            )
+
+    options_obj = options or DownloadContext()
+    validation = validate_classification(classification_code, artifact, options_obj)
+    if not validation.is_valid:
+        detail = validation.detail or "classification-invalid"
+        return DownloadOutcome(
+            classification=Classification.MISS,
+            path=None,
+            http_status=response.status_code,
+            content_type=response.headers.get("Content-Type"),
+            elapsed_ms=elapsed_ms,
+            reason=ReasonCode.UNKNOWN,
+            reason_detail=detail,
+            sha256=None,
+            content_length=content_length,
+            etag=etag,
+            last_modified=last_modified,
+            extracted_text_path=extracted_text_path,
+            retry_after=retry_after,
+        )
+
+    reason_code: Optional[ReasonCode] = None
+    reason_detail: Optional[str] = None
+    if flagged_unknown and classification_code is Classification.PDF:
+        reason_code = ReasonCode.PDF_SNIFF_UNKNOWN
+        reason_detail = "pdf-sniff-unknown"
+
+    if reason_code is None and classification_code in PDF_LIKE:
+        reason_code = ReasonCode.CONDITIONAL_NOT_MODIFIED
+
+    path_str = str(dest_path) if dest_path else None
+
+    return DownloadOutcome(
+        classification=classification_code,
+        path=path_str,
+        http_status=response.status_code,
+        content_type=response.headers.get("Content-Type"),
+        elapsed_ms=elapsed_ms,
+        reason=reason_code,
+        reason_detail=reason_detail,
+        sha256=sha256,
+        content_length=content_length,
+        etag=etag,
+        last_modified=last_modified,
+        extracted_text_path=extracted_text_path,
+        retry_after=retry_after,
+    )
 
 
 def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
@@ -659,7 +1075,6 @@ def download_candidate(
     # but feature is disabled by default pending append-mode implementation.
     enable_resume = ctx.enable_range_resume
     resume_bytes_offset: Optional[int] = None
-    resume_probe_path: Optional[Path] = None
     accept_overrides = ctx.host_accept_overrides
     accept_value: Optional[str] = None
     if isinstance(accept_overrides, dict):
@@ -728,7 +1143,6 @@ def download_candidate(
     start = time.monotonic()
     try:
         while True:
-            resume_probe_path = None
             if (
                 enable_resume
                 and existing_path
@@ -750,7 +1164,6 @@ def download_candidate(
                             and file_size < previous_length
                         ):
                             resume_bytes_offset = file_size
-                            resume_probe_path = candidate_file
                             LOGGER.debug(
                                 "Resuming partial download from byte %d for %s (source=%s)",
                                 resume_bytes_offset,
@@ -974,28 +1387,9 @@ def download_candidate(
                                 "resume_offset": resume_bytes_offset,
                             },
                         )
-                    cleanup_targets: List[Path] = []
-                    if existing_path:
-                        cleanup_targets.append(Path(existing_path))
-                        cleanup_targets.append(
-                            Path(existing_path).with_suffix(Path(existing_path).suffix + ".part")
-                        )
-                    if resume_probe_path:
-                        cleanup_targets.append(resume_probe_path)
-                    seen: Set[Path] = set()
-                    for candidate in cleanup_targets:
-                        if candidate in seen:
-                            continue
-                        seen.add(candidate)
-                        try:
-                            candidate.unlink()
-                        except FileNotFoundError:
-                            continue
-                        except OSError as exc:
-                            LOGGER.debug("Failed to remove partial file %s: %s", candidate, exc)
+                    cleanup_sidecar_files(artifact, Classification.PDF, ctx)
                     existing_path = None
                     resume_bytes_offset = None
-                    resume_probe_path = None
                     attempt_conditional = False
                     cond_helper = ConditionalRequestHelper()
                     continue
@@ -1175,25 +1569,46 @@ def download_candidate(
                         retry_after=retry_after_hint,
                     )
 
+            strategy_factory = getattr(ctx, "extra", {}).get("strategy_factory")
+            if not callable(strategy_factory):
+                strategy_factory = get_strategy_for_classification
+            strategy = strategy_factory(detected)
+            strategy_context = DownloadStrategyContext(
+                download_context=ctx,
+                content_type=content_type,
+                disposition=disposition,
+                elapsed_ms=elapsed_ms,
+                flagged_unknown=flagged_unknown,
+                min_pdf_bytes=min_pdf_bytes,
+                tail_check_bytes=tail_window_bytes,
+                head_precheck_passed=head_precheck_passed,
+                retry_after=retry_after_hint,
+                classification_hint=detected,
+            )
+
             if dry_run:
-                return _build_download_outcome(
-                    artifact=artifact,
-                    classification=detected,
-                    dest_path=None,
-                    response=response,
-                    elapsed_ms=elapsed_ms,
-                    flagged_unknown=flagged_unknown,
-                    sha256=None,
-                    content_length=None,
-                    etag=modified_result.etag,
-                    last_modified=modified_result.last_modified,
-                    extracted_text_path=None,
-                    dry_run=True,
-                    tail_bytes=None,
-                    head_precheck_passed=head_precheck_passed,
-                    min_pdf_bytes=min_pdf_bytes,
-                    tail_check_bytes=tail_window_bytes,
-                    retry_after=retry_after_hint,
+                if not strategy.should_download(artifact, strategy_context):
+                    return strategy_context.skip_outcome or DownloadOutcome(
+                        classification=Classification.SKIPPED,
+                        path=None,
+                        http_status=None,
+                        content_type=None,
+                        elapsed_ms=elapsed_ms,
+                        reason=ReasonCode.UNKNOWN,
+                        reason_detail="strategy-skip",
+                    )
+                strategy_context.retry_after = retry_after_hint
+                processed_classification = strategy.process_response(
+                    response, artifact, strategy_context
+                )
+                strategy_context.elapsed_ms = elapsed_ms
+                strategy_context.etag = modified_result.etag
+                strategy_context.last_modified = modified_result.last_modified
+                strategy_context.flagged_unknown = flagged_unknown
+                return strategy.finalize_artifact(
+                    artifact,
+                    processed_classification,
+                    strategy_context,
                 )
 
             if detected == Classification.HTML:
@@ -1207,6 +1622,19 @@ def download_candidate(
                 dest_dir = artifact.pdf_dir
             suffix = _infer_suffix(url, content_type, disposition, detected, default_suffix)
             dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
+            strategy_context.dest_path = dest_path
+            strategy_context.content_type = content_type
+            strategy_context.disposition = disposition
+            if not strategy.should_download(artifact, strategy_context):
+                return strategy_context.skip_outcome or DownloadOutcome(
+                    classification=Classification.SKIPPED,
+                    path=None,
+                    http_status=None,
+                    content_type=None,
+                    elapsed_ms=elapsed_ms,
+                    reason=ReasonCode.UNKNOWN,
+                    reason_detail="strategy-skip",
+                )
             ensure_dir(dest_path.parent)
 
             # Optimization: Only maintain tail buffer for PDFs (used for corruption detection)
@@ -1389,24 +1817,22 @@ def download_candidate(
                             extracted_text_path = str(text_path)
 
             ctx.stream_retry_attempts = 0
-            return _build_download_outcome(
-                artifact=artifact,
-                classification=detected,
-                dest_path=dest_path,
-                response=response,
-                elapsed_ms=elapsed_ms,
-                flagged_unknown=flagged_unknown,
-                sha256=sha256,
-                content_length=content_length,
-                etag=modified_result.etag,
-                last_modified=modified_result.last_modified,
-                extracted_text_path=extracted_text_path,
-                dry_run=False,
-                tail_bytes=tail_snapshot,
-                head_precheck_passed=head_precheck_passed,
-                min_pdf_bytes=min_pdf_bytes,
-                tail_check_bytes=tail_window_bytes,
-                retry_after=retry_after_hint,
+            strategy_context.elapsed_ms = elapsed_ms
+            strategy_context.sha256 = sha256
+            strategy_context.content_length = content_length
+            strategy_context.etag = modified_result.etag
+            strategy_context.last_modified = modified_result.last_modified
+            strategy_context.extracted_text_path = extracted_text_path
+            strategy_context.tail_bytes = tail_snapshot
+            strategy_context.flagged_unknown = flagged_unknown
+            strategy_context.retry_after = retry_after_hint
+            processed_classification = strategy.process_response(
+                response, artifact, strategy_context
+            )
+            return strategy.finalize_artifact(
+                artifact,
+                processed_classification,
+                strategy_context,
             )
     except requests.RequestException as exc:
         elapsed_ms = (time.monotonic() - start) * 1000.0
@@ -1453,6 +1879,9 @@ def process_one_work(
     *,
     options: DownloadOptions,
     session_factory: Optional[Callable[[], requests.Session]] = None,
+    strategy_selector: Callable[
+        [Classification], DownloadStrategy
+    ] = get_strategy_for_classification,
 ) -> Dict[str, Any]:
     """Process a single work artifact through the resolver pipeline.
 
@@ -1487,7 +1916,6 @@ def process_one_work(
     list_only = options.list_only
     extract_html_text = options.extract_html_text
     previous_lookup = options.previous_lookup
-    resume_completed = options.resume_completed
     max_bytes = options.max_bytes
     sniff_bytes = options.sniff_bytes
     min_pdf_bytes = options.min_pdf_bytes
@@ -1505,52 +1933,11 @@ def process_one_work(
     }
 
     raw_previous = previous_lookup.get(artifact.work_id, {})
-    previous_map: Dict[str, Dict[str, Any]] = {}
-    for previous_url, entry in raw_previous.items():
-        if not isinstance(entry, dict):
-            continue
-        normalized_url = normalize_url(previous_url)
-        etag = entry.get("etag")
-        last_modified = entry.get("last_modified")
-        path = entry.get("path")
-        sha256 = entry.get("sha256")
-        content_length = entry.get("content_length")
-        content_length_value: Optional[int]
-        if isinstance(content_length, str):
-            try:
-                content_length_value = int(content_length)
-            except ValueError:
-                content_length_value = None
-        else:
-            content_length_value = content_length
+    if not isinstance(raw_previous, Mapping):
+        raw_previous = {}
 
-        if etag or last_modified:
-            missing_fields = []
-            if not path:
-                missing_fields.append("path")
-            if not sha256:
-                missing_fields.append("sha256")
-            if content_length_value is None:
-                missing_fields.append("content_length")
-            if missing_fields:
-                LOGGER.warning(
-                    "resume-metadata-incomplete: dropping cached metadata",
-                    extra={
-                        "extra_fields": {
-                            "work_id": artifact.work_id,
-                            "url": previous_url,
-                            "missing_fields": missing_fields,
-                        }
-                    },
-                )
-                continue
-        previous_map[normalized_url] = {
-            "etag": etag,
-            "last_modified": last_modified,
-            "path": path,
-            "sha256": sha256,
-            "content_length": content_length_value,
-        }
+    resume_decision = handle_resume_logic(artifact, raw_previous, options)
+    previous_map = resume_decision.previous_map
     download_context = DownloadContext(
         dry_run=dry_run,
         extract_html_text=extract_html_text,
@@ -1575,33 +1962,33 @@ def process_one_work(
         "robots_checker",
         "content_addressed",
     )
+    download_context.extra["strategy_factory"] = strategy_selector
 
     cohort_order = _cohort_order_for(artifact)
     if cohort_order:
         download_context.resolver_order = list(dict.fromkeys(cohort_order))
         download_context.mark_explicit("resolver_order")
 
-    if artifact.work_id in resume_completed:
-        LOGGER.info("Skipping %s (already completed)", artifact.work_id)
-        skipped_outcome = DownloadOutcome(
+    if resume_decision.should_skip:
+        skipped_outcome = resume_decision.outcome or DownloadOutcome(
             classification=Classification.SKIPPED,
             path=None,
             http_status=None,
             content_type=None,
             elapsed_ms=None,
-            reason=ReasonCode.RESUME_COMPLETE,
-            reason_detail="resume-complete",
+            reason=resume_decision.reason or ReasonCode.UNKNOWN,
+            reason_detail=resume_decision.reason_detail or "resume-skip",
         )
         logger.record_manifest(
             artifact,
-            resolver="resume",
+            resolver=resume_decision.resolver,
             url=None,
             outcome=skipped_outcome,
             html_paths=[],
             dry_run=dry_run,
             run_id=run_id,
-            reason=ReasonCode.RESUME_COMPLETE,
-            reason_detail="resume-complete",
+            reason=resume_decision.reason,
+            reason_detail=resume_decision.reason_detail,
         )
         result["skipped"] = True
         return result
@@ -1652,6 +2039,14 @@ def process_one_work(
             dry_run=dry_run,
             run_id=run_id,
         )
+        validation = validate_classification(
+            pipeline_result.outcome.classification,
+            artifact,
+            options,
+        )
+        if not validation.is_valid:
+            pipeline_result.outcome.reason = validation.reason or ReasonCode.UNKNOWN
+            pipeline_result.outcome.reason_detail = validation.detail or "classification-invalid"
         if pipeline_result.outcome.is_pdf:
             result["saved"] = True
             LOGGER.info(
