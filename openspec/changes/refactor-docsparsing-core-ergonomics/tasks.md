@@ -2,25 +2,25 @@
 
 ## 1. Core Module Decomposition
 
-- [ ] 1.1 Inventory functions/classes inside `DocParsing/core.py`, mapping them to target submodules (discovery, http, manifest, planning, cli utils).
-- [ ] 1.2 Scaffold `src/DocsToKG/DocParsing/core/` package with `__init__.py` façade and placeholder modules.
-- [ ] 1.3 Move filesystem discovery helpers into `core/discovery.py`; update imports and add docstrings.
-- [ ] 1.4 Move HTTP session/timeout utilities into `core/http.py`; ensure they expose factories instead of module-level singletons.
-- [ ] 1.5 Move manifest bookkeeping (`ManifestTracker`, readers/writers) into `core/manifest.py` with explicit interfaces.
-- [ ] 1.6 Move planner orchestration (`build_plan`, chunk/embedding planners) into `core/planning.py`.
-- [ ] 1.7 Collect CLI glue helpers (`resolve_paths`, argument mungers) into `core/cli_utils.py`.
-- [ ] 1.8 Keep `core.py` under 200 lines, re-exporting façade symbols and providing legacy import compatibility.
-- [ ] 1.9 Update chunking/embedding modules and tests to import through the façade (no direct submodule references unless necessary).
-- [ ] 1.10 Add unit tests for each new submodule covering key behaviors (e.g., HTTP timeout configuration, manifest iteration).
+- [x] 1.1 Inventory functions/classes inside `DocParsing/core.py`, mapping them to target submodules (discovery, http, manifest, planning, cli utils). (Discovery: path derivations, chunk iteration; HTTP: timeout/session helpers; Manifest: resume controller, skip logic; Planning: plan builders, display; CLI utils: parser composition, mode detection, preview helpers; additional utilities earmarked for batching/concurrency modules.)
+- [x] 1.2 Scaffold `src/DocsToKG/DocParsing/core/` package with `__init__.py` façade and placeholder modules.
+- [x] 1.3 Move filesystem discovery helpers into `core/discovery.py`; update imports and add docstrings.
+- [x] 1.4 Move HTTP session/timeout utilities into `core/http.py`; ensure they expose factories instead of module-level singletons.
+- [x] 1.5 Move manifest bookkeeping (`ManifestTracker`, readers/writers) into `core/manifest.py` with explicit interfaces.
+- [x] 1.6 Move planner orchestration (`build_plan`, chunk/embedding planners) into `core/planning.py`.
+- [x] 1.7 Collect CLI glue helpers (`resolve_paths`, argument mungers) into `core/cli_utils.py`.
+- [x] 1.8 Keep `core.py` under 200 lines, re-exporting façade symbols and providing legacy import compatibility.
+- [x] 1.9 Update chunking/embedding modules and tests to import through the façade (no direct submodule references unless necessary).
+- [x] 1.10 Add unit tests for each new submodule covering key behaviors (e.g., HTTP timeout configuration, manifest iteration). (Created `tests/docparsing/test_core_submodules.py` covering discovery, HTTP, manifest, and CLI utilities.)
 
 ## 2. Public Configuration Loaders
 
-- [ ] 2.1 Extract `_load_yaml_markers` and `_load_toml_markers` into a new module `DocParsing/config_loaders.py`.
-- [ ] 2.2 Rename helpers to public symbols (`load_yaml_markers`, `load_toml_markers`) and export them via `DocParsing/config/__init__.py`.
-- [ ] 2.3 Update `core` and other consumers to use the new public API (remove private underscore imports).
-- [ ] 2.4 Write docstrings explaining expected schema, error handling, and return types.
-- [ ] 2.5 Add unit tests for successful loads, missing files, malformed YAML/TOML, and backwards compatibility.
-- [ ] 2.6 Document the new API in developer docs and changelog.
+- [x] 2.1 Extract `_load_yaml_markers` and `_load_toml_markers` into a new module `DocParsing/config_loaders.py`.
+- [x] 2.2 Rename helpers to public symbols (`load_yaml_markers`, `load_toml_markers`) and export them via `DocParsing/config`.
+- [x] 2.3 Update `core` and other consumers to use the new public API (remove private underscore imports).
+- [x] 2.4 Write docstrings explaining expected schema, error handling, and return types.
+- [x] 2.5 Add unit tests for successful loads, missing files, malformed YAML/TOML, and backwards compatibility.
+- [x] 2.6 Document the new API in developer docs and changelog. (README configuration section references the new helpers.)
 
 ## 3. CLI Validation UX
 

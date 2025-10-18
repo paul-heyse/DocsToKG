@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Dict, Optional
 
+from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
 from DocsToKG.DocParsing.config import StageConfigBase
 from DocsToKG.DocParsing.core import DEFAULT_SERIALIZER_PROVIDER, DEFAULT_TOKENIZER
 from DocsToKG.DocParsing.env import data_chunks, data_doctags, detect_data_root
@@ -148,17 +149,35 @@ class ChunkerCfg(StageConfigBase):
         self.inject_anchors = bool(self.inject_anchors)
 
         if self.min_tokens < 0 or self.max_tokens < 0:
-            raise ValueError("min_tokens and max_tokens must be non-negative")
+            raise ChunkingCLIValidationError(
+                option="--min-tokens/--max-tokens",
+                message="values must be non-negative",
+            )
         if self.min_tokens > self.max_tokens:
-            raise ValueError("min_tokens must be <= max_tokens")
+            raise ChunkingCLIValidationError(
+                option="--min-tokens/--max-tokens",
+                message="minimum threshold cannot exceed maximum",
+            )
         if self.shard_count < 1:
-            raise ValueError("shard_count must be >= 1")
+            raise ChunkingCLIValidationError(
+                option="--shard-count",
+                message="must be >= 1",
+            )
         if not (0 <= self.shard_index < self.shard_count):
-            raise ValueError("shard_index must be in [0, shard_count)")
+            raise ChunkingCLIValidationError(
+                option="--shard-index",
+                message="must be between 0 and shard-count-1",
+            )
         if self.workers < 1:
-            raise ValueError("workers must be >= 1")
+            raise ChunkingCLIValidationError(
+                option="--workers",
+                message="must be >= 1",
+            )
         if self.soft_barrier_margin < 0:
-            raise ValueError("soft_barrier_margin must be >= 0")
+            raise ChunkingCLIValidationError(
+                option="--soft-barrier-margin",
+                message="must be >= 0",
+            )
 
 
 CHUNK_PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {

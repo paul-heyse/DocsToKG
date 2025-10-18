@@ -278,17 +278,36 @@ from DocsToKG.DocParsing.logging import (
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
 from .cli import build_parser, parse_args
+from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
 from .config import CHUNK_PROFILE_PRESETS, ChunkerCfg, SOFT_BARRIER_MARGIN
 
 CHUNK_STAGE = "chunking"
+
+
+@dataclass(slots=True)
+class Rec:
+    """Chunk record used by coalescence helpers during validation."""
+
+    text: str
+    n_tok: int
+    src_idxs: List[int]
+    refs: List[Any]
+    pages: List[Any]
+    has_image_captions: bool
+    has_image_classification: bool
+    num_images: int
+    image_confidence: float
+    start_offset: int
+    picture_meta: Optional[Dict[str, Any]] = None
 
 
 def _resolve_serializer_provider(spec: str) -> type[ChunkingSerializerProvider]:
     """Return the serializer provider class referenced by ``spec``."""
 
     if ":" not in spec:
-        raise ValueError(
-            "Serializer provider must be specified as 'module:Class', received %r" % (spec,)
+        raise ChunkingCLIValidationError(
+            option="--serializer-provider",
+            message=f"expected 'module:Class' but received {spec!r}",
         )
     module_name, class_name = spec.split(":", 1)
     try:
@@ -500,7 +519,10 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
             min_tokens=args.min_tokens,
             max_tokens=args.max_tokens,
         )
-        raise ValueError("--min-tokens and --max-tokens must be non-negative")
+        raise ChunkingCLIValidationError(
+            option="--min-tokens/--max-tokens",
+            message="values must be non-negative",
+        )
     if args.min_tokens > args.max_tokens:
         log_event(
             logger,
@@ -509,7 +531,10 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
             min_tokens=args.min_tokens,
             max_tokens=args.max_tokens,
         )
-        raise ValueError("--min-tokens must be less than or equal to --max-tokens")
+        raise ChunkingCLIValidationError(
+            option="--min-tokens/--max-tokens",
+            message="minimum threshold cannot exceed maximum",
+        )
     if args.soft_barrier_margin < 0:
         log_event(
             logger,
@@ -517,7 +542,10 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
             "Soft barrier margin must be non-negative",
             soft_barrier_margin=args.soft_barrier_margin,
         )
-        raise ValueError("--soft-barrier-margin must be >= 0")
+        raise ChunkingCLIValidationError(
+            option="--soft-barrier-margin",
+            message="must be >= 0",
+        )
 
     serializer_spec = getattr(args, "serializer_provider", DEFAULT_SERIALIZER_PROVIDER)
     try:
@@ -530,14 +558,20 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
             serializer_provider=serializer_spec,
             error=str(exc),
         )
-        raise ValueError(f"Invalid serializer provider '{serializer_spec}': {exc}") from exc
+        raise ChunkingCLIValidationError(
+            option="--serializer-provider",
+            message=f"invalid provider: {exc}",
+        ) from exc
 
     try:
         min_tokens = int(args.min_tokens)
         max_tokens = int(args.max_tokens)
         soft_margin = int(args.soft_barrier_margin)
     except (TypeError, ValueError) as exc:
-        raise ValueError("Token thresholds must be integers") from exc
+        raise ChunkingCLIValidationError(
+            option="--min-tokens/--max-tokens/--soft-barrier-margin",
+            message="must be integers",
+        ) from exc
 
     args.min_tokens = min_tokens
     args.max_tokens = max_tokens
@@ -554,11 +588,17 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         shard_count = int(getattr(args, "shard_count", 1))
         shard_index = int(getattr(args, "shard_index", 0))
     except (TypeError, ValueError) as exc:
-        raise ValueError("--shard-count and --shard-index must be integers") from exc
+        raise ChunkingCLIValidationError(
+            option="--shard-count/--shard-index",
+            message="must be integers",
+        ) from exc
     if shard_count < 1:
-        raise ValueError("--shard-count must be >= 1")
+        raise ChunkingCLIValidationError(option="--shard-count", message="must be >= 1")
     if not 0 <= shard_index < shard_count:
-        raise ValueError("--shard-index must be between 0 and shard-count-1")
+        raise ChunkingCLIValidationError(
+            option="--shard-index",
+            message="must be between 0 and shard-count-1",
+        )
     args.shard_count = shard_count
     args.shard_index = shard_index
 

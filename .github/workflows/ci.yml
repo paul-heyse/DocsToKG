@@ -8,19 +8,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up micromamba
-        uses: mamba-org/setup-micromamba@v2
         with:
-          environment-file: environment.yml
-          environment-name: ci
-          cache-downloads: true
-          cache-env: true
-      - name: Run tests
-        shell: bash -l {0}
+          lfs: true
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Restore cached virtualenv
+        id: cache-venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: ${{ runner.os }}-venv-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('requirements.txt', 'ci/wheels/*.whl') }}
+          restore-keys: |
+            ${{ runner.os }}-venv-${{ steps.setup-python.outputs.python-version }}-
+      - name: Install dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        shell: bash
         run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Add virtualenv to PATH
+        run: echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
+      - name: Run tests
+        shell: bash
+        run: |
+          source .venv/bin/activate
           python -V
           pytest -q
       - name: HybridSearch validation CLI smoke test
-        shell: bash -l {0}
+        shell: bash
         run: |
+          source .venv/bin/activate
           python -m DocsToKG.HybridSearch.validation --help

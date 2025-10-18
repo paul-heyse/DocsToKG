@@ -16,38 +16,13 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Dict, Iterable, Mapping, Optional, Set, Tuple
 
+from .config_loaders import ConfigLoadError, load_toml_markers, load_yaml_markers
+
 _ARGPARSE_SENTINEL = object()
 
 # ---------------------------------------------------------------------------
 # Serialization helpers
 # ---------------------------------------------------------------------------
-
-
-def _load_yaml_markers(raw: str) -> object:
-    """Deserialize YAML configuration content, raising for missing dependencies."""
-
-    try:
-        import yaml
-    except ImportError as exc:  # pragma: no cover - optional dependency
-        raise RuntimeError(
-            "Loading YAML configuration requires the 'PyYAML' package (pip install PyYAML)."
-        ) from exc
-    return yaml.safe_load(raw)
-
-
-def _load_toml_markers(raw: str) -> object:
-    """Deserialize TOML configuration content with compatibility fallbacks."""
-
-    try:
-        import tomllib  # Python 3.11+
-    except ModuleNotFoundError:  # pragma: no cover - fallback path
-        try:
-            import tomli as tomllib  # type: ignore[import-not-found]
-        except ImportError as exc:  # pragma: no cover - optional dependency
-            raise RuntimeError(
-                "Loading TOML configuration requires the 'tomli' package (pip install tomli)."
-            ) from exc
-    return tomllib.loads(raw)
 
 
 def load_config_mapping(path: Path) -> Dict[str, Any]:
@@ -56,11 +31,14 @@ def load_config_mapping(path: Path) -> Dict[str, Any]:
     raw = path.read_text(encoding="utf-8")
     suffix = path.suffix.lower()
     if suffix in {".yaml", ".yml"}:
-        data = _load_yaml_markers(raw)
+        data = load_yaml_markers(raw)
     elif suffix == ".toml":
-        data = _load_toml_markers(raw)
+        data = load_toml_markers(raw)
     else:
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ConfigLoadError(f"Failed to parse JSON configuration payload: {exc}") from exc
     if not isinstance(data, dict):
         raise ValueError(
             f"Stage configuration file {path} must contain an object; received {type(data).__name__}."
@@ -403,10 +381,13 @@ class StageConfigBase:
 
 __all__ = [
     "annotate_cli_overrides",
+    "ConfigLoadError",
     "ensure_cli_metadata",
     "parse_args_with_overrides",
     "StageConfigBase",
     "load_config_mapping",
+    "load_toml_markers",
+    "load_yaml_markers",
     "_coerce_bool",
     "_coerce_float",
     "_coerce_int",

@@ -93,6 +93,14 @@ include:
 | `--format` | Embedder | Vector output format (`jsonl` today; `parquet` in progress). |
 | `--no-cache` | Embedder | Disable Qwen LLM reuse between batches (helpful for debugging). |
 
+### Programmatic configuration loading
+
+The `DocsToKG.DocParsing.config` module exposes public helpers for teams that
+manage structural-marker inventories outside the CLI. Use
+`load_yaml_markers` / `load_toml_markers` (raising `ConfigLoadError` on malformed
+input) to deserialize marker documents before passing the resulting dictionaries
+into `load_structural_marker_profile`.
+
 ### Environment Variables
 
 | Variable | Purpose |
