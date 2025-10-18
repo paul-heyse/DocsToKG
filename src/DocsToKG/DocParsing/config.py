@@ -9,12 +9,18 @@ testing less cumbersome and prevents import-time side effects.
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Dict, Optional, Set, Tuple
+from typing import Any, Callable, ClassVar, Dict, Iterable, Mapping, Optional, Set, Tuple
 
+_ARGPARSE_SENTINEL = object()
+
+# ---------------------------------------------------------------------------
+# Serialization helpers
+# ---------------------------------------------------------------------------
 
 def _load_yaml_markers(raw: str) -> object:
     """Deserialize YAML configuration content, raising for missing dependencies."""
@@ -97,21 +103,39 @@ def _coerce_optional_path(value: object, base_dir: Optional[Path] = None) -> Opt
     return _coerce_path(value, base_dir)
 
 
+_TRUE_BOOL_LITERALS = frozenset({"1", "true", "t", "yes", "y", "on"})
+_FALSE_BOOL_LITERALS = frozenset({"0", "false", "f", "no", "n", "off", ""})
+
+
 def _coerce_bool(value: object, _base_dir: Optional[Path] = None) -> bool:
-    """Convert truthy strings or numbers to boolean."""
+    """Convert supported string and numeric representations into booleans.
+
+    Raises:
+        ValueError: If ``value`` cannot be interpreted as a boolean literal.
+    """
 
     if isinstance(value, bool):
         return value
     if value is None:
         return False
     if isinstance(value, (int, float)):
-        return bool(value)
+        if value == 0 or value == 0.0:
+            return False
+        if value == 1 or value == 1.0:
+            return True
+        raise ValueError(
+            f"Boolean flags only accept 0/1 numeric values; received {value!r}."
+        )
     normalized = str(value).strip().lower()
-    if normalized in {"1", "true", "yes", "on"}:
+    if normalized in _TRUE_BOOL_LITERALS:
         return True
-    if normalized in {"0", "false", "no", "off"}:
+    if normalized in _FALSE_BOOL_LITERALS:
         return False
-    return bool(normalized)
+    raise ValueError(
+        "Boolean flags must be one of "
+        f"{sorted(_TRUE_BOOL_LITERALS | _FALSE_BOOL_LITERALS)!r}; "
+        f"received {value!r}."
+    )
 
 
 def _coerce_int(value: object, _base_dir: Optional[Path] = None) -> int:
@@ -179,6 +203,83 @@ def _coerce_str_tuple(value: object, _base_dir: Optional[Path] = None) -> Tuple[
     return tuple(part for part in parts if part)
 
 
+def _namespace_setdefault(namespace: Any, name: str, default: Any) -> Any:
+    """Return ``namespace.name`` or set it to ``default`` when absent."""
+
+    if not hasattr(namespace, "__dict__"):
+        raise TypeError("Argparse namespace must expose a __dict__ for metadata injection")
+    if name not in namespace.__dict__:
+        namespace.__dict__[name] = default
+    return namespace.__dict__[name]
+
+
+def annotate_cli_overrides(
+    namespace: Any,
+    *,
+    explicit: Iterable[str],
+    defaults: Mapping[str, Any],
+) -> Set[str]:
+    """Attach CLI override metadata to ``namespace`` and return the explicit set."""
+
+    if not hasattr(namespace, "__dict__"):  # pragma: no cover - defensive
+        raise TypeError("Namespace must support attribute assignment for CLI metadata")
+
+    overrides = set(explicit)
+    namespace.__dict__["_cli_explicit_overrides"] = overrides
+    stored_defaults = _namespace_setdefault(namespace, "_cli_defaults", {})
+    stored_defaults.update(dict(defaults))
+    return overrides
+
+
+def parse_args_with_overrides(
+    parser: argparse.ArgumentParser, argv: Optional[Iterable[str]] = None
+) -> argparse.Namespace:
+    """Parse CLI arguments while tracking which options were explicitly provided."""
+
+    option_actions = []
+    for action in parser._actions:
+        if not action.option_strings:
+            continue
+        if action.dest is argparse.SUPPRESS:
+            continue
+        if action.default is argparse.SUPPRESS:
+            continue
+        option_actions.append((action, action.default))
+        action.default = _ARGPARSE_SENTINEL
+
+    try:
+        namespace = parser.parse_args(argv)
+    finally:
+        for action, original in option_actions:
+            action.default = original
+
+    explicit: Set[str] = set()
+    defaults: Dict[str, Any] = {}
+    for action, original in option_actions:
+        dest = action.dest
+        defaults[dest] = original
+        value = getattr(namespace, dest, _ARGPARSE_SENTINEL)
+        if value is _ARGPARSE_SENTINEL:
+            setattr(namespace, dest, original)
+        else:
+            explicit.add(dest)
+
+    annotate_cli_overrides(namespace, explicit=explicit, defaults=defaults)
+    return namespace
+
+
+def ensure_cli_metadata(namespace: Any) -> Set[str]:
+    """Ensure ``namespace`` carries CLI metadata, defaulting to treating all fields as explicit."""
+
+    if hasattr(namespace, "_cli_explicit_overrides"):
+        return getattr(namespace, "_cli_explicit_overrides")
+    if hasattr(namespace, "__dict__"):
+        candidates = {name for name in vars(namespace) if not name.startswith("_")}
+        annotate_cli_overrides(namespace, explicit=candidates, defaults={})
+        return candidates
+    return set()
+
+
 @dataclass
 class StageConfigBase:
     """Base dataclass for stage configuration objects."""
@@ -229,9 +330,14 @@ class StageConfigBase:
     def apply_args(self, args: Any) -> None:
         """Overlay configuration from an argparse namespace."""
 
+        explicit = getattr(args, "_cli_explicit_overrides", None)
+        if explicit is None:
+            explicit = ensure_cli_metadata(args)
         for field_def in fields(self):
             name = field_def.name
             if not hasattr(args, name):
+                continue
+            if explicit is not None and name not in explicit:
                 continue
             value = getattr(args, name)
             if value is None:
@@ -288,6 +394,9 @@ class StageConfigBase:
 
 
 __all__ = [
+    "annotate_cli_overrides",
+    "ensure_cli_metadata",
+    "parse_args_with_overrides",
     "StageConfigBase",
     "load_config_mapping",
     "_coerce_bool",

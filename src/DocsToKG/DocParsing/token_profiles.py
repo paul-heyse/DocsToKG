@@ -12,7 +12,11 @@ from typing import Any, Callable, ClassVar, Dict, Iterable, List, Optional, Sequ
 
 from transformers import AutoTokenizer
 
-from DocsToKG.DocParsing.config import StageConfigBase
+from DocsToKG.DocParsing.config import (
+    StageConfigBase,
+    annotate_cli_overrides,
+    parse_args_with_overrides,
+)
 from DocsToKG.DocParsing.core import (
     CLIOption,
     DEFAULT_TOKENIZER,
@@ -292,7 +296,8 @@ def build_parser() -> argparse.ArgumentParser:
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse CLI arguments for tokenizer profiling."""
 
-    return build_parser().parse_args(argv)
+    parser = build_parser()
+    return parse_args_with_overrides(parser, argv)
 
 
 def main(args: argparse.Namespace | Sequence[str] | None = None) -> int:
@@ -300,11 +305,14 @@ def main(args: argparse.Namespace | Sequence[str] | None = None) -> int:
 
     parser = build_parser()
     if args is None:
-        namespace = parser.parse_args()
+        namespace = parse_args_with_overrides(parser)
     elif isinstance(args, argparse.Namespace):
-        namespace = argparse.Namespace(**vars(args))
+        namespace = args
+        if getattr(namespace, "_cli_explicit_overrides", None) is None:
+            keys = [name for name in vars(namespace) if not name.startswith("_")]
+            annotate_cli_overrides(namespace, explicit=keys, defaults={})
     else:
-        namespace = parser.parse_args(list(args))
+        namespace = parse_args_with_overrides(parser, list(args))
 
     cfg = TokenProfilesCfg.from_args(namespace)
     tokenizer_ids = cfg.tokenizer_ids()

@@ -319,6 +319,7 @@ def manifest_append(
     warnings: Optional[List[str]] = None,
     error: Optional[str] = None,
     schema_version: str = "",
+    atomic: bool = False,
     **metadata,
 ) -> None:
     """Append a structured entry to the processing manifest."""
@@ -341,7 +342,7 @@ def manifest_append(
         entry["error"] = str(error)
     entry.update(metadata)
 
-    jsonl_append_iter(manifest_path, [entry])
+    jsonl_append_iter(manifest_path, [entry], atomic=atomic)
 
 
 def resolve_manifest_path(stage: str, root: Optional[Path] = None) -> Path:

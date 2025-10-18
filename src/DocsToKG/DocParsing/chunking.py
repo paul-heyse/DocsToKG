@@ -172,7 +172,7 @@ import statistics
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, fields
 from types import SimpleNamespace
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, ClassVar, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import uuid
 
@@ -201,7 +201,11 @@ __all__ = (
     "summarize_image_metadata",
 )
 
-from DocsToKG.DocParsing.config import StageConfigBase
+from DocsToKG.DocParsing.config import (
+    StageConfigBase,
+    annotate_cli_overrides,
+    parse_args_with_overrides,
+)
 from DocsToKG.DocParsing.core import (
     DEFAULT_CAPTION_MARKERS,
     DEFAULT_HEADING_MARKERS,
@@ -729,6 +733,91 @@ except Exception as exc:  # pragma: no cover - exercised in misconfigured enviro
 # --- Public Functions ---
 
 
+def _chunk_log_context(chunk: BaseChunk, *, chunk_index: Optional[int] = None) -> Dict[str, object]:
+    """Return structured logging context for ``chunk``."""
+
+    meta = getattr(chunk, "meta", None)
+    doc_id: Optional[str] = None
+    if meta is not None:
+        for attr in ("document_id", "doc_id", "doc_name"):
+            candidate = getattr(meta, attr, None)
+            if candidate:
+                doc_id = str(candidate)
+                break
+    if doc_id is None:
+        doc_id = getattr(chunk, "doc_id", None)
+    if doc_id is None:
+        doc_id = getattr(chunk, "id", None)
+    context: Dict[str, object] = {"doc_id": doc_id or "unknown"}
+
+    chunk_id = getattr(chunk, "chunk_id", None)
+    if chunk_id is None:
+        chunk_id = getattr(chunk, "id", None)
+    if chunk_id is not None:
+        context["chunk_id"] = chunk_id
+    if chunk_index is not None:
+        context["chunk_index"] = chunk_index
+    return context
+
+
+def _log_chunk_metadata_issue(
+    level: str,
+    message: str,
+    *,
+    chunk: BaseChunk,
+    error_code: str,
+    detail: str,
+    chunk_index: Optional[int] = None,
+) -> None:
+    """Emit a structured log record describing chunk metadata issues."""
+
+    log_event(
+        _LOGGER,
+        level,
+        message,
+        stage=CHUNK_STAGE,
+        error_code=error_code,
+        detail=detail,
+        **_chunk_log_context(chunk, chunk_index=chunk_index),
+    )
+
+
+def _collect_doc_items(chunk: BaseChunk) -> List[object]:
+    """Return DocTags items associated with ``chunk``."""
+
+    meta = getattr(chunk, "meta", None)
+    if meta is None:
+        return []
+    try:
+        raw_items = getattr(meta, "doc_items")
+    except AttributeError:
+        return []
+    except Exception as exc:  # pragma: no cover - defensive guard
+        _log_chunk_metadata_issue(
+            "error",
+            "Failed to resolve chunk doc_items",
+            chunk=chunk,
+            error_code="CHUNK_DOCITEMS_ERROR",
+            detail=f"{exc.__class__.__name__}: {exc}",
+        )
+        raise
+    if raw_items is None:
+        return []
+    if isinstance(raw_items, (list, tuple, set)):
+        return [item for item in raw_items if item is not None]
+    try:
+        return [item for item in raw_items if item is not None]  # type: ignore[arg-type]
+    except TypeError as exc:
+        _log_chunk_metadata_issue(
+            "warning",
+            "Doc item collection is not iterable; coercing to list",
+            chunk=chunk,
+            error_code="CHUNK_DOCITEMS_NON_ITERABLE",
+            detail=f"{exc.__class__.__name__}: {exc}",
+        )
+        return [raw_items]
+
+
 def read_utf8(p: Path) -> str:
     """Load text from disk using UTF-8 with replacement for invalid bytes.
 
@@ -756,28 +845,50 @@ def build_doc(doc_name: str, doctags_text: str) -> DoclingDocument:
 
 
 def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
-    """Collect self-references and page numbers associated with a chunk.
+    """Collect self-references and page numbers associated with a chunk."""
 
-    Args:
-        chunk: Chunk object produced by the hybrid chunker.
-
-    Returns:
-        Tuple containing a list of reference identifiers and sorted page numbers.
-
-    Raises:
-        None
-    """
-    refs, pages = [], set()
-    try:
-        for it in chunk.meta.doc_items:
-            if getattr(it, "self_ref", None):
-                refs.append(it.self_ref)
-            for pv in getattr(it, "prov", []) or []:
-                pn = getattr(pv, "page_no", None)
-                if pn is not None:
-                    pages.add(int(pn))
-    except Exception:
-        pass
+    refs: List[str] = []
+    pages: set[int] = set()
+    doc_items = _collect_doc_items(chunk)
+    for index, item in enumerate(doc_items):
+        if item is None:
+            continue
+        self_ref = getattr(item, "self_ref", None)
+        if self_ref:
+            refs.append(self_ref)
+        prov_candidates = getattr(item, "prov", None)
+        if prov_candidates is None:
+            prov_iterable: Iterable[object] = ()
+        else:
+            try:
+                prov_iterable = iter(prov_candidates)  # type: ignore[arg-type]
+            except TypeError as exc:
+                _log_chunk_metadata_issue(
+                    "warning",
+                    "Chunk provenance metadata is not iterable; coercing to single entry",
+                    chunk=chunk,
+                    error_code="CHUNK_PROV_NON_ITERABLE",
+                    detail=f"{exc.__class__.__name__}: {exc}",
+                    chunk_index=index,
+                )
+                prov_iterable = (prov_candidates,)
+        for prov_entry in prov_iterable:
+            if prov_entry is None:
+                continue
+            page_value = getattr(prov_entry, "page_no", None)
+            if page_value is None:
+                continue
+            try:
+                pages.add(int(page_value))
+            except (TypeError, ValueError) as exc:
+                _log_chunk_metadata_issue(
+                    "warning",
+                    "Invalid page number in chunk provenance metadata",
+                    chunk=chunk,
+                    error_code="CHUNK_PAGE_INVALID",
+                    detail=f"{exc.__class__.__name__}: {exc}",
+                    chunk_index=index,
+                )
     return refs, sorted(pages)
 
 
@@ -793,10 +904,7 @@ def summarize_image_metadata(
     confidence_candidates: List[float] = []
     picture_meta: List[Dict[str, Any]] = []
 
-    try:
-        doc_items = getattr(chunk.meta, "doc_items", []) or []
-    except Exception:  # pragma: no cover - defensive catch
-        doc_items = []
+    doc_items = _collect_doc_items(chunk)
 
     def _maybe_add_conf(value: object) -> None:
         """Collect numeric confidence scores from metadata sources."""
@@ -809,6 +917,7 @@ def summarize_image_metadata(
 
     def _normalise_meta(payload: object, doc_item: object) -> List[Dict[str, Any]]:
         """Convert DocTags picture metadata into detached dictionaries safe for JSON."""
+
         entries: List[Dict[str, Any]] = []
         if isinstance(payload, dict):
             candidates = [payload]
@@ -831,7 +940,7 @@ def summarize_image_metadata(
             entries.append(cloned)
         return entries
 
-    for doc_item in doc_items:
+    for index, doc_item in enumerate(doc_items):
         picture = getattr(doc_item, "doc_item", doc_item)
         flags = getattr(picture, "_docstokg_flags", None)
         if isinstance(flags, dict):
@@ -840,16 +949,63 @@ def summarize_image_metadata(
             _maybe_add_conf(flags.get("image_confidence"))
         meta_payload = getattr(picture, "_docstokg_meta", None)
         if meta_payload:
-            picture_meta.extend(_normalise_meta(meta_payload, doc_item))
-        annotations = (
-            getattr(picture, "annotations", []) or getattr(doc_item, "annotations", []) or []
-        )
-        for ann in annotations:
+            try:
+                picture_meta.extend(_normalise_meta(meta_payload, doc_item))
+            except (TypeError, ValueError) as exc:
+                _log_chunk_metadata_issue(
+                    "warning",
+                    "Failed to normalise picture metadata",
+                    chunk=chunk,
+                    error_code="CHUNK_PICTURE_META_INVALID",
+                    detail=f"{exc.__class__.__name__}: {exc}",
+                    chunk_index=index,
+                )
+            except Exception as exc:  # pragma: no cover - unexpected
+                _log_chunk_metadata_issue(
+                    "error",
+                    "Unexpected error while normalising picture metadata",
+                    chunk=chunk,
+                    error_code="CHUNK_PICTURE_META_ERROR",
+                    detail=f"{exc.__class__.__name__}: {exc}",
+                    chunk_index=index,
+                )
+                raise
+        annotations_source = getattr(picture, "annotations", None)
+        if not annotations_source:
+            annotations_source = getattr(doc_item, "annotations", None)
+        if annotations_source is None:
+            annotations_iterable: Iterable[object] = ()
+        else:
+            try:
+                annotations_iterable = iter(annotations_source)  # type: ignore[arg-type]
+            except TypeError as exc:
+                _log_chunk_metadata_issue(
+                    "warning",
+                    "Annotations metadata is not iterable; coercing to single entry",
+                    chunk=chunk,
+                    error_code="CHUNK_ANNOTATIONS_NON_ITERABLE",
+                    detail=f"{exc.__class__.__name__}: {exc}",
+                    chunk_index=index,
+                )
+                annotations_iterable = (annotations_source,)
+        for ann in annotations_iterable:
             _maybe_add_conf(getattr(ann, "confidence", None))
             _maybe_add_conf(getattr(ann, "score", None))
             predicted = getattr(ann, "predicted_classes", None)
             if predicted:
-                for cls in predicted:
+                try:
+                    predicted_iter = iter(predicted)  # type: ignore[arg-type]
+                except TypeError as exc:
+                    _log_chunk_metadata_issue(
+                        "warning",
+                        "Predicted classes metadata is not iterable; coercing to single entry",
+                        chunk=chunk,
+                        error_code="CHUNK_PREDICTED_CLASSES_NON_ITERABLE",
+                        detail=f"{exc.__class__.__name__}: {exc}",
+                        chunk_index=index,
+                    )
+                    predicted_iter = (predicted,)
+                for cls in predicted_iter:
                     _maybe_add_conf(getattr(cls, "confidence", None))
                     _maybe_add_conf(getattr(cls, "probability", None))
         if getattr(picture, "__class__", type(None)).__name__.lower().startswith("picture"):
@@ -1456,7 +1612,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         SystemExit: Propagated if ``argparse`` reports invalid arguments.
     """
 
-    return build_parser().parse_args(argv)
+    parser = build_parser()
+    return parse_args_with_overrides(parser, argv)
 
 
 def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = None) -> int:
@@ -1478,11 +1635,21 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     except Exception:
         pass
     if args is None:
-        namespace = parser.parse_args()
-    elif isinstance(args, (argparse.Namespace, SimpleNamespace)):
-        namespace = argparse.Namespace(**vars(args))
+        namespace = parse_args_with_overrides(parser)
+    elif isinstance(args, argparse.Namespace):
+        namespace = args
+        if getattr(namespace, "_cli_explicit_overrides", None) is None:
+            keys = [name for name in vars(namespace) if not name.startswith("_")]
+            annotate_cli_overrides(namespace, explicit=keys, defaults={})
+    elif isinstance(args, SimpleNamespace) or hasattr(args, "__dict__"):
+        base = parser.parse_args([])
+        payload = {key: value for key, value in vars(args).items() if not key.startswith("_")}
+        for key, value in payload.items():
+            setattr(base, key, value)
+        annotate_cli_overrides(base, explicit=payload.keys(), defaults={})
+        namespace = base
     else:
-        namespace = parser.parse_args(args)
+        namespace = parse_args_with_overrides(parser, args)
 
     profile = getattr(namespace, "profile", None)
     defaults = CHUNK_PROFILE_PRESETS.get(profile or "", {})
