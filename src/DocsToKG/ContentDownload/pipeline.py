@@ -202,6 +202,7 @@ from DocsToKG.ContentDownload.telemetry import AttemptSink
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
+    from DocsToKG.ContentDownload.download import DownloadConfig
 
 # --- Globals ---
 
@@ -209,6 +210,28 @@ LOGGER = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RESOLVER_CREDENTIALS_PATH = PROJECT_ROOT / "config" / "resolver_credentials.yaml"
+
+
+def _coerce_download_context(
+    context: Optional[Union["DownloadConfig", DownloadContext, Mapping[str, Any]]]
+) -> DownloadContext:
+    """Normalise context-like inputs into a :class:`DownloadContext` instance."""
+
+    if isinstance(context, DownloadContext):
+        return context
+
+    if context is None:
+        return DownloadContext.from_mapping({})
+
+    if hasattr(context, "to_context"):
+        try:
+            return context.to_context({})  # type: ignore[call-arg]
+        except TypeError:
+            return context.to_context()  # type: ignore[call-arg]
+
+    from DocsToKG.ContentDownload.download import DownloadConfig
+
+    return DownloadConfig.from_options(context).to_context({})
 
 
 __all__ = [
@@ -1550,7 +1573,7 @@ class ResolverPipeline:
         self,
         session: _requests.Session,
         artifact: "WorkArtifact",
-        context: Optional[Union[DownloadContext, Mapping[str, Any]]] = None,
+        context: Optional[Union["DownloadConfig", DownloadContext, Mapping[str, Any]]] = None,
         *,
         session_factory: Optional[Callable[[], _requests.Session]] = None,
     ) -> PipelineResult:
@@ -1567,7 +1590,7 @@ class ResolverPipeline:
             PipelineResult capturing resolver attempts and successful downloads.
         """
 
-        context_obj = DownloadContext.from_mapping(context)
+        context_obj = _coerce_download_context(context)
         state = _RunState(dry_run=context_obj.dry_run)
         if session_factory is None:
 

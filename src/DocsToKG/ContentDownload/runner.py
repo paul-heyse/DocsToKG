@@ -16,7 +16,7 @@ from pyalex import Works
 from DocsToKG.ContentDownload.args import ResolvedConfig
 from DocsToKG.ContentDownload.core import WorkArtifact, atomic_write_text
 from DocsToKG.ContentDownload.download import (
-    DownloadOptions,
+    DownloadConfig,
     RobotsCache,
     create_artifact,
     download_candidate,
@@ -51,7 +51,7 @@ class DownloadRunState:
     """Mutable run-time state shared across the runner lifecycle."""
 
     session_factory: ThreadLocalSessionFactory
-    options: DownloadOptions
+    options: DownloadConfig
     resume_lookup: Dict[str, Dict[str, Any]]
     resume_completed: Set[str]
     processed: int = 0
@@ -217,7 +217,7 @@ class DownloadRun:
         """Initialise download options and counters for the run."""
 
         resume_lookup, resume_completed = load_previous_manifest(self.args.resume_from)
-        options = DownloadOptions(
+        options = DownloadConfig(
             dry_run=self.args.dry_run,
             list_only=self.args.list_only,
             extract_html_text=self.resolved.extract_html_text,
@@ -250,7 +250,7 @@ class DownloadRun:
     def process_work_item(
         self,
         work: WorkArtifact,
-        options: DownloadOptions,
+        options: DownloadConfig,
         session: Optional[requests.Session] = None,
     ) -> Dict[str, Any]:
         """Process a single work artefact and update aggregate counters."""
