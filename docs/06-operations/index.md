@@ -14,7 +14,7 @@ This guide covers day-two operations for DocsToKG, including ingestion jobs, sea
 ### 3.1 Content Acquisition
 
 ```bash
-python -m DocsToKG.ContentDownload.cli \
+direnv exec . python -m DocsToKG.ContentDownload.cli \
   --topic "knowledge graphs" \
   --year-start 2022 --year-end 2024 \
   --out Data/PyalexRaw \
@@ -30,9 +30,9 @@ python -m DocsToKG.ContentDownload.cli \
   run, derive sidecars with the post-processing helpers:
 
   ```bash
-  python tools/manifest_to_index.py runs/20250101_1200/manifest.jsonl \
+  direnv exec . python tools/manifest_to_index.py runs/20250101_1200/manifest.jsonl \
     runs/20250101_1200/manifest.index.json
-  python tools/manifest_to_csv.py runs/20250101_1200/manifest.jsonl \
+  direnv exec . python tools/manifest_to_csv.py runs/20250101_1200/manifest.jsonl \
     runs/20250101_1200/manifest.last.csv
   ```
 - `--log-format csv` keeps JSONL manifests while adding a consolidated attempts
@@ -45,20 +45,23 @@ python -m DocsToKG.ContentDownload.cli \
 
 ```bash
 # Convert DocTags into chunked Markdown and metadata
-python src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py \
-  --input Data/DocTagsFiles \
-  --output Data/ChunkedDocTagFiles \
-  --max-workers 8
+direnv exec . docparse chunk \
+  --in-dir Data/DocTagsFiles \
+  --out-dir Data/ChunkedDocTagFiles \
+  --workers 4 \
+  --min-tokens 256 \
+  --max-tokens 512
 
 # Generate embeddings suitable for FAISS ingestion
-python src/DocsToKG/DocParsing/EmbeddingV2.py \
-  --chunks Data/ChunkedDocTagFiles \
-  --output Data/Embeddings \
-  --model sentence-transformers/all-mpnet-base-v2
+direnv exec . docparse embed \
+  --chunks-dir Data/ChunkedDocTagFiles \
+  --out-dir Data/Embeddings \
+  --profile gpu-default \
+  --batch-size-qwen 96
 ```
 
-- Adjust default input/output paths via CLI flags; see script headers for environment defaults.
-- Use the `--batch-size` option when processing large corpora on GPU hardware.
+- Adjust default input/output paths via CLI flags; see `docparse chunk --help` and `docparse embed --help` for environment defaults.
+- Use the `--batch-size-qwen` option when processing large corpora on GPU hardware.
 
 ### 3.3 Hybrid Search Indexing
 
@@ -67,12 +70,11 @@ import json
 from pathlib import Path
 
 from DocsToKG.HybridSearch.config import HybridSearchConfigManager
-from DocsToKG.HybridSearch.vectorstore import FaissVectorStore
+from DocsToKG.HybridSearch import Observability
 from DocsToKG.HybridSearch.ingest import ChunkIngestionPipeline
+from DocsToKG.HybridSearch.store import FaissVectorStore, ChunkRegistry, serialize_state
+from DocsToKG.HybridSearch.storage import OpenSearchSimulator
 from DocsToKG.HybridSearch.types import DocumentInput
-from DocsToKG.HybridSearch.observability import Observability
-from DocsToKG.HybridSearch.vectorstore import serialize_state
-from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
 
 config_manager = HybridSearchConfigManager(Path("config/hybrid_config.json"))
 config = config_manager.get()
@@ -87,7 +89,7 @@ pipeline = ChunkIngestionPipeline(
 )
 
 snapshot_path = Path("artifacts/faiss.snapshot.json")
-docs = [
+docs_to_upsert = [
     DocumentInput(
         doc_id="whitepaper-001",
         namespace="public",
@@ -96,7 +98,7 @@ docs = [
         metadata={"source": "pyalex"},
     )
 ]
-pipeline.upsert_documents(docs)
+pipeline.upsert_documents(docs_to_upsert)
 snapshot = serialize_state(faiss, registry)
 snapshot_path.write_text(json.dumps(snapshot))
 ```
@@ -107,13 +109,13 @@ snapshot_path.write_text(json.dumps(snapshot))
 ### 3.4 Ontology Downloads
 
 ```bash
-python -m DocsToKG.OntologyDownload.cli pull \
+direnv exec . python -m DocsToKG.OntologyDownload.cli pull \
   --spec configs/sources.yaml \
   --force \
   --json > logs/ontology_pull.json
 ```
 
-- Validate downloads with `python -m DocsToKG.OntologyDownload.cli validate <id>`.
+- Validate downloads with `direnv exec . python -m DocsToKG.OntologyDownload.cli validate <id>`.
 - Maintain configuration under version control and rotate API credentials securely.
 - Tune validation throughput with `defaults.validation.max_concurrent_validators`
   (1-8) and switch large ontologies to streaming normalization by lowering
@@ -125,7 +127,7 @@ python -m DocsToKG.OntologyDownload.cli pull \
 Integrate `HybridSearchAPI` into your preferred web framework. Example with FastAPI:
 
 ```python
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 from DocsToKG.HybridSearch import HybridSearchAPI
 from my_project.hybrid import build_hybrid_service  # assemble service as shown above
@@ -137,7 +139,9 @@ api = HybridSearchAPI(service)
 @app.post("/v1/hybrid-search")
 def hybrid_search(payload: dict):
     status, body = api.post_hybrid_search(payload)
-    return body, status
+    if status != 200:
+        raise HTTPException(status_code=status, detail=body)
+    return body
 ```
 
 - Reload configuration dynamically using `HybridSearchConfigManager.reload`.
@@ -145,9 +149,7 @@ def hybrid_search(payload: dict):
 
 ## 5. Module Consolidation Checklist
 
-- Review `docs/hybrid_search_module_migration.md` and update any automation that still
-  imports from deprecated shims (`results`, `similarity`, `retrieval`, `schema`, `operations`,
-  or `tools`).
+- Review `docs/hybrid_search_module_migration.md` and update any automation that still imports from deprecated shims (`results`, `similarity`, `retrieval`, `schema`, `operations`, `tools`).
 - Ensure CI workflows call `python -m DocsToKG.HybridSearch.validation` instead of legacy
   scripts.
 - Watch for `DeprecationWarning` in logs and resolve them before upgrading to DocsToKG

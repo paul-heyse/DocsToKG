@@ -1074,12 +1074,26 @@ def test_resolve_expected_checksum_fetches_url(monkeypatch: pytest.MonkeyPatch) 
     )
 
     class DummyResponse:
-        text = f"{expected_digest} hp.owl"
+        def __init__(self) -> None:
+            self.text = f"{expected_digest} hp.owl"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
 
         def raise_for_status(self) -> None:
             return None
 
-    monkeypatch.setattr(requests, "get", lambda url, timeout: DummyResponse())
+        def iter_content(self, chunk_size: int):
+            yield self.text.encode("utf-8")
+
+    monkeypatch.setattr(
+        requests,
+        "get",
+        lambda url, timeout, **kwargs: DummyResponse(),
+    )
     monkeypatch.setattr(
         pipeline_mod,
         "validate_url_security",

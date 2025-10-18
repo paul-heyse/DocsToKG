@@ -1,16 +1,17 @@
 """Chunking stage package with modular subcomponents."""
 
-from .config import CHUNK_PROFILE_PRESETS, ChunkerCfg, SOFT_BARRIER_MARGIN
-from .cli import CHUNK_CLI_OPTIONS, build_parser, parse_args
-from .runtime import main
-from .runtime import *  # noqa: F401,F403 - re-export legacy runtime symbols
-from . import runtime as _runtime
+from DocsToKG.DocParsing.io import atomic_write
 from DocsToKG.DocParsing.logging import (
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
 )
-from DocsToKG.DocParsing.io import atomic_write
+
+from . import runtime as _runtime
+from .cli import CHUNK_CLI_OPTIONS, build_parser, parse_args
+from .config import CHUNK_PROFILE_PRESETS, SOFT_BARRIER_MARGIN, ChunkerCfg
+from .runtime import *  # noqa: F401,F403 - re-export legacy runtime symbols
+from .runtime import main
 
 __all__ = [
     "ChunkerCfg",
@@ -20,6 +21,10 @@ __all__ = [
     "build_parser",
     "parse_args",
     "main",
+    "atomic_write",
+    "manifest_log_failure",
+    "manifest_log_skip",
+    "manifest_log_success",
 ]
 
 for _name in list(globals()):
@@ -40,6 +45,7 @@ _LEGACY_EXPORTS = (
     "manifest_log_success",
     "manifest_log_skip",
     "atomic_write",
+    "_LOGGER",
 )
 
 for _legacy_name in _LEGACY_EXPORTS:
@@ -47,9 +53,8 @@ for _legacy_name in _LEGACY_EXPORTS:
         globals()[_legacy_name] = getattr(_runtime, _legacy_name)
         if _legacy_name not in __all__:
             __all__.append(_legacy_name)
-    else:
+    elif _legacy_name in globals():
         # Provided via DocsToKG.DocParsing.logging imports above.
-        globals()[_legacy_name] = globals()[_legacy_name]
         if _legacy_name not in __all__:
             __all__.append(_legacy_name)
 

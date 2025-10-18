@@ -417,7 +417,7 @@ class _DummyTqdm:
         return iter(self._iterable)
 
 
-import DocsToKG.DocParsing.chunking as doc_chunking  # noqa: E402
+import DocsToKG.DocParsing._chunking.runtime as doc_chunking  # noqa: E402
 import DocsToKG.DocParsing.config as doc_config  # noqa: E402
 import DocsToKG.DocParsing.env as doc_env  # noqa: E402
 import DocsToKG.DocParsing.io as doc_io  # noqa: E402
@@ -1242,7 +1242,7 @@ def test_ensure_uuid_deterministic_generation() -> None:
 
 
 def test_qwen_embed_caches_llm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from DocsToKG.DocParsing import embedding as embedding
+    import DocsToKG.DocParsing._embedding.runtime as embedding
 
     class DummyOutput:
         def __init__(self) -> None:
@@ -1261,10 +1261,9 @@ def test_qwen_embed_caches_llm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
         def __init__(self, normalize: bool = True, **kwargs: Any) -> None:
             self.normalize = normalize
 
-    monkeypatch.setattr(embedding, "LLM", DummyLLM)
-    monkeypatch.setattr(embedding, "PoolingParams", DummyPoolingParams)
-    monkeypatch.setattr(embedding, "_VLLM_IMPORT_ERROR", None)
-    monkeypatch.setattr(embedding, "_QWEN_LLM_CACHE", {})
+    embedding._QWEN_LLM_CACHE.clear()
+    monkeypatch.setattr(embedding, "_get_vllm_components", lambda: (DummyLLM, DummyPoolingParams))
+    monkeypatch.setattr(embedding, "ensure_qwen_dependencies", lambda: None)
 
     cfg = embedding.QwenCfg(model_dir=tmp_path, batch_size=2)
     first = embedding.qwen_embed(cfg, ["a", "b"])

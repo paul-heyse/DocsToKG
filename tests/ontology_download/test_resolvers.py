@@ -179,8 +179,10 @@ pytest.importorskip("pydantic_settings")
 from DocsToKG.OntologyDownload import FetchSpec, resolvers
 from DocsToKG.OntologyDownload import api as core
 from DocsToKG.OntologyDownload import io as io_mod
-from DocsToKG.OntologyDownload import validation as plugins_mod
-from DocsToKG.OntologyDownload.api import ConfigError, DefaultsConfig, ResolvedConfig
+from DocsToKG.OntologyDownload.io import network as network_mod
+import DocsToKG.OntologyDownload.plugins as plugins_mod
+from DocsToKG.OntologyDownload.api import ConfigError
+from DocsToKG.OntologyDownload.settings import DefaultsConfig, ResolvedConfig
 
 
 @pytest.fixture()
@@ -197,6 +199,15 @@ def load_cassette():
         return json.loads(path.read_text())
 
     return _load
+
+
+def _reset_plugin_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(plugins_mod, "_PLUGINS_INITIALIZED", False, raising=False)
+    plugins_mod._PLUGIN_REGISTRIES.clear()
+    plugins_mod._RESOLVER_REGISTRY.clear()
+    plugins_mod._VALIDATOR_REGISTRY.clear()
+    plugins_mod._RESOLVER_ENTRY_META.clear()
+    plugins_mod._VALIDATOR_ENTRY_META.clear()
 
 
 # --- Test Cases ---
@@ -520,6 +531,7 @@ def test_resolver_uses_service_rate_limit(monkeypatch, resolved_config):
         return bucket
 
     monkeypatch.setattr(io_mod, "get_bucket", _capture_bucket, raising=False)
+    monkeypatch.setattr(network_mod, "get_bucket", _capture_bucket, raising=False)
     monkeypatch.setattr(resolvers, "get_bucket", _capture_bucket, raising=False)
     monkeypatch.setattr(resolvers, "retry_with_backoff", lambda func, **kwargs: func())
 
@@ -574,6 +586,7 @@ def test_lov_resolver_respects_timeout_and_rate_limit(monkeypatch, resolved_conf
         return bucket
 
     monkeypatch.setattr(io_mod, "get_bucket", _fake_get_bucket, raising=False)
+    monkeypatch.setattr(network_mod, "get_bucket", _fake_get_bucket, raising=False)
     monkeypatch.setattr(resolvers, "get_bucket", _fake_get_bucket, raising=False)
     monkeypatch.setattr(resolvers, "retry_with_backoff", lambda func, **kwargs: func())
 
@@ -731,6 +744,7 @@ def test_resolver_fallback_chain_on_failure(monkeypatch, resolved_config):
 def test_resolver_plugin_loader_registers_and_warns(monkeypatch, caplog):
     base = resolvers.RESOLVERS.copy()
     monkeypatch.setattr(resolvers, "RESOLVERS", base.copy())
+    _reset_plugin_state(monkeypatch)
 
     class DummyResolver:
         NAME = "plugin"
@@ -758,7 +772,6 @@ def test_resolver_plugin_loader_registers_and_warns(monkeypatch, caplog):
         select=lambda *, group=None: entries if group == "docstokg.ontofetch.resolver" else []
     )
     monkeypatch.setattr(plugins_mod.metadata, "entry_points", lambda: stub)
-    monkeypatch.setattr(plugins_mod, "_RESOLVER_PLUGINS_LOADED", False, raising=False)
 
     caplog.set_level(logging.INFO)
     plugins_mod.load_resolver_plugins(
@@ -779,9 +792,10 @@ def test_resolver_plugin_guard_is_idempotent(monkeypatch):
         return SimpleNamespace(select=lambda *, group=None: [])
 
     monkeypatch.setattr(plugins_mod.metadata, "entry_points", fake_entry_points)
-    monkeypatch.setattr(plugins_mod, "_RESOLVER_PLUGINS_LOADED", False, raising=False)
+    _reset_plugin_state(monkeypatch)
 
     plugins_mod.ensure_resolver_plugins(resolvers.RESOLVERS, logger=logging.getLogger("test"))
     plugins_mod.ensure_resolver_plugins(resolvers.RESOLVERS, logger=logging.getLogger("test"))
 
-    assert calls["count"] == 1
+    # ensure_plugins_loaded queries entry points for both resolver and validator groups
+    assert calls["count"] == 2

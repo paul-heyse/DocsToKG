@@ -31,9 +31,9 @@ except ImportError:  # pragma: no cover - non-windows
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
 import requests
-from requests.structures import CaseInsensitiveDict
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
+from requests.structures import CaseInsensitiveDict
 
 from .checksums import ExpectedChecksum, resolve_expected_checksum
 from .errors import (
@@ -106,6 +106,7 @@ def _log_with_extra(
         logger.logger.log(level, message, extra=merged)
         return
     logger.log(level, message, extra=extra)
+
 
 MANIFEST_SCHEMA_VERSION = "1.0"
 
@@ -1451,7 +1452,9 @@ def _ontology_index_lock(
                 release_extra.setdefault("stage", "download")
                 release_extra["event"] = "ontology_index_lock_released"
                 release_extra["lock_path"] = str(lock_path)
-                _log_with_extra(logger, logging.DEBUG, "ontology index lock released", release_extra)
+                _log_with_extra(
+                    logger, logging.DEBUG, "ontology index lock released", release_extra
+                )
 
 
 def _mirror_to_cas_if_enabled(

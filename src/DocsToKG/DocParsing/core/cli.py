@@ -9,7 +9,13 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Sequence
 
 from DocsToKG.DocParsing.cli_errors import CLIValidationError, format_cli_error
-from DocsToKG.DocParsing.env import data_doctags, data_html, data_manifests, data_pdfs, detect_data_root
+from DocsToKG.DocParsing.env import (
+    data_doctags,
+    data_html,
+    data_manifests,
+    data_pdfs,
+    detect_data_root,
+)
 from DocsToKG.DocParsing.io import iter_manifest_entries
 from DocsToKG.DocParsing.logging import get_logger, log_event, summarize_manifest
 
@@ -144,7 +150,6 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
 def _resolve_doctags_paths(args: argparse.Namespace) -> tuple[str, Path, Path, str]:
     """Resolve DocTags input/output directories and mode."""
 
-    from DocsToKG.DocParsing import doctags as doctags_module
 
     resolved_root = (
         detect_data_root(args.data_root) if args.data_root is not None else detect_data_root()
@@ -414,8 +419,12 @@ def _build_stage_args(args: argparse.Namespace) -> tuple[List[str], List[str], L
 
     chunk_shard_count = args.chunk_shard_count
     chunk_shard_index = args.chunk_shard_index
-    embed_shard_count = args.embed_shard_count if args.embed_shard_count is not None else chunk_shard_count
-    embed_shard_index = args.embed_shard_index if args.embed_shard_index is not None else args.chunk_shard_index
+    embed_shard_count = (
+        args.embed_shard_count if args.embed_shard_count is not None else chunk_shard_count
+    )
+    embed_shard_index = (
+        args.embed_shard_index if args.embed_shard_index is not None else args.chunk_shard_index
+    )
 
     doctags_args: List[str] = ["--log-level", args.log_level]
     chunk_args: List[str] = ["--log-level", args.log_level]
@@ -489,7 +498,12 @@ def run_all(argv: Sequence[str] | None = None) -> int:
         description="Run doctags → chunk → embed in sequence",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--data-root", type=Path, default=None, help="DocsToKG data root override passed to all stages")
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=None,
+        help="DocsToKG data root override passed to all stages",
+    )
     parser.add_argument(
         "--log-level",
         type=lambda value: str(value).upper(),
@@ -497,29 +511,124 @@ def run_all(argv: Sequence[str] | None = None) -> int:
         choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
         help="Logging verbosity applied to all stages",
     )
-    parser.add_argument("--resume", action="store_true", help="Resume each stage by skipping outputs with matching manifests")
-    parser.add_argument("--force", action="store_true", help="Force regeneration in each stage even when outputs exist")
-    parser.add_argument("--mode", choices=["auto", "html", "pdf"], default="auto", help="DocTags conversion mode")
-    parser.add_argument("--doctags-in-dir", type=Path, default=None, help="Override DocTags input directory")
-    parser.add_argument("--doctags-out-dir", type=Path, default=None, help="Override DocTags output directory")
-    parser.add_argument("--overwrite", action="store_true", help="Allow rewriting DocTags outputs (HTML mode only)")
-    parser.add_argument("--vllm-wait-timeout", type=int, default=None, help="Seconds to wait for vLLM readiness during the DocTags stage")
-    parser.add_argument("--chunk-out-dir", type=Path, default=None, help="Output directory override for chunk JSONL files")
-    parser.add_argument("--chunk-workers", type=int, default=None, help="Worker processes for the chunk stage")
-    parser.add_argument("--chunk-min-tokens", type=int, default=None, help="Minimum tokens per chunk passed to the chunk stage")
-    parser.add_argument("--chunk-max-tokens", type=int, default=None, help="Maximum tokens per chunk passed to the chunk stage")
-    parser.add_argument("--structural-markers", type=Path, default=None, help="Structural marker configuration forwarded to the chunk stage")
-    parser.add_argument("--chunk-shard-count", type=int, default=None, help="Total number of shards for the chunk stage")
-    parser.add_argument("--chunk-shard-index", type=int, default=None, help="Zero-based shard index for the chunk stage")
-    parser.add_argument("--embed-out-dir", type=Path, default=None, help="Output directory override for embedding JSONL files")
-    parser.add_argument("--embed-offline", action="store_true", help="Run the embedding stage with TRANSFORMERS_OFFLINE=1")
-    parser.add_argument("--embed-validate-only", action="store_true", help="Skip embedding generation and only validate existing vectors")
-    parser.add_argument("--splade-sparsity-warn-pct", dest="splade_sparsity_warn_pct", type=float, default=None, help="Override SPLADE sparsity warning threshold for the embed stage")
-    parser.add_argument("--embed-shard-count", type=int, default=None, help="Total number of shards for the embed stage (defaults to chunk shard count)")
-    parser.add_argument("--embed-shard-index", type=int, default=None, help="Zero-based shard index for the embed stage (defaults to chunk shard index)")
-    parser.add_argument("--embed-format", choices=["jsonl", "parquet"], default=None, help="Vector output format for the embed stage")
-    parser.add_argument("--embed-no-cache", action="store_true", help="Disable Qwen cache reuse during the embed stage")
-    parser.add_argument("--plan", action="store_true", help="Show a plan of the files each stage would touch instead of running")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume each stage by skipping outputs with matching manifests",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force regeneration in each stage even when outputs exist",
+    )
+    parser.add_argument(
+        "--mode", choices=["auto", "html", "pdf"], default="auto", help="DocTags conversion mode"
+    )
+    parser.add_argument(
+        "--doctags-in-dir", type=Path, default=None, help="Override DocTags input directory"
+    )
+    parser.add_argument(
+        "--doctags-out-dir", type=Path, default=None, help="Override DocTags output directory"
+    )
+    parser.add_argument(
+        "--overwrite", action="store_true", help="Allow rewriting DocTags outputs (HTML mode only)"
+    )
+    parser.add_argument(
+        "--vllm-wait-timeout",
+        type=int,
+        default=None,
+        help="Seconds to wait for vLLM readiness during the DocTags stage",
+    )
+    parser.add_argument(
+        "--chunk-out-dir",
+        type=Path,
+        default=None,
+        help="Output directory override for chunk JSONL files",
+    )
+    parser.add_argument(
+        "--chunk-workers", type=int, default=None, help="Worker processes for the chunk stage"
+    )
+    parser.add_argument(
+        "--chunk-min-tokens",
+        type=int,
+        default=None,
+        help="Minimum tokens per chunk passed to the chunk stage",
+    )
+    parser.add_argument(
+        "--chunk-max-tokens",
+        type=int,
+        default=None,
+        help="Maximum tokens per chunk passed to the chunk stage",
+    )
+    parser.add_argument(
+        "--structural-markers",
+        type=Path,
+        default=None,
+        help="Structural marker configuration forwarded to the chunk stage",
+    )
+    parser.add_argument(
+        "--chunk-shard-count",
+        type=int,
+        default=None,
+        help="Total number of shards for the chunk stage",
+    )
+    parser.add_argument(
+        "--chunk-shard-index",
+        type=int,
+        default=None,
+        help="Zero-based shard index for the chunk stage",
+    )
+    parser.add_argument(
+        "--embed-out-dir",
+        type=Path,
+        default=None,
+        help="Output directory override for embedding JSONL files",
+    )
+    parser.add_argument(
+        "--embed-offline",
+        action="store_true",
+        help="Run the embedding stage with TRANSFORMERS_OFFLINE=1",
+    )
+    parser.add_argument(
+        "--embed-validate-only",
+        action="store_true",
+        help="Skip embedding generation and only validate existing vectors",
+    )
+    parser.add_argument(
+        "--splade-sparsity-warn-pct",
+        dest="splade_sparsity_warn_pct",
+        type=float,
+        default=None,
+        help="Override SPLADE sparsity warning threshold for the embed stage",
+    )
+    parser.add_argument(
+        "--embed-shard-count",
+        type=int,
+        default=None,
+        help="Total number of shards for the embed stage (defaults to chunk shard count)",
+    )
+    parser.add_argument(
+        "--embed-shard-index",
+        type=int,
+        default=None,
+        help="Zero-based shard index for the embed stage (defaults to chunk shard index)",
+    )
+    parser.add_argument(
+        "--embed-format",
+        choices=["jsonl", "parquet"],
+        default=None,
+        help="Vector output format for the embed stage",
+    )
+    parser.add_argument(
+        "--embed-no-cache",
+        action="store_true",
+        help="Disable Qwen cache reuse during the embed stage",
+    )
+    parser.add_argument(
+        "--plan",
+        action="store_true",
+        help="Show a plan of the files each stage would touch instead of running",
+    )
 
     args = parser.parse_args([] if argv is None else list(argv))
     logger = get_logger(__name__, level=args.log_level)
@@ -661,8 +770,12 @@ COMMANDS: Dict[str, _Command] = {
     "chunk": _command(chunk, "Run the Docling hybrid chunker"),
     "embed": _command(embed, "Generate BM25/SPLADE/dense vectors"),
     "doctags": _command(doctags, "Convert HTML/PDF corpora into DocTags"),
-    "token-profiles": _command(token_profiles, "Print token count ratios for DocTags samples across tokenizers"),
-    "plan": _command(plan, "Show the projected doctags → chunk → embed actions without running stages"),
+    "token-profiles": _command(
+        token_profiles, "Print token count ratios for DocTags samples across tokenizers"
+    ),
+    "plan": _command(
+        plan, "Show the projected doctags → chunk → embed actions without running stages"
+    ),
     "manifest": _command(manifest, "Inspect manifest artifacts (tail/summarize)"),
 }
 

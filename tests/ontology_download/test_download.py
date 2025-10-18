@@ -341,8 +341,10 @@ pytest.importorskip("pydantic_settings")
 
 import DocsToKG.OntologyDownload.io as download
 import DocsToKG.OntologyDownload.planning as pipeline_mod
+from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.io import sanitize_filename
 from DocsToKG.OntologyDownload.planning import ConfigurationError, FetchPlan, FetchSpec
+from DocsToKG.OntologyDownload.migrations import migrate_manifest
 from DocsToKG.OntologyDownload.settings import (
     CACHE_DIR,
     ConfigError,
@@ -426,6 +428,7 @@ def make_session(monkeypatch, responses, head_responses=None):
         return session
 
     monkeypatch.setattr(requests, "Session", _factory)
+    monkeypatch.setattr(network_mod.requests, "Session", _factory, raising=False)
     return session
 
 
@@ -434,8 +437,10 @@ def clear_token_buckets():
     """Reset token bucket cache between tests to avoid leakage."""
 
     download.reset()
+    network_mod.SESSION_POOL.clear()
     yield
     download.reset()
+    network_mod.SESSION_POOL.clear()
 
 
 # --- Test Cases ---
@@ -635,7 +640,7 @@ def test_download_stream_retries(monkeypatch, tmp_path):
     error_response = DummyResponse(500, b"", {}, raise_error=True)
     success_response = DummyResponse(200, b"data", {})
     make_session(monkeypatch, [error_response, success_response])
-    monkeypatch.setattr(download.time, "sleep", lambda _: None)
+    monkeypatch.setattr(network_mod.time, "sleep", lambda _: None)
     destination = tmp_path / "file.owl"
     result = download.download_stream(
         url="https://example.org/file.owl",
@@ -660,6 +665,7 @@ def test_download_stream_rate_limiting(monkeypatch, tmp_path):
             consumed.append(True)
 
     monkeypatch.setattr(download, "get_bucket", lambda **_kwargs: StubBucket())
+    monkeypatch.setattr(network_mod, "get_bucket", lambda **_kwargs: StubBucket(), raising=False)
     destination = tmp_path / "file.owl"
     download.download_stream(
         url="https://example.org/file.owl",
@@ -683,7 +689,7 @@ def test_download_stream_sets_known_hash(monkeypatch, tmp_path):
         cache_path.write_bytes(b"payload")
         return cache_path
 
-    monkeypatch.setattr(download.pooch, "retrieve", fake_retrieve)
+    monkeypatch.setattr(network_mod.pooch, "retrieve", fake_retrieve)
     destination = tmp_path / "file.owl"
 
     expected_digest = "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5"
@@ -1118,9 +1124,9 @@ def test_validate_url_security_rejects_private_ip():
 
 
 def test_validate_url_security_upgrades_http(monkeypatch):
-    download._DNS_CACHE.clear()
+    network_mod._DNS_CACHE.clear()
     monkeypatch.setattr(
-        download.socket,
+        network_mod.socket,
         "getaddrinfo",
         lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
     )
@@ -1129,14 +1135,14 @@ def test_validate_url_security_upgrades_http(monkeypatch):
 
 
 def test_validate_url_security_respects_allowlist(monkeypatch):
-    download._DNS_CACHE.clear()
+    network_mod._DNS_CACHE.clear()
     looked_up = {}
 
     def fake_getaddrinfo(host, *_args, **_kwargs):
         looked_up["host"] = host
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
     config = DownloadConfiguration(allowed_hosts=["example.org", "purl.obolibrary.org"])
 
     secure_url = download.validate_url_security("https://purl.obolibrary.org/ontology.owl", config)
@@ -1148,19 +1154,19 @@ def test_validate_url_security_respects_allowlist(monkeypatch):
 def test_validate_url_security_blocks_disallowed_host():
     config = DownloadConfiguration(allowed_hosts=["example.org"])
 
-    with pytest.raises(ConfigError):
+    with pytest.raises(PolicyError):
         download.validate_url_security("https://malicious.com/evil.owl", config)
 
 
 def test_validate_url_security_normalizes_idn(monkeypatch):
-    download._DNS_CACHE.clear()
+    network_mod._DNS_CACHE.clear()
     looked_up = {}
 
     def fake_getaddrinfo(host, *_args, **_kwargs):
         looked_up["host"] = host
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
 
     config = DownloadConfiguration()
     secure_url = download.validate_url_security("https://münchen.example.org/ontology.owl", config)
@@ -1175,12 +1181,12 @@ def test_validate_url_security_rejects_mixed_script_idn():
 
 
 def test_validate_url_security_respects_wildcard_allowlist(monkeypatch):
-    download._DNS_CACHE.clear()
+    network_mod._DNS_CACHE.clear()
 
     def fake_getaddrinfo(host, *_args, **_kwargs):
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
     config = DownloadConfiguration(allowed_hosts=["*.example.org"])
 
     secure_url = download.validate_url_security("https://sub.example.org/ontology.owl", config)
@@ -1189,20 +1195,20 @@ def test_validate_url_security_respects_wildcard_allowlist(monkeypatch):
 
 
 def test_validate_url_security_rejects_userinfo() -> None:
-    with pytest.raises(ConfigError):
+    with pytest.raises(PolicyError):
         download.validate_url_security("https://user:secret@example.org/resource.owl")
 
 
 def test_validate_url_security_enforces_default_ports() -> None:
-    with pytest.raises(ConfigError):
+    with pytest.raises(PolicyError):
         download.validate_url_security("https://example.org:8443/ontology.owl")
 
 
 def test_validate_url_security_allows_configured_port(monkeypatch):
-    download._DNS_CACHE.clear()
+    network_mod._DNS_CACHE.clear()
 
     monkeypatch.setattr(
-        download.socket,
+        network_mod.socket,
         "getaddrinfo",
         lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
     )
@@ -1214,10 +1220,10 @@ def test_validate_url_security_allows_configured_port(monkeypatch):
 
 
 def test_validate_url_security_allows_host_specific_port(monkeypatch):
-    download._DNS_CACHE.clear()
+    network_mod._DNS_CACHE.clear()
 
     monkeypatch.setattr(
-        download.socket,
+        network_mod.socket,
         "getaddrinfo",
         lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
     )
@@ -1229,14 +1235,14 @@ def test_validate_url_security_allows_host_specific_port(monkeypatch):
 
 
 def test_validate_url_security_dns_lookup_cached(monkeypatch):
-    download._DNS_CACHE.clear()
+    network_mod._DNS_CACHE.clear()
     calls = {"count": 0}
 
     def fake_getaddrinfo(host, *_args, **_kwargs):
         calls["count"] += 1
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
 
     config = DownloadConfiguration()
     url = "https://example.org/ontology.owl"
@@ -1286,23 +1292,33 @@ def test_sanitize_filename_removes_traversal():
 
 
 def test_migrate_manifest_sets_default_version():
-    payload = {}
-    pipeline_mod._migrate_manifest_inplace(payload)
+    payload = migrate_manifest({})
     assert payload["schema_version"] == "1.0"
 
 
 def test_migrate_manifest_upgrades_old_schema():
-    payload = {"schema_version": "0.9"}
-    pipeline_mod._migrate_manifest_inplace(payload)
+    payload = migrate_manifest({"schema_version": "0.9"})
     assert payload["schema_version"] == "1.0"
     assert payload["resolver_attempts"] == []
 
 
 def test_migrate_manifest_warns_unknown_version(caplog):
-    caplog.set_level(logging.WARNING)
-    payload = {"schema_version": "2.0"}
-    pipeline_mod._migrate_manifest_inplace(payload)
-    assert any("unknown manifest schema version" in record.message for record in caplog.records)
+    caplog.set_level(logging.WARNING, logger="DocsToKG.OntologyDownload.migrations")
+    logger = logging.getLogger("DocsToKG.OntologyDownload.migrations")
+    captured: list[logging.LogRecord] = []
+
+    class _RecordingHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - helper
+            captured.append(record)
+
+    handler = _RecordingHandler()
+    logger.addHandler(handler)
+    try:
+        migrate_manifest({"schema_version": "2.0"})
+    finally:
+        logger.removeHandler(handler)
+
+    assert any("unknown manifest schema version" in record.getMessage() for record in captured)
 
 
 def test_read_manifest_applies_migration(tmp_path, monkeypatch):

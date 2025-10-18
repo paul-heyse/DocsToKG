@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import ipaddress
-import json
 import logging
-import os
 import random
+import shutil
 import socket
 import threading
 import time
@@ -17,7 +17,16 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Set, Tuple, TypeVar
+from typing import (
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+)
 from urllib.parse import ParseResult, urlparse, urlunparse
 
 import pooch
@@ -26,16 +35,12 @@ import requests
 from ..errors import ConfigError, DownloadFailure, OntologyDownloadError, PolicyError
 from ..settings import DownloadConfiguration
 from .filesystem import (
-    extract_archive_safe,
-    format_bytes,
-    generate_correlation_id,
-    mask_sensitive_data,
-    sanitize_filename,
-    sha256_file,
     _compute_file_hash,
     _materialize_cached_file,
+    sanitize_filename,
+    sha256_file,
 )
-from .rate_limit import get_bucket, apply_retry_after
+from .rate_limit import apply_retry_after, get_bucket
 
 try:  # pragma: no cover - psutil may be unavailable in minimal environments
     import psutil  # type: ignore[import]
@@ -76,8 +81,10 @@ for canonical, aliases in _RDF_ALIAS_GROUPS.items():
         RDF_MIME_FORMAT_LABELS[alias] = label
 
 SESSION_POOL_CACHE_DEFAULT = 2
+_RETRYABLE_HTTP_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
 
 T = TypeVar("T")
+
 
 def _enforce_idn_safety(host: str) -> None:
     """Validate internationalized hostnames and reject suspicious patterns."""
@@ -109,6 +116,7 @@ def _enforce_idn_safety(host: str) -> None:
     if len(scripts) > 1:
         raise ConfigError("Internationalized host mixes multiple scripts")
 
+
 def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
     """Reconstruct URL netloc with a normalized hostname."""
 
@@ -118,6 +126,7 @@ def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
 
     port = f":{parsed.port}" if parsed.port else ""
     return f"{host_component}{port}"
+
 
 def _cached_getaddrinfo(host: str) -> List[Tuple]:
     """Resolve *host* using an expiring LRU cache to avoid repeated DNS lookups."""
@@ -142,6 +151,7 @@ def _cached_getaddrinfo(host: str) -> List[Tuple]:
         _prune_dns_cache(now)
     return results
 
+
 def _prune_dns_cache(current_time: float) -> None:
     """Expire stale DNS entries and enforce the cache size bound."""
 
@@ -153,6 +163,7 @@ def _prune_dns_cache(current_time: float) -> None:
 
     while len(_DNS_CACHE) > _DNS_CACHE_MAX_ENTRIES:
         _DNS_CACHE.popitem(last=False)
+
 
 def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
     """Validate URLs to avoid SSRF, enforce HTTPS, normalize IDNs, and honor host allowlists."""
@@ -260,6 +271,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
 
     return urlunparse(parsed)
 
+
 class SessionPool:
     """Lightweight pool that reuses requests sessions per (service, host)."""
 
@@ -312,6 +324,7 @@ class SessionPool:
                     session.close()
             self._pool.clear()
 
+
 def retry_with_backoff(
     func: Callable[[], T],
     *,
@@ -358,6 +371,7 @@ def retry_with_backoff(
                     pass
             sleep(max(delay, 0.0))
 
+
 def log_memory_usage(
     logger: logging.Logger,
     *,
@@ -384,6 +398,8 @@ def log_memory_usage(
         extra["validator"] = validator
     logger.debug("memory usage", extra=extra)
 
+
+@dataclass(slots=True)
 class DownloadResult:
     """Result metadata for a completed download operation.
 
@@ -410,6 +426,7 @@ class DownloadResult:
     content_type: Optional[str]
     content_length: Optional[int]
 
+
 def _parse_retry_after(value: Optional[str]) -> Optional[float]:
     if not value:
         return None
@@ -431,12 +448,14 @@ def _parse_retry_after(value: Optional[str]) -> Optional[float]:
         seconds = (retry_time - now).total_seconds()
     return max(seconds, 0.0)
 
+
 def _is_retryable_status(status_code: Optional[int]) -> bool:
     if status_code is None:
         return True
     if status_code >= 500:
         return True
     return status_code in _RETRYABLE_HTTP_STATUSES
+
 
 def is_retryable_error(exc: BaseException) -> bool:
     """Return ``True`` when ``exc`` represents a retryable network failure."""
@@ -459,6 +478,7 @@ def is_retryable_error(exc: BaseException) -> bool:
     if isinstance(exc, requests.RequestException):
         return True
     return False
+
 
 SESSION_POOL = SessionPool()
 
@@ -484,7 +504,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
     Examples:
         >>> from pathlib import Path
-        >>> from DocsToKG.OntologyDownload import DownloadConfiguration
+        >>> from DocsToKG.OntologyDownload.settings import DownloadConfiguration
         >>> downloader = StreamingDownloader(
         ...     destination=Path("/tmp/ontology.owl"),
         ...     headers={},
@@ -981,6 +1001,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         part_path.replace(Path(output_file))
         destination_part_path.unlink(missing_ok=True)
 
+
 def _extract_correlation_id(logger: logging.Logger) -> Optional[str]:
     extra = getattr(logger, "extra", None)
     if isinstance(extra, dict):
@@ -988,6 +1009,7 @@ def _extract_correlation_id(logger: logging.Logger) -> Optional[str]:
         if isinstance(value, str):
             return value
     return None
+
 
 def download_stream(
     *,

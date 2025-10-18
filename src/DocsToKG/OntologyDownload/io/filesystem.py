@@ -12,13 +12,14 @@ import tarfile
 import uuid
 import zipfile
 from pathlib import Path, PurePosixPath
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-from ..errors import ConfigError, DownloadFailure
+from ..errors import ConfigError
 from ..settings import get_default_config
 
 _TAR_SUFFIXES = (".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2")
 _MAX_COMPRESSION_RATIO = 10.0
+
 
 def _resolve_max_uncompressed_bytes(limit: Optional[int]) -> Optional[int]:
     """Return the effective archive expansion limit, honoring runtime overrides."""
@@ -26,6 +27,7 @@ def _resolve_max_uncompressed_bytes(limit: Optional[int]) -> Optional[int]:
     if limit is not None:
         return limit
     return get_default_config().defaults.http.max_uncompressed_bytes()
+
 
 def sanitize_filename(filename: str) -> str:
     """Return a filesystem-safe filename derived from ``filename``."""
@@ -43,10 +45,12 @@ def sanitize_filename(filename: str) -> str:
         )
     return safe
 
+
 def generate_correlation_id() -> str:
     """Return a short-lived identifier that links related log entries."""
 
     return uuid.uuid4().hex[:12]
+
 
 def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
     """Return a copy of ``payload`` with common secret fields masked."""
@@ -89,6 +93,7 @@ def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
             masked[key] = _mask_value(value, lower)
     return masked
 
+
 def sha256_file(path: Path) -> str:
     """Compute the SHA-256 digest for the provided file."""
 
@@ -97,6 +102,7 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1 << 20), b""):
             hasher.update(chunk)
     return hasher.hexdigest()
+
 
 def _compute_file_hash(path: Path, algorithm: str) -> str:
     """Compute ``algorithm`` digest for ``path``."""
@@ -110,6 +116,7 @@ def _compute_file_hash(path: Path, algorithm: str) -> str:
             hasher.update(chunk)
     return hasher.hexdigest()
 
+
 def _validate_member_path(member_name: str) -> Path:
     """Validate archive member paths to prevent traversal attacks."""
 
@@ -122,6 +129,7 @@ def _validate_member_path(member_name: str) -> Path:
     if any(part in {"", ".", ".."} for part in relative.parts):
         raise ConfigError(f"Unsafe path detected in archive: {member_name}")
     return Path(*relative.parts)
+
 
 def _check_compression_ratio(
     *,
@@ -154,6 +162,7 @@ def _check_compression_ratio(
             f"exceeding {_MAX_COMPRESSION_RATIO}:1 compression ratio"
         )
 
+
 def _enforce_uncompressed_ceiling(
     *,
     total_uncompressed: int,
@@ -183,6 +192,7 @@ def _enforce_uncompressed_ceiling(
         f"{archive_type} archive {archive} expands to {total_uncompressed} bytes, "
         f"exceeding configured ceiling of {limit_bytes} bytes"
     )
+
 
 def extract_zip_safe(
     zip_path: Path,
@@ -245,6 +255,7 @@ def extract_zip_safe(
             extra={"stage": "extract", "archive": str(zip_path), "files": len(extracted)},
         )
     return extracted
+
 
 def extract_tar_safe(
     tar_path: Path,
@@ -316,6 +327,7 @@ def extract_tar_safe(
         )
     return extracted
 
+
 def extract_archive_safe(
     archive_path: Path,
     destination: Path,
@@ -342,6 +354,7 @@ def extract_archive_safe(
             max_uncompressed_bytes=limit_bytes,
         )
     raise ConfigError(f"Unsupported archive format: {archive_path}")
+
 
 def _materialize_cached_file(source: Path, destination: Path) -> tuple[Path, Path]:
     """Link or move ``source`` into ``destination`` without redundant copies.
@@ -373,6 +386,7 @@ def _materialize_cached_file(source: Path, destination: Path) -> tuple[Path, Pat
         return destination, destination
     finally:
         temp_path.unlink(missing_ok=True)
+
 
 def format_bytes(num: int) -> str:
     """Return a human-readable representation for ``num`` bytes."""

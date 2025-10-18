@@ -230,7 +230,7 @@ def dependency_stubs(dense_dim: int = 2560) -> None:
 
         @classmethod
         def from_doctags_and_image_pairs(
-            cls, texts: Sequence[str], _pairs
+            cls, texts: Sequence[str], images=None, **_kwargs
         ) -> "_StubDocTagsDocument":
             return cls(texts)
 
@@ -246,6 +246,9 @@ def dependency_stubs(dense_dim: int = 2560) -> None:
             if not parts:
                 parts = [joined.strip() or "Synthetic paragraph"]
             return cls(parts, document_name)
+
+        def __iter__(self):
+            return iter(self.paragraphs)
 
     class _StubBaseChunk:
         def __init__(self, text: str) -> None:

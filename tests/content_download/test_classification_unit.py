@@ -80,7 +80,7 @@ def test_build_download_outcome_respects_head_flag(tmp_path):
     pdf_path.write_bytes(b"%PDF-1.4\n0 1 obj\nendobj\nstartxref\n0\n%%EOF")
     response = SimpleNamespace(status_code=200, headers={"Content-Type": "application/pdf"})
 
-    outcome = downloader._build_download_outcome(  # type: ignore[attr-defined]
+    outcome = downloader.build_download_outcome(
         artifact=artifact,
         classification=Classification.PDF,
         dest_path=pdf_path,
@@ -95,13 +95,16 @@ def test_build_download_outcome_respects_head_flag(tmp_path):
         tail_bytes=b"%%EOF",
         dry_run=False,
         head_precheck_passed=True,
+        min_pdf_bytes=downloader.DEFAULT_MIN_PDF_BYTES,
+        tail_check_bytes=downloader.DEFAULT_TAIL_CHECK_BYTES,
+        retry_after=None,
     )
 
     assert outcome.classification is Classification.PDF
     assert outcome.path == str(pdf_path)
 
     pdf_path.write_bytes(b"short")
-    outcome_small = downloader._build_download_outcome(  # type: ignore[attr-defined]
+    outcome_small = downloader.build_download_outcome(
         artifact=artifact,
         classification="pdf",
         dest_path=pdf_path,
@@ -116,6 +119,9 @@ def test_build_download_outcome_respects_head_flag(tmp_path):
         tail_bytes=b"short",
         dry_run=False,
         head_precheck_passed=False,
+        min_pdf_bytes=downloader.DEFAULT_MIN_PDF_BYTES,
+        tail_check_bytes=downloader.DEFAULT_TAIL_CHECK_BYTES,
+        retry_after=None,
     )
 
     assert outcome_small.classification is Classification.MISS

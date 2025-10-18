@@ -114,7 +114,7 @@ class ValidationRequest:
 
     Examples:
         >>> from pathlib import Path
-        >>> from DocsToKG.OntologyDownload import ResolvedConfig
+        >>> from DocsToKG.OntologyDownload.settings import ResolvedConfig
         >>> req = ValidationRequest(
         ...     name="rdflib",
         ...     file_path=Path("ontology.owl"),

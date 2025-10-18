@@ -169,6 +169,7 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
+import DocsToKG.OntologyDownload.plugins as plugins_mod
 import DocsToKG.OntologyDownload.validation as validation_mod
 from DocsToKG.OntologyDownload.settings import DefaultsConfig, ResolvedConfig
 from DocsToKG.OntologyDownload.validation import (
@@ -185,6 +186,16 @@ from DocsToKG.OntologyDownload.validation import (
     validate_rdflib,
     validate_robot,
 )
+
+
+def _reset_validator_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(plugins_mod, "_PLUGINS_INITIALIZED", False, raising=False)
+    plugins_mod._PLUGIN_REGISTRIES.clear()
+    plugins_mod._RESOLVER_REGISTRY.clear()
+    plugins_mod._VALIDATOR_REGISTRY.clear()
+    plugins_mod._RESOLVER_ENTRY_META.clear()
+    plugins_mod._VALIDATOR_ENTRY_META.clear()
+    validation_mod._VALIDATOR_REGISTRY_CACHE = None
 
 
 @pytest.fixture()
@@ -451,6 +462,7 @@ def test_sort_triple_file_falls_back_without_sort(monkeypatch, tmp_path):
 def test_validator_plugin_loader_registers_and_warns(monkeypatch, caplog):
     base = validation_mod.VALIDATORS.copy()
     monkeypatch.setattr(validation_mod, "VALIDATORS", base.copy())
+    _reset_validator_state(monkeypatch)
 
     def _plugin(request, logger):  # pragma: no cover - handler not executed here
         return ValidationResult(ok=True, details={"ok": True}, output_files=[])
@@ -474,8 +486,7 @@ def test_validator_plugin_loader_registers_and_warns(monkeypatch, caplog):
     stub = SimpleNamespace(
         select=lambda *, group=None: entries if group == "docstokg.ontofetch.validator" else []
     )
-    monkeypatch.setattr(validation_mod.metadata, "entry_points", lambda: stub)
-    monkeypatch.setattr(validation_mod, "_VALIDATOR_PLUGINS_LOADED", False)
+    monkeypatch.setattr(plugins_mod.metadata, "entry_points", lambda: stub)
 
     caplog.set_level(logging.INFO)
     load_validator_plugins(validation_mod.VALIDATORS, logger=logging.getLogger("test"))

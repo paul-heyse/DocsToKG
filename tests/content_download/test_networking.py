@@ -604,7 +604,7 @@ from DocsToKG.ContentDownload.cli import (
     DEFAULT_TAIL_CHECK_BYTES,
     DownloadOptions,
     WorkArtifact,
-    _build_download_outcome,
+    build_download_outcome,
     download_candidate,
     process_one_work,
 )
@@ -614,8 +614,10 @@ from DocsToKG.ContentDownload.core import (
     ReasonCode,
     classify_payload,
     dedupe,
+    normalize_arxiv,
     normalize_doi,
     normalize_pmcid,
+    normalize_pmid,
     normalize_url,
     strip_prefix,
 )
@@ -1176,7 +1178,7 @@ if HAS_REQUESTS and HAS_PYALEX:
         artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
         pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
         response = SimpleNamespace(status_code=200, headers={"Content-Type": "application/pdf"})
-        outcome = _build_download_outcome(
+        outcome = build_download_outcome(
             artifact=artifact,
             classification=Classification.PDF,
             dest_path=pdf_path,
@@ -1191,6 +1193,9 @@ if HAS_REQUESTS and HAS_PYALEX:
             tail_bytes=b"%%EOF",
             dry_run=False,
             head_precheck_passed=True,
+            min_pdf_bytes=DEFAULT_MIN_PDF_BYTES,
+            tail_check_bytes=DEFAULT_TAIL_CHECK_BYTES,
+            retry_after=None,
         )
         assert outcome.classification is Classification.PDF
         assert outcome.path == str(pdf_path)
@@ -1201,7 +1206,7 @@ if HAS_REQUESTS and HAS_PYALEX:
         artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
         pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
         response = SimpleNamespace(status_code=200, headers={"Content-Type": "application/pdf"})
-        outcome = _build_download_outcome(
+        outcome = build_download_outcome(
             artifact=artifact,
             classification="pdf",
             dest_path=pdf_path,
@@ -1216,6 +1221,9 @@ if HAS_REQUESTS and HAS_PYALEX:
             tail_bytes=b"%%EOF",
             dry_run=False,
             head_precheck_passed=False,
+            min_pdf_bytes=DEFAULT_MIN_PDF_BYTES,
+            tail_check_bytes=DEFAULT_TAIL_CHECK_BYTES,
+            retry_after=None,
         )
         assert outcome.classification is Classification.MISS
         assert outcome.path is None
@@ -3298,7 +3306,7 @@ def test_classify_payload_variants(payload, ctype, url, expected):
 # --- test_download_utils.py ---
 
 
-def test_collect_location_urls_dedupes_and_tracks_sources():
+def test_collect_location_urls_dedupes_and_tracks_sources(tmp_path: Path):
     work = {
         "best_oa_location": {
             "landing_page_url": "https://host.example/landing",
@@ -3319,17 +3327,23 @@ def test_collect_location_urls_dedupes_and_tracks_sources():
         ],
         "open_access": {"oa_url": "https://oa.example/paper.pdf"},
     }
-    collected = downloader._collect_location_urls(work)
-    assert collected["landing"] == [
+    pdf_dir = tmp_path / "pdf"
+    html_dir = tmp_path / "html"
+    xml_dir = tmp_path / "xml"
+    pdf_dir.mkdir()
+    html_dir.mkdir()
+    xml_dir.mkdir()
+    artifact = download_impl.create_artifact(work, pdf_dir, html_dir, xml_dir)
+    assert artifact.landing_urls == [
         "https://host.example/landing",
         "https://mirror.example/landing",
     ]
-    assert collected["pdf"] == [
+    assert artifact.pdf_urls == [
         "https://host.example/paper.pdf",
         "https://cdn.example/paper.pdf",
         "https://oa.example/paper.pdf",
     ]
-    assert collected["sources"] == ["Host", "Mirror"]
+    assert artifact.source_display_names == ["Host", "Mirror"]
 
 
 # --- test_download_utils.py ---
@@ -3359,7 +3373,7 @@ def test_normalize_doi(value, expected):
     ],
 )
 def test_normalize_pmid(value, expected):
-    assert downloader._normalize_pmid(value) == expected
+    assert normalize_pmid(value) == expected
 
 
 # --- test_download_utils.py ---
@@ -3390,7 +3404,7 @@ def test_normalize_pmcid(value, expected):
     ],
 )
 def test_normalize_arxiv(value, expected):
-    assert downloader._normalize_arxiv(value) == expected
+    assert normalize_arxiv(value) == expected
 
 
 # --- test_content_download_utils.py ---
@@ -4063,9 +4077,7 @@ def test_manifest_url_index_lazy_get_does_not_trigger_full_load(tmp_path: Path, 
     def _fail_loader(path):
         raise AssertionError("ManifestUrlIndex should not eager-load via load_manifest_url_index")
 
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _fail_loader
-    )
+    monkeypatch.setattr("DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _fail_loader)
 
     index = ManifestUrlIndex(db_path, eager=False)
     record = index.get(entry.url)

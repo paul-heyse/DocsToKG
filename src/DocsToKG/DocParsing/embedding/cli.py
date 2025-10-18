@@ -99,7 +99,11 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
             "type": str,
             "default": "auto",
             "choices": ["auto", "flash", "sdpa", "eager"],
-            "help": "SPLADE attention backend preference order (default: %(default)s).",
+            "help": (
+                "SPLADE attention backend preference order (default: %(default)s). "
+                "Auto first attempts FlashAttention 2, then scaled dot-product attention (SDPA) "
+                "before falling back to eager/standard attention."
+            ),
         },
     ),
     CLIOption(

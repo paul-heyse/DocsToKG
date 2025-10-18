@@ -16,8 +16,8 @@ import shutil
 import threading
 import time
 from dataclasses import dataclass, field
-from functools import lru_cache
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
 from typing import (
     Any,
@@ -52,16 +52,16 @@ from DocsToKG.ContentDownload.core import (
     classify_payload,
     dedupe,
     has_pdf_eof,
+    normalize_arxiv,
     normalize_doi,
     normalize_pmcid,
+    normalize_pmid,
     normalize_reason,
     normalize_url,
     slugify,
     tail_contains_html,
     update_tail_buffer,
 )
-from DocsToKG.ContentDownload.core import normalize_arxiv as _normalize_arxiv
-from DocsToKG.ContentDownload.core import normalize_pmid as _normalize_pmid
 from DocsToKG.ContentDownload.errors import (
     log_download_failure,
 )
@@ -375,47 +375,6 @@ class DownloadState(Enum):
 
 class _MaxBytesExceeded(RuntimeError):
     """Internal signal raised when the stream exceeds the configured byte budget."""
-
-
-def _build_download_outcome(
-    *,
-    artifact: WorkArtifact,
-    classification: Optional[Classification | str],
-    dest_path: Optional[Path],
-    response: requests.Response,
-    elapsed_ms: float,
-    flagged_unknown: bool,
-    sha256: Optional[str],
-    content_length: Optional[int],
-    etag: Optional[str],
-    last_modified: Optional[str],
-    extracted_text_path: Optional[str],
-    tail_bytes: Optional[bytes],
-    dry_run: bool,
-    head_precheck_passed: bool = False,
-    min_pdf_bytes: int = 1024,
-    tail_check_bytes: int = 2048,
-    retry_after: Optional[float] = None,
-) -> DownloadOutcome:
-    return build_download_outcome(
-        artifact=artifact,
-        classification=classification,
-        dest_path=dest_path,
-        response=response,
-        elapsed_ms=elapsed_ms,
-        flagged_unknown=flagged_unknown,
-        sha256=sha256,
-        content_length=content_length,
-        etag=etag,
-        last_modified=last_modified,
-        extracted_text_path=extracted_text_path,
-        dry_run=dry_run,
-        tail_bytes=tail_bytes,
-        head_precheck_passed=head_precheck_passed,
-        min_pdf_bytes=min_pdf_bytes,
-        tail_check_bytes=tail_check_bytes,
-        retry_after=retry_after,
-    )
 
 
 _DIGEST_CACHE_MAXSIZE = 256
@@ -1094,9 +1053,9 @@ def create_artifact(
     year = work.get("publication_year")
     ids = work.get("ids") or {}
     doi = normalize_doi(ids.get("doi"))
-    pmid = _normalize_pmid(ids.get("pmid"))
+    pmid = normalize_pmid(ids.get("pmid"))
     pmcid = normalize_pmcid(ids.get("pmcid"))
-    arxiv_id = _normalize_arxiv(ids.get("arxiv"))
+    arxiv_id = normalize_arxiv(ids.get("arxiv"))
 
     locations = _collect_location_urls(work)
     landing_urls = locations["landing"]

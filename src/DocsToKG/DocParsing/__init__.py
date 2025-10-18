@@ -11,10 +11,10 @@ from importlib.abc import Loader, MetaPathFinder
 from importlib.machinery import ModuleSpec
 from typing import Callable, Iterable
 
-from . import chunking as _chunking
+from . import _chunking
 from . import core as _core
 from . import doctags as _doctags
-from . import embedding as _embedding
+from . import _embedding
 from . import formats as _formats
 from . import io as _io
 from . import logging as _logging

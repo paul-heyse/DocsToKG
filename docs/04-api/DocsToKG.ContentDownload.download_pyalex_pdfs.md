@@ -21,9 +21,8 @@ Key features:
   re-exports.
 - Direct access to download primitives such as ``process_one_work`` and
   ``download_candidate`` for customised workflows.
-- Compatibility shims (``_build_download_outcome``) maintained for legacy call
-  sites while new helpers (``build_download_outcome``) offer richer telemetry
-  capture.
+- Direct import of ``build_download_outcome`` for constructing telemetry-rich
+  download results without invoking the full runner.
 
 ## 2. Functions and Re-exports
 
@@ -57,11 +56,6 @@ strategy dispatch.
 Re-export of :func:`DocsToKG.ContentDownload.download.build_download_outcome`.
 Constructs a :class:`DownloadOutcome` after applying corruption heuristics and
 capturing HTTP metadata.
-
-### `_build_download_outcome(...)`
-
-Legacy wrapper maintained for historical imports. Internally forwards to
-:func:`build_download_outcome`.
 
 ### `create_artifact(work, pdf_dir, html_dir, xml_dir)`
 

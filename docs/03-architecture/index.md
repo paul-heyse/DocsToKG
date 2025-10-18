@@ -28,7 +28,7 @@ graph TD
 ### 2. Document Parsing (`DocsToKG.DocParsing`)
 
 - Converts DocTags into chunked text and embeddings using Docling-backed runtimes.
-- Unified CLI entry points (`python -m DocsToKG.DocParsing.chunking` / `python -m DocsToKG.DocParsing.embedding`) forward to `_chunking.runtime` and `_embedding.runtime`, maintaining backwards-compatible imports.
+- Unified CLI entry points (``docparse chunk`` / ``docparse embed`` via :mod:`DocsToKG.DocParsing.core`) forward to `_chunking.runtime` and `_embedding.runtime`.
 - Shared infrastructure lives in `DocsToKG.DocParsing.core` (config loading, CLI orchestration, telemetry via `StageTelemetry` and `TelemetrySink`).
 - Chunk metadata preserves provenance (page numbers, references, figure captions) for accurate highlights and diagnostics downstream.
 

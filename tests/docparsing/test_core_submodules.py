@@ -9,10 +9,7 @@ from pathlib import Path
 import pytest
 
 import DocsToKG.DocParsing.core.http as core_http
-from DocsToKG.DocParsing.cli_errors import (
-    ChunkingCLIValidationError,
-    EmbeddingCLIValidationError,
-)
+from DocsToKG.DocParsing.config import ConfigLoadError, load_toml_markers, load_yaml_markers
 from DocsToKG.DocParsing.core import (
     ResumeController,
     compute_relative_doc_id,
@@ -28,7 +25,6 @@ from DocsToKG.DocParsing.core import cli as core_cli
 from DocsToKG.DocParsing.core.cli_utils import merge_args, preview_list
 from DocsToKG.DocParsing.core.http import get_http_session
 from DocsToKG.DocParsing.core.planning import display_plan
-from DocsToKG.DocParsing.config import ConfigLoadError, load_toml_markers, load_yaml_markers
 
 
 def test_normalize_http_timeout_scalar_and_iterables() -> None:

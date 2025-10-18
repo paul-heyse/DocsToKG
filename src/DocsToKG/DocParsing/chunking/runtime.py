@@ -5,6 +5,12 @@
 #   "purpose": "CLI entry points for DocsToKG.DocParsing.chunking workflows",
 #   "sections": [
 #     {
+#       "id": "chunking-module",
+#       "name": "_chunking_module",
+#       "anchor": "function-chunking-module",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "rec",
 #       "name": "Rec",
 #       "anchor": "class-rec",
@@ -108,7 +114,7 @@
 Docling Hybrid Chunker with Minimum Token Coalescence
 
 Transforms DocTags documents into chunked records with topic-aware coalescence.
-The module exposes a CLI (`python -m DocsToKG.DocParsing.chunking`)
+The module exposes a CLI (``python -m DocsToKG.DocParsing.core chunk``)
 and reusable helpers for other pipelines.
 
 Key Features:
@@ -122,7 +128,7 @@ Dependencies:
 - tqdm: Optional progress reporting when imported by callers.
 
 Usage:
-    python -m DocsToKG.DocParsing.chunking \\
+    python -m DocsToKG.DocParsing.core chunk \\
         --data-root /datasets/Data --min-tokens 256 --max-tokens 512
 
 Tokenizer Alignment:
@@ -155,21 +161,19 @@ import argparse
 import importlib
 import json
 import logging
-import os
 import statistics
 import time
 import uuid
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, fields
 from types import SimpleNamespace
-from typing import Any, Callable, ClassVar, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
-from transformers import AutoTokenizer
 
 # --- Globals ---
 
@@ -189,6 +193,7 @@ __all__ = (
     "summarize_image_metadata",
 )
 
+from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError, format_cli_error
 from DocsToKG.DocParsing.config import annotate_cli_overrides, parse_args_with_overrides
 from DocsToKG.DocParsing.context import ParsingContext
 from DocsToKG.DocParsing.core import (
@@ -200,7 +205,6 @@ from DocsToKG.DocParsing.core import (
     ChunkTask,
     ChunkWorkerConfig,
     ResumeController,
-    acquire_lock,
     compute_relative_doc_id,
     compute_stable_shard,
     dedupe_preserve_order,
@@ -208,7 +212,6 @@ from DocsToKG.DocParsing.core import (
     load_structural_marker_config,
     set_spawn_or_warn,
 )
-from DocsToKG.DocParsing.doctags import add_data_root_option, add_resume_force_options
 from DocsToKG.DocParsing.env import (
     data_chunks,
     data_doctags,
@@ -219,8 +222,6 @@ from DocsToKG.DocParsing.env import (
 )
 from DocsToKG.DocParsing.formats import (
     CHUNK_SCHEMA_VERSION,
-    ChunkRow,
-    ProvenanceMetadata,
     get_docling_version,
     validate_chunk_row,
 )
@@ -241,8 +242,7 @@ from DocsToKG.DocParsing.logging import get_logger, log_event, telemetry_scope
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
 from .cli import build_parser, parse_args
-from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError, format_cli_error
-from .config import CHUNK_PROFILE_PRESETS, ChunkerCfg, SOFT_BARRIER_MARGIN
+from .config import CHUNK_PROFILE_PRESETS, ChunkerCfg
 
 CHUNK_STAGE = "chunking"
 
@@ -250,11 +250,11 @@ _LOGGER = get_logger(__name__)
 
 
 def _chunking_module():
-    """Return the public chunking shim module (monkeypatch friendly)."""
+    """Return the public chunking package (monkeypatch friendly)."""
 
-    import DocsToKG.DocParsing.chunking as chunking_shim
+    import DocsToKG.DocParsing._chunking as chunking_pkg
 
-    return chunking_shim
+    return chunking_pkg
 
 
 @dataclass(slots=True)
@@ -338,11 +338,14 @@ def is_structural_boundary(
     return False
 
 
-def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, int, Optional[float], List[Dict[str, Any]]]:
+def summarize_image_metadata(
+    chunk: BaseChunk, text: str
+) -> Tuple[bool, bool, int, Optional[float], List[Dict[str, Any]]]:
     """Summarise image annotations associated with ``chunk``."""
 
     has_caption = any(
-        marker and marker in text for marker in ("Figure caption:", "Table:", "Picture description:")
+        marker and marker in text
+        for marker in ("Figure caption:", "Table:", "Picture description:")
     ) or text.strip().startswith("<!-- image -->")
     has_classification = False
     num_images = 0
@@ -441,7 +444,9 @@ def merge_rec(a: Rec, b: Rec, tokenizer: Any) -> Rec:
     token_count = tokenizer.count_tokens(text=text)
     refs = list(dict.fromkeys(a.refs + [ref for ref in b.refs if ref not in a.refs]))
     pages = sorted(set(a.pages + b.pages))
-    start_offset_candidates = [offset for offset in (a.start_offset, b.start_offset) if isinstance(offset, int)]
+    start_offset_candidates = [
+        offset for offset in (a.start_offset, b.start_offset) if isinstance(offset, int)
+    ]
     start_offset = min(start_offset_candidates) if start_offset_candidates else None
 
     picture_meta: List[Dict[str, Any]] = []
@@ -450,7 +455,11 @@ def merge_rec(a: Rec, b: Rec, tokenizer: Any) -> Rec:
     if b.picture_meta:
         picture_meta.extend(b.picture_meta)
 
-    confidences = [score for score in (a.image_confidence, b.image_confidence) if isinstance(score, (int, float))]
+    confidences = [
+        score
+        for score in (a.image_confidence, b.image_confidence)
+        if isinstance(score, (int, float))
+    ]
     image_confidence = max(confidences) if confidences else None
 
     return Rec(
@@ -845,9 +854,7 @@ def _main_inner(
         data_doctags(bootstrap_root)
         data_chunks(bootstrap_root)
     except Exception as exc:
-        logging.getLogger(__name__).debug(
-            "Failed to bootstrap chunking directories", exc_info=exc
-        )
+        logging.getLogger(__name__).debug("Failed to bootstrap chunking directories", exc_info=exc)
     if args is None:
         namespace = parse_args_with_overrides(parser)
     elif isinstance(args, argparse.Namespace):
@@ -1374,10 +1381,6 @@ def _main_inner(
         return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
-
-
 def _run_validate_only(
     *,
     files: Sequence[Path],
@@ -1522,6 +1525,7 @@ def _run_validate_only(
         output_relpath=relative_path(out_dir, data_root),
     )
 
+
 def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = None) -> int:
     """Wrapper that normalises CLI validation failures for the chunk stage."""
 
@@ -1530,3 +1534,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     except ChunkingCLIValidationError as exc:
         print(format_cli_error(exc), file=sys.stderr)
         return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

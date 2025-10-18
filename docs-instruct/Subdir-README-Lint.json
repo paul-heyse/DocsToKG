@@ -1,0 +1,58 @@
+{
+  "spec_version": "2025-10-18",
+  "front_matter": {
+    "required": true,
+    "keys": [
+      "subdir_id",
+      "owning_team",
+      "interfaces",
+      "stability",
+      "versioning",
+      "codeowners",
+      "last_updated"
+    ],
+    "last_updated_max_age_days": 90
+  },
+  "required_sections": [
+    { "title": "Quickstart", "pattern": "^## Quickstart", "min_lines": 3 },
+    { "title": "Common commands", "pattern": "^## Common commands", "min_lines": 2 },
+    { "title": "Folder map", "pattern": "^## Folder map", "min_lines": 3 },
+    { "title": "System overview", "pattern": "^## System overview", "min_lines": 6 },
+    { "title": "Entry points & contracts", "pattern": "^## Entry points & contracts", "min_lines": 3 },
+    { "title": "Configuration", "pattern": "^## Configuration", "min_lines": 3 },
+    { "title": "Data contracts & schemas", "pattern": "^## Data contracts & schemas", "min_lines": 2 },
+    { "title": "Interactions with other packages", "pattern": "^## Interactions with other packages", "min_lines": 2 },
+    { "title": "Observability", "pattern": "^## Observability", "min_lines": 3 },
+    { "title": "Security & data handling", "pattern": "^## Security & data handling", "min_lines": 3 },
+    { "title": "Development tasks", "pattern": "^## Development tasks", "min_lines": 3 },
+    { "title": "Agent guardrails", "pattern": "^## Agent guardrails", "min_lines": 4 },
+    { "title": "FAQ", "pattern": "^## FAQ", "min_lines": 2 }
+  ],
+  "order": [
+    "Quickstart",
+    "Common commands",
+    "Folder map",
+    "System overview",
+    "Entry points & contracts",
+    "Configuration",
+    "Data contracts & schemas",
+    "Interactions with other packages",
+    "Observability",
+    "Security & data handling",
+    "Development tasks",
+    "Agent guardrails",
+    "FAQ"
+  ],
+  "mermaid_minimum": 2,
+  "x_agent_map": {
+    "required": true,
+    "json_block_name": "x-agent-map"
+  },
+  "max_repo_map_entries": 15,
+  "placeholders_required": true,
+  "checks": {
+    "markdownlint": true,
+    "link_check": true,
+    "mermaid_compile": true
+  }
+}

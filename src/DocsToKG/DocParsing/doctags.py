@@ -1654,7 +1654,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     )
     stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=MANIFEST_STAGE)
     with telemetry_scope(stage_telemetry):
-        
+
         manifest_log_success(
             stage=MANIFEST_STAGE,
             doc_id="__config__",
@@ -1665,7 +1665,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
             output_path=output_dir,
             config=config_snapshot,
         )
-        
+
         logger.info(
             "I/O configuration",
             extra={
@@ -1685,12 +1685,12 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                 }
             },
         )
-        
+
         if cfg.force:
             logger.info("Force mode: reprocessing all documents")
         elif cfg.resume:
             logger.info("Resume mode enabled: unchanged outputs will be skipped")
-        
+
         preflight_start = time.perf_counter()
         port, proc, owns = ensure_vllm(
             int(cfg.port),
@@ -1727,7 +1727,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                 }
             },
         )
-        
+
         try:
             pdfs = list_pdfs(input_dir)
             if not pdfs:
@@ -1742,10 +1742,12 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                     input_dir=str(input_dir),
                 )
                 return 0
-        
-            manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
+
+            manifest_index = (
+                load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
+            )
             resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
-        
+
             workers = max(1, int(cfg.workers))
             logger.info(
                 "Launching workers",
@@ -1756,7 +1758,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                     }
                 },
             )
-        
+
             tasks: List[PdfTask] = []
             ok = fail = skip = 0
             for pdf_path in pdfs:
@@ -1787,7 +1789,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                     )
                     skip += 1
                     continue
-        
+
                 tasks.append(
                     PdfTask(
                         pdf_path=pdf_path,
@@ -1802,7 +1804,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                         vlm_stop=tuple(args.vlm_stop or []),
                     )
                 )
-        
+
             if not tasks:
                 logger.info(
                     "Conversion summary",
@@ -1815,7 +1817,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                     },
                 )
                 return 0
-        
+
             with ProcessPoolExecutor(max_workers=workers) as ex:
                 future_map = {ex.submit(pdf_convert_one, task): task for task in tasks}
                 with tqdm(total=len(future_map), desc="Converting PDFs", unit="file") as pbar:
@@ -1839,7 +1841,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                                 error_code="PDF_CONVERSION_FAILED",
                                 error=result.error or "unknown",
                             )
-        
+
                         duration = round(result.duration_s, 3)
                         common_extra = {
                             "parse_engine": "docling-vlm",
@@ -1881,9 +1883,9 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                                 error=result.error or "unknown",
                                 **common_extra,
                             )
-        
+
                         pbar.update(1)
-        
+
             logger.info(
                 "Conversion summary",
                 extra={
@@ -1897,10 +1899,10 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         finally:
             stop_vllm(proc, owns, grace=10)
             logger.info("All done")
-        
+
         return 0
-        
-        
+
+
 # --- HTML Pipeline ---
 
 HTML_MANIFEST_STAGE = "doctags-html"
@@ -2364,7 +2366,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
     )
     stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=HTML_MANIFEST_STAGE)
     with telemetry_scope(stage_telemetry):
-        
+
         manifest_log_success(
             stage=HTML_MANIFEST_STAGE,
             doc_id="__config__",
@@ -2375,7 +2377,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
             output_path=output_dir,
             config=config_snapshot,
         )
-        
+
         if cfg.force:
             logger.info(
                 "Force mode: reprocessing all documents",
@@ -2386,7 +2388,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 "Resume mode enabled: unchanged outputs will be skipped",
                 extra={"extra_fields": {"mode": "resume"}},
             )
-        
+
         files = list_htmls(input_dir)
         if not files:
             log_event(
@@ -2400,10 +2402,12 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 input_dir=str(input_dir),
             )
             return 0
-        
-        manifest_index = load_manifest_index(HTML_MANIFEST_STAGE, resolved_root) if cfg.resume else {}
+
+        manifest_index = (
+            load_manifest_index(HTML_MANIFEST_STAGE, resolved_root) if cfg.resume else {}
+        )
         resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
-        
+
         tasks: List[HtmlTask] = []
         ok = fail = skip = 0
         for path in files:
@@ -2444,7 +2448,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                     sanitizer_profile=cfg.html_sanitizer,
                 )
             )
-        
+
         if not tasks:
             logger.info(
                 "HTML conversion summary",
@@ -2457,7 +2461,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 },
             )
             return 0
-        
+
         with ProcessPoolExecutor(max_workers=cfg.workers) as ex:
             futures = [ex.submit(html_convert_one, task) for task in tasks]
             for fut in tqdm(
@@ -2515,7 +2519,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                         parse_engine="docling-html",
                         html_sanitizer=result.sanitizer_profile,
                     )
-        
+
         logger.info(
             "HTML conversion summary",
             extra={
@@ -2526,10 +2530,10 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 }
             },
         )
-        
+
         return 0
-        
-        
+
+
 # --- Docling Test Stubs ---
 
 _DOCLING_STUB_INSTALLED = False

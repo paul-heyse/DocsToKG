@@ -5,6 +5,60 @@
 #   "purpose": "Embedding pipelines for DocParsing",
 #   "sections": [
 #     {
+#       "id": "embedding-module",
+#       "name": "_embedding_module",
+#       "anchor": "function-embedding-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "embedding-attr",
+#       "name": "_embedding_attr",
+#       "anchor": "function-embedding-attr",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-failure",
+#       "name": "_manifest_log_failure",
+#       "anchor": "function-manifest-log-failure",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-success",
+#       "name": "_manifest_log_success",
+#       "anchor": "function-manifest-log-success",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-skip",
+#       "name": "_manifest_log_skip",
+#       "anchor": "function-manifest-log-skip",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-bm25-vector",
+#       "name": "_build_bm25_vector",
+#       "anchor": "function-build-bm25-vector",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-splade-vector",
+#       "name": "_build_splade_vector",
+#       "anchor": "function-build-splade-vector",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-dense-vector",
+#       "name": "_build_dense_vector",
+#       "anchor": "function-build-dense-vector",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-vector-row",
+#       "name": "_build_vector_row",
+#       "anchor": "function-build-vector-row",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "get-sparse-encoder-cls",
 #       "name": "_get_sparse_encoder_cls",
 #       "anchor": "function-get-sparse-encoder-cls",
@@ -277,7 +331,7 @@ Key Features:
 - Explain SPLADE attention backend fallbacks (auto→FlashAttention2→SDPA→eager)
 
 Usage:
-    python -m DocsToKG.DocParsing.embedding --resume
+    python -m DocsToKG.DocParsing.core embed --resume
 
 Dependencies:
 - sentence_transformers (optional): Provides SPLADE sparse encoders.
@@ -298,6 +352,7 @@ if __name__ == "__main__" and __package__ is None:
     if str(package_root) not in sys.path:
         sys.path.insert(0, str(package_root))
 
+import argparse
 import atexit
 import hashlib
 import json
@@ -314,20 +369,18 @@ import unicodedata
 import uuid
 from collections import Counter, OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-import argparse
 from dataclasses import fields
 from types import SimpleNamespace
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
-    ClassVar,
     Dict,
     Iterator,
     List,
     Optional,
     Sequence,
     Tuple,
-    TYPE_CHECKING,
 )
 
 # Third-party imports
@@ -377,6 +430,7 @@ except Exception:  # pragma: no cover - fallback when tqdm is unavailable
         return _TqdmFallback(iterable, **kwargs)
 
 
+from DocsToKG.DocParsing.cli_errors import EmbeddingCLIValidationError, format_cli_error
 from DocsToKG.DocParsing.config import annotate_cli_overrides, parse_args_with_overrides
 from DocsToKG.DocParsing.context import ParsingContext
 from DocsToKG.DocParsing.core import (
@@ -393,10 +447,6 @@ from DocsToKG.DocParsing.core import (
     derive_doc_id_and_vectors_path,
     iter_chunks,
 )
-from DocsToKG.DocParsing.doctags import (
-    add_data_root_option,
-    add_resume_force_options,
-)
 from DocsToKG.DocParsing.env import (
     data_chunks,
     data_vectors,
@@ -412,10 +462,6 @@ from DocsToKG.DocParsing.env import (
 )
 from DocsToKG.DocParsing.formats import (
     VECTOR_SCHEMA_VERSION,
-    BM25Vector,
-    DenseVector,
-    SPLADEVector,
-    VectorRow,
 )
 from DocsToKG.DocParsing.io import (
     atomic_write,
@@ -423,13 +469,13 @@ from DocsToKG.DocParsing.io import (
     compute_content_hash,
     iter_jsonl,
     load_manifest_index,
+    manifest_append,
     quarantine_artifact,
     relative_path,
     resolve_attempts_path,
     resolve_manifest_path,
 )
 from DocsToKG.DocParsing.logging import get_logger, log_event, telemetry_scope
-from DocsToKG.DocParsing.cli_errors import EmbeddingCLIValidationError, format_cli_error
 from DocsToKG.DocParsing.schemas import (
     SchemaKind,
     ensure_chunk_schema,
@@ -439,22 +485,81 @@ from DocsToKG.DocParsing.schemas import (
     validate_vector_row as schema_validate_vector_row,
 )
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
-from .cli import build_parser
+
+from .cli import build_parser, parse_args as _cli_parse_args
 from .config import (
     EMBED_PROFILE_PRESETS,
     SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
     EmbedCfg,
 )
 
+parse_args = _cli_parse_args
+
 
 def _embedding_module():
-    """Return the embedding shim module to honour monkeypatching."""
+    """Return the embedding package to honour monkeypatching."""
 
-    import DocsToKG.DocParsing.embedding as embedding_shim
+    import DocsToKG.DocParsing._embedding as embedding_pkg
 
-    return embedding_shim
+    return embedding_pkg
+
+
+def _embedding_attr(name: str):
+    """Fetch ``name`` from the public embedding shim module."""
+
+    return getattr(_embedding_module(), name)
+
+
+def _manifest_log_failure(*args, **kwargs):
+    """Delegate manifest failure logging to the embedding shim."""
+
+    return _embedding_attr("manifest_log_failure")(*args, **kwargs)
+
+
+def _manifest_log_success(*args, **kwargs):
+    """Delegate manifest success logging to the embedding shim."""
+
+    return _embedding_attr("manifest_log_success")(*args, **kwargs)
+
+
+def _manifest_log_skip(*args, **kwargs):
+    """Delegate manifest skip logging to the embedding shim."""
+
+    return _embedding_attr("manifest_log_skip")(*args, **kwargs)
+
+
+manifest_log_failure = _manifest_log_failure
+manifest_log_success = _manifest_log_success
+manifest_log_skip = _manifest_log_skip
+
+
+def _build_bm25_vector(**kwargs):
+    """Construct a BM25 vector using the embedding shim."""
+
+    return _embedding_attr("BM25Vector")(**kwargs)
+
+
+def _build_splade_vector(**kwargs):
+    """Construct a SPLADE vector using the embedding shim."""
+
+    return _embedding_attr("SPLADEVector")(**kwargs)
+
+
+def _build_dense_vector(**kwargs):
+    """Construct a dense vector using the embedding shim."""
+
+    return _embedding_attr("DenseVector")(**kwargs)
+
+
+def _build_vector_row(**kwargs):
+    """Construct a VectorRow using the embedding shim."""
+
+    return _embedding_attr("VectorRow")(**kwargs)
+
 
 # --- Globals ---
+
+EMBED_STAGE = "embedding"
 
 __all__ = (
     "BM25Stats",
@@ -491,6 +596,7 @@ __all__ = (
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from sentence_transformers import SparseEncoder  # type: ignore
+
     from vllm import LLM, PoolingParams
 else:  # pragma: no cover - runtime fallback when optional deps absent
     SparseEncoder = Any  # type: ignore[assignment]
@@ -528,7 +634,8 @@ def _get_vllm_components() -> Tuple[type, type]:
         return _VLLM_COMPONENTS
     ensure_qwen_dependencies()
     try:
-        from vllm import LLM as llm_cls, PoolingParams as pooling_cls  # type: ignore
+        from vllm import LLM as llm_cls  # type: ignore
+        from vllm import PoolingParams as pooling_cls
     except ImportError as exc:  # pragma: no cover - optional dependency missing
         raise RuntimeError(
             "vLLM is required for Qwen embeddings. Install it with `pip install vllm`."
@@ -737,6 +844,8 @@ def _percentile(data: Sequence[float], pct: float) -> float:
 
 
 MANIFEST_STAGE = "embeddings"
+
+
 def _ensure_splade_dependencies() -> None:
     """Backward-compatible shim that delegates to core.ensure_splade_dependencies."""
 
@@ -1724,9 +1833,9 @@ def write_vectors(
         terms, weights = bm25_vector(text, stats, k1=bm25_k1, b=bm25_b)
 
         try:
-            vector_row = VectorRow(
+            vector_row = _build_vector_row(
                 UUID=uuid_value,
-                BM25=BM25Vector(
+                BM25=_build_bm25_vector(
                     terms=terms,
                     weights=weights,
                     k1=bm25_k1,
@@ -1734,8 +1843,8 @@ def write_vectors(
                     avgdl=stats.avgdl,
                     N=stats.N,
                 ),
-                SPLADEv3=SPLADEVector(tokens=tokens_list, weights=weight_list),
-                Qwen3_4B=DenseVector(
+                SPLADEv3=_build_splade_vector(tokens=tokens_list, weights=weight_list),
+                Qwen3_4B=_build_dense_vector(
                     model_id=DEFAULT_TOKENIZER,
                     vector=[float(x) for x in qwen_vector],
                     dimension=int(args.qwen_dim),
@@ -1761,7 +1870,7 @@ def write_vectors(
                 uuid=uuid_value,
                 error=str(exc),
             )
-            manifest_log_failure(
+            _manifest_log_failure(
                 stage="embeddings",
                 doc_id=doc_id,
                 duration_s=0.0,
@@ -1810,7 +1919,7 @@ def _handle_embedding_quarantine(
         )
         input_path = chunk_path
 
-    manifest_log_failure(
+    _manifest_log_failure(
         stage=MANIFEST_STAGE,
         doc_id=doc_id,
         duration_s=0.0,
@@ -1875,7 +1984,7 @@ def _validate_vectors_for_chunks(
             except Exception:
                 input_hash = ""
             quarantine_path = quarantine_artifact(vector_path, reason=reason, logger=logger)
-            manifest_log_failure(
+            _manifest_log_failure(
                 stage=MANIFEST_STAGE,
                 doc_id=doc_id,
                 duration_s=0.0,
@@ -1971,9 +2080,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         data_chunks(bootstrap_root)
         data_vectors(bootstrap_root)
     except Exception as exc:
-        logging.getLogger(__name__).debug(
-            "Failed to bootstrap data directories", exc_info=exc
-        )
+        logging.getLogger(__name__).debug("Failed to bootstrap data directories", exc_info=exc)
     if args is None:
         namespace = parse_args_with_overrides(parser)
     elif isinstance(args, argparse.Namespace):
@@ -2458,7 +2565,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         input_relpath=relative_path(chunk_file, resolved_root),
                         output_relpath=relative_path(out_path, resolved_root),
                     )
-                    manifest_log_skip(
+                    _manifest_log_skip(
                         stage=MANIFEST_STAGE,
                         doc_id=doc_id,
                         input_path=chunk_file,
@@ -2506,7 +2613,9 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         context.update_extra(files_parallel_effective=files_parallel)
 
         if files_parallel > 1:
-            log_event(logger, "info", "File-level parallelism enabled", files_parallel=files_parallel)
+            log_event(
+                logger, "info", "File-level parallelism enabled", files_parallel=files_parallel
+            )
 
         qwen_queue: QwenEmbeddingQueue | None = None
         try:
@@ -2553,7 +2662,9 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
             elif files_parallel > 1:
                 with (
                     ThreadPoolExecutor(max_workers=files_parallel) as executor,
-                    tqdm(total=len(file_entries), desc="Pass B: Encoding vectors", unit="file") as bar,
+                    tqdm(
+                        total=len(file_entries), desc="Pass B: Encoding vectors", unit="file"
+                    ) as bar,
                 ):
                     future_map = {
                         executor.submit(_process_entry, entry): entry for entry in file_entries
@@ -2563,7 +2674,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         try:
                             count, nnz, norms, duration, quarantined = future.result()
                         except EmbeddingProcessingError as exc:
-                            manifest_log_failure(
+                            _manifest_log_failure(
                                 stage=MANIFEST_STAGE,
                                 doc_id=doc_id,
                                 duration_s=round(exc.duration, 3),
@@ -2576,7 +2687,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                             bar.update(1)
                             raise exc.original from exc
                         except Exception as exc:
-                            manifest_log_failure(
+                            _manifest_log_failure(
                                 stage=MANIFEST_STAGE,
                                 doc_id=doc_id,
                                 duration_s=0.0,
@@ -2595,7 +2706,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         total_vectors += count
                         splade_nnz_all.extend(nnz)
                         qwen_norms_all.extend(norms)
-                        manifest_log_success(
+                        _manifest_log_success(
                             stage=MANIFEST_STAGE,
                             doc_id=doc_id,
                             duration_s=round(duration, 3),
@@ -2628,7 +2739,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                     try:
                         count, nnz, norms, duration, quarantined = _process_entry(entry)
                     except EmbeddingProcessingError as exc:
-                        manifest_log_failure(
+                        _manifest_log_failure(
                             stage=MANIFEST_STAGE,
                             doc_id=doc_id,
                             duration_s=round(exc.duration, 3),
@@ -2640,7 +2751,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         )
                         raise exc.original from exc
                     except Exception as exc:
-                        manifest_log_failure(
+                        _manifest_log_failure(
                             stage=MANIFEST_STAGE,
                             doc_id=doc_id,
                             duration_s=0.0,
@@ -2687,7 +2798,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
             args.qwen_queue = None
             if qwen_queue is not None:
                 qwen_queue.shutdown()
-    
+
         if quarantined_files:
             log_event(
                 logger,
@@ -2705,7 +2816,9 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         validator.report(logger)
 
         zero_pct = (
-            100.0 * len([n for n in splade_nnz_all if n == 0]) / total_vectors if total_vectors else 0.0
+            100.0 * len([n for n in splade_nnz_all if n == 0]) / total_vectors
+            if total_vectors
+            else 0.0
         )
         avg_nnz = statistics.mean(splade_nnz_all) if splade_nnz_all else 0.0
         median_nnz = statistics.median(splade_nnz_all) if splade_nnz_all else 0.0
@@ -2757,7 +2870,9 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
             input_path="__corpus__",
             input_hash="",
             output_path=out_dir,
-            warnings=validator.zero_nnz_chunks[: validator.top_n] if validator.zero_nnz_chunks else [],
+            warnings=(
+                validator.zero_nnz_chunks[: validator.top_n] if validator.zero_nnz_chunks else []
+            ),
             total_vectors=total_vectors,
             splade_avg_nnz=avg_nnz,
             splade_median_nnz=median_nnz,
@@ -2794,9 +2909,6 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
-
 def main(args: argparse.Namespace | None = None) -> int:
     """Wrapper that normalises CLI validation failures for the embedding stage."""
 
@@ -2805,3 +2917,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     except EmbeddingCLIValidationError as exc:
         print(format_cli_error(exc), file=sys.stderr)
         return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

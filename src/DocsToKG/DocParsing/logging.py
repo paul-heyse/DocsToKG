@@ -329,8 +329,8 @@ __all__ = [
 ]
 
 
-_STAGE_TELEMETRY_VAR: contextvars.ContextVar[Optional[StageTelemetry]] = (
-    contextvars.ContextVar("docparse_stage_telemetry", default=None)
+_STAGE_TELEMETRY_VAR: contextvars.ContextVar[Optional[StageTelemetry]] = contextvars.ContextVar(
+    "docparse_stage_telemetry", default=None
 )
 
 

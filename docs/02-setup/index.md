@@ -110,7 +110,7 @@ Open `docs/build/_build/html/index.html` in your browser once the build complete
 ## 5. Next Steps
 
 - Run content download pipelines via `python -m DocsToKG.ContentDownload.cli`.
-- Generate DocTags and embeddings (`python -m DocsToKG.DocParsing.chunking`, `python -m DocsToKG.DocParsing.embedding`).
+- Generate DocTags and embeddings (`docparse chunk`, `docparse embed`).
 - Ingest data into the hybrid search service and expose APIs (`DocsToKG.HybridSearch`).
 
 Refer to the **Architecture Guide** (`docs/03-architecture/index.md`) for subsystem details and the **Operations Guide** (`docs/06-operations/index.md`) for day-two workflows.

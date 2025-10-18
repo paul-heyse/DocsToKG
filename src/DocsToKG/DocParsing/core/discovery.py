@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from pathlib import Path
-from typing import Iterator, List, Mapping, Optional, Sequence, Tuple
+from typing import Iterator, List, Tuple
 
 from DocsToKG.DocParsing.config import load_toml_markers, load_yaml_markers
 

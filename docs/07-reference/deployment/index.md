@@ -52,7 +52,7 @@ direnv exec . python -m DocsToKG.ContentDownload.cli \
 ### 4.2 DocParsing Chunking Pipeline
 
 ```bash
-direnv exec . python -m DocsToKG.DocParsing.chunking \
+direnv exec . docparse chunk \
   --in-dir $DOCSTOKG_DATA_ROOT/doctags \
   --out-dir $DOCSTOKG_DATA_ROOT/chunks \
   --min-tokens 256 \
@@ -66,11 +66,11 @@ direnv exec . python -m DocsToKG.DocParsing.chunking \
 ### 4.3 Embedding Pipeline
 
 ```bash
-direnv exec . python -m DocsToKG.DocParsing.embedding \
-  --chunks $DOCSTOKG_DATA_ROOT/chunks \
-  --vectors $DOCSTOKG_DATA_ROOT/embeddings \
-  --model sentence-transformers/all-mpnet-base-v2 \
-  --batch-size 96
+direnv exec . docparse embed \
+  --chunks-dir $DOCSTOKG_DATA_ROOT/chunks \
+  --out-dir $DOCSTOKG_DATA_ROOT/embeddings \
+  --profile gpu-default \
+  --batch-size-qwen 96
 ```
 
 - Relies on `torch`, `xformers`, and `cupy` wheels installed during bootstrap; confirm CUDA 12.9 drivers for GPU use.
@@ -81,12 +81,12 @@ direnv exec . python -m DocsToKG.DocParsing.embedding \
 ```python
 from pathlib import Path
 
+from DocsToKG.HybridSearch import Observability
 from DocsToKG.HybridSearch.config import HybridSearchConfigManager
 from DocsToKG.HybridSearch.ingest import ChunkIngestionPipeline
-from DocsToKG.HybridSearch.observability import Observability
-from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
+from DocsToKG.HybridSearch.store import FaissVectorStore, ChunkRegistry, serialize_state
+from DocsToKG.HybridSearch.storage import OpenSearchSimulator
 from DocsToKG.HybridSearch.types import DocumentInput
-from DocsToKG.HybridSearch.vectorstore import FaissVectorStore, serialize_state
 
 config = HybridSearchConfigManager(Path("/etc/docstokg/hybrid_config.json")).get()
 faiss = FaissVectorStore(dim=config.dense.dim, config=config.dense)
@@ -144,8 +144,8 @@ direnv exec . python -m DocsToKG.OntologyDownload.cli validate hp latest
 3. **Scheduled Jobs**
    - Use Airflow/cron/Kubernetes Jobs to invoke:
      - `python -m DocsToKG.ContentDownload.cli …`
-     - `python -m DocsToKG.DocParsing.chunking …`
-     - `python -m DocsToKG.DocParsing.embedding …`
+    - `docparse chunk …`
+    - `docparse embed …`
      - `python -m DocsToKG.OntologyDownload.cli pull …`
 
 ## 6. Validation Before Flip

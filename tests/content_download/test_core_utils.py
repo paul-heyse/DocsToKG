@@ -14,7 +14,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
 from DocsToKG.ContentDownload.core import (
     DEFAULT_TAIL_CHECK_BYTES,
     Classification,
-    atomic_write_bytes,
+    atomic_write,
     atomic_write_text,
     classify_payload,
     dedupe,
@@ -72,7 +72,7 @@ def test_tail_detection(tmp_path: Path):
 
 def test_atomic_write_helpers(tmp_path: Path):
     target = tmp_path / "atomic.bin"
-    total = atomic_write_bytes(target, [b"hello", b"world"])
+    total = atomic_write(target, [b"hello", b"world"])
     assert total == 10
     assert target.read_bytes() == b"helloworld"
 

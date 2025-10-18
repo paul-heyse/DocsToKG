@@ -7,7 +7,7 @@ DocsToKG ships an extensive pytest suite that spans content download resiliency,
 | Path | Focus | Notes |
 |------|-------|-------|
 | `tests/content_download/` | Resolver pipeline, networking retries, manifest sinks. | Requires optional dependencies (`pyalex`, `beautifulsoup4`, `trafilatura`). Tests fall back to stubs where available. |
-| `tests/docparsing/` | Chunker CLI, embedding pipeline, docstring and NAVMAP validation. | Includes smoke tests for `DocsToKG.DocParsing.chunking` and `embedding` shims. |
+| `tests/docparsing/` | Chunker CLI, embedding pipeline, docstring and NAVMAP validation. | Includes smoke tests for `docparse chunk` / `docparse embed` and the underlying `_chunking` / `_embedding` runtimes. |
 | `tests/hybrid_search/test_suite.py` | Hybrid search ranking, fusion, FAISS integration. | Uses custom markers `real_vectors` and `scale_vectors` for GPU-backed assertions. |
 | `tests/ontology_download/` | CLI, configuration, storage backends, validation flows. | Skips gracefully when `pydantic-settings` or fsspec extras are missing. |
 | `tests/pipeline/` | End-to-end orchestration and retry controllers. | Marked with `@pytest.mark.integration` for slower runs. |

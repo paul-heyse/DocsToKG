@@ -121,9 +121,10 @@ import requests
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import DownloadConfiguration
-from DocsToKG.OntologyDownload import api as download
+import DocsToKG.OntologyDownload.io as download
 from DocsToKG.OntologyDownload import io as io_mod
+from DocsToKG.OntologyDownload.io import network as network_mod
+from DocsToKG.OntologyDownload.settings import DownloadConfiguration
 
 
 @dataclass
@@ -287,8 +288,9 @@ def _allow_local_addresses(monkeypatch):
     def _validate(url: str, http_config=None):  # noqa: ANN001 - test helper
         return url
 
-    monkeypatch.setattr(download, "validate_url_security", _validate)
+    monkeypatch.setattr(download, "validate_url_security", _validate, raising=False)
     monkeypatch.setattr(io_mod, "validate_url_security", _validate, raising=False)
+    monkeypatch.setattr(network_mod, "validate_url_security", _validate, raising=False)
 
     class _LocalResponse:
         def __init__(self, url: str, method: str, headers: Dict[str, str], timeout: Optional[int]):
@@ -346,7 +348,7 @@ def _allow_local_addresses(monkeypatch):
                 merged = {**self.headers, **(headers or {})}
                 return _LocalResponse(url, "GET", merged, timeout)
 
-        monkeypatch.setattr(download.requests, "Session", _LocalSession, raising=False)
+        monkeypatch.setattr(network_mod.requests, "Session", _LocalSession, raising=False)
 
 
 def _download_to_tmp(
@@ -513,6 +515,7 @@ def test_token_bucket_limits_concurrency(monkeypatch, http_server, tmp_path):
 
     monkeypatch.setattr(download, "get_bucket", _get_bucket, raising=False)
     monkeypatch.setattr(io_mod, "get_bucket", _get_bucket, raising=False)
+    monkeypatch.setattr(network_mod, "get_bucket", _get_bucket, raising=False)
 
     def _run(idx: int) -> Path:
         path = tmp_path / f"concurrent-{idx}.owl"
@@ -551,6 +554,7 @@ def test_concurrent_hosts_do_not_block(monkeypatch, http_server, tmp_path):
 
     monkeypatch.setattr(download, "get_bucket", _bucket_for_host, raising=False)
     monkeypatch.setattr(io_mod, "get_bucket", _bucket_for_host, raising=False)
+    monkeypatch.setattr(network_mod, "get_bucket", _bucket_for_host, raising=False)
 
     def _run(url: str, output: Path) -> None:
         download.download_stream(

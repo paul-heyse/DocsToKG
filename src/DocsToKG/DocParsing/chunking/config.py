@@ -116,7 +116,9 @@ class ChunkerCfg(StageConfigBase):
         else:
             env_root = os.getenv("DOCSTOKG_DATA_ROOT")
             resolved_root = (
-                StageConfigBase._coerce_optional_path(env_root, None) if env_root else detect_data_root()
+                StageConfigBase._coerce_optional_path(env_root, None)
+                if env_root
+                else detect_data_root()
             )
         self.data_root = resolved_root
 
@@ -131,7 +133,9 @@ class ChunkerCfg(StageConfigBase):
             self.out_dir = StageConfigBase._coerce_path(self.out_dir, None)
 
         if self.structural_markers is not None:
-            self.structural_markers = StageConfigBase._coerce_optional_path(self.structural_markers, None)
+            self.structural_markers = StageConfigBase._coerce_optional_path(
+                self.structural_markers, None
+            )
 
         if self.config is not None:
             self.config = StageConfigBase._coerce_optional_path(self.config, None)

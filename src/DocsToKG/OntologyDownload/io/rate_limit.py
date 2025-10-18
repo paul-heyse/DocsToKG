@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Tuple
-import re
+from dataclasses import dataclass
 
 from ..settings import DownloadConfiguration
 
@@ -21,6 +21,7 @@ try:  # pragma: no cover - Windows only
     import msvcrt  # type: ignore
 except ImportError:  # pragma: no cover - POSIX fallback
     msvcrt = None  # type: ignore[assignment]
+
 
 class TokenBucket:
     """Token bucket used to enforce per-host and per-service rate limits."""
@@ -46,6 +47,7 @@ class TokenBucket:
                     return
                 needed = tokens - self.tokens
             time.sleep(max(needed / self.rate, 0.0))
+
 
 class SharedTokenBucket(TokenBucket):
     """Token bucket backed by a filesystem state file for multi-process usage."""
@@ -127,6 +129,7 @@ class SharedTokenBucket(TokenBucket):
                 return
             time.sleep(max(needed / self.rate, 0.0))
 
+
 def _shared_bucket_path(http_config: DownloadConfiguration, key: str) -> Optional[Path]:
     """Return the filesystem path for the shared token bucket state."""
 
@@ -139,11 +142,14 @@ def _shared_bucket_path(http_config: DownloadConfiguration, key: str) -> Optiona
         token = "bucket"
     return base / f"{token}.json"
 
+
+@dataclass(slots=True)
 class _BucketEntry:
     bucket: TokenBucket
     rate: float
     capacity: float
     shared_path: Optional[Path]
+
 
 class RateLimiterRegistry:
     """Manage shared token buckets keyed by (service, host)."""
@@ -227,6 +233,7 @@ class RateLimiterRegistry:
         with self._lock:
             self._buckets.clear()
 
+
 def get_bucket(
     *,
     http_config: DownloadConfiguration,
@@ -236,6 +243,7 @@ def get_bucket(
     """Return a registry-managed bucket."""
 
     return REGISTRY.get_bucket(http_config=http_config, service=service, host=host)
+
 
 def apply_retry_after(
     *,
@@ -253,9 +261,11 @@ def apply_retry_after(
         delay=delay,
     )
 
+
 def reset() -> None:
     """Clear all buckets (testing hook)."""
 
     REGISTRY.reset()
+
 
 REGISTRY = RateLimiterRegistry()

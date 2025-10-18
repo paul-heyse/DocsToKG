@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import builtins
+import importlib
 import sys
 
 import pytest
 
-sys.modules.pop("DocsToKG.DocParsing.embedding", None)
 
-import DocsToKG.DocParsing.embedding.runtime as embedding_runtime
+def _import_runtime():
+    sys.modules.pop("DocsToKG.DocParsing._embedding.runtime", None)
+    return importlib.import_module("DocsToKG.DocParsing._embedding.runtime")
+
+
+embedding_runtime = _import_runtime()
 
 
 def test_sparse_encoder_missing_dependency(monkeypatch: pytest.MonkeyPatch) -> None:

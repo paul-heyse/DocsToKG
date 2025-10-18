@@ -8,12 +8,12 @@ and ontology ingest latency.
 - **Dense index parameters**: Adjust `DenseIndexConfig` (see
   `DocsToKG.HybridSearch.config`) for `nlist`, `nprobe`, and PQ settings. Use the FAISS
   scaffold to evaluate recall/latency trade-offs before rolling updates.
-- **Fusion weights**: Tweak `FusionConfig.k0` and `FusionConfig.mmr_lambda` to balance lexical vs dense dominance. Validate with `tests/test_hybrid_search.py`.
+- **Fusion weights**: Tweak `FusionConfig.k0` and `FusionConfig.mmr_lambda` to balance lexical vs dense dominance. Validate with `tests/hybrid_search/test_suite.py`.
 - **Oversampling**: Increase `DenseIndexConfig.oversample` when accuracy drifts; monitor GPU memory impact via observability metrics.
 
 ## 3. Document Parsing
 
-- **Batching**: Use the `--batch-size` flags on DocParsing pipelines to balance throughput and memory consumption.
+- **Batching**: Use the chunking `--workers` flag and embedding `--batch-size-qwen` / `--batch-size-splade` options to balance throughput and memory consumption.
 - **vLLM workers**: Enable multi-worker mode when running large-scale extraction with GPU acceleration.
 - **Caching**: Cache intermediate DocTags outputs to avoid repeated parsing of static corpora.
 
@@ -24,12 +24,12 @@ and ontology ingest latency.
 
 ## 5. Monitoring Signals
 
-Track the following metrics via `DocsToKG.HybridSearch.observability` or external dashboards:
+Track the following metrics via `Observability.metrics_snapshot()` or exported Prometheus gauges/counters:
 
-- Query latency percentiles by namespace
-- Recall@k on benchmark datasets
-- FAISS index load/restore durations
-- Ontology download success rates and average transfer time
+- `hybrid_search_timings_total_ms` percentiles per namespace.
+- Recall@k from `python -m DocsToKG.HybridSearch.validation`.
+- `faiss_ntotal`, `faiss_rebuilds`, and `faiss_gpu_bytes` for dense index health.
+- Ontology download success rates and transfer latency from CLI summaries.
 
 Use `docs/hybrid_search_runbook.md` for remediation actions when metrics breach guardrails.
 

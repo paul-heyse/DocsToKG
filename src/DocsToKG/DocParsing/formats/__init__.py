@@ -1035,12 +1035,15 @@ class RichSerializerProvider(ChunkingSerializerProvider):
             caption and annotation metadata.
         """
 
-        serializer = ChunkingDocSerializer(
-            doc=doc,
-            picture_serializer=self._build_picture_serializer(),
-            table_serializer=self._build_table_serializer(),
-            params=getattr(self.markdown_params, "core", None),
-        )
+        serializer_kwargs: Dict[str, object] = {
+            "doc": doc,
+            "picture_serializer": self._build_picture_serializer(),
+            "table_serializer": self._build_table_serializer(),
+        }
+        core_params = getattr(self.markdown_params, "core", None)
+        if core_params is not None:
+            serializer_kwargs["params"] = core_params
+        serializer = ChunkingDocSerializer(**serializer_kwargs)
         return serializer
 
 

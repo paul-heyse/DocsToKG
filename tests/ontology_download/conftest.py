@@ -228,10 +228,11 @@ if "pooch" not in sys.modules:
     sys.modules["pooch"] = _stub_pooch
 
 from DocsToKG.OntologyDownload import api as core  # noqa: E402  (after stubs)
+import DocsToKG.OntologyDownload.planning as planning_mod
 
 # --- Globals ---
 
-_ORIGINAL_BUILD_DESTINATION = core._build_destination
+_ORIGINAL_BUILD_DESTINATION = planning_mod._build_destination
 
 
 @pytest.fixture(autouse=True)
@@ -241,7 +242,12 @@ _ORIGINAL_BUILD_DESTINATION = core._build_destination
 def _reset_build_destination(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure tests see the canonical _build_destination implementation."""
 
-    monkeypatch.setattr(core, "_build_destination", _ORIGINAL_BUILD_DESTINATION, raising=False)
+    monkeypatch.setattr(
+        planning_mod,
+        "_build_destination",
+        _ORIGINAL_BUILD_DESTINATION,
+        raising=False,
+    )
 
 
 @pytest.fixture(autouse=True)

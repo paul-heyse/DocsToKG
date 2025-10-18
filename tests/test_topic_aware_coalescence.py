@@ -44,7 +44,7 @@ import pytest
 
 pytest.importorskip("transformers")
 
-from DocsToKG.DocParsing.chunking import (
+from DocsToKG.DocParsing._chunking.runtime import (
     Rec,
     coalesce_small_runs,
     is_structural_boundary,

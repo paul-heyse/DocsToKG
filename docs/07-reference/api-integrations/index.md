@@ -39,8 +39,8 @@ for hit in response.results:
 ## 4. CLI Utilities
 
 - `python -m DocsToKG.ContentDownload.cli` – Batch download scholarly PDFs from Pyalex and other resolvers.
-- `python -m DocsToKG.DocParsing.chunking` – Convert DocTags into chunked Markdown/metadata (see `--validate-only` and profile flags).
-- `python -m DocsToKG.DocParsing.embedding` – Generate dense embeddings for chunked output.
+- `docparse chunk` – Convert DocTags into chunked Markdown/metadata (see `--validate-only` and profile flags).
+- `docparse embed` – Generate dense embeddings for chunked output.
 - `python -m DocsToKG.OntologyDownload.cli pull` – Download and validate ontologies described in `sources.yaml`.
 
 Each CLI supports `--help` for flags and is documented in `docs/06-operations/index.md`.

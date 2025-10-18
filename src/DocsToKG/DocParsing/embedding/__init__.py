@@ -1,16 +1,17 @@
 """Embedding stage package with modular subcomponents."""
 
-from .config import EmbedCfg, EMBED_PROFILE_PRESETS
-from .cli import EMBED_CLI_OPTIONS, build_parser, parse_args
-from .runtime import main
-from .runtime import *  # noqa: F401,F403 - re-export legacy runtime symbols
-from . import runtime as _runtime
 from DocsToKG.DocParsing.formats import BM25Vector, DenseVector, SPLADEVector, VectorRow
 from DocsToKG.DocParsing.logging import (
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
 )
+
+from . import runtime as _runtime
+from .cli import EMBED_CLI_OPTIONS, build_parser, parse_args
+from .config import EMBED_PROFILE_PRESETS, EmbedCfg
+from .runtime import *  # noqa: F401,F403 - re-export legacy runtime symbols
+from .runtime import main
 
 __all__ = [
     "EmbedCfg",
@@ -19,6 +20,13 @@ __all__ = [
     "build_parser",
     "parse_args",
     "main",
+    "BM25Vector",
+    "DenseVector",
+    "SPLADEVector",
+    "VectorRow",
+    "manifest_log_failure",
+    "manifest_log_skip",
+    "manifest_log_success",
 ]
 
 # Export the names brought in from runtime to maintain backwards compatibility.

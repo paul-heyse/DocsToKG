@@ -38,33 +38,15 @@ _PUBLIC_EXPORTS = tuple(spec.name for spec in EXPORTS if spec.include_in_manifes
 
 __all__ = [*_PUBLIC_EXPORTS, "PUBLIC_API_MANIFEST"]
 
-_LEGACY_EXPORTS = {
-    "DefaultsConfig",
-    "DownloadConfiguration",
-    "ResolvedConfig",
-    "ResolverCandidate",
-    "LoggingConfiguration",
-    "mask_sensitive_data",
-    "setup_logging",
-    "plan_all",
-    "plan_one",
-    "run_validators",
-    "validate_manifest_dict",
-}
-
 if TYPE_CHECKING:  # pragma: no cover - import for static analysis only
     from . import api as _api
 
-    DefaultsConfig = _api.DefaultsConfig
-    DownloadConfiguration = _api.DownloadConfiguration
     DownloadFailure = _api.DownloadFailure
     DownloadResult = _api.DownloadResult
     FetchResult = _api.FetchResult
     FetchSpec = _api.FetchSpec
     OntologyDownloadError = _api.OntologyDownloadError
     PlannedFetch = _api.PlannedFetch
-    ResolvedConfig = _api.ResolvedConfig
-    ResolverCandidate = _api.ResolverCandidate
     ValidationRequest = _api.ValidationRequest
     ValidationResult = _api.ValidationResult
     ValidationTimeout = _api.ValidationTimeout
@@ -91,16 +73,10 @@ def __getattr__(name: str) -> Any:
         value = getattr(module, spec.attribute)
         globals()[name] = value
         return value
-
-    if name in _LEGACY_EXPORTS:
-        module = import_module(".api", __name__)
-        value = getattr(module, name)
-        globals()[name] = value
-        return value
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
 def __dir__() -> list[str]:
     """Expose lazily-populated attributes in ``dir()`` results."""
 
-    return sorted(set(globals()) | set(__all__) | _LEGACY_EXPORTS)
+    return sorted(set(globals()) | set(__all__))

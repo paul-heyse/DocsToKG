@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Sequence, TextIO
-
 import sys
+from typing import Any, Dict, List, Optional, Sequence, TextIO
 
 from DocsToKG.DocParsing.env import (
     data_chunks,
@@ -273,9 +272,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     }
 
 
-def display_plan(
-    plans: Sequence[Dict[str, Any]], stream: Optional[TextIO] = None
-) -> List[str]:
+def display_plan(plans: Sequence[Dict[str, Any]], stream: Optional[TextIO] = None) -> List[str]:
     """Pretty-print plan summaries and return the rendered lines."""
 
     lines: List[str] = ["docparse all plan"]

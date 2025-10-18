@@ -112,17 +112,12 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import (
-    DefaultsConfig,
-    FetchResult,
-    FetchSpec,
-    PlannedFetch,
-    ResolvedConfig,
-    ResolverCandidate,
-)
-from DocsToKG.OntologyDownload import api as cli
 import DocsToKG.OntologyDownload.cli as cli_module
+from DocsToKG.OntologyDownload import FetchResult, FetchSpec, PlannedFetch
+from DocsToKG.OntologyDownload import api as cli
 from DocsToKG.OntologyDownload.planning import FetchPlan
+from DocsToKG.OntologyDownload.resolvers import ResolverCandidate
+from DocsToKG.OntologyDownload.settings import DefaultsConfig, ResolvedConfig
 
 
 @pytest.fixture()
@@ -169,6 +164,14 @@ def _planned_fetch(ontology_id: str, url: str = "https://example.org/doc.owl") -
     )
 
 
+def _patch_cli_attr(monkeypatch: pytest.MonkeyPatch, name: str, value) -> None:
+    """Patch CLI-facing attributes on both API and CLI modules when available."""
+
+    monkeypatch.setattr(cli, name, value, raising=False)
+    if hasattr(cli_module, name):
+        monkeypatch.setattr(cli_module, name, value, raising=False)
+
+
 # --- Test Cases ---
 
 
@@ -181,10 +184,10 @@ def test_cli_pull_json_output(monkeypatch, stub_logger, tmp_path, capsys):
         manifest_path=tmp_path / "manifest.json",
         artifacts=[str(tmp_path / "hp.owl")],
     )
-    monkeypatch.setattr(cli, "fetch_all", lambda specs, config, force: [result])
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    _patch_cli_attr(monkeypatch, "fetch_all", lambda specs, config, force: [result])
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
     exit_code = cli.cli_main(["pull", "hp", "--json"])
@@ -203,10 +206,10 @@ def test_cli_pull_table_output(monkeypatch, stub_logger, tmp_path, capsys):
         manifest_path=tmp_path / "manifest.json",
         artifacts=[str(tmp_path / "hp.owl")],
     )
-    monkeypatch.setattr(cli, "fetch_all", lambda specs, config, force: [result])
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    _patch_cli_attr(monkeypatch, "fetch_all", lambda specs, config, force: [result])
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
     exit_code = cli.cli_main(["pull", "hp"])
@@ -218,13 +221,17 @@ def test_cli_pull_table_output(monkeypatch, stub_logger, tmp_path, capsys):
 
 def test_cli_pull_dry_run(monkeypatch, stub_logger, capsys):
     plans = [_planned_fetch("hp")]
-    monkeypatch.setattr(cli, "plan_all", lambda specs, *, config=None, since=None: list(plans))
-    monkeypatch.setattr(
-        cli, "fetch_all", lambda *_, **__: pytest.fail("fetch_all should not run in dry-run")
+    _patch_cli_attr(
+        monkeypatch, "plan_all", lambda specs, *, config=None, since=None: list(plans)
     )
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    _patch_cli_attr(
+        monkeypatch,
+        "fetch_all",
+        lambda *_, **__: pytest.fail("fetch_all should not run in dry-run"),
+    )
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
     exit_code = cli.cli_main(["pull", "hp", "--dry-run"])
@@ -242,11 +249,11 @@ def test_cli_pull_concurrency_and_hosts(monkeypatch, stub_logger):
         captured["hosts"] = list(config.defaults.http.allowed_hosts)
         return []
 
-    monkeypatch.setattr(cli, "plan_all", lambda *_, **__: [])
-    monkeypatch.setattr(cli, "fetch_all", _fake_fetch)
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    _patch_cli_attr(monkeypatch, "plan_all", lambda *_, **__: [])
+    _patch_cli_attr(monkeypatch, "fetch_all", _fake_fetch)
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
     exit_code = cli.cli_main(
@@ -291,10 +298,10 @@ def test_cli_plan_enables_planner_probes():
 
 def test_cli_plan_json_output(monkeypatch, stub_logger, capsys):
     plan = _planned_fetch("hp")
-    monkeypatch.setattr(cli, "plan_all", lambda specs, *, config=None, since=None: [plan])
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    _patch_cli_attr(monkeypatch, "plan_all", lambda specs, *, config=None, since=None: [plan])
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
     captured_lock: Dict[str, str] = {}
 
@@ -302,7 +309,7 @@ def test_cli_plan_json_output(monkeypatch, stub_logger, capsys):
         captured_lock["path"] = str(path)
         return path
 
-    monkeypatch.setattr(cli, "_write_lockfile", _fake_lockfile)
+    monkeypatch.setattr(cli_module, "write_lockfile", _fake_lockfile, raising=False)
 
     exit_code = cli.cli_main(["plan", "hp", "--json"])
     assert exit_code == 0
@@ -321,15 +328,16 @@ def test_cli_plan_since_passed_to_plan_all(monkeypatch, stub_logger):
         captured_since = since
         return [_planned_fetch("hp")]
 
-    monkeypatch.setattr(cli, "plan_all", _plan_all)
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    _patch_cli_attr(monkeypatch, "plan_all", _plan_all)
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
     monkeypatch.setattr(
-        cli,
-        "_write_lockfile",
+        cli_module,
+        "write_lockfile",
         lambda plans, path: captured_lock.setdefault("path", str(path)) or path,
+        raising=False,
     )
 
     exit_code = cli.cli_main(["plan", "hp", "--since", "2024-05-01"])
@@ -341,20 +349,17 @@ def test_cli_plan_since_passed_to_plan_all(monkeypatch, stub_logger):
 
 def test_cli_plan_concurrency_override(monkeypatch, stub_logger):
     captured = {}
-    monkeypatch.setattr(
-        cli,
-        "_write_lockfile",
-        lambda plans, path: path,
-    )
+    monkeypatch.setattr(cli_module, "write_lockfile", lambda plans, path: path, raising=False)
+    monkeypatch.setattr(cli_module, "write_lockfile", lambda plans, path: path, raising=False)
 
     def _plan_all(specs, *, config=None, since=None):
         captured["plans"] = config.defaults.http.concurrent_plans
         return [_planned_fetch("hp")]
 
-    monkeypatch.setattr(cli, "plan_all", _plan_all)
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    _patch_cli_attr(monkeypatch, "plan_all", _plan_all)
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
     exit_code = cli.cli_main(["plan", "hp", "--concurrent-plans", "5"])
@@ -380,16 +385,17 @@ def test_cli_plan_diff_outputs(monkeypatch, stub_logger, tmp_path, capsys):
     )
 
     new_plan = _planned_fetch("hp", url="https://example.org/new.owl")
-    monkeypatch.setattr(cli, "plan_all", lambda specs, *, config=None, since=None: [new_plan])
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    _patch_cli_attr(monkeypatch, "plan_all", lambda specs, *, config=None, since=None: [new_plan])
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
     captured_lock: Dict[str, str] = {}
     monkeypatch.setattr(
-        cli,
-        "_write_lockfile",
+        cli_module,
+        "write_lockfile",
         lambda plans, path: captured_lock.setdefault("path", str(path)) or path,
+        raising=False,
     )
 
     exit_code = cli.cli_main(["plan-diff", "hp", "--baseline", str(baseline_path), "--json"])
@@ -440,7 +446,7 @@ def test_resolve_specs_from_args_lockfile(monkeypatch, tmp_path):
         concurrent_downloads=None,
         allowed_hosts=None,
     )
-    config, specs = cli._resolve_specs_from_args(args, _default_config())
+    config, specs = cli_module._resolve_specs_from_args(args, _default_config())
     assert config.defaults.resolver_fallback_enabled is False
     assert config.defaults.prefer_source == ["direct"]
     assert len(specs) == 1
@@ -457,12 +463,12 @@ def test_cli_plan_diff_updates_baseline(monkeypatch, stub_logger, tmp_path, caps
     baseline_path = tmp_path / "baseline.json"
     plan = _planned_fetch("hp", url="https://example.org/new.owl")
 
-    monkeypatch.setattr(cli, "plan_all", lambda specs, *, config=None, since=None: [plan])
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    _patch_cli_attr(monkeypatch, "plan_all", lambda specs, *, config=None, since=None: [plan])
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
-    monkeypatch.setattr(cli, "_write_lockfile", lambda plans, path: path)
+    monkeypatch.setattr(cli_module, "write_lockfile", lambda plans, path: path, raising=False)
 
     exit_code = cli.cli_main(
         ["plan-diff", "hp", "--baseline", str(baseline_path), "--update-baseline"]
@@ -491,11 +497,28 @@ def test_cli_prune_dry_run_json(monkeypatch, stub_logger, capsys):
         },
     ]
 
-    monkeypatch.setattr(cli, "_collect_version_metadata", lambda oid: list(metadata))
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        cli_module,
+        "collect_version_metadata",
+        lambda oid: list(metadata),
+        raising=False,
     )
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(
+        cli_module,
+        "collect_version_metadata",
+        lambda oid: list(metadata),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "collect_version_metadata",
+        lambda oid: list(metadata),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+    )
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
 
     monkeypatch.setattr(cli.STORAGE, "available_ontologies", lambda: ["hp"])
     monkeypatch.setattr(cli.STORAGE, "available_versions", lambda oid: ["2023", "2024"])
@@ -532,11 +555,16 @@ def test_cli_prune_older_than(monkeypatch, stub_logger, capsys):
         },
     ]
 
-    monkeypatch.setattr(cli, "_collect_version_metadata", lambda oid: list(metadata))
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        cli_module,
+        "collect_version_metadata",
+        lambda oid: list(metadata),
+        raising=False,
     )
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+    )
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(cli.STORAGE, "available_ontologies", lambda: ["hp"])
     monkeypatch.setattr(cli.STORAGE, "delete_version", lambda *_, **__: 0)
     monkeypatch.setattr(cli.STORAGE, "set_latest_version", lambda *_, **__: None)
@@ -566,11 +594,16 @@ def test_cli_prune_updates_latest_marker(monkeypatch, stub_logger):
         },
     ]
 
-    monkeypatch.setattr(cli, "_collect_version_metadata", lambda oid: list(metadata))
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        cli_module,
+        "collect_version_metadata",
+        lambda oid: list(metadata),
+        raising=False,
     )
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+    )
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
 
     monkeypatch.setattr(cli.STORAGE, "available_ontologies", lambda: ["hp"])
     monkeypatch.setattr(cli.STORAGE, "available_versions", lambda oid: ["2023", "2024"])
@@ -596,10 +629,10 @@ def test_cli_plan_serializes_enriched_metadata(monkeypatch, stub_logger, capsys)
         "content_length": 4096,
         "etag": '"abc123"',
     }
-    monkeypatch.setattr(cli, "plan_all", lambda specs, *, config=None, since=None: [plan])
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    _patch_cli_attr(monkeypatch, "plan_all", lambda specs, *, config=None, since=None: [plan])
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
     exit_code = cli.cli_main(["plan", "hp", "--json"])
@@ -618,11 +651,11 @@ def test_cli_doctor_reports_diagnostics(monkeypatch, stub_logger, tmp_path, caps
     for path in (config_dir, cache_dir, log_dir, ontology_dir):
         path.mkdir()
 
-    monkeypatch.setattr(cli, "CONFIG_DIR", config_dir)
-    monkeypatch.setattr(cli, "CACHE_DIR", cache_dir)
-    monkeypatch.setattr(cli, "LOG_DIR", log_dir)
-    monkeypatch.setattr(cli, "LOCAL_ONTOLOGY_DIR", ontology_dir)
-    monkeypatch.setattr(cli, "ONTOLOGY_DIR", ontology_dir)
+    _patch_cli_attr(monkeypatch, "CONFIG_DIR", config_dir)
+    _patch_cli_attr(monkeypatch, "CACHE_DIR", cache_dir)
+    _patch_cli_attr(monkeypatch, "LOG_DIR", log_dir)
+    _patch_cli_attr(monkeypatch, "LOCAL_ONTOLOGY_DIR", ontology_dir)
+    _patch_cli_attr(monkeypatch, "ONTOLOGY_DIR", ontology_dir)
 
     manifest_dir = ontology_dir / "hp" / "2024-01-01"
     manifest_dir.mkdir(parents=True)
@@ -653,14 +686,19 @@ def test_cli_doctor_reports_diagnostics(monkeypatch, stub_logger, tmp_path, caps
     default_config.defaults.http.rate_limits = {"ols": "10/minute"}
 
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: default_config)
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: default_config)
     )
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
-    monkeypatch.setattr(cli, "validate_manifest_dict", lambda payload, source=None: None)
-    monkeypatch.setattr(cli, "get_manifest_schema", lambda: {"type": "object"})
-    monkeypatch.setattr(cli.Draft202012Validator, "check_schema", lambda schema: None)
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
+    _patch_cli_attr(monkeypatch, "validate_manifest_dict", lambda payload, source=None: None)
+    _patch_cli_attr(monkeypatch, "get_manifest_schema", lambda: {"type": "object"})
+    monkeypatch.setattr(
+        cli_module.Draft202012Validator,
+        "check_schema",
+        lambda schema: None,
+        raising=False,
+    )
 
-    original_find_spec = cli.importlib.util.find_spec
+    original_find_spec = cli_module.importlib.util.find_spec
 
     def _fake_find_spec(name: str):
         if name in {"rdflib", "pronto", "owlready2"}:
@@ -669,18 +707,25 @@ def test_cli_doctor_reports_diagnostics(monkeypatch, stub_logger, tmp_path, caps
             return None
         return original_find_spec(name)
 
-    monkeypatch.setattr(cli.importlib.util, "find_spec", _fake_find_spec)
+    monkeypatch.setattr(
+        cli_module.importlib.util,
+        "find_spec",
+        _fake_find_spec,
+        raising=False,
+    )
 
     monkeypatch.setattr(
-        cli.shutil,
+        cli_module.shutil,
         "disk_usage",
         lambda path: SimpleNamespace(total=10_000_000_000, used=4_000_000_000, free=6_000_000_000),
     )
     monkeypatch.setattr(
-        cli.shutil, "which", lambda name: "/usr/bin/robot" if name == "robot" else None
+        cli_module.shutil,
+        "which",
+        lambda name: "/usr/bin/robot" if name == "robot" else None,
     )
     monkeypatch.setattr(
-        cli.subprocess,
+        cli_module.subprocess,
         "run",
         lambda *_, **__: SimpleNamespace(stdout="ROBOT version 1.9", stderr="", returncode=0),
     )
@@ -696,13 +741,13 @@ def test_cli_doctor_reports_diagnostics(monkeypatch, stub_logger, tmp_path, caps
             return _Response(200, True)
         if "bioontology" in url:
             return _Response(405, False, "Method Not Allowed")
-        raise cli.requests.RequestException("timeout")
+        raise cli_module.requests.RequestException("timeout")
 
     def _fake_get(url: str, **_kwargs):
         return _Response(200, True)
 
-    monkeypatch.setattr(cli.requests, "head", _fake_head, raising=False)
-    monkeypatch.setattr(cli.requests, "get", _fake_get, raising=False)
+    monkeypatch.setattr(cli_module.requests, "head", _fake_head, raising=False)
+    monkeypatch.setattr(cli_module.requests, "get", _fake_get, raising=False)
 
     exit_code = cli.cli_main(["doctor", "--json"])
     assert exit_code == 0
@@ -728,34 +773,48 @@ def test_cli_doctor_fix_applies_actions(monkeypatch, stub_logger, tmp_path, caps
     log_dir = tmp_path / "logs"
     ontology_dir = tmp_path / "ontologies"
 
-    monkeypatch.setattr(cli, "CONFIG_DIR", config_dir)
-    monkeypatch.setattr(cli, "CACHE_DIR", cache_dir)
-    monkeypatch.setattr(cli, "LOG_DIR", log_dir)
-    monkeypatch.setattr(cli, "LOCAL_ONTOLOGY_DIR", ontology_dir)
-    monkeypatch.setattr(cli, "ONTOLOGY_DIR", ontology_dir)
+    _patch_cli_attr(monkeypatch, "CONFIG_DIR", config_dir)
+    _patch_cli_attr(monkeypatch, "CACHE_DIR", cache_dir)
+    _patch_cli_attr(monkeypatch, "LOG_DIR", log_dir)
+    _patch_cli_attr(monkeypatch, "LOCAL_ONTOLOGY_DIR", ontology_dir)
+    _patch_cli_attr(monkeypatch, "ONTOLOGY_DIR", ontology_dir)
 
     log_dir.mkdir(parents=True)
     (log_dir / "ontofetch.log").write_text("log")
 
     monkeypatch.setattr(
-        cli.shutil,
+        cli_module.shutil,
         "disk_usage",
         lambda path: SimpleNamespace(total=10_000_000_000, used=4_000_000_000, free=6_000_000_000),
     )
-    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    monkeypatch.setattr(cli_module.shutil, "which", lambda name: None)
     monkeypatch.setattr(
-        cli.requests,
+        cli_module.requests,
         "head",
         lambda *_, **__: SimpleNamespace(status_code=200, ok=True, reason="OK"),
+        raising=False,
     )
     monkeypatch.setattr(
-        cli.requests, "get", lambda *_, **__: SimpleNamespace(status_code=200, ok=True, reason="OK")
+        cli_module.requests,
+        "get",
+        lambda *_, **__: SimpleNamespace(status_code=200, ok=True, reason="OK"),
+        raising=False,
     )
-    monkeypatch.setattr(cli.importlib.util, "find_spec", lambda name: object())
-    monkeypatch.setattr(cli, "validate_manifest_dict", lambda payload, source=None: None)
-    monkeypatch.setattr(cli, "get_manifest_schema", lambda: {"type": "object"})
-    monkeypatch.setattr(cli.Draft202012Validator, "check_schema", lambda schema: None)
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(
+        cli_module.importlib.util,
+        "find_spec",
+        lambda name: object(),
+        raising=False,
+    )
+    _patch_cli_attr(monkeypatch, "validate_manifest_dict", lambda payload, source=None: None)
+    _patch_cli_attr(monkeypatch, "get_manifest_schema", lambda: {"type": "object"})
+    monkeypatch.setattr(
+        cli_module.Draft202012Validator,
+        "check_schema",
+        lambda schema: None,
+        raising=False,
+    )
+    _patch_cli_attr(monkeypatch, "setup_logging", lambda *_, **__: stub_logger)
 
     exit_code = cli.cli_main(["doctor", "--fix"])
     assert exit_code == 0
@@ -776,7 +835,7 @@ def test_cli_plugins_json(monkeypatch, capsys):
         lambda kind: {"demo": f"{kind}.Demo"},
     )
     monkeypatch.setattr(
-        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+        ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
     exit_code = cli.cli_main(["plugins", "--kind", "all", "--json"])
     assert exit_code == 0
@@ -798,22 +857,23 @@ def test_handle_plan_diff_uses_manifest_baseline(monkeypatch):
         concurrent_downloads=None,
         allowed_hosts=None,
     )
-    monkeypatch.setattr(cli, "_write_lockfile", lambda plans, path: path)
+    monkeypatch.setattr(cli_module, "write_lockfile", lambda plans, path: path, raising=False)
 
     spec = FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
     monkeypatch.setattr(
-        cli,
+        cli_module,
         "_resolve_specs_from_args",
         lambda *_args, **_kwargs: (_default_config(), [spec]),
+        raising=False,
     )
-    monkeypatch.setattr(
-        cli,
+    _patch_cli_attr(
+        monkeypatch,
         "plan_all",
-        lambda specs, config=None, since=None: [_planned_fetch("hp")],
+        lambda specs, *, config=None, since=None: [_planned_fetch("hp")],
     )
     monkeypatch.setattr(
-        cli,
-        "_load_latest_manifest",
+        cli_module,
+        "load_latest_manifest",
         lambda oid: {
             "id": oid,
             "resolver": "obo",
@@ -824,8 +884,9 @@ def test_handle_plan_diff_uses_manifest_baseline(monkeypatch):
             "last_modified": "2023-12-31T00:00:00Z",
             "content_length": 42,
         },
+        raising=False,
     )
-    diff = cli._handle_plan_diff(args, _default_config())
+    diff = cli_module._handle_plan_diff(args, _default_config())
     assert diff["baseline"] == "manifests"
     assert diff["modified"], "expected modified entries when manifests differ"
     assert diff["lockfile"].endswith("ontologies.lock.json")

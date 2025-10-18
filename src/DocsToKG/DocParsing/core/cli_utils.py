@@ -6,7 +6,7 @@ import argparse
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Dict, List, Sequence, Tuple
 
 PDF_SUFFIXES: tuple[str, ...] = (".pdf",)
 HTML_SUFFIXES: tuple[str, ...] = (".html", ".htm")

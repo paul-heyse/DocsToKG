@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import logging
 import os
@@ -20,7 +21,12 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
 from .api import _collect_plugin_details
-from .errors import ConfigError, OntologyDownloadError, UnsupportedPythonError
+from .errors import (
+    ConfigError,
+    ConfigurationError,
+    OntologyDownloadError,
+    UnsupportedPythonError,
+)
 from .formatters import (
     PLAN_TABLE_HEADERS,
     format_plan_rows,

@@ -116,10 +116,12 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import DownloadConfiguration, FetchResult, FetchSpec
-from DocsToKG.OntologyDownload import api as download
+from DocsToKG.OntologyDownload import FetchResult, FetchSpec
+import DocsToKG.OntologyDownload.planning as pipeline_mod
 from DocsToKG.OntologyDownload import io as io_mod
+from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.api import _results_to_dict, format_results_table
+from DocsToKG.OntologyDownload.settings import DownloadConfiguration
 
 
 class _TestHTTPServer(ThreadingHTTPServer):
@@ -328,10 +330,13 @@ def _make_http_config(**overrides) -> DownloadConfiguration:
 @pytest.fixture(autouse=True)
 def _allow_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        download, "validate_url_security", lambda url, http_config=None: url, raising=False
+        io_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
     )
     monkeypatch.setattr(
-        io_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
+        pipeline_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
+    )
+    monkeypatch.setattr(
+        network_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
     )
 
 
@@ -349,7 +354,7 @@ def _download(
     cache = cache_dir or destination.parent / "cache"
     cache.mkdir(parents=True, exist_ok=True)
     log = logger or logging.getLogger("ontology-download-test")
-    return download.download_stream(
+    return io_mod.download_stream(
         url=url,
         destination=destination,
         headers={},

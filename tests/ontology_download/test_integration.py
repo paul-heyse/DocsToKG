@@ -84,9 +84,11 @@ pytest.importorskip("pydantic_settings")
 import DocsToKG.OntologyDownload.planning as pipeline_mod
 from DocsToKG.OntologyDownload import api as core
 from DocsToKG.OntologyDownload import io as io_mod
+from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload import settings as settings_mod
 from DocsToKG.OntologyDownload.planning import RESOLVERS, FetchPlan
 from DocsToKG.OntologyDownload.settings import DefaultsConfig, ResolvedConfig
+from DocsToKG.OntologyDownload.validation import ValidationResult
 
 
 @pytest.fixture()
@@ -171,7 +173,7 @@ def stubbed_validators(monkeypatch):
             details = {"ok": True}
             if req.name == "rdflib":
                 details["normalized_sha256"] = hashlib.sha256(b"normalized").hexdigest()
-            results[req.name] = core.ValidationResult(
+            results[req.name] = ValidationResult(
                 ok=True,
                 details=details,
                 output_files=[str(ttl_path), str(json_path)],
@@ -188,6 +190,9 @@ def _allow_download_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(
         pipeline_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
+    )
+    monkeypatch.setattr(
+        network_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
     )
     monkeypatch.setattr(
         core, "validate_url_security", lambda url, http_config=None: url, raising=False
@@ -217,7 +222,7 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         shutil.copy2(headers["__fixture__"], destination)
         sha256 = io_mod.sha256_file(destination)
         content_length = destination.stat().st_size
-        return core.DownloadResult(
+        return io_mod.DownloadResult(
             path=destination,
             status="fresh",
             sha256=sha256,
@@ -266,7 +271,7 @@ def test_force_download_bypasses_manifest(monkeypatch, patched_dirs, stubbed_val
         captured["previous"] = kwargs.get("previous_manifest")
         kwargs["destination"].write_bytes(fixture.read_bytes())
         content_length = kwargs["destination"].stat().st_size
-        return core.DownloadResult(
+        return io_mod.DownloadResult(
             path=kwargs["destination"],
             status="fresh",
             sha256="sha",
@@ -294,7 +299,7 @@ def test_multi_version_storage(monkeypatch, patched_dirs, stubbed_validators):
     def _download(**kwargs):
         kwargs["destination"].write_bytes(fixture.read_bytes())
         content_length = kwargs["destination"].stat().st_size
-        return core.DownloadResult(
+        return io_mod.DownloadResult(
             path=kwargs["destination"],
             status="fresh",
             sha256="sha",
@@ -322,7 +327,7 @@ def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, 
     def _download(**kwargs):
         kwargs["destination"].write_bytes(fixture.read_bytes())
         content_length = kwargs["destination"].stat().st_size
-        return core.DownloadResult(
+        return io_mod.DownloadResult(
             path=kwargs["destination"],
             status="fresh",
             sha256="sha",
@@ -336,9 +341,22 @@ def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, 
     monkeypatch.setattr(core, "download_stream", _download, raising=False)
     monkeypatch.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
     config = ResolvedConfig(defaults=DefaultsConfig(), specs=[])
-    caplog.set_level(logging.INFO)
-    core.fetch_all(
-        [core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])],
-        config=config,
-    )
-    assert any("progress" in record.getMessage() for record in caplog.records)
+    caplog.set_level(logging.INFO, logger="DocsToKG.OntologyDownload")
+    logger = logging.getLogger("DocsToKG.OntologyDownload")
+    recorded = []
+
+    class _RecordingHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - test helper
+            recorded.append(record)
+
+    handler = _RecordingHandler()
+    logger.addHandler(handler)
+    try:
+        core.fetch_all(
+            [core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])],
+            config=config,
+        )
+    finally:
+        logger.removeHandler(handler)
+
+    assert any("progress update" in record.getMessage() for record in recorded)

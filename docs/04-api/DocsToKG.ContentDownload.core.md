@@ -22,13 +22,12 @@ Performance Note:
 When ``hasher`` is provided, uses an optimized code path that avoids
 conditional checks in the hot loop for better throughput on large files.
 
-### `atomic_write_bytes(path, chunks)`
-
-Backward-compatible wrapper for :func:`atomic_write`.
-
 ### `atomic_write_text(path, text)`
 
 Atomically write ``text`` to ``path`` using :func:`atomic_write`.
+
+The previous ``atomic_write_bytes`` alias has been removed; callers should
+depend on ``atomic_write`` directly for streaming writes.
 
 ### `normalize_classification(value)`
 

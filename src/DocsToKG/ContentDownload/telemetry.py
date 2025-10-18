@@ -292,6 +292,7 @@ class ManifestUrlIndex:
             "mtime_ns": path_mtime_ns,
         }
 
+
 @runtime_checkable
 class AttemptSink(Protocol):
     """Protocol implemented by telemetry sinks used by the pipeline and CLI.
@@ -1319,7 +1320,9 @@ class SqliteSink:
 
     def _populate_normalized_urls(self) -> None:
         try:
-            rows = list(self._conn.execute("SELECT id, url FROM manifests WHERE normalized_url IS NULL"))
+            rows = list(
+                self._conn.execute("SELECT id, url FROM manifests WHERE normalized_url IS NULL")
+            )
         except sqlite3.OperationalError:
             return
         for row_id, url in rows:

@@ -30,7 +30,6 @@ __all__ = (
     "WorkArtifact",
     "DownloadContext",
     "atomic_write",
-    "atomic_write_bytes",
     "atomic_write_text",
     "classify_payload",
     "_extract_filename_from_disposition",
@@ -139,23 +138,6 @@ def atomic_write(
         if not replaced and not partial_kept:
             with suppress(FileNotFoundError):
                 temp_path.unlink()
-
-
-def atomic_write_bytes(
-    path: Path,
-    chunks: Iterable[bytes],
-    *,
-    hasher: Optional[Any] = None,
-    keep_partial_on_error: bool = False,
-) -> int:
-    """Backward-compatible wrapper for :func:`atomic_write`."""
-
-    return atomic_write(
-        path,
-        chunks,
-        hasher=hasher,
-        keep_partial_on_error=keep_partial_on_error,
-    )
 
 
 def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:

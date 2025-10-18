@@ -76,18 +76,33 @@ def test_resolve_expected_checksum_matrix(
     if fetched_digest is not None:
 
         class _DummyResponse:
-            text = f"{fetched_digest} ontology.owl"
+            def __init__(self) -> None:
+                self._payload = f"{fetched_digest} ontology.owl".encode("utf-8")
 
-            @staticmethod
-            def raise_for_status() -> None:
+            def __enter__(self) -> "_DummyResponse":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> bool:
+                return False
+
+            def raise_for_status(self) -> None:
                 return None
 
-        monkeypatch.setattr(checksums_mod.requests, "get", lambda url, timeout: _DummyResponse())
+            def iter_content(self, chunk_size: int):
+                yield self._payload
+
+        monkeypatch.setattr(
+            checksums_mod.requests,
+            "get",
+            lambda url, timeout, **kwargs: _DummyResponse(),
+        )
     else:
         monkeypatch.setattr(
             checksums_mod.requests,
             "get",
-            lambda url, timeout: pytest.fail("unexpected network call for checksum fetch"),
+            lambda url, timeout, **kwargs: pytest.fail(
+                "unexpected network call for checksum fetch"
+            ),
         )
 
     spec = FetchSpec(

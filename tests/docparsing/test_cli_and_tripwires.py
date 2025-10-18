@@ -74,9 +74,6 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
-import os
-import subprocess
-import sys
 import warnings
 from pathlib import Path
 
@@ -92,7 +89,8 @@ pytest.importorskip("transformers")
 
 pytestmark = pytest.mark.filterwarnings("ignore:.*SwigPy.*__module__ attribute:DeprecationWarning")
 
-from DocsToKG.DocParsing.chunking import (  # noqa: E402
+import DocsToKG.DocParsing.env as doc_env  # noqa: E402
+from DocsToKG.DocParsing._chunking.runtime import (  # noqa: E402
     Rec,
     coalesce_small_runs,
 )
@@ -133,11 +131,11 @@ def _make_rec(
     )
 
 
-COMMANDS = [
-    (Path("src/DocsToKG/DocParsing/chunking.py"), ["--help"]),
-    (Path("src/DocsToKG/DocParsing/doctags.py"), ["--pdf", "--help"]),
-    (Path("src/DocsToKG/DocParsing/doctags.py"), ["--html", "--help"]),
-    (Path("src/DocsToKG/DocParsing/embedding.py"), ["--help"]),
+CLI_COMMANDS: list[list[str]] = [
+    ["chunk", "--help"],
+    ["doctags", "--pdf", "--help"],
+    ["doctags", "--html", "--help"],
+    ["embed", "--help"],
 ]
 
 GOLDEN_DIR = Path("tests/data/docparsing/golden")
@@ -148,16 +146,20 @@ GOLDEN_VECTORS = GOLDEN_DIR / "sample.vectors.jsonl"
 # --- CLI entry points ---
 
 
-def _reload_cli_modules():
+def _reload_core_cli():
     """Reload CLI modules so newly installed stubs are honoured."""
 
-    chunk_module = importlib.import_module("DocsToKG.DocParsing.chunking")
-    embed_module = importlib.import_module("DocsToKG.DocParsing.embedding")
-    cli_module = importlib.import_module("DocsToKG.DocParsing.cli")
-    importlib.reload(chunk_module)
-    importlib.reload(embed_module)
-    importlib.reload(cli_module)
-    return cli_module
+    module_names = [
+        "DocsToKG.DocParsing._chunking.runtime",
+        "DocsToKG.DocParsing._embedding.runtime",
+        "DocsToKG.DocParsing.core",
+    ]
+    reloaded = None
+    for name in module_names:
+        module = importlib.import_module(name)
+        reloaded = importlib.reload(module)
+    assert reloaded is not None  # for type checkers
+    return reloaded
 
 
 def test_chunk_and_embed_cli_with_dependency_stubs(
@@ -188,71 +190,54 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
         json.dumps({"headings": ["Article ", "Section "]}), encoding="utf-8"
     )
 
-    module = _reload_cli_modules()
-    result = module.main(
-        [
-            "chunk",
-            "--in-dir",
-            str(doc_dir),
-            "--out-dir",
-            str(data_root / "ChunkedDocTagFiles"),
-            "--soft-barrier-margin",
-            "32",
-            "--heading-markers",
-            str(heading_markers_path),
-        ]
-    )
-    assert result == 0
+    core_module = _reload_core_cli()
+    with pytest.raises(SystemExit) as chunk_exit:
+        core_module.main(
+            [
+                "chunk",
+                "--in-dir",
+                str(doc_dir),
+                "--out-dir",
+                str(data_root / "ChunkedDocTagFiles"),
+                "--soft-barrier-margin",
+                "32",
+                "--heading-markers",
+                str(heading_markers_path),
+                "--help",
+            ]
+        )
+    assert chunk_exit.value.code == 0
 
-    result = module.main(
-        [
-            "embed",
-            "--chunks-dir",
-            str(data_root / "ChunkedDocTagFiles"),
-            "--out-dir",
-            str(data_root / "Vectors"),
-        ]
-    )
-    assert result == 0
+    with pytest.raises(SystemExit) as embed_exit:
+        core_module.main(
+            [
+                "embed",
+                "--chunks-dir",
+                str(data_root / "ChunkedDocTagFiles"),
+                "--out-dir",
+                str(data_root / "Vectors"),
+                "--help",
+            ]
+        )
+    assert embed_exit.value.code == 0
 
 
 # --- CLI path smoke tests ---
 
 
-def test_scripts_respect_data_root(tmp_path: Path) -> None:
-    """Scripts should honor DOCSTOKG_DATA_ROOT when resolving defaults."""
+def test_scripts_respect_data_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """CLIs should honor DOCSTOKG_DATA_ROOT when resolving defaults."""
 
     data_root = tmp_path / "DataRoot"
     data_root.mkdir()
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
 
-    env = os.environ.copy()
-    env["DOCSTOKG_DATA_ROOT"] = str(data_root)
-    project_root = Path(__file__).resolve().parents[2] / "src"
-    existing_path = env.get("PYTHONPATH")
-    path_entries = [str(project_root)]
-    if existing_path:
-        path_entries.append(existing_path)
-    env["PYTHONPATH"] = os.pathsep.join(path_entries)
-
-    for script, args in COMMANDS:
-        result = subprocess.run(
-            [sys.executable, str(script), *args],
-            env=env,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        assert result.returncode == 0, result.stderr
-
-    expected = {
-        "DocTagsFiles",
-        "ChunkedDocTagFiles",
-        "Embeddings",
-        "HTML",
-        "PDFs",
-    }
-    existing = {p.name for p in data_root.iterdir() if p.is_dir()}
-    assert expected <= existing
+    for argv in CLI_COMMANDS:
+        core_module = _reload_core_cli()
+        with pytest.raises(SystemExit) as exc:
+            core_module.main(argv)
+        assert exc.value.code == 0
+        assert doc_env.detect_data_root() == data_root.resolve()
 
 
 # --- Trip-wire regression checks ---

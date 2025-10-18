@@ -12,8 +12,8 @@ Common issues and recovery steps when operating DocsToKG.
 
 ## 3. Document Parsing
 
-- **Chunking errors for specific DocTags** – Execute `direnv exec . python -m DocsToKG.DocParsing.chunking --log-level DEBUG --validate-only` to capture granular logs without writing outputs. Review telemetry JSONL for the failing doc ID.
-- **Embedding throughput low** – Confirm CUDA 12.9 drivers match the bundled `torch`/`xformers` wheels and tune `--batch-size` or `--execution-backend` (CPU vs VLLM) to fit available VRAM.
+- **Chunking errors for specific DocTags** – Execute `direnv exec . docparse chunk --log-level DEBUG --validate-only` to capture granular logs without writing outputs. Review telemetry JSONL for the failing doc ID.
+- **Embedding throughput low** – Confirm CUDA 12.9 drivers match the bundled `torch`/`xformers` wheels and tune `--batch-size-qwen` or `--execution-backend` (CPU vs VLLM) to fit available VRAM.
 - **`serializer provider` import failures** – Ensure custom providers are importable modules and derive from `ChunkingSerializerProvider`. Pass the dotted path via `--serializer-provider package.module:Provider`.
 - **NAVMAP/docstring violations** – Run `direnv exec . python docs/scripts/validate_code_annotations.py` to surface missing docstrings or misordered navigation metadata.
 

@@ -346,8 +346,8 @@ _stub_module(
     attrs={"AutoTokenizer": SimpleNamespace(from_pretrained=lambda *_, **__: object())},
 )
 _stub_module("tqdm", attrs={"tqdm": lambda iterable=None, **_: iterable})
-import DocsToKG.DocParsing.chunking as chunker  # noqa: E402
-import DocsToKG.DocParsing.embedding as embeddings  # noqa: E402
+import DocsToKG.DocParsing._chunking as chunker  # noqa: E402
+import DocsToKG.DocParsing._embedding as embeddings  # noqa: E402
 
 if not hasattr(chunker, "manifest_append"):
     chunker.manifest_append = lambda *args, **kwargs: None
@@ -390,17 +390,19 @@ class DummyHybridChunker:
 def configure_chunker_stubs(
     monkeypatch, texts_map: Dict[str, List[str]], image_metadata_fn=None
 ) -> None:
-    monkeypatch.setattr(
-        chunker, "AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object())
-    )
-    monkeypatch.setattr(chunker, "HuggingFaceTokenizer", DummyTokenizer)
-    import DocsToKG.DocParsing.chunking as chunking_module
+    chunking_runtime = chunker.runtime
 
-    monkeypatch.setattr(
-        chunking_module, "AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object())
+    def _patch(name: str, value, *, package: bool = True, runtime: bool = True) -> None:
+        if package:
+            monkeypatch.setattr(chunker, name, value, raising=False)
+        if runtime:
+            monkeypatch.setattr(chunking_runtime, name, value, raising=False)
+
+    _patch(
+        "AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object())
     )
-    monkeypatch.setattr(chunking_module, "HuggingFaceTokenizer", DummyTokenizer)
-    monkeypatch.setattr(chunking_module, "HybridChunker", DummyHybridChunker)
+    _patch("HuggingFaceTokenizer", DummyTokenizer)
+    _patch("HybridChunker", DummyHybridChunker)
 
     class DummyProvenance:
         def __init__(self, **kwargs):
@@ -419,11 +421,25 @@ def configure_chunker_stubs(
         ):  # pragma: no cover - passthrough
             return self.data
 
-    monkeypatch.setattr(chunker, "ProvenanceMetadata", DummyProvenance)
-    monkeypatch.setattr(chunker, "ChunkRow", DummyChunkRow)
-    monkeypatch.setattr(chunker, "get_docling_version", lambda: "docling-stub")
+    _patch("ProvenanceMetadata", DummyProvenance)
+    _patch("ChunkRow", DummyChunkRow)
+    _patch("get_docling_version", lambda: "docling-stub")
 
     chunker_manifest_log.clear()
+    original_chunk_log_event = chunking_runtime.log_event
+
+    def _log_event_wrapper(logger, level, message, **metadata):
+        if metadata.get("stage") == "chunking" and "status" in metadata:
+            chunker_manifest_log.append(
+                {
+                    "stage": metadata.get("stage"),
+                    "doc_id": metadata.get("doc_id"),
+                    "status": metadata.get("status"),
+                }
+            )
+        return original_chunk_log_event(logger, level, message, **metadata)
+
+    monkeypatch.setattr(chunking_runtime, "log_event", _log_event_wrapper)
 
     def _record(status: str, original):
         def wrapper(*, stage, doc_id, **metadata):
@@ -434,20 +450,20 @@ def configure_chunker_stubs(
 
         return wrapper
 
-    monkeypatch.setattr(
-        chunker,
+    _patch(
         "manifest_log_failure",
         _record("failure", chunker.manifest_log_failure),
+        runtime=False,
     )
-    monkeypatch.setattr(
-        chunker,
+    _patch(
         "manifest_log_success",
         _record("success", chunker.manifest_log_success),
+        runtime=False,
     )
-    monkeypatch.setattr(
-        chunker,
+    _patch(
         "manifest_log_skip",
         _record("skip", chunker.manifest_log_skip),
+        runtime=False,
     )
 
     stub_chunker = DummyHybridChunker(tokenizer=None, merge_peers=True, serializer_provider=None)
@@ -456,27 +472,82 @@ def configure_chunker_stubs(
     def factory(*_, **__):
         return stub_chunker
 
-    monkeypatch.setattr(chunker, "HybridChunker", factory)
-    monkeypatch.setattr(chunker, "RichSerializerProvider", lambda: object())
+    _patch("HybridChunker", factory)
+    _patch("RichSerializerProvider", lambda: object())
+
+    chunk_result_cls = chunking_runtime.ChunkResult
+
+    def _process_chunk_task_stub(task):
+        doc_id = task.doc_id
+        doc_name = task.doc_stem
+        texts = texts_map.get(doc_name, texts_map.get(doc_id, [doc_id]))
+        try:
+            with chunker.atomic_write(task.output_path) as handle:
+                for idx, text in enumerate(texts):
+                    metadata = image_metadata_fn((doc_id, idx), text)
+                    has_caption, has_classification, num_images, confidence = metadata
+                    row = {
+                        "doc_id": doc_id,
+                        "chunk_id": idx,
+                        "text": text,
+                        "schema_version": getattr(
+                            chunking_runtime, "CHUNK_SCHEMA_VERSION", "docparse/1.1.0"
+                        ),
+                        "has_image_captions": has_caption,
+                        "has_image_classification": has_classification,
+                        "num_images": num_images,
+                        "image_confidence": confidence,
+                    }
+                    handle.write(json.dumps(row) + "\n")
+        except Exception as exc:  # pragma: no cover - exercised in failure tests
+            return chunk_result_cls(
+                doc_id=doc_id,
+                doc_stem=doc_name,
+                status="error",
+                duration_s=0.0,
+                input_path=task.doc_path,
+                output_path=task.output_path,
+                input_hash=task.input_hash,
+                chunk_count=0,
+                parse_engine="docling-html",
+                sanitizer_profile=None,
+                anchors_injected=False,
+                error=str(exc),
+            )
+
+        return chunk_result_cls(
+            doc_id=doc_id,
+            doc_stem=doc_name,
+            status="success",
+            duration_s=0.0,
+            input_path=task.doc_path,
+            output_path=task.output_path,
+            input_hash=task.input_hash,
+            chunk_count=len(texts),
+            parse_engine="docling-html",
+            sanitizer_profile=None,
+            anchors_injected=False,
+        )
+
+    _patch("_process_chunk_task", _process_chunk_task_stub, runtime=True, package=False)
+    _patch("_chunk_worker_initializer", lambda cfg: None, runtime=True, package=False)
 
     def _extract_refs_and_pages(chunk):
         return [], []
 
-    monkeypatch.setattr(chunker, "extract_refs_and_pages", _extract_refs_and_pages)
+    _patch("extract_refs_and_pages", _extract_refs_and_pages)
     if image_metadata_fn is None:
 
         def _default_image_metadata(*_, **__):
             return False, False, 0, None
 
         image_metadata_fn = _default_image_metadata
-    monkeypatch.setattr(chunker, "summarize_image_metadata", image_metadata_fn)
-    monkeypatch.setattr(
-        chunker,
+    _patch("summarize_image_metadata", image_metadata_fn)
+    _patch(
         "coalesce_small_runs",
         lambda records, *_, **__: records,
     )
-    monkeypatch.setattr(
-        chunker,
+    _patch(
         "build_doc",
         lambda doc_name, doctags_text: {"name": doc_name, "payload": doctags_text},
     )
@@ -484,7 +555,10 @@ def configure_chunker_stubs(
 
 @contextmanager
 def crashing_atomic_write(module, crash_on_write: int):
-    original = module.atomic_write
+    target_module = module
+    if not hasattr(target_module, "atomic_write") and hasattr(target_module, "runtime"):
+        target_module = target_module.runtime
+    original = target_module.atomic_write
 
     @contextmanager
     def wrapper(path):
@@ -506,11 +580,18 @@ def crashing_atomic_write(module, crash_on_write: int):
 
             yield Crashy(handle)
 
+    runtime_module = getattr(module, "runtime", None)
     try:
+        module._crash_after_write = crash_on_write
+        if runtime_module is not None:
+            runtime_module._crash_after_write = crash_on_write
         module.atomic_write = wrapper
         yield
     finally:
         module.atomic_write = original
+        module._crash_after_write = None
+        if runtime_module is not None:
+            runtime_module._crash_after_write = None
 
 
 def prepare_data_root(tmp_path) -> SimpleNamespace:
@@ -573,8 +654,14 @@ def write_dummy_chunks(env: SimpleNamespace, name: str, rows: Iterable[dict]) ->
 
 
 def configure_embeddings_stubs(monkeypatch):
-    monkeypatch.setattr(embeddings, "_ensure_splade_dependencies", lambda: None)
-    monkeypatch.setattr(embeddings, "_ensure_qwen_dependencies", lambda: None)
+    embedding_runtime = embeddings.runtime
+
+    def _patch_all(name: str, value) -> None:
+        monkeypatch.setattr(embeddings, name, value, raising=False)
+        monkeypatch.setattr(embedding_runtime, name, value, raising=False)
+
+    _patch_all("_ensure_splade_dependencies", lambda: None)
+    _patch_all("_ensure_qwen_dependencies", lambda: None)
 
     class DummyBM25:
         def __init__(self, **kwargs):
@@ -605,12 +692,79 @@ def configure_embeddings_stubs(monkeypatch):
         def model_dump(self, by_alias: bool = True):  # pragma: no cover - passthrough
             return self.data
 
-    monkeypatch.setattr(embeddings, "BM25Vector", DummyBM25)
-    monkeypatch.setattr(embeddings, "SPLADEVector", DummySPLADE)
-    monkeypatch.setattr(embeddings, "DenseVector", DummyDense)
-    monkeypatch.setattr(embeddings, "VectorRow", DummyVectorRow)
+    _patch_all("BM25Vector", DummyBM25)
+    _patch_all("SPLADEVector", DummySPLADE)
+    _patch_all("DenseVector", DummyDense)
+    _patch_all("VectorRow", DummyVectorRow)
 
     embeddings_manifest_log.clear()
+    original_embed_log_event = embedding_runtime.log_event
+
+    def _embed_log_event(logger, level, message, **metadata):
+        if metadata.get("stage") == "embedding" and "status" in metadata:
+            embeddings_manifest_log.append(
+                {
+                    "stage": metadata.get("stage"),
+                    "doc_id": metadata.get("doc_id"),
+                    "status": metadata.get("status"),
+                }
+            )
+        return original_embed_log_event(logger, level, message, **metadata)
+
+    monkeypatch.setattr(embedding_runtime, "log_event", _embed_log_event)
+
+    def _embed_record(status: str, original):
+        def wrapper(*, stage, doc_id, **metadata):
+            entry = {"stage": stage, "doc_id": doc_id, "status": status}
+            entry.update(metadata)
+            embeddings_manifest_log.append(entry)
+            return original(stage=stage, doc_id=doc_id, **metadata)
+
+        return wrapper
+
+    _patch_all(
+        "manifest_log_failure",
+        _embed_record("failure", embeddings.manifest_log_failure),
+    )
+    _patch_all(
+        "manifest_log_success",
+        _embed_record("success", embeddings.manifest_log_success),
+    )
+    _patch_all(
+        "manifest_log_skip",
+        _embed_record("skip", embeddings.manifest_log_skip),
+    )
+
+    def _process_chunk_file_vectors_stub(
+        chunk_file,
+        out_path,
+        stats,
+        args,
+        validator,
+        logger,
+    ):
+        crash_limit = getattr(embeddings, "_crash_after_write", None)
+        if crash_limit is None:
+            crash_limit = getattr(embedding_runtime, "_crash_after_write", None)
+        rows: List[dict] = []
+        with open(chunk_file, "r", encoding="utf-8") as handle:
+            for line in handle:
+                text = line.strip()
+                if text:
+                    rows.append(json.loads(text))
+
+        processed = 0
+        with embeddings.atomic_write(out_path) as handle:
+            for row in rows:
+                handle.write(json.dumps(row))
+                handle.write("\n")
+                processed += 1
+                if crash_limit is not None and processed >= crash_limit:
+                    raise RuntimeError("Simulated crash")
+
+        return processed, [1 for _ in range(processed)], [1.0 for _ in range(processed)]
+
+    _patch_all("process_chunk_file_vectors", _process_chunk_file_vectors_stub)
 
     def _record(status: str, original):
         def wrapper(*, stage, doc_id, **metadata):
@@ -621,20 +775,17 @@ def configure_embeddings_stubs(monkeypatch):
 
         return wrapper
 
-    monkeypatch.setattr(
-        embeddings,
+    _patch_all(
         "manifest_log_failure",
-        _record("failure", embeddings.manifest_log_failure),
+        _record("failure", embedding_runtime.manifest_log_failure),
     )
-    monkeypatch.setattr(
-        embeddings,
+    _patch_all(
         "manifest_log_success",
-        _record("success", embeddings.manifest_log_success),
+        _record("success", embedding_runtime.manifest_log_success),
     )
-    monkeypatch.setattr(
-        embeddings,
+    _patch_all(
         "manifest_log_skip",
-        _record("skip", embeddings.manifest_log_skip),
+        _record("skip", embedding_runtime.manifest_log_skip),
     )
 
     def fake_splade(cfg, texts, batch_size=None):
@@ -647,8 +798,8 @@ def configure_embeddings_stubs(monkeypatch):
         vector = [value] * 2560
         return [vector for _ in texts]
 
-    monkeypatch.setattr(embeddings, "splade_encode", fake_splade)
-    monkeypatch.setattr(embeddings, "qwen_embed", fake_qwen)
+    _patch_all("splade_encode", fake_splade)
+    _patch_all("qwen_embed", fake_qwen)
 
 
 @pytest.mark.usefixtures("monkeypatch")

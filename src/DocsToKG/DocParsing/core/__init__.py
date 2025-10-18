@@ -59,6 +59,7 @@ from .cli import (
     CLI_DESCRIPTION,
     COMMANDS,
     CommandHandler,
+    _Command,
     chunk,
     doctags,
     embed,
@@ -67,7 +68,6 @@ from .cli import (
     plan,
     run_all,
     token_profiles,
-    _Command,
 )
 from .cli_utils import CLIOption, build_subcommand, detect_mode
 from .concurrency import acquire_lock, find_free_port, set_spawn_or_warn
@@ -86,15 +86,15 @@ from .discovery import (
 from .http import DEFAULT_HTTP_TIMEOUT, get_http_session, normalize_http_timeout
 from .manifest import ResumeController, should_skip_output
 from .models import (
+    DEFAULT_SERIALIZER_PROVIDER,
+    DEFAULT_TOKENIZER,
+    UUID_NAMESPACE,
     BM25Stats,
     ChunkResult,
     ChunkTask,
     ChunkWorkerConfig,
-    DEFAULT_SERIALIZER_PROVIDER,
-    DEFAULT_TOKENIZER,
     QwenCfg,
     SpladeCfg,
-    UUID_NAMESPACE,
 )
 
 __all__ = [
@@ -124,6 +124,7 @@ __all__ = [
     "compute_chunk_uuid",
     "quarantine_artifact",
     "manifest_append",
+    "StructuredLogger",
     "manifest_log_failure",
     "manifest_log_skip",
     "manifest_log_success",
@@ -176,6 +177,7 @@ __all__ = [
     "CommandHandler",
     "_Command",
     "CLI_DESCRIPTION",
+    "COMMANDS",
     "main",
     "run_all",
     "chunk",
@@ -185,7 +187,3 @@ __all__ = [
     "plan",
     "manifest",
 ]
-
-__all__.extend([
-    "StructuredLogger",
-])

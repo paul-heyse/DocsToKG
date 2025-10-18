@@ -13,7 +13,7 @@ resolver telemetry improvements, and hybrid search validation harnesses.
 ### Content Acquisition & Parsing
 
 - Download corpora and metadata from external sources (e.g., Pyalex) using the `DocsToKG.ContentDownload.cli` orchestration entry point.
-- Convert PDFs and HTML into DocTags, chunked Markdown, and embeddings via `DocsToKG.DocParsing.chunking` and `DocsToKG.DocParsing.embedding`, backed by Docling.
+- Convert PDFs and HTML into DocTags, chunked Markdown, and embeddings via the `docparse` CLI (``docparse chunk`` / ``docparse embed``) powered by Docling.
 - Preserve provenance (page numbers, figure references, captions) and telemetry via manifest sinks for downstream quality checks.
 
 ### Hybrid Search

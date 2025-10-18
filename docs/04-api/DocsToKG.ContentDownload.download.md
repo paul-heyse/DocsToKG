@@ -73,10 +73,9 @@ headers, and extracted-text paths when available. Callers supply the
 ``DownloadContext`` options via the ``options`` keyword to ensure dry-run and
 content-addressable storage preferences are honoured.
 
-### `_build_download_outcome(...)`
-
-Compatibility wrapper invoking :func:`build_download_outcome` with legacy
-parameters used by historical call sites.
+Prior releases exposed a private ``_build_download_outcome`` wrapper for legacy
+imports. That shim has been retired; dependants should import and call
+``build_download_outcome`` directly.
 
 ### `_validate_cached_artifact(result)`
 
