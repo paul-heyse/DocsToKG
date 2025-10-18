@@ -427,6 +427,8 @@ def _manifest_main(argv: Sequence[str]) -> int:
             resolved = STAGE_ALIASES.get(normalized, (normalized,))
             invalid = [stage for stage in resolved if stage not in allowed_stage_set]
             if invalid:
+                canonical_list = ", ".join(sorted(known_stage_set))
+                discovered_list = ", ".join(discovered) if discovered else "<none>"
                 raise CLIValidationError(
                     option="--stage",
                     message=(
