@@ -2,76 +2,76 @@
 
 ## 1. Resolver Modularization
 
-- [ ] 1.1 Create `src/DocsToKG/ContentDownload/resolvers/` directory
-- [ ] 1.2 Create `resolvers/__init__.py` with `ResolverRegistry` and public exports
-- [ ] 1.3 Create `resolvers/base.py` with `RegisteredResolver`, `ApiResolverBase`, shared helpers
-- [ ] 1.4 Extract `ArxivResolver` → `resolvers/arxiv.py`
-- [ ] 1.5 Extract `CoreResolver` → `resolvers/core.py`
-- [ ] 1.6 Extract `CrossrefResolver` → `resolvers/crossref.py`
-- [ ] 1.7 Extract `DoajResolver` → `resolvers/doaj.py`
-- [ ] 1.8 Extract `EuropePmcResolver` → `resolvers/europe_pmc.py`
-- [ ] 1.9 Extract `FigshareResolver` → `resolvers/figshare.py`
-- [ ] 1.10 Extract `HalResolver` → `resolvers/hal.py`
-- [ ] 1.11 Extract `LandingPageResolver` → `resolvers/landing_page.py`
-- [ ] 1.12 Extract `OpenAireResolver` → `resolvers/openaire.py`
-- [ ] 1.13 Extract `OpenAlexResolver` → `resolvers/openalex.py`
-- [ ] 1.14 Extract `OsfResolver` → `resolvers/osf.py`
-- [ ] 1.15 Extract `PmcResolver` → `resolvers/pmc.py`
-- [ ] 1.16 Extract `SemanticScholarResolver` → `resolvers/semantic_scholar.py`
-- [ ] 1.17 Extract `UnpaywallResolver` → `resolvers/unpaywall.py`
-- [ ] 1.18 Extract `WaybackResolver` → `resolvers/wayback.py`
-- [ ] 1.19 Extract `ZenodoResolver` → `resolvers/zenodo.py`
-- [ ] 1.20 Update `pipeline.py` to import from `resolvers/`
-- [ ] 1.21 Update `runner.py` imports to use `resolvers/`
-- [ ] 1.22 Update `args.py` imports to use `resolvers/`
-- [ ] 1.23 Update tests to import from `resolvers/`
-- [ ] 1.24 Verify resolver auto-discovery works correctly
-- [ ] 1.25 Add test to verify all expected resolvers are registered
-- [ ] 1.26 Update NAVMAP annotations in new modules
-- [ ] 1.27 Remove resolver implementations from `pipeline.py`
+- [x] 1.1 Create `src/DocsToKG/ContentDownload/resolvers/` directory
+- [x] 1.2 Create `resolvers/__init__.py` with `ResolverRegistry` and public exports
+- [x] 1.3 Create `resolvers/base.py` with `RegisteredResolver`, `ApiResolverBase`, shared helpers
+- [x] 1.4 Extract `ArxivResolver` → `resolvers/arxiv.py`
+- [x] 1.5 Extract `CoreResolver` → `resolvers/core.py`
+- [x] 1.6 Extract `CrossrefResolver` → `resolvers/crossref.py`
+- [x] 1.7 Extract `DoajResolver` → `resolvers/doaj.py`
+- [x] 1.8 Extract `EuropePmcResolver` → `resolvers/europe_pmc.py`
+- [x] 1.9 Extract `FigshareResolver` → `resolvers/figshare.py`
+- [x] 1.10 Extract `HalResolver` → `resolvers/hal.py`
+- [x] 1.11 Extract `LandingPageResolver` → `resolvers/landing_page.py`
+- [x] 1.12 Extract `OpenAireResolver` → `resolvers/openaire.py`
+- [x] 1.13 Extract `OpenAlexResolver` → `resolvers/openalex.py`
+- [x] 1.14 Extract `OsfResolver` → `resolvers/osf.py`
+- [x] 1.15 Extract `PmcResolver` → `resolvers/pmc.py`
+- [x] 1.16 Extract `SemanticScholarResolver` → `resolvers/semantic_scholar.py`
+- [x] 1.17 Extract `UnpaywallResolver` → `resolvers/unpaywall.py`
+- [x] 1.18 Extract `WaybackResolver` → `resolvers/wayback.py`
+- [x] 1.19 Extract `ZenodoResolver` → `resolvers/zenodo.py`
+- [x] 1.20 Update `pipeline.py` to import from `resolvers/`
+- [x] 1.21 Update `runner.py` imports to use `resolvers/`
+- [x] 1.22 Update `args.py` imports to use `resolvers/`
+- [x] 1.23 Update tests to import from `resolvers/`
+- [x] 1.24 Verify resolver auto-discovery works correctly
+- [x] 1.25 Add test to verify all expected resolvers are registered
+- [x] 1.26 Update NAVMAP annotations in new modules
+- [x] 1.27 Remove resolver implementations from `pipeline.py`
 
 ## 2. Configuration Purity
 
-- [ ] 2.1 Add `frozen=True` to `ResolvedConfig` dataclass
-- [ ] 2.2 Create `bootstrap_run_environment(resolved: ResolvedConfig) -> None` function
-- [ ] 2.3 Move `ensure_dir(pdf_dir)` from `resolve_config` to `bootstrap_run_environment`
-- [ ] 2.4 Move `ensure_dir(html_dir)` from `resolve_config` to `bootstrap_run_environment`
-- [ ] 2.5 Move `ensure_dir(xml_dir)` from `resolve_config` to `bootstrap_run_environment`
-- [ ] 2.6 Remove `args.extract_html_text = ...` mutation from `resolve_config`
-- [ ] 2.7 Compute `extract_html_text` derived field in `ResolvedConfig` dataclass
-- [ ] 2.8 Update `cli.py` to call `bootstrap_run_environment(resolved)` before `run(resolved)`
-- [ ] 2.9 Update tests to remove filesystem mocks from `resolve_config` tests
-- [ ] 2.10 Add test for `resolve_config` purity (no side effects)
-- [ ] 2.11 Add test for `bootstrap_run_environment` directory creation
-- [ ] 2.12 Document immutability contract in `ResolvedConfig` docstring
+- [x] 2.1 Add `frozen=True` to `ResolvedConfig` dataclass
+- [x] 2.2 Create `bootstrap_run_environment(resolved: ResolvedConfig) -> None` function
+- [x] 2.3 Move `ensure_dir(pdf_dir)` from `resolve_config` to `bootstrap_run_environment`
+- [x] 2.4 Move `ensure_dir(html_dir)` from `resolve_config` to `bootstrap_run_environment`
+- [x] 2.5 Move `ensure_dir(xml_dir)` from `resolve_config` to `bootstrap_run_environment`
+- [x] 2.6 Remove `args.extract_html_text = ...` mutation from `resolve_config`
+- [x] 2.7 Compute `extract_html_text` derived field in `ResolvedConfig` dataclass
+- [x] 2.8 Update `cli.py` to call `bootstrap_run_environment(resolved)` before `run(resolved)`
+- [x] 2.9 Update tests to remove filesystem mocks from `resolve_config` tests
+- [x] 2.10 Add test for `resolve_config` purity (no side effects)
+- [x] 2.11 Add test for `bootstrap_run_environment` directory creation
+- [x] 2.12 Document immutability contract in `ResolvedConfig` docstring
 
 ## 3. Runner Decomposition
 
-- [ ] 3.1 Create `DownloadRun` class in `runner.py`
-- [ ] 3.2 Add `__init__(self, resolved: ResolvedConfig)` to initialize state
-- [ ] 3.3 Implement `setup_sinks(self) -> MultiSink` method
-- [ ] 3.4 Implement `setup_resolver_pipeline(self) -> ResolverPipeline` method
-- [ ] 3.5 Implement `setup_work_provider(self) -> WorkProvider` method
-- [ ] 3.6 Implement `setup_download_state(self, session_factory, robots_cache) -> DownloadState` method
-- [ ] 3.7 Implement `setup_worker_pool(self) -> ThreadPoolExecutor` method
-- [ ] 3.8 Implement `process_work_item(self, work, options) -> ProcessResult` method
-- [ ] 3.9 Implement `check_budget_limits(self) -> bool` method
-- [ ] 3.10 Implement `DownloadRun.run(self) -> RunResult` orchestration method
-- [ ] 3.11 Migrate sink wiring logic from `run()` to `setup_sinks()`
-- [ ] 3.12 Migrate resolver pipeline creation from `run()` to `setup_resolver_pipeline()`
-- [ ] 3.13 Migrate OpenAlex provider creation from `run()` to `setup_work_provider()`
-- [ ] 3.14 Migrate worker pool management from `run()` to `setup_worker_pool()`
-- [ ] 3.15 Migrate budget enforcement from `run()` to `check_budget_limits()`
-- [ ] 3.16 Update `cli.py` to instantiate `DownloadRun` and call `.run()`
-- [ ] 3.17 Add unit tests for `setup_sinks()`
-- [ ] 3.18 Add unit tests for `setup_resolver_pipeline()`
-- [ ] 3.19 Add unit tests for `setup_work_provider()`
-- [ ] 3.20 Add unit tests for `setup_download_state()`
-- [ ] 3.21 Add unit tests for `setup_worker_pool()`
-- [ ] 3.22 Add unit tests for `check_budget_limits()`
-- [ ] 3.23 Add integration test for `DownloadRun.run()`
-- [ ] 3.24 Remove old `run()` function
-- [ ] 3.25 Update documentation to reference `DownloadRun` class
+- [x] 3.1 Create `DownloadRun` class in `runner.py`
+- [x] 3.2 Add `__init__(self, resolved: ResolvedConfig)` to initialize state
+- [x] 3.3 Implement `setup_sinks(self) -> MultiSink` method
+- [x] 3.4 Implement `setup_resolver_pipeline(self) -> ResolverPipeline` method
+- [x] 3.5 Implement `setup_work_provider(self) -> WorkProvider` method
+- [x] 3.6 Implement `setup_download_state(self, session_factory, robots_cache) -> DownloadState` method
+- [x] 3.7 Implement `setup_worker_pool(self) -> ThreadPoolExecutor` method
+- [x] 3.8 Implement `process_work_item(self, work, options) -> ProcessResult` method
+- [x] 3.9 Implement `check_budget_limits(self) -> bool` method
+- [x] 3.10 Implement `DownloadRun.run(self) -> RunResult` orchestration method
+- [x] 3.11 Migrate sink wiring logic from `run()` to `setup_sinks()`
+- [x] 3.12 Migrate resolver pipeline creation from `run()` to `setup_resolver_pipeline()`
+- [x] 3.13 Migrate OpenAlex provider creation from `run()` to `setup_work_provider()`
+- [x] 3.14 Migrate worker pool management from `run()` to `setup_worker_pool()`
+- [x] 3.15 Migrate budget enforcement from `run()` to `check_budget_limits()`
+- [x] 3.16 Update `cli.py` to instantiate `DownloadRun` and call `.run()`
+- [x] 3.17 Add unit tests for `setup_sinks()`
+- [x] 3.18 Add unit tests for `setup_resolver_pipeline()`
+- [x] 3.19 Add unit tests for `setup_work_provider()`
+- [x] 3.20 Add unit tests for `setup_download_state()`
+- [x] 3.21 Add unit tests for `setup_worker_pool()`
+- [x] 3.22 Add unit tests for `check_budget_limits()`
+- [x] 3.23 Add integration test for `DownloadRun.run()`
+- [x] 3.24 Remove old `run()` function
+- [x] 3.25 Update documentation to reference `DownloadRun` class
 
 ## 4. Download Strategy Pattern
 

@@ -133,13 +133,8 @@ from pathlib import Path
 import pytest
 
 from DocsToKG.ContentDownload import cli as downloader
-from DocsToKG.ContentDownload.pipeline import (
-    FigshareResolver,
-    ResolverConfig,
-    ResolverEvent,
-    ResolverEventReason,
-    ZenodoResolver,
-)
+from DocsToKG.ContentDownload.pipeline import ResolverConfig, ResolverEvent, ResolverEventReason
+from DocsToKG.ContentDownload.resolvers import FigshareResolver, ZenodoResolver
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 

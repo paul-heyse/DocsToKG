@@ -14,6 +14,8 @@ from DocsToKG.ContentDownload.pipeline import (  # noqa: E402
     ResolverResult,
     ResolverEvent,
     ResolverEventReason,
+)
+from DocsToKG.ContentDownload.resolvers import (  # noqa: E402
     find_pdf_via_anchor,
     find_pdf_via_link,
     find_pdf_via_meta,

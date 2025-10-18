@@ -1,0 +1,115 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.resolvers.zenodo",
+#   "purpose": "Zenodo resolver implementation",
+#   "sections": [
+#     {
+#       "id": "zenodo-resolver",
+#       "name": "ZenodoResolver",
+#       "anchor": "class-zenodoresolver",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+"""Resolver implementation for the Zenodo REST API."""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Iterable
+
+import requests as _requests
+
+from DocsToKG.ContentDownload.core import normalize_doi
+
+from .base import ApiResolverBase, ResolverEvent, ResolverEventReason, ResolverResult
+
+if TYPE_CHECKING:  # pragma: no cover
+    from DocsToKG.ContentDownload.core import WorkArtifact
+    from DocsToKG.ContentDownload.pipeline import ResolverConfig
+
+
+LOGGER = logging.getLogger(__name__)
+
+
+class ZenodoResolver(ApiResolverBase):
+    """Resolve Zenodo records into downloadable open-access PDF URLs."""
+
+    name = "zenodo"
+    api_display_name = "Zenodo"
+
+    def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        return artifact.doi is not None
+
+    def iter_urls(
+        self,
+        session: _requests.Session,
+        config: "ResolverConfig",
+        artifact: "WorkArtifact",
+    ) -> Iterable[ResolverResult]:
+        doi = normalize_doi(artifact.doi)
+        if not doi:
+            yield ResolverResult(
+                url=None,
+                event=ResolverEvent.SKIPPED,
+                event_reason=ResolverEventReason.NO_DOI,
+            )
+            return
+
+        data, error = self._request_json(
+            session,
+            "GET",
+            "https://zenodo.org/api/records/",
+            config=config,
+            params={"q": f'doi:"{doi}"', "size": 3, "sort": "mostrecent"},
+        )
+        if error:
+            if error.event_reason is ResolverEventReason.CONNECTION_ERROR:
+                error.event_reason = ResolverEventReason.REQUEST_ERROR
+            yield error
+            return
+
+        hits = data.get("hits", {})
+        if not isinstance(hits, dict):
+            LOGGER.warning(
+                "Zenodo API returned malformed hits payload: %s",
+                type(hits).__name__,
+            )
+            return
+        hits_list = hits.get("hits", [])
+        if not isinstance(hits_list, list):
+            LOGGER.warning(
+                "Zenodo API returned malformed hits list: %s",
+                type(hits_list).__name__,
+            )
+            return
+        for record in hits_list or []:
+            if not isinstance(record, dict):
+                LOGGER.warning("Skipping malformed Zenodo record: %r", record)
+                continue
+            files = record.get("files", []) or []
+            if not isinstance(files, list):
+                LOGGER.warning("Skipping Zenodo record with invalid files payload: %r", files)
+                continue
+            for file_entry in files:
+                if not isinstance(file_entry, dict):
+                    LOGGER.warning(
+                        "Skipping non-dict Zenodo file entry in record %s",
+                        record.get("id"),
+                    )
+                    continue
+                file_type = (file_entry.get("type") or "").lower()
+                file_key = (file_entry.get("key") or "").lower()
+                if file_type == "pdf" or file_key.endswith(".pdf"):
+                    links = file_entry.get("links")
+                    url = links.get("self") if isinstance(links, dict) else None
+                    if url:
+                        yield ResolverResult(
+                            url=url,
+                            metadata={
+                                "source": "zenodo",
+                                "record_id": record.get("id"),
+                                "filename": file_entry.get("key"),
+                            },
+                        )
