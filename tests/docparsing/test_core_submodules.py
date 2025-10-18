@@ -37,21 +37,38 @@ def test_normalize_http_timeout_scalar_and_iterables() -> None:
     assert normalize_http_timeout([2, 3]) == (2.0, 3.0)
 
 
-def test_get_http_session_reuses_singleton() -> None:
-    """Shared HTTP session is memoised and merges headers."""
+def test_get_http_session_reuses_singleton_without_base_headers() -> None:
+    """Shared HTTP session is memoised when not requesting transient headers."""
 
     with (
         mock.patch.object(core_http, "_HTTP_SESSION", None),
         mock.patch.object(core_http, "_HTTP_SESSION_TIMEOUT", core_http.DEFAULT_HTTP_TIMEOUT),
     ):
-        session_a, timeout_a = get_http_session(timeout=10, base_headers={"X-Test": "one"})
-        session_b, timeout_b = get_http_session(base_headers={"X-Other": "two"})
+        session_a, timeout_a = get_http_session(timeout=10)
+        session_b, timeout_b = get_http_session()
 
         assert session_a is session_b
         assert timeout_a == (5.0, 10.0)
         assert timeout_b == (5.0, 30.0)
-        assert session_b.headers["X-Test"] == "one"
-        assert session_b.headers["X-Other"] == "two"
+
+
+def test_get_http_session_transient_headers_do_not_leak() -> None:
+    """Transient base headers return isolated sessions without contaminating shared state."""
+
+    with (
+        mock.patch.object(core_http, "_HTTP_SESSION", None),
+        mock.patch.object(core_http, "_HTTP_SESSION_TIMEOUT", core_http.DEFAULT_HTTP_TIMEOUT),
+    ):
+        session_a, _ = get_http_session(base_headers={"Authorization": "Token A"})
+        session_b, _ = get_http_session(base_headers={"Authorization": "Token B"})
+        shared_session, _ = get_http_session()
+
+        assert session_a is not session_b
+        assert session_a.headers["Authorization"] == "Token A"
+        assert session_b.headers["Authorization"] == "Token B"
+        assert shared_session is not session_a
+        assert shared_session is not session_b
+        assert "Authorization" not in shared_session.headers
 
 
 def test_manifest_resume_controller(tmp_path: Path) -> None:
