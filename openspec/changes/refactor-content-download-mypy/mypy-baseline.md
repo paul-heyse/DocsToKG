@@ -57,3 +57,8 @@ Output captured on 2025-10-18T14:05:55Z is stored verbatim in `/tmp/mypy_baselin
 | tests/content_download/test_atomic_writes.py:355 | fake `docling_core.persistence.manifest_load` missing | Fake dependency coverage |
 | tests/content_download/test_atomic_writes.py:357 | fake `docling_core.serializers.RichSerializerProvider` missing | Fake dependency coverage |
 | tests/content_download/test_atomic_writes.py:467 | `DummyHybridChunker` tokenizer arg is `None` | Chunker initialization typing |
+
+## Stub Dependencies Added
+
+- `types-requests` — provides typing coverage for `requests` and `requests.structures`, eliminating the missing stub diagnostics
+  observed in the baseline run across networking-focused tests.

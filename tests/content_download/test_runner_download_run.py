@@ -33,8 +33,10 @@ class DummyWorks:
         return iter(self._pages)
 
 
-def _build_args(**overrides: object) -> argparse.Namespace:
-    defaults = {
+def _build_args(
+    overrides: Optional[Dict[str, object]] = None, **extra: object
+) -> argparse.Namespace:
+    defaults: Dict[str, object] = {
         "log_rotate": None,
         "resume_from": None,
         "dry_run": False,
@@ -50,7 +52,9 @@ def _build_args(**overrides: object) -> argparse.Namespace:
         "workers": 1,
         "sleep": 0.0,
     }
-    defaults.update(overrides)
+    if overrides:
+        defaults.update(overrides)
+    defaults.update(extra)
     return argparse.Namespace(**defaults)
 
 

@@ -35,6 +35,7 @@ from typing import (
     List,
     Optional,
     Protocol,
+    TracebackType,
     Set,
     Tuple,
     runtime_checkable,
@@ -413,6 +414,28 @@ class RunTelemetry(AttemptSink):
     def log_summary(self, summary: Dict[str, Any]) -> None:
         """Publish the final run summary to downstream sinks."""
         self._sink.log_summary(summary)
+
+    def __enter__(self) -> "RunTelemetry":
+        """Enter the context manager, delegating to the underlying sink if present."""
+
+        enter = getattr(self._sink, "__enter__", None)
+        if enter is not None:
+            enter()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc: Optional[BaseException],
+        tb: Optional[TracebackType],
+    ) -> Optional[bool]:
+        """Exit the context manager, closing the sink when appropriate."""
+
+        exit_method = getattr(self._sink, "__exit__", None)
+        if exit_method is not None:
+            return exit_method(exc_type, exc, tb)
+        self.close()
+        return None
 
     def close(self) -> None:
         """Release sink resources and flush buffered telemetry."""

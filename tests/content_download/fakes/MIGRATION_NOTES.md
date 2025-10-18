@@ -11,3 +11,9 @@
    shim exists.
 4. Refresh the mypy baseline (`openspec/changes/refactor-content-download-mypy/mypy-baseline.md`)
    whenever the fakes expand to track the expected diagnostics.
+
+## 2025-10-19 Updates
+
+- The networking refactor now relies on `_ListAttemptSink` for typed telemetry
+  within tests; no additional fake dependency modules were required beyond the
+  existing registry.
