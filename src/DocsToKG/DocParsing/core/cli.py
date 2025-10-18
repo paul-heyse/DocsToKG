@@ -419,9 +419,10 @@ def manifest(argv: Sequence[str] | None = None) -> int:
                 continue
             normalized = trimmed.lower()
             resolved = STAGE_ALIASES.get(normalized, (normalized,))
-            invalid = [stage for stage in resolved if stage not in known_stage_set]
+            invalid = [stage for stage in resolved if stage not in allowed_stage_set]
             if invalid:
-                expected = ", ".join(_expected_stage_choices)
+                canonical_list = ", ".join(sorted(known_stage_set))
+                discovered_list = ", ".join(discovered) if discovered else "<none>"
                 raise CLIValidationError(
                     option="--stage",
                     message=(

@@ -44,6 +44,75 @@ def _prepare_manifest_cli_stubs(monkeypatch) -> None:
     yaml_stub = types.SimpleNamespace(safe_load=lambda *_args, **_kwargs: {}, YAMLError=Exception)
     monkeypatch.setitem(sys.modules, "yaml", yaml_stub)
 
+    if "requests" not in sys.modules:
+        requests_module = types.ModuleType("requests")
+
+        class _RequestException(Exception):
+            """Base request exception stub."""
+
+        class _HTTPError(_RequestException):
+            def __init__(self, response=None) -> None:  # pragma: no cover - stub
+                super().__init__("HTTP error")
+                self.response = response
+
+        class _Session:
+            def __init__(self) -> None:  # pragma: no cover - stub
+                self.headers: dict[str, str] = {}
+                self.auth = None
+                self.cookies: dict[str, str] = {}
+                self.params: dict[str, str] = {}
+                self.proxies: dict[str, str] = {}
+                self.verify = True
+                self.cert = None
+                self.trust_env = True
+                self.max_redirects = 30
+                self.stream = False
+                self.hooks: dict[str, list[object]] = {"response": []}
+                self.adapters: dict[str, object] = {}
+
+            def mount(self, prefix: str, adapter: object) -> None:  # pragma: no cover - stub
+                self.adapters[prefix] = adapter
+
+        requests_module.Session = _Session
+        requests_module.RequestException = _RequestException
+        requests_module.HTTPError = _HTTPError
+        requests_module.ConnectionError = _RequestException
+        requests_module.Timeout = _RequestException
+        requests_module.exceptions = types.SimpleNamespace(SSLError=_RequestException)
+        monkeypatch.setitem(sys.modules, "requests", requests_module)
+
+    if "requests.adapters" not in sys.modules:
+        adapters_module = types.ModuleType("requests.adapters")
+
+        class _HTTPAdapter:
+            def __init__(self, *args, **kwargs) -> None:  # pragma: no cover - stub
+                self.args = args
+                self.kwargs = kwargs
+
+        adapters_module.HTTPAdapter = _HTTPAdapter
+        monkeypatch.setitem(sys.modules, "requests.adapters", adapters_module)
+        sys.modules["requests"].adapters = adapters_module  # type: ignore[index]
+
+    if "urllib3" not in sys.modules:
+        urllib3_module = types.ModuleType("urllib3")
+        monkeypatch.setitem(sys.modules, "urllib3", urllib3_module)
+
+    if "urllib3.util" not in sys.modules:
+        urllib3_util_module = types.ModuleType("urllib3.util")
+        monkeypatch.setitem(sys.modules, "urllib3.util", urllib3_util_module)
+        sys.modules["urllib3"].util = urllib3_util_module  # type: ignore[index]
+
+    if "urllib3.util.retry" not in sys.modules:
+        urllib3_retry_module = types.ModuleType("urllib3.util.retry")
+
+        class _Retry:
+            def __init__(self, *args, **kwargs) -> None:  # pragma: no cover - stub
+                self.args = args
+                self.kwargs = kwargs
+
+        urllib3_retry_module.Retry = _Retry
+        monkeypatch.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
+
 
 @pytest.mark.parametrize("tail", [7])
 def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -> None:
