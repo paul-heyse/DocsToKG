@@ -414,6 +414,8 @@ def _manifest_main(argv: Sequence[str]) -> int:
     canonical_list = ", ".join(known_stages)
     discovered_list = ", ".join(discovered) if discovered else "none"
     allowed_stage_set = set(known_stage_set).union(discovered)
+    canonical_list = ", ".join(sorted(known_stage_set))
+    discovered_list = ", ".join(sorted(discovered)) or "none"
 
     if args.stages:
         seen: List[str] = []
