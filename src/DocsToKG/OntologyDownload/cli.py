@@ -522,6 +522,71 @@ def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
         config.defaults.http.allowed_hosts = existing
 
 
+def _resolve_specs_from_args(
+    args,
+    base_config: Optional[ResolvedConfig],
+    *,
+    allow_empty: bool = False,
+) -> tuple[ResolvedConfig, List[FetchSpec]]:
+    """Return configuration and fetch specifications derived from CLI arguments."""
+
+    target_formats = _parse_target_formats(getattr(args, "target_formats", None))
+    config_path: Optional[Path] = getattr(args, "spec", None)
+    ids: List[str] = list(getattr(args, "ids", []))
+    if config_path is None and not ids:
+        default_config = CONFIG_DIR / "sources.yaml"
+        if default_config.exists():
+            config_path = default_config
+
+    if config_path:
+        config = load_config(config_path)
+    else:
+        config = base_config or get_default_config(copy=True)
+
+    config.defaults.logging.level = getattr(args, "log_level", config.defaults.logging.level)
+    _apply_cli_overrides(config, args)
+
+    lock_path: Optional[Path] = getattr(args, "lock", None)
+    if lock_path is not None:
+        lock_payload = load_lockfile_payload(lock_path)
+        specs = specs_from_lock_payload(
+            lock_payload,
+            defaults=config.defaults,
+            requested_ids=ids,
+        )
+        if not specs and not allow_empty:
+            raise ConfigError(f"No matching entries found in lock file {lock_path}")
+        config.defaults.resolver_fallback_enabled = False
+        config.defaults.prefer_source = ["direct"]
+        config.specs = specs
+        logging.getLogger(\"DocsToKG.OntologyDownload\").info(
+            \"using lockfile\",
+            extra={
+                \"stage\": \"plan\",
+                \"lock_path\": str(lock_path.expanduser()),
+                \"entries\": len(specs),
+            },
+        )
+        return config, specs
+
+    if ids:
+        resolver_name = getattr(args, \"resolver\", None) or config.defaults.prefer_source[0]
+        formats = target_formats or config.defaults.normalize_to
+        specs = [
+            FetchSpec(id=oid, resolver=resolver_name, extras={}, target_formats=formats)
+            for oid in ids
+        ]
+        return config, specs
+
+    if config.specs:
+        return config, config.specs
+
+    if allow_empty:
+        return config, []
+
+    raise ConfigError(\"Please provide ontology IDs or --spec configuration\")
+
+
 def _handle_pull(
     args,
     base_config: Optional[ResolvedConfig],
@@ -1211,7 +1276,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(arg_list)
     try:
-        base_config = ResolvedConfig.from_defaults()
+        base_config = get_default_config(copy=True)
         base_config.defaults.logging.level = args.log_level
         logging_config = base_config.defaults.logging
         logger = setup_logging(
