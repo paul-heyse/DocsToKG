@@ -25,12 +25,12 @@ var pageName = "";
 
 if (pageName == "") {
 	pageName = "Auto Article Locator";
-} 
+}
 	function autoRedirectToURL() {
 		var url = '/retrieve/'+document.getElementById('resultName').value+'?Redirect='+document.getElementById('redirectURL').value+'&key='+document.getElementById('key').value
 	  window.location = url;
 	}
-	
+
 </script>
 </head>
 <body onload="autoRedirectToURL();">
@@ -38,7 +38,7 @@ if (pageName == "") {
   <td colspan="2">
 <input type="hidden" name="redirectURL" value="https%3A%2F%2Fwww.sciencedirect.com%2Fscience%2Farticle%2Fpii%2FS1279770725002337%3Fvia%253Dihub" id="redirectURL"/>  </td>
 </tr>
- 
+
 	<tr style="display:none;">
   <td colspan="2">
 <input type="hidden" name="key" value="f384b1bdb87a92b815de466f7cce0fb5de1387de" id="key"/>  </td>
@@ -48,7 +48,7 @@ if (pageName == "") {
   <td colspan="2">
 <input type="hidden" name="id" value="S1279770725002337" id="id"/>  </td>
 </tr>
- 
+
 	<tr style="display:none;">
   <td colspan="2">
 <input type="hidden" name="resultName" value="articleSelectSinglePerm" id="resultName"/>  </td>
@@ -65,7 +65,7 @@ if (pageName == "") {
 			     loadTimestamp : Date.now().toString(),
 			     name : pageName,
 			     productName : 'IH',
-			     type : 'ih:article',        
+			     type : 'ih:article',
 			     detail : 'sciencedirect',
 			     format :"MIME-XHTML",
 			     accessType : 'ih:anon_guest',

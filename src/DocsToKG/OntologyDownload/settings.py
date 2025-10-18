@@ -18,6 +18,7 @@ from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Dict,
     Iterable,
     List,
@@ -26,7 +27,6 @@ from typing import (
     Protocol,
     Set,
     Tuple,
-    Callable,
 )
 
 try:  # pragma: no cover - dependency check

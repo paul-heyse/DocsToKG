@@ -3,7 +3,7 @@
 This module coordinates the streaming download workflow, tying together
 resolver outputs, HTTP policy enforcement, and telemetry reporting. It exposes
 utilities that transform resolver candidates into stored artifacts while
-respecting retry budgets, robots.txt directives, and classification rules.
+respecting retry policies, robots.txt directives, and classification rules.
 """
 
 from __future__ import annotations
@@ -374,7 +374,7 @@ class DownloadState(Enum):
 
 
 class _MaxBytesExceeded(RuntimeError):
-    """Internal signal raised when the stream exceeds the configured byte budget."""
+    """Internal signal raised when the stream exceeds the configured byte limit."""
 
 
 _DIGEST_CACHE_MAXSIZE = 256

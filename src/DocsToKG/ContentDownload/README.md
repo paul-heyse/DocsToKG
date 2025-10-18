@@ -62,7 +62,7 @@ python scripts/export_attempts_csv.py pdfs/manifest.jsonl reports/attempts.csv
 - `src/DocsToKG/ContentDownload/download.py` - Streaming download strategies, robots enforcement, cache validation, and artifact writers.
 - `src/DocsToKG/ContentDownload/core.py` - Shared enums, classifiers, normalization helpers, and the `WorkArtifact` data structure.
 - `src/DocsToKG/ContentDownload/networking.py` - HTTP session factory, retry logic, token buckets, and circuit breaker utilities.
-- `src/DocsToKG/ContentDownload/runner.py` - `DownloadRun` lifecycle managing worker pools, budgets, and summary emission.
+- `src/DocsToKG/ContentDownload/runner.py` - `DownloadRun` lifecycle managing worker pools and summary emission.
 - `src/DocsToKG/ContentDownload/telemetry.py` - Manifest schema contracts (`MANIFEST_SCHEMA_VERSION`), sink interfaces, and SQLite manifest index helpers.
 - `src/DocsToKG/ContentDownload/providers.py` - `WorkProvider` protocol and the `OpenAlexWorkProvider` adapter around `pyalex`.
 - `src/DocsToKG/ContentDownload/summary.py` - Run summary dataclass plus console reporting helpers.
@@ -127,13 +127,13 @@ sequenceDiagram
 - Entry points: `src/DocsToKG/ContentDownload/cli.py:main`, `python -m DocsToKG.ContentDownload.cli`.
 - `ResolvedConfig` (args.py) is immutable; mutate via helper functions (`bootstrap_run_environment`, `apply_config_overrides`) rather than altering dataclass fields.
 - `DownloadRun.setup_sinks()` must precede `setup_resolver_pipeline()` because the pipeline depends on telemetry sinks for attempt logging.
-- `ResolverPipeline` executes resolvers in configured order, respecting `ResolverConfig.resolver_toggles`, domain budgets, and global URL deduplication.
+- `ResolverPipeline` executes resolvers in configured order, respecting `ResolverConfig.resolver_toggles`, rate limits, and global URL deduplication.
 - Download strategies enforce classification invariants (`PDF_LIKE`, HTML, XML) and robots compliance before persisting artifacts.
 - Manifest outputs must remain JSONL with `record_type` markers (`attempt`, `manifest`, `summary`) to keep downstream analytics compatible.
 
 ## Configuration
 
-- CLI flags defined in `args.py` cover topics, date windows, concurrency, budgets, resolver ordering, and telemetry sinks.
+- CLI flags defined in `args.py` cover topics, date windows, concurrency, resolver ordering, and telemetry sinks.
 - Resolver credentials load from `config/resolver_credentials.yaml` plus `--resolver-config` overrides; unknown fields raise `ValueError`.
 - Environment variables:
   - `UNPAYWALL_EMAIL` (default: `None`) - polite contact for Unpaywall resolver; fallback to `--mailto`.
@@ -146,7 +146,7 @@ sequenceDiagram
 
 - Manifest and attempt records conform to `telemetry.ManifestEntry` (`MANIFEST_SCHEMA_VERSION = 3`); see `src/DocsToKG/ContentDownload/telemetry.py`.
 - Manifest SQLite index obeys `SQLITE_SCHEMA_VERSION = 4`; consumers should query via `ManifestUrlIndex`.
-- Metrics sidecar (`manifest.metrics.json`) serializes `summary.build_summary_record` output with resolver totals and budgets.
+- Metrics sidecar (`manifest.metrics.json`) serializes `summary.build_summary_record` output with resolver totals and aggregate counters.
 - CSV exports use `scripts/export_attempts_csv.py` header ordering to stay compatible with legacy analytics.
 - TODO: Document any formal schema artifacts if manifest schema is externalized (e.g., JSON Schema file).
 
@@ -164,7 +164,7 @@ sequenceDiagram
 
 - Telemetry: `telemetry.MultiSink` multiplexes JSONL manifests, `.index.json`, `.last.csv`, `.sqlite3`, `.summary.json`, and `.metrics.json`.
 - Logging: standard Python logging under the `DocsToKG.ContentDownload` namespace; configure verbosity via `LOGLEVEL` or logging config.
-- Dashboards: TODO: link dashboards that visualize resolver success, latency, and budgets.
+- Dashboards: TODO: link dashboards that visualize resolver success and latency.
 - SLIs/SLOs:
   - Download success rate (`saved / processed`). SLO: TODO define threshold (e.g., ≥0.95).
   - Resolver P95 latency (ms) per `summary.latency_ms`. SLO: TODO cap (e.g., ≤5000 ms).
@@ -180,7 +180,7 @@ sequenceDiagram
   - Spoofing: enforce HTTPS endpoints and domain allowlists in resolver configs.
   - Tampering: SHA-256 digests verified for cached artifacts (`download._cached_sha256`).
   - Repudiation: JSONL manifest entries include timestamps, run IDs, and resolver names.
-  - Denial of service: budgets, token buckets, and circuit breakers (`networking.TokenBucket`, `CircuitBreaker`) throttle abusive traffic.
+  - Denial of service: token buckets and circuit breakers (`networking.TokenBucket`, `CircuitBreaker`) throttle abusive traffic.
   - Information disclosure: logs avoid storing raw payloads; ensure manifests stay on trusted storage (TODO: document retention policy).
 - External input is untrusted; treat downloaded artifacts as unsafe and never execute them directly.
 
@@ -204,7 +204,7 @@ mypy src/DocsToKG/ContentDownload
 - Do not:
   - Disable robots enforcement or polite headers in committed code paths without legal approval.
   - Remove telemetry sinks or change `record_type` values without coordinating analytics consumers.
-  - Commit credentials or modify default budgets to unsafe values.
+  - Commit credentials or modify default limits to unsafe values.
 - Danger zone:
   - `rm -rf pdfs html xml` deletes cached artifacts and resumes; keep backups before purging.
   - `python -m DocsToKG.ContentDownload.cli --ignore-robots` bypasses robots.txt and should only run with explicit authorization.

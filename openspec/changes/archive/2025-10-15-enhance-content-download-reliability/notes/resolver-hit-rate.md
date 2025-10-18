@@ -1,6 +1,6 @@
 # Resolver Hit-Rate Impact Analysis
 
-Date: 2025-10-16  
+Date: 2025-10-16
 Source: Production crawler logs (`openalex-prod`, build 2025.10.12).
 
 We compared resolver hit-rate metrics for the seven-day window preceding the DOI

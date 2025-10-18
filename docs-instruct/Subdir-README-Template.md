@@ -14,7 +14,7 @@ sbom: { path: <path-to-spdx-or-cyclonedx> }
 
 # <REPO NAME> • <SUBDIRECTORY NAME>
 
-Purpose: <ONE-LINE PURPOSE>  
+Purpose: <ONE-LINE PURPOSE>
 Scope boundary: <WHAT THIS SUBMODULE DOES / DOES NOT DO>
 
 ---
@@ -114,10 +114,10 @@ pytest -q <subdir-tests>
   - `<command>` deletes `./cache`
 
 ## FAQ  <!-- explanation -->
-- Q: <question>  
+- Q: <question>
   A: <short answer>
 
-- Q: <question>  
+- Q: <question>
   A: <short answer>
 
 <!-- Machine-readable appendix -->

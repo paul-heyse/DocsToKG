@@ -61,7 +61,6 @@ class DownloadRunState:
     skipped: int = 0
     downloaded_bytes: int = 0
     worker_failures: int = 0
-    stop_due_to_budget: bool = False
 
     def update_from_result(self, result: Dict[str, Any]) -> None:
         """Update aggregate counters from an individual work result."""
@@ -279,23 +278,6 @@ class DownloadRun:
         self.state.update_from_result(result)
         return result
 
-    def check_budget_limits(self) -> bool:
-        """Return ``True`` when request or byte budgets have been exhausted."""
-
-        if self.state is None:
-            return False
-        if (
-            self.resolved.budget_requests is not None
-            and self.state.processed >= self.resolved.budget_requests
-        ):
-            return True
-        if (
-            self.resolved.budget_bytes is not None
-            and self.state.downloaded_bytes >= self.resolved.budget_bytes
-        ):
-            return True
-        return False
-
     def run(self) -> RunResult:
         """Execute the content download pipeline and return the aggregate result."""
 
@@ -326,12 +308,7 @@ class DownloadRun:
                 if self.args.workers == 1:
                     session = state.session_factory()
                     for artifact in provider.iter_artifacts():
-                        if state.stop_due_to_budget:
-                            break
                         self.process_work_item(artifact, state.options, session=session)
-                        if not state.stop_due_to_budget and self.check_budget_limits():
-                            state.stop_due_to_budget = True
-                            break
                         if self.args.sleep > 0:
                             time.sleep(self.args.sleep)
                 else:
@@ -362,23 +339,14 @@ class DownloadRun:
                                     extra={"extra_fields": extra_fields},
                                 )
                                 state.update_from_result({"skipped": True})
-                                if not state.stop_due_to_budget and self.check_budget_limits():
-                                    state.stop_due_to_budget = True
                                 return
 
-                            if not state.stop_due_to_budget and self.check_budget_limits():
-                                state.stop_due_to_budget = True
-
                         for artifact in provider.iter_artifacts():
-                            if state.stop_due_to_budget:
-                                break
                             if len(in_flight) >= max_in_flight:
                                 done, pending = wait(set(in_flight), return_when=FIRST_COMPLETED)
                                 for completed_future in done:
                                     _handle_future(completed_future)
                                 in_flight = list(pending)
-                                if state.stop_due_to_budget:
-                                    break
                             in_flight.append(_submit(artifact))
 
                         if in_flight:
@@ -388,18 +356,6 @@ class DownloadRun:
         except Exception:
             raise
         else:
-            if state and state.stop_due_to_budget:
-                LOGGER.info(
-                    "Stopping due to budget exhaustion",
-                    extra={
-                        "extra_fields": {
-                            "budget_requests": self.resolved.budget_requests,
-                            "budget_bytes": self.resolved.budget_bytes,
-                            "processed": state.processed,
-                            "bytes_downloaded": state.downloaded_bytes,
-                        }
-                    },
-                )
             metrics = self.metrics or ResolverMetrics()
             summary = metrics.summary()
             summary_record = build_summary_record(
@@ -412,9 +368,6 @@ class DownloadRun:
                 worker_failures=state.worker_failures if state else 0,
                 bytes_downloaded=state.downloaded_bytes if state else 0,
                 summary=summary,
-                budget_requests=self.resolved.budget_requests,
-                budget_bytes=self.resolved.budget_bytes,
-                stop_due_to_budget=state.stop_due_to_budget if state else False,
             )
             if self.attempt_logger is not None:
                 try:
@@ -444,9 +397,6 @@ class DownloadRun:
             skipped=state.skipped if state else 0,
             worker_failures=state.worker_failures if state else 0,
             bytes_downloaded=state.downloaded_bytes if state else 0,
-            budget_requests=self.resolved.budget_requests,
-            budget_bytes=self.resolved.budget_bytes,
-            stop_due_to_budget=state.stop_due_to_budget if state else False,
             summary=summary,
             summary_record=summary_record,
         )

@@ -30003,4 +30003,3 @@ _:geo1499 a schema:GeoCoordinates ;
     schema:latitude "40.59"^^xsd:decimal ;
     schema:longitude "-69.41"^^xsd:decimal ;
     dcterms:modified "2024-02-01"^^xsd:date .
-

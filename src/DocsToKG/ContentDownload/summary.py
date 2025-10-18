@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 __all__ = [
     "RunResult",
@@ -24,9 +24,6 @@ class RunResult:
     skipped: int
     worker_failures: int
     bytes_downloaded: int
-    budget_requests: Optional[int]
-    budget_bytes: Optional[int]
-    stop_due_to_budget: bool
     summary: Dict[str, Any]
     summary_record: Dict[str, Any]
 
@@ -42,9 +39,6 @@ def build_summary_record(
     worker_failures: int,
     bytes_downloaded: int,
     summary: Dict[str, Any],
-    budget_requests: Optional[int] = None,
-    budget_bytes: Optional[int] = None,
-    stop_due_to_budget: bool = False,
 ) -> Dict[str, Any]:
     """Assemble the structured run summary record persisted to metrics sinks."""
 
@@ -59,13 +53,6 @@ def build_summary_record(
         "skipped": skipped,
         "worker_failures": worker_failures,
         "bytes_downloaded": bytes_downloaded,
-        "budget": {
-            "requests": budget_requests,
-            "bytes": budget_bytes,
-            "requests_consumed": processed,
-            "bytes_consumed": bytes_downloaded,
-            "exhausted": stop_due_to_budget,
-        },
         "classification_totals": dict(classification_totals),
         "reason_totals": dict(reason_totals),
         "resolvers": summary,
@@ -80,8 +67,6 @@ def emit_console_summary(result: RunResult, *, dry_run: bool) -> None:
         f"HTML-only {result.html_only}, XML-only {result.xml_only}, skipped {result.skipped}."
     )
     print(f"Total bytes downloaded {result.bytes_downloaded}.")
-    if result.stop_due_to_budget:
-        print("Budget exhausted; halting further work.")
     if dry_run:
         print("DRY RUN: no files written, resolver coverage only.")
     if result.worker_failures:

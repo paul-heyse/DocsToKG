@@ -91,9 +91,9 @@
 
 ## 8. Update public interface and maintain backward compatibility
 
-- [x] 8.1 Audit `__init__.py` to ensure all previously exported symbols remain available at their original import paths  
+- [x] 8.1 Audit `__init__.py` to ensure all previously exported symbols remain available at their original import paths
       Verified exports for service pagination helpers, vectorstore state ops, and ranking shaper, ensuring shims surface the legacy names without altering warning behaviour.
-- [x] 8.2 Add explicit re-exports in `__init__.py` for deprecated modules using `sys.modules` aliasing pattern: `sys.modules[__name__ + ".similarity"] = sys.modules[__name__ + ".vectorstore"]`  
+- [x] 8.2 Add explicit re-exports in `__init__.py` for deprecated modules using `sys.modules` aliasing pattern: `sys.modules[__name__ + ".similarity"] = sys.modules[__name__ + ".vectorstore"]`
       Confirmed compatibility via dedicated shim modules so importing legacy paths still raises deprecation warnings only when explicitly used (avoids eager warnings during package import).
 - [x] 8.3 Verify deprecation warnings are emitted when users import from deprecated module paths
 - [x] 8.4 Document the deprecation timeline in `CHANGELOG.md` with specific guidance on migration paths
@@ -102,15 +102,15 @@
 
 ## 9. Update test suite for new module structure
 
-- [x] 9.1 Create mapping of all test files in `tests/hybrid_search/` to modules they test  
+- [x] 9.1 Create mapping of all test files in `tests/hybrid_search/` to modules they test
       Mapping recorded: `test_suite.py` exercises ingest/service/vectorstore/storage/ranking/config/features/validation plus shim warning coverage.
 - [x] 9.2 Update import statements in test files to use new module paths (preferring new paths over deprecated shims)
-- [x] 9.3 Verify no tests rely on internal implementation details exposed only through now-consolidated modules  
+- [x] 9.3 Verify no tests rely on internal implementation details exposed only through now-consolidated modules
       Adjusted hybrid search stack fixture to use the public `FaissIndexManager.dim` property instead of touching the private `_dim` attribute.
 - [x] 9.4 Add tests specifically validating deprecation warnings are emitted when using old import paths
 - [ ] 9.5 Run full test suite with coverage analysis to ensure no coverage gaps introduced by consolidation
       Coverage execution not attempted: even focused pytest runs fail due to missing `numpy`, so coverage tooling cannot run.
-- [x] 9.6 Update test utilities or fixtures that may have hardcoded module paths  
+- [x] 9.6 Update test utilities or fixtures that may have hardcoded module paths
       Normalised all fixture imports to consolidated modules and added explicit shim warning assertions to guard against regressions.
 
 ## 10. Update documentation and examples
@@ -118,7 +118,7 @@
 - [x] 10.1 Search documentation files (`docs/hybrid_search*.md`) for import examples using deprecated module paths
 - [x] 10.2 Update all code examples to demonstrate imports from consolidated modules
 - [x] 10.3 Add migration guide section to relevant documentation explaining the consolidation and providing import path translations
-- [x] 10.4 Update architecture diagrams or module dependency graphs to reflect nine-module structure  
+- [x] 10.4 Update architecture diagrams or module dependency graphs to reflect nine-module structure
       Added a mermaid dependency graph to the migration guide documenting the consolidated module DAG.
 - [x] 10.5 Ensure API reference documentation (if auto-generated) correctly resolves to new module locations
 - [x] 10.6 Update docstrings that reference other modules by path to use correct post-consolidation paths

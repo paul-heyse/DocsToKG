@@ -287,7 +287,7 @@ Change 'modularize-content-download-architecture' is valid
 
 ## Final QA Status (Implementation Complete)
 
-- ✅ `pytest tests -q` (optional dependencies `pyalex`, `faiss`, `transformers` auto-skip when unavailable) — validates resolver order, rate limiting, and documentation-driven fixtures under modular pipeline. 
+- ✅ `pytest tests -q` (optional dependencies `pyalex`, `faiss`, `transformers` auto-skip when unavailable) — validates resolver order, rate limiting, and documentation-driven fixtures under modular pipeline.
 - ℹ️ Known warnings: legacy compatibility shims for `DocsToKG.ContentDownload.resolvers.time`/`requests` and unregistered `pytest.mark.integration`; both retained intentionally for downstream users during migration.
 - 🔍 Manual verification: OpenAlex, CORE, Zenodo, and concurrency tests patched with `MethodType`-bound stubs to mirror legacy semantics while exercising new modular code paths.
 

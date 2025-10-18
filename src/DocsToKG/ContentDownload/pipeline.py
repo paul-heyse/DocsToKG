@@ -4,9 +4,6 @@
 #   "purpose": "Resolver definitions and pipeline orchestration",
 #   "sections": [
 #     {
-#       "id": "normalise-domain-bytes-budget",
-#       "name": "_normalise_domain_bytes_budget",
-#       "anchor": "function-normalise-domain-bytes-budget",
 #       "kind": "function"
 #     },
 #     {
@@ -255,37 +252,6 @@ __all__ = [
 # --- Resolver Configuration ---
 
 
-def _normalise_domain_bytes_budget(data: Mapping[str, Any]) -> Dict[str, int]:
-    """Normalize domain byte budgets to lower-case host keys and integer byte limits."""
-
-    if data is None:
-        return {}
-    if not isinstance(data, Mapping):  # pragma: no cover - defensive guard
-        raise ValueError("domain_bytes_budget must be a mapping of host -> bytes")
-
-    normalized: Dict[str, int] = {}
-    for host, value in data.items():
-        host_key = str(host).strip().lower()
-        if not host_key:
-            continue
-        try:
-            limit = int(value)
-        except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
-            raise ValueError(
-                ("domain_bytes_budget['{name}'] must be an integer, got {value!r}").format(
-                    name=host, value=value
-                )
-            ) from exc
-        if limit <= 0:
-            raise ValueError(
-                ("domain_bytes_budget['{name}'] must be positive, got {value}").format(
-                    name=host, value=value
-                )
-            )
-        normalized[host_key] = limit
-    return normalized
-
-
 def _normalise_domain_content_rules(data: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
     """Normalize domain content policies to lower-case host keys and canonical values."""
 
@@ -397,7 +363,6 @@ class ResolverConfig:
         max_concurrent_per_host: Upper bound on simultaneous downloads per hostname.
         enable_global_url_dedup: Enable global URL deduplication across works when True.
         domain_token_buckets: Mapping of hostname to token bucket parameters.
-        domain_bytes_budget: Mapping of hostname to maximum bytes permitted this run.
         domain_content_rules: Mapping of hostname to MIME allow-lists and max-bytes caps.
         resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
 
@@ -439,7 +404,6 @@ class ResolverConfig:
     max_concurrent_per_host: int = 3
     enable_global_url_dedup: bool = True
     domain_token_buckets: Dict[str, Dict[str, float]] = field(default_factory=dict)
-    domain_bytes_budget: Dict[str, int] = field(default_factory=dict)
     domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     resolver_circuit_breakers: Dict[str, Dict[str, float]] = field(default_factory=dict)
     # Heuristic knobs (defaults preserve current CLI behaviour)
@@ -541,8 +505,6 @@ class ResolverConfig:
         if normalized_domain_limits:
             self.domain_min_interval_s = normalized_domain_limits
 
-        if self.domain_bytes_budget:
-            self.domain_bytes_budget = _normalise_domain_bytes_budget(self.domain_bytes_budget)
         if self.domain_content_rules:
             self.domain_content_rules = _normalise_domain_content_rules(self.domain_content_rules)
 
@@ -690,13 +652,10 @@ def apply_config_overrides(
         "domain_token_buckets",
         "resolver_circuit_breakers",
         "max_concurrent_per_host",
-        "domain_bytes_budget",
         "domain_content_rules",
     ):
         if field_name in data and data[field_name] is not None:
-            if field_name == "domain_bytes_budget":
-                setattr(config, field_name, _normalise_domain_bytes_budget(data[field_name]))
-            elif field_name == "domain_content_rules":
+            if field_name == "domain_content_rules":
                 setattr(config, field_name, _normalise_domain_content_rules(data[field_name]))
             else:
                 setattr(config, field_name, data[field_name])
@@ -783,11 +742,6 @@ def load_resolver_config(
         for domain, interval in args.domain_min_interval:
             domain_limits[domain] = interval
         config.domain_min_interval_s = domain_limits
-    if getattr(args, "domain_bytes_budget", None):
-        budget_map = dict(config.domain_bytes_budget)
-        for domain, limit in args.domain_bytes_budget:
-            budget_map[domain] = limit
-        config.domain_bytes_budget = _normalise_domain_bytes_budget(budget_map)
     if getattr(args, "domain_token_bucket", None):
         bucket_map: Dict[str, Dict[str, float]] = dict(config.domain_token_buckets)
         for domain, spec in args.domain_token_bucket:
@@ -1303,8 +1257,6 @@ class ResolverPipeline:
         self._host_breaker_lock = threading.Lock()
         self._host_semaphores: Dict[str, BoundedSemaphore] = {}
         self._host_semaphore_lock = threading.Lock()
-        self._domain_bytes_consumed: Dict[str, int] = defaultdict(int)
-        self._domain_bytes_lock = threading.Lock()
         self._resolver_breakers: Dict[str, CircuitBreaker] = {}
         circuit_breakers = getattr(self.config, "resolver_circuit_breakers", {}) or {}
         for name, spec in circuit_breakers.items():
@@ -1473,65 +1425,6 @@ class ResolverPipeline:
                 )
                 self._host_buckets[host] = bucket
             return bucket
-
-    def _resolve_budget_host_key(self, host: str) -> Optional[str]:
-        if not host:
-            return None
-        host_key = host.lower()
-        if host_key in self.config.domain_bytes_budget:
-            return host_key
-        if host_key.startswith("www."):
-            bare = host_key[4:]
-            if bare in self.config.domain_bytes_budget:
-                return bare
-        return None
-
-    def _domain_budget_remaining(self, host_key: str) -> Optional[int]:
-        budget = self.config.domain_bytes_budget.get(host_key)
-        if budget is None:
-            return None
-        with self._domain_bytes_lock:
-            consumed = self._domain_bytes_consumed.get(host_key, 0)
-        return budget - consumed
-
-    def _estimate_outcome_bytes(self, outcome: DownloadOutcome) -> Optional[int]:
-        length = outcome.content_length
-        bytes_value: Optional[int]
-        if isinstance(length, str):
-            try:
-                bytes_value = int(length)
-            except ValueError:
-                bytes_value = None
-        elif isinstance(length, int):
-            bytes_value = length
-        elif length is not None:
-            try:
-                bytes_value = int(length)
-            except (TypeError, ValueError):
-                bytes_value = None
-        else:
-            bytes_value = None
-        if bytes_value is not None and bytes_value > 0:
-            return bytes_value
-        path = outcome.path
-        if not path:
-            return None
-        try:
-            return max(int(Path(path).stat().st_size), 0)
-        except (OSError, ValueError):
-            return None
-
-    def _record_domain_bytes(self, host_key: str, outcome: DownloadOutcome) -> None:
-        if host_key not in self.config.domain_bytes_budget:
-            return
-        if outcome.reason is ReasonCode.SKIP_LARGE_DOWNLOAD:
-            return
-        bytes_used = self._estimate_outcome_bytes(outcome)
-        if bytes_used is None or bytes_used <= 0:
-            return
-        with self._domain_bytes_lock:
-            consumed = self._domain_bytes_consumed.get(host_key, 0)
-            self._domain_bytes_consumed[host_key] = consumed + bytes_used
 
     def _acquire_host_slot(self, host: str) -> Optional[Callable[[], None]]:
         limit = self.config.max_concurrent_per_host
@@ -2210,39 +2103,10 @@ class ResolverPipeline:
             head_precheck_passed = True
 
         release_host_slot: Optional[Callable[[], None]] = None
-        budget_key: Optional[str] = None
         try:
             state.attempt_counter += 1
             host_value = (parsed_url.netloc or "").lower()
             if host_value:
-                budget_key = self._resolve_budget_host_key(host_value)
-                if budget_key is not None:
-                    remaining_budget = self._domain_budget_remaining(budget_key)
-                    if remaining_budget is not None and remaining_budget <= 0:
-                        self._emit_attempt(
-                            AttemptRecord(
-                                run_id=self._run_id,
-                                work_id=artifact.work_id,
-                                resolver_name=resolver_name,
-                                resolver_order=order_index,
-                                url=url,
-                                status=Classification.SKIPPED,
-                                http_status=None,
-                                content_type=None,
-                                elapsed_ms=None,
-                                reason=ReasonCode.BUDGET_EXHAUSTED,
-                                reason_detail="domain-bytes-budget",
-                                metadata=result.metadata,
-                                dry_run=state.dry_run,
-                                resolver_wall_time_ms=resolver_wall_time_ms,
-                            )
-                        )
-                        self._record_skip(resolver_name, "domain-bytes-budget")
-                        state.last_reason = ReasonCode.BUDGET_EXHAUSTED
-                        state.last_reason_detail = "domain-bytes-budget"
-                        if url not in state.failed_urls:
-                            state.failed_urls.append(url)
-                        return None
                 allowed, remaining = self._host_breaker_allows(host_value)
                 if not allowed:
                     detail = f"cooldown-{remaining:.1f}s"
@@ -2337,8 +2201,6 @@ class ResolverPipeline:
             )
             self.metrics.record_attempt(resolver_name, outcome)
             self._update_breakers(resolver_name, host_value, outcome)
-            if budget_key is not None:
-                self._record_domain_bytes(budget_key, outcome)
 
             classification = outcome.classification
             if classification is Classification.HTML and outcome.path:

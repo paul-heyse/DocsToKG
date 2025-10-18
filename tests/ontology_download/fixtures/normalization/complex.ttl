@@ -42005,4 +42005,3 @@ ex:entity6000 a foaf:Person ;
 _:b6000 a foaf:Person ;
     foaf:name "Associate 6000" ;
     foaf:mbox <mailto:associate6000@example.org> .
-

@@ -149,8 +149,8 @@ def get_actionable_error_message(
         )
     elif reason_code == "domain_max_bytes":
         return (
-            "Domain bandwidth budget exceeded",
-            "Increase domain_bytes_budget for this host or prioritize critical resources",
+            "Domain download size limit exceeded",
+            "Increase or remove the max_bytes setting in domain_content_rules for this host.",
         )
     elif reason_code == "domain_disallowed_mime":
         return (

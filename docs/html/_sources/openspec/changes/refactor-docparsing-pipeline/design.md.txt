@@ -643,7 +643,7 @@ class Batcher(Generic[T]):
     def __init__(self, iterable: Iterable[T], batch_size: int): ...
     def __iter__(self) -> Iterator[List[T]]: ...
 
-def manifest_append(stage: str, doc_id: str, status: str, 
+def manifest_append(stage: str, doc_id: str, status: str,
                    duration_s: float = 0.0, warnings: Optional[List[str]] = None,
                    error: Optional[str] = None, schema_version: str = "",
                    **metadata) -> None:

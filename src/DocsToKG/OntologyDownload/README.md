@@ -17,7 +17,7 @@ sbom:
 
 # DocsToKG • OntologyDownload
 
-Purpose: Plan, download, and validate third-party ontologies for DocsToKG ingestion.  
+Purpose: Plan, download, and validate third-party ontologies for DocsToKG ingestion.
 Scope boundary: Handles resolver planning, secure HTTP streaming, and manifest/validator orchestration; does **not** parse downstream documents or manage non-ontology assets.
 
 ---
@@ -145,10 +145,10 @@ direnv exec . pytest tests/ontology_download -q
   - `python -m DocsToKG.OntologyDownload.cli prune --keep <n>` deletes stored ontology versions under `LOCAL_ONTOLOGY_DIR`.
 
 ## FAQ
-- Q: How do I pin downloads to a previously generated plan?  
+- Q: How do I pin downloads to a previously generated plan?
   A: Use `ontofetch plan --lock-output ontologies.lock.json`, then run `ontofetch pull --lock ontologies.lock.json` to reuse resolver outputs.
 
-- Q: How can I load a custom validator?  
+- Q: How can I load a custom validator?
   A: Implement a callable exposed via the `docstokg.ontofetch.validator` entry-point group; `plugins.load_validator_plugins` will register it on startup.
 
 ```json x-agent-map

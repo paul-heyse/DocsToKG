@@ -70,8 +70,6 @@ class ResolvedConfig:
     previous_url_index: ManifestUrlIndex
     persistent_seen_urls: Set[str]
     robots_checker: Optional[RobotsCache]
-    budget_requests: Optional[int]
-    budget_bytes: Optional[int]
     concurrency_product: int
     extract_html_text: bool
     verify_cache_digest: bool
@@ -159,13 +157,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--ignore-robots",
         action="store_true",
         help="Bypass robots.txt checks (defaults to respecting policies).",
-    )
-    parser.add_argument(
-        "--budget",
-        action="append",
-        default=[],
-        metavar="KIND=VALUE",
-        help="Stop after reaching a budget (e.g., requests=1000, bytes=5GB). Option may repeat.",
     )
     parser.add_argument(
         "--log-rotate",
@@ -282,15 +273,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="DOMAIN=SECONDS",
         help="Enforce a minimum interval between requests to a domain. Repeat to configure multiple domains.",
-    )
-    resolver_group.add_argument(
-        "--domain-bytes-budget",
-        dest="domain_bytes_budget",
-        type=_parse_domain_bytes_budget,
-        action="append",
-        default=[],
-        metavar="DOMAIN=SIZE",
-        help="Cap total bytes downloaded per domain (e.g., example.org=500MB). Repeat to configure multiple domains.",
     )
     resolver_group.add_argument(
         "--domain-token-bucket",
@@ -500,22 +482,10 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         in {Classification.PDF.value, Classification.CACHED.value, Classification.XML.value}
     }
 
-    budget_requests: Optional[int] = None
-    budget_bytes: Optional[int] = None
     robots_checker: Optional[RobotsCache] = None
     if not args.ignore_robots:
         user_agent = config.polite_headers.get("User-Agent", "DocsToKGDownloader/1.0")
         robots_checker = RobotsCache(user_agent)
-    for spec in args.budget or []:
-        try:
-            kind, amount = _parse_budget(spec)
-        except argparse.ArgumentTypeError as exc:
-            parser.error(str(exc))
-        if kind == "requests":
-            budget_requests = amount if budget_requests is None else min(budget_requests, amount)
-        else:
-            budget_bytes = amount if budget_bytes is None else min(budget_bytes, amount)
-
     return ResolvedConfig(
         args=args,
         run_id=run_id,
@@ -531,8 +501,6 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         previous_url_index=previous_url_index,
         persistent_seen_urls=persistent_seen_urls,
         robots_checker=robots_checker,
-        budget_requests=budget_requests,
-        budget_bytes=budget_bytes,
         concurrency_product=concurrency_product,
         extract_html_text=extract_html_text,
         verify_cache_digest=args.verify_cache_digest,
@@ -581,19 +549,6 @@ def _parse_domain_interval(value: str) -> Tuple[str, float]:
     if seconds < 0:
         raise argparse.ArgumentTypeError(f"interval for domain '{domain}' must be non-negative")
     return domain, seconds
-
-
-def _parse_domain_bytes_budget(value: str) -> Tuple[str, int]:
-    """Parse ``DOMAIN=BYTES`` CLI arguments for domain byte budgets."""
-
-    if "=" not in value:
-        raise argparse.ArgumentTypeError("domain bytes budget must use the format domain=size")
-    domain, raw = value.split("=", 1)
-    domain = domain.strip().lower()
-    if not domain:
-        raise argparse.ArgumentTypeError("domain component cannot be empty")
-    limit = _parse_size(raw)
-    return domain, limit
 
 
 def _parse_domain_token_bucket(value: str) -> Tuple[str, Dict[str, float]]:
@@ -645,44 +600,6 @@ def _parse_domain_token_bucket(value: str) -> Tuple[str, Dict[str, float]]:
         capacity = 1.0
 
     return domain, {"rate_per_second": float(rate), "capacity": float(capacity)}
-
-
-def _parse_budget(value: str) -> Tuple[str, int]:
-    """Parse ``requests=N`` or ``bytes=N`` budget specifications."""
-
-    if "=" not in value:
-        raise argparse.ArgumentTypeError("budget must use the format kind=value")
-    kind, raw_amount = value.split("=", 1)
-    key = kind.strip().lower()
-    if key not in {"requests", "bytes"}:
-        raise argparse.ArgumentTypeError("budget kind must be 'requests' or 'bytes'")
-    amount_text = raw_amount.strip().lower().replace(",", "").replace("_", "")
-    multiplier = 1
-    if amount_text.endswith("kb"):
-        multiplier = 1024
-        amount_text = amount_text[:-2]
-    elif amount_text.endswith("mb"):
-        multiplier = 1024**2
-        amount_text = amount_text[:-2]
-    elif amount_text.endswith("gb"):
-        multiplier = 1024**3
-        amount_text = amount_text[:-2]
-    elif amount_text.endswith("k"):
-        multiplier = 1000
-        amount_text = amount_text[:-1]
-    elif amount_text.endswith("m"):
-        multiplier = 1000**2
-        amount_text = amount_text[:-1]
-    elif amount_text.endswith("g"):
-        multiplier = 1000**3
-        amount_text = amount_text[:-1]
-    try:
-        amount = int(amount_text)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError(f"invalid budget value: {raw_amount}") from exc
-    if amount <= 0:
-        raise argparse.ArgumentTypeError("budget value must be positive")
-    return key, amount * multiplier
 
 
 def build_query(args: argparse.Namespace) -> Works:

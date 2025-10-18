@@ -182,10 +182,10 @@ class TestGetActionableErrorMessage:
         assert "max_bytes" in suggestion.lower()
 
     def test_domain_max_bytes(self):
-        """Test domain bandwidth budget exceeded."""
+        """Test domain max-bytes limit exceeded."""
         msg, suggestion = get_actionable_error_message(None, "domain_max_bytes")
-        assert "bandwidth budget exceeded" in msg.lower()
-        assert "domain_bytes_budget" in suggestion.lower()
+        assert "size limit" in msg.lower()
+        assert "domain_content_rules" in suggestion.lower()
 
     def test_request_exception(self):
         """Test general request exception."""

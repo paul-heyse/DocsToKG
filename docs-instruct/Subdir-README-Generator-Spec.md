@@ -105,64 +105,64 @@ At the very end of the README, include a fenced block named **x-agent-map** with
 
 ## 3) Output: required sections (in this order)
 
-1. **Title**  
+1. **Title**
    `# <Repo Name> • <Subdirectory Name>`
 
-2. **Purpose & scope boundary** *(explanation)*  
+2. **Purpose & scope boundary** *(explanation)*
    One or two sentences. Include a one-line boundary: what this submodule does **and does not** do.
 
-3. **Quickstart** *(how-to)*  
+3. **Quickstart** *(how-to)*
    Shortest path to run the core workflow (prefer Dev Container; provide local alternative).
 
-4. **Common commands** *(reference)*  
+4. **Common commands** *(reference)*
    - Prefer `just`/`make` task names if present (self-documenting).
    - Provide direct CLI alternatives (`python -m package ...`).
 
-5. **Folder map (top N)** *(reference)*  
+5. **Folder map (top N)** *(reference)*
    8–15 lines max. For each key folder/file: a one-line purpose (no prose).
 
-6. **System overview** *(explanation)*  
+6. **System overview** *(explanation)*
    Two small Mermaid diagrams: a **context/container-style flowchart** and a **sequence** for a common request path.
    - **Diagram DoD:** mark external dependencies, trust boundaries, and one failure/retry path.
 
-7. **Entry points & contracts** *(reference)*  
+7. **Entry points & contracts** *(reference)*
    - CLI/HTTP/event entry points and the relevant files.
    - Invariants and layering rules (e.g., pure domain layer, single I/O path).
    - Interfaces or protocols implemented (e.g., Provider protocol).
 
-8. **Configuration** *(reference)*  
+8. **Configuration** *(reference)*
    - Env vars with defaults and meaning (`.env.example` if present).
    - Config validation command (if available).
 
-9. **Data contracts & schemas** *(reference)*  
+9. **Data contracts & schemas** *(reference)*
    - Paths to JSON Schemas, OpenAPI, protobufs, etc.
    - How to validate or generate them.
 
-10. **Interactions with other packages** *(explanation/reference)*  
+10. **Interactions with other packages** *(explanation/reference)*
     - Upstream inputs (if any).
     - Downstream consumers and guarantees (IDs, paths, formats).
 
-11. **Observability** *(reference)*  
+11. **Observability** *(reference)*
     - Logs/metrics/tracing and how to view them (link to dashboards if any).
     - **SLIs/SLOs**: list 2–3 SLIs and their SLO targets (e.g., success rate, P50/P95 latency).
     - Health/doctor commands and expected exit codes.
 
-12. **Security & data handling** *(reference/explanation)*  
+12. **Security & data handling** *(reference/explanation)*
     - **ASVS** level (L1/L2/L3) relevant to this module.
     - Top **STRIDE** threats considered (3–5 bullets) and mitigations or upstream responsibilities.
     - Data classification (PII/no-PII); secrets handling rules.
     - Any relevant secure coding invariants (e.g., constant-time compare for secrets).
 
-13. **Development tasks** *(how-to/reference)*  
+13. **Development tasks** *(how-to/reference)*
     - Lint/typecheck/test commands.
     - Typical inner loop.
     - Pre-commit hooks.
 
-14. **Agent guardrails** *(reference)*  
+14. **Agent guardrails** *(reference)*
     - What agents **may/must not** change (hashing, IDs, schema field order, versioning schemes).
     - **Danger zone**: destructive commands (e.g., cache wipes, migrations).
 
-15. **FAQ** *(explanation)*  
+15. **FAQ** *(explanation)*
     - 3–8 frequent questions with crisp answers.
 
 > *Optional:* A short **Changelog hook** at the top can link to `CHANGELOG.md` if the subdir has independent releases.

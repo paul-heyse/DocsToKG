@@ -60,10 +60,8 @@ def make_resolved_config(
     *,
     workers: int = 1,
     csv: bool = True,
-    budgets: Optional[Dict[str, int]] = None,
     works_pages: Optional[Sequence[Iterable[Dict[str, object]]]] = None,
 ) -> ResolvedConfig:
-    budgets = budgets or {}
     args = _build_args(workers=workers)
     pdf_dir = tmp_path / "pdfs"
     html_dir = tmp_path / "html"
@@ -90,8 +88,6 @@ def make_resolved_config(
         previous_url_index=ManifestUrlIndex(None),
         persistent_seen_urls=set(),
         robots_checker=None,
-        budget_requests=budgets.get("requests"),
-        budget_bytes=budgets.get("bytes"),
         concurrency_product=max(workers, 1),
         extract_html_text=False,
         verify_cache_digest=False,
@@ -170,30 +166,6 @@ def test_setup_worker_pool_creates_executor_when_parallel(tmp_path):
     finally:
         pool.shutdown(wait=True)
         download_run.close()
-
-
-def test_check_budget_limits_detects_limits(tmp_path):
-    resolved = make_resolved_config(
-        tmp_path,
-        csv=False,
-        budgets={"requests": 2, "bytes": 100},
-    )
-    download_run = DownloadRun(resolved)
-
-    factory = ThreadLocalSessionFactory(requests.Session)
-    state = download_run.setup_download_state(factory)
-
-    assert download_run.check_budget_limits() is False
-
-    state.processed = 2
-    assert download_run.check_budget_limits() is True
-
-    state.processed = 1
-    state.downloaded_bytes = 150
-    assert download_run.check_budget_limits() is True
-
-    factory.close_all()
-    download_run.close()
 
 
 def test_download_run_run_processes_artifacts(patcher, tmp_path):
@@ -282,6 +254,5 @@ def test_download_run_run_processes_artifacts(patcher, tmp_path):
     assert result.processed == 2
     assert result.saved == 2
     assert result.bytes_downloaded == 84
-    assert result.stop_due_to_budget is False
 
     download_run.close()

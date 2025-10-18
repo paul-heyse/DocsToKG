@@ -14,7 +14,7 @@ sbom: { path: TODO_SBOM_PATH }
 
 # DocsToKG • DocParsing
 
-Purpose: Convert raw documents (PDF/HTML/etc.) into DocTags, topic-aware chunks, and embeddings with resumable manifests.  
+Purpose: Convert raw documents (PDF/HTML/etc.) into DocTags, topic-aware chunks, and embeddings with resumable manifests.
 Scope boundary: Handles conversion, chunking, embedding, and telemetry; does not persist vectors to external stores or orchestrate downstream ingestion.
 
 ---
@@ -165,10 +165,10 @@ direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # optional
   - Changing embedding formats (`--format`) requires updating `formats` validators and downstream loaders.
 
 ## FAQ
-- Q: How do I resume after a failure?  
+- Q: How do I resume after a failure?
   A: Use `--resume` on the affected stage; manifests mark completed docs. Combine with `--force` for targeted reruns.
 
-- Q: How do I validate outputs without writing new files?  
+- Q: How do I validate outputs without writing new files?
   A: Run `chunk` or `embed` with `--validate-only` to check existing JSONL artifacts and exit with status.
 
 <!-- Machine-readable appendix -->

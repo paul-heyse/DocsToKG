@@ -14,24 +14,24 @@ DocsToKG is transitioning from ad-hoc document-level vector storage to a product
   - Delivering hard predicate filtering inside FAISS IVF (post-filtering suffices for this change)
 
 ## Decisions
-- Decision: **Chunk the corpus into 400–800 token windows with 100–200 token overlaps**, storing doc_id, chunk_id, namespace, and metadata fields in OpenSearch to support filters, ACLs, dedupe, and highlighting.  
+- Decision: **Chunk the corpus into 400–800 token windows with 100–200 token overlaps**, storing doc_id, chunk_id, namespace, and metadata fields in OpenSearch to support filters, ACLs, dedupe, and highlighting.
   Alternatives: sentence-level chunks (too fine-grained, higher overhead) or document-level blobs (insufficient recall control). We keep chunk granularity adjustable but start with the recommended window sizes.
-- Decision: **Use OpenSearch rank_features to persist SPLADEv3 token→weight maps** alongside BM25 text, ensuring we can issue neural sparse queries without external services.  
+- Decision: **Use OpenSearch rank_features to persist SPLADEv3 token→weight maps** alongside BM25 text, ensuring we can issue neural sparse queries without external services.
   Alternatives: storing sparse vectors in a side-car service would complicate query orchestration.
-- Decision: **Normalize dense vectors (float32) and store them in FAISS GPU indexes wrapped by IndexIDMap2 using vector_id == chunk UUID.**  
+- Decision: **Normalize dense vectors (float32) and store them in FAISS GPU indexes wrapped by IndexIDMap2 using vector_id == chunk UUID.**
   Alternatives: rely on FAISS auto IDs (breaks joins) or maintain CPU indexes (misses GPU acceleration). UUID bridge keeps joins deterministic.
-- Decision: **Support both GpuIndexFlatIP and GpuIndexIVFFlat/GpuIndexIVFPQ**, enabling exact search for small corpora and ANN for large ones.  
+- Decision: **Support both GpuIndexFlatIP and GpuIndexIVFFlat/GpuIndexIVFPQ**, enabling exact search for small corpora and ANN for large ones.
   Alternatives: only Flat (memory-heavy) or only IVF (higher setup cost). We keep both and gate via configuration.
-- Decision: **Apply Reciprocal Rank Fusion (k0≈60) across BM25, SPLADE, and dense candidate lists, then optionally run MMR diversification with λ∈[0.5,0.8] on the fused top-M.**  
+- Decision: **Apply Reciprocal Rank Fusion (k0≈60) across BM25, SPLADE, and dense candidate lists, then optionally run MMR diversification with λ∈[0.5,0.8] on the fused top-M.**
   Alternatives: score normalization + weighted sum (harder to calibrate) or heuristic linear combos (less robust).
 - Decision: **Implement namespace isolation at the data layer (namespace keyword field) while allowing single- or multi-index FAISS deployments.** Default is a shared FAISS index with downstream filters; we can shard by namespace if isolation requires it.
-- Decision: **Provide full validation harness using the supplied JSONL vectors**, covering ingest integrity, BM25/SPLADE relevance, dense self-hits, namespace filtering, pagination, fusion quality, and backup/restore parity.  
+- Decision: **Provide full validation harness using the supplied JSONL vectors**, covering ingest integrity, BM25/SPLADE relevance, dense self-hits, namespace filtering, pagination, fusion quality, and backup/restore parity.
   Alternatives: manual spot checks would not meet regression requirements.
-- Decision: **Expose configuration through a hot-reloadable config layer (YAML + watch or service-backed)** controlling chunking, FAISS index selection/parameters, search oversampling, fusion/MMR thresholds, dedupe cosine level, and namespace routing.  
+- Decision: **Expose configuration through a hot-reloadable config layer (YAML + watch or service-backed)** controlling chunking, FAISS index selection/parameters, search oversampling, fusion/MMR thresholds, dedupe cosine level, and namespace routing.
   Alternatives: hard-coded settings would require redeploys for tuning and impede calibration.
-- Decision: **Expose retrieval via a synchronous REST endpoint (`POST /v1/hybrid-search`)** returning fused results, diagnostics, and pagination cursors.  
+- Decision: **Expose retrieval via a synchronous REST endpoint (`POST /v1/hybrid-search`)** returning fused results, diagnostics, and pagination cursors.
   Alternatives: asynchronous jobs introduce latency and complicate RAG integration; gRPC can be added later if needed.
-- Decision: **Instrument ingestion and retrieval with structured logs, Prometheus metrics, and distributed tracing**, feeding dashboards/alerts for throughput, latency, error, and delete-churn thresholds.  
+- Decision: **Instrument ingestion and retrieval with structured logs, Prometheus metrics, and distributed tracing**, feeding dashboards/alerts for throughput, latency, error, and delete-churn thresholds.
   Alternatives: ad-hoc logging would not satisfy operational readiness.
 
 ## Architecture Overview

@@ -14,7 +14,7 @@ sbom: { path: TODO_SBOM_PATH }
 
 # DocsToKG • HybridSearch
 
-Purpose: Hybrid retrieval engine combining lexical and dense vector search with configurable fusion and observability.  
+Purpose: Hybrid retrieval engine combining lexical and dense vector search with configurable fusion and observability.
 Scope boundary: Ingests chunked documents, maintains FAISS/OpenSearch-style indexes, and exposes search APIs; does not train embedding models or manage downstream ranking pipelines.
 
 ---
@@ -154,10 +154,10 @@ direnv exec . pytest tests/hybrid_search/test_suite.py -q
   - Modifying serialization formats (`serialize_state`, `ChunkPayload`) without coordinated migrations.
 
 ## FAQ
-- Q: How do I add a new dense store implementation?  
+- Q: How do I add a new dense store implementation?
   A: Implement `DenseVectorStore` protocol, wire into `FaissRouter` via factory, update `HybridSearchConfigManager`.
 
-- Q: How can I run the end-to-end test suite?  
+- Q: How can I run the end-to-end test suite?
   A: `direnv exec . pytest tests/hybrid_search/test_suite.py -q`; ensure optional GPU tests skipped or satisfied.
 
 <!-- Machine-readable appendix -->

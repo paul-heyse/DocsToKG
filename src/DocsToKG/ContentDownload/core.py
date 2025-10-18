@@ -462,10 +462,8 @@ class ReasonCode(Enum):
     MAX_ATTEMPTS_REACHED = "max_attempts_reached"
     RESOLVER_BREAKER_OPEN = "resolver_breaker_open"
     DOMAIN_BREAKER_OPEN = "domain_breaker_open"
-    DOMAIN_BYTES_BUDGET = "domain_bytes_budget"
     DOMAIN_MAX_BYTES = "domain_max_bytes"
     DOMAIN_DISALLOWED_MIME = "domain_disallowed_mime"
-    BUDGET_EXHAUSTED = "budget_exhausted"
     SKIP_LARGE_DOWNLOAD = "skip_large_download"
 
     @classmethod
