@@ -671,7 +671,8 @@ def test_download_stream_rate_limiting(tmp_path):
         def lock(self):
             return contextlib.nullcontext()
 
-    config.set_bucket_provider(lambda service, cfg, host: StubBucket())
+    bucket = StubBucket()
+    config.set_bucket_provider(lambda: (lambda service, cfg, host: bucket))
     destination = tmp_path / "file.owl"
     download.download_stream(
         url="https://example.org/file.owl",

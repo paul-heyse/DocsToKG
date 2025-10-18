@@ -148,7 +148,7 @@ sequenceDiagram
 
 ## Configuration Surfaces
 
-- CLI flags in `args.py` hydrate `ResolverConfig`, `DownloadOptions`, and `DownloadContext` helpers.
+- CLI flags in `args.py` hydrate `ResolverConfig`, `DownloadConfig`, and `DownloadContext` helpers. `DownloadOptions` remains as a compatibility shim that subclasses `DownloadConfig` for legacy imports.
 - Resolver configuration files (`--resolver-config`) mirror `ResolverConfig` fields. Unknown keys raise `ValueError`; add new fields to `ResolverConfig` with defaults before accepting them via CLI.
 - Environment variables:
   - `UNPAYWALL_EMAIL` — polite contact for Unpaywall resolver; fallback to `--mailto`.
