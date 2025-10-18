@@ -36,7 +36,7 @@ from DocsToKG.ContentDownload.pipeline import (
     read_resolver_config,
 )
 from DocsToKG.ContentDownload.providers import OpenAlexWorkProvider, WorkProvider
-from DocsToKG.ContentDownload.runner import iterate_openalex, run
+from DocsToKG.ContentDownload.runner import DownloadRun, iterate_openalex
 from DocsToKG.ContentDownload.summary import RunResult, emit_console_summary
 from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
@@ -78,6 +78,7 @@ __all__ = (
     "create_artifact",
     "download_candidate",
     "ensure_dir",
+    "DownloadRun",
     "iterate_openalex",
     "load_previous_manifest",
     "load_resolver_config",
@@ -101,7 +102,8 @@ def main(argv: Optional[Sequence[str]] = None) -> RunResult:
     args = parse_args(parser, argv)
     resolved = resolve_config(args, parser)
     bootstrap_run_environment(resolved)
-    result = run(resolved)
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
     emit_console_summary(result, dry_run=args.dry_run)
     return result
 

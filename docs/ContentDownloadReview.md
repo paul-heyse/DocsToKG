@@ -322,7 +322,7 @@ Where you currently do `filtered = [x for x in self._samples if x.ts > cutoff]` 
 Refactor the 2.8k-line `cli.py` into:
 
 * `args.py` – argument parsing & config resolution
-* `runner.py` – run lifecycle (pool setup, futures, error handling)
+* `runner.py` – `DownloadRun` class encapsulates the run lifecycle (pool setup, futures, error handling)
 * `download.py` – artifact preparation, `download_candidate`, resume policy
 * `summary.py` – statistics/summary emission & pretty printing
 

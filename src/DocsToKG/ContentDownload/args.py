@@ -13,7 +13,6 @@ import requests
 from pyalex import Topics, Works
 from pyalex import config as oa_config
 
-from DocsToKG.ContentDownload import pipeline as resolvers
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
@@ -21,7 +20,8 @@ from DocsToKG.ContentDownload.core import (
     Classification,
 )
 from DocsToKG.ContentDownload.download import RobotsCache, ensure_dir
-from DocsToKG.ContentDownload.pipeline import default_resolvers, load_resolver_config
+from DocsToKG.ContentDownload.pipeline import load_resolver_config
+from DocsToKG.ContentDownload.resolvers import default_resolvers
 from DocsToKG.ContentDownload.telemetry import load_manifest_url_index
 
 __all__ = [
