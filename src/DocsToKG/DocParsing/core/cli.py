@@ -358,12 +358,26 @@ def manifest(argv: Sequence[str] | None = None) -> int:
 
     args = parser.parse_args([] if argv is None else list(argv))
     manifest_dir = data_manifests(args.data_root)
+    known_stages = ("doctags", "chunk", "embeddings")
+    known_stage_set = set(known_stages)
     if args.stages:
         seen: List[str] = []
-        for stage in args.stages:
-            trimmed = stage.strip()
-            if trimmed and trimmed not in seen:
-                seen.append(trimmed)
+        for raw_stage in args.stages:
+            trimmed = raw_stage.strip()
+            if not trimmed:
+                continue
+            normalized = trimmed.lower()
+            if normalized not in known_stage_set:
+                expected = ", ".join(known_stages)
+                raise CLIValidationError(
+                    option="--stage",
+                    message=(
+                        f"Unsupported stage '{trimmed}'. Expected one of: {expected}"
+                    ),
+                    hint="Choose a supported manifest stage.",
+                )
+            if normalized not in seen:
+                seen.append(normalized)
         stages = seen
     else:
         discovered: List[str] = []
