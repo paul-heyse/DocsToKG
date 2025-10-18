@@ -120,10 +120,14 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List
 
 import pytest
+
+from tests.content_download.stubs import dependency_stubs as install_content_download_stubs
+
+install_content_download_stubs()
 
 # --- Globals ---
 
@@ -145,13 +149,6 @@ if DOWNLOAD_DEPS_AVAILABLE:
     from DocsToKG.ContentDownload.cli import download_candidate
     from DocsToKG.ContentDownload.core import WorkArtifact
 
-    class _DummyHeadResponse:
-        status_code = 200
-        headers = {"Content-Type": "application/pdf"}
-
-        def close(self) -> None:  # pragma: no cover - no side effects
-            return
-
     class _BaseDummyResponse:
         def __init__(self, status_code: int = 200, headers: Dict[str, str] | None = None) -> None:
             self.status_code = status_code
@@ -167,6 +164,11 @@ if DOWNLOAD_DEPS_AVAILABLE:
 
         def close(self) -> None:  # pragma: no cover - no resources to release
             return
+
+    class _DummyHeadResponse(_BaseDummyResponse):
+        def __init__(self) -> None:
+            super().__init__(status_code=200)
+
 
     class _FailingResponse(_BaseDummyResponse):
         def iter_content(self, chunk_size: int):  # noqa: D401 - streaming interface
@@ -185,7 +187,7 @@ if DOWNLOAD_DEPS_AVAILABLE:
         def __init__(self, response: _BaseDummyResponse) -> None:
             self._response = response
 
-        def head(self, url: str, **kwargs: Any) -> _DummyHeadResponse:  # noqa: D401
+        def head(self, url: str, **kwargs: Any) -> _BaseDummyResponse:  # noqa: D401
             return _DummyHeadResponse()
 
         def get(self, url: str, **kwargs: Any) -> _BaseDummyResponse:  # noqa: D401
@@ -225,7 +227,7 @@ if DOWNLOAD_DEPS_AVAILABLE:
 
     def _download_with_session(
         session: _DummySession, tmp_path: Path
-    ) -> tuple[WorkArtifact, Path, Dict[str, Dict[str, Any]]]:
+    ) -> tuple[WorkArtifact, Path, Dict[str, Dict[str, Any]], DownloadOutcome]:
         artifact = _make_artifact(tmp_path)
         context: Dict[str, Dict[str, Any]] = {"previous": {}}
         outcome = download_candidate(
@@ -270,93 +272,20 @@ embeddings_manifest_log: List[dict] = []
 # --- Helper Functions ---
 
 
-def _stub_module(
-    name: str, *, package: bool = False, attrs: Dict[str, object] | None = None
-) -> ModuleType:
-    """Create a lightweight module stub registered in ``sys.modules``."""
-
-    module = ModuleType(name)
-    if package:
-        module.__path__ = []  # type: ignore[attr-defined]
-    if attrs:
-        for key, value in attrs.items():
-            setattr(module, key, value)
-    sys.modules.setdefault(name, module)
-    return module
-
-
-_stub_module("docling_core", package=True)
-_stub_module("docling_core.transforms", package=True)
-_stub_module("docling_core.transforms.chunker", package=True)
-_stub_module("docling_core.transforms.chunker.base", attrs={"BaseChunk": type("BaseChunk", (), {})})
-_stub_module(
-    "docling_core.transforms.chunker.hybrid_chunker",
-    attrs={"HybridChunker": type("HybridChunker", (), {})},
-)
-_stub_module(
-    "docling_core.transforms.chunker.hierarchical_chunker",
-    attrs={
-        "HierarchicalChunker": type("HierarchicalChunker", (), {}),
-        "ChunkingDocSerializer": type("ChunkingDocSerializer", (), {}),
-        "ChunkingSerializerProvider": type("ChunkingSerializerProvider", (), {}),
-    },
-)
-_stub_module(
-    "docling_core.transforms.chunker.tokenizer",
-    package=True,
-)
-_stub_module(
-    "docling_core.transforms.serializer.base",
-    attrs={
-        "BaseDocSerializer": type("BaseDocSerializer", (), {}),
-        "SerializationResult": type("SerializationResult", (), {}),
-    },
-)
-_stub_module(
-    "docling_core.transforms.serializer.common",
-    attrs={"create_ser_result": lambda *_, **__: None},
-)
-_stub_module(
-    "docling_core.transforms.serializer.markdown",
-    attrs={
-        "MarkdownParams": type("MarkdownParams", (), {}),
-        "MarkdownPictureSerializer": type("MarkdownPictureSerializer", (), {}),
-        "MarkdownTableSerializer": type("MarkdownTableSerializer", (), {}),
-    },
-)
-_stub_module(
-    "docling_core.transforms.chunker.tokenizer.huggingface",
-    attrs={"HuggingFaceTokenizer": type("HuggingFaceTokenizer", (), {})},
-)
-_stub_module("docling_core.types", package=True)
-_stub_module("docling_core.types.doc", package=True)
-_stub_module(
-    "docling_core.types.doc.document",
-    attrs={
-        "DoclingDocument": type("DoclingDocument", (), {}),
-        "DocTagsDocument": type("DocTagsDocument", (), {}),
-        "PictureClassificationData": type("PictureClassificationData", (), {}),
-        "PictureDescriptionData": type("PictureDescriptionData", (), {}),
-        "PictureItem": type("PictureItem", (), {}),
-        "PictureMoleculeData": type("PictureMoleculeData", (), {}),
-    },
-)
-_stub_module(
-    "transformers",
-    attrs={"AutoTokenizer": SimpleNamespace(from_pretrained=lambda *_, **__: object())},
-)
-_stub_module("tqdm", attrs={"tqdm": lambda iterable=None, **_: iterable})
 import DocsToKG.DocParsing.chunking as chunker  # noqa: E402
 import DocsToKG.DocParsing.embedding as embeddings  # noqa: E402
+from docling_core.persistence import manifest_append, manifest_load  # noqa: E402
+from docling_core.serializers import RichSerializerProvider  # noqa: E402
+from DocsToKG.ContentDownload.core import Classification  # noqa: E402
+from DocsToKG.ContentDownload.pipeline import DownloadOutcome  # noqa: E402
+from DocsToKG.DocParsing.core import iter_jsonl  # noqa: E402
 
 if not hasattr(chunker, "manifest_append"):
-    chunker.manifest_append = lambda *args, **kwargs: None
+    chunker.manifest_append = manifest_append  # type: ignore[assignment]
 if not hasattr(chunker, "manifest_load"):
-    chunker.manifest_load = lambda *args, **kwargs: []
+    chunker.manifest_load = manifest_load  # type: ignore[assignment]
 if not hasattr(chunker, "RichSerializerProvider"):
-    chunker.RichSerializerProvider = lambda: SimpleNamespace()
-from DocsToKG.ContentDownload.core import Classification  # noqa: E402
-from DocsToKG.DocParsing.core import iter_jsonl  # noqa: E402
+    chunker.RichSerializerProvider = RichSerializerProvider  # type: ignore[assignment]
 
 
 class DummyTokenizer:
@@ -464,14 +393,18 @@ def configure_chunker_stubs(
         runtime=False,
     )
 
-    stub_chunker = DummyHybridChunker(tokenizer=None, merge_peers=True, serializer_provider=None)
+    stub_chunker = DummyHybridChunker(
+        tokenizer=DummyTokenizer(tokenizer=object(), max_tokens=512),
+        merge_peers=True,
+        serializer_provider=RichSerializerProvider(),
+    )
     stub_chunker.prime(texts_map)
 
     def factory(*_, **__):
         return stub_chunker
 
     _patch("HybridChunker", factory)
-    _patch("RichSerializerProvider", lambda: object())
+    _patch("RichSerializerProvider", RichSerializerProvider)
 
     chunk_result_cls = chunking_runtime.ChunkResult
 

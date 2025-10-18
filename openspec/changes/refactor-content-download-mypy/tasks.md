@@ -1,21 +1,21 @@
 ## 1. Baseline the Current Failures
-- [ ] 1.1 Run `pre-commit run mypy --files tests/content_download/*.py src/DocsToKG/ContentDownload/telemetry.py` and paste the output into `openspec/changes/refactor-content-download-mypy/mypy-baseline.md` for traceability.
-- [ ] 1.2 Label each diagnostic with a theme (e.g. “bad return type”, “missing stub package”, “dynamic module stub”) so downstream tasks can reference the exact line numbers they must fix.
+- [x] 1.1 Run `pre-commit run mypy --files tests/content_download/*.py src/DocsToKG/ContentDownload/telemetry.py` and paste the output into `openspec/changes/refactor-content-download-mypy/mypy-baseline.md` for traceability.
+- [x] 1.2 Label each diagnostic with a theme (e.g. “bad return type”, “missing stub package”, “dynamic module stub”) so downstream tasks can reference the exact line numbers they must fix.
 
 ## 2. Introduce Shared Fake Dependencies
-- [ ] 2.1 Scaffold `tests/content_download/fakes/__init__.py` explaining the package goal and how it complements `tests.docparsing.fake_deps`.
-- [ ] 2.2 Add `tests/content_download/fakes/README.md` and `MIGRATION_NOTES.md` documenting which external modules are mirrored (starting with `pyalex` and any others discovered during task 1).
-- [ ] 2.3 Implement `tests/content_download/fakes/pyalex/__init__.py` exposing `Topics`, `Works`, and a nested `config` module with `mailto`; ensure attributes match the expectations from `tests/content_download/test_networking.py`.
-- [ ] 2.4 Create `tests/content_download/stubs.py` (or similar helper) that invokes `tests.docparsing.stubs.dependency_stubs()` and then registers the new content-download-specific fakes.
-- [ ] 2.5 Update all content download tests currently fabricating modules via `_stub_module` (notably `test_atomic_writes.py`) to call the new helper instead of constructing `ModuleType` stubs inline.
+- [x] 2.1 Scaffold `tests/content_download/fakes/__init__.py` explaining the package goal and how it complements `tests.docparsing.fake_deps`.
+- [x] 2.2 Add `tests/content_download/fakes/README.md` and `MIGRATION_NOTES.md` documenting which external modules are mirrored (starting with `pyalex` and any others discovered during task 1).
+- [x] 2.3 Implement `tests/content_download/fakes/pyalex/__init__.py` exposing `Topics`, `Works`, and a nested `config` module with `mailto`; ensure attributes match the expectations from `tests/content_download/test_networking.py`.
+- [x] 2.4 Create `tests/content_download/stubs.py` (or similar helper) that invokes `tests.docparsing.stubs.dependency_stubs()` and then registers the new content-download-specific fakes.
+- [x] 2.5 Update all content download tests currently fabricating modules via `_stub_module` (notably `test_atomic_writes.py`) to call the new helper instead of constructing `ModuleType` stubs inline.
 
 ## 3. Phase 1 – Refactor `test_atomic_writes.py`
-- [ ] 3.1 Replace the top-level `_stub_module` invocations with a call to `tests.content_download.stubs.dependency_stubs()`, ensuring the helper is invoked before any imports that rely on fake modules.
-- [ ] 3.2 Update `_DummySession.head()` to return `_BaseDummyResponse` and adjust `_download_with_session()` so its signature returns a typed 4-tuple (`WorkArtifact`, `Path`, `Dict[str, Dict[str, Any]]`, `DownloadOutcome`).
-- [ ] 3.3 Ensure helper factories (`DummyHybridChunker`, manifest logger wrappers) accept typed arguments—provide a non-`None` tokenizer instance and annotate manifest log collections as `List[Dict[str, Any]]`.
-- [ ] 3.4 Replace raw string classifications with `Classification` enums where `DownloadOutcome` instances are built or asserted.
-- [ ] 3.5 Run `pre-commit run mypy --files tests/content_download/test_atomic_writes.py` and confirm all diagnostics for this module are resolved before proceeding to Phase 2.
-- [ ] 3.6 Execute `pytest tests/content_download/test_atomic_writes.py` to ensure behavioural parity after refactoring.
+- [x] 3.1 Replace the top-level `_stub_module` invocations with a call to `tests.content_download.stubs.dependency_stubs()`, ensuring the helper is invoked before any imports that rely on fake modules.
+- [x] 3.2 Update `_DummySession.head()` to return `_BaseDummyResponse` and adjust `_download_with_session()` so its signature returns a typed 4-tuple (`WorkArtifact`, `Path`, `Dict[str, Dict[str, Any]]`, `DownloadOutcome`).
+- [x] 3.3 Ensure helper factories (`DummyHybridChunker`, manifest logger wrappers) accept typed arguments—provide a non-`None` tokenizer instance and annotate manifest log collections as `List[Dict[str, Any]]`.
+- [x] 3.4 Replace raw string classifications with `Classification` enums where `DownloadOutcome` instances are built or asserted.
+- [x] 3.5 Run `pre-commit run mypy --files tests/content_download/test_atomic_writes.py` and confirm all diagnostics for this module are resolved before proceeding to Phase 2.
+- [x] 3.6 Execute `pytest tests/content_download/test_atomic_writes.py` to ensure behavioural parity after refactoring.
 
 ## 4. Phase 2 – Refactor `test_networking.py`
 - [ ] 4.1 Replace the inline pyalex stubs (`types.ModuleType("pyalex")`, etc.) with imports from `tests.content_download.stubs`, ensuring the helper runs before any `pytest.importorskip("pyalex")` checks.

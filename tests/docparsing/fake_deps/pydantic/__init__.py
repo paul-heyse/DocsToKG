@@ -6,6 +6,8 @@ __all__ = [
     "BaseModel",
     "ConfigDict",
     "Field",
+    "PrivateAttr",
+    "ValidationError",
     "field_validator",
     "model_validator",
 ]
@@ -93,3 +95,12 @@ class BaseModel(metaclass=_PydanticMeta):
             else:
                 result[key] = value
         return result
+
+
+class ValidationError(Exception):
+    """Compatibility shim for pydantic.ValidationError."""
+
+def PrivateAttr(default: Any = None) -> Any:
+    """Return the supplied default for compatibility with pydantic."""
+
+    return default
