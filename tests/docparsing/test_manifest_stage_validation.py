@@ -146,7 +146,21 @@ def test_manifest_stage_normalization(monkeypatch: pytest.MonkeyPatch, tmp_path:
         return _iter_stub(stages)
 
     monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
-    monkeypatch.setattr(cli, "data_manifests", lambda _root: tmp_path)
+    monkeypatch.setattr(
+        cli, "data_manifests", lambda _root, *, ensure=True: tmp_path
+    )
+    monkeypatch.setattr(
+        cli,
+        "known_stages",
+        ["doctags", "chunk", "embeddings"],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli,
+        "known_stage_set",
+        {"doctags", "chunk", "embeddings"},
+        raising=False,
+    )
 
     exit_code = cli.manifest(
         [
@@ -176,7 +190,21 @@ def test_manifest_rejects_unknown_stage(monkeypatch: pytest.MonkeyPatch, tmp_pat
     _prepare_runtime(monkeypatch)
     from DocsToKG.DocParsing.core import cli
 
-    monkeypatch.setattr(cli, "data_manifests", lambda _root: tmp_path)
+    monkeypatch.setattr(
+        cli, "data_manifests", lambda _root, *, ensure=True: tmp_path
+    )
+    monkeypatch.setattr(
+        cli,
+        "known_stages",
+        ["doctags", "chunk", "embeddings"],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli,
+        "known_stage_set",
+        {"doctags", "chunk", "embeddings"},
+        raising=False,
+    )
 
     with pytest.raises(CLIValidationError) as excinfo:
         cli.manifest([

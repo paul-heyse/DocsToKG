@@ -151,6 +151,8 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
     monkeypatch.setattr(
         cli, "data_manifests", lambda data_root, *, ensure=True: tmp_path
     )
+    monkeypatch.setattr(cli, "known_stages", [stage_name], raising=False)
+    monkeypatch.setattr(cli, "known_stage_set", {stage_name}, raising=False)
 
     exit_code = cli.manifest(
         [
@@ -198,6 +200,8 @@ def test_manifest_missing_directory_read_only(tmp_path, monkeypatch, capsys) -> 
         raise AssertionError("iter_manifest_entries should not run when manifests are missing")
 
     monkeypatch.setattr(cli, "iter_manifest_entries", _fail_iter)
+    monkeypatch.setattr(cli, "known_stages", ["chunk"], raising=False)
+    monkeypatch.setattr(cli, "known_stage_set", {"chunk"}, raising=False)
 
     read_only_root.chmod(0o555)
     try:
@@ -210,3 +214,60 @@ def test_manifest_missing_directory_read_only(tmp_path, monkeypatch, capsys) -> 
 
     output = capsys.readouterr()
     assert "No manifest directory found" in output.out
+
+
+def test_manifest_read_only_root_existing_manifests(tmp_path, monkeypatch, capsys) -> None:
+    """CLI should read manifests without creating directories when root is read-only."""
+
+    _prepare_manifest_cli_stubs(monkeypatch)
+
+    from DocsToKG.DocParsing.core import cli
+
+    read_only_root = tmp_path / "readonly"
+    manifests_dir = read_only_root / "Manifests"
+    manifests_dir.mkdir(parents=True)
+
+    stage_name = "chunk"
+    manifest_path = manifests_dir / f"docparse.{stage_name}.manifest.jsonl"
+    entries = [
+        {
+            "timestamp": "2025-01-01T00:00:00+00:00",
+            "stage": stage_name,
+            "doc_id": "doc-1",
+            "status": "success",
+            "duration_s": 1.23,
+        },
+        {
+            "timestamp": "2025-01-01T00:01:00+00:00",
+            "stage": stage_name,
+            "doc_id": "doc-2",
+            "status": "failure",
+            "duration_s": 2.34,
+            "error": "boom",
+        },
+    ]
+    manifest_path.write_text(
+        "\n".join(json.dumps(entry) for entry in entries) + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(cli, "known_stages", [stage_name], raising=False)
+    monkeypatch.setattr(cli, "known_stage_set", {stage_name}, raising=False)
+
+    expected_contents = sorted(path.name for path in read_only_root.iterdir())
+
+    read_only_root.chmod(0o555)
+    manifests_dir.chmod(0o555)
+    try:
+        exit_code = cli.manifest(["--data-root", str(read_only_root), "--tail", "1"])
+    finally:
+        manifests_dir.chmod(0o755)
+        read_only_root.chmod(0o755)
+
+    assert exit_code == 0
+    assert sorted(path.name for path in read_only_root.iterdir()) == expected_contents
+
+    stdout = capsys.readouterr().out.splitlines()
+    assert stdout[0] == "docparse manifest tail (last 1 entries)"
+    assert "doc-2" in stdout[1]
+    assert "status=failure" in stdout[1]
