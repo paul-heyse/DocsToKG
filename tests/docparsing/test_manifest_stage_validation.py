@@ -152,13 +152,19 @@ def test_manifest_stage_normalization(monkeypatch: pytest.MonkeyPatch, tmp_path:
     monkeypatch.setattr(
         cli,
         "known_stages",
-        ["doctags", "chunk", "embeddings"],
+        ["doctags-html", "doctags-pdf", "chunk", "embeddings"],
         raising=False,
     )
     monkeypatch.setattr(
         cli,
         "known_stage_set",
-        {"doctags", "chunk", "embeddings"},
+        {"doctags-html", "doctags-pdf", "chunk", "embeddings"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli,
+        "STAGE_ALIASES",
+        {"doctags": ("doctags-html", "doctags-pdf")},
         raising=False,
     )
 
@@ -180,7 +186,7 @@ def test_manifest_stage_normalization(monkeypatch: pytest.MonkeyPatch, tmp_path:
     )
 
     assert exit_code == 0
-    assert observed["stages"] == ["doctags", "embeddings", "chunk"]
+    assert observed["stages"] == ["doctags-html", "doctags-pdf", "embeddings", "chunk"]
     assert observed["data_root"] == tmp_path
 
 
@@ -196,13 +202,19 @@ def test_manifest_rejects_unknown_stage(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setattr(
         cli,
         "known_stages",
-        ["doctags", "chunk", "embeddings"],
+        ["doctags-html", "doctags-pdf", "chunk", "embeddings"],
         raising=False,
     )
     monkeypatch.setattr(
         cli,
         "known_stage_set",
-        {"doctags", "chunk", "embeddings"},
+        {"doctags-html", "doctags-pdf", "chunk", "embeddings"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli,
+        "STAGE_ALIASES",
+        {"doctags": ("doctags-html", "doctags-pdf")},
         raising=False,
     )
 
@@ -231,5 +243,7 @@ def test_manifest_help_describes_stage_default(
         cli.manifest(["--help"])
 
     output = " ".join(capsys.readouterr().out.split())
+    assert "Supported stages: doctags-html, doctags-pdf, chunks, embeddings." in output
+    assert "The alias 'doctags' selects both doctags-html and doctags-pdf." in output
     assert "Defaults to stages discovered from manifest files" in output
     assert "falls back to embeddings when no manifests are present." in output

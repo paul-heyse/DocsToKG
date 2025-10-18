@@ -39,7 +39,6 @@ CommandHandler = Callable[[Sequence[str]], int]
 # ``Data/Manifests``. The values are derived from the canonical filenames to
 # avoid drifting stage identifiers across the CLI and the pipeline writers.
 _MANIFEST_FILENAMES = (
-    "docparse.doctags.manifest.jsonl",
     "docparse.doctags-html.manifest.jsonl",
     "docparse.doctags-pdf.manifest.jsonl",
     "docparse.chunks.manifest.jsonl",
@@ -47,6 +46,13 @@ _MANIFEST_FILENAMES = (
 )
 known_stages = [filename.split(".")[1] for filename in _MANIFEST_FILENAMES]
 known_stage_set = frozenset(known_stages)
+STAGE_ALIASES: Dict[str, Sequence[str]] = {
+    "doctags": ("doctags-html", "doctags-pdf"),
+}
+_expected_stage_choices = tuple(
+    list(known_stages)
+    + [alias for alias in sorted(STAGE_ALIASES) if alias not in known_stage_set]
+)
 
 CLI_DESCRIPTION = """\
 Unified DocParsing CLI
@@ -345,9 +351,10 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         action="append",
         default=None,
         help=(
-            "Manifest stage to inspect (repeatable). Defaults to stages discovered"
-            " from manifest files; falls back to embeddings when no manifests are"
-            " present."
+            "Manifest stage to inspect (repeatable). Supported stages: doctags-html,"
+            " doctags-pdf, chunks, embeddings. The alias 'doctags' selects both"
+            " doctags-html and doctags-pdf. Defaults to stages discovered from"
+            " manifest files; falls back to embeddings when no manifests are present."
         ),
     )
     parser.add_argument(
@@ -401,8 +408,10 @@ def manifest(argv: Sequence[str] | None = None) -> int:
             if not trimmed:
                 continue
             normalized = trimmed.lower()
-            if normalized not in known_stage_set:
-                expected = ", ".join(known_stages)
+            resolved = STAGE_ALIASES.get(normalized, (normalized,))
+            invalid = [stage for stage in resolved if stage not in known_stage_set]
+            if invalid:
+                expected = ", ".join(_expected_stage_choices)
                 raise CLIValidationError(
                     option="--stage",
                     message=(
@@ -410,8 +419,9 @@ def manifest(argv: Sequence[str] | None = None) -> int:
                     ),
                     hint="Choose a supported manifest stage.",
                 )
-            if normalized not in seen:
-                seen.append(normalized)
+            for stage in resolved:
+                if stage not in seen:
+                    seen.append(stage)
         stages = seen
     else:
         discovered: List[str] = []
