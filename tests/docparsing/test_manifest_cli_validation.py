@@ -44,7 +44,40 @@ def test_manifest_accepts_known_stage(monkeypatch, tmp_path) -> None:
     assert captured["data_root"] == tmp_path
 
     with pytest.raises(CLIValidationError) as excinfo:
-        cli.manifest(["--stage", "unknown-stage", "--data-root", str(tmp_path)])
+        cli._manifest_main(["--stage", "unknown-stage", "--data-root", str(tmp_path)])
 
     assert "Unsupported stage" in str(excinfo.value)
     assert call_count["value"] == 1
+
+
+def test_manifest_cli_unknown_stage_structured_error(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    """CLI wrapper should format validation errors consistently."""
+
+    _prepare_manifest_cli_stubs(monkeypatch)
+
+    from DocsToKG.DocParsing.core import cli
+
+    manifests_dir = tmp_path / "Manifests"
+    manifests_dir.mkdir()
+
+    monkeypatch.setattr(cli, "iter_manifest_entries", lambda *_args, **_kwargs: iter(()))
+    monkeypatch.setattr(
+        cli,
+        "data_manifests",
+        lambda _root, *, ensure=False: manifests_dir,
+    )
+    monkeypatch.setattr(cli, "known_stages", ["embeddings"], raising=False)
+    monkeypatch.setattr(cli, "known_stage_set", {"embeddings"}, raising=False)
+
+    exit_code = cli.manifest(["--stage", "invalid", "--data-root", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.out == ""
+    assert (
+        captured.err.strip()
+        == "[cli] --stage: Unsupported stage 'invalid'. Expected one of: embeddings."
+        " Hint: Choose a supported manifest stage."
+    )

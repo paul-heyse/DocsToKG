@@ -41,6 +41,56 @@ def _prepare_manifest_cli_stubs(monkeypatch) -> None:
         sys.modules, "DocsToKG.OntologyDownload.logging_utils", logging_utils_module
     )
 
+    requests_module = types.ModuleType("requests")
+
+    class _RequestException(Exception):
+        pass
+
+    class _HTTPError(_RequestException):
+        def __init__(self, response=None) -> None:
+            super().__init__("HTTP error")
+            self.response = response
+
+    class _Session:
+        def __init__(self) -> None:  # pragma: no cover - stub
+            self.headers = {}
+
+        def mount(self, *_args, **_kwargs) -> None:  # pragma: no cover - stub
+            return None
+
+    adapters_module = types.ModuleType("requests.adapters")
+
+    class _HTTPAdapter:
+        def __init__(self, *args, **kwargs) -> None:  # pragma: no cover - stub
+            self.args = args
+            self.kwargs = kwargs
+
+    adapters_module.HTTPAdapter = _HTTPAdapter
+    requests_module.Session = _Session
+    requests_module.RequestException = _RequestException
+    requests_module.HTTPError = _HTTPError
+    requests_module.ConnectionError = _RequestException
+    requests_module.Timeout = _RequestException
+    requests_module.adapters = adapters_module
+    requests_module.exceptions = types.SimpleNamespace(SSLError=_RequestException)
+    monkeypatch.setitem(sys.modules, "requests", requests_module)
+    monkeypatch.setitem(sys.modules, "requests.adapters", adapters_module)
+
+    urllib3_module = types.ModuleType("urllib3")
+    urllib3_util_module = types.ModuleType("urllib3.util")
+    urllib3_retry_module = types.ModuleType("urllib3.util.retry")
+
+    class _Retry:
+        def __init__(self, *args, **kwargs) -> None:  # pragma: no cover - stub
+            self.args = args
+            self.kwargs = kwargs
+
+    urllib3_retry_module.Retry = _Retry
+    urllib3_module.util = urllib3_util_module
+    monkeypatch.setitem(sys.modules, "urllib3", urllib3_module)
+    monkeypatch.setitem(sys.modules, "urllib3.util", urllib3_util_module)
+    monkeypatch.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
+
     yaml_stub = types.SimpleNamespace(safe_load=lambda *_args, **_kwargs: {}, YAMLError=Exception)
     monkeypatch.setitem(sys.modules, "yaml", yaml_stub)
 

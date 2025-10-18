@@ -331,8 +331,8 @@ def plan(argv: Sequence[str] | None = None) -> int:
     return run_all(args)
 
 
-def manifest(argv: Sequence[str] | None = None) -> int:
-    """Inspect pipeline manifest artifacts via CLI."""
+def _manifest_main(argv: Sequence[str]) -> int:
+    """Implementation for the ``docparse manifest`` CLI entry point."""
 
     parser = argparse.ArgumentParser(
         prog="docparse manifest",
@@ -373,7 +373,7 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         help="Output tail entries as JSON instead of human-readable text",
     )
 
-    args = parser.parse_args([] if argv is None else list(argv))
+    args = parser.parse_args(list(argv))
     manifest_dir = data_manifests(args.data_root, ensure=False)
     logger = get_logger(__name__, base_fields={"stage": "manifest"})
 
@@ -518,6 +518,12 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         stages=stages,
     )
     return 0
+
+
+def manifest(argv: Sequence[str] | None = None) -> int:
+    """Inspect pipeline manifest artifacts via CLI."""
+
+    return _run_stage(_manifest_main, argv)
 
 
 def _build_stage_args(args: argparse.Namespace) -> tuple[List[str], List[str], List[str]]:
