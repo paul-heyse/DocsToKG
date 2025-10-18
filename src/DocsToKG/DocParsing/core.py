@@ -1978,9 +1978,9 @@ def _run_doctags(argv: Sequence[str]) -> int:
         detect_data_root(args.data_root) if args.data_root is not None else detect_data_root()
     )
 
-    html_default_in = data_html(resolved_root)
-    pdf_default_in = data_pdfs(resolved_root)
-    doctags_default_out = data_doctags(resolved_root)
+    html_default_in = data_html(resolved_root, ensure=False)
+    pdf_default_in = data_pdfs(resolved_root, ensure=False)
+    doctags_default_out = data_doctags(resolved_root, ensure=False)
 
     mode = args.mode
     if args.in_dir is not None:
@@ -2072,9 +2072,9 @@ def _plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
         detect_data_root(args.data_root) if args.data_root is not None else detect_data_root()
     )
 
-    html_default_in = data_html(resolved_root)
-    pdf_default_in = data_pdfs(resolved_root)
-    doctags_default_out = data_doctags(resolved_root)
+    html_default_in = data_html(resolved_root, ensure=False)
+    pdf_default_in = data_pdfs(resolved_root, ensure=False)
+    doctags_default_out = data_doctags(resolved_root, ensure=False)
 
     mode = args.mode
     if args.in_dir is not None:
@@ -2153,15 +2153,15 @@ def _plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
     resolved_root = doctags_module.prepare_data_root(args.data_root, detect_data_root())
     data_root_overridden = args.data_root is not None
 
-    default_in_dir = data_doctags(resolved_root)
-    default_out_dir = data_chunks(resolved_root)
+    default_in_dir = data_doctags(resolved_root, ensure=False)
+    default_out_dir = data_chunks(resolved_root, ensure=False)
 
     in_dir = doctags_module.resolve_pipeline_path(
         cli_value=args.in_dir,
         default_path=default_in_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
-        resolver=data_doctags,
+        resolver=lambda root: data_doctags(root, ensure=False),
     ).resolve()
 
     out_dir = doctags_module.resolve_pipeline_path(
@@ -2169,7 +2169,7 @@ def _plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
         default_path=default_out_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
-        resolver=data_chunks,
+        resolver=lambda root: data_chunks(root, ensure=False),
     ).resolve()
 
     if not in_dir.exists():
@@ -2220,15 +2220,15 @@ def _plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     resolved_root = doctags_module.prepare_data_root(args.data_root, detect_data_root())
     data_root_overridden = args.data_root is not None
 
-    default_chunks_dir = data_chunks(resolved_root)
-    default_vectors_dir = data_vectors(resolved_root)
+    default_chunks_dir = data_chunks(resolved_root, ensure=False)
+    default_vectors_dir = data_vectors(resolved_root, ensure=False)
 
     chunks_dir = doctags_module.resolve_pipeline_path(
         cli_value=args.chunks_dir,
         default_path=default_chunks_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
-        resolver=data_chunks,
+        resolver=lambda root: data_chunks(root, ensure=False),
     ).resolve()
 
     vectors_dir = doctags_module.resolve_pipeline_path(
@@ -2236,7 +2236,7 @@ def _plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         default_path=default_vectors_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
-        resolver=data_vectors,
+        resolver=lambda root: data_vectors(root, ensure=False),
     ).resolve()
 
     if args.validate_only:

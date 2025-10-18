@@ -257,6 +257,17 @@ Usage:
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+if __name__ == "__main__" and __package__ is None:
+    script_dir = Path(__file__).resolve().parent
+    if sys.path and sys.path[0] == str(script_dir):
+        sys.path.pop(0)
+    package_root = script_dir.parents[2]
+    if str(package_root) not in sys.path:
+        sys.path.insert(0, str(package_root))
+
 import argparse
 import os
 import random
@@ -264,7 +275,6 @@ import re
 import shutil
 import socket
 import subprocess as sp
-import sys
 import tempfile
 import threading
 import time
@@ -273,7 +283,6 @@ import uuid
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, fields
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -323,6 +332,8 @@ from DocsToKG.DocParsing.io import (
     load_manifest_index,
     manifest_append,
     relative_path,
+    resolve_attempts_path,
+    resolve_manifest_path,
 )
 from DocsToKG.DocParsing.logging import (
     get_logger,
@@ -330,7 +341,9 @@ from DocsToKG.DocParsing.logging import (
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
+    set_stage_telemetry,
 )
+from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
 try:  # pragma: no cover - optional dependency
     from packaging.version import InvalidVersion, Version
@@ -1544,6 +1557,13 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     else:
         namespace = pdf_parse_args(args)
 
+    bootstrap_root = detect_data_root()
+    try:
+        data_pdfs(bootstrap_root)
+        data_doctags(bootstrap_root)
+    except Exception:
+        pass
+
     profile = getattr(namespace, "profile", None)
     defaults = PROFILE_PRESETS.get(profile or "", {})
     cfg = DoctagsCfg.from_args(namespace, mode="pdf", defaults=defaults)
@@ -1554,7 +1574,12 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         config_snapshot.setdefault("profile", profile)
 
     log_level = cfg.log_level
-    logger = get_logger(__name__, level=str(log_level))
+    run_id = uuid.uuid4().hex
+    logger = get_logger(
+        __name__,
+        level=str(log_level),
+        base_fields={"run_id": run_id, "stage": MANIFEST_STAGE},
+    )
     if profile and defaults:
         logger.info(
             "Applying profile",
@@ -1597,7 +1622,8 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     if data_root_override is not None:
         os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved_root)
 
-    data_manifests(resolved_root)
+    manifest_dir = data_manifests(resolved_root)
+    manifest_dir.mkdir(parents=True, exist_ok=True)
 
     input_dir = Path(cfg.input).resolve()
     output_dir = Path(cfg.output).resolve()
@@ -1622,6 +1648,13 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
             "http_timeout": [float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
         }
     )
+
+    telemetry_sink = TelemetrySink(
+        resolve_attempts_path(MANIFEST_STAGE, resolved_root),
+        resolve_manifest_path(MANIFEST_STAGE, resolved_root),
+    )
+    stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=MANIFEST_STAGE)
+    set_stage_telemetry(stage_telemetry)
 
     manifest_log_success(
         stage=MANIFEST_STAGE,
@@ -1865,6 +1898,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     finally:
         stop_vllm(proc, owns, grace=10)
         logger.info("All done")
+        set_stage_telemetry(None)
 
     return 0
 
@@ -2250,7 +2284,12 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         setattr(namespace, field_def.name, getattr(cfg, field_def.name))
 
     log_level = cfg.log_level
-    logger = get_logger(__name__, level=str(log_level))
+    run_id = uuid.uuid4().hex
+    logger = get_logger(
+        __name__,
+        level=str(log_level),
+        base_fields={"run_id": run_id, "stage": HTML_MANIFEST_STAGE},
+    )
     set_spawn_or_warn(logger)
 
     import multiprocessing as mp
@@ -2275,7 +2314,8 @@ def html_main(args: argparse.Namespace | None = None) -> int:
     if data_root_override is not None:
         os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved_root)
 
-    data_manifests(resolved_root)
+    manifest_dir = data_manifests(resolved_root)
+    manifest_dir.mkdir(parents=True, exist_ok=True)
 
     input_dir = Path(cfg.input).resolve()
     output_dir = Path(cfg.output).resolve()
@@ -2308,6 +2348,13 @@ def html_main(args: argparse.Namespace | None = None) -> int:
             "http_timeout": [float(cfg.http_timeout[0]), float(cfg.http_timeout[1])],
         }
     )
+
+    telemetry_sink = TelemetrySink(
+        resolve_attempts_path(HTML_MANIFEST_STAGE, resolved_root),
+        resolve_manifest_path(HTML_MANIFEST_STAGE, resolved_root),
+    )
+    stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=HTML_MANIFEST_STAGE)
+    set_stage_telemetry(stage_telemetry)
 
     manifest_log_success(
         stage=HTML_MANIFEST_STAGE,
@@ -2343,6 +2390,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
             error_code="NO_INPUT_FILES",
             input_dir=str(input_dir),
         )
+        set_stage_telemetry(None)
         return 0
 
     manifest_index = load_manifest_index(HTML_MANIFEST_STAGE, resolved_root) if cfg.resume else {}
@@ -2400,6 +2448,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 }
             },
         )
+        set_stage_telemetry(None)
         return 0
 
     with ProcessPoolExecutor(max_workers=cfg.workers) as ex:
@@ -2471,6 +2520,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         },
     )
 
+    set_stage_telemetry(None)
     return 0
 
 

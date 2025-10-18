@@ -42,6 +42,7 @@ from threading import BoundedSemaphore
 import psutil
 
 from . import plugins as _plugins
+from .plugins import get_validator_registry
 from .io import log_memory_usage
 from .settings import ResolvedConfig, get_owlready2, get_pronto, get_rdflib
 
@@ -50,9 +51,6 @@ metadata = _plugins.metadata
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from .plugins import ResolverPlugin, ValidatorPlugin
 
-
-_RESOLVER_PLUGINS_LOADED = False
-_VALIDATOR_PLUGINS_LOADED = False
 _PROCESS = psutil.Process()
 _VALIDATOR_SEMAPHORE_CACHE: Dict[int, BoundedSemaphore] = {}
 
@@ -78,43 +76,6 @@ def _acquire_validator_slot(config: ResolvedConfig) -> BoundedSemaphore:
         semaphore = BoundedSemaphore(limit)
         _VALIDATOR_SEMAPHORE_CACHE[limit] = semaphore
     return semaphore
-
-def load_resolver_plugins(
-    registry: MutableMapping[str, "ResolverPlugin"],
-    *,
-    logger: Optional[logging.Logger] = None,
-    reload: bool = False,
-) -> None:
-    """Proxy to :mod:`plugins` resolver discovery preserving legacy globals."""
-
-    global _RESOLVER_PLUGINS_LOADED
-    _plugins._RESOLVER_PLUGINS_LOADED = _RESOLVER_PLUGINS_LOADED
-    _plugins.load_resolver_plugins(registry, logger=logger, reload=reload)
-    _RESOLVER_PLUGINS_LOADED = _plugins._RESOLVER_PLUGINS_LOADED
-
-
-def ensure_resolver_plugins(
-    registry: MutableMapping[str, "ResolverPlugin"],
-    *,
-    logger: Optional[logging.Logger] = None,
-) -> None:
-    """Load resolver plugins exactly once per interpreter."""
-
-    load_resolver_plugins(registry, logger=logger, reload=False)
-
-
-def load_validator_plugins(
-    registry: MutableMapping[str, "ValidatorPlugin"],
-    *,
-    logger: Optional[logging.Logger] = None,
-    reload: bool = False,
-) -> None:
-    """Proxy to :mod:`plugins` validator discovery preserving legacy globals."""
-
-    global _VALIDATOR_PLUGINS_LOADED
-    _plugins._VALIDATOR_PLUGINS_LOADED = _VALIDATOR_PLUGINS_LOADED
-    _plugins.load_validator_plugins(registry, logger=logger, reload=reload)
-    _VALIDATOR_PLUGINS_LOADED = _plugins._VALIDATOR_PLUGINS_LOADED
 
 rdflib = get_rdflib()
 pronto = get_pronto()
@@ -498,17 +459,6 @@ def normalize_streaming(
     if return_header_hash:
         return content_hash, header_hash
     return content_hash
-
-
-def ensure_validator_plugins(
-    registry: MutableMapping[str, ValidatorPlugin],
-    *,
-    logger: Optional[logging.Logger] = None,
-) -> None:
-    """Load validator plugins exactly once per interpreter."""
-
-    load_validator_plugins(registry, logger=logger, reload=False)
-
 
 class ValidatorSubprocessError(RuntimeError):
     """Raised when a validator subprocess exits unsuccessfully.
@@ -1099,7 +1049,7 @@ VALIDATORS = {
 
 
 _plugins.register_plugin_registry("validator", VALIDATORS)
-ensure_validator_plugins(VALIDATORS)
+get_validator_registry()
 
 
 def _run_validator_task(
@@ -1331,13 +1281,9 @@ __all__ = [
     "validate_rdflib",
     "validate_pronto",
     "validate_owlready2",
-    "validate_robot",
-    "validate_arelle",
-    "VALIDATORS",
-    "load_resolver_plugins",
-    "ensure_resolver_plugins",
-    "load_validator_plugins",
-    "ensure_validator_plugins",
+   "validate_robot",
+   "validate_arelle",
+   "VALIDATORS",
     "main",
 ]
 

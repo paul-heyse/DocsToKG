@@ -73,10 +73,10 @@ class TelemetrySink:
             handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
-def _input_bytes(path: Path) -> int:
+def _input_bytes(path: Path | str) -> int:
     try:
-        return path.stat().st_size
-    except OSError:
+        return Path(path).stat().st_size
+    except (OSError, ValueError):
         return 0
 
 
@@ -92,7 +92,7 @@ class StageTelemetry:
         self,
         *,
         doc_id: str,
-        input_path: Path,
+        input_path: Path | str,
         status: str,
         duration_s: float = 0.0,
         reason: Optional[str] = None,
@@ -118,7 +118,7 @@ class StageTelemetry:
         *,
         doc_id: str,
         output_path: Path | str,
-        tokens: int,
+        tokens: Optional[int] = None,
         schema_version: str,
         duration_s: float,
         metadata: Optional[Dict[str, Any]] = None,
@@ -128,7 +128,7 @@ class StageTelemetry:
             file_id=doc_id,
             stage=self._stage,
             output_path=str(output_path),
-            tokens=tokens,
+            tokens=tokens or 0,
             schema_version=schema_version,
             duration_s=duration_s,
             metadata=metadata or {},
@@ -139,9 +139,9 @@ class StageTelemetry:
         self,
         *,
         doc_id: str,
-        input_path: Path,
+        input_path: Path | str,
         output_path: Path | str,
-        tokens: int,
+        tokens: Optional[int] = None,
         schema_version: str,
         duration_s: float,
         metadata: Optional[Dict[str, Any]] = None,
@@ -166,7 +166,7 @@ class StageTelemetry:
         self,
         *,
         doc_id: str,
-        input_path: Path,
+        input_path: Path | str,
         duration_s: float,
         reason: str,
         metadata: Optional[Dict[str, Any]] = None,
@@ -194,7 +194,7 @@ class StageTelemetry:
         self,
         *,
         doc_id: str,
-        input_path: Path,
+        input_path: Path | str,
         reason: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:

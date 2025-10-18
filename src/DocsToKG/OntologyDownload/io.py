@@ -18,6 +18,7 @@ import time
 import unicodedata
 import uuid
 import zipfile
+from collections import OrderedDict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -27,15 +28,34 @@ from typing import Callable, Dict, Iterator, List, Optional, Set, Tuple, TypeVar
 from urllib.parse import ParseResult, urlparse, urlunparse
 
 import pooch
-import psutil
 import requests
 
 from .errors import ConfigError, DownloadFailure, OntologyDownloadError, PolicyError
-from .settings import DownloadConfiguration
+from .settings import DownloadConfiguration, ResolvedConfig
 
-_DNS_CACHE: Dict[str, Tuple[float, List[Tuple]]] = {}
+try:  # pragma: no cover - psutil may be unavailable in minimal environments
+    import psutil  # type: ignore[import]
+except Exception:  # pragma: no cover - fallback when psutil cannot be imported
+    psutil = None  # type: ignore[assignment]
+    _PROCESS = None
+else:
+    try:
+        _PROCESS = psutil.Process()
+    except Exception:  # pragma: no cover - defensive against exotic psutil failures
+        _PROCESS = None
+
 _DNS_CACHE_TTL = 120.0
-_DEFAULT_MAX_UNCOMPRESSED_BYTES = DownloadConfiguration().max_uncompressed_bytes()
+_DNS_CACHE_MAX_ENTRIES = 4096
+_DNS_CACHE_LOCK = threading.Lock()
+_DNS_CACHE: "OrderedDict[str, Tuple[float, List[Tuple]]]" = OrderedDict()
+
+
+def _resolve_max_uncompressed_bytes(limit: Optional[int]) -> Optional[int]:
+    """Return the effective archive expansion limit, honoring runtime overrides."""
+
+    if limit is not None:
+        return limit
+    return ResolvedConfig.from_defaults().defaults.http.max_uncompressed_bytes()
 
 
 def sanitize_filename(filename: str) -> str:
@@ -146,17 +166,40 @@ def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
 
 
 def _cached_getaddrinfo(host: str) -> List[Tuple]:
-    """Resolve *host* using a short-lived cache to avoid repeated DNS lookups."""
+    """Resolve *host* using an expiring LRU cache to avoid repeated DNS lookups."""
 
     now = time.monotonic()
-    cached = _DNS_CACHE.get(host)
-    if cached is not None:
-        timestamp, results = cached
-        if now - timestamp <= _DNS_CACHE_TTL:
-            return results
+    with _DNS_CACHE_LOCK:
+        cached = _DNS_CACHE.get(host)
+        if cached is not None:
+            expires_at, results = cached
+            if expires_at > now:
+                _DNS_CACHE.move_to_end(host)
+                _prune_dns_cache(now)
+                return results
+            _DNS_CACHE.pop(host, None)
+        _prune_dns_cache(now)
+
     results = socket.getaddrinfo(host, None)
-    _DNS_CACHE[host] = (now, results)
+    expires_at = now + _DNS_CACHE_TTL
+    with _DNS_CACHE_LOCK:
+        _DNS_CACHE[host] = (expires_at, results)
+        _DNS_CACHE.move_to_end(host)
+        _prune_dns_cache(now)
     return results
+
+
+def _prune_dns_cache(current_time: float) -> None:
+    """Expire stale DNS entries and enforce the cache size bound."""
+
+    while _DNS_CACHE:
+        first_key, (expires_at, _) = next(iter(_DNS_CACHE.items()))
+        if expires_at > current_time:
+            break
+        _DNS_CACHE.pop(first_key, None)
+
+    while len(_DNS_CACHE) > _DNS_CACHE_MAX_ENTRIES:
+        _DNS_CACHE.popitem(last=False)
 
 
 def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
@@ -374,7 +417,7 @@ def extract_zip_safe(
     destination: Path,
     *,
     logger: Optional[logging.Logger] = None,
-    max_uncompressed_bytes: Optional[int] = _DEFAULT_MAX_UNCOMPRESSED_BYTES,
+    max_uncompressed_bytes: Optional[int] = None,
 ) -> List[Path]:
     """Extract a ZIP archive while preventing traversal and compression bombs."""
 
@@ -382,6 +425,7 @@ def extract_zip_safe(
         raise ConfigError(f"ZIP archive not found: {zip_path}")
     destination.mkdir(parents=True, exist_ok=True)
     extracted: List[Path] = []
+    limit_bytes = _resolve_max_uncompressed_bytes(max_uncompressed_bytes)
     with zipfile.ZipFile(zip_path) as archive:
         members = archive.infolist()
         safe_members: List[tuple[zipfile.ZipInfo, Path]] = []
@@ -409,7 +453,7 @@ def extract_zip_safe(
         )
         _enforce_uncompressed_ceiling(
             total_uncompressed=total_uncompressed,
-            limit_bytes=max_uncompressed_bytes,
+            limit_bytes=limit_bytes,
             archive=zip_path,
             logger=logger,
             archive_type="ZIP",
@@ -436,7 +480,7 @@ def extract_tar_safe(
     destination: Path,
     *,
     logger: Optional[logging.Logger] = None,
-    max_uncompressed_bytes: Optional[int] = _DEFAULT_MAX_UNCOMPRESSED_BYTES,
+    max_uncompressed_bytes: Optional[int] = None,
 ) -> List[Path]:
     """Safely extract tar archives (tar, tar.gz, tar.xz) with traversal and compression checks."""
 
@@ -444,6 +488,7 @@ def extract_tar_safe(
         raise ConfigError(f"TAR archive not found: {tar_path}")
     destination.mkdir(parents=True, exist_ok=True)
     extracted: List[Path] = []
+    limit_bytes = _resolve_max_uncompressed_bytes(max_uncompressed_bytes)
     try:
         with tarfile.open(tar_path, mode="r:*") as archive:
             members = archive.getmembers()
@@ -474,7 +519,7 @@ def extract_tar_safe(
             )
             _enforce_uncompressed_ceiling(
                 total_uncompressed=total_uncompressed,
-                limit_bytes=max_uncompressed_bytes,
+                limit_bytes=limit_bytes,
                 archive=tar_path,
                 logger=logger,
                 archive_type="TAR",
@@ -509,24 +554,25 @@ def extract_archive_safe(
     destination: Path,
     *,
     logger: Optional[logging.Logger] = None,
-    max_uncompressed_bytes: Optional[int] = _DEFAULT_MAX_UNCOMPRESSED_BYTES,
+    max_uncompressed_bytes: Optional[int] = None,
 ) -> List[Path]:
     """Extract archives by dispatching to the appropriate safe handler."""
 
     lower_name = archive_path.name.lower()
+    limit_bytes = _resolve_max_uncompressed_bytes(max_uncompressed_bytes)
     if lower_name.endswith(".zip"):
         return extract_zip_safe(
             archive_path,
             destination,
             logger=logger,
-            max_uncompressed_bytes=max_uncompressed_bytes,
+            max_uncompressed_bytes=limit_bytes,
         )
     if any(lower_name.endswith(suffix) for suffix in _TAR_SUFFIXES):
         return extract_tar_safe(
             archive_path,
             destination,
             logger=logger,
-            max_uncompressed_bytes=max_uncompressed_bytes,
+            max_uncompressed_bytes=limit_bytes,
         )
     raise ConfigError(f"Unsupported archive format: {archive_path}")
 
@@ -853,12 +899,12 @@ T = TypeVar("T")
 def retry_with_backoff(
     func: Callable[[], T],
     *,
-    retryable: Callable[[BaseException], bool],
+    retryable: Callable[[Exception], bool],
     max_attempts: int = 3,
     backoff_base: float = 0.5,
     jitter: float = 0.5,
-    callback: Optional[Callable[[int, BaseException, float], None]] = None,
-    retry_after: Optional[Callable[[BaseException], Optional[float]]] = None,
+    callback: Optional[Callable[[int, Exception, float], None]] = None,
+    retry_after: Optional[Callable[[Exception], Optional[float]]] = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> T:
     """Execute ``func`` with exponential backoff until it succeeds."""
@@ -871,7 +917,11 @@ def retry_with_backoff(
         attempt += 1
         try:
             return func()
-        except BaseException as exc:  # pragma: no cover - behaviour verified via callers
+        except KeyboardInterrupt:
+            raise
+        except SystemExit:
+            raise
+        except Exception as exc:  # pragma: no cover - behaviour verified via callers
             if attempt >= max_attempts or not retryable(exc):
                 raise
             delay = backoff_base * (2 ** (attempt - 1))
@@ -908,8 +958,12 @@ def log_memory_usage(
         enabled = False
     if not enabled:
         return
-    process = psutil.Process()
-    memory_mb = process.memory_info().rss / (1024**2)
+    if not psutil or _PROCESS is None:
+        return
+    try:
+        memory_mb = _PROCESS.memory_info().rss / (1024**2)
+    except (psutil.Error, OSError):  # pragma: no cover - defensive guard
+        return
     extra: Dict[str, object] = {"stage": stage, "event": event, "memory_mb": round(memory_mb, 2)}
     if validator:
         extra["validator"] = validator
@@ -1293,10 +1347,19 @@ class StreamingDownloader(pooch.HTTPDownloader):
             def _stream_once() -> str:
                 nonlocal resume_position
                 resume_position = part_path.stat().st_size if part_path.exists() else 0
-                if resume_position:
-                    request_headers["Range"] = f"bytes={resume_position}-"
+                original_resume_position = resume_position
+                want_range = original_resume_position > 0
+                if want_range:
+                    request_headers["Range"] = f"bytes={original_resume_position}-"
                 else:
                     request_headers.pop("Range", None)
+
+                def _clear_partial_files() -> None:
+                    for candidate in (part_path, destination_part_path):
+                        try:
+                            candidate.unlink(missing_ok=True)
+                        except OSError:
+                            pass
 
                 with session.get(
                     url,
@@ -1354,7 +1417,51 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         response.close()
                         raise http_error
 
-                    if response.status_code == 206:
+                    range_honored = response.status_code == 206
+                    if want_range and range_honored:
+                        content_range = response.headers.get("Content-Range")
+                        reported_offset: Optional[int] = None
+                        if content_range and content_range.startswith("bytes "):
+                            try:
+                                reported_offset = int(content_range.split()[1].split("-")[0])
+                            except (IndexError, ValueError):
+                                reported_offset = None
+                        if (
+                            reported_offset is not None
+                            and reported_offset != original_resume_position
+                        ):
+                            self.logger.warning(
+                                "range resume misaligned; restarting from beginning",
+                                extra={
+                                    "stage": "download",
+                                    "expected_offset": original_resume_position,
+                                    "reported_offset": reported_offset,
+                                    "status_code": response.status_code,
+                                },
+                            )
+                            _clear_partial_files()
+                            range_honored = False
+                            resume_position = 0
+                            want_range = False
+                    if want_range and not range_honored:
+                        self.logger.warning(
+                            "range resume not honored; restarting from beginning",
+                            extra={
+                                "stage": "download",
+                                "status_code": response.status_code,
+                                "resume_position": original_resume_position,
+                            },
+                        )
+                        _clear_partial_files()
+                        range_honored = False
+                        resume_position = 0
+                        want_range = False
+                    elif range_honored:
+                        resume_position = original_resume_position
+                    else:
+                        resume_position = 0
+
+                    if range_honored:
                         self.status = "updated"
                     response.raise_for_status()
 
@@ -1398,7 +1505,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             next_progress = ((int(completed_fraction * 10)) + 1) / 10
                     self.response_etag = response.headers.get("ETag")
                     self.response_last_modified = response.headers.get("Last-Modified")
-                    mode = "ab" if resume_position else "wb"
+                    mode = "ab" if range_honored else "wb"
                     bytes_downloaded = resume_position
                     part_path.parent.mkdir(parents=True, exist_ok=True)
                     try:
@@ -1489,6 +1596,38 @@ class StreamingDownloader(pooch.HTTPDownloader):
         destination_part_path.unlink(missing_ok=True)
 
 
+def _materialize_cached_file(source: Path, destination: Path) -> tuple[Path, Path]:
+    """Link or move ``source`` into ``destination`` without redundant copies.
+
+    Returns a tuple ``(artifact_path, cache_path)`` where ``artifact_path`` is the final
+    destination path and ``cache_path`` points to the retained cache file (which may be
+    identical to ``artifact_path`` when the cache entry is moved instead of linked).
+    """
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if source == destination:
+        return destination, destination
+    if destination.exists():
+        try:
+            if destination.samefile(source):
+                return destination, source
+        except (FileNotFoundError, OSError):
+            pass
+    temp_path = destination.with_suffix(destination.suffix + ".tmpdownload")
+    temp_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path.unlink(missing_ok=True)
+    try:
+        os.link(source, temp_path)
+        os.replace(temp_path, destination)
+        return destination, source
+    except OSError:
+        shutil.move(str(source), str(temp_path))
+        os.replace(temp_path, destination)
+        return destination, destination
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
 def _extract_correlation_id(logger: logging.Logger) -> Optional[str]:
     extra = getattr(logger, "extra", None)
     if isinstance(extra, dict):
@@ -1536,37 +1675,27 @@ def download_stream(
     parsed = urlparse(secure_url)
     host = parsed.hostname
     bucket = get_bucket(http_config=http_config, host=host, service=service)
-    bucket.consume()
 
-    start_time = time.monotonic()
     log_memory_usage(logger, stage="download", event="before")
     polite_headers = http_config.polite_http_headers(correlation_id=_extract_correlation_id(logger))
     merged_headers: Dict[str, str] = dict(polite_headers)
     merged_headers.update({str(k): str(v) for k, v in headers.items()})
 
-    downloader = StreamingDownloader(
-        destination=destination,
-        headers=merged_headers,
-        http_config=http_config,
-        previous_manifest=previous_manifest,
-        logger=logger,
-        expected_media_type=expected_media_type,
-        service=service,
-        origin_host=host,
-    )
-
-    def _resolved_content_metadata() -> tuple[Optional[str], Optional[int]]:
-        content_type = downloader.response_content_type or downloader.head_content_type
-        if content_type is None and previous_manifest:
-            manifest_type = previous_manifest.get("content_type")
+    def _resolved_content_metadata(
+        current_downloader: StreamingDownloader,
+        manifest: Optional[Dict[str, object]],
+    ) -> tuple[Optional[str], Optional[int]]:
+        content_type = current_downloader.response_content_type or current_downloader.head_content_type
+        if content_type is None and manifest:
+            manifest_type = manifest.get("content_type")
             if isinstance(manifest_type, str):
                 content_type = manifest_type
 
-        content_length = downloader.response_content_length
-        if content_length is None and downloader.head_content_length is not None:
-            content_length = downloader.head_content_length
-        if content_length is None and previous_manifest:
-            manifest_length = previous_manifest.get("content_length")
+        content_length = current_downloader.response_content_length
+        if content_length is None and current_downloader.head_content_length is not None:
+            content_length = current_downloader.head_content_length
+        if content_length is None and manifest:
+            manifest_length = manifest.get("content_length")
             try:
                 content_length = int(manifest_length) if manifest_length is not None else None
             except (TypeError, ValueError):
@@ -1596,16 +1725,20 @@ def download_stream(
     safe_name = sanitize_filename(destination.name)
     url_hash = hashlib.sha256(secure_url.encode("utf-8")).hexdigest()[:12]
     cache_key = f"{url_hash}_{safe_name}"
-    cached_path_ref: Optional[Path] = None
 
-    def _verify_expected_checksum(sha256_value: Optional[str]) -> None:
+    def _verify_expected_checksum(
+        sha256_value: Optional[str],
+        *,
+        artifact_path: Path,
+        cache_path: Optional[Path],
+    ) -> None:
         if not expected_algorithm or not expected_digest:
             return
         try:
             if expected_algorithm == "sha256" and sha256_value is not None:
                 actual = sha256_value.lower()
             else:
-                actual = _compute_file_hash(destination, expected_algorithm).lower()
+                actual = _compute_file_hash(artifact_path, expected_algorithm).lower()
         except ValueError:
             logger.warning(
                 "unsupported checksum algorithm",
@@ -1626,74 +1759,154 @@ def download_stream(
                     "url": secure_url,
                 },
             )
-            destination.unlink(missing_ok=True)
-            if cached_path_ref is not None:
-                cached_path_ref.unlink(missing_ok=True)
+            artifact_path.unlink(missing_ok=True)
+            if cache_path is not None and cache_path != artifact_path:
+                cache_path.unlink(missing_ok=True)
             raise DownloadFailure(
                 f"Checksum mismatch for {secure_url}",
                 retryable=False,
             )
 
+    raw_attempts = getattr(http_config, "checksum_mismatch_retries", 3)
     try:
-        cached_path = Path(
-            pooch.retrieve(
-                secure_url,
-                path=cache_dir,
-                fname=cache_key,
-                known_hash=pooch_known_hash,
-                downloader=downloader,
-                progressbar=False,
-            )
+        max_checksum_attempts = int(raw_attempts)
+    except (TypeError, ValueError):
+        max_checksum_attempts = 3
+    if max_checksum_attempts < 1:
+        max_checksum_attempts = 1
+
+    manifest_for_attempt = previous_manifest
+
+    for attempt in range(1, max_checksum_attempts + 1):
+        downloader = StreamingDownloader(
+            destination=destination,
+            headers=merged_headers,
+            http_config=http_config,
+            previous_manifest=manifest_for_attempt,
+            logger=logger,
+            expected_media_type=expected_media_type,
+            service=service,
+            origin_host=host,
         )
-        cached_path_ref = cached_path
-    except requests.HTTPError as exc:
-        status_code = getattr(getattr(exc, "response", None), "status_code", None)
-        message = f"HTTP error while downloading {secure_url}: {exc}"
-        retryable = _is_retryable_status(status_code)
-        logger.error(
-            "download request failed",
+        attempt_start = time.monotonic()
+        bucket.consume()
+        try:
+            cached_path = Path(
+                pooch.retrieve(
+                    secure_url,
+                    path=cache_dir,
+                    fname=cache_key,
+                    known_hash=pooch_known_hash,
+                    downloader=downloader,
+                    progressbar=False,
+                )
+            )
+        except requests.HTTPError as exc:
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+            message = f"HTTP error while downloading {secure_url}: {exc}"
+            retryable = _is_retryable_status(status_code)
+            logger.error(
+                "download request failed",
+                extra={
+                    "stage": "download",
+                    "url": secure_url,
+                    "error": str(exc),
+                    "status_code": status_code,
+                },
+            )
+            raise DownloadFailure(message, status_code=status_code, retryable=retryable) from exc
+        except (
+            requests.ConnectionError,
+            requests.Timeout,
+            requests.exceptions.SSLError,
+        ) as exc:
+            logger.error(
+                "download request failed",
+                extra={"stage": "download", "url": secure_url, "error": str(exc)},
+            )
+            raise DownloadFailure(
+                f"HTTP error while downloading {secure_url}: {exc}", retryable=True
+            ) from exc
+        except Exception as exc:  # pragma: no cover - defensive catch for pooch errors
+            logger.error(
+                "pooch download error",
+                extra={"stage": "download", "url": secure_url, "error": str(exc)},
+            )
+            raise OntologyDownloadError(f"Download failed for {secure_url}: {exc}") from exc
+
+        if downloader.status == "cached":
+            elapsed_cached = (time.monotonic() - attempt_start) * 1000
+            logger.info(
+                "cache hit",
+                extra={"stage": "download", "status": "cached", "elapsed_ms": round(elapsed_cached, 2)},
+            )
+            if destination.exists():
+                artifact_path = destination
+                cache_reference: Optional[Path] = cached_path if cached_path.exists() else None
+            else:
+                artifact_path, cache_reference = _materialize_cached_file(cached_path, destination)
+            sha256 = sha256_file(artifact_path)
+            _verify_expected_checksum(
+                sha256,
+                artifact_path=artifact_path,
+                cache_path=cache_reference,
+            )
+            log_memory_usage(logger, stage="download", event="after")
+            content_type, content_length = _resolved_content_metadata(downloader, manifest_for_attempt)
+            return DownloadResult(
+                path=artifact_path,
+                status="cached",
+                sha256=sha256,
+                etag=downloader.response_etag,
+                last_modified=downloader.response_last_modified,
+                content_type=content_type,
+                content_length=content_length,
+            )
+
+        artifact_path, cache_reference = _materialize_cached_file(cached_path, destination)
+
+        sha256 = sha256_file(artifact_path)
+        _verify_expected_checksum(
+            sha256,
+            artifact_path=artifact_path,
+            cache_path=cache_reference,
+        )
+        previous_sha256 = manifest_for_attempt.get("sha256") if manifest_for_attempt else None
+        if previous_sha256 and previous_sha256 != sha256:
+            logger.error(
+                "sha256 mismatch detected",
+                extra={
+                    "stage": "download",
+                    "expected": expected_hash,
+                    "actual": sha256,
+                    "url": secure_url,
+                },
+            )
+            artifact_path.unlink(missing_ok=True)
+            if cache_reference != artifact_path:
+                cache_reference.unlink(missing_ok=True)
+            if attempt >= max_checksum_attempts:
+                raise OntologyDownloadError(
+                    f"checksum mismatch after {max_checksum_attempts} attempts: {secure_url}"
+                )
+            manifest_for_attempt = None
+            continue
+
+        elapsed = (time.monotonic() - attempt_start) * 1000
+        logger.info(
+            "download complete",
             extra={
                 "stage": "download",
-                "url": secure_url,
-                "error": str(exc),
-                "status_code": status_code,
+                "status": downloader.status,
+                "elapsed_ms": round(elapsed, 2),
+                "sha256": sha256,
             },
         )
-        raise DownloadFailure(message, status_code=status_code, retryable=retryable) from exc
-    except (
-        requests.ConnectionError,
-        requests.Timeout,
-        requests.exceptions.SSLError,
-    ) as exc:
-        logger.error(
-            "download request failed",
-            extra={"stage": "download", "url": secure_url, "error": str(exc)},
-        )
-        raise DownloadFailure(
-            f"HTTP error while downloading {secure_url}: {exc}", retryable=True
-        ) from exc
-    except Exception as exc:  # pragma: no cover - defensive catch for pooch errors
-        logger.error(
-            "pooch download error",
-            extra={"stage": "download", "url": secure_url, "error": str(exc)},
-        )
-        raise OntologyDownloadError(f"Download failed for {secure_url}: {exc}") from exc
-    if downloader.status == "cached":
-        elapsed = (time.monotonic() - start_time) * 1000
-        logger.info(
-            "cache hit",
-            extra={"stage": "download", "status": "cached", "elapsed_ms": round(elapsed, 2)},
-        )
-        if not destination.exists():
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(cached_path, destination)
-        sha256 = sha256_file(destination)
-        _verify_expected_checksum(sha256)
         log_memory_usage(logger, stage="download", event="after")
-        content_type, content_length = _resolved_content_metadata()
+        content_type, content_length = _resolved_content_metadata(downloader, manifest_for_attempt)
         return DownloadResult(
-            path=destination,
-            status="cached",
+            path=artifact_path,
+            status=downloader.status,
             sha256=sha256,
             etag=downloader.response_etag,
             last_modified=downloader.response_last_modified,
@@ -1701,54 +1914,8 @@ def download_stream(
             content_length=content_length,
         )
 
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(cached_path, destination)
-    sha256 = sha256_file(destination)
-    _verify_expected_checksum(sha256)
-    previous_sha256 = previous_manifest.get("sha256") if previous_manifest else None
-    if previous_sha256 and previous_sha256 != sha256:
-        logger.error(
-            "sha256 mismatch detected",
-            extra={
-                "stage": "download",
-                "expected": expected_hash,
-                "actual": sha256,
-                "url": secure_url,
-            },
-        )
-        destination.unlink(missing_ok=True)
-        cached_path.unlink(missing_ok=True)
-        return download_stream(
-            url=url,
-            destination=destination,
-            headers=headers,
-            previous_manifest=None,
-            http_config=http_config,
-            cache_dir=cache_dir,
-            logger=logger,
-            expected_media_type=expected_media_type,
-            service=service,
-        )
-    elapsed = (time.monotonic() - start_time) * 1000
-    logger.info(
-        "download complete",
-        extra={
-            "stage": "download",
-            "status": downloader.status,
-            "elapsed_ms": round(elapsed, 2),
-            "sha256": sha256,
-        },
-    )
-    log_memory_usage(logger, stage="download", event="after")
-    content_type, content_length = _resolved_content_metadata()
-    return DownloadResult(
-        path=destination,
-        status=downloader.status,
-        sha256=sha256,
-        etag=downloader.response_etag,
-        last_modified=downloader.response_last_modified,
-        content_type=content_type,
-        content_length=content_length,
+    raise OntologyDownloadError(
+        f"checksum mismatch after {max_checksum_attempts} attempts: {secure_url}"
     )
 
 

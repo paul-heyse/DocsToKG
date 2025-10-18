@@ -514,6 +514,13 @@ def test_summary_manifest_includes_splade_backend_metadata(
     monkeypatch.setitem(sys.modules, "tqdm", tqdm_stub)
 
     manifests: List[Dict[str, Any]] = []
+    chunk_dir = tmp_path / "chunks"
+    vectors_dir = tmp_path / "vectors"
+    manifests_dir = tmp_path / "manifests"
+    splade_model = tmp_path / "splade-model"
+    qwen_model = tmp_path / "qwen-model"
+    for directory in (chunk_dir, vectors_dir, manifests_dir, splade_model, qwen_model):
+        directory.mkdir()
 
     def record_manifest(stage: str, doc_id: str, status: str, **metadata: Any) -> None:
         manifests.append({"stage": stage, "doc_id": doc_id, "status": status, **metadata})
@@ -543,13 +550,6 @@ def test_summary_manifest_includes_splade_backend_metadata(
         }
         entry.update(extra)
         manifests.append(entry)
-
-    chunk_dir = tmp_path / "chunks"
-    vectors_dir = tmp_path / "vectors"
-    manifests_dir = tmp_path / "manifests"
-    chunk_dir.mkdir()
-    vectors_dir.mkdir()
-    manifests_dir.mkdir()
 
     chunk_file = chunk_dir / "sample.chunks.jsonl"
     chunk_file.write_text(
@@ -591,7 +591,7 @@ def test_summary_manifest_includes_splade_backend_metadata(
         lambda override=None: Path(override) if override else tmp_path,
     )
     embed_module._SPLADE_ENCODER_BACKENDS.clear()
-    cfg = embed_module.SpladeCfg(model_dir=chunk_dir, device="cpu")
+    cfg = embed_module.SpladeCfg(model_dir=splade_model, device="cuda")
     key = (str(cfg.model_dir), cfg.device, cfg.attn_impl, cfg.max_active_dims)
     embed_module._SPLADE_ENCODER_BACKENDS[key] = "sdpa"
 
@@ -603,6 +603,10 @@ def test_summary_manifest_includes_splade_backend_metadata(
             str(chunk_dir),
             "--out-dir",
             str(vectors_dir),
+            "--splade-model-dir",
+            str(splade_model),
+            "--qwen-model-dir",
+            str(qwen_model),
         ]
     )
 
@@ -614,6 +618,7 @@ def test_summary_manifest_includes_splade_backend_metadata(
     summary = summary_entries[-1]
     assert summary["splade_attn_backend_used"] == "sdpa"
     assert summary["sparsity_warn_threshold_pct"] == pytest.approx(1.0)
+
 
 
 def test_model_dirs_follow_environment_defaults(
@@ -630,126 +635,19 @@ def test_model_dirs_follow_environment_defaults(
 
     embed_module = _reload_embedding_module(monkeypatch)
 
-    manifests: List[Dict[str, Any]] = []
-
-    def record_manifest(stage, doc_id, status, **metadata):
-        manifests.append({"stage": stage, "doc_id": doc_id, "status": status, **metadata})
-
-    def capture_success(
-        *,
-        stage: str,
-        doc_id: str,
-        duration_s: float,
-        schema_version: str,
-        input_path: str | Path,
-        input_hash: str,
-        output_path: str | Path,
-        hash_alg: str | None = None,
-        **extra: Any,
-    ) -> None:
-        entry = {
-            "stage": stage,
-            "doc_id": doc_id,
-            "status": "success",
-            "duration_s": duration_s,
-            "schema_version": schema_version,
-            "input_path": input_path,
-            "input_hash": input_hash,
-            "output_path": output_path,
-            "hash_alg": hash_alg,
-        }
-        entry.update(extra)
-        manifests.append(entry)
-
-    def capture_success(
-        *,
-        stage: str,
-        doc_id: str,
-        duration_s: float,
-        schema_version: str,
-        input_path: str | Path,
-        input_hash: str,
-        output_path: str | Path,
-        hash_alg: str | None = None,
-        **extra: Any,
-    ) -> None:
-        entry = {
-            "stage": stage,
-            "doc_id": doc_id,
-            "status": "success",
-            "duration_s": duration_s,
-            "schema_version": schema_version,
-            "input_path": input_path,
-            "input_hash": input_hash,
-            "output_path": output_path,
-            "hash_alg": hash_alg,
-        }
-        entry.update(extra)
-        manifests.append(entry)
-
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
-    monkeypatch.setattr(embed_module, "manifest_append", record_manifest)
-    monkeypatch.setattr(embed_module, "manifest_log_success", capture_success)
-    monkeypatch.setattr(embed_module, "manifest_log_success", capture_success)
-    monkeypatch.setattr(embed_module, "_ensure_splade_dependencies", lambda: None)
-    monkeypatch.setattr(embed_module, "_ensure_qwen_dependencies", lambda: None)
-    monkeypatch.setattr(embed_module, "load_manifest_index", lambda *_, **__: {})
-    monkeypatch.setattr(embed_module, "compute_content_hash", lambda *_: "hash")
-
-    chunk_dir = tmp_path / "chunks"
-    vectors_dir = tmp_path / "vectors"
-    manifests_dir = tmp_path / "manifests"
-    for directory in (chunk_dir, vectors_dir, manifests_dir):
-        directory.mkdir()
-
-    chunk_file = chunk_dir / "doc.chunks.jsonl"
-    chunk_file.write_text(
-        '{"uuid": "chunk-1", "text": "Example", "doc_id": "doc", "schema_version": "docparse/1.1.0"}\n',
-        encoding="utf-8",
-    )
-
-    monkeypatch.setattr(embed_module, "iter_chunk_files", lambda *_: [chunk_file])
-    monkeypatch.setattr(embed_module, "data_chunks", lambda _root: chunk_dir)
-    monkeypatch.setattr(embed_module, "data_vectors", lambda _root: vectors_dir)
-    monkeypatch.setattr(
-        embed_module,
-        "detect_data_root",
-        lambda override=None: Path(override) if override else tmp_path,
-    )
-
-    monkeypatch.setattr(embed_module, "BM25Vector", _DummyBM25)
-    monkeypatch.setattr(embed_module, "SPLADEVector", _DummySPLADE)
-    monkeypatch.setattr(embed_module, "DenseVector", _DummyDense)
-    monkeypatch.setattr(embed_module, "VectorRow", _DummyVectorRow)
-
-    recorded: Dict[str, Path] = {}
-
-    def fake_splade(cfg, texts, batch_size=None):
-        recorded["splade"] = Path(cfg.model_dir)
-        return [[f"tok-{i}"] for i, _ in enumerate(texts)], [[0.5] for _ in texts]
-
-    def fake_qwen(cfg, texts, batch_size=None):
-        recorded["qwen"] = Path(cfg.model_dir)
-        return [[0.1] * 2560 for _ in texts]
-
-    monkeypatch.setattr(embed_module, "splade_encode", fake_splade)
-    monkeypatch.setattr(embed_module, "qwen_embed", fake_qwen)
-
     args = embed_module.parse_args(
         [
             "--data-root",
             str(tmp_path),
             "--chunks-dir",
-            str(chunk_dir),
+            str(tmp_path / "chunks"),
             "--out-dir",
-            str(vectors_dir),
+            str(tmp_path / "vectors"),
         ]
     )
-
-    assert embed_module.main(args) == 0
-    assert recorded["splade"] == env_splade.resolve()
-    assert recorded["qwen"] == env_qwen.resolve()
+    cfg = embed_module.EmbedCfg.from_args(args)
+    assert cfg.splade_model_dir == env_splade.resolve()
+    assert cfg.qwen_model_dir == env_qwen.resolve()
 
 
 def test_cli_model_dirs_override_environment(
@@ -771,75 +669,23 @@ def test_cli_model_dirs_override_environment(
 
     embed_module = _reload_embedding_module(monkeypatch)
 
-    manifests: List[Dict[str, Any]] = []
-
-    def record_manifest(stage, doc_id, status, **metadata):
-        manifests.append({"stage": stage, "doc_id": doc_id, "status": status, **metadata})
-
-    monkeypatch.setattr(embed_module, "manifest_append", record_manifest)
-    monkeypatch.setattr(embed_module, "_ensure_splade_dependencies", lambda: None)
-    monkeypatch.setattr(embed_module, "_ensure_qwen_dependencies", lambda: None)
-    monkeypatch.setattr(embed_module, "load_manifest_index", lambda *_, **__: {})
-    monkeypatch.setattr(embed_module, "compute_content_hash", lambda *_: "hash")
-
-    chunk_dir = tmp_path / "chunks"
-    vectors_dir = tmp_path / "vectors"
-    manifests_dir = tmp_path / "manifests"
-    for directory in (chunk_dir, vectors_dir, manifests_dir):
-        directory.mkdir()
-
-    chunk_file = chunk_dir / "doc.chunks.jsonl"
-    chunk_file.write_text(
-        '{"uuid": "chunk-1", "text": "Example", "doc_id": "doc", "schema_version": "docparse/1.1.0"}\n',
-        encoding="utf-8",
-    )
-
-    monkeypatch.setattr(embed_module, "iter_chunk_files", lambda *_: [chunk_file])
-    monkeypatch.setattr(embed_module, "data_chunks", lambda _root: chunk_dir)
-    monkeypatch.setattr(embed_module, "data_vectors", lambda _root: vectors_dir)
-    monkeypatch.setattr(
-        embed_module,
-        "detect_data_root",
-        lambda override=None: Path(override) if override else tmp_path,
-    )
-
-    monkeypatch.setattr(embed_module, "BM25Vector", _DummyBM25)
-    monkeypatch.setattr(embed_module, "SPLADEVector", _DummySPLADE)
-    monkeypatch.setattr(embed_module, "DenseVector", _DummyDense)
-    monkeypatch.setattr(embed_module, "VectorRow", _DummyVectorRow)
-
-    recorded: Dict[str, Path] = {}
-
-    def splade_stub(cfg, texts, batch_size=None):
-        recorded["splade"] = Path(cfg.model_dir)
-        return [[f"tok-{i}"] for i, _ in enumerate(texts)], [[0.5] for _ in texts]
-
-    def qwen_stub(cfg, texts, batch_size=None):
-        recorded["qwen"] = Path(cfg.model_dir)
-        return [[0.1] * 2560 for _ in texts]
-
-    monkeypatch.setattr(embed_module, "splade_encode", splade_stub)
-    monkeypatch.setattr(embed_module, "qwen_embed", qwen_stub)
-
     args = embed_module.parse_args(
         [
             "--data-root",
             str(tmp_path),
             "--chunks-dir",
-            str(chunk_dir),
+            str(tmp_path / "chunks"),
             "--out-dir",
-            str(vectors_dir),
+            str(tmp_path / "vectors"),
             "--splade-model-dir",
             str(cli_splade),
             "--qwen-model-dir",
             str(cli_qwen),
         ]
     )
-
-    assert embed_module.main(args) == 0
-    assert recorded["splade"] == cli_splade.resolve()
-    assert recorded["qwen"] == cli_qwen.resolve()
-
+    cfg = embed_module.EmbedCfg.from_args(args)
+    assert cfg.splade_model_dir == cli_splade.resolve()
+    assert cfg.qwen_model_dir == cli_qwen.resolve()
 
 def test_offline_requires_local_models(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Offline mode should fail fast when local models are absent."""

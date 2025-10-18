@@ -310,7 +310,13 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
 from . import plugins as plugin_mod
-from .errors import ConfigurationError, DownloadFailure, OntologyDownloadError, PolicyError
+from .errors import (
+    ConfigurationError,
+    DownloadFailure,
+    OntologyDownloadError,
+    PolicyError,
+    UnsupportedPythonError,
+)
 from .io import (
     RDF_MIME_ALIASES,
     DownloadResult,
@@ -2720,6 +2726,9 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
     except ConfigError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
+    except UnsupportedPythonError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
     except OntologyDownloadError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

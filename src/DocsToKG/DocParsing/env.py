@@ -214,8 +214,6 @@ def detect_data_root(start: Optional[Path] = None) -> Path:
     env_root = os.getenv("DOCSTOKG_DATA_ROOT")
     if env_root:
         env_path = Path(env_root).expanduser().resolve()
-        if not env_path.exists():
-            env_path.mkdir(parents=True, exist_ok=True)
         return env_path
 
     start_path = Path.cwd() if start is None else Path(start).resolve()
@@ -234,29 +232,47 @@ def _ensure_dir(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     return path.resolve()
 
+def _resolve_data_path(root: Optional[Path], name: str) -> Path:
+    """Resolve ``name`` relative to the DocsToKG data root without creating it."""
 
-def data_doctags(root: Optional[Path] = None) -> Path:
-    """Return the DocTags directory and ensure it exists."""
-
-    return _ensure_dir(detect_data_root(root) / "DocTagsFiles")
-
-
-def data_chunks(root: Optional[Path] = None) -> Path:
-    """Return the chunk directory and ensure it exists."""
-
-    return _ensure_dir(detect_data_root(root) / "ChunkedDocTagFiles")
+    if root is not None:
+        base = Path(root).expanduser().resolve()
+    else:
+        base = detect_data_root()
+    return (base / name).resolve()
 
 
-def data_vectors(root: Optional[Path] = None) -> Path:
-    """Return the vectors directory and ensure it exists."""
+def data_doctags(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+    """Return the DocTags directory path relative to the data root.
 
-    return _ensure_dir(detect_data_root(root) / "Embeddings")
+    Args:
+        root: Optional override for the data root.
+        ensure: When ``True`` (default) the directory is created if missing.
+    """
+
+    path = _resolve_data_path(root, "DocTagsFiles")
+    return _ensure_dir(path) if ensure else path
 
 
-def data_manifests(root: Optional[Path] = None) -> Path:
-    """Return the manifests directory and ensure it exists."""
+def data_chunks(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+    """Return the chunk directory path relative to the data root."""
 
-    return _ensure_dir(detect_data_root(root) / "Manifests")
+    path = _resolve_data_path(root, "ChunkedDocTagFiles")
+    return _ensure_dir(path) if ensure else path
+
+
+def data_vectors(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+    """Return the vector directory path relative to the data root."""
+
+    path = _resolve_data_path(root, "Embeddings")
+    return _ensure_dir(path) if ensure else path
+
+
+def data_manifests(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+    """Return the manifest directory path relative to the data root."""
+
+    path = _resolve_data_path(root, "Manifests")
+    return _ensure_dir(path) if ensure else path
 
 
 def prepare_data_root(data_root_arg: Optional[Path], default_root: Path) -> Path:
@@ -265,7 +281,7 @@ def prepare_data_root(data_root_arg: Optional[Path], default_root: Path) -> Path
     resolved = detect_data_root(data_root_arg) if data_root_arg is not None else default_root
     if data_root_arg is not None:
         os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved)
-    data_manifests(resolved)
+    _ensure_dir((resolved / "Manifests").resolve())
     return resolved
 
 
@@ -286,16 +302,18 @@ def resolve_pipeline_path(
     return cli_value
 
 
-def data_pdfs(root: Optional[Path] = None) -> Path:
-    """Return the PDFs directory and ensure it exists."""
+def data_pdfs(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+    """Return the PDFs directory path relative to the data root."""
 
-    return _ensure_dir(detect_data_root(root) / "PDFs")
+    path = _resolve_data_path(root, "PDFs")
+    return _ensure_dir(path) if ensure else path
 
 
-def data_html(root: Optional[Path] = None) -> Path:
-    """Return the HTML directory and ensure it exists."""
+def data_html(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+    """Return the HTML directory path relative to the data root."""
 
-    return _ensure_dir(detect_data_root(root) / "HTML")
+    path = _resolve_data_path(root, "HTML")
+    return _ensure_dir(path) if ensure else path
 
 
 __all__ = [

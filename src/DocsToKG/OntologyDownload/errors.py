@@ -6,6 +6,7 @@ from typing import Optional
 
 __all__ = [
     "OntologyDownloadError",
+    "UnsupportedPythonError",
     "ConfigurationError",
     "ResolverError",
     "ValidationError",
@@ -18,6 +19,10 @@ __all__ = [
 
 class OntologyDownloadError(RuntimeError):
     """Base exception for ontology planning, download, or validation failures."""
+
+
+class UnsupportedPythonError(OntologyDownloadError):
+    """Raised when the active interpreter is older than the supported minimum."""
 
 
 class ConfigurationError(OntologyDownloadError):

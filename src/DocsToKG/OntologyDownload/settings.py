@@ -44,6 +44,7 @@ from .errors import (
     OntologyDownloadError,
     PolicyError,
     ResolverError,
+    UnsupportedPythonError,
     UserConfigError,
     ValidationError,
 )
@@ -55,12 +56,16 @@ if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checkers onl
 PYTHON_MIN_VERSION = (3, 9)
 
 
-def ensure_python_version() -> None:
+def ensure_python_version(
+    min_major: int = PYTHON_MIN_VERSION[0],
+    min_minor: int = PYTHON_MIN_VERSION[1],
+) -> None:
     """Ensure the interpreter meets the minimum supported Python version."""
 
-    if sys.version_info < PYTHON_MIN_VERSION:
-        print("Error: Python 3.9+ required", file=sys.stderr)
-        raise SystemExit(1)
+    if (sys.version_info.major, sys.version_info.minor) < (min_major, min_minor):
+        required = f"{min_major}.{min_minor}"
+        found = sys.version.split()[0]
+        raise UnsupportedPythonError(f"Python >= {required} required; found {found}")
 
 
 def _coerce_sequence(value: Optional[Iterable[str]]) -> List[str]:
@@ -244,7 +249,13 @@ class DownloadConfiguration(BaseModel):
         limit_str = self.rate_limits.get(service)
         if limit_str is None:
             return None
-        return parse_rate_limit_to_rps(limit_str)
+        parsed = parse_rate_limit_to_rps(limit_str)
+        if parsed is None:
+            raise ValueError(
+                f"Invalid rate limit '{limit_str}' for service '{service}'. "
+                "Expected format: <number>/<unit> (e.g., '5/second', '60/min')"
+            )
+        return parsed
 
     def allowed_port_set(self) -> Set[int]:
         """Return the union of default ports and user-configured allowances."""
@@ -437,7 +448,9 @@ class ResolvedConfig(BaseModel):
     def from_defaults(cls) -> "ResolvedConfig":
         """Construct a resolved configuration populated with default values only."""
 
-        return cls(defaults=DefaultsConfig(), specs=[])
+        defaults = DefaultsConfig()
+        _apply_env_overrides(defaults)
+        return cls(defaults=defaults, specs=[])
 
     model_config = {
         "validate_assignment": True,

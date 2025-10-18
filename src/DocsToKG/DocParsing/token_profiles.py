@@ -32,7 +32,7 @@ DEFAULT_COMPARATORS = [
 ]
 
 DEFAULT_DATA_ROOT = detect_data_root()
-DEFAULT_DOCTAGS_DIR = data_doctags(DEFAULT_DATA_ROOT)
+DEFAULT_DOCTAGS_DIR = data_doctags(DEFAULT_DATA_ROOT, ensure=False)
 
 TAG_RE = re.compile(r"<[^>]+>")
 SPACE_RE = re.compile(r"\s+")

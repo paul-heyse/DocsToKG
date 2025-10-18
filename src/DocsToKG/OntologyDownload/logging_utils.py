@@ -70,6 +70,7 @@ def setup_logging(
     retention_days: int = 30,
     max_log_size_mb: int = 100,
     log_dir: Optional[Path] = None,
+    propagate: bool = False,
 ) -> logging.Logger:
     """Configure ontology downloader logging with rotation and JSON sidecars."""
 
@@ -104,5 +105,5 @@ def setup_logging(
     file_handler._ontofetch_managed = True  # type: ignore[attr-defined]
     logger.addHandler(file_handler)
 
-    logger.propagate = True
+    logger.propagate = propagate
     return logger

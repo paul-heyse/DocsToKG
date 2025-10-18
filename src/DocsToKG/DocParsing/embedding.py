@@ -275,6 +275,17 @@ Dependencies:
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+if __name__ == "__main__" and __package__ is None:
+    script_dir = Path(__file__).resolve().parent
+    if sys.path and sys.path[0] == str(script_dir):
+        sys.path.pop(0)
+    package_root = script_dir.parents[2]
+    if str(package_root) not in sys.path:
+        sys.path.insert(0, str(package_root))
+
 import argparse
 import atexit
 import hashlib
@@ -292,7 +303,6 @@ import uuid
 from collections import Counter, OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, fields
-from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable, ClassVar, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
@@ -365,6 +375,8 @@ from DocsToKG.DocParsing.io import (
     load_manifest_index,
     quarantine_artifact,
     relative_path,
+    resolve_attempts_path,
+    resolve_manifest_path,
 )
 from DocsToKG.DocParsing.logging import (
     get_logger,
@@ -372,6 +384,7 @@ from DocsToKG.DocParsing.logging import (
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
+    set_stage_telemetry,
 )
 from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
@@ -390,6 +403,7 @@ from DocsToKG.DocParsing.schemas import (
     validate_schema_version,
     validate_vector_row as schema_validate_vector_row,
 )
+from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
 # --- Globals ---
 
@@ -984,12 +998,12 @@ class EmbedCfg(StageConfigBase):
         self.data_root = resolved_root
 
         if self.chunks_dir is None:
-            self.chunks_dir = data_chunks(resolved_root)
+            self.chunks_dir = data_chunks(resolved_root, ensure=False)
         else:
             self.chunks_dir = StageConfigBase._coerce_path(self.chunks_dir, None)
 
         if self.out_dir is None:
-            self.out_dir = data_vectors(resolved_root)
+            self.out_dir = data_vectors(resolved_root, ensure=False)
         else:
             self.out_dir = StageConfigBase._coerce_path(self.out_dir, None)
 
@@ -2298,6 +2312,12 @@ def main(args: argparse.Namespace | None = None) -> int:
     """
 
     parser = build_parser()
+    bootstrap_root = detect_data_root()
+    try:
+        data_chunks(bootstrap_root)
+        data_vectors(bootstrap_root)
+    except Exception:
+        pass
     if args is None:
         namespace = parser.parse_args()
     elif isinstance(args, argparse.Namespace):
@@ -2454,15 +2474,15 @@ def main(args: argparse.Namespace | None = None) -> int:
     resolved_root = prepare_data_root(data_root_override, detect_data_root())
     logger.bind(data_root=str(resolved_root))
 
-    default_chunks_dir = data_chunks(resolved_root)
-    default_vectors_dir = data_vectors(resolved_root)
+    default_chunks_dir = data_chunks(resolved_root, ensure=False)
+    default_vectors_dir = data_vectors(resolved_root, ensure=False)
 
     chunks_dir = resolve_pipeline_path(
         cli_value=args.chunks_dir,
         default_path=default_chunks_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
-        resolver=data_chunks,
+        resolver=lambda root: data_chunks(root, ensure=False),
     ).resolve()
 
     out_dir = resolve_pipeline_path(
@@ -2470,7 +2490,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         default_path=default_vectors_dir,
         resolved_data_root=resolved_root,
         data_root_overridden=data_root_overridden,
-        resolver=data_vectors,
+        resolver=lambda root: data_vectors(root, ensure=False),
     ).resolve()
 
     logger.bind(
@@ -2539,6 +2559,13 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     context_payload = context.to_manifest()
 
+    telemetry_sink = TelemetrySink(
+        resolve_attempts_path(MANIFEST_STAGE, resolved_root),
+        resolve_manifest_path(MANIFEST_STAGE, resolved_root),
+    )
+    stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=EMBED_STAGE)
+    set_stage_telemetry(stage_telemetry)
+
     manifest_log_success(
         stage=MANIFEST_STAGE,
         doc_id="__config__",
@@ -2569,6 +2596,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 }
             },
         )
+        set_stage_telemetry(None)
         return 0
 
     args.out_dir = out_dir
@@ -2610,6 +2638,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             error_code="NO_INPUT_FILES",
             chunks_dir=str(chunks_dir),
         )
+        set_stage_telemetry(None)
         return 0
 
     if args.shard_count > 1:
@@ -2644,6 +2673,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 shard_index=args.shard_index,
                 shard_count=args.shard_count,
             )
+            set_stage_telemetry(None)
             return 0
 
     incompatible_chunks: List[Path] = []
@@ -2721,6 +2751,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 input_hash=None,
                 error_code="NO_PASS_A_DATA",
             )
+            set_stage_telemetry(None)
             return 0
 
     validator = SPLADEValidator(
@@ -2796,6 +2827,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             if len(skipped_ids) > 5:
                 preview += f", ... (+{len(skipped_ids) - 5} more)"
             print("  skip preview:", preview)
+        set_stage_telemetry(None)
         return 0
 
     files_parallel = min(requested_parallel, max(1, len(file_entries)))
@@ -2986,6 +3018,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         args.qwen_queue = None
         if qwen_queue is not None:
             qwen_queue.shutdown()
+        set_stage_telemetry(None)
 
     if quarantined_files:
         log_event(
@@ -3090,6 +3123,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         total_vectors=total_vectors,
     )
 
+    set_stage_telemetry(None)
     return 0
 
 

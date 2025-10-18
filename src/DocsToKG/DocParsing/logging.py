@@ -13,8 +13,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
-from ..OntologyDownload.logging_utils import JSONFormatter
+from DocsToKG.OntologyDownload.logging_utils import JSONFormatter
 from .io import manifest_append, resolve_hash_algorithm
+from .telemetry import StageTelemetry
 
 
 class StructuredLogger(logging.LoggerAdapter):
@@ -121,6 +122,27 @@ def manifest_log_skip(
 ) -> None:
     """Record a manifest entry indicating the pipeline skipped work."""
 
+    if _STAGE_TELEMETRY is not None:
+        metadata: Dict[str, Any] = {
+            "stage": stage,
+            "status": "skip",
+            "duration_s": float(duration_s),
+            "schema_version": schema_version,
+            "input_path": _stringify_path(input_path),
+            "input_hash": input_hash,
+            "hash_alg": hash_alg or resolve_hash_algorithm(),
+            "output_path": _stringify_path(output_path),
+        }
+        metadata.update(extra)
+        reason = metadata.get("reason")
+        _STAGE_TELEMETRY.log_skip(
+            doc_id=doc_id,
+            input_path=input_path,
+            reason=str(reason) if reason is not None else None,
+            metadata=metadata,
+        )
+        return
+
     payload: Dict[str, object] = {
         "stage": stage,
         "doc_id": doc_id,
@@ -149,6 +171,35 @@ def manifest_log_success(
     **extra: object,
 ) -> None:
     """Record a manifest entry marking successful pipeline output."""
+
+    if _STAGE_TELEMETRY is not None:
+        metadata: Dict[str, Any] = {
+            "stage": stage,
+            "status": "success",
+            "duration_s": float(duration_s),
+            "schema_version": schema_version,
+            "input_path": _stringify_path(input_path),
+            "input_hash": input_hash,
+            "hash_alg": hash_alg or resolve_hash_algorithm(),
+            "output_path": _stringify_path(output_path),
+        }
+        metadata.update(extra)
+        tokens: Optional[int] = None
+        for key in ("tokens", "chunk_count", "vector_count"):
+            value = metadata.get(key)
+            if isinstance(value, int):
+                tokens = value
+                break
+        _STAGE_TELEMETRY.log_success(
+            doc_id=doc_id,
+            input_path=input_path,
+            output_path=output_path,
+            tokens=tokens,
+            schema_version=schema_version,
+            duration_s=duration_s,
+            metadata=metadata,
+        )
+        return
 
     payload: Dict[str, object] = {
         "stage": stage,
@@ -179,6 +230,29 @@ def manifest_log_failure(
     **extra: object,
 ) -> None:
     """Record a manifest entry describing a failed pipeline attempt."""
+
+    if _STAGE_TELEMETRY is not None:
+        metadata: Dict[str, Any] = {
+            "stage": stage,
+            "status": "failure",
+            "duration_s": float(duration_s),
+            "schema_version": schema_version,
+            "input_path": _stringify_path(input_path),
+            "input_hash": input_hash,
+            "hash_alg": hash_alg or resolve_hash_algorithm(),
+            "output_path": _stringify_path(output_path),
+            "error": error,
+        }
+        metadata.update(extra)
+        _STAGE_TELEMETRY.log_failure(
+            doc_id=doc_id,
+            input_path=input_path,
+            duration_s=duration_s,
+            reason=error,
+            metadata=metadata,
+            manifest_metadata=metadata,
+        )
+        return
 
     payload: Dict[str, object] = {
         "stage": stage,
@@ -229,5 +303,16 @@ __all__ = [
     "manifest_log_failure",
     "manifest_log_skip",
     "manifest_log_success",
+    "set_stage_telemetry",
     "summarize_manifest",
 ]
+
+
+_STAGE_TELEMETRY: Optional[StageTelemetry] = None
+
+
+def set_stage_telemetry(stage_telemetry: Optional[StageTelemetry]) -> None:
+    """Register ``stage_telemetry`` for manifest logging helpers."""
+
+    global _STAGE_TELEMETRY
+    _STAGE_TELEMETRY = stage_telemetry

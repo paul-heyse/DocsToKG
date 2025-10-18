@@ -15,6 +15,11 @@ from .settings import DownloadConfiguration
 
 ErrorType = Type[Exception]
 
+_DIGEST_PATTERN = re.compile(r"(?i)\b([0-9a-f]{32,128})\b")
+_CHECKSUM_STREAM_CHUNK_SIZE = 8192
+_CHECKSUM_STREAM_TAIL_BYTES = 128
+_CHECKSUM_STREAM_MAX_BYTES = 2 * 1024 * 1024  # 2 MiB ceiling prevents unbounded reads
+
 
 @dataclass(slots=True, frozen=True)
 class ExpectedChecksum:
@@ -121,7 +126,7 @@ def parse_checksum_url_extra(
 
 
 def _extract_checksum_from_text(text: str, *, context: str) -> str:
-    match = re.search(r"[0-9a-fA-F]{32,128}", text)
+    match = _DIGEST_PATTERN.search(text)
     if not match:
         raise OntologyDownloadError(f"Unable to parse checksum from {context}")
     return match.group(0).lower()
@@ -135,21 +140,40 @@ def _fetch_checksum_from_url(
     logger: logging.Logger,
 ) -> str:
     secure_url = validate_url_security(url, http_config)
+    total_bytes = 0
+    tail = b""
     try:
-        response = requests.get(secure_url, timeout=http_config.timeout_sec)
-        response.raise_for_status()
+        with requests.get(
+            secure_url,
+            timeout=http_config.timeout_sec,
+            stream=True,
+        ) as response:
+            response.raise_for_status()
+            for chunk in response.iter_content(_CHECKSUM_STREAM_CHUNK_SIZE):
+                if not chunk:
+                    continue
+                total_bytes += len(chunk)
+                if total_bytes > _CHECKSUM_STREAM_MAX_BYTES:
+                    raise OntologyDownloadError(
+                        f"checksum response too large (> {_CHECKSUM_STREAM_MAX_BYTES} bytes)"
+                    )
+                buffer = tail + chunk
+                match = _DIGEST_PATTERN.search(buffer.decode("utf-8", errors="ignore"))
+                if match:
+                    digest = match.group(1).lower()
+                    logger.info(
+                        "fetched checksum",
+                        extra={
+                            "stage": "download",
+                            "checksum_url": secure_url,
+                            "algorithm": algorithm,
+                        },
+                    )
+                    return digest
+                tail = buffer[-_CHECKSUM_STREAM_TAIL_BYTES :]
     except requests.RequestException as exc:
         raise OntologyDownloadError(f"Failed to fetch checksum from {secure_url}: {exc}") from exc
-    digest = _extract_checksum_from_text(response.text, context=secure_url)
-    logger.info(
-        "fetched checksum",
-        extra={
-            "stage": "download",
-            "checksum_url": secure_url,
-            "algorithm": algorithm,
-        },
-    )
-    return digest
+    raise OntologyDownloadError(f"Unable to parse checksum from {secure_url}")
 
 
 def resolve_expected_checksum(

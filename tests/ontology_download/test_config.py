@@ -304,6 +304,15 @@ def test_download_config_service_rate_limits() -> None:
     assert config.parse_service_rate_limit("unknown") is None
 
 
+def test_download_config_service_rate_limits_invalid() -> None:
+    """Bad per-service rate limits should surface immediately."""
+
+    config = DownloadConfiguration()
+    config.rate_limits["obo"] = "garbage"
+    with pytest.raises(ValueError, match="Invalid rate limit 'garbage'"):
+        config.parse_service_rate_limit("obo")
+
+
 def test_download_config_invalid_rate_limit() -> None:
     """Invalid rate limit strings should raise a ValidationError."""
 

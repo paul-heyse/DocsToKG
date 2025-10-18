@@ -152,18 +152,28 @@ Tokenizer Alignment:
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+if __name__ == "__main__" and __package__ is None:
+    script_dir = Path(__file__).resolve().parent
+    if sys.path and sys.path[0] == str(script_dir):
+        sys.path.pop(0)
+    package_root = script_dir.parents[2]
+    if str(package_root) not in sys.path:
+        sys.path.insert(0, str(package_root))
+
 import argparse
 import importlib
 import json
 import os
 import time
-import uuid
 import statistics
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, fields
-from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Sequence, Tuple
+
 import uuid
 
 # Third-party imports
@@ -212,6 +222,7 @@ from DocsToKG.DocParsing.core import (
     ResumeController,
 )
 from DocsToKG.DocParsing.context import ParsingContext
+from DocsToKG.DocParsing.interfaces import ChunkingSerializerProvider
 from DocsToKG.DocParsing.env import (
     data_chunks,
     data_doctags,
@@ -235,6 +246,7 @@ from DocsToKG.DocParsing.io import (
 from DocsToKG.DocParsing.logging import (
     get_logger,
     log_event,
+    set_stage_telemetry,
 )
 from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
@@ -253,7 +265,7 @@ SOFT_BARRIER_MARGIN = 64
 CHUNK_STAGE = "chunking"
 
 
-def _resolve_serializer_provider(spec: str):
+def _resolve_serializer_provider(spec: str) -> type[ChunkingSerializerProvider]:
     """Return the serializer provider class referenced by ``spec``."""
 
     if ":" not in spec:
@@ -271,7 +283,11 @@ def _resolve_serializer_provider(spec: str):
         raise ImportError(
             f"Serializer provider '{class_name}' not found in module '{module_name}'"
         ) from exc
-    return provider_cls
+    if not isinstance(provider_cls, type):
+        raise TypeError(f"{spec!r} did not resolve to a class")
+    if not issubclass(provider_cls, ChunkingSerializerProvider):  # type: ignore[arg-type]
+        raise TypeError(f"{spec!r} is not a ChunkingSerializerProvider")
+    return provider_cls  # type: ignore[return-value]
 
 
 def _validate_chunk_files(
@@ -500,12 +516,12 @@ class ChunkerCfg(StageConfigBase):
         self.data_root = resolved_root
 
         if self.in_dir is None:
-            self.in_dir = data_doctags(resolved_root)
+            self.in_dir = data_doctags(resolved_root, ensure=False)
         else:
             self.in_dir = StageConfigBase._coerce_path(self.in_dir, None)
 
         if self.out_dir is None:
-            self.out_dir = data_chunks(resolved_root)
+            self.out_dir = data_chunks(resolved_root, ensure=False)
         else:
             self.out_dir = StageConfigBase._coerce_path(self.out_dir, None)
 
@@ -1453,6 +1469,12 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     """
 
     parser = build_parser()
+    bootstrap_root = detect_data_root()
+    try:
+        data_doctags(bootstrap_root)
+        data_chunks(bootstrap_root)
+    except Exception:
+        pass
     if args is None:
         namespace = parser.parse_args()
     elif isinstance(args, (argparse.Namespace, SimpleNamespace)):
@@ -1578,22 +1600,22 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     )
     docling_version = get_docling_version()
 
-    default_in_dir = data_doctags(resolved_data_root)
-    default_out_dir = data_chunks(resolved_data_root)
+    default_in_dir = data_doctags(resolved_data_root, ensure=False)
+    default_out_dir = data_chunks(resolved_data_root, ensure=False)
 
     in_dir = resolve_pipeline_path(
         cli_value=args.in_dir,
         default_path=default_in_dir,
         resolved_data_root=resolved_data_root,
         data_root_overridden=data_root_overridden,
-        resolver=data_doctags,
+        resolver=lambda root: data_doctags(root, ensure=False),
     )
     out_dir = resolve_pipeline_path(
         cli_value=args.out_dir,
         default_path=default_out_dir,
         resolved_data_root=resolved_data_root,
         data_root_overridden=data_root_overridden,
-        resolver=data_chunks,
+        resolver=lambda root: data_chunks(root, ensure=False),
     )
     in_dir = in_dir.resolve()
     out_dir = out_dir.resolve()
@@ -1655,12 +1677,6 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         context.update_extra(structural_markers=str(markers_path))
 
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    telemetry_sink = TelemetrySink(
-        resolve_attempts_path(MANIFEST_STAGE, resolved_data_root),
-        resolve_manifest_path(MANIFEST_STAGE, resolved_data_root),
-    )
-    stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=CHUNK_STAGE)
 
     files = list(iter_doctags(in_dir))
     if args.shard_count > 1:
@@ -1724,6 +1740,13 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         extra={"extra_fields": {"tokenizer_model": tokenizer_model}},
     )
 
+    telemetry_sink = TelemetrySink(
+        resolve_attempts_path(MANIFEST_STAGE, resolved_data_root),
+        resolve_manifest_path(MANIFEST_STAGE, resolved_data_root),
+    )
+    stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=CHUNK_STAGE)
+    set_stage_telemetry(stage_telemetry)
+
     if getattr(args, "validate_only", False):
         _run_validate_only(
             files=files,
@@ -1737,6 +1760,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
             out_dir=out_dir,
             telemetry=stage_telemetry,
         )
+        set_stage_telemetry(None)
         return 0
 
     chunk_config = ChunkWorkerConfig(
@@ -1860,6 +1884,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         )
 
     if not tasks:
+        set_stage_telemetry(None)
         return 0
 
     def handle_result(result: ChunkResult) -> None:
@@ -1895,6 +1920,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
                     "parse_engine": result.parse_engine,
                 },
             )
+            set_stage_telemetry(None)
             raise RuntimeError(
                 f"Chunking failed for {result.doc_id}: {result.error or 'unknown error'}"
             )
@@ -1947,6 +1973,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
             for result in pool.map(_process_chunk_task, tasks):
                 handle_result(result)
 
+    set_stage_telemetry(None)
     return 0
 
 
