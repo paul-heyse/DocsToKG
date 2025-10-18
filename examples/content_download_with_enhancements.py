@@ -94,7 +94,6 @@ def example_basic_download():
         "progress_callback": progress_tracker,
         "size_warning_threshold": 50 * 1024 * 1024,  # Warn if file > 50MB
         "skip_large_downloads": False,  # Don't skip, just warn
-        "max_bytes": 100 * 1024 * 1024,  # Hard limit: 100MB
     }
 
     try:
@@ -322,7 +321,6 @@ def example_size_limits_and_warnings():
     context: Dict[str, Any] = {
         "size_warning_threshold": 10 * 1024 * 1024,  # Warn at 10MB
         "skip_large_downloads": True,  # Skip downloads > threshold
-        "max_bytes": 50 * 1024 * 1024,  # Hard limit: 50MB
     }
 
     try:

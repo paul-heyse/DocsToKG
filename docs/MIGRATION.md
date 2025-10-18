@@ -49,5 +49,5 @@ This guide summarises the key operational updates introduced by the
 ## 6. Content Download Integrity Updates
 
 - Treat missing manifest reasons as successful downloads. Conditional hits still report ``conditional_not_modified``, while operator-triggered skips use the dedicated ``skip_large_download`` reason code.
-- Dashboards and notebooks should pivot on ``skip_large_download`` separately from ``domain_max_bytes`` to keep voluntary limits distinct from enforced quotas.
+- Dashboards and notebooks should track ``skip_large_download`` events explicitly to distinguish voluntary limits from genuine errors.
 - Manifest warm-up is lazy by default. Use ``--warm-manifest-cache`` only for small manifests; large deployments should rely on the lazy iterator to avoid >150 MB startup spikes and long cold starts.

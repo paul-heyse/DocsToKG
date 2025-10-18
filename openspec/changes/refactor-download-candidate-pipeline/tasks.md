@@ -7,9 +7,9 @@
 - [ ] 1.6 Add an integration-style test around `download_candidate` validating that the orchestrated path still emits progress callbacks and manifest-ready outcomes.
 
 ## 2. Harden partial download cleanup
-- [ ] 2.1 Ensure the stream size-limit guard (e.g., the `_MaxBytesExceeded` path in `download.py`) plus domain-policy max bytes and any other early-stream abort paths invoke `cleanup_sidecar_files` with the relevant classification hint before returning.
+- [ ] 2.1 Ensure streaming abort paths (e.g., chunked encoding errors, client cancellations, content-policy skips) invoke `cleanup_sidecar_files` with the relevant classification hint before returning.
 - [ ] 2.2 Gate the cleanup so that when range resume is explicitly enabled and supported we retain the partial file for retry (documented in code comments).
-- [ ] 2.3 Write regression tests that create temporary artifact directories and confirm `.part` files disappear after size-limit aborts for PDF and HTML payloads.
+- [ ] 2.3 Write regression tests that create temporary artifact directories and confirm `.part` files disappear after streaming failures for PDF and HTML payloads.
 - [ ] 2.4 Verify that successful retries continue to honor existing cache manifests (i.e., cleanup does not wipe successfully completed artifacts) and add assertions if needed.
 
 ## 3. Consolidate classification validation

@@ -128,7 +128,7 @@ retry_statuses: HTTP status codes that should trigger a retry. Defaults to
 ``{429, 500, 502, 503, 504}``.
 backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to ``0.75``.
 respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
-content_policy: Optional mapping describing max-bytes and allowed MIME types for the target host.
+content_policy: Optional mapping describing allowed MIME types for the target host.
 max_retry_duration: Maximum total time to spend on retries in seconds. If exceeded, raises
 immediately. Defaults to ``None`` (no limit).
 backoff_max: Maximum delay between retries in seconds. Prevents excessive wait times.

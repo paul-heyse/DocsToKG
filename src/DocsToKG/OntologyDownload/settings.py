@@ -141,7 +141,7 @@ class ValidationConfig(BaseModel):
         description="Validator names that should run in the process pool when enabled.",
     )
 
-    model_config = {"validate_assignment": True}
+    model_config = {"validate_assignment": True, "extra": "ignore"}
 
 
 class DownloadConfiguration(BaseModel):
@@ -161,7 +161,6 @@ class DownloadConfiguration(BaseModel):
         pattern=_RATE_LIMIT_PATTERN.pattern,
         description="Token bucket style rate limit expressed as <number>/<unit>",
     )
-    max_download_size_gb: float = Field(default=5.0, gt=0, le=100.0)
     max_uncompressed_size_gb: float = Field(
         default=10.0,
         gt=0,
@@ -239,11 +238,6 @@ class DownloadConfiguration(BaseModel):
         if parsed is None:
             raise ValueError(f"Invalid rate limit format: {self.per_host_rate_limit}")
         return parsed
-
-    def max_download_bytes(self) -> int:
-        """Return the maximum allowed download payload size in bytes."""
-
-        return int(self.max_download_size_gb * (1024**3))
 
     def max_uncompressed_bytes(self) -> int:
         """Return the maximum allowed uncompressed archive size in bytes."""
@@ -416,7 +410,7 @@ class DownloadConfiguration(BaseModel):
         copied._bucket_provider = self._bucket_provider
         return copied
 
-    model_config = {"validate_assignment": True}
+    model_config = {"validate_assignment": True, "extra": "ignore"}
 
 
 class PlannerConfig(BaseModel):

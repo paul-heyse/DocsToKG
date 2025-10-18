@@ -25,21 +25,17 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import settings as storage
+from DocsToKG.OntologyDownload.settings import FsspecStorageBackend
 
 
 @pytest.mark.skipif(importlib.util.find_spec("fsspec") is None, reason="fsspec not installed")
 # --- Test Cases ---
 
 
-def test_fsspec_storage_roundtrip(patch_stack, tmp_path: Path) -> None:
+def test_fsspec_storage_roundtrip(tmp_path: Path) -> None:
     """Remote storage should mirror uploads and allow subsequent retrievals."""
 
-    patch_stack.setenv("PYSTOW_HOME", str(tmp_path))
-    patch_stack.setenv("ONTOFETCH_STORAGE_URL", "memory://ontologies")
-
-    mod = importlib.reload(storage)
-    backend = mod.STORAGE
+    backend = FsspecStorageBackend("memory://ontologies")
 
     local_dir = backend.prepare_version("hp", "2024")
     manifest = local_dir / "manifest.json"
@@ -59,6 +55,3 @@ def test_fsspec_storage_roundtrip(patch_stack, tmp_path: Path) -> None:
 
     backend.fs.get_file(str(remote_manifest), str(manifest))
     assert manifest.exists()
-
-    patch_stack.delenv("ONTOFETCH_STORAGE_URL", raising=False)
-    importlib.reload(storage)

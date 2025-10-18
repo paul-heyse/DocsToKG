@@ -12,7 +12,6 @@ defaults:
     rate_limits:
       ols: "5/second"
       bioportal: "1/second"
-    max_download_size_gb: 5
     validate_media_type: true
   validation:
     parser_timeout_sec: 60

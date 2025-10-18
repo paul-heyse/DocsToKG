@@ -92,9 +92,9 @@ class TestContentPolicyError:
 
     def test_init_minimal(self):
         """Test initialization with only message and violation."""
-        exc = ContentPolicyError("Policy violation", violation="max-bytes")
+        exc = ContentPolicyError("Policy violation", violation="content-type")
         assert str(exc) == "Policy violation"
-        assert exc.violation == "max-bytes"
+        assert exc.violation == "content-type"
         assert exc.policy == {}
 
 

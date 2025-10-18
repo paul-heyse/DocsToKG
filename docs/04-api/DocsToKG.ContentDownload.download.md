@@ -254,10 +254,6 @@ Concrete :class:`DownloadStrategy` used for XML artifacts. It shares the common
 finalisation flow while deferring classification-specific behaviour to the
 strategy protocol.
 
-### `_MaxBytesExceeded`
-
-Internal signal raised when the stream exceeds the configured byte budget.
-
 ### `RobotsCache`
 
 Cache robots.txt policies per host and evaluate allowed URLs with TTL.

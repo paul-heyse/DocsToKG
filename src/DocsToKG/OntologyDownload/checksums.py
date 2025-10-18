@@ -18,7 +18,6 @@ ErrorType = Type[Exception]
 _DIGEST_PATTERN = re.compile(r"(?i)\b([0-9a-f]{32,128})\b")
 _CHECKSUM_STREAM_CHUNK_SIZE = 8192
 _CHECKSUM_STREAM_TAIL_BYTES = 128
-_CHECKSUM_STREAM_MAX_BYTES = 2 * 1024 * 1024  # 2 MiB ceiling prevents unbounded reads
 
 
 @dataclass(slots=True, frozen=True)
@@ -151,10 +150,6 @@ def _fetch_checksum_from_url(
                 if not chunk:
                     continue
                 total_bytes += len(chunk)
-                if total_bytes > _CHECKSUM_STREAM_MAX_BYTES:
-                    raise OntologyDownloadError(
-                        f"checksum response too large (> {_CHECKSUM_STREAM_MAX_BYTES} bytes)"
-                    )
                 buffer = tail + chunk
                 match = _DIGEST_PATTERN.search(buffer.decode("utf-8", errors="ignore"))
                 if match:

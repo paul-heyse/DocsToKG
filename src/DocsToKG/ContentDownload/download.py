@@ -1767,6 +1767,14 @@ def download_candidate(
                     exc,
                     extra={"extra_fields": {"work_id": artifact.work_id}},
                 )
+                # Ensure partial artifacts are removed when streaming aborts mid-transfer
+                if dest_path is not None and not dry_run:
+                    classification_hint = (
+                        detected
+                        if detected in {Classification.PDF, Classification.HTML, Classification.XML}
+                        else Classification.PDF
+                    )
+                    cleanup_sidecar_files(artifact, classification_hint, ctx)
                 seen_attempts = ctx.stream_retry_attempts
                 if seen_attempts < 1:
                     ctx.stream_retry_attempts = seen_attempts + 1

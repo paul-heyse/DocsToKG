@@ -366,7 +366,6 @@ EXAMPLE_SOURCES_YAML = """# Example configuration for ontology downloader\ndefau
     timeout_sec: 30
     backoff_factor: 0.5
     per_host_rate_limit: "4/second"
-    max_download_size_gb: 5
     max_uncompressed_size_gb: 10
     validate_media_type: true
   validation:

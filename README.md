@@ -160,8 +160,6 @@ back to the original ``GET`` attempt to avoid false negatives.
 - ``--resolver-config config.yaml``: load advanced options such as
   ``max_concurrent_resolvers`` and ``resolver_head_precheck`` (see
   ``docs/resolver-configuration.md``).
-- ``--max-bytes <n>``: abort downloads that exceed ``n`` bytes and classify them as
-  ``html_too_large`` / ``payload_too_large``.
 
 ### Resolver Enhancements
 

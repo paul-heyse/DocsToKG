@@ -11,8 +11,8 @@ The downloader SHALL orchestrate candidate fetches via discrete phases (prefligh
 ### Requirement: Partial artifact cleanup
 The downloader SHALL remove partial artifact files (including `.part` suffixes) whenever streaming aborts before completion, unless range resume is explicitly enabled and supported.
 
-#### Scenario: Size limit abort
-- **WHEN** streaming exceeds the configured max-bytes limit for a PDF
+#### Scenario: Streaming failure cleanup
+- **WHEN** streaming fails mid-transfer because of a chunked encoding error
 - **THEN** the system calls `cleanup_sidecar_files` for the artifact
 - **AND** no `.part` file remains in the artifact directory after the outcome is returned.
 
@@ -33,6 +33,14 @@ The system SHALL expose a single source of truth for download configuration so C
 - **WHEN** CLI arguments enable `skip_head_precheck` and provide a progress callback hook
 - **THEN** the unified configuration propagates these settings to the pipeline execution without bespoke wiring
 - **AND** tests cover the round-trip via `.to_context()` and `.from_cli_args()`.
+
+### Requirement: Remove global byte caps
+The downloader SHALL rely on warning thresholds and policy-driven skips instead of enforcing per-request byte ceilings.
+
+#### Scenario: CLI flag removed
+- **WHEN** the CLI help output is inspected
+- **THEN** no `--max-bytes` argument is available
+- **AND** legacy configurations specifying `max_bytes` or `max_download_size_gb` fields are ignored without raising validation errors.
 
 ### Requirement: Authoritative outcome classification
 The runner SHALL trust downloader outcomes as authoritative, avoiding duplicate classification validation while preserving manifest reason codes produced by the downloader.

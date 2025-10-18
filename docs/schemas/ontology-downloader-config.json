@@ -81,13 +81,6 @@
           "title": "Per Host Rate Limit",
           "type": "string"
         },
-        "max_download_size_gb": {
-          "default": 5.0,
-          "exclusiveMinimum": 0,
-          "maximum": 100.0,
-          "title": "Max Download Size Gb",
-          "type": "number"
-        },
         "concurrent_downloads": {
           "default": 1,
           "maximum": 10,

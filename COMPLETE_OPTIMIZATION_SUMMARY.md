@@ -160,7 +160,6 @@ context = {
     "size_warning_threshold": 100 * 1024 * 1024,
     "skip_large_downloads": False,
     "chunk_size": 128 * 1024,
-    "max_bytes": 500 * 1024 * 1024,  # 500MB hard limit
 }
 
 # Request with enhanced retry
@@ -333,7 +332,6 @@ context = {
     "progress_callback": progress_logger,
     "size_warning_threshold": 50 * 1024 * 1024,  # 50MB
     "skip_large_downloads": True,  # Auto-skip large files
-    "max_bytes": 100 * 1024 * 1024,  # 100MB hard limit
 }
 
 session = create_session(

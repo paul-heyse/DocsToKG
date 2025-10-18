@@ -453,7 +453,7 @@ max_concurrent_per_host: Upper bound on simultaneous downloads per hostname.
 enable_global_url_dedup: Enable global URL deduplication across works when True.
 domain_token_buckets: Mapping of hostname to token bucket parameters.
 domain_bytes_budget: Mapping of hostname to maximum bytes permitted this run.
-domain_content_rules: Mapping of hostname to MIME allow-lists and max-bytes caps.
+domain_content_rules: Mapping of hostname to MIME allow-lists.
 resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
 
 Notes:

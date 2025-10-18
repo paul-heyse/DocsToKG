@@ -355,6 +355,7 @@ from DocsToKG.OntologyDownload.settings import (
     PolicyError,
     ResolvedConfig,
 )
+from DocsToKG.OntologyDownload.testing import ResponseSpec
 
 
 @dataclass
@@ -806,27 +807,6 @@ def test_head_check_graceful_on_405(patch_stack, tmp_path):
 
     assert content_type is None
     assert content_length is None
-
-
-def test_head_check_raises_on_oversized(patch_stack, tmp_path):
-    oversize_bytes = 6 * 1024 * 1024 * 1024
-    head_response = DummyResponse(
-        200,
-        b"",
-        {"Content-Length": str(oversize_bytes)},
-    )
-    session = make_session(patch_stack, [], head_responses=[head_response])
-    downloader = download.StreamingDownloader(
-        destination=tmp_path / "file.owl",
-        headers={},
-        http_config=DownloadConfiguration(max_download_size_gb=5.0),
-        previous_manifest=None,
-        logger=_noop_logger(),
-    )
-    with pytest.raises(PolicyError) as exc_info:
-        downloader._preliminary_head_check("https://example.org/huge.owl", session)
-
-    assert "exceeds limit" in str(exc_info.value)
 
 
 def test_validate_media_type_match(tmp_path):
@@ -1337,21 +1317,6 @@ def test_read_manifest_applies_migration(tmp_path, patch_stack):
     assert payload["schema_version"] == "1.0"
     assert payload["resolver_attempts"] == []
     assert observed == {"schema_version": "1.0", "resolver_attempts": []}
-
-
-def test_download_stream_rejects_large_content(patch_stack, tmp_path):
-    response = DummyResponse(200, b"data", {"Content-Length": str(10 * 1024 * 1024 * 1024)})
-    make_session(patch_stack, [response])
-    with pytest.raises(OntologyDownloadError):
-        download.download_stream(
-            url="https://example.org/file.owl",
-            destination=tmp_path / "file.owl",
-            headers={},
-            previous_manifest=None,
-            http_config=DownloadConfiguration(max_download_size_gb=1),
-            cache_dir=tmp_path / "cache",
-            logger=_noop_logger(),
-        )
 
 
 def test_version_lock_serializes_concurrent_writers(tmp_path):

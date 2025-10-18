@@ -607,8 +607,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
             headers. Each element is ``None`` when the origin omits it.
 
         Raises:
-            PolicyError: If the origin reports a payload larger than the
-                configured ``max_download_size_gb`` limit.
+            PolicyError: Propagates download policy errors encountered during the HEAD request.
         """
 
         try:
@@ -640,25 +639,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
         content_type = response.headers.get("Content-Type")
         content_length_header = response.headers.get("Content-Length")
         content_length = int(content_length_header) if content_length_header else None
-
-        if content_length:
-            max_bytes = self.http_config.max_download_bytes()
-            if content_length > max_bytes:
-                self.logger.error(
-                    "file exceeds size limit (HEAD check)",
-                    extra={
-                        "stage": "download",
-                        "content_length": content_length,
-                        "limit_bytes": max_bytes,
-                        "url": url,
-                    },
-                )
-                raise PolicyError(
-                    "File size {size} bytes exceeds limit of {limit} GB (detected via HEAD)".format(
-                        size=content_length,
-                        limit=self.http_config.max_download_size_gb,
-                    )
-                )
 
         return content_type, content_length
 
@@ -758,7 +738,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
             pooch_logger: Logger instance supplied by pooch (unused).
 
         Raises:
-            PolicyError: If download limits are exceeded.
+            PolicyError: If download policies are violated (e.g., invalid URLs or disallowed MIME types).
             OntologyDownloadError: If filesystem errors occur.
             requests.HTTPError: Propagated when HTTP status codes indicate failure.
 
@@ -937,20 +917,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     self.response_content_length = parsed_length
                     if parsed_length is not None:
                         total_bytes = parsed_length
-                    max_bytes = self.http_config.max_download_bytes()
-                    if total_bytes is not None and total_bytes > max_bytes:
-                        self.logger.error(
-                            "file exceeds size limit",
-                            extra={
-                                "stage": "download",
-                                "size": total_bytes,
-                                "limit": max_bytes,
-                            },
-                        )
-                        raise PolicyError(
-                            f"File size {total_bytes} exceeds configured limit of "
-                            f"{self.http_config.max_download_size_gb} GB"
-                        )
                     if total_bytes:
                         completed_fraction = resume_position / total_bytes
                         if completed_fraction >= 1:
@@ -986,18 +952,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                         if next_progress > 1:
                                             next_progress = None
                                             break
-                                if bytes_downloaded > self.http_config.max_download_bytes():
-                                    self.logger.error(
-                                        "download exceeded size limit",
-                                        extra={
-                                            "stage": "download",
-                                            "size": bytes_downloaded,
-                                            "limit": self.http_config.max_download_bytes(),
-                                        },
-                                    )
-                                    raise PolicyError(
-                                        "Download exceeded maximum configured size while streaming"
-                                    )
                     except OSError as exc:
                         part_path.unlink(missing_ok=True)
                         self.logger.error(

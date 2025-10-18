@@ -181,6 +181,8 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         self._http_thread: Optional[threading.Thread] = None
         self._http_server: Optional[_ThreadedHTTPServer] = None
         self._http_root: Optional[str] = None
+        self._http_host: Optional[str] = None
+        self._http_port: Optional[int] = None
         self._original_paths: Dict[str, Dict[str, object]] = {}
         self._storage: Optional[_StorageBackend] = None
         self._bucket_state: Dict[Tuple[Optional[str], Optional[str]], rate_mod.TokenBucket] = {}
@@ -312,6 +314,8 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         self._http_server = server
         self._http_thread = thread
         self._http_root = f"http://{host}:{port}/"
+        self._http_host = host
+        self._http_port = port
 
     def _stop_http_server(self) -> None:
         if self._http_server is not None:
@@ -322,6 +326,8 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
             self._http_thread.join(timeout=5)
             self._http_thread = None
         self._responses.clear()
+        self._http_host = None
+        self._http_port = None
 
     def http_url(self, path: str) -> str:
         """Return the absolute URL served by the harness for ``path``."""
@@ -389,6 +395,12 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         config = DownloadConfiguration()
         config.set_session_factory(self._session_factory)
         config.set_bucket_provider(self._bucket_provider)
+        if self._http_host:
+            allowed = [self._http_host]
+            if self._http_port is not None:
+                allowed.append(f"{self._http_host}:{self._http_port}")
+            config.allowed_hosts = allowed
+            config.allowed_ports = list({80, 443, self._http_port} if self._http_port else {80, 443})
         return config
 
     def build_resolved_config(self) -> ResolvedConfig:

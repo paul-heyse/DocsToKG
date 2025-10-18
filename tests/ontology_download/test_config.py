@@ -187,8 +187,10 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 import sys
 import textwrap
+from contextlib import contextmanager, redirect_stderr
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
@@ -198,11 +200,20 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
+from unittest.mock import patch
+
 from pydantic import BaseModel, ValidationError
 
 from DocsToKG.OntologyDownload import api as core
 from DocsToKG.OntologyDownload import planning as pipeline_mod
-from DocsToKG.OntologyDownload.planning import RESOLVERS, FetchPlan, ResolverError, merge_defaults
+from DocsToKG.OntologyDownload.planning import (
+    RESOLVERS,
+    ConfigurationError,
+    FetchPlan,
+    ResolverError,
+    merge_defaults,
+)
+from DocsToKG.OntologyDownload.errors import OntologyDownloadError
 from DocsToKG.OntologyDownload.settings import (
     ConfigError,
     DefaultsConfig,
@@ -216,6 +227,23 @@ from DocsToKG.OntologyDownload.settings import (
     load_raw_yaml,
     validate_config,
 )
+from DocsToKG.OntologyDownload.testing import temporary_resolver
+
+
+@contextmanager
+def temporary_env(**overrides: str):
+    previous = {}
+    try:
+        for key, value in overrides.items():
+            previous[key] = os.environ.get(key)
+            os.environ[key] = value
+        yield
+    finally:
+        for key, old in previous.items():
+            if old is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old
 
 # --- Test Cases ---
 
@@ -289,6 +317,24 @@ def test_download_config_rate_limit_formats() -> None:
 
     config = DownloadConfiguration(per_host_rate_limit="3600/hour")
     assert config.rate_limit_per_second() == pytest.approx(1.0)
+
+
+def test_download_config_ignores_legacy_max_bytes() -> None:
+    """Legacy max-bytes values should be ignored instead of raising errors."""
+
+    raw_config = {
+        "defaults": {
+            "http": {
+                "max_download_size_gb": 5,
+                "timeout_sec": 45,
+            }
+        },
+        "ontologies": [],
+    }
+
+    resolved = build_resolved_config(raw_config)
+    http_settings = resolved.defaults.http.model_dump()
+    assert "max_download_size_gb" not in http_settings
 
 
 def test_download_config_service_rate_limits() -> None:
@@ -429,29 +475,33 @@ def test_defaults_config_prefer_source_validation() -> None:
         DefaultsConfig(prefer_source=["obo", "invalid-resolver"])
 
 
-def test_env_override_applies_settings(patch_stack, tmp_path: Path) -> None:
+def test_env_override_applies_settings(tmp_path: Path) -> None:
     """Environment overrides should be merged into defaults via Pydantic settings."""
 
-    patch_stack.setenv("ONTOFETCH_MAX_RETRIES", "3")
-    patch_stack.setenv("ONTOFETCH_TIMEOUT_SEC", "45")
-    patch_stack.setenv("ONTOFETCH_SHARED_RATE_LIMIT_DIR", str(tmp_path))
-    patch_stack.setenv("ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB", "12.5")
     raw_config: Dict[str, object] = {"ontologies": []}
 
-    resolved = build_resolved_config(raw_config)
+    with temporary_env(
+        ONTOFETCH_MAX_RETRIES="3",
+        ONTOFETCH_TIMEOUT_SEC="45",
+        ONTOFETCH_SHARED_RATE_LIMIT_DIR=str(tmp_path),
+        ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB="12.5",
+    ):
+        resolved = build_resolved_config(raw_config)
     assert resolved.defaults.http.max_retries == 3
     assert resolved.defaults.http.timeout_sec == 45
     assert resolved.defaults.http.shared_rate_limit_dir == tmp_path
     assert resolved.defaults.http.max_uncompressed_size_gb == pytest.approx(12.5)
 
 
-def test_get_env_overrides_backwards_compatible(patch_stack, tmp_path: Path) -> None:
+def test_get_env_overrides_backwards_compatible(tmp_path: Path) -> None:
     """get_env_overrides should expose overrides for legacy code paths."""
 
-    patch_stack.setenv("ONTOFETCH_BACKOFF_FACTOR", "1.5")
-    patch_stack.setenv("ONTOFETCH_SHARED_RATE_LIMIT_DIR", str(tmp_path))
-    patch_stack.setenv("ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB", "15")
-    overrides = get_env_overrides()
+    with temporary_env(
+        ONTOFETCH_BACKOFF_FACTOR="1.5",
+        ONTOFETCH_SHARED_RATE_LIMIT_DIR=str(tmp_path),
+        ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB="15",
+    ):
+        overrides = get_env_overrides()
     assert overrides["backoff_factor"] == "1.5"
     assert overrides["shared_rate_limit_dir"] == str(tmp_path)
     assert float(overrides["max_uncompressed_size_gb"]) == pytest.approx(15.0)
@@ -518,14 +568,14 @@ def test_validate_config_rejects_non_mapping_extras(tmp_path: Path) -> None:
     assert "extras" in str(exc_info.value)
 
 
-def test_load_raw_yaml_missing_file_exits(tmp_path: Path, patch_stack) -> None:
+def test_load_raw_yaml_missing_file_exits(tmp_path: Path) -> None:
     """Missing YAML files should exit with status code 2 and helpful message."""
 
     path = tmp_path / "missing.yaml"
     stderr = io.StringIO()
-    patch_stack.setattr(sys, "stderr", stderr)
-    with pytest.raises(SystemExit) as exc_info:
-        load_raw_yaml(path)
+    with redirect_stderr(stderr):
+        with pytest.raises(SystemExit) as exc_info:
+            load_raw_yaml(path)
     assert exc_info.value.code == 2
     assert "Configuration file not found" in stderr.getvalue()
 
@@ -539,7 +589,7 @@ def test_load_config_invalid_yaml(tmp_path: Path) -> None:
         load_config(config_path)
 
 
-def test_fetch_one_rejects_disallowed_license(patch_stack) -> None:
+def test_fetch_one_rejects_disallowed_license() -> None:
     """fetch_one should reject ontologies with disallowed licenses."""
 
     class StubResolver:
@@ -554,12 +604,12 @@ def test_fetch_one_rejects_disallowed_license(patch_stack) -> None:
                 service=spec.resolver,
             )
 
-    patch_stack.setitem(RESOLVERS, "stub", StubResolver())
     config = ResolvedConfig(defaults=DefaultsConfig(accept_licenses=["CC0-1.0"]), specs=[])
-    spec = core.FetchSpec(id="example", resolver="stub", extras={}, target_formats=["owl"])
+    spec = pipeline_mod.FetchSpec(id="example", resolver="stub", extras={}, target_formats=["owl"])
 
-    with pytest.raises(core.ConfigurationError):
-        core.fetch_one(spec, config=config, force=True, logger=_noop_logger())
+    with temporary_resolver("stub", StubResolver()):
+        with pytest.raises(ConfigurationError):
+            pipeline_mod.fetch_one(spec, config=config, force=True, logger=_noop_logger())
 
 
 def test_fetch_one_unknown_resolver() -> None:
@@ -572,10 +622,10 @@ def test_fetch_one_unknown_resolver() -> None:
         )
 
 
-def test_fetch_one_download_error(patch_stack) -> None:
+def test_fetch_one_download_error() -> None:
     """Download failures should be wrapped in OntologyDownloadError."""
 
-    spec = core.FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
+    spec = pipeline_mod.FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
 
     class StubResolver:
         def plan(self, spec, config, logger):
@@ -589,17 +639,18 @@ def test_fetch_one_download_error(patch_stack) -> None:
                 service=spec.resolver,
             )
 
-    patch_stack.setitem(RESOLVERS, "obo", StubResolver())
-    patch_stack.setattr(
-        pipeline_mod,
-        "download_stream",
-        lambda **_: (_ for _ in ()).throw(ConfigError("boom")),
-    )
+    failing_download = lambda **_: (_ for _ in ()).throw(ConfigError("boom"))
 
-    with pytest.raises(core.OntologyDownloadError):
-        core.fetch_one(
-            spec, config=ResolvedConfig.from_defaults(), force=True, logger=_noop_logger()
-        )
+    with temporary_resolver("obo", StubResolver()):
+        with patch.object(
+            pipeline_mod,
+            "download_stream",
+            side_effect=lambda **_: failing_download(),
+        ):
+            with pytest.raises(OntologyDownloadError):
+                pipeline_mod.fetch_one(
+                    spec, config=ResolvedConfig.from_defaults(), force=True, logger=_noop_logger()
+                )
 
 
 # --- Helper Functions ---

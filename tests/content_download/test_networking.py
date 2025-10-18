@@ -973,12 +973,60 @@ if HAS_REQUESTS and HAS_PYALEX:
             referer=None,
             timeout=5.0,
             context=context,
-        )
+    )
 
-        assert outcome.classification is Classification.SKIPPED
-        assert outcome.reason is ReasonCode.DOMAIN_DISALLOWED_MIME
+    assert outcome.classification is Classification.SKIPPED
+    assert outcome.reason is ReasonCode.DOMAIN_DISALLOWED_MIME
 
-    def test_skip_large_downloads_emit_voluntary_reason(tmp_path: Path, patcher) -> None:
+def test_download_candidate_cleans_partial_on_stream_failure(tmp_path: Path, monkeypatch):
+    artifact = _make_artifact(tmp_path)
+    artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
+
+    class _Response:
+        def __init__(self) -> None:
+            self.status_code = 200
+            self.headers = {"Content-Type": "application/pdf"}
+
+        def __enter__(self) -> "_Response":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            self.close()
+
+        def iter_content(self, chunk_size: int = 1024) -> Iterable[bytes]:
+            yield b"%PDF-1.4\n"
+            yield b"data"
+
+        def close(self) -> None:
+            return None
+
+    class _Session:
+        def request(self, *, method: str, url: str, **kwargs: Any) -> _Response:
+            assert method == "GET"
+            return _Response()
+
+    def _failing_atomic_write(dest_path: Path, chunks: Iterable[bytes], **kwargs: Any) -> None:
+        part_path = dest_path.with_suffix(dest_path.suffix + ".part")
+        part_path.parent.mkdir(parents=True, exist_ok=True)
+        part_path.write_bytes(b"partial")
+        raise requests.exceptions.ChunkedEncodingError("stream interrupted")
+
+    monkeypatch.setattr(download_impl, "atomic_write", _failing_atomic_write)
+
+    outcome = download_candidate(
+        _Session(),
+        artifact,
+        "https://example.org/bad.pdf",
+        referer=None,
+        timeout=5.0,
+        context={"previous": {}},
+    )
+
+    assert outcome.classification is Classification.HTTP_ERROR
+    assert not any(artifact.pdf_dir.glob("*.part"))
+
+
+def test_skip_large_downloads_emit_voluntary_reason(tmp_path: Path, patcher) -> None:
         artifact = _make_artifact(tmp_path)
         url = "https://example.org/oversized.pdf"
 

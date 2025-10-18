@@ -17,7 +17,7 @@ Proactive monitoring keeps ingestion pipelines, ontology downloaders, and hybrid
 
 ### Content Download Telemetry
 
-- Aggregate reason codes from manifest/attempt logs to distinguish conditional hits (`conditional_not_modified`), voluntary skips (`skip_large_download`), and enforced quota exits (`domain_max_bytes`).
+- Aggregate reason codes from manifest/attempt logs to distinguish conditional hits (`conditional_not_modified`) and voluntary skips (`skip_large_download`).
 - Surface the `resume_disabled` flag emitted in attempt metadata when callers still request HTTP range resume—the downloader ignores the flag but the tag helps spot outdated automation.
 - Treat missing reason codes as successful downloads in dashboards and notebooks.
 

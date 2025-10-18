@@ -373,7 +373,6 @@ context = {
     "size_warning_threshold": 50 * 1024 * 1024,  # 50MB (lower threshold)
     "skip_large_downloads": True,  # Auto-skip large files
     "chunk_size": 16 * 1024,  # 16KB chunks
-    "max_bytes": 100 * 1024 * 1024,  # Hard limit at 100MB
 }
 
 # Use conservative retry settings

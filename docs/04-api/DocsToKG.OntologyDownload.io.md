@@ -223,9 +223,7 @@ Clear all registered buckets (used in tests).
 
 Probe the origin with HEAD to audit media type and size before downloading.
 
-The HEAD probe allows the pipeline to abort before streaming large
-payloads that exceed configured limits and to log early warnings for
-mismatched Content-Type headers reported by the origin.
+The HEAD probe logs early warnings for mismatched Content-Type headers reported by the origin and returns metadata that downstream components can use to inform progress reporting.
 
 Args:
 url: Fully qualified download URL resolved by the planner.
@@ -234,10 +232,6 @@ session: Prepared requests session used for outbound calls.
 Returns:
 Tuple ``(content_type, content_length)`` extracted from response
 headers. Each element is ``None`` when the origin omits it.
-
-Raises:
-PolicyError: If the origin reports a payload larger than the
-configured ``max_download_size_gb`` limit.
 
 ### `_validate_media_type(self, actual_content_type, expected_media_type, url)`
 
