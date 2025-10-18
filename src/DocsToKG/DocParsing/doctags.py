@@ -299,7 +299,11 @@ from typing import (
 import requests
 from tqdm import tqdm
 
-from DocsToKG.DocParsing.config import StageConfigBase
+from DocsToKG.DocParsing.config import (
+    StageConfigBase,
+    annotate_cli_overrides,
+    parse_args_with_overrides,
+)
 from DocsToKG.DocParsing.core import (
     PDF_MODEL_SUBDIR,
     CLIOption,
@@ -926,7 +930,8 @@ def pdf_parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         SystemExit: Propagated if ``argparse`` detects invalid arguments.
     """
 
-    return pdf_build_parser().parse_args(argv)
+    parser = pdf_build_parser()
+    return parse_args_with_overrides(parser, argv)
 
 
 # --- PDF Pipeline ---
@@ -1561,6 +1566,9 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         namespace = pdf_parse_args()
     elif isinstance(args, argparse.Namespace):
         namespace = args
+        if getattr(namespace, "_cli_explicit_overrides", None) is None:
+            keys = [name for name in vars(namespace) if not name.startswith("_")]
+            annotate_cli_overrides(namespace, explicit=keys, defaults={})
     else:
         namespace = pdf_parse_args(args)
 
@@ -2018,7 +2026,8 @@ def html_parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         SystemExit: Propagated if ``argparse`` detects invalid options.
     """
 
-    return html_build_parser().parse_args(argv)
+    parser = html_build_parser()
+    return parse_args_with_overrides(parser, argv)
 
 
 @dataclass
@@ -2282,6 +2291,9 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         namespace = html_parse_args()
     elif isinstance(args, argparse.Namespace):
         namespace = args
+        if getattr(namespace, "_cli_explicit_overrides", None) is None:
+            keys = [name for name in vars(namespace) if not name.startswith("_")]
+            annotate_cli_overrides(namespace, explicit=keys, defaults={})
     else:
         namespace = html_parse_args(args)
 

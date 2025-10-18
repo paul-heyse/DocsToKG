@@ -337,7 +337,11 @@ except Exception:  # pragma: no cover - fallback when tqdm is unavailable
     def tqdm(iterable=None, **kwargs):  # type: ignore
         return _TqdmFallback(iterable, **kwargs)
 
-from DocsToKG.DocParsing.config import StageConfigBase
+from DocsToKG.DocParsing.config import (
+    StageConfigBase,
+    annotate_cli_overrides,
+    parse_args_with_overrides,
+)
 from DocsToKG.DocParsing.core import (
     DEFAULT_TOKENIZER,
     UUID_NAMESPACE,
@@ -1523,7 +1527,10 @@ def _qwen_embed_direct(
             download_dir=str(HF_HOME),  # belt & suspenders: keep any aux files in your cache
         )
         if use_cache:
-            _QWEN_LLM_CACHE.put(cache_key, llm)
+            if hasattr(_QWEN_LLM_CACHE, "put"):
+                _QWEN_LLM_CACHE.put(cache_key, llm)
+            else:  # pragma: no cover - compatibility with dict-like caches in tests
+                _QWEN_LLM_CACHE[cache_key] = llm
     pool = PoolingParams(normalize=True, dimensions=int(cfg.dim))
     out: List[List[float]] = []
     try:
@@ -2296,7 +2303,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         SystemExit: Propagated if ``argparse`` reports invalid options.
     """
 
-    return build_parser().parse_args(argv)
+    parser = build_parser()
+    return parse_args_with_overrides(parser, argv)
 
 
 def main(args: argparse.Namespace | None = None) -> int:
@@ -2321,16 +2329,22 @@ def main(args: argparse.Namespace | None = None) -> int:
     except Exception:
         pass
     if args is None:
-        namespace = parser.parse_args()
+        namespace = parse_args_with_overrides(parser)
     elif isinstance(args, argparse.Namespace):
         namespace = args
+        if getattr(namespace, "_cli_explicit_overrides", None) is None:
+            keys = [name for name in vars(namespace) if not name.startswith("_")]
+            annotate_cli_overrides(namespace, explicit=keys, defaults={})
     elif isinstance(args, SimpleNamespace) or hasattr(args, "__dict__"):
-        defaults = parser.parse_args([])
-        for key, value in vars(args).items():
-            setattr(defaults, key, value)
-        namespace = defaults
+        base = parse_args_with_overrides(parser, [])
+        payload = {key: value for key, value in vars(args).items() if not key.startswith("_")}
+        for key, value in payload.items():
+            setattr(base, key, value)
+        defaults = getattr(base, "_cli_defaults", {})
+        annotate_cli_overrides(base, explicit=payload.keys(), defaults=defaults)
+        namespace = base
     else:
-        namespace = parser.parse_args(args)
+        namespace = parse_args_with_overrides(parser, args)
 
     if getattr(namespace, "plan_only", False) and getattr(namespace, "validate_only", False):
         raise ValueError("--plan-only cannot be combined with --validate-only")

@@ -288,15 +288,17 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import importlib
 import json
 import socket
 import sys
 import uuid
 import warnings
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from typing import Any
+from typing import Any, ClassVar, Dict
 
 import pytest
 
@@ -414,9 +416,12 @@ class _DummyTqdm:
         return iter(self._iterable)
 
 
+import DocsToKG.DocParsing.config as doc_config  # noqa: E402
+import DocsToKG.DocParsing.chunking as doc_chunking  # noqa: E402
 import DocsToKG.DocParsing.env as doc_env  # noqa: E402
 import DocsToKG.DocParsing.io as doc_io  # noqa: E402
 import DocsToKG.DocParsing.logging as doc_logging  # noqa: E402
+import DocsToKG.DocParsing.telemetry as doc_telemetry  # noqa: E402
 from DocsToKG.DocParsing import core, formats  # noqa: E402
 from DocsToKG.DocParsing.formats import (  # noqa: E402
     CHUNK_SCHEMA_VERSION,
@@ -570,6 +575,272 @@ def test_jsonl_save_validation_error(tmp_path: Path) -> None:
         doc_io.jsonl_save(target, [{"a": 1}], validate=validate)
 
 
+def test_jsonl_append_iter_appends_atomically(tmp_path: Path) -> None:
+    target = tmp_path / "logs" / "events.jsonl"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    doc_io.jsonl_save(target, [{"id": 1}])
+
+    appended = [{"id": 2}, {"id": 3}]
+    count = doc_io.jsonl_append_iter(target, appended, atomic=True)
+    assert count == 2
+
+    records = [json.loads(line) for line in target.read_text(encoding="utf-8").splitlines()]
+    assert [row["id"] for row in records] == [1, 2, 3]
+
+
+def test_jsonl_append_iter_non_atomic(tmp_path: Path) -> None:
+    target = tmp_path / "data.jsonl"
+    doc_io.jsonl_save(target, [{"value": "initial"}])
+    count = doc_io.jsonl_append_iter(target, [{"value": "later"}], atomic=False)
+    assert count == 1
+    records = [json.loads(line) for line in target.read_text(encoding="utf-8").splitlines()]
+    assert [row["value"] for row in records] == ["initial", "later"]
+
+
+def test_extract_refs_and_pages_handles_invalid_metadata(capsys) -> None:
+    chunk = SimpleNamespace(
+        meta=SimpleNamespace(
+            document_id="doc-1",
+            doc_items=[
+                SimpleNamespace(
+                    self_ref="ref-1",
+                    prov=[
+                        SimpleNamespace(page_no=2),
+                        SimpleNamespace(page_no="page-x"),
+                    ],
+                )
+            ],
+        )
+    )
+
+    capsys.readouterr()
+    refs, pages = doc_chunking.extract_refs_and_pages(chunk)
+    stderr = capsys.readouterr().err
+
+    assert refs == ["ref-1"]
+    assert pages == [2]
+    assert '"error_code": "CHUNK_PAGE_INVALID"' in stderr
+
+
+def test_extract_refs_and_pages_surfaces_doc_items_failures() -> None:
+    class BrokenMeta:
+        document_id = "doc-err"
+
+        @property
+        def doc_items(self):
+            raise RuntimeError("boom")
+
+    chunk = SimpleNamespace(meta=BrokenMeta())
+
+    with pytest.raises(RuntimeError, match="boom"):
+        doc_chunking.extract_refs_and_pages(chunk)
+
+
+def test_summarize_image_metadata_logs_non_iterable_sources(capsys) -> None:
+    non_iterable_annotations = object()
+    predicted_holder = SimpleNamespace(predicted_classes=object())
+    doc_items = [
+        SimpleNamespace(
+            doc_item=SimpleNamespace(
+                _docstokg_flags={
+                    "has_image_captions": True,
+                    "has_image_classification": False,
+                    "image_confidence": 0.7,
+                },
+                _docstokg_meta=None,
+                annotations=non_iterable_annotations,
+            ),
+            annotations=None,
+        ),
+        SimpleNamespace(
+            doc_item=SimpleNamespace(
+                _docstokg_flags=None,
+                _docstokg_meta=None,
+                annotations=[predicted_holder],
+            ),
+            annotations=None,
+        ),
+    ]
+    chunk = SimpleNamespace(meta=SimpleNamespace(document_id="doc-annot", doc_items=doc_items))
+
+    capsys.readouterr()
+    has_caption, has_classification, num_images, confidence, metadata = doc_chunking.summarize_image_metadata(
+        chunk, "Figure caption: sample text"
+    )
+    stderr = capsys.readouterr().err
+
+    assert has_caption is True
+    assert has_classification is False
+    assert num_images == 1
+    assert confidence == 0.7
+    assert metadata == []
+    assert '"error_code": "CHUNK_ANNOTATIONS_NON_ITERABLE"' in stderr
+    assert '"error_code": "CHUNK_PREDICTED_CLASSES_NON_ITERABLE"' in stderr
+
+
+def test_telemetry_sink_uses_lock_and_jsonl_append(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    attempts_path = tmp_path / "telemetry" / "attempts.jsonl"
+    manifest_path = tmp_path / "telemetry" / "manifest.jsonl"
+
+    lock_calls: list[Path] = []
+
+    @contextlib.contextmanager
+    def _fake_lock(path: Path):
+        lock_calls.append(path)
+        yield True
+
+    monkeypatch.setattr(doc_telemetry, "_acquire_lock_for", _fake_lock)
+
+    sink = doc_telemetry.TelemetrySink(attempts_path, manifest_path)
+
+    sink.write_attempt(
+        doc_telemetry.Attempt(
+            run_id="run-1",
+            file_id="file-1",
+            stage="chunking",
+            status="success",
+            reason=None,
+            started_at=0.0,
+            finished_at=1.0,
+            bytes=256,
+            metadata={"extra": "attempt"},
+        )
+    )
+    sink.write_manifest_entry(
+        doc_telemetry.ManifestEntry(
+            run_id="run-1",
+            file_id="file-1",
+            stage="chunking",
+            output_path="output.jsonl",
+            tokens=42,
+            schema_version="1.0",
+            duration_s=0.5,
+            metadata={"extra": "manifest"},
+        )
+    )
+
+    attempts_records = [
+        json.loads(line)
+        for line in attempts_path.read_text(encoding="utf-8").splitlines()
+    ]
+    manifest_records = [
+        json.loads(line)
+        for line in manifest_path.read_text(encoding="utf-8").splitlines()
+    ]
+
+    assert attempts_records == [
+        {
+            "run_id": "run-1",
+            "file_id": "file-1",
+            "stage": "chunking",
+            "status": "success",
+            "reason": None,
+            "started_at": 0.0,
+            "finished_at": 1.0,
+            "bytes": 256,
+            "extra": "attempt",
+        }
+    ]
+    assert manifest_records == [
+        {
+            "run_id": "run-1",
+            "file_id": "file-1",
+            "stage": "chunking",
+            "output_path": "output.jsonl",
+            "tokens": 42,
+            "schema_version": "1.0",
+            "duration_s": 0.5,
+            "extra": "manifest",
+            "doc_id": "file-1",
+        }
+    ]
+    assert lock_calls == [attempts_path, manifest_path]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (True, True),
+        (False, False),
+        ("true", True),
+        ("FALSE", False),
+        ("  yEs  ", True),
+        ("off", False),
+        ("n", False),
+        ("", False),
+        (1, True),
+        (0, False),
+        (1.0, True),
+        (0.0, False),
+        (None, False),
+    ],
+)
+def test_coerce_bool_accepts_supported_literals(value: object, expected: bool) -> None:
+    assert doc_config._coerce_bool(value) is expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "treu",
+        "enable",
+        "2",
+        2,
+        0.5,
+        object(),
+    ],
+)
+def test_coerce_bool_rejects_unknown_literals(value: object) -> None:
+    with pytest.raises(ValueError):
+        doc_config._coerce_bool(value)
+
+
+@dataclass
+class _DummyCfg(doc_config.StageConfigBase):
+    value: int = 256
+
+    FIELD_PARSERS: ClassVar[Dict[str, Any]] = {
+        "value": doc_config.StageConfigBase._coerce_int,
+    }
+
+
+def test_apply_args_skips_parser_defaults() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--value", type=int, default=256)
+    namespace = doc_config.parse_args_with_overrides(parser, [])
+
+    cfg = _DummyCfg()
+    cfg.value = 384
+    cfg.overrides.add("value")
+
+    cfg.apply_args(namespace)
+    assert cfg.value == 384
+    assert cfg.is_overridden("value")
+    assert namespace._cli_explicit_overrides == set()
+
+
+def test_apply_args_honours_explicit_cli_overrides() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--value", type=int, default=256)
+    namespace = doc_config.parse_args_with_overrides(parser, ["--value", "256"])
+
+    cfg = _DummyCfg()
+    cfg.value = 384
+    cfg.overrides.add("value")
+
+    cfg.apply_args(namespace)
+    assert cfg.value == 256
+    assert cfg.is_overridden("value")
+    assert "value" in namespace._cli_explicit_overrides
+
+
+def test_apply_args_handles_manual_namespaces() -> None:
+    cfg = _DummyCfg()
+    cfg.apply_args(argparse.Namespace(value=512))
+    assert cfg.value == 512
+    assert cfg.is_overridden("value")
+
+
 def test_iter_jsonl_batches(tmp_path: Path) -> None:
     file_one = tmp_path / "one.jsonl"
     file_two = tmp_path / "two.jsonl"
@@ -614,14 +885,46 @@ def test_batcher() -> None:
     assert list(core.Batcher([], 3)) == []
 
 
-def test_manifest_append(tmp_path: Path) -> None:
-    manifest = doc_env.data_manifests() / "docparse.chunks.manifest.jsonl"
+def test_manifest_append(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    manifest = tmp_path / "docparse.chunks.manifest.jsonl"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        doc_io,
+        "resolve_manifest_path",
+        lambda stage, root=None: manifest,
+    )
     doc_io.manifest_append("chunks", "doc-1", "success", duration_s=1.23)
     content = manifest.read_text(encoding="utf-8").strip()
     record = json.loads(content)
     assert record["stage"] == "chunks"
     assert record["doc_id"] == "doc-1"
     assert record["status"] == "success"
+
+
+def test_manifest_append_respects_atomic_flag(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls = []
+
+    def fake_append(path, rows, *, atomic):
+        calls.append({"path": Path(path), "rows": list(rows), "atomic": atomic})
+        return len(calls[-1]["rows"])
+
+    monkeypatch.setattr(doc_io, "jsonl_append_iter", fake_append)
+    monkeypatch.setattr(
+        doc_io,
+        "resolve_manifest_path",
+        lambda stage, root=None: tmp_path / f"{stage}.jsonl",
+    )
+
+    doc_io.manifest_append("chunks", "doc-a", "success")
+    doc_io.manifest_append("chunks", "doc-b", "success", atomic=True)
+
+    assert len(calls) == 2
+    assert calls[0]["atomic"] is False
+    assert calls[0]["path"] == tmp_path / "chunks.jsonl"
+    assert calls[0]["rows"][0]["doc_id"] == "doc-a"
+    assert calls[1]["atomic"] is True
 
 
 # --- Schema validation tests ---
