@@ -134,3 +134,7 @@ $RECYCLE.BIN/
 *~
 
 .wheelhouse/
+
+# local caches
+.wheelhouse/
+ci/wheels/
