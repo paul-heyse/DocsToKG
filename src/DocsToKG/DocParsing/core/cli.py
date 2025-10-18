@@ -9,7 +9,11 @@ from collections import Counter, defaultdict, deque
 from pathlib import Path
 from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
 
-from DocsToKG.DocParsing.cli_errors import CLIValidationError, format_cli_error
+from DocsToKG.DocParsing.cli_errors import (
+    CLIValidationError,
+    DoctagsCLIValidationError,
+    format_cli_error,
+)
 from DocsToKG.DocParsing.env import (
     data_doctags,
     data_html,
@@ -161,9 +165,16 @@ def _resolve_doctags_paths(args: argparse.Namespace) -> tuple[str, Path, Path, s
 
     mode = args.mode
     if args.in_dir is not None:
-        input_dir = args.in_dir.resolve()
+        input_dir = args.in_dir.expanduser().resolve()
         if mode == "auto":
-            mode = detect_mode(input_dir)
+            try:
+                mode = detect_mode(input_dir)
+            except ValueError as exc:
+                raise DoctagsCLIValidationError(
+                    option="--mode",
+                    message=str(exc),
+                    hint="Specify --mode html or --mode pdf to override auto-detection",
+                ) from exc
     else:
         if mode == "auto":
             html_present = directory_contains_suffixes(html_default_in, HTML_SUFFIXES)
@@ -172,11 +183,27 @@ def _resolve_doctags_paths(args: argparse.Namespace) -> tuple[str, Path, Path, s
                 mode = "html"
             elif pdf_present and not html_present:
                 mode = "pdf"
+            elif html_present and pdf_present:
+                raise DoctagsCLIValidationError(
+                    option="--mode",
+                    message=(
+                        "Cannot auto-detect mode: found HTML sources in "
+                        f"{html_default_in} and PDF sources in {pdf_default_in}"
+                    ),
+                    hint="Specify --mode html or --mode pdf to disambiguate the sources",
+                )
             else:
-                raise ValueError("Cannot auto-detect mode: specify --mode or --input explicitly")
+                raise DoctagsCLIValidationError(
+                    option="--mode",
+                    message=(
+                        "Cannot auto-detect mode: expected HTML files in "
+                        f"{html_default_in} or PDF files in {pdf_default_in}"
+                    ),
+                    hint="Provide --input or set --mode html/--mode pdf explicitly",
+                )
         input_dir = html_default_in if mode == "html" else pdf_default_in
 
-    output_dir = args.out_dir.resolve() if args.out_dir is not None else doctags_default_out
+    output_dir = args.out_dir.expanduser().resolve() if args.out_dir is not None else doctags_default_out
     return mode, input_dir, output_dir, str(resolved_root)
 
 
@@ -189,7 +216,11 @@ def doctags(argv: Sequence[str] | None = None) -> int:
     parsed = parser.parse_args([] if argv is None else list(argv))
     logger = get_logger(__name__)
 
-    mode, input_dir, output_dir, resolved_root = _resolve_doctags_paths(parsed)
+    try:
+        mode, input_dir, output_dir, resolved_root = _resolve_doctags_paths(parsed)
+    except CLIValidationError as exc:
+        print(format_cli_error(exc), file=sys.stderr)
+        return 2
 
     parsed.in_dir = input_dir
     parsed.out_dir = output_dir
