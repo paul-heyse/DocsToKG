@@ -36,5 +36,5 @@ Use `docs/hybrid_search_runbook.md` for remediation actions when metrics breach 
 ## 6. Content Download Cache Validation
 
 - The downloader now skips SHA-256 recomputation when cached files match recorded size and mtime. This keeps 304 validations effectively free even for 100 MB artifacts.
-- When regulatory or audit workflows require full digests, enable `--verify-cache-digest` (or set `DownloadOptions.verify_cache_digest=True`). Expect ~55 ms per 100 MB artifact while the in-process LRU prevents repeat hashing within a run.
+- When regulatory or audit workflows require full digests, enable `--verify-cache-digest` (or set `DownloadConfig.verify_cache_digest=True`). Expect ~55 ms per 100 MB artifact while the in-process LRU prevents repeat hashing within a run.
 - Remember to reset the flag once investigations conclude; always-on digest verification materially increases CPU and I/O on large corpora.

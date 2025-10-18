@@ -49,10 +49,6 @@ known_stage_set = frozenset(known_stages)
 STAGE_ALIASES: Dict[str, Sequence[str]] = {
     "doctags": ("doctags-html", "doctags-pdf"),
 }
-_expected_stage_choices = tuple(
-    list(known_stages)
-    + [alias for alias in sorted(STAGE_ALIASES) if alias not in known_stage_set]
-)
 
 CLI_DESCRIPTION = """\
 Unified DocParsing CLI
@@ -340,6 +336,12 @@ def plan(argv: Sequence[str] | None = None) -> int:
 def manifest(argv: Sequence[str] | None = None) -> int:
     """Inspect pipeline manifest artifacts via CLI."""
 
+    return _run_stage(_manifest_main, argv)
+
+
+def _manifest_main(argv: Sequence[str]) -> int:
+    """Implementation for the ``docparse manifest`` command."""
+
     parser = argparse.ArgumentParser(
         prog="docparse manifest",
         description="Inspect DocParsing manifest artifacts",
@@ -380,7 +382,7 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         help="Output tail entries as JSON instead of human-readable text",
     )
 
-    args = parser.parse_args([] if argv is None else list(argv))
+    args = parser.parse_args(list(argv))
     manifest_dir = data_manifests(args.data_root, ensure=False)
     logger = get_logger(__name__, base_fields={"stage": "manifest"})
 
@@ -409,7 +411,11 @@ def manifest(argv: Sequence[str] | None = None) -> int:
             if stage not in discovered:
                 discovered.append(stage)
 
+    canonical_list = ", ".join(known_stages)
+    discovered_list = ", ".join(discovered) if discovered else "none"
     allowed_stage_set = set(known_stage_set).union(discovered)
+    canonical_list = ", ".join(sorted(known_stage_set))
+    discovered_list = ", ".join(sorted(discovered)) or "none"
 
     if args.stages:
         seen: List[str] = []

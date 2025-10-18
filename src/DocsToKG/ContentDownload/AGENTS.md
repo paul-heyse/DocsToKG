@@ -55,7 +55,7 @@ flowchart LR
 - Optimisation levers:
   - Adjust `ResolverConfig.{resolver_min_interval_s,domain_min_interval_s,domain_token_buckets}` to throttle hot hosts without stalling the pipeline.
   - Ensure resolver implementations reuse HTTP sessions and respect `head_precheck` to filter HTML responses quickly.
-  - Tweak `DownloadOptions.sniff_bytes`/`tail_check_bytes` when classifier heuristics mislabel payloads.
+  - Tweak `DownloadConfig.sniff_bytes`/`tail_check_bytes` when classifier heuristics mislabel payloads (legacy guides may refer to `DownloadOptions`, which now subclasses `DownloadConfig`).
   - Use `--warm-manifest-cache` for large resumes so SQLite indexes load once.
 
 ## Complexity & Scalability Guidance

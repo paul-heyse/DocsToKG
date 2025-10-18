@@ -25,6 +25,7 @@ from DocsToKG.ContentDownload.core import (
     slugify,
 )
 from DocsToKG.ContentDownload.download import (
+    DownloadConfig,
     DownloadOptions,
     DownloadState,
     _collect_location_urls,
@@ -100,6 +101,7 @@ __all__ = (
     "read_resolver_config",
     "resolve_topic_id_if_needed",
     "slugify",
+    "DownloadConfig",
     "DownloadOptions",
     "oa_config",
 )

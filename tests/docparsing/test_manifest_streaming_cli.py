@@ -10,6 +10,8 @@ import types
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from typing import Dict
+
 import pytest
 
 from DocsToKG.DocParsing.env import data_manifests
