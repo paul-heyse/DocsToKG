@@ -634,7 +634,12 @@ from DocsToKG.ContentDownload.pipeline import (
     ResolverResult,
     WaybackResolver,
 )
-from DocsToKG.ContentDownload.telemetry import JsonlSink, RunTelemetry, SqliteSink, load_manifest_url_index
+from DocsToKG.ContentDownload.telemetry import (
+    JsonlSink,
+    RunTelemetry,
+    SqliteSink,
+    load_manifest_url_index,
+)
 
 # --- test_conditional_requests.py ---
 

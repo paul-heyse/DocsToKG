@@ -31,7 +31,7 @@ import pooch
 import requests
 
 from .errors import ConfigError, DownloadFailure, OntologyDownloadError, PolicyError
-from .settings import DownloadConfiguration, ResolvedConfig
+from .settings import DownloadConfiguration, get_default_config
 
 try:  # pragma: no cover - psutil may be unavailable in minimal environments
     import psutil  # type: ignore[import]
@@ -55,7 +55,7 @@ def _resolve_max_uncompressed_bytes(limit: Optional[int]) -> Optional[int]:
 
     if limit is not None:
         return limit
-    return ResolvedConfig.from_defaults().defaults.http.max_uncompressed_bytes()
+    return get_default_config().defaults.http.max_uncompressed_bytes()
 
 
 def sanitize_filename(filename: str) -> str:
@@ -1685,7 +1685,9 @@ def download_stream(
         current_downloader: StreamingDownloader,
         manifest: Optional[Dict[str, object]],
     ) -> tuple[Optional[str], Optional[int]]:
-        content_type = current_downloader.response_content_type or current_downloader.head_content_type
+        content_type = (
+            current_downloader.response_content_type or current_downloader.head_content_type
+        )
         if content_type is None and manifest:
             manifest_type = manifest.get("content_type")
             if isinstance(manifest_type, str):
@@ -1838,7 +1840,11 @@ def download_stream(
             elapsed_cached = (time.monotonic() - attempt_start) * 1000
             logger.info(
                 "cache hit",
-                extra={"stage": "download", "status": "cached", "elapsed_ms": round(elapsed_cached, 2)},
+                extra={
+                    "stage": "download",
+                    "status": "cached",
+                    "elapsed_ms": round(elapsed_cached, 2),
+                },
             )
             if destination.exists():
                 artifact_path = destination
@@ -1852,7 +1858,9 @@ def download_stream(
                 cache_path=cache_reference,
             )
             log_memory_usage(logger, stage="download", event="after")
-            content_type, content_length = _resolved_content_metadata(downloader, manifest_for_attempt)
+            content_type, content_length = _resolved_content_metadata(
+                downloader, manifest_for_attempt
+            )
             return DownloadResult(
                 path=artifact_path,
                 status="cached",

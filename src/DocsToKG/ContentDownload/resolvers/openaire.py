@@ -4,7 +4,7 @@
 #   "purpose": "OpenAIRE resolver implementation",
 #   "sections": [
 #     {
-#       "id": "openaire-resolver",
+#       "id": "openaireresolver",
 #       "name": "OpenAireResolver",
 #       "anchor": "class-openaireresolver",
 #       "kind": "class"
@@ -47,6 +47,15 @@ class OpenAireResolver(RegisteredResolver):
     name = "openaire"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the work includes a DOI for OpenAIRE queries.
+
+        Args:
+            config: Resolver configuration (unused for enablement).
+            artifact: Work record under evaluation.
+
+        Returns:
+            bool: Whether this resolver should attempt the work.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -55,6 +64,16 @@ class OpenAireResolver(RegisteredResolver):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield OpenAIRE URLs that point to downloadable PDFs.
+
+        Args:
+            session: Requests session for issuing HTTP requests.
+            config: Resolver configuration providing timeouts and headers.
+            artifact: Work metadata containing the DOI lookup.
+
+        Yields:
+            ResolverResult: Candidate download URLs or diagnostic events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(

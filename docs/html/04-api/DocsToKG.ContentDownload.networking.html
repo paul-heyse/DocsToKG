@@ -118,6 +118,10 @@ None.</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="get-thread-session">
+<h3><code class="docutils literal notranslate"><span class="pre">get_thread_session()</span></code><a class="headerlink" href="#get-thread-session" title="Link to this heading"></a></h3>
+<p>Return a default thread-local session using :func:<code class="docutils literal notranslate"><span class="pre">create_session</span></code>.</p>
+</section>
 <section id="create-session-headers">
 <h3><code class="docutils literal notranslate"><span class="pre">create_session(headers)</span></code><a class="headerlink" href="#create-session-headers" title="Link to this heading"></a></h3>
 <p>Return a <code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> configured for DocsToKG network requests.</p>
@@ -128,15 +132,20 @@ unchanged.
 adapter_max_retries: Retry count configured on mounted HTTP adapters. Defaults to
 <code class="docutils literal notranslate"><span class="pre">0</span></code> so :func:<code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> governs retry behaviour.
 pool_connections: Lower bound of connection pools shared across the session’s adapters.
-pool_maxsize: Maximum number of connections kept per host in the adapter pool.</p>
+pool_maxsize: Maximum number of connections kept per host in the adapter pool.
+enable_compression: Whether to request gzip/deflate compression. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
 <p>Returns:
 requests.Session: Session instance with HTTP/HTTPS adapters mounted and ready for pipeline usage.</p>
 <p>Raises:
 None.</p>
 <p>Notes:
-The returned session uses <code class="docutils literal notranslate"><span class="pre">HTTPAdapter</span></code> for connection pooling. It is safe to share
-across threads provided callers avoid mutating shared mutable state (for example,
-updating <code class="docutils literal notranslate"><span class="pre">session.headers</span></code>) once the session is distributed to worker threads.</p>
+The returned session uses <code class="docutils literal notranslate"><span class="pre">HTTPAdapter</span></code> for connection pooling. When executing
+concurrently, prefer wrapping :func:<code class="docutils literal notranslate"><span class="pre">create_session</span></code> with
+:class:<code class="docutils literal notranslate"><span class="pre">ThreadLocalSessionFactory</span></code> so each worker maintains its own connection
+pool without sharing mutable session state across threads.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">enable_compression</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, the session automatically requests gzip
+and deflate compression, which can reduce bandwidth usage by 60-80% for text-heavy
+HTML/XML content.</p>
 </section>
 <section id="parse-retry-after-header-response">
 <h3><code class="docutils literal notranslate"><span class="pre">parse_retry_after_header(response)</span></code><a class="headerlink" href="#parse-retry-after-header-response" title="Link to this heading"></a></h3>
@@ -194,13 +203,20 @@ retry_statuses: HTTP status codes that should trigger a retry. Defaults to
 backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to <code class="docutils literal notranslate"><span class="pre">0.75</span></code>.
 respect_retry_after: Whether to parse and obey <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> headers. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.
 content_policy: Optional mapping describing max-bytes and allowed MIME types for the target host.
-**kwargs: Additional keyword arguments forwarded directly to :meth:<code class="docutils literal notranslate"><span class="pre">requests.Session.request</span></code>.</p>
+max_retry_duration: Maximum total time to spend on retries in seconds. If exceeded, raises
+immediately. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code> (no limit).
+backoff_max: Maximum delay between retries in seconds. Prevents excessive wait times.
+Defaults to <code class="docutils literal notranslate"><span class="pre">60.0</span></code> seconds.
+**kwargs: Additional keyword arguments forwarded directly to :meth:<code class="docutils literal notranslate"><span class="pre">requests.Session.request</span></code>.
+Note: If <code class="docutils literal notranslate"><span class="pre">timeout</span></code> is provided as a single float, it will be converted to a tuple
+(connect_timeout, read_timeout) with read_timeout = timeout * 2 for better error handling.</p>
 <p>Returns:
 requests.Response: Successful response object. Callers are responsible for closing the
 response when streaming content.</p>
 <p>Raises:
 ValueError: If <code class="docutils literal notranslate"><span class="pre">max_retries</span></code> or <code class="docutils literal notranslate"><span class="pre">backoff_factor</span></code> are invalid or <code class="docutils literal notranslate"><span class="pre">url</span></code>/<code class="docutils literal notranslate"><span class="pre">method</span></code> are empty.
-requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.</p>
+requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.
+TimeoutError: If <code class="docutils literal notranslate"><span class="pre">max_retry_duration</span></code> is exceeded.</p>
 </section>
 <section id="head-precheck-session-url-timeout">
 <h3><code class="docutils literal notranslate"><span class="pre">head_precheck(session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-session-url-timeout" title="Link to this heading"></a></h3>
@@ -228,9 +244,29 @@ blocking legitimate downloads.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_head_precheck_via_get(session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-via-get-session-url-timeout" title="Link to this heading"></a></h3>
 <p>Fallback GET probe for providers that reject HEAD requests.</p>
 </section>
+<section id="get-thread-session-self">
+<h3><code class="docutils literal notranslate"><span class="pre">get_thread_session(self)</span></code><a class="headerlink" href="#get-thread-session-self" title="Link to this heading"></a></h3>
+<p>Return a session scoped to the current thread.</p>
+</section>
+<section id="call-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__call__(self)</span></code><a class="headerlink" href="#call-self" title="Link to this heading"></a></h3>
+<p>Allow instances to be used as session factories callable.</p>
+</section>
+<section id="close-current-self">
+<h3><code class="docutils literal notranslate"><span class="pre">close_current(self)</span></code><a class="headerlink" href="#close-current-self" title="Link to this heading"></a></h3>
+<p>Close and remove the session bound to the current thread.</p>
+</section>
+<section id="close-all-self">
+<h3><code class="docutils literal notranslate"><span class="pre">close_all(self)</span></code><a class="headerlink" href="#close-all-self" title="Link to this heading"></a></h3>
+<p>Close all cached sessions and reset thread-local state.</p>
+</section>
 <section id="request-func">
 <h3><code class="docutils literal notranslate"><span class="pre">request_func()</span></code><a class="headerlink" href="#request-func" title="Link to this heading"></a></h3>
 <p>Invoke the appropriate request callable on the provided session.</p>
+</section>
+<section id="close-response">
+<h3><code class="docutils literal notranslate"><span class="pre">_close_response()</span></code><a class="headerlink" href="#close-response" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="build-headers-self">
 <h3><code class="docutils literal notranslate"><span class="pre">build_headers(self)</span></code><a class="headerlink" href="#build-headers-self" title="Link to this heading"></a></h3>
@@ -285,6 +321,14 @@ TypeError: If <code class="docutils literal notranslate"><span class="pre">respo
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="threadlocalsessionfactory">
+<h3><code class="docutils literal notranslate"><span class="pre">ThreadLocalSessionFactory</span></code><a class="headerlink" href="#threadlocalsessionfactory" title="Link to this heading"></a></h3>
+<p>Create or reuse :class:<code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> instances per thread.</p>
+<p>The factory caches sessions keyed by thread identifier so worker pools can
+retain warm connection pools while avoiding cross-thread sharing. Callers
+should invoke :meth:<code class="docutils literal notranslate"><span class="pre">close_all</span></code> when tearing down the pool to release open
+sockets promptly.</p>
+</section>
 <section id="contentpolicyviolation">
 <h3><code class="docutils literal notranslate"><span class="pre">ContentPolicyViolation</span></code><a class="headerlink" href="#contentpolicyviolation" title="Link to this heading"></a></h3>
 <p>Raised when a response violates configured content policies.</p>

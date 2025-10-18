@@ -4,12 +4,6 @@
 #   "purpose": "Resolver definitions and pipeline orchestration",
 #   "sections": [
 #     {
-#       "id": "resolverresult",
-#       "name": "ResolverResult",
-#       "anchor": "class-resolverresult",
-#       "kind": "class"
-#     },
-#     {
 #       "id": "normalise-domain-bytes-budget",
 #       "name": "_normalise_domain_bytes_budget",
 #       "anchor": "function-normalise-domain-bytes-budget",
@@ -94,168 +88,6 @@
 #       "kind": "class"
 #     },
 #     {
-#       "id": "fetch-semantic-scholar-data",
-#       "name": "_fetch_semantic_scholar_data",
-#       "anchor": "function-fetch-semantic-scholar-data",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "fetch-unpaywall-data",
-#       "name": "_fetch_unpaywall_data",
-#       "anchor": "function-fetch-unpaywall-data",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolverregistry",
-#       "name": "ResolverRegistry",
-#       "anchor": "class-resolverregistry",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "registeredresolver",
-#       "name": "RegisteredResolver",
-#       "anchor": "class-registeredresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "apiresolverbase",
-#       "name": "ApiResolverBase",
-#       "anchor": "class-apiresolverbase",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "absolute-url",
-#       "name": "_absolute_url",
-#       "anchor": "function-absolute-url",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "collect-candidate-urls",
-#       "name": "_collect_candidate_urls",
-#       "anchor": "function-collect-candidate-urls",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "find-pdf-via-meta",
-#       "name": "find_pdf_via_meta",
-#       "anchor": "function-find-pdf-via-meta",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "find-pdf-via-link",
-#       "name": "find_pdf_via_link",
-#       "anchor": "function-find-pdf-via-link",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "find-pdf-via-anchor",
-#       "name": "find_pdf_via_anchor",
-#       "anchor": "function-find-pdf-via-anchor",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "default-resolvers",
-#       "name": "default_resolvers",
-#       "anchor": "function-default-resolvers",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "arxivresolver",
-#       "name": "ArxivResolver",
-#       "anchor": "class-arxivresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "coreresolver",
-#       "name": "CoreResolver",
-#       "anchor": "class-coreresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "crossrefresolver",
-#       "name": "CrossrefResolver",
-#       "anchor": "class-crossrefresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "doajresolver",
-#       "name": "DoajResolver",
-#       "anchor": "class-doajresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "europepmcresolver",
-#       "name": "EuropePmcResolver",
-#       "anchor": "class-europepmcresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "figshareresolver",
-#       "name": "FigshareResolver",
-#       "anchor": "class-figshareresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "halresolver",
-#       "name": "HalResolver",
-#       "anchor": "class-halresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "landingpageresolver",
-#       "name": "LandingPageResolver",
-#       "anchor": "class-landingpageresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "openaireresolver",
-#       "name": "OpenAireResolver",
-#       "anchor": "class-openaireresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "openalexresolver",
-#       "name": "OpenAlexResolver",
-#       "anchor": "class-openalexresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "osfresolver",
-#       "name": "OsfResolver",
-#       "anchor": "class-osfresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "pmcresolver",
-#       "name": "PmcResolver",
-#       "anchor": "class-pmcresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "semanticscholarresolver",
-#       "name": "SemanticScholarResolver",
-#       "anchor": "class-semanticscholarresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "unpaywallresolver",
-#       "name": "UnpaywallResolver",
-#       "anchor": "class-unpaywallresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "waybackresolver",
-#       "name": "WaybackResolver",
-#       "anchor": "class-waybackresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "zenodoresolver",
-#       "name": "ZenodoResolver",
-#       "anchor": "class-zenodoresolver",
-#       "kind": "class"
-#     },
-#     {
 #       "id": "callable-accepts-argument",
 #       "name": "_callable_accepts_argument",
 #       "anchor": "function-callable-accepts-argument",
@@ -329,7 +161,6 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Iterable,
     List,
     Mapping,
     Optional,
@@ -338,7 +169,7 @@ from typing import (
     Tuple,
     Union,
 )
-from urllib.parse import urlsplit
+from urllib.parse import urlparse, urlsplit
 
 import requests as _requests
 
@@ -348,33 +179,28 @@ from DocsToKG.ContentDownload.core import (
     DEFAULT_TAIL_CHECK_BYTES,
     PDF_LIKE,
     Classification,
+    DownloadContext,
     ReasonCode,
     normalize_classification,
     normalize_reason,
-    DownloadContext,
-    dedupe,
-    normalize_doi,
-    normalize_pmcid,
     normalize_url,
     parse_size,
-    strip_prefix,
 )
 from DocsToKG.ContentDownload.networking import (
     CircuitBreaker,
     TokenBucket,
     head_precheck,
-    request_with_retries,
 )
 from DocsToKG.ContentDownload.resolvers import (
-    ApiResolverBase,
     DEFAULT_RESOLVER_ORDER,
     DEFAULT_RESOLVER_TOGGLES,
+    ApiResolverBase,
+    RegisteredResolver,
     Resolver,
     ResolverEvent,
     ResolverEventReason,
     ResolverRegistry,
     ResolverResult,
-    RegisteredResolver,
     default_resolvers,
 )
 from DocsToKG.ContentDownload.telemetry import AttemptSink
@@ -1136,110 +962,6 @@ class PipelineResult:
             self.reason = self.reason.value.replace("_", "-")
 
 
-class ResolverEvent(Enum):
-    """Canonical resolver event categories emitted via :class:`ResolverResult`."""
-
-    ERROR = "error"
-    SKIPPED = "skipped"
-    INFO = "info"
-
-    @classmethod
-    def from_wire(cls, value: Union[str, "ResolverEvent", None]) -> Optional["ResolverEvent"]:
-        """Coerce serialized event values into :class:`ResolverEvent` members."""
-
-        if value is None:
-            return None
-        if isinstance(value, cls):
-            return value
-        text = str(value).strip().lower()
-        if not text:
-            return None
-        for member in cls:
-            if member.value == text:
-                return member
-        raise ValueError(f"Unknown resolver event '{value}'")
-
-
-class ResolverEventReason(Enum):
-    """Structured reason taxonomy for resolver events."""
-
-    CONNECTION_ERROR = "connection-error"
-    HTTP_ERROR = "http-error"
-    JSON_ERROR = "json-error"
-    REQUEST_ERROR = "request-error"
-    UNEXPECTED_ERROR = "unexpected-error"
-    TIMEOUT = "timeout"
-    NO_ARXIV_ID = "no-arxiv-id"
-    NO_DOI = "no-doi"
-    NO_BEAUTIFULSOUP = "no-beautifulsoup"
-    NO_FAILED_URLS = "no-failed-urls"
-    NO_OPENACCESS_PDF = "no-openaccess-pdf"
-    NO_OPENALEX_URLS = "no-openalex-urls"
-    NO_PMCID = "no-pmcid"
-    RESOLVER_EXCEPTION = "resolver-exception"
-    RATE_LIMIT = "rate-limit"
-    NOT_APPLICABLE = "not-applicable"
-
-    @classmethod
-    def from_wire(
-        cls, value: Union[str, "ResolverEventReason", None]
-    ) -> Optional["ResolverEventReason"]:
-        """Coerce serialized reason values into :class:`ResolverEventReason` members."""
-
-        if value is None:
-            return None
-        if isinstance(value, cls):
-            return value
-        text = str(value).strip().lower()
-        if not text:
-            return None
-        for member in cls:
-            if member.value == text:
-                return member
-        raise ValueError(f"Unknown resolver event reason '{value}'")
-
-class Resolver(Protocol):
-    """Protocol that resolver implementations must follow.
-
-    Attributes:
-        name: Resolver identifier used within configuration.
-
-    Examples:
-        Concrete implementations are provided in classes such as
-        :class:`UnpaywallResolver` and :class:`CrossrefResolver` below.
-    """
-
-    name: str
-
-    def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` if this resolver should run for the given artifact.
-
-        Args:
-            config: Resolver configuration options.
-            artifact: Work artifact under consideration.
-
-        Returns:
-            bool: ``True`` when the resolver should run for the artifact.
-        """
-
-    def iter_urls(
-        self,
-        session: _requests.Session,
-        config: ResolverConfig,
-        artifact: "WorkArtifact",
-    ) -> Iterable[ResolverResult]:
-        """Yield candidate URLs or events for the given artifact.
-
-        Args:
-            session: HTTP session used for outbound _requests.
-            config: Resolver configuration.
-            artifact: Work artifact describing the current item.
-
-        Returns:
-            Iterable[ResolverResult]: Stream of download candidates or events.
-        """
-
-
 @dataclass
 class ResolverMetrics:
     """Lightweight metrics collector for resolver execution.
@@ -1610,7 +1332,10 @@ class ResolverPipeline:
         self.logger.log_attempt(record, timestamp=timestamp)
 
     def _record_skip(
-        self, resolver_name: str, reason: Union[str, ReasonCode], detail: Optional[Union[str, ReasonCode]] = None
+        self,
+        resolver_name: str,
+        reason: Union[str, ReasonCode],
+        detail: Optional[Union[str, ReasonCode]] = None,
     ) -> None:
         """Normalise and record skip telemetry for resolver events."""
 
@@ -1631,7 +1356,6 @@ class ResolverPipeline:
             detail_text = str(detail_token)
         if detail_text and detail_text != reason_text:
             self.metrics.record_skip(resolver_name, detail_text)
-
 
     def _respect_rate_limit(self, resolver_name: str) -> None:
         """Sleep as required to respect per-resolver rate limiting policies.
@@ -1951,8 +1675,11 @@ class ResolverPipeline:
         context_obj = DownloadContext.from_mapping(context)
         state = _RunState(dry_run=context_obj.dry_run)
         if session_factory is None:
+
             def session_provider() -> _requests.Session:
+                """Return the shared HTTP session when no factory override is provided."""
                 return session
+
         else:
             session_provider = session_factory
 
@@ -1986,9 +1713,7 @@ class ResolverPipeline:
         if override:
             ordered_names = [name for name in override if name in self._resolver_map]
             ordered_names.extend(
-                name
-                for name in self.config.resolver_order
-                if name not in ordered_names
+                name for name in self.config.resolver_order if name not in ordered_names
             )
         else:
             ordered_names = list(self.config.resolver_order)
@@ -2052,9 +1777,7 @@ class ResolverPipeline:
         if override:
             resolver_order = [name for name in override if name in self._resolver_map]
             resolver_order.extend(
-                name
-                for name in self.config.resolver_order
-                if name not in resolver_order
+                name for name in self.config.resolver_order if name not in resolver_order
             )
         else:
             resolver_order = list(self.config.resolver_order)

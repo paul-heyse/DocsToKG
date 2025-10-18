@@ -4,7 +4,7 @@
 #   "purpose": "DOAJ resolver implementation",
 #   "sections": [
 #     {
-#       "id": "doaj-resolver",
+#       "id": "doajresolver",
 #       "name": "DoajResolver",
 #       "anchor": "class-doajresolver",
 #       "kind": "class"
@@ -36,6 +36,15 @@ class DoajResolver(ApiResolverBase):
     api_display_name = "DOAJ"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when a DOI is present for DOAJ lookups.
+
+        Args:
+            config: Resolver configuration (unused for enablement).
+            artifact: Work record being processed.
+
+        Returns:
+            bool: Whether DOAJ should attempt resolution.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -44,6 +53,16 @@ class DoajResolver(ApiResolverBase):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield PDF links surfaced by the DOAJ search API.
+
+        Args:
+            session: Requests session for outbound HTTP calls.
+            config: Resolver configuration containing optional API key.
+            artifact: Work record supplying DOI metadata.
+
+        Yields:
+            ResolverResult: Candidate download URLs or skip events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(

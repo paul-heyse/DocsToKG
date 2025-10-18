@@ -93,6 +93,10 @@
 <h3><code class="docutils literal notranslate"><span class="pre">_detect_entry_version(entry)</span></code><a class="headerlink" href="#detect-entry-version-entry" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="load-resolver-plugins-locked-registry">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_resolver_plugins_locked(registry)</span></code><a class="headerlink" href="#load-resolver-plugins-locked-registry" title="Link to this heading"></a></h3>
+<p>Populate <code class="docutils literal notranslate"><span class="pre">registry</span></code> with resolver plugins discovered via entry points.</p>
+</section>
 <section id="load-resolver-plugins-registry">
 <h3><code class="docutils literal notranslate"><span class="pre">load_resolver_plugins(registry)</span></code><a class="headerlink" href="#load-resolver-plugins-registry" title="Link to this heading"></a></h3>
 <p>Discover resolver plugins registered via <code class="docutils literal notranslate"><span class="pre">entry_points</span></code>.</p>
@@ -101,9 +105,25 @@
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_resolver_plugins(registry)</span></code><a class="headerlink" href="#ensure-resolver-plugins-registry" title="Link to this heading"></a></h3>
 <p>Load resolver plugins exactly once per interpreter.</p>
 </section>
+<section id="load-validator-plugins-locked-registry">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_validator_plugins_locked(registry)</span></code><a class="headerlink" href="#load-validator-plugins-locked-registry" title="Link to this heading"></a></h3>
+<p>Populate <code class="docutils literal notranslate"><span class="pre">registry</span></code> with validator plugins discovered via entry points.</p>
+</section>
 <section id="load-validator-plugins-registry">
 <h3><code class="docutils literal notranslate"><span class="pre">load_validator_plugins(registry)</span></code><a class="headerlink" href="#load-validator-plugins-registry" title="Link to this heading"></a></h3>
 <p>Discover validator plugins registered via <code class="docutils literal notranslate"><span class="pre">entry_points</span></code>.</p>
+</section>
+<section id="ensure-plugins-loaded">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_plugins_loaded()</span></code><a class="headerlink" href="#ensure-plugins-loaded" title="Link to this heading"></a></h3>
+<p>Load resolver and validator plugins exactly once in a thread-safe manner.</p>
+</section>
+<section id="get-resolver-registry">
+<h3><code class="docutils literal notranslate"><span class="pre">get_resolver_registry()</span></code><a class="headerlink" href="#get-resolver-registry" title="Link to this heading"></a></h3>
+<p>Return the resolver plugin registry, ensuring plugins are loaded once.</p>
+</section>
+<section id="get-validator-registry">
+<h3><code class="docutils literal notranslate"><span class="pre">get_validator_registry()</span></code><a class="headerlink" href="#get-validator-registry" title="Link to this heading"></a></h3>
+<p>Return the validator plugin registry, ensuring plugins are loaded once.</p>
 </section>
 <section id="register-plugin-registry-kind-registry">
 <h3><code class="docutils literal notranslate"><span class="pre">register_plugin_registry(kind,</span> <span class="pre">registry)</span></code><a class="headerlink" href="#register-plugin-registry-kind-registry" title="Link to this heading"></a></h3>

@@ -4,7 +4,7 @@
 #   "purpose": "HAL resolver implementation",
 #   "sections": [
 #     {
-#       "id": "hal-resolver",
+#       "id": "halresolver",
 #       "name": "HalResolver",
 #       "anchor": "class-halresolver",
 #       "kind": "class"
@@ -35,6 +35,15 @@ class HalResolver(ApiResolverBase):
     name = "hal"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the work includes a DOI for HAL search.
+
+        Args:
+            config: Resolver configuration (unused for enablement).
+            artifact: Work record being evaluated.
+
+        Returns:
+            bool: Whether the resolver is applicable to the work.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -43,6 +52,16 @@ class HalResolver(ApiResolverBase):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield HAL download URLs referencing ``artifact``.
+
+        Args:
+            session: Requests session to execute HTTP calls.
+            config: Resolver configuration with request limits.
+            artifact: Work metadata that supplies the DOI.
+
+        Yields:
+            ResolverResult: Candidate PDF URLs or diagnostic events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(

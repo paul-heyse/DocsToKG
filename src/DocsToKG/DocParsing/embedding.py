@@ -11,6 +11,18 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "lrucache",
+#       "name": "_LRUCache",
+#       "anchor": "class-lrucache",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "flush-llm-cache",
+#       "name": "flush_llm_cache",
+#       "anchor": "function-flush-llm-cache",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "close-all-qwen",
 #       "name": "close_all_qwen",
 #       "anchor": "function-close-all-qwen",
@@ -80,12 +92,6 @@
 #       "id": "legacy-chunk-uuid",
 #       "name": "_legacy_chunk_uuid",
 #       "anchor": "function-legacy-chunk-uuid",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-chunk-schema",
-#       "name": "ensure_chunk_schema",
-#       "anchor": "function-ensure-chunk-schema",
 #       "kind": "function"
 #     },
 #     {
@@ -176,6 +182,12 @@
 #       "id": "iter-rows-in-batches",
 #       "name": "iter_rows_in_batches",
 #       "anchor": "function-iter-rows-in-batches",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-chunk-file-schema",
+#       "name": "_validate_chunk_file_schema",
+#       "anchor": "function-validate-chunk-file-schema",
 #       "kind": "function"
 #     },
 #     {
@@ -304,12 +316,23 @@ from collections import Counter, OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, fields
 from types import SimpleNamespace
-from typing import Any, Callable, ClassVar, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 # Third-party imports
 try:
     from tqdm import tqdm  # type: ignore
 except Exception:  # pragma: no cover - fallback when tqdm is unavailable
+
     class _TqdmFallback:
         """Lightweight iterator wrapper used when tqdm is unavailable."""
 
@@ -322,9 +345,13 @@ except Exception:  # pragma: no cover - fallback when tqdm is unavailable
             return iter(self._iterable)
 
         def update(self, *args, **kwargs):
+            """Mirror tqdm's update interface without tracking state."""
+
             return None
 
         def close(self):
+            """Provide a noop close hook for compatibility."""
+
             return None
 
         def __enter__(self):
@@ -335,13 +362,17 @@ except Exception:  # pragma: no cover - fallback when tqdm is unavailable
             return False
 
     def tqdm(iterable=None, **kwargs):  # type: ignore
+        """Fallback tqdm implementation returning a lightweight iterator."""
+
         return _TqdmFallback(iterable, **kwargs)
+
 
 from DocsToKG.DocParsing.config import (
     StageConfigBase,
     annotate_cli_overrides,
     parse_args_with_overrides,
 )
+from DocsToKG.DocParsing.context import ParsingContext
 from DocsToKG.DocParsing.core import (
     DEFAULT_TOKENIZER,
     UUID_NAMESPACE,
@@ -349,6 +380,7 @@ from DocsToKG.DocParsing.core import (
     BM25Stats,
     CLIOption,
     QwenCfg,
+    ResumeController,
     SpladeCfg,
     acquire_lock,
     build_subcommand,
@@ -356,9 +388,11 @@ from DocsToKG.DocParsing.core import (
     compute_stable_shard,
     derive_doc_id_and_vectors_path,
     iter_chunks,
-    ResumeController,
 )
-from DocsToKG.DocParsing.context import ParsingContext
+from DocsToKG.DocParsing.doctags import (
+    add_data_root_option,
+    add_resume_force_options,
+)
 from DocsToKG.DocParsing.env import (
     data_chunks,
     data_vectors,
@@ -372,12 +406,18 @@ from DocsToKG.DocParsing.env import (
     prepare_data_root,
     resolve_pipeline_path,
 )
+from DocsToKG.DocParsing.formats import (
+    VECTOR_SCHEMA_VERSION,
+    BM25Vector,
+    DenseVector,
+    SPLADEVector,
+    VectorRow,
+)
 from DocsToKG.DocParsing.io import (
     atomic_write,
     compute_chunk_uuid,
     compute_content_hash,
     iter_jsonl,
-    manifest_append,
     load_manifest_index,
     quarantine_artifact,
     relative_path,
@@ -392,21 +432,12 @@ from DocsToKG.DocParsing.logging import (
     manifest_log_success,
     set_stage_telemetry,
 )
-from DocsToKG.DocParsing.doctags import (
-    add_data_root_option,
-    add_resume_force_options,
-)
-from DocsToKG.DocParsing.formats import (
-    VECTOR_SCHEMA_VERSION,
-    BM25Vector,
-    DenseVector,
-    SPLADEVector,
-    VectorRow,
-)
 from DocsToKG.DocParsing.schemas import (
     SchemaKind,
     ensure_chunk_schema,
     validate_schema_version,
+)
+from DocsToKG.DocParsing.schemas import (
     validate_vector_row as schema_validate_vector_row,
 )
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
@@ -495,6 +526,8 @@ class _LRUCache:
         self._store: OrderedDict[Any, Any] = OrderedDict()
 
     def get(self, key: Any) -> Any:
+        """Return the cached value for ``key`` or ``None`` when absent."""
+
         try:
             value = self._store[key]
         except KeyError:
@@ -503,19 +536,27 @@ class _LRUCache:
         return value
 
     def put(self, key: Any, value: Any) -> None:
+        """Insert ``value`` for ``key`` and evict least-recently-used entries."""
+
         self._store[key] = value
         self._store.move_to_end(key)
         self._evict_if_needed()
 
     def clear(self) -> None:
+        """Discard all cached values, invoking the closer for each."""
+
         for _, value in list(self._store.items()):
             self._close(value)
         self._store.clear()
 
     def items(self) -> List[Tuple[Any, Any]]:
+        """Return a snapshot of ``(key, value)`` pairs ordered by recency."""
+
         return list(self._store.items())
 
     def values(self) -> List[Any]:
+        """Return cached values ordered from least to most recently used."""
+
         return list(self._store.values())
 
     def _evict_if_needed(self) -> None:
@@ -2532,9 +2573,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     context.files_parallel = None
     context.profile = profile
     base_extra = {
-        key: value
-        for key, value in base_config.items()
-        if key not in ParsingContext.field_names()
+        key: value for key, value in base_config.items() if key not in ParsingContext.field_names()
     }
     if base_extra:
         context.merge_extra(base_extra)

@@ -4,7 +4,7 @@
 #   "purpose": "Zenodo resolver implementation",
 #   "sections": [
 #     {
-#       "id": "zenodo-resolver",
+#       "id": "zenodoresolver",
 #       "name": "ZenodoResolver",
 #       "anchor": "class-zenodoresolver",
 #       "kind": "class"
@@ -40,6 +40,15 @@ class ZenodoResolver(ApiResolverBase):
     api_display_name = "Zenodo"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when a DOI is present to drive Zenodo lookups.
+
+        Args:
+            config: Resolver configuration (unused for enablement).
+            artifact: Work record describing the document.
+
+        Returns:
+            bool: Whether the resolver should attempt the work.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -48,6 +57,16 @@ class ZenodoResolver(ApiResolverBase):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield Zenodo hosted PDFs for the supplied work.
+
+        Args:
+            session: Requests session for issuing HTTP calls.
+            config: Resolver configuration providing retry policies.
+            artifact: Work metadata containing DOI information.
+
+        Yields:
+            ResolverResult: Candidate download URLs or diagnostic events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(

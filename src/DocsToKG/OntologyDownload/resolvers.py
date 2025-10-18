@@ -97,6 +97,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from . import io
 from .errors import ResolverError, UserConfigError
 from .io import (
     get_bucket,
@@ -192,7 +193,6 @@ def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
     if cleaned.upper().startswith("CC-BY-"):
         return cleaned.upper()
     return cleaned
-
 
 
 # --- Resolver Data Structures ---
@@ -637,7 +637,9 @@ class BioPortalResolver(BaseResolver):
                 logger=logger,
                 name="bioportal",
                 service="bioportal",
-                host=urlparse(getattr(self.client, "base_url", "https://data.bioontology.org")).hostname,
+                host=urlparse(
+                    getattr(self.client, "base_url", "https://data.bioontology.org")
+                ).hostname,
             )
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
@@ -656,7 +658,9 @@ class BioPortalResolver(BaseResolver):
             logger=logger,
             name="bioportal",
             service="bioportal",
-            host=urlparse(getattr(self.client, "base_url", "https://data.bioontology.org")).hostname,
+            host=urlparse(
+                getattr(self.client, "base_url", "https://data.bioontology.org")
+            ).hostname,
         )
         if isinstance(latest_submission, dict):
             download_url = (

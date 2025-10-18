@@ -1,6 +1,5 @@
 """Unit tests for DocsToKG.ContentDownload.statistics module."""
 
-import time
 from unittest.mock import patch
 
 import pytest

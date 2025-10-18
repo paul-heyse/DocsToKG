@@ -1,15 +1,19 @@
+"""Command-line entry point for DocsToKG content downloads."""
+
 from __future__ import annotations
 
 import logging
 from typing import Optional, Sequence
 
+from pyalex import config as oa_config
+
 from DocsToKG.ContentDownload import pipeline as resolvers
 from DocsToKG.ContentDownload.args import (
     bootstrap_run_environment,
     build_parser,
+    build_query,
     parse_args,
     resolve_config,
-    build_query,
     resolve_topic_id_if_needed,
 )
 from DocsToKG.ContentDownload.core import (
@@ -26,7 +30,6 @@ from DocsToKG.ContentDownload.download import (
     create_artifact,
     download_candidate,
     ensure_dir,
-    _build_download_outcome,
     process_one_work,
 )
 from DocsToKG.ContentDownload.pipeline import (
@@ -48,10 +51,8 @@ from DocsToKG.ContentDownload.telemetry import (
     ManifestIndexSink,
     MultiSink,
     RunTelemetry,
-    SummarySink,
     load_previous_manifest,
 )
-from pyalex import config as oa_config
 
 __all__ = (
     "AttemptSink",

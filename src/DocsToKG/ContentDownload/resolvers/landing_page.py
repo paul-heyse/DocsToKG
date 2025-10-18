@@ -4,7 +4,7 @@
 #   "purpose": "Landing page scraping resolver",
 #   "sections": [
 #     {
-#       "id": "landing-page-resolver",
+#       "id": "landingpageresolver",
 #       "name": "LandingPageResolver",
 #       "anchor": "class-landingpageresolver",
 #       "kind": "class"
@@ -49,6 +49,15 @@ class LandingPageResolver(RegisteredResolver):
     name = "landing_page"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when landing page URLs are available to scrape.
+
+        Args:
+            config: Resolver configuration (unused for enablement).
+            artifact: Work record containing landing URLs.
+
+        Returns:
+            bool: Whether the resolver should attempt scraping.
+        """
         return bool(artifact.landing_urls)
 
     def iter_urls(
@@ -57,6 +66,16 @@ class LandingPageResolver(RegisteredResolver):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Scrape landing pages for PDF links and yield matching results.
+
+        Args:
+            session: Requests session for HTTP interactions.
+            config: Resolver configuration providing timeouts and headers.
+            artifact: Work metadata containing landing URLs.
+
+        Yields:
+            ResolverResult: Candidate download URLs or diagnostic events.
+        """
         if BeautifulSoup is None:
             yield ResolverResult(
                 url=None,

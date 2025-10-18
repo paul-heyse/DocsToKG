@@ -941,24 +941,29 @@ from unittest.mock import Mock, patch
 import pytest
 
 import DocsToKG.ContentDownload.pipeline as pipeline_module
-import DocsToKG.ContentDownload.resolvers.base as providers_module
 import DocsToKG.ContentDownload.resolvers as resolvers
+import DocsToKG.ContentDownload.resolvers.base as providers_module
 from DocsToKG.ContentDownload import cli as downloader
 from DocsToKG.ContentDownload.cli import (
     WorkArtifact,
     ensure_dir,
     load_resolver_config,
 )
-from DocsToKG.ContentDownload.core import Classification, DownloadContext, ReasonCode, classify_payload
+from DocsToKG.ContentDownload.core import (
+    Classification,
+    DownloadContext,
+    ReasonCode,
+    classify_payload,
+)
 from DocsToKG.ContentDownload.pipeline import (
     AttemptRecord,
     DownloadOutcome,
     ResolverConfig,
+    ResolverEvent,
+    ResolverEventReason,
     ResolverMetrics,
     ResolverPipeline,
     ResolverResult,
-    ResolverEvent,
-    ResolverEventReason,
 )
 from DocsToKG.ContentDownload.resolvers import (
     ApiResolverBase,
@@ -2508,9 +2513,7 @@ def test_pipeline_global_deduplication_skips_repeat_urls(tmp_path):
     assert result_first.success is True
     assert result_second.success is False
     assert download_calls == [artifact.work_id]
-    assert any(
-        _reason_matches(record.reason, "duplicate-url-global") for record in logger.records
-    )
+    assert any(_reason_matches(record.reason, "duplicate-url-global") for record in logger.records)
     assert metrics.skips["static:duplicate-url-global"] == 1
 
 

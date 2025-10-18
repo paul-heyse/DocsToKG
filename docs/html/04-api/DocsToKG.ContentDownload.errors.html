@@ -1,0 +1,231 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: errors &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: errors</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.ContentDownload.errors.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-errors">
+<h1>1. Module: errors<a class="headerlink" href="#module-errors" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.errors</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Enhanced error handling and actionable error messages for content downloads.</p>
+<p>This module provides structured error messages with diagnostic information and
+suggested remediation steps to help users troubleshoot download failures.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="get-actionable-error-message-http-status-reason-code-url">
+<h3><code class="docutils literal notranslate"><span class="pre">get_actionable_error_message(http_status,</span> <span class="pre">reason_code,</span> <span class="pre">url)</span></code><a class="headerlink" href="#get-actionable-error-message-http-status-reason-code-url" title="Link to this heading"></a></h3>
+<p>Generate user-friendly error message with actionable suggestions.</p>
+<p>Args:
+http_status: HTTP status code from failed request
+reason_code: Internal reason code describing failure
+url: URL that failed to download</p>
+<p>Returns:
+Tuple of (error_message, suggestion) where suggestion may be None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>msg, suggestion = get_actionable_error_message(403, “request_exception”)
+print(msg)
+Access forbidden (HTTP 403)
+print(suggestion)
+Check authentication credentials or access permissions for this resource</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="log-download-failure-logger-url-work-id-http-status-reason-code-error-details-exception">
+<h3><code class="docutils literal notranslate"><span class="pre">log_download_failure(logger,</span> <span class="pre">url,</span> <span class="pre">work_id,</span> <span class="pre">http_status,</span> <span class="pre">reason_code,</span> <span class="pre">error_details,</span> <span class="pre">exception)</span></code><a class="headerlink" href="#log-download-failure-logger-url-work-id-http-status-reason-code-error-details-exception" title="Link to this heading"></a></h3>
+<p>Log download failure with structured context and actionable suggestions.</p>
+<p>Args:
+logger: Logger instance to use for output
+url: URL that failed to download
+work_id: Work identifier for correlation
+http_status: HTTP status code if available
+reason_code: Internal reason code describing failure
+error_details: Additional error context
+exception: Original exception if available</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>log_download_failure(
+…     LOGGER,
+…     “https://example.org/paper.pdf”,
+…     “W123”,
+…     http_status=403,
+…     reason_code=”request_exception”
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="format-download-summary-total-attempts-successes-failures-by-reason">
+<h3><code class="docutils literal notranslate"><span class="pre">format_download_summary(total_attempts,</span> <span class="pre">successes,</span> <span class="pre">failures_by_reason)</span></code><a class="headerlink" href="#format-download-summary-total-attempts-successes-failures-by-reason" title="Link to this heading"></a></h3>
+<p>Format a human-readable download summary with recommendations.</p>
+<p>Args:
+total_attempts: Total number of download attempts
+successes: Number of successful downloads
+failures_by_reason: Dictionary mapping reason codes to failure counts</p>
+<p>Returns:
+Formatted summary string with recommendations</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>summary = format_download_summary(
+…     total_attempts=100,
+…     successes=85,
+…     failures_by_reason={“http_error”: 10, “timeout”: 5}
+… )
+print(summary)
+Download Summary:</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+<ul class="simple">
+<li><p>Total attempts: 100</p></li>
+<li><p>Successes: 85 (85.0%)</p></li>
+<li><p>Failures: 15 (15.0%)</p></li>
+</ul>
+<p>Top failure reasons:</p>
+<ol class="arabic simple">
+<li><p>http_error: 10 occurrences (66.7% of failures)</p></li>
+<li><p>timeout: 5 occurrences (33.3% of failures)</p></li>
+</ol>
+<p>Recommendations:</p>
+<ul class="simple">
+<li><p>http_error: Check server logs or network connectivity for more details</p></li>
+<li><p>timeout: Increase timeout value or check network latency. May indicate slow server.</p></li>
+</ul>
+</section>
+<section id="post-init-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="downloaderror">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadError</span></code><a class="headerlink" href="#downloaderror" title="Link to this heading"></a></h3>
+<p>Structured download error with diagnostic information.</p>
+</section>
+<section id="networkerror">
+<h3><code class="docutils literal notranslate"><span class="pre">NetworkError</span></code><a class="headerlink" href="#networkerror" title="Link to this heading"></a></h3>
+<p>Raised when network-related download failures occur.</p>
+</section>
+<section id="contentpolicyerror">
+<h3><code class="docutils literal notranslate"><span class="pre">ContentPolicyError</span></code><a class="headerlink" href="#contentpolicyerror" title="Link to this heading"></a></h3>
+<p>Raised when content policy violations prevent downloads.</p>
+</section>
+<section id="ratelimiterror">
+<h3><code class="docutils literal notranslate"><span class="pre">RateLimitError</span></code><a class="headerlink" href="#ratelimiterror" title="Link to this heading"></a></h3>
+<p>Raised when rate limiting prevents downloads.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

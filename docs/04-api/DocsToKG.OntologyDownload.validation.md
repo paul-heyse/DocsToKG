@@ -16,17 +16,9 @@ Return the current resident memory usage in megabytes.
 
 Return a process-wide semaphore guarding validator concurrency.
 
-### `load_resolver_plugins(registry)`
-
-Proxy to :mod:`plugins` resolver discovery preserving legacy globals.
-
-### `ensure_resolver_plugins(registry)`
-
-Load resolver plugins exactly once per interpreter.
-
 ### `load_validator_plugins(registry)`
 
-Proxy to :mod:`plugins` validator discovery preserving legacy globals.
+Load validator plugins while tracking module-level load state.
 
 ### `_write_validation_json(path, payload)`
 
@@ -109,10 +101,6 @@ return_header_hash: When True, also return the hash of Turtle prefix directives.
 Returns:
 SHA-256 hex digest of the canonical Turtle content, and optionally the hash
 of the serialized prefix header when ``return_header_hash`` is True.
-
-### `ensure_validator_plugins(registry)`
-
-Load validator plugins exactly once per interpreter.
 
 ### `_worker_pronto(payload)`
 

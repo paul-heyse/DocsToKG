@@ -14,13 +14,23 @@ import hashlib
 import json
 import logging
 import os
-import shutil
 import unicodedata
 import uuid
 import warnings
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, TextIO, Tuple
+from typing import (
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    TextIO,
+    Tuple,
+)
 
 from .env import data_manifests
 
@@ -158,22 +168,16 @@ def jsonl_append_iter(
         return count
 
     path = Path(target)
-    if not atomic:
-        count = 0
-        with path.open("a", encoding="utf-8") as handle:
-            for row in rows:
-                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-                count += 1
-        return count
-
+    path.parent.mkdir(parents=True, exist_ok=True)
     count = 0
-    with atomic_write(path) as handle:
-        if path.exists():
-            with path.open("r", encoding="utf-8", errors="replace") as src:
-                shutil.copyfileobj(src, handle)
+    with path.open("ab") as handle:
         for row in rows:
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+            payload = json.dumps(row, ensure_ascii=False).encode("utf-8") + b"\n"
+            handle.write(payload)
             count += 1
+        if atomic:
+            handle.flush()
+            os.fsync(handle.fileno())
     return count
 
 

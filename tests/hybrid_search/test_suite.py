@@ -1456,7 +1456,9 @@ def test_result_shaper_enforces_global_budgets() -> None:
         namespace="default",
         text="Delta epsilon zeta",
         metadata={},
-        features=ChunkFeatures({}, {}, np.concatenate((np.ones(4), np.zeros(4))).astype(np.float32)),
+        features=ChunkFeatures(
+            {}, {}, np.concatenate((np.ones(4), np.zeros(4))).astype(np.float32)
+        ),
         token_count=3,
         source_chunk_idxs=[1],
         doc_items_refs=[],
@@ -1468,7 +1470,9 @@ def test_result_shaper_enforces_global_budgets() -> None:
         namespace="default",
         text="Eta theta iota",
         metadata={},
-        features=ChunkFeatures({}, {}, np.concatenate((np.zeros(4), np.ones(4))).astype(np.float32)),
+        features=ChunkFeatures(
+            {}, {}, np.concatenate((np.zeros(4), np.ones(4))).astype(np.float32)
+        ),
         token_count=3,
         source_chunk_idxs=[2],
         doc_items_refs=[],
@@ -1488,7 +1492,11 @@ def test_result_shaper_enforces_global_budgets() -> None:
     request = HybridSearchRequest(query="alpha epsilon", namespace=None, filters={}, page_size=5)
     ordered = [chunk_a, chunk_b, chunk_c]
     fused_scores = {chunk.vector_id: score for chunk, score in zip(ordered, (1.0, 0.9, 0.8))}
-    channel_scores: Mapping[str, Mapping[str, float]] = {"dense": fused_scores, "bm25": {}, "splade": {}}
+    channel_scores: Mapping[str, Mapping[str, float]] = {
+        "dense": fused_scores,
+        "bm25": {},
+        "splade": {},
+    }
 
     results = shaper.shape(ordered, fused_scores, request, channel_scores)
     assert len(results) == 2, "Budgets should stop shaping before exhausting candidates"

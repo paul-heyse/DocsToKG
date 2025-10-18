@@ -4,7 +4,7 @@
 #   "purpose": "Wayback Machine resolver",
 #   "sections": [
 #     {
-#       "id": "wayback-resolver",
+#       "id": "waybackresolver",
 #       "name": "WaybackResolver",
 #       "anchor": "class-waybackresolver",
 #       "kind": "class"
@@ -21,8 +21,13 @@ from typing import TYPE_CHECKING, Iterable
 
 import requests as _requests
 
-from .base import RegisteredResolver, ResolverEvent, ResolverEventReason, ResolverResult
-from .base import request_with_retries
+from .base import (
+    RegisteredResolver,
+    ResolverEvent,
+    ResolverEventReason,
+    ResolverResult,
+    request_with_retries,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
@@ -38,6 +43,15 @@ class WaybackResolver(RegisteredResolver):
     name = "wayback"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when prior resolver attempts have failed.
+
+        Args:
+            config: Resolver configuration (unused for enablement).
+            artifact: Work record containing failed PDF URLs.
+
+        Returns:
+            bool: Whether the Wayback resolver should run.
+        """
         return bool(artifact.failed_pdf_urls)
 
     def iter_urls(
@@ -46,6 +60,16 @@ class WaybackResolver(RegisteredResolver):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Query the Wayback Machine for archived versions of failed URLs.
+
+        Args:
+            session: Requests session for HTTP calls.
+            config: Resolver configuration providing timeouts and headers.
+            artifact: Work metadata listing failed PDF URLs to retry.
+
+        Yields:
+            ResolverResult: Archived download URLs or diagnostic events.
+        """
         if not artifact.failed_pdf_urls:
             yield ResolverResult(
                 url=None,

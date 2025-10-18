@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
 from DocsToKG.OntologyDownload.logging_utils import JSONFormatter
+
 from .io import manifest_append, resolve_hash_algorithm
 from .telemetry import StageTelemetry
 
@@ -21,7 +22,9 @@ from .telemetry import StageTelemetry
 class StructuredLogger(logging.LoggerAdapter):
     """Logger adapter that enriches structured logs with shared context."""
 
-    def __init__(self, logger: logging.Logger, base_fields: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(
+        self, logger: logging.Logger, base_fields: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Store underlying logger and initial structured ``base_fields``."""
 
         super().__init__(logger, {})
@@ -54,7 +57,9 @@ class StructuredLogger(logging.LoggerAdapter):
         return StructuredLogger(self.logger, merged)
 
 
-def get_logger(name: str, level: str = "INFO", *, base_fields: Optional[Dict[str, Any]] = None) -> StructuredLogger:
+def get_logger(
+    name: str, level: str = "INFO", *, base_fields: Optional[Dict[str, Any]] = None
+) -> StructuredLogger:
     """Get a structured JSON logger configured for console output."""
 
     logger = logging.getLogger(name)
@@ -79,7 +84,11 @@ def log_event(logger: logging.Logger, level: str, message: str, **fields: object
     normalised_level = str(level).lower()
     if normalised_level in {"warning", "error"}:
         if "stage" not in fields:
-            base_stage = getattr(logger, "base_fields", {}).get("stage") if hasattr(logger, "base_fields") else None
+            base_stage = (
+                getattr(logger, "base_fields", {}).get("stage")
+                if hasattr(logger, "base_fields")
+                else None
+            )
             fields["stage"] = base_stage or "unknown"
         if "doc_id" not in fields:
             fields["doc_id"] = "unknown"
@@ -92,7 +101,11 @@ def log_event(logger: logging.Logger, level: str, message: str, **fields: object
             fields["error_code"] = str(error_code).upper()
     else:
         if "stage" not in fields:
-            base_stage = getattr(logger, "base_fields", {}).get("stage") if hasattr(logger, "base_fields") else None
+            base_stage = (
+                getattr(logger, "base_fields", {}).get("stage")
+                if hasattr(logger, "base_fields")
+                else None
+            )
             if base_stage is not None:
                 fields["stage"] = base_stage
 

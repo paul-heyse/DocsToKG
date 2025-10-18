@@ -22,6 +22,7 @@ _ARGPARSE_SENTINEL = object()
 # Serialization helpers
 # ---------------------------------------------------------------------------
 
+
 def _load_yaml_markers(raw: str) -> object:
     """Deserialize YAML configuration content, raising for missing dependencies."""
 
@@ -123,9 +124,7 @@ def _coerce_bool(value: object, _base_dir: Optional[Path] = None) -> bool:
             return False
         if value == 1 or value == 1.0:
             return True
-        raise ValueError(
-            f"Boolean flags only accept 0/1 numeric values; received {value!r}."
-        )
+        raise ValueError(f"Boolean flags only accept 0/1 numeric values; received {value!r}.")
     normalized = str(value).strip().lower()
     if normalized in _TRUE_BOOL_LITERALS:
         return True
@@ -187,7 +186,9 @@ def _coerce_str_tuple(value: object, _base_dir: Optional[Path] = None) -> Tuple[
     text = str(value).strip()
     if not text:
         return ()
-    if (text.startswith("[") and text.endswith("]")) or (text.startswith("(") and text.endswith(")")):
+    if (text.startswith("[") and text.endswith("]")) or (
+        text.startswith("(") and text.endswith(")")
+    ):
         try:
             parsed = json.loads(text)
             if isinstance(parsed, (list, tuple, set)):

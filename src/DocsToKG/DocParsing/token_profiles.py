@@ -8,7 +8,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Sequence, Tuple
 
 from transformers import AutoTokenizer
 
@@ -18,14 +18,14 @@ from DocsToKG.DocParsing.config import (
     parse_args_with_overrides,
 )
 from DocsToKG.DocParsing.core import (
-    CLIOption,
     DEFAULT_TOKENIZER,
+    CLIOption,
     build_subcommand,
 )
+from DocsToKG.DocParsing.doctags import add_data_root_option
 from DocsToKG.DocParsing.env import data_doctags, detect_data_root
 from DocsToKG.DocParsing.io import iter_doctags
 from DocsToKG.DocParsing.logging import get_logger, log_event
-from DocsToKG.DocParsing.doctags import add_data_root_option
 
 __all__ = ["TokenProfilesCfg", "build_parser", "parse_args", "main"]
 
@@ -157,7 +157,11 @@ TOKEN_PROFILE_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--doctags-dir",),
-        {"type": Path, "default": DEFAULT_DOCTAGS_DIR, "help": "Directory containing DocTags files."},
+        {
+            "type": Path,
+            "default": DEFAULT_DOCTAGS_DIR,
+            "help": "Directory containing DocTags files.",
+        },
     ),
     CLIOption(
         ("--sample-size",),
@@ -165,11 +169,19 @@ TOKEN_PROFILE_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--max-chars",),
-        {"type": int, "default": 4000, "help": "Trim samples to this many characters (<=0 keeps full text)."},
+        {
+            "type": int,
+            "default": 4000,
+            "help": "Trim samples to this many characters (<=0 keeps full text).",
+        },
     ),
     CLIOption(
         ("--baseline",),
-        {"type": str, "default": DEFAULT_TOKENIZER, "help": "Tokenizer treated as baseline for ratios."},
+        {
+            "type": str,
+            "default": DEFAULT_TOKENIZER,
+            "help": "Tokenizer treated as baseline for ratios.",
+        },
     ),
     CLIOption(
         ("--tokenizer",),
@@ -371,7 +383,9 @@ def main(args: argparse.Namespace | Sequence[str] | None = None) -> int:
         print(f"Baseline tokenizer {cfg.baseline!r} was not profiled.")
         return 1
 
-    table = _render_table(tokenizer_ids, counts, cfg.baseline, baseline_counts, cfg.window_min, cfg.window_max)
+    table = _render_table(
+        tokenizer_ids, counts, cfg.baseline, baseline_counts, cfg.window_min, cfg.window_max
+    )
     print(f"Sampled {len(samples)} DocTags from {cfg.doctags_dir}")
     print(f"Baseline tokenizer: {cfg.baseline}")
     print("")

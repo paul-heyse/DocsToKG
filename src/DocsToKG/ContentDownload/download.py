@@ -1,3 +1,11 @@
+"""Download orchestration helpers for the content acquisition pipeline.
+
+This module coordinates the streaming download workflow, tying together
+resolver outputs, HTTP policy enforcement, and telemetry reporting. It exposes
+utilities that transform resolver candidates into stored artifacts while
+respecting retry budgets, robots.txt directives, and classification rules.
+"""
+
 from __future__ import annotations
 
 import contextlib
@@ -10,7 +18,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Union
 from urllib.parse import urlparse, urlsplit
 from urllib.robotparser import RobotFileParser
 
@@ -42,7 +50,6 @@ from DocsToKG.ContentDownload.core import (
 from DocsToKG.ContentDownload.core import normalize_arxiv as _normalize_arxiv
 from DocsToKG.ContentDownload.core import normalize_pmid as _normalize_pmid
 from DocsToKG.ContentDownload.errors import (
-    get_actionable_error_message,
     log_download_failure,
 )
 from DocsToKG.ContentDownload.networking import (
@@ -63,16 +70,16 @@ from DocsToKG.ContentDownload.pipeline import (
 from DocsToKG.ContentDownload.telemetry import RunTelemetry
 
 __all__ = [
-    'ensure_dir',
-    'DownloadOptions',
-    'DownloadState',
-    'RobotsCache',
-    'create_artifact',
-    'download_candidate',
-    'process_one_work',
+    "ensure_dir",
+    "DownloadOptions",
+    "DownloadState",
+    "RobotsCache",
+    "create_artifact",
+    "download_candidate",
+    "process_one_work",
 ]
 
-LOGGER = logging.getLogger('DocsToKG.ContentDownload')
+LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
 
 def ensure_dir(path: Path) -> None:
@@ -732,9 +739,7 @@ def download_candidate(
                     existing_file = Path(existing_path)
                     candidate_file = existing_file
                     if not candidate_file.exists():
-                        candidate_part = existing_file.with_suffix(
-                            existing_file.suffix + ".part"
-                        )
+                        candidate_part = existing_file.with_suffix(existing_file.suffix + ".part")
                         if candidate_part.exists():
                             candidate_file = candidate_part
                     if candidate_file.exists() and candidate_file.is_file():
@@ -1138,12 +1143,9 @@ def download_candidate(
 
                     # Optimize: Only classify when buffer has grown enough or first time
                     buffer_size = len(sniff_buffer)
-                    should_classify = (
-                        last_classification_size == 0  # First chunk
-                        or (
-                            detected is Classification.UNKNOWN
-                            and buffer_size >= last_classification_size + min_classify_interval
-                        )
+                    should_classify = last_classification_size == 0 or (  # First chunk
+                        detected is Classification.UNKNOWN
+                        and buffer_size >= last_classification_size + min_classify_interval
                     )
 
                     if should_classify:
@@ -1361,12 +1363,7 @@ def download_candidate(
             if hasher is not None:
                 sha256 = hasher.hexdigest()
                 content_length = byte_count
-            if (
-                dest_path
-                and ctx.content_addressed
-                and sha256
-                and detected is Classification.PDF
-            ):
+            if dest_path and ctx.content_addressed and sha256 and detected is Classification.PDF:
                 dest_path = _apply_content_addressed_storage(dest_path, sha256)
             tail_snapshot: Optional[bytes] = bytes(tail_buffer) if tail_buffer else None
 

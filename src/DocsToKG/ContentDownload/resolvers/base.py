@@ -4,58 +4,88 @@
 #   "purpose": "Resolver shared types, registry primitives, and helper utilities",
 #   "sections": [
 #     {
-#       "id": "default-resolver-order",
-#       "name": "DEFAULT_RESOLVER_ORDER",
-#       "anchor": "data-default-resolver-order",
-#       "kind": "data"
-#     },
-#     {
-#       "id": "resolver-registry",
-#       "name": "ResolverRegistry",
-#       "anchor": "class-resolverregistry",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "registered-resolver",
-#       "name": "RegisteredResolver",
-#       "anchor": "class-registeredresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "api-resolver-base",
-#       "name": "ApiResolverBase",
-#       "anchor": "class-apiresolverbase",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "resolver-result",
+#       "id": "resolverresult",
 #       "name": "ResolverResult",
 #       "anchor": "class-resolverresult",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "resolver-events",
+#       "id": "resolverevent",
 #       "name": "ResolverEvent",
 #       "anchor": "class-resolverevent",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "resolver-event-reason",
+#       "id": "resolvereventreason",
 #       "name": "ResolverEventReason",
 #       "anchor": "class-resolvereventreason",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "resolver-protocol",
+#       "id": "resolver",
 #       "name": "Resolver",
 #       "anchor": "class-resolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "shared-helpers",
-#       "name": "Shared helpers",
-#       "anchor": "section-shared-helpers",
-#       "kind": "section"
+#       "id": "resolverregistry",
+#       "name": "ResolverRegistry",
+#       "anchor": "class-resolverregistry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "registeredresolver",
+#       "name": "RegisteredResolver",
+#       "anchor": "class-registeredresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "apiresolverbase",
+#       "name": "ApiResolverBase",
+#       "anchor": "class-apiresolverbase",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "absolute-url",
+#       "name": "_absolute_url",
+#       "anchor": "function-absolute-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-candidate-urls",
+#       "name": "_collect_candidate_urls",
+#       "anchor": "function-collect-candidate-urls",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-meta",
+#       "name": "find_pdf_via_meta",
+#       "anchor": "function-find-pdf-via-meta",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-link",
+#       "name": "find_pdf_via_link",
+#       "anchor": "function-find-pdf-via-link",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-anchor",
+#       "name": "find_pdf_via_anchor",
+#       "anchor": "function-find-pdf-via-anchor",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-semantic-scholar-data",
+#       "name": "_fetch_semantic_scholar_data",
+#       "anchor": "function-fetch-semantic-scholar-data",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-unpaywall-data",
+#       "name": "_fetch_unpaywall_data",
+#       "anchor": "function-fetch-unpaywall-data",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -68,7 +98,18 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Protocol, Tuple, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    Mapping,
+    Optional,
+    Protocol,
+    Tuple,
+    Type,
+    Union,
+)
 from urllib.parse import quote, urljoin, urlparse
 
 import requests as _requests

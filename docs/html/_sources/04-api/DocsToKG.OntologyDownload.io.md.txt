@@ -8,6 +8,10 @@ Filesystem safety, rate limiting, and networking helpers for ontology downloads.
 
 ## 2. Functions
 
+### `_resolve_max_uncompressed_bytes(limit)`
+
+Return the effective archive expansion limit, honoring runtime overrides.
+
 ### `sanitize_filename(filename)`
 
 Return a filesystem-safe filename derived from ``filename``.
@@ -30,7 +34,11 @@ Reconstruct URL netloc with a normalized hostname.
 
 ### `_cached_getaddrinfo(host)`
 
-Resolve *host* using a short-lived cache to avoid repeated DNS lookups.
+Resolve *host* using an expiring LRU cache to avoid repeated DNS lookups.
+
+### `_prune_dns_cache(current_time)`
+
+Expire stale DNS entries and enforce the cache size bound.
 
 ### `validate_url_security(url, http_config)`
 
@@ -103,6 +111,14 @@ Emit debug-level memory usage snapshots when enabled.
 ### `is_retryable_error(exc)`
 
 Return ``True`` when ``exc`` represents a retryable network failure.
+
+### `_materialize_cached_file(source, destination)`
+
+Link or move ``source`` into ``destination`` without redundant copies.
+
+Returns a tuple ``(artifact_path, cache_path)`` where ``artifact_path`` is the final
+destination path and ``cache_path`` points to the retained cache file (which may be
+identical to ``artifact_path`` when the cache entry is moved instead of linked).
 
 ### `_extract_correlation_id(logger)`
 
@@ -256,7 +272,7 @@ requests.HTTPError: Propagated when HTTP status codes indicate failure.
 Returns:
 None
 
-### `_resolved_content_metadata()`
+### `_resolved_content_metadata(current_downloader, manifest)`
 
 *No documentation available.*
 
@@ -273,6 +289,10 @@ None
 *No documentation available.*
 
 ### `_on_retry(attempt_number, exc, delay)`
+
+*No documentation available.*
+
+### `_clear_partial_files()`
 
 *No documentation available.*
 

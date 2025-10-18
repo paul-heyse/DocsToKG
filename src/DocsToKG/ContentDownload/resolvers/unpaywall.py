@@ -4,7 +4,7 @@
 #   "purpose": "Unpaywall resolver implementation",
 #   "sections": [
 #     {
-#       "id": "unpaywall-resolver",
+#       "id": "unpaywallresolver",
 #       "name": "UnpaywallResolver",
 #       "anchor": "class-unpaywallresolver",
 #       "kind": "class"
@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Tuple
 
 import requests as _requests
 
@@ -46,6 +46,15 @@ class UnpaywallResolver(RegisteredResolver):
     name = "unpaywall"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when unpaywall credentials and a DOI are provided.
+
+        Args:
+            config: Resolver configuration containing the Unpaywall contact email.
+            artifact: Work record offering DOI metadata.
+
+        Returns:
+            bool: Whether the resolver should attempt to fetch data.
+        """
         return bool(config.unpaywall_email and artifact.doi)
 
     def iter_urls(
@@ -54,6 +63,16 @@ class UnpaywallResolver(RegisteredResolver):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield Unpaywall-sourced PDF URLs for ``artifact``.
+
+        Args:
+            session: Requests session for outbound HTTP calls.
+            config: Resolver configuration with API parameters.
+            artifact: Work metadata used to build the lookup.
+
+        Yields:
+            ResolverResult: Candidate download URLs or diagnostic events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(

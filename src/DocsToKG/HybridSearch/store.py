@@ -111,7 +111,6 @@ import base64
 import logging
 import time
 import uuid
-import warnings
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from threading import Event, RLock
@@ -120,8 +119,8 @@ from typing import Callable, ClassVar, Dict, Iterator, List, Mapping, Optional, 
 import numpy as np
 
 from .config import DenseIndexConfig
-from .interfaces import DenseVectorStore
 from .devtools.opensearch_simulator import OpenSearchSimulator
+from .interfaces import DenseVectorStore
 from .pipeline import Observability
 from .types import ChunkPayload
 
@@ -153,6 +152,7 @@ def _vector_uuid_to_faiss_int(vector_id: str) -> int:
     """Translate a vector UUID into a FAISS-compatible 63-bit integer."""
 
     return uuid.UUID(vector_id).int & _MASK_63_BITS
+
 
 try:  # pragma: no cover - exercised via integration tests
     import faiss  # type: ignore
@@ -462,14 +462,15 @@ class FaissVectorStore(DenseVectorStore):
             extra={
                 "event": {
                     "changes": {
-                        name: {"old": change[0], "new": change[1]}
-                        for name, change in diffs.items()
+                        name: {"old": change[0], "new": change[1]} for name, change in diffs.items()
                     }
                 }
             },
         )
         if "nprobe" in changes:
-            with self._observability.trace("faiss_set_config_nprobe", nprobe=str(changes["nprobe"])):
+            with self._observability.trace(
+                "faiss_set_config_nprobe", nprobe=str(changes["nprobe"])
+            ):
                 with self._lock:
                     self._set_nprobe()
                     self._last_nprobe_update = time.time()
@@ -2033,7 +2034,6 @@ class ChunkRegistry:
         """Return all vector identifiers in insertion order."""
 
         return list(self._chunks.keys())
-
 
 
 class ManagedFaissAdapter(DenseVectorStore):

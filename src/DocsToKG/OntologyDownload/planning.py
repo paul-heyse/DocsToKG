@@ -33,6 +33,7 @@ import requests
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 
+from .checksums import ExpectedChecksum, resolve_expected_checksum
 from .errors import (
     ConfigurationError,
     DownloadFailure,
@@ -41,7 +42,6 @@ from .errors import (
     ResolverError,
     ValidationError,
 )
-from .checksums import ExpectedChecksum, resolve_expected_checksum
 from .io import (
     RDF_MIME_ALIASES,
     RDF_MIME_FORMAT_LABELS,
@@ -51,8 +51,8 @@ from .io import (
     sanitize_filename,
     validate_url_security,
 )
-from .migrations import migrate_manifest
 from .logging_utils import setup_logging
+from .migrations import migrate_manifest
 from .resolvers import (
     RESOLVERS,
     BaseResolver,
@@ -74,10 +74,10 @@ from .settings import (
     STORAGE,
     ConfigError,
     DefaultsConfig,
-    DownloadConfiguration,
     ResolvedConfig,
     _coerce_sequence,
     ensure_python_version,
+    get_default_config,
 )
 from .validation import ValidationRequest, ValidationResult, run_validators
 
@@ -341,6 +341,7 @@ class FetchResult:
     manifest_path: Path
     artifacts: Sequence[str]
     expected_checksum: Optional[ExpectedChecksum] = None
+
 
 ResolvedConfig.model_rebuild()
 
@@ -1283,19 +1284,18 @@ def _resolve_plan_with_fallback(
         try:
             plan = resolver.plan(spec, config, adapter)
         except PolicyError as exc:
-            attempt_record.update({"status": "policy", "error": str(exc)})
-            resolver_attempts.append(dict(attempt_record))
+            message = str(exc)
+            attempts.append(f"{resolver_name}: {message}")
             adapter.warning(
                 "download attempt rejected by policy",
                 extra={
                     "stage": "download",
-                    "resolver": candidate.resolver,
+                    "resolver": resolver_name,
                     "attempt": attempt_number,
-                    "error": str(exc),
+                    "error": message,
                 },
             )
-            last_error = exc
-            raise
+            continue
         except (ConfigError, DownloadFailure) as exc:
             message = str(exc)
             attempts.append(f"{resolver_name}: {message}")
@@ -1376,7 +1376,7 @@ def fetch_one(
     """
 
     ensure_python_version()
-    active_config = config or ResolvedConfig.from_defaults()
+    active_config = config or get_default_config(copy=True)
     logging_config = active_config.defaults.logging
     log = logger or setup_logging(
         level=logging_config.level,
@@ -1735,7 +1735,7 @@ def plan_one(
     """
 
     ensure_python_version()
-    active_config = config or ResolvedConfig.from_defaults()
+    active_config = config or get_default_config(copy=True)
     logging_config = active_config.defaults.logging
     log = logger or setup_logging(
         level=logging_config.level,
@@ -1799,7 +1799,7 @@ def plan_all(
     """
 
     ensure_python_version()
-    active_config = config or ResolvedConfig.from_defaults()
+    active_config = config or get_default_config(copy=True)
     logging_config = active_config.defaults.logging
     log = logger or setup_logging(
         level=logging_config.level,
@@ -1918,7 +1918,7 @@ def fetch_all(
     """
 
     ensure_python_version()
-    active_config = config or ResolvedConfig.from_defaults()
+    active_config = config or get_default_config(copy=True)
     if logger is not None:
         log = logger
     else:

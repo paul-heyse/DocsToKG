@@ -2,7 +2,7 @@ import argparse
 import contextlib
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import requests
 

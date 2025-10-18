@@ -197,7 +197,9 @@ def test_path_resolution_edge_cases():
         assert len(result) > 0  # Should not be empty
 
 
-def test_chunker_finalize_respects_data_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_chunker_finalize_respects_data_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     data_root = tmp_path / "Data"
     monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
     cfg = ChunkerCfg()
@@ -214,7 +216,9 @@ def test_chunker_finalize_token_window_invariant(monkeypatch: pytest.MonkeyPatch
         cfg.finalize()
 
 
-def test_embed_finalize_parallelism_invariant(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_embed_finalize_parallelism_invariant(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path / "Data"))
     cfg = EmbedCfg(files_parallel=0)
     with pytest.raises(ValueError):

@@ -154,23 +154,6 @@ sorted(action.dest for action in parser._actions if action.option_strings)
 </div></blockquote>
 </div></blockquote>
 </section>
-<section id="dedupe-preserve-order-names">
-<h3><code class="docutils literal notranslate"><span class="pre">_dedupe_preserve_order(names)</span></code><a class="headerlink" href="#dedupe-preserve-order-names" title="Link to this heading"></a></h3>
-<p>Return a list containing <code class="docutils literal notranslate"><span class="pre">names</span></code> without duplicates while preserving order.</p>
-<p>Args:
-names: Iterable of candidate names that may include duplicates or empty values.</p>
-<p>Returns:
-List of unique names in their original encounter order.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>_dedupe_preserve_order([“a”, “b”, “a”, “c”])
-[‘a’, ‘b’, ‘c’]</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
 <section id="normalize-served-model-names-raw">
 <h3><code class="docutils literal notranslate"><span class="pre">_normalize_served_model_names(raw)</span></code><a class="headerlink" href="#normalize-served-model-names-raw" title="Link to this heading"></a></h3>
 <p>Flatten CLI-provided served model names into a deduplicated tuple.</p>

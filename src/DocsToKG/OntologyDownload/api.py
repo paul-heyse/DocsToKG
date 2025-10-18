@@ -302,7 +302,7 @@ from collections import OrderedDict
 from datetime import datetime, timezone
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import requests
 import yaml
@@ -312,45 +312,42 @@ from jsonschema.exceptions import SchemaError
 from . import plugins as plugin_mod
 from .errors import (
     ConfigurationError,
-    DownloadFailure,
     OntologyDownloadError,
     PolicyError,
     UnsupportedPythonError,
 )
+from .exports import PUBLIC_EXPORT_NAMES
+from .formatters import (
+    PLAN_TABLE_HEADERS,
+    format_plan_rows,
+    format_results_table,
+    format_table,
+    format_validation_summary,
+)
 from .io import (
-    RDF_MIME_ALIASES,
-    DownloadResult,
-    download_stream,
-    extract_archive_safe,
     format_bytes,
-    generate_correlation_id,
-    mask_sensitive_data,
-    retry_with_backoff,
     sanitize_filename,
+)
+from .io import (
     validate_url_security as _validate_url_security,
 )
 from .logging_utils import setup_logging
+from .manifests import (
+    DEFAULT_LOCKFILE_PATH,
+    DEFAULT_PLAN_BASELINE,
+    LOCKFILE_SCHEMA_VERSION,
+)
 from .planning import (
-    MANIFEST_JSON_SCHEMA,
     MANIFEST_SCHEMA_VERSION,
-    RESOLVERS,
-    BatchFetchError,
-    BatchPlanningError,
     FetchResult,
     FetchSpec,
     PlannedFetch,
-    ResolverCandidate,
-    _build_destination,
     fetch_all,
-    fetch_one,
     get_manifest_schema,
     infer_version_timestamp,
-    merge_defaults,
-    parse_http_datetime,
     parse_iso_datetime,
     parse_version_timestamp,
     plan_all,
-    plan_one,
     validate_manifest_dict,
 )
 from .settings import (
@@ -365,31 +362,14 @@ from .settings import (
     LoggingConfiguration,
     ResolvedConfig,
     ValidationConfig,
-    build_resolved_config,
-    ensure_python_version,
-    get_env_overrides,
-    get_owlready2,
-    get_pronto,
-    get_pystow,
-    get_rdflib,
+    get_default_config,
     load_config,
-    load_raw_yaml,
     parse_rate_limit_to_rps,
     validate_config,
 )
 from .validation import (
-    VALIDATORS,
     ValidationRequest,
-    ValidationResult,
-    ValidationTimeout,
-    ValidatorSubprocessError,
-    normalize_streaming,
     run_validators,
-    validate_arelle,
-    validate_owlready2,
-    validate_pronto,
-    validate_rdflib,
-    validate_robot,
 )
 from .validation import (
     main as validation_main,
@@ -424,49 +404,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
         raise ConfigError(str(exc)) from exc
 
 
-PUBLIC_API_MANIFEST: Dict[str, str] = {
-    "FetchSpec": "class",
-    "PlannedFetch": "class",
-    "FetchResult": "class",
-    "DownloadResult": "class",
-    "DownloadFailure": "class",
-    "OntologyDownloadError": "class",
-    "ValidationRequest": "class",
-    "ValidationResult": "class",
-    "ValidationTimeout": "class",
-    "ValidatorSubprocessError": "class",
-    "plan_all": "function",
-    "plan_one": "function",
-    "fetch_all": "function",
-    "fetch_one": "function",
-    "run_validators": "function",
-    "validate_manifest_dict": "function",
-    "__version__": "const",
-    "PUBLIC_API_MANIFEST": "const",
-}
-
-__all__ = [
-    "FetchSpec",
-    "PlannedFetch",
-    "FetchResult",
-    "DownloadResult",
-    "DownloadFailure",
-    "OntologyDownloadError",
-    "ValidationRequest",
-    "ValidationResult",
-    "ValidationTimeout",
-    "ValidatorSubprocessError",
-    "plan_all",
-    "plan_one",
-    "fetch_all",
-    "fetch_one",
-    "run_validators",
-    "validate_manifest_dict",
-    "cli_main",
-    "validator_worker_main",
-    "__version__",
-    "PUBLIC_API_MANIFEST",
-]
+__all__ = list(PUBLIC_EXPORT_NAMES)
 
 
 def list_plugins(kind: str) -> Dict[str, str]:
@@ -488,11 +426,7 @@ def list_plugins(kind: str) -> Dict[str, str]:
 def _collect_plugin_details(kind: str) -> "OrderedDict[str, Dict[str, str]]":
     """Return plugin metadata including qualified path and version."""
 
-    if kind == "resolver":
-        registry = RESOLVERS
-    elif kind == "validator":
-        registry = VALIDATORS
-    else:
+    if kind not in {"resolver", "validator"}:
         raise ValueError(f"Unknown plugin kind: {kind}")
 
     discovered_meta = plugin_mod.get_registered_plugin_meta(kind)
@@ -519,7 +453,7 @@ def _collect_plugin_details(kind: str) -> "OrderedDict[str, Dict[str, str]]":
 
 def about() -> Dict[str, object]:
     """Return metadata describing the ontology download subsystem."""
-    config = ResolvedConfig.from_defaults()
+    config = get_default_config()
     defaults = config.defaults
 
     logging_cfg = defaults.logging
@@ -832,150 +766,11 @@ PLAN_DIFF_FIELDS = (
 # --- Public Functions ---
 
 
-def format_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
-    """Render a padded ASCII table.
 
-    Args:
-        headers: Column headers rendered on the first row.
-        rows: Iterable of table rows; each row must match the header length.
-
-    Returns:
-        Formatted table as a multi-line string.
-    """
-
-    column_widths = [len(header) for header in headers]
-    for row in rows:
-        for index, cell in enumerate(row):
-            column_widths[index] = max(column_widths[index], len(cell))
-
-    def _format_row(values: Sequence[str]) -> str:
-        return " | ".join(value.ljust(column_widths[index]) for index, value in enumerate(values))
-
-    separator = "-+-".join("-" * width for width in column_widths)
-    lines = [_format_row(headers), separator]
-    lines.extend(_format_row(row) for row in rows)
-    return "\n".join(lines)
+# --- Private Helpers ---
 
 
 
-PlanRow = Tuple[str, str, str, str, str, str, str, str]
-PLAN_TABLE_HEADERS: Tuple[str, ...] = (
-    "id",
-    "resolver",
-    "service",
-    "media_type",
-    "version",
-    "license",
-    "expected_checksum",
-    "url",
-)
-RESULT_TABLE_HEADERS: Tuple[str, ...] = (
-    "id",
-    "resolver",
-    "status",
-    "sha256",
-    "expected_checksum",
-    "file",
-)
-
-
-def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[PlanRow]:
-    """Convert planner output into rows for table rendering.
-
-    Args:
-        plans: Planned fetch objects emitted by the planner.
-
-    Returns:
-        List of tuples suitable for :func:`format_table`.
-    """
-
-    rows: List[PlanRow] = []
-    for plan in plans:
-        expected_checksum = ""
-        checksum = plan.metadata.get("expected_checksum")
-        if isinstance(checksum, dict):
-            algorithm = checksum.get("algorithm")
-            value = checksum.get("value")
-            if isinstance(algorithm, str) and isinstance(value, str):
-                expected_checksum = f"{algorithm}:{value[:12]}…" if len(value) > 12 else f"{algorithm}:{value}"
-
-        rows.append(
-            (
-                plan.spec.id,
-                plan.resolver,
-                plan.plan.service or "",
-                plan.plan.media_type or "",
-                plan.plan.version or "",
-                plan.plan.license or "",
-                expected_checksum,
-                plan.plan.url,
-            )
-        )
-    return rows
-
-
-def format_results_table(results: Iterable[FetchResult]) -> str:
-    """Render download results as a table summarizing status and file paths.
-
-    Args:
-        results: Download results produced by :func:`fetch_all`.
-
-    Returns:
-        Formatted table summarizing ontology downloads.
-    """
-
-    rows = []
-    for result in results:
-        checksum_text = ""
-        checksum_obj = getattr(result, "expected_checksum", None)
-        if checksum_obj is not None:
-            checksum_text = checksum_obj.to_known_hash()
-            if ":" in checksum_text:
-                algo, value = checksum_text.split(":", 1)
-                checksum_text = f"{algo}:{value[:12]}…" if len(value) > 12 else checksum_text
-        else:
-            extras = result.spec.extras if isinstance(result.spec.extras, dict) else {}
-            checksum = extras.get("expected_checksum") if isinstance(extras, dict) else None
-            if isinstance(checksum, dict):
-                algo = checksum.get("algorithm")
-                value = checksum.get("value")
-                if isinstance(algo, str) and isinstance(value, str):
-                    checksum_text = f"{algo}:{value[:12]}…" if len(value) > 12 else f"{algo}:{value}"
-        rows.append(
-            (
-                result.spec.id,
-                result.spec.resolver,
-                result.status,
-                result.sha256,
-                checksum_text,
-                str(result.local_path),
-            )
-        )
-    return format_table(RESULT_TABLE_HEADERS, rows)
-
-
-def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
-    """Summarise validator outcomes in a compact status table.
-
-    Args:
-        results: Mapping of validator names to structured result payloads.
-
-    Returns:
-        Table highlighting validator status and notable detail messages.
-    """
-
-    formatted: List[Tuple[str, str, str]] = []
-    for name, payload in results.items():
-        status = "ok" if payload.get("ok") else "error"
-        details = payload.get("details", {})
-        message = ""
-        if isinstance(details, dict):
-            if "error" in details:
-                message = str(details["error"])
-            elif details:
-                message = ", ".join(f"{key}={value}" for key, value in details.items())
-        formatted.append((name, status, message))
-    return format_table(("validator", "status", "details"), formatted)
 
 
 # --- Private Helpers ---
@@ -1428,9 +1223,11 @@ def _results_to_dict(result: FetchResult) -> dict:
         "sha256": result.sha256,
         "manifest": str(result.manifest_path),
         "artifacts": list(result.artifacts),
-        "expected_checksum": result.expected_checksum.to_mapping()
-        if getattr(result, "expected_checksum", None)
-        else None,
+        "expected_checksum": (
+            result.expected_checksum.to_mapping()
+            if getattr(result, "expected_checksum", None)
+            else None
+        ),
     }
 
 
@@ -1854,7 +1651,7 @@ def _resolve_specs_from_args(
     if config_path:
         config = load_config(config_path)
     else:
-        config = base_config or ResolvedConfig.from_defaults()
+        config = base_config or get_default_config(copy=True)
 
     config.defaults.logging.level = getattr(args, "log_level", config.defaults.logging.level)
     _apply_cli_overrides(config, args)
@@ -2217,7 +2014,7 @@ def _doctor_report() -> Dict[str, object]:
         network[name] = result
 
     rate_limits: Dict[str, object] = {
-        "effective": ResolvedConfig.from_defaults().defaults.http.rate_limits,
+        "effective": get_default_config().defaults.http.rate_limits,
     }
     config_path = CONFIG_DIR / "sources.yaml"
     if config_path.exists():
@@ -2589,7 +2386,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(arg_list)
     try:
-        base_config = ResolvedConfig.from_defaults()
+        base_config = get_default_config(copy=True)
         base_config.defaults.logging.level = args.log_level
         logging_config = base_config.defaults.logging
         logger = setup_logging(

@@ -1,0 +1,229 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: io &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: io</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.DocParsing.io.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-io">
+<h1>1. Module: io<a class="headerlink" href="#module-io" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.io</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Low-level I/O helpers shared across DocParsing stages.</p>
+<p>This module houses JSONL streaming utilities, atomic write helpers, and manifest
+bookkeeping routines. It deliberately avoids importing the CLI-facing modules so
+that other packages can depend on these primitives without pulling in heavy
+dependencies.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="atomic-write-path">
+<h3><code class="docutils literal notranslate"><span class="pre">atomic_write(path)</span></code><a class="headerlink" href="#atomic-write-path" title="Link to this heading"></a></h3>
+<p>Write to a temporary file and atomically replace the destination.</p>
+</section>
+<section id="iter-jsonl-path">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_jsonl(path)</span></code><a class="headerlink" href="#iter-jsonl-path" title="Link to this heading"></a></h3>
+<p>Stream JSONL records from <code class="docutils literal notranslate"><span class="pre">path</span></code> without materialising the full file.</p>
+</section>
+<section id="iter-jsonl-batches-paths-batch-size">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_jsonl_batches(paths,</span> <span class="pre">batch_size)</span></code><a class="headerlink" href="#iter-jsonl-batches-paths-batch-size" title="Link to this heading"></a></h3>
+<p>Yield JSONL rows from <code class="docutils literal notranslate"><span class="pre">paths</span></code> in batches of <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> records.</p>
+</section>
+<section id="dedupe-preserve-order-items">
+<h3><code class="docutils literal notranslate"><span class="pre">dedupe_preserve_order(items)</span></code><a class="headerlink" href="#dedupe-preserve-order-items" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">items</span></code> without duplicates while preserving encounter order.</p>
+</section>
+<section id="jsonl-load-path-skip-invalid-max-errors">
+<h3><code class="docutils literal notranslate"><span class="pre">jsonl_load(path,</span> <span class="pre">skip_invalid,</span> <span class="pre">max_errors)</span></code><a class="headerlink" href="#jsonl-load-path-skip-invalid-max-errors" title="Link to this heading"></a></h3>
+<p>Load a JSONL file into memory with optional error tolerance.</p>
+<p>.. deprecated:: 0.2.0
+Use :func:<code class="docutils literal notranslate"><span class="pre">iter_jsonl</span></code> or :func:<code class="docutils literal notranslate"><span class="pre">iter_jsonl_batches</span></code> for streaming access.</p>
+</section>
+<section id="jsonl-save-path-rows-validate">
+<h3><code class="docutils literal notranslate"><span class="pre">jsonl_save(path,</span> <span class="pre">rows,</span> <span class="pre">validate)</span></code><a class="headerlink" href="#jsonl-save-path-rows-validate" title="Link to this heading"></a></h3>
+<p>Persist dictionaries to a JSONL file atomically.</p>
+</section>
+<section id="jsonl-append-iter-target-rows">
+<h3><code class="docutils literal notranslate"><span class="pre">jsonl_append_iter(target,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#jsonl-append-iter-target-rows" title="Link to this heading"></a></h3>
+<p>Append JSON-serialisable rows to a JSONL file.</p>
+</section>
+<section id="build-jsonl-split-map-path">
+<h3><code class="docutils literal notranslate"><span class="pre">build_jsonl_split_map(path)</span></code><a class="headerlink" href="#build-jsonl-split-map-path" title="Link to this heading"></a></h3>
+<p>Return newline-aligned byte ranges that partition <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
+</section>
+<section id="iter-doctags-directory">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_doctags(directory)</span></code><a class="headerlink" href="#iter-doctags-directory" title="Link to this heading"></a></h3>
+<p>Yield DocTags files within <code class="docutils literal notranslate"><span class="pre">directory</span></code> and subdirectories.</p>
+</section>
+<section id="iter-jsonl-records-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_iter_jsonl_records(path)</span></code><a class="headerlink" href="#iter-jsonl-records-path" title="Link to this heading"></a></h3>
+<p>Yield JSON-decoded records between optional byte offsets.</p>
+</section>
+<section id="sanitise-stage-stage">
+<h3><code class="docutils literal notranslate"><span class="pre">_sanitise_stage(stage)</span></code><a class="headerlink" href="#sanitise-stage-stage" title="Link to this heading"></a></h3>
+<p>Return a filesystem-friendly identifier for <code class="docutils literal notranslate"><span class="pre">stage</span></code>.</p>
+</section>
+<section id="telemetry-filename-stage-kind">
+<h3><code class="docutils literal notranslate"><span class="pre">_telemetry_filename(stage,</span> <span class="pre">kind)</span></code><a class="headerlink" href="#telemetry-filename-stage-kind" title="Link to this heading"></a></h3>
+<p>Return a telemetry filename for <code class="docutils literal notranslate"><span class="pre">stage</span></code> and <code class="docutils literal notranslate"><span class="pre">kind</span></code>.</p>
+</section>
+<section id="manifest-filename-stage">
+<h3><code class="docutils literal notranslate"><span class="pre">_manifest_filename(stage)</span></code><a class="headerlink" href="#manifest-filename-stage" title="Link to this heading"></a></h3>
+<p>Return manifest filename for a given stage.</p>
+</section>
+<section id="manifest-append-stage-doc-id-status">
+<h3><code class="docutils literal notranslate"><span class="pre">manifest_append(stage,</span> <span class="pre">doc_id,</span> <span class="pre">status)</span></code><a class="headerlink" href="#manifest-append-stage-doc-id-status" title="Link to this heading"></a></h3>
+<p>Append a structured entry to the processing manifest.</p>
+</section>
+<section id="resolve-manifest-path-stage-root">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_manifest_path(stage,</span> <span class="pre">root)</span></code><a class="headerlink" href="#resolve-manifest-path-stage-root" title="Link to this heading"></a></h3>
+<p>Return the manifest path for <code class="docutils literal notranslate"><span class="pre">stage</span></code> relative to <code class="docutils literal notranslate"><span class="pre">root</span></code>.</p>
+</section>
+<section id="resolve-attempts-path-stage-root">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_attempts_path(stage,</span> <span class="pre">root)</span></code><a class="headerlink" href="#resolve-attempts-path-stage-root" title="Link to this heading"></a></h3>
+<p>Return the attempts log path for <code class="docutils literal notranslate"><span class="pre">stage</span></code> relative to <code class="docutils literal notranslate"><span class="pre">root</span></code>.</p>
+</section>
+<section id="normalise-hash-name-candidate">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalise_hash_name(candidate)</span></code><a class="headerlink" href="#normalise-hash-name-candidate" title="Link to this heading"></a></h3>
+<p>Normalise algorithm names for comparison against hashlib.</p>
+</section>
+<section id="select-hash-algorithm-requested-default">
+<h3><code class="docutils literal notranslate"><span class="pre">_select_hash_algorithm(requested,</span> <span class="pre">default)</span></code><a class="headerlink" href="#select-hash-algorithm-requested-default" title="Link to this heading"></a></h3>
+<p>Return a supported hash algorithm honouring env overrides and defaults.</p>
+</section>
+<section id="resolve-hash-algorithm-default">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_hash_algorithm(default)</span></code><a class="headerlink" href="#resolve-hash-algorithm-default" title="Link to this heading"></a></h3>
+<p>Return the active content hash algorithm, guarding invalid overrides.</p>
+</section>
+<section id="make-hasher-name">
+<h3><code class="docutils literal notranslate"><span class="pre">make_hasher(name)</span></code><a class="headerlink" href="#make-hasher-name" title="Link to this heading"></a></h3>
+<p>Return a configured hashlib object with guarded algorithm resolution.</p>
+</section>
+<section id="compute-chunk-uuid-doc-id-start-offset-text">
+<h3><code class="docutils literal notranslate"><span class="pre">compute_chunk_uuid(doc_id,</span> <span class="pre">start_offset,</span> <span class="pre">text)</span></code><a class="headerlink" href="#compute-chunk-uuid-doc-id-start-offset-text" title="Link to this heading"></a></h3>
+<p>Compute a deterministic UUID for a chunk of text.</p>
+</section>
+<section id="relative-path-path-root">
+<h3><code class="docutils literal notranslate"><span class="pre">relative_path(path,</span> <span class="pre">root)</span></code><a class="headerlink" href="#relative-path-path-root" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">path</span></code> rendered relative to <code class="docutils literal notranslate"><span class="pre">root</span></code> when feasible.</p>
+</section>
+<section id="quarantine-artifact-path-reason">
+<h3><code class="docutils literal notranslate"><span class="pre">quarantine_artifact(path,</span> <span class="pre">reason)</span></code><a class="headerlink" href="#quarantine-artifact-path-reason" title="Link to this heading"></a></h3>
+<p>Move <code class="docutils literal notranslate"><span class="pre">path</span></code> to a <code class="docutils literal notranslate"><span class="pre">.quarantine</span></code> sibling for operator review.</p>
+</section>
+<section id="compute-content-hash-path-algorithm">
+<h3><code class="docutils literal notranslate"><span class="pre">compute_content_hash(path,</span> <span class="pre">algorithm)</span></code><a class="headerlink" href="#compute-content-hash-path-algorithm" title="Link to this heading"></a></h3>
+<p>Compute a content hash for <code class="docutils literal notranslate"><span class="pre">path</span></code> using the requested algorithm.</p>
+</section>
+<section id="load-manifest-index-stage-root">
+<h3><code class="docutils literal notranslate"><span class="pre">load_manifest_index(stage,</span> <span class="pre">root)</span></code><a class="headerlink" href="#load-manifest-index-stage-root" title="Link to this heading"></a></h3>
+<p>Load the latest manifest entries for a specific pipeline stage.</p>
+</section>
+<section id="iter-manifest-entries-stages-root">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_manifest_entries(stages,</span> <span class="pre">root)</span></code><a class="headerlink" href="#iter-manifest-entries-stages-root" title="Link to this heading"></a></h3>
+<p>Yield manifest entries for the requested <code class="docutils literal notranslate"><span class="pre">stages</span></code> sorted by timestamp.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

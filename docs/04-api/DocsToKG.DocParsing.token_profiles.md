@@ -22,7 +22,7 @@ Return token counts for ``texts`` using the HuggingFace tokenizer ``name``.
 
 ### `_mean(values)`
 
-*No documentation available.*
+Return the average of ``values`` or ``0.0`` when empty.
 
 ### `_mean_ratio(candidate, baseline)`
 

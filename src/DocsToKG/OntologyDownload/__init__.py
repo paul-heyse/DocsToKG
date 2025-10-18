@@ -30,29 +30,13 @@ deterministic fingerprints.
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-_API_EXPORTS = (
-    "FetchSpec",
-    "PlannedFetch",
-    "FetchResult",
-    "DownloadResult",
-    "DownloadFailure",
-    "OntologyDownloadError",
-    "ValidationRequest",
-    "ValidationResult",
-    "ValidationTimeout",
-    "ValidatorSubprocessError",
-    "plan_all",
-    "plan_one",
-    "fetch_all",
-    "fetch_one",
-    "run_validators",
-    "validate_manifest_dict",
-    "__version__",
-)
+from .exports import EXPORT_MAP, EXPORTS, PUBLIC_API_MANIFEST
 
-__all__ = [*_API_EXPORTS, "PUBLIC_API_MANIFEST"]
+_PUBLIC_EXPORTS = tuple(spec.name for spec in EXPORTS if spec.include_in_manifest)
+
+__all__ = [*_PUBLIC_EXPORTS, "PUBLIC_API_MANIFEST"]
 
 _LEGACY_EXPORTS = {
     "DefaultsConfig",
@@ -62,38 +46,53 @@ _LEGACY_EXPORTS = {
     "LoggingConfiguration",
     "mask_sensitive_data",
     "setup_logging",
+    "plan_all",
+    "plan_one",
+    "run_validators",
+    "validate_manifest_dict",
 }
 
 if TYPE_CHECKING:  # pragma: no cover - import for static analysis only
-    from .api import (
-        DownloadFailure,
-        DownloadResult,
-        FetchResult,
-        FetchSpec,
-        DefaultsConfig,
-        DownloadConfiguration,
-        OntologyDownloadError,
-        PlannedFetch,
-        ResolverCandidate,
-        ResolvedConfig,
-        ValidationRequest,
-        ValidationResult,
-        ValidationTimeout,
-        ValidatorSubprocessError,
-        __version__,
-        fetch_all,
-        fetch_one,
-        plan_all,
-        plan_one,
-        run_validators,
-        validate_manifest_dict,
-    )
+    from . import api as _api
+
+    DefaultsConfig = _api.DefaultsConfig
+    DownloadConfiguration = _api.DownloadConfiguration
+    DownloadFailure = _api.DownloadFailure
+    DownloadResult = _api.DownloadResult
+    FetchResult = _api.FetchResult
+    FetchSpec = _api.FetchSpec
+    OntologyDownloadError = _api.OntologyDownloadError
+    PlannedFetch = _api.PlannedFetch
+    ResolvedConfig = _api.ResolvedConfig
+    ResolverCandidate = _api.ResolverCandidate
+    ValidationRequest = _api.ValidationRequest
+    ValidationResult = _api.ValidationResult
+    ValidationTimeout = _api.ValidationTimeout
+    ValidatorSubprocessError = _api.ValidatorSubprocessError
+    __version__ = _api.__version__
+    fetch_all = _api.fetch_all
+    fetch_one = _api.fetch_one
+    plan_all = _api.plan_all
+    plan_one = _api.plan_one
+    run_validators = _api.run_validators
+    validate_manifest_dict = _api.validate_manifest_dict
 
 
 def __getattr__(name: str) -> Any:
     """Lazily import API exports to avoid resolver dependencies at import time."""
 
-    if name in __all__ or name in _LEGACY_EXPORTS:
+    if name == "PUBLIC_API_MANIFEST":
+        globals()[name] = PUBLIC_API_MANIFEST
+        return PUBLIC_API_MANIFEST
+
+    spec = EXPORT_MAP.get(name)
+    if spec is not None and spec.name in _PUBLIC_EXPORTS:
+        module = import_module(spec.module)
+        value = getattr(module, spec.attribute)
+        globals()[name] = value
+        return value
+
+    if name in _LEGACY_EXPORTS:
         module = import_module(".api", __name__)
         value = getattr(module, name)
         globals()[name] = value
@@ -105,5 +104,3 @@ def __dir__() -> list[str]:
     """Expose lazily-populated attributes in ``dir()`` results."""
 
     return sorted(set(globals()) | set(__all__) | _LEGACY_EXPORTS)
-
-PUBLIC_API_MANIFEST: dict

@@ -85,8 +85,8 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="ensure-python-version">
-<h3><code class="docutils literal notranslate"><span class="pre">ensure_python_version()</span></code><a class="headerlink" href="#ensure-python-version" title="Link to this heading"></a></h3>
+<section id="ensure-python-version-min-major-min-minor">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_python_version(min_major,</span> <span class="pre">min_minor)</span></code><a class="headerlink" href="#ensure-python-version-min-major-min-minor" title="Link to this heading"></a></h3>
 <p>Ensure the interpreter meets the minimum supported Python version.</p>
 </section>
 <section id="coerce-sequence-value">
@@ -96,6 +96,14 @@
 <section id="parse-rate-limit-to-rps-limit-str">
 <h3><code class="docutils literal notranslate"><span class="pre">parse_rate_limit_to_rps(limit_str)</span></code><a class="headerlink" href="#parse-rate-limit-to-rps-limit-str" title="Link to this heading"></a></h3>
 <p>Convert a rate limit expression into requests-per-second.</p>
+</section>
+<section id="get-default-config">
+<h3><code class="docutils literal notranslate"><span class="pre">get_default_config()</span></code><a class="headerlink" href="#get-default-config" title="Link to this heading"></a></h3>
+<p>Return a memoised :class:<code class="docutils literal notranslate"><span class="pre">ResolvedConfig</span></code> constructed from defaults.</p>
+</section>
+<section id="invalidate-default-config-cache">
+<h3><code class="docutils literal notranslate"><span class="pre">invalidate_default_config_cache()</span></code><a class="headerlink" href="#invalidate-default-config-cache" title="Link to this heading"></a></h3>
+<p>Invalidate the cached default configuration.</p>
 </section>
 <section id="get-env-overrides">
 <h3><code class="docutils literal notranslate"><span class="pre">get_env_overrides()</span></code><a class="headerlink" href="#get-env-overrides" title="Link to this heading"></a></h3>

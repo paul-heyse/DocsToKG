@@ -4,7 +4,7 @@
 #   "purpose": "Figshare resolver implementation",
 #   "sections": [
 #     {
-#       "id": "figshare-resolver",
+#       "id": "figshareresolver",
 #       "name": "FigshareResolver",
 #       "anchor": "class-figshareresolver",
 #       "kind": "class"
@@ -40,6 +40,15 @@ class FigshareResolver(ApiResolverBase):
     api_display_name = "Figshare"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when a DOI is available for Figshare searches.
+
+        Args:
+            config: Resolver configuration (unused for enablement checks).
+            artifact: Work record describing the target document.
+
+        Returns:
+            bool: Whether this resolver should be activated.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -48,6 +57,16 @@ class FigshareResolver(ApiResolverBase):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield Figshare file download URLs associated with ``artifact``.
+
+        Args:
+            session: Requests session for issuing HTTP requests.
+            config: Resolver configuration controlling Figshare access.
+            artifact: Work metadata used to seed the query.
+
+        Yields:
+            ResolverResult: Candidate download URLs or skip events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(

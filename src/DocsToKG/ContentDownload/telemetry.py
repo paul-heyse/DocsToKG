@@ -26,7 +26,18 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol, Set, Tuple, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
@@ -36,9 +47,9 @@ from DocsToKG.ContentDownload.core import (
     PDF_LIKE,
     Classification,
     ReasonCode,
+    atomic_write_text,
     normalize_classification,
     normalize_reason,
-    atomic_write_text,
     normalize_url,
 )
 
@@ -143,8 +154,6 @@ class ManifestEntry:
                 if coerced < 0:
                     coerced = None
             object.__setattr__(self, "content_length", coerced)
-
-
 
 
 @runtime_checkable
@@ -252,15 +261,24 @@ class RunTelemetry(AttemptSink):
         self._sink = sink
 
     def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+        """Proxy attempt logging to the underlying sink.
+
+        Args:
+            record: Resolver attempt payload to record.
+            timestamp: Optional ISO-8601 timestamp overriding ``datetime.utcnow``.
+        """
         self._sink.log_attempt(record, timestamp=timestamp)
 
     def log_manifest(self, entry: ManifestEntry) -> None:
+        """Forward manifest entries to the configured sink."""
         self._sink.log_manifest(entry)
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Publish the final run summary to downstream sinks."""
         self._sink.log_summary(summary)
 
     def close(self) -> None:
+        """Release sink resources and flush buffered telemetry."""
         self._sink.close()
 
     def record_manifest(
@@ -276,6 +294,22 @@ class RunTelemetry(AttemptSink):
         reason: Optional[ReasonCode | str] = None,
         reason_detail: Optional[str] = None,
     ) -> ManifestEntry:
+        """Construct and emit a manifest entry for ``artifact``.
+
+        Args:
+            artifact: Work artifact being recorded.
+            resolver: Name of the resolver that produced the outcome.
+            url: Final URL that yielded the content.
+            outcome: Download outcome describing classification and metadata.
+            html_paths: HTML artefacts captured alongside the document.
+            dry_run: Whether the pipeline ran in dry-run mode.
+            run_id: Unique identifier for this pipeline execution.
+            reason: Optional diagnostic reason code.
+            reason_detail: Optional human-readable reason detail.
+
+        Returns:
+            ManifestEntry: Structured manifest entry persisted via the sink.
+        """
         entry = build_manifest_entry(
             artifact,
             resolver=resolver,
@@ -298,6 +332,17 @@ class RunTelemetry(AttemptSink):
         dry_run: bool,
         run_id: Optional[str],
     ) -> ManifestEntry:
+        """Record pipeline output, normalising reason metadata on the way out.
+
+        Args:
+            artifact: Work artifact that was processed.
+            result: Pipeline result encapsulating resolver outcome details.
+            dry_run: Whether side effects were suppressed.
+            run_id: Unique identifier for the current pipeline execution.
+
+        Returns:
+            ManifestEntry: Manifest record produced for downstream sinks.
+        """
         outcome = result.outcome
         reason_token = normalize_reason(result.reason) if result.reason else None
         if reason_token is None and outcome is not None:
@@ -318,7 +363,6 @@ class RunTelemetry(AttemptSink):
             reason=reason_token,
             reason_detail=detail_token,
         )
-
 
 
 class JsonlSink:
@@ -1179,9 +1223,7 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
                     qualifier = (
                         "newer"
                         if schema_version > MANIFEST_SCHEMA_VERSION
-                        else "older"
-                        if schema_version < MANIFEST_SCHEMA_VERSION
-                        else "unknown"
+                        else "older" if schema_version < MANIFEST_SCHEMA_VERSION else "unknown"
                     )
                     raise ValueError(
                         "Unsupported manifest schema_version {observed} ({qualifier}); expected version {expected}. "

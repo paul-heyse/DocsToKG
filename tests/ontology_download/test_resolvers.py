@@ -176,12 +176,11 @@ import requests
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import FetchSpec
-from DocsToKG.OntologyDownload import resolvers
+from DocsToKG.OntologyDownload import FetchSpec, resolvers
 from DocsToKG.OntologyDownload import api as core
-from DocsToKG.OntologyDownload.api import ConfigError, DefaultsConfig, ResolvedConfig
 from DocsToKG.OntologyDownload import io as io_mod
 from DocsToKG.OntologyDownload import validation as plugins_mod
+from DocsToKG.OntologyDownload.api import ConfigError, DefaultsConfig, ResolvedConfig
 
 
 @pytest.fixture()

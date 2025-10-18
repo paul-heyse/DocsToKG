@@ -362,7 +362,7 @@ class TestFormatDownloadSummary:
 
     def test_recommendations_limited_to_top_3(self):
         """Test that recommendations are limited to top 3 reasons."""
-        failures = {f"timeout": 30, "http_error": 20, "connection_error": 10, "other": 5}
+        failures = {"timeout": 30, "http_error": 20, "connection_error": 10, "other": 5}
         summary = format_download_summary(
             total_attempts=100, successes=35, failures_by_reason=failures
         )

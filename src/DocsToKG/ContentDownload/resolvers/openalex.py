@@ -4,7 +4,7 @@
 #   "purpose": "OpenAlex resolver implementation",
 #   "sections": [
 #     {
-#       "id": "openalex-resolver",
+#       "id": "openalexresolver",
 #       "name": "OpenAlexResolver",
 #       "anchor": "class-openalexresolver",
 #       "kind": "class"
@@ -35,6 +35,15 @@ class OpenAlexResolver(RegisteredResolver):
     name = "openalex"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when OpenAlex metadata includes candidate URLs.
+
+        Args:
+            config: Resolver configuration (unused for enablement).
+            artifact: Work record being evaluated.
+
+        Returns:
+            bool: Whether the resolver should attempt the work.
+        """
         return bool(artifact.pdf_urls or artifact.open_access_url)
 
     def iter_urls(
@@ -43,6 +52,16 @@ class OpenAlexResolver(RegisteredResolver):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield URLs surfaced directly from OpenAlex metadata.
+
+        Args:
+            session: Requests session (unused; signature parity).
+            config: Resolver configuration controlling policy headers.
+            artifact: Work metadata containing PDF candidates.
+
+        Yields:
+            ResolverResult: Candidate download URLs or skip events.
+        """
         candidates = list(dedupe(artifact.pdf_urls))
         if getattr(artifact, "open_access_url", None):
             candidates.append(artifact.open_access_url)

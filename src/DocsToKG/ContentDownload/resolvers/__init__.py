@@ -4,22 +4,10 @@
 #   "purpose": "Resolver registry and concrete resolver exports",
 #   "sections": [
 #     {
-#       "id": "registry",
-#       "name": "ResolverRegistry",
-#       "anchor": "class-resolverregistry",
-#       "kind": "class"
-#     },
-#     {
 #       "id": "default-resolvers",
 #       "name": "default_resolvers",
 #       "anchor": "function-default-resolvers",
 #       "kind": "function"
-#     },
-#     {
-#       "id": "exports",
-#       "name": "Resolver exports",
-#       "anchor": "section-resolver-exports",
-#       "kind": "section"
 #     }
 #   ]
 # }
@@ -31,16 +19,16 @@ from __future__ import annotations
 from typing import List
 
 from .base import (
-    ApiResolverBase,
-    BeautifulSoup,
     DEFAULT_RESOLVER_ORDER,
     DEFAULT_RESOLVER_TOGGLES,
+    ApiResolverBase,
+    BeautifulSoup,
+    RegisteredResolver,
     Resolver,
     ResolverEvent,
     ResolverEventReason,
     ResolverRegistry,
     ResolverResult,
-    RegisteredResolver,
     XMLParsedAsHTMLWarning,
     _absolute_url,
     _collect_candidate_urls,

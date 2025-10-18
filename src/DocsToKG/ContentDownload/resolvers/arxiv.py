@@ -4,7 +4,7 @@
 #   "purpose": "arXiv resolver implementation",
 #   "sections": [
 #     {
-#       "id": "arxiv-resolver",
+#       "id": "arxivresolver",
 #       "name": "ArxivResolver",
 #       "anchor": "class-arxivresolver",
 #       "kind": "class"
@@ -23,9 +23,10 @@ from DocsToKG.ContentDownload.core import strip_prefix
 from .base import RegisteredResolver, ResolverEvent, ResolverEventReason, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
-    from DocsToKG.ContentDownload.pipeline import ResolverConfig
-    from DocsToKG.ContentDownload.core import WorkArtifact
     import requests as _requests
+
+    from DocsToKG.ContentDownload.core import WorkArtifact
+    from DocsToKG.ContentDownload.pipeline import ResolverConfig
 
 
 class ArxivResolver(RegisteredResolver):
@@ -34,6 +35,15 @@ class ArxivResolver(RegisteredResolver):
     name = "arxiv"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the work exposes an arXiv identifier.
+
+        Args:
+            config: Resolver configuration (unused but part of the contract).
+            artifact: Work record under consideration.
+
+        Returns:
+            bool: Whether this resolver should attempt to resolve the work.
+        """
         return bool(artifact.arxiv_id)
 
     def iter_urls(
@@ -42,6 +52,16 @@ class ArxivResolver(RegisteredResolver):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield the canonical arXiv PDF URL for ``artifact`` when available.
+
+        Args:
+            session: Requests session to use for follow-up HTTP calls.
+            config: Resolver configuration supplied by the pipeline.
+            artifact: Work record containing source identifiers.
+
+        Yields:
+            ResolverResult: Candidate PDF URL or skip event.
+        """
         arxiv_id = artifact.arxiv_id
         if not arxiv_id:
             yield ResolverResult(
@@ -51,4 +71,6 @@ class ArxivResolver(RegisteredResolver):
             )
             return
         arxiv_id = strip_prefix(arxiv_id, "arxiv:")
-        yield ResolverResult(url=f"https://arxiv.org/pdf/{arxiv_id}.pdf", metadata={"identifier": arxiv_id})
+        yield ResolverResult(
+            url=f"https://arxiv.org/pdf/{arxiv_id}.pdf", metadata={"identifier": arxiv_id}
+        )

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-import json
+import contextlib
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from DocsToKG.DocParsing.io import jsonl_append_iter
 
 __all__ = [
     "Attempt",
@@ -14,6 +16,14 @@ __all__ = [
     "TelemetrySink",
     "StageTelemetry",
 ]
+
+
+def _acquire_lock_for(path: Path) -> contextlib.AbstractContextManager[bool]:
+    """Return an advisory lock context manager for ``path``."""
+
+    from DocsToKG.DocParsing.core import acquire_lock
+
+    return acquire_lock(path)
 
 
 @dataclass(slots=True)
@@ -56,14 +66,19 @@ class TelemetrySink:
         self._attempts_path.parent.mkdir(parents=True, exist_ok=True)
         self._manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
+    def _append_payload(self, path: Path, payload: Dict[str, Any]) -> None:
+        """Append ``payload`` to ``path`` under a file lock."""
+
+        with _acquire_lock_for(path):
+            jsonl_append_iter(path, [payload])
+
     def write_attempt(self, attempt: Attempt) -> None:
         """Append ``attempt`` to the attempts log."""
 
         payload = asdict(attempt)
         metadata = dict(payload.pop("metadata", {}) or {})
         payload.update(metadata)
-        with open(self._attempts_path, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        self._append_payload(self._attempts_path, payload)
 
     def write_manifest_entry(self, entry: ManifestEntry) -> None:
         """Append ``entry`` to the manifest log."""
@@ -71,8 +86,8 @@ class TelemetrySink:
         payload = asdict(entry)
         metadata = dict(payload.pop("metadata", {}) or {})
         payload.update(metadata)
-        with open(self._manifest_path, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        payload.setdefault("doc_id", entry.file_id)
+        self._append_payload(self._manifest_path, payload)
 
 
 def _input_bytes(path: Path | str) -> int:
@@ -102,6 +117,8 @@ class StageTelemetry:
         reason: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
+        """Persist an Attempt entry describing the outcome for ``doc_id``."""
+
         finished = time.time()
         started = finished - max(duration_s, 0.0)
         payload = Attempt(
@@ -127,6 +144,8 @@ class StageTelemetry:
         duration_s: float,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
+        """Append a manifest row for ``doc_id`` and optional metadata."""
+
         entry = ManifestEntry(
             run_id=self._run_id,
             file_id=doc_id,
@@ -150,6 +169,8 @@ class StageTelemetry:
         duration_s: float,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
+        """Record a successful attempt and mirror the manifest entry."""
+
         self.record_attempt(
             doc_id=doc_id,
             input_path=input_path,
@@ -176,6 +197,8 @@ class StageTelemetry:
         metadata: Optional[Dict[str, Any]] = None,
         manifest_metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
+        """Record a failure attempt and optionally log manifest metadata."""
+
         self.record_attempt(
             doc_id=doc_id,
             input_path=input_path,
@@ -202,6 +225,8 @@ class StageTelemetry:
         reason: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
+        """Record a skipped attempt and optional manifest metadata."""
+
         self.record_attempt(
             doc_id=doc_id,
             input_path=input_path,
@@ -210,6 +235,15 @@ class StageTelemetry:
             reason=reason,
             metadata=metadata,
         )
+        if metadata is not None:
+            self.write_manifest(
+                doc_id=doc_id,
+                output_path=metadata.get("output_path", ""),
+                tokens=0,
+                schema_version=str(metadata.get("schema_version", "")),
+                duration_s=0.0,
+                metadata=metadata,
+            )
 
     def log_config(
         self,
@@ -218,6 +252,8 @@ class StageTelemetry:
         schema_version: str,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
+        """Record the configuration manifest emitted at startup."""
+
         self.write_manifest(
             doc_id="__config__",
             output_path=output_path,

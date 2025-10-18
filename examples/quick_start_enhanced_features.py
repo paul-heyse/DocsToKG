@@ -9,11 +9,10 @@ A minimal example demonstrating the key enhancements:
 """
 
 import logging
-from pathlib import Path
 from typing import Optional
 
-from DocsToKG.ContentDownload.statistics import DownloadStatistics
 from DocsToKG.ContentDownload.errors import log_download_failure
+from DocsToKG.ContentDownload.statistics import DownloadStatistics
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
@@ -78,7 +77,7 @@ def main():
 
     print(stats.format_summary())
 
-    LOGGER.info(f"\nQuick Stats:")
+    LOGGER.info("\nQuick Stats:")
     LOGGER.info(f"  Success Rate: {stats.get_success_rate():.1f}%")
     LOGGER.info(f"  Total Downloaded: {stats.get_total_mb():.2f} MB")
     LOGGER.info(f"  Average Speed: {stats.get_average_speed_mbps():.2f} Mbps")

@@ -135,6 +135,7 @@ from .config import (
     HybridSearchConfigManager,
     RetrievalConfig,
 )
+from .devtools.opensearch_simulator import matches_filters
 from .interfaces import DenseVectorStore, LexicalIndex
 from .pipeline import ChunkIngestionPipeline, FeatureGenerator, Observability, tokenize
 from .router import FaissRouter
@@ -151,7 +152,6 @@ from .store import (
     restore_state,
     serialize_state,
 )
-from .devtools.opensearch_simulator import matches_filters
 from .types import (
     ChunkFeatures,
     ChunkPayload,
@@ -1417,9 +1417,7 @@ class HybridSearchService:
                 "search_channel_candidates", len(filtered), channel="dense"
             )
             if adapter_stats is not None:
-                fp16_metric = (
-                    1.0 if bool(getattr(adapter_stats, "fp16_enabled", False)) else 0.0
-                )
+                fp16_metric = 1.0 if bool(getattr(adapter_stats, "fp16_enabled", False)) else 0.0
                 self._observability.metrics.set_gauge(
                     "faiss_fp16_enabled", fp16_metric, channel="dense"
                 )
@@ -1527,9 +1525,7 @@ class HybridSearchService:
             "search_channel_candidates", len(filtered), channel="dense"
         )
         if adapter_stats is not None:
-            fp16_metric = (
-                1.0 if bool(getattr(adapter_stats, "fp16_enabled", False)) else 0.0
-            )
+            fp16_metric = 1.0 if bool(getattr(adapter_stats, "fp16_enabled", False)) else 0.0
             self._observability.metrics.set_gauge(
                 "faiss_fp16_enabled", fp16_metric, channel="dense"
             )

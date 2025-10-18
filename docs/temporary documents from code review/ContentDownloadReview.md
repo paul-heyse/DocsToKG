@@ -1,0 +1,420 @@
+Absolutely—here is a single, consolidated set of recommendations that merges all four reviews into
+one clear plan. I have grouped items by priority and subsystem, included rationale, and added
+concrete implementation notes plus code patterns your engineer can drop in.
+
+---
+
+# 1. TL;DR (Prioritized)
+
+**P0 – Correctness & run-stoppers (fix first)**
+
+1. Fix JSONL resume loader to read **every** row and avoid `UnboundLocalError`.
+2. Make `DownloadStatistics` **thread-safe on reads** (snapshot under the same lock as writes).
+3. Repair **resume/range** logic so the resume probe runs when conditional requests are downgraded.
+4. Harden `parse_retry_after_header` against **NaN/invalid values**.
+5. In `request_with_retries`, **close the prior Response** before sleeping/retry.
+
+**P1 – Concurrency & networking hygiene**
+6) Use **per-thread `requests.Session`** (or a session factory) in concurrent paths; don’t share a Session across threads.
+7) In the multi-worker CLI path, **reuse a thread-local session** per worker to keep connection pools warm.
+8) Wrap future `.result()` calls to **log and continue** on worker exceptions (no run-wide abort).
+
+**P2 – Performance & memory**
+9) Make `BandwidthTracker` **O(1)** with a `deque` and time-based pruning.
+10) Bound `DownloadStatistics` histories (latency, sizes) via **sliding windows** (or streaming percentiles like t-digest).
+11) Avoid O(n²) list filtering in telemetry; prefer **incremental pruning** or head/tail indices.
+
+**P3 – Modularity, types, and observability**
+12) Split the **CLI** into smaller modules (`args.py`, `runner.py`, `download.py`, `summary.py`).
+13) Replace ad-hoc **context dicts** with a typed object (`@dataclass` or `TypedDict`) shared by CLI and pipeline.
+14) **Deduplicate normalization** helpers for `classification`/`reason` across Attempt/Outcome/Manifest.
+15) Clarify the **source of truth for manifest writing/aggregation** (move into telemetry or a top-level orchestrator).
+16) Factor a small `_record_skip(reason, detail)` to unify “skip” telemetry.
+
+**P4 – Tests**
+17) Add regression tests for: resume downgrade path; NaN Retry-After; concurrent reads; response close on retries; futures raising; concurrent resolver runs.
+
+---
+
+# 2. Detailed Recommendations (With How-Tos)
+
+## 2.1 P0 – Correctness & Run-Stoppers
+
+### 1) JSONL resume loader reads only the last row → read all rows
+
+**Symptom:** `load_previous_manifest(...)` validates schema/version **outside** the per-line loop, so only the last parsed object is considered; empty files risk `UnboundLocalError`.
+
+**Fix pattern:**
+
+```python
+def load_previous_manifest(paths: Iterable[Path]) -> list[ManifestRow]:
+    rows: list[ManifestRow] = []
+    for p in paths:
+        try:
+            with p.open("r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue  # or log & continue
+                    if obj.get("schema") != MANIFEST_SCHEMA or obj.get("version") != MANIFEST_VERSION:
+                        continue  # skip mismatched schema/version
+                    rows.append(ManifestRow(**obj))
+        except FileNotFoundError:
+            continue
+    return rows
+```
+
+*If you also need the **latest** record per `doc_id`, fold a dedupe pass after parsing.*
+
+---
+
+### 2) `DownloadStatistics` read-side methods must snapshot under lock
+
+**Symptom:** getters iterate over mutable containers without acquiring the same lock as writers → `RuntimeError: changed size during iteration` and stale summaries.
+
+**Fix pattern:**
+
+```python
+class DownloadStatistics:
+    # ...
+    def _snapshot_unlocked(self) -> dict:
+        # assume self._lock is held by the caller
+        return {
+            "succ": self._success_count,
+            "fail": self._failure_count,
+            "times": tuple(self._download_times),  # immutable view
+            "sizes": tuple(self._sizes_mb),
+        }
+
+    def get_success_rate(self) -> float:
+        with self._lock:
+            snap = self._snapshot_unlocked()
+        total = snap["succ"] + snap["fail"]
+        return (snap["succ"] / total) if total else 0.0
+
+    def get_percentile_time(self, p: float) -> float:
+        with self._lock:
+            times = tuple(self._download_times)  # snapshot
+        if not times:
+            return 0.0
+        idx = max(0, min(len(times)-1, int(round((p/100.0) * (len(times)-1)))))
+        return sorted(times)[idx]
+```
+
+---
+
+### 3) Resume logic never activates after conditional → probe inside retry loop
+
+**Symptom:** `attempt_conditional` starts `True`, is flipped to `False` **inside** the retry loop, but the code that computes `resume_bytes_offset` runs **outside** (or only once) → we never send a `Range` request after downgrading.
+
+**Fix pattern (conceptual):**
+
+```python
+resume_bytes_offset: Optional[int] = None
+attempt_conditional = True
+
+for attempt in range(max_retries):
+    # If we’ve just downgraded from conditional, compute range offset
+    if not attempt_conditional and resume_bytes_offset is None:
+        resume_bytes_offset = compute_resume_offset_if_partial(local_path)
+
+    headers = build_headers(
+        conditional=attempt_conditional,
+        etag=etag, last_modified=last_modified,
+        resume_offset=resume_bytes_offset,
+    )
+
+    resp = session.get(url, headers=headers, stream=True, timeout=timeout)
+
+    if resp.status_code == 412:  # Precondition Failed: ETag/L-M changed
+        # Drop conditional, retry; allow resume on next loop
+        attempt_conditional = False
+        resp.close()
+        continue
+
+    if resp.status_code == 416:  # Range Not Satisfiable
+        # Our partial file is invalid (oversized or server disagrees)
+        discard_partial(local_path)
+        resume_bytes_offset = None
+        attempt_conditional = False
+        resp.close()
+        continue
+
+    # ... normal streaming write & EOF check ...
+```
+
+**Key idea:** (a) compute `resume_bytes_offset` *after* conditional is dropped, *before* building headers; (b) handle 416 by deleting partial and retrying full.
+
+---
+
+### 4) `parse_retry_after_header` must reject NaN/invalid values
+
+**Symptom:** returning a NaN/negative directly can crash `time.sleep`.
+
+**Fix pattern:**
+
+```python
+from math import isfinite
+from email.utils import parsedate_to_datetime
+from datetime import datetime, timezone
+
+def parse_retry_after_header(headers: Mapping[str, str]) -> Optional[float]:
+    value = headers.get("Retry-After")
+    if not value:
+        return None
+    # seconds form
+    try:
+        sec = float(value)
+        return sec if sec > 0 and isfinite(sec) else None
+    except ValueError:
+        pass
+    # HTTP-date form
+    try:
+        dt = parsedate_to_datetime(value)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        delta = (dt - datetime.now(timezone.utc)).total_seconds()
+        return delta if delta > 0 and isfinite(delta) else None
+    except Exception:
+        return None
+```
+
+---
+
+### 5) Close the previous `Response` before retrying
+
+**Symptom:** retry loop leaks sockets if a prior `Response` isn’t closed before sleeping/retry.
+
+**Fix pattern:**
+
+```python
+def request_with_retries(session, method, url, *, max_retries=3, backoff=..., **kw):
+    last_exc = None
+    resp = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            resp = session.request(method, url, **kw)
+            if should_retry(resp):  # your 5xx/429 logic
+                delay = parse_retry_after_header(resp.headers) or backoff(attempt)
+                try:
+                    resp.close()
+                finally:
+                    resp = None
+                time.sleep(delay)
+                continue
+            return resp
+        except Exception as e:
+            last_exc = e
+            if attempt == max_retries:
+                raise
+            if resp is not None:
+                try: resp.close()
+                finally: resp = None
+            time.sleep(backoff(attempt))
+    raise last_exc  # defensive
+```
+
+---
+
+## 2.2 P1 – Concurrency & Networking Hygiene
+
+### 6) Don’t share a `requests.Session` across threads → thread-local sessions
+
+```python
+_thread_local = threading.local()
+
+def get_thread_session() -> requests.Session:
+    s = getattr(_thread_local, "session", None)
+    if s is None:
+        s = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_connections=100, pool_maxsize=100)
+        s.mount("http://", adapter)
+        s.mount("https://", adapter)
+        _thread_local.session = s
+    return s
+```
+
+Use `get_thread_session()` inside your concurrent resolver execution and in any per-thread worker.
+
+---
+
+### 7) Reuse a session per worker in multi-worker CLI path
+
+If each work item currently does `with requests.Session(): ...`, refactor to create **one** session per worker and reuse across items in that worker (e.g., pass `session_factory=get_thread_session` into the pool workers).
+
+---
+
+### 8) Keep the run alive when a future raises
+
+```python
+for fut in concurrent.futures.as_completed(futures):
+    try:
+        result = fut.result()
+        # normal success handling
+    except Exception as e:
+        logger.exception("worker_crash", error=str(e))
+        telemetry.log_download_failure(error=str(e))  # structured record
+        continue  # don’t abort the whole run
+```
+
+---
+
+## 2.3 P2 – Performance & Memory
+
+### 9) `BandwidthTracker`: O(1) with `deque` + time-based pruning
+
+```python
+from collections import deque
+class BandwidthTracker:
+    def __init__(self, window_seconds=30.0):
+        self._window = float(window_seconds)
+        self._samples = deque()  # (timestamp, bytes)
+        self._lock = threading.Lock()
+
+    def record(self, ts: float, nbytes: int):
+        cutoff = ts - self._window
+        with self._lock:
+            self._samples.append((ts, nbytes))
+            while self._samples and self._samples[0][0] < cutoff:
+                self._samples.popleft()
+
+    def bytes_per_sec(self, now: Optional[float] = None) -> float:
+        if now is None:
+            now = time.time()
+        cutoff = now - self._window
+        with self._lock:
+            # ensure window is pruned
+            while self._samples and self._samples[0][0] < cutoff:
+                self._samples.popleft()
+            total = sum(b for _, b in self._samples)
+        return total / self._window
+```
+
+---
+
+### 10) Bound `DownloadStatistics` history
+
+Use `deque(maxlen=WINDOW)` (e.g., 50k samples) for latency/size **plus** rolling aggregates:
+
+```python
+self._download_times = deque(maxlen=50000)
+self._sizes_mb = deque(maxlen=50000)
+self._total_bytes += nbytes     # all-time totals preserved
+self._total_downloads += 1
+```
+
+*If you need approximate percentiles over long runs, consider a streaming quantile (e.g., Greenwald-Khanna) or t-digest; otherwise, computing percentiles over a bounded deque is fast and keeps memory bounded.*
+
+---
+
+### 11) Avoid O(n²) list filtering in telemetry
+
+Where you currently do `filtered = [x for x in self._samples if x.ts > cutoff]` on every write/read, replace with the `deque` pruning pattern above or keep a moving index/head pointer.
+
+---
+
+## 2.4 P3 – Modularity, Types, and Observability
+
+### 12) Split the CLI
+
+Refactor the 2.8k-line `cli.py` into:
+
+* `args.py` – argument parsing & config resolution
+* `runner.py` – `DownloadRun` class encapsulates the run lifecycle (pool setup, futures, error handling)
+* `download.py` – artifact preparation, `download_candidate`, resume policy
+* `summary.py` – statistics/summary emission & pretty printing
+
+This lets you unit-test each part and lowers cognitive load.
+
+---
+
+### 13) Replace context dicts with a typed object
+
+```python
+from dataclasses import dataclass, field
+@dataclass
+class DownloadContext:
+    resolver_order: list[str]
+    enable_head_precheck: bool = True
+    head_precheck_host_overrides: dict[str, bool] = field(default_factory=dict)
+    domain_content_rules: dict[str, "ContentRule"] = field(default_factory=dict)
+    sniff_bytes: int = 4096
+    byte_budget_mb: float = 200.0
+    prior_manifest: dict[str, "ManifestRow"] = field(default_factory=dict)
+    # any other knobs you currently pass around as stringly-typed dict keys
+```
+
+Then pass `DownloadContext` through CLI → pipeline → resolvers. Convert your existing dicts at the boundary to ease migration.
+
+---
+
+### 14) Deduplicate normalization for `classification` / `reason`
+
+```python
+def normalize_classification(v: Union[str, Classification]) -> str:
+    return v.value if isinstance(v, Classification) else str(v).lower()
+
+def normalize_reason(v: Optional[Union[str, ReasonCode]]) -> Optional[str]:
+    if v is None: return None
+    return v.value if isinstance(v, ReasonCode) else str(v).lower()
+```
+
+Use these in `AttemptRecord`, `DownloadOutcome`, `ManifestEntry` to keep taxonomy changes consistent.
+
+---
+
+### 15) Clarify manifest ownership
+
+Move **writing and aggregation of manifest** into telemetry (or a dedicated orchestrator) so `process_one_work` focuses on coordination. The pipeline already emits structured attempts—use the telemetry sink to compose per-work manifest entries and summaries.
+
+---
+
+### 16) Factor `_record_skip`
+
+Anywhere `_prepare_resolver` manually logs multiple skip variants, factor:
+
+```python
+def _record_skip(stats: DownloadStatistics, reason: str, detail: str | None = None) -> None:
+    stats.on_skip(reason=reason, detail=detail)  # single place to normalize + emit
+```
+
+Reduces duplication and keeps future “skip” reasons consistent.
+
+---
+
+## 2.5 P4 – Regression Tests to Add
+
+* **Manifest loader:** empty file, multi-row file, schema mismatch rows interleaved, malformed JSON lines → no exceptions; correct rows loaded.
+* **Statistics concurrency:** concurrent writers + readers; no `RuntimeError`; snapshots consistent.
+* **Retry-After:** numeric (int/float), NaN, negative, HTTP-date in past/future → returns `None` or positive seconds as appropriate; never raises.
+* **Retry loop:** verify `response.close()` is called on retry paths (e.g., monkeypatch a dummy response with a sentinel).
+* **Resume downgrade path:** simulate `412` then successful `206` after computing `Range`; simulate `416` then full retry after deleting partial.
+* **Thread sessions:** concurrent resolver tasks don’t share the same Session object (assert different `id()` or `is`).
+* **Futures raising:** one worker raises; run continues; failure is structured-logged.
+* **BandwidthTracker:** time-window pruning works; adding many samples remains O(1); bytes/second math correct.
+
+---
+
+# Roll-out plan
+
+**Day 0 (hotfix P0):** manifest loader, stat snapshots, resume probe, Retry-After guard, response close.
+**Day 1 (P1):** thread-local sessions, session reuse in workers, future exception handling.
+**Day 2 (P2):** `BandwidthTracker` deque, bounded histories, remove O(n²) filters.
+**Day 3–4 (P3):** CLI split, typed `DownloadContext`, normalization helpers, skip helper, shift manifest ownership.
+**Day 5 (P4):** tests + CI gates for the above; add a perf test that runs a synthetic crawl for 2–3 minutes.
+
+---
+
+## 3. Notes on Backward Compatibility
+
+* Keep dict→dataclass adapters at module boundaries so existing callers continue to work during the refactor.
+* For telemetry sinks, maintain current public methods; add new structured calls, then switch callers gradually.
+* When bounding histories, **preserve running totals** (`total_bytes`, `total_downloads`) so your summaries don’t regress.
+
+---
+
+If you want, I can turn any subset of the P0/P1 items into concrete patches against your current branch—just point me at the exact function signatures you have for `load_previous_manifest`, `DownloadStatistics`, `download_candidate`, and `request_with_retries`, and I’ll align the code 1:1.

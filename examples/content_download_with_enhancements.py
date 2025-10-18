@@ -208,7 +208,7 @@ def example_statistics_tracking():
         p50 = stats.get_percentile_time(50)
         p95 = stats.get_percentile_time(95)
         p99 = stats.get_percentile_time(99)
-        LOGGER.info(f"\nDownload Time Percentiles:")
+        LOGGER.info("\nDownload Time Percentiles:")
         LOGGER.info(f"  50th (median): {p50:.0f} ms")
         LOGGER.info(f"  95th: {p95:.0f} ms")
         LOGGER.info(f"  99th: {p99:.0f} ms")
@@ -216,7 +216,7 @@ def example_statistics_tracking():
         # Top failures
         top_failures = stats.get_top_failures(limit=3)
         if top_failures:
-            LOGGER.info(f"\nTop Failure Reasons:")
+            LOGGER.info("\nTop Failure Reasons:")
             for reason, count in top_failures:
                 LOGGER.info(f"  {reason}: {count} occurrences")
 

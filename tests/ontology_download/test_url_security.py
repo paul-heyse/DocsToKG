@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ipaddress
 import socket
 from typing import List, Tuple
 
@@ -10,7 +9,7 @@ import pytest
 
 from DocsToKG.OntologyDownload import api as api_mod
 from DocsToKG.OntologyDownload import io as io_mod
-from DocsToKG.OntologyDownload.errors import ConfigError, PolicyError
+from DocsToKG.OntologyDownload.errors import ConfigError
 from DocsToKG.OntologyDownload.settings import DownloadConfiguration
 
 
@@ -49,9 +48,7 @@ def test_validate_url_security_blocks_private_cidr(monkeypatch: pytest.MonkeyPat
 
     # Hostnames resolving to private space are also rejected unless allowlisted.
     def _private_getaddrinfo(host: str) -> List[Tuple]:
-        return [
-            (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("10.1.2.3", 0))
-        ]
+        return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("10.1.2.3", 0))]
 
     monkeypatch.setattr(io_mod, "_cached_getaddrinfo", _private_getaddrinfo)
     with pytest.raises(ConfigError):

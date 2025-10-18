@@ -85,6 +85,10 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="resolve-max-uncompressed-bytes-limit">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_max_uncompressed_bytes(limit)</span></code><a class="headerlink" href="#resolve-max-uncompressed-bytes-limit" title="Link to this heading"></a></h3>
+<p>Return the effective archive expansion limit, honoring runtime overrides.</p>
+</section>
 <section id="sanitize-filename-filename">
 <h3><code class="docutils literal notranslate"><span class="pre">sanitize_filename(filename)</span></code><a class="headerlink" href="#sanitize-filename-filename" title="Link to this heading"></a></h3>
 <p>Return a filesystem-safe filename derived from <code class="docutils literal notranslate"><span class="pre">filename</span></code>.</p>
@@ -107,7 +111,11 @@
 </section>
 <section id="cached-getaddrinfo-host">
 <h3><code class="docutils literal notranslate"><span class="pre">_cached_getaddrinfo(host)</span></code><a class="headerlink" href="#cached-getaddrinfo-host" title="Link to this heading"></a></h3>
-<p>Resolve <em>host</em> using a short-lived cache to avoid repeated DNS lookups.</p>
+<p>Resolve <em>host</em> using an expiring LRU cache to avoid repeated DNS lookups.</p>
+</section>
+<section id="prune-dns-cache-current-time">
+<h3><code class="docutils literal notranslate"><span class="pre">_prune_dns_cache(current_time)</span></code><a class="headerlink" href="#prune-dns-cache-current-time" title="Link to this heading"></a></h3>
+<p>Expire stale DNS entries and enforce the cache size bound.</p>
 </section>
 <section id="validate-url-security-url-http-config">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_url_security(url,</span> <span class="pre">http_config)</span></code><a class="headerlink" href="#validate-url-security-url-http-config" title="Link to this heading"></a></h3>
@@ -180,6 +188,13 @@
 <section id="is-retryable-error-exc">
 <h3><code class="docutils literal notranslate"><span class="pre">is_retryable_error(exc)</span></code><a class="headerlink" href="#is-retryable-error-exc" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">exc</span></code> represents a retryable network failure.</p>
+</section>
+<section id="materialize-cached-file-source-destination">
+<h3><code class="docutils literal notranslate"><span class="pre">_materialize_cached_file(source,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#materialize-cached-file-source-destination" title="Link to this heading"></a></h3>
+<p>Link or move <code class="docutils literal notranslate"><span class="pre">source</span></code> into <code class="docutils literal notranslate"><span class="pre">destination</span></code> without redundant copies.</p>
+<p>Returns a tuple <code class="docutils literal notranslate"><span class="pre">(artifact_path,</span> <span class="pre">cache_path)</span></code> where <code class="docutils literal notranslate"><span class="pre">artifact_path</span></code> is the final
+destination path and <code class="docutils literal notranslate"><span class="pre">cache_path</span></code> points to the retained cache file (which may be
+identical to <code class="docutils literal notranslate"><span class="pre">artifact_path</span></code> when the cache entry is moved instead of linked).</p>
 </section>
 <section id="extract-correlation-id-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">_extract_correlation_id(logger)</span></code><a class="headerlink" href="#extract-correlation-id-logger" title="Link to this heading"></a></h3>
@@ -320,8 +335,8 @@ requests.HTTPError: Propagated when HTTP status codes indicate failure.</p>
 <p>Returns:
 None</p>
 </section>
-<section id="resolved-content-metadata">
-<h3><code class="docutils literal notranslate"><span class="pre">_resolved_content_metadata()</span></code><a class="headerlink" href="#resolved-content-metadata" title="Link to this heading"></a></h3>
+<section id="resolved-content-metadata-current-downloader-manifest">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolved_content_metadata(current_downloader,</span> <span class="pre">manifest)</span></code><a class="headerlink" href="#resolved-content-metadata-current-downloader-manifest" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="verify-expected-checksum-sha256-value">
@@ -338,6 +353,10 @@ None</p>
 </section>
 <section id="on-retry-attempt-number-exc-delay">
 <h3><code class="docutils literal notranslate"><span class="pre">_on_retry(attempt_number,</span> <span class="pre">exc,</span> <span class="pre">delay)</span></code><a class="headerlink" href="#on-retry-attempt-number-exc-delay" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="clear-partial-files">
+<h3><code class="docutils literal notranslate"><span class="pre">_clear_partial_files()</span></code><a class="headerlink" href="#clear-partial-files" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 </section>

@@ -326,9 +326,7 @@ class DownloadStatistics:
             }
 
         elapsed = self.get_elapsed_seconds()
-        success_rate = (
-            (total_successes / total_attempts) * 100.0 if total_attempts else 0.0
-        )
+        success_rate = (total_successes / total_attempts) * 100.0 if total_attempts else 0.0
         avg_speed = 0.0
         if total_time_ms:
             seconds = total_time_ms / 1000.0
@@ -369,6 +367,7 @@ class DownloadStatistics:
             last_index = len(sorted_times) - 1
 
             def percentile_value(p: float) -> float:
+                """Return the download time at percentile ``p`` from cached samples."""
                 index = int((p / 100.0) * len(sorted_times))
                 index = min(max(index, 0), last_index)
                 return sorted_times[index]

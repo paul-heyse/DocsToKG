@@ -23,6 +23,24 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "chunk-log-context",
+#       "name": "_chunk_log_context",
+#       "anchor": "function-chunk-log-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-chunk-metadata-issue",
+#       "name": "_log_chunk_metadata_issue",
+#       "anchor": "function-log-chunk-metadata-issue",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-doc-items",
+#       "name": "_collect_doc_items",
+#       "anchor": "function-collect-doc-items",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "read-utf8",
 #       "name": "read_utf8",
 #       "anchor": "function-read-utf8",
@@ -167,14 +185,13 @@ import argparse
 import importlib
 import json
 import os
-import time
 import statistics
+import time
+import uuid
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, fields
 from types import SimpleNamespace
 from typing import Any, Callable, ClassVar, Dict, Iterable, List, Optional, Sequence, Tuple
-
-import uuid
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
@@ -206,6 +223,7 @@ from DocsToKG.DocParsing.config import (
     annotate_cli_overrides,
     parse_args_with_overrides,
 )
+from DocsToKG.DocParsing.context import ParsingContext
 from DocsToKG.DocParsing.core import (
     DEFAULT_CAPTION_MARKERS,
     DEFAULT_HEADING_MARKERS,
@@ -215,6 +233,7 @@ from DocsToKG.DocParsing.core import (
     ChunkTask,
     ChunkWorkerConfig,
     CLIOption,
+    ResumeController,
     acquire_lock,
     build_subcommand,
     compute_relative_doc_id,
@@ -223,10 +242,11 @@ from DocsToKG.DocParsing.core import (
     derive_doc_id_and_chunks_path,
     load_structural_marker_config,
     set_spawn_or_warn,
-    ResumeController,
 )
-from DocsToKG.DocParsing.context import ParsingContext
-from DocsToKG.DocParsing.interfaces import ChunkingSerializerProvider
+from DocsToKG.DocParsing.doctags import (
+    add_data_root_option,
+    add_resume_force_options,
+)
 from DocsToKG.DocParsing.env import (
     data_chunks,
     data_doctags,
@@ -235,6 +255,14 @@ from DocsToKG.DocParsing.env import (
     prepare_data_root,
     resolve_pipeline_path,
 )
+from DocsToKG.DocParsing.formats import (
+    CHUNK_SCHEMA_VERSION,
+    ChunkRow,
+    ProvenanceMetadata,
+    get_docling_version,
+    validate_chunk_row,
+)
+from DocsToKG.DocParsing.interfaces import ChunkingSerializerProvider
 from DocsToKG.DocParsing.io import (
     atomic_write,
     compute_chunk_uuid,
@@ -244,24 +272,13 @@ from DocsToKG.DocParsing.io import (
     quarantine_artifact,
     relative_path,
     resolve_attempts_path,
-    resolve_manifest_path,
     resolve_hash_algorithm,
+    resolve_manifest_path,
 )
 from DocsToKG.DocParsing.logging import (
     get_logger,
     log_event,
     set_stage_telemetry,
-)
-from DocsToKG.DocParsing.doctags import (
-    add_data_root_option,
-    add_resume_force_options,
-)
-from DocsToKG.DocParsing.formats import (
-    CHUNK_SCHEMA_VERSION,
-    ChunkRow,
-    ProvenanceMetadata,
-    get_docling_version,
-    validate_chunk_row,
 )
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
@@ -1812,13 +1829,10 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     context.inject_anchors = bool(args.inject_anchors)
     context.profile = profile
     base_extra = {
-        key: value
-        for key, value in base_config.items()
-        if key not in ParsingContext.field_names()
+        key: value for key, value in base_config.items() if key not in ParsingContext.field_names()
     }
     if base_extra:
         context.merge_extra(base_extra)
-
 
     heading_markers: Tuple[str, ...] = DEFAULT_HEADING_MARKERS
     caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS
@@ -2148,6 +2162,8 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
 def _run_validate_only(
     *,
     files: Sequence[Path],
@@ -2266,6 +2282,8 @@ def _run_validate_only(
     avg_tokens = statistics.mean(token_counts) if token_counts else 0.0
     min_tokens = min(token_counts) if token_counts else 0
     max_tokens = max(token_counts) if token_counts else 0
+    validated_files = stats["files"]
+    validated_rows = stats["rows"]
 
     log_event(
         logger,

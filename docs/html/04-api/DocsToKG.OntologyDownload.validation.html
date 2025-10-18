@@ -93,17 +93,9 @@
 <h3><code class="docutils literal notranslate"><span class="pre">_acquire_validator_slot(config)</span></code><a class="headerlink" href="#acquire-validator-slot-config" title="Link to this heading"></a></h3>
 <p>Return a process-wide semaphore guarding validator concurrency.</p>
 </section>
-<section id="load-resolver-plugins-registry">
-<h3><code class="docutils literal notranslate"><span class="pre">load_resolver_plugins(registry)</span></code><a class="headerlink" href="#load-resolver-plugins-registry" title="Link to this heading"></a></h3>
-<p>Proxy to :mod:<code class="docutils literal notranslate"><span class="pre">plugins</span></code> resolver discovery preserving legacy globals.</p>
-</section>
-<section id="ensure-resolver-plugins-registry">
-<h3><code class="docutils literal notranslate"><span class="pre">ensure_resolver_plugins(registry)</span></code><a class="headerlink" href="#ensure-resolver-plugins-registry" title="Link to this heading"></a></h3>
-<p>Load resolver plugins exactly once per interpreter.</p>
-</section>
 <section id="load-validator-plugins-registry">
 <h3><code class="docutils literal notranslate"><span class="pre">load_validator_plugins(registry)</span></code><a class="headerlink" href="#load-validator-plugins-registry" title="Link to this heading"></a></h3>
-<p>Proxy to :mod:<code class="docutils literal notranslate"><span class="pre">plugins</span></code> validator discovery preserving legacy globals.</p>
+<p>Load validator plugins while tracking module-level load state.</p>
 </section>
 <section id="write-validation-json-path-payload">
 <h3><code class="docutils literal notranslate"><span class="pre">_write_validation_json(path,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#write-validation-json-path-payload" title="Link to this heading"></a></h3>
@@ -173,10 +165,6 @@ return_header_hash: When True, also return the hash of Turtle prefix directives.
 <p>Returns:
 SHA-256 hex digest of the canonical Turtle content, and optionally the hash
 of the serialized prefix header when <code class="docutils literal notranslate"><span class="pre">return_header_hash</span></code> is True.</p>
-</section>
-<section id="ensure-validator-plugins-registry">
-<h3><code class="docutils literal notranslate"><span class="pre">ensure_validator_plugins(registry)</span></code><a class="headerlink" href="#ensure-validator-plugins-registry" title="Link to this heading"></a></h3>
-<p>Load validator plugins exactly once per interpreter.</p>
 </section>
 <section id="worker-pronto-payload">
 <h3><code class="docutils literal notranslate"><span class="pre">_worker_pronto(payload)</span></code><a class="headerlink" href="#worker-pronto-payload" title="Link to this heading"></a></h3>

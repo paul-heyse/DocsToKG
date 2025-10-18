@@ -4,7 +4,7 @@
 #   "purpose": "Europe PMC resolver implementation",
 #   "sections": [
 #     {
-#       "id": "europe-pmc-resolver",
+#       "id": "europepmcresolver",
 #       "name": "EuropePmcResolver",
 #       "anchor": "class-europepmcresolver",
 #       "kind": "class"
@@ -35,6 +35,15 @@ class EuropePmcResolver(ApiResolverBase):
     name = "europe_pmc"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when a DOI is available for Europe PMC lookups.
+
+        Args:
+            config: Resolver configuration (unused but part of the interface).
+            artifact: Work record we may attempt to resolve.
+
+        Returns:
+            bool: Whether this resolver should run for the work.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -43,6 +52,17 @@ class EuropePmcResolver(ApiResolverBase):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield PDF URLs announced by the Europe PMC REST API.
+
+        Args:
+            session: Requests session for HTTP calls.
+            config: Resolver configuration controlling limits.
+            artifact: Work record that triggered this resolver.
+
+        Yields:
+            ResolverResult: Candidate download URLs or skip events.
+        """
+
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(

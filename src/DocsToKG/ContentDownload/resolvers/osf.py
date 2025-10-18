@@ -4,7 +4,7 @@
 #   "purpose": "OSF resolver implementation",
 #   "sections": [
 #     {
-#       "id": "osf-resolver",
+#       "id": "osfresolver",
 #       "name": "OsfResolver",
 #       "anchor": "class-osfresolver",
 #       "kind": "class"
@@ -35,6 +35,15 @@ class OsfResolver(ApiResolverBase):
     name = "osf"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when a DOI is available for OSF lookups.
+
+        Args:
+            config: Resolver configuration (unused for enablement).
+            artifact: Work record describing the document.
+
+        Returns:
+            bool: Whether the resolver should attempt the work.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -43,6 +52,16 @@ class OsfResolver(ApiResolverBase):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield OSF download URLs corresponding to ``artifact``.
+
+        Args:
+            session: Requests session for HTTP operations.
+            config: Resolver configuration managing limits.
+            artifact: Work metadata providing DOI information.
+
+        Yields:
+            ResolverResult: Candidate download URLs or skip events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(

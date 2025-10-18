@@ -17,7 +17,7 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Union
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 __all__ = (
@@ -50,6 +50,9 @@ __all__ = (
     "normalize_reason",
     "parse_size",
 )
+
+if TYPE_CHECKING:
+    from DocsToKG.ContentDownload.download import RobotsCache
 
 
 # ---------------------------------------------------------------------------
@@ -494,8 +497,6 @@ class ReasonCode(Enum):
         return cls.UNKNOWN
 
 
-
-
 def normalize_classification(value: Union[str, Classification, None]) -> Union[Classification, str]:
     """Return a normalized classification token preserving unknown custom codes."""
 
@@ -509,10 +510,11 @@ def normalize_classification(value: Union[str, Classification, None]) -> Union[C
     candidate = Classification.from_wire(text)
     if isinstance(value, str):
         lowered = text.lower()
-        if candidate is Classification.UNKNOWN and lowered not in {member.value for member in Classification}:
+        if candidate is Classification.UNKNOWN and lowered not in {
+            member.value for member in Classification
+        }:
             return value
     return candidate
-
 
 
 def normalize_reason(value: Optional[Union[str, ReasonCode]]) -> Optional[Union[ReasonCode, str]]:
@@ -525,7 +527,7 @@ def normalize_reason(value: Optional[Union[str, ReasonCode]]) -> Optional[Union[
     text = str(value).strip()
     if not text:
         return None
-    normalized = text.replace('-', '_')
+    normalized = text.replace("-", "_")
     candidate = ReasonCode.from_wire(normalized)
     if candidate is not ReasonCode.UNKNOWN or normalized == ReasonCode.UNKNOWN.value:
         return candidate

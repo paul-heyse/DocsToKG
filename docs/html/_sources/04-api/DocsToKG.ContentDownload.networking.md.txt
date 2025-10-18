@@ -45,6 +45,10 @@ Raises:
 
 ## 2. Functions
 
+### `get_thread_session()`
+
+Return a default thread-local session using :func:`create_session`.
+
 ### `create_session(headers)`
 
 Return a ``requests.Session`` configured for DocsToKG network requests.
@@ -57,6 +61,7 @@ adapter_max_retries: Retry count configured on mounted HTTP adapters. Defaults t
 ``0`` so :func:`request_with_retries` governs retry behaviour.
 pool_connections: Lower bound of connection pools shared across the session's adapters.
 pool_maxsize: Maximum number of connections kept per host in the adapter pool.
+enable_compression: Whether to request gzip/deflate compression. Defaults to ``True``.
 
 Returns:
 requests.Session: Session instance with HTTP/HTTPS adapters mounted and ready for pipeline usage.
@@ -65,9 +70,14 @@ Raises:
 None.
 
 Notes:
-The returned session uses ``HTTPAdapter`` for connection pooling. It is safe to share
-across threads provided callers avoid mutating shared mutable state (for example,
-updating ``session.headers``) once the session is distributed to worker threads.
+The returned session uses ``HTTPAdapter`` for connection pooling. When executing
+concurrently, prefer wrapping :func:`create_session` with
+:class:`ThreadLocalSessionFactory` so each worker maintains its own connection
+pool without sharing mutable session state across threads.
+
+When ``enable_compression`` is ``True``, the session automatically requests gzip
+and deflate compression, which can reduce bandwidth usage by 60-80% for text-heavy
+HTML/XML content.
 
 ### `parse_retry_after_header(response)`
 
@@ -119,7 +129,13 @@ retry_statuses: HTTP status codes that should trigger a retry. Defaults to
 backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to ``0.75``.
 respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
 content_policy: Optional mapping describing max-bytes and allowed MIME types for the target host.
+max_retry_duration: Maximum total time to spend on retries in seconds. If exceeded, raises
+immediately. Defaults to ``None`` (no limit).
+backoff_max: Maximum delay between retries in seconds. Prevents excessive wait times.
+Defaults to ``60.0`` seconds.
 **kwargs: Additional keyword arguments forwarded directly to :meth:`requests.Session.request`.
+Note: If ``timeout`` is provided as a single float, it will be converted to a tuple
+(connect_timeout, read_timeout) with read_timeout = timeout * 2 for better error handling.
 
 Returns:
 requests.Response: Successful response object. Callers are responsible for closing the
@@ -128,6 +144,7 @@ response when streaming content.
 Raises:
 ValueError: If ``max_retries`` or ``backoff_factor`` are invalid or ``url``/``method`` are empty.
 requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.
+TimeoutError: If ``max_retry_duration`` is exceeded.
 
 ### `head_precheck(session, url, timeout)`
 
@@ -158,9 +175,29 @@ Return ``True`` when response headers suggest a PDF payload.
 
 Fallback GET probe for providers that reject HEAD requests.
 
+### `get_thread_session(self)`
+
+Return a session scoped to the current thread.
+
+### `__call__(self)`
+
+Allow instances to be used as session factories callable.
+
+### `close_current(self)`
+
+Close and remove the session bound to the current thread.
+
+### `close_all(self)`
+
+Close all cached sessions and reset thread-local state.
+
 ### `request_func()`
 
 Invoke the appropriate request callable on the provided session.
+
+### `_close_response()`
+
+*No documentation available.*
 
 ### `build_headers(self)`
 
@@ -218,6 +255,15 @@ Consume tokens and return wait seconds required before proceeding.
 Attempt to consume tokens without blocking; return ``True`` if granted.
 
 ## 3. Classes
+
+### `ThreadLocalSessionFactory`
+
+Create or reuse :class:`requests.Session` instances per thread.
+
+The factory caches sessions keyed by thread identifier so worker pools can
+retain warm connection pools while avoiding cross-thread sharing. Callers
+should invoke :meth:`close_all` when tearing down the pool to release open
+sockets promptly.
 
 ### `ContentPolicyViolation`
 

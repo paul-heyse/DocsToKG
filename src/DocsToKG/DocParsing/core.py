@@ -4,27 +4,9 @@
 #   "purpose": "Shared utilities and CLI glue for DocParsing workflows",
 #   "sections": [
 #     {
-#       "id": "dedupe-preserve-order",
-#       "name": "dedupe_preserve_order",
-#       "anchor": "function-dedupe-preserve-order",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "ensure-str-sequence",
 #       "name": "_ensure_str_sequence",
 #       "anchor": "function-ensure-str-sequence",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-yaml-markers",
-#       "name": "_load_yaml_markers",
-#       "anchor": "function-load-yaml-markers",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-toml-markers",
-#       "name": "_load_toml_markers",
-#       "anchor": "function-load-toml-markers",
 #       "kind": "function"
 #     },
 #     {
@@ -52,48 +34,6 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "coerce-path",
-#       "name": "_coerce_path",
-#       "anchor": "function-coerce-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "coerce-optional-path",
-#       "name": "_coerce_optional_path",
-#       "anchor": "function-coerce-optional-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "coerce-bool",
-#       "name": "_coerce_bool",
-#       "anchor": "function-coerce-bool",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "coerce-int",
-#       "name": "_coerce_int",
-#       "anchor": "function-coerce-int",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "coerce-float",
-#       "name": "_coerce_float",
-#       "anchor": "function-coerce-float",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "coerce-str",
-#       "name": "_coerce_str",
-#       "anchor": "function-coerce-str",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "coerce-str-tuple",
-#       "name": "_coerce_str_tuple",
-#       "anchor": "function-coerce-str-tuple",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "normalize-http-timeout",
 #       "name": "normalize_http_timeout",
 #       "anchor": "function-normalize-http-timeout",
@@ -104,24 +44,6 @@
 #       "name": "get_http_session",
 #       "anchor": "function-get-http-session",
 #       "kind": "function"
-#     },
-#     {
-#       "id": "manifest-value",
-#       "name": "_manifest_value",
-#       "anchor": "function-manifest-value",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-config-mapping",
-#       "name": "load_config_mapping",
-#       "anchor": "function-load-config-mapping",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "stageconfigbase",
-#       "name": "StageConfigBase",
-#       "anchor": "class-stageconfigbase",
-#       "kind": "class"
 #     },
 #     {
 #       "id": "bm25stats",
@@ -158,144 +80,6 @@
 #       "name": "ChunkResult",
 #       "anchor": "class-chunkresult",
 #       "kind": "class"
-#     },
-#     {
-#       "id": "expand-path",
-#       "name": "expand_path",
-#       "anchor": "function-expand-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-hf-home",
-#       "name": "resolve_hf_home",
-#       "anchor": "function-resolve-hf-home",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-model-root",
-#       "name": "resolve_model_root",
-#       "anchor": "function-resolve-model-root",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "looks-like-filesystem-path",
-#       "name": "looks_like_filesystem_path",
-#       "anchor": "function-looks-like-filesystem-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-pdf-model-path",
-#       "name": "resolve_pdf_model_path",
-#       "anchor": "function-resolve-pdf-model-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "init-hf-env",
-#       "name": "init_hf_env",
-#       "anchor": "function-init-hf-env",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "detect-cuda-device",
-#       "name": "_detect_cuda_device",
-#       "anchor": "function-detect-cuda-device",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-model-environment",
-#       "name": "ensure_model_environment",
-#       "anchor": "function-ensure-model-environment",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-optional-dependency",
-#       "name": "_ensure_optional_dependency",
-#       "anchor": "function-ensure-optional-dependency",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-splade-dependencies",
-#       "name": "ensure_splade_dependencies",
-#       "anchor": "function-ensure-splade-dependencies",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-qwen-dependencies",
-#       "name": "ensure_qwen_dependencies",
-#       "anchor": "function-ensure-qwen-dependencies",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-splade-environment",
-#       "name": "ensure_splade_environment",
-#       "anchor": "function-ensure-splade-environment",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-qwen-environment",
-#       "name": "ensure_qwen_environment",
-#       "anchor": "function-ensure-qwen-environment",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "detect-data-root",
-#       "name": "detect_data_root",
-#       "anchor": "function-detect-data-root",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-dir",
-#       "name": "_ensure_dir",
-#       "anchor": "function-ensure-dir",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "data-doctags",
-#       "name": "data_doctags",
-#       "anchor": "function-data-doctags",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "data-chunks",
-#       "name": "data_chunks",
-#       "anchor": "function-data-chunks",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "data-vectors",
-#       "name": "data_vectors",
-#       "anchor": "function-data-vectors",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "data-manifests",
-#       "name": "data_manifests",
-#       "anchor": "function-data-manifests",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "prepare-data-root",
-#       "name": "prepare_data_root",
-#       "anchor": "function-prepare-data-root",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-pipeline-path",
-#       "name": "resolve_pipeline_path",
-#       "anchor": "function-resolve-pipeline-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "data-pdfs",
-#       "name": "data_pdfs",
-#       "anchor": "function-data-pdfs",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "data-html",
-#       "name": "data_html",
-#       "anchor": "function-data-html",
-#       "kind": "function"
 #     },
 #     {
 #       "id": "derive-doc-id-and-doctags-path",
@@ -340,63 +124,9 @@
 #       "kind": "class"
 #     },
 #     {
-#       "id": "stringify-path",
-#       "name": "_stringify_path",
-#       "anchor": "function-stringify-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "manifest-log-skip",
-#       "name": "manifest_log_skip",
-#       "anchor": "function-manifest-log-skip",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "manifest-log-success",
-#       "name": "manifest_log_success",
-#       "anchor": "function-manifest-log-success",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "manifest-log-failure",
-#       "name": "manifest_log_failure",
-#       "anchor": "function-manifest-log-failure",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "structuredlogger",
-#       "name": "StructuredLogger",
-#       "anchor": "class-structuredlogger",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "get-logger",
-#       "name": "get_logger",
-#       "anchor": "function-get-logger",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "log-event",
-#       "name": "log_event",
-#       "anchor": "function-log-event",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "find-free-port",
 #       "name": "find_free_port",
 #       "anchor": "function-find-free-port",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "atomic-write",
-#       "name": "atomic_write",
-#       "anchor": "function-atomic-write",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "iter-doctags",
-#       "name": "iter_doctags",
-#       "anchor": "function-iter-doctags",
 #       "kind": "function"
 #     },
 #     {
@@ -406,100 +136,10 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "jsonl-load",
-#       "name": "jsonl_load",
-#       "anchor": "function-jsonl-load",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "jsonl-save",
-#       "name": "jsonl_save",
-#       "anchor": "function-jsonl-save",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "jsonl-append-iter",
-#       "name": "jsonl_append_iter",
-#       "anchor": "function-jsonl-append-iter",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "build-jsonl-split-map",
-#       "name": "build_jsonl_split_map",
-#       "anchor": "function-build-jsonl-split-map",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "iter-jsonl-records",
-#       "name": "_iter_jsonl_records",
-#       "anchor": "function-iter-jsonl-records",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "batcher",
 #       "name": "Batcher",
 #       "anchor": "class-batcher",
 #       "kind": "class"
-#     },
-#     {
-#       "id": "manifest-filename",
-#       "name": "_manifest_filename",
-#       "anchor": "function-manifest-filename",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "manifest-append",
-#       "name": "manifest_append",
-#       "anchor": "function-manifest-append",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-hash-algorithm",
-#       "name": "resolve_hash_algorithm",
-#       "anchor": "function-resolve-hash-algorithm",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "compute-chunk-uuid",
-#       "name": "compute_chunk_uuid",
-#       "anchor": "function-compute-chunk-uuid",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "relative-path",
-#       "name": "relative_path",
-#       "anchor": "function-relative-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "quarantine-artifact",
-#       "name": "quarantine_artifact",
-#       "anchor": "function-quarantine-artifact",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "compute-content-hash",
-#       "name": "compute_content_hash",
-#       "anchor": "function-compute-content-hash",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-manifest-index",
-#       "name": "load_manifest_index",
-#       "anchor": "function-load-manifest-index",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "iter-manifest-entries",
-#       "name": "iter_manifest_entries",
-#       "anchor": "function-iter-manifest-entries",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "summarize-manifest",
-#       "name": "summarize_manifest",
-#       "anchor": "function-summarize-manifest",
-#       "kind": "function"
 #     },
 #     {
 #       "id": "acquire-lock",
@@ -744,63 +384,143 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from ..OntologyDownload.logging_utils import JSONFormatter
 from .config import (
-    StageConfigBase,
     _load_toml_markers,
     _load_yaml_markers,
-    load_config_mapping,
 )
 from .env import (
-    PDF_MODEL_SUBDIR,
     data_chunks as _data_chunks,
+)
+from .env import (
     data_doctags as _data_doctags,
+)
+from .env import (
     data_html as _data_html,
+)
+from .env import (
     data_manifests as _data_manifests,
+)
+from .env import (
     data_pdfs as _data_pdfs,
+)
+from .env import (
     data_vectors as _data_vectors,
+)
+from .env import (
     detect_data_root as _detect_data_root,
+)
+from .env import (
     ensure_model_environment as _ensure_model_environment,
+)
+from .env import (
     ensure_qwen_dependencies as _ensure_qwen_dependencies,
+)
+from .env import (
     ensure_qwen_environment as _ensure_qwen_environment,
+)
+from .env import (
     ensure_splade_dependencies as _ensure_splade_dependencies,
+)
+from .env import (
     ensure_splade_environment as _ensure_splade_environment,
+)
+from .env import (
     expand_path as _expand_path,
+)
+from .env import (
     init_hf_env as _init_hf_env,
+)
+from .env import (
     looks_like_filesystem_path as _looks_like_fs_path,
+)
+from .env import (
     prepare_data_root as _prepare_data_root,
+)
+from .env import (
     resolve_hf_home as _resolve_hf_home,
+)
+from .env import (
     resolve_model_root as _resolve_model_root,
+)
+from .env import (
     resolve_pdf_model_path as _resolve_pdf_model_path,
+)
+from .env import (
     resolve_pipeline_path as _resolve_pipeline_path,
 )
 from .io import (
     atomic_write as _atomic_write,
+)
+from .io import (
     build_jsonl_split_map as _build_jsonl_split_map,
+)
+from .io import (
     compute_chunk_uuid as _compute_chunk_uuid,
+)
+from .io import (
     compute_content_hash as _compute_content_hash,
+)
+from .io import (
     dedupe_preserve_order as _dedupe_preserve_order,
-    make_hasher as _make_hasher,
+)
+from .io import (
     iter_doctags as _iter_doctags,
+)
+from .io import (
     iter_jsonl as _iter_jsonl,
+)
+from .io import (
     iter_jsonl_batches as _iter_jsonl_batches,
+)
+from .io import (
     iter_manifest_entries as _iter_manifest_entries,
+)
+from .io import (
     jsonl_append_iter as _jsonl_append_iter,
+)
+from .io import (
     jsonl_load as _jsonl_load,
+)
+from .io import (
     jsonl_save as _jsonl_save,
+)
+from .io import (
     load_manifest_index as _load_manifest_index,
+)
+from .io import (
+    make_hasher as _make_hasher,
+)
+from .io import (
     manifest_append as _manifest_append,
+)
+from .io import (
     quarantine_artifact as _quarantine_artifact,
+)
+from .io import (
     relative_path as _relative_path,
+)
+from .io import (
     resolve_hash_algorithm as _resolve_hash_algorithm,
 )
 from .logging import (
     StructuredLogger as _StructuredLogger,
+)
+from .logging import (
     get_logger as _get_logger,
+)
+from .logging import (
     log_event as _log_event,
+)
+from .logging import (
     manifest_log_failure as _manifest_log_failure,
+)
+from .logging import (
     manifest_log_skip as _manifest_log_skip,
+)
+from .logging import (
     manifest_log_success as _manifest_log_success,
+)
+from .logging import (
     summarize_manifest as _summarize_manifest,
 )
 
@@ -1160,7 +880,6 @@ __all__ = [
 UUID_NAMESPACE = uuid.UUID("00000000-0000-0000-0000-000000000000")
 DEFAULT_SERIALIZER_PROVIDER = "DocsToKG.DocParsing.formats:RichSerializerProvider"
 DEFAULT_TOKENIZER = "Qwen/Qwen3-Embedding-4B"
-PDF_MODEL_SUBDIR = Path("granite-docling-258M")
 
 
 @dataclass(slots=True)
@@ -1429,12 +1148,35 @@ def iter_chunks(directory: Path) -> Iterator[Path]:
         True
     """
 
-    seen = set()
-    for candidate in directory.rglob("*.chunks.jsonl"):
-        if candidate.is_file() and not candidate.name.startswith("."):
-            seen.add(candidate.resolve())
-    for path in sorted(seen):
-        yield path
+    root = directory.resolve()
+    if root.is_file():
+        if root.name.endswith(".chunks.jsonl"):
+            yield root
+        return
+    if not root.exists():
+        return
+
+    yielded_symlink_targets: set[Path] = set()
+
+    def _walk(current: Path) -> Iterator[Path]:
+        try:
+            entries = sorted(current.iterdir(), key=lambda p: p.name)
+        except FileNotFoundError:  # pragma: no cover - defensive guard
+            return
+        for entry in entries:
+            if entry.name.startswith("."):
+                continue
+            if entry.is_dir() and not entry.is_symlink():
+                yield from _walk(entry)
+            elif entry.is_file() and entry.name.endswith(".chunks.jsonl"):
+                resolved = entry.resolve()
+                if entry.is_symlink():
+                    if resolved in yielded_symlink_targets:
+                        continue
+                    yielded_symlink_targets.add(resolved)
+                yield resolved
+
+    yield from _walk(root)
 
 
 # --- Collection Utilities ---
@@ -1491,10 +1233,7 @@ class Batcher(Iterable[List[T]]):
     def _ordered_indices(self) -> List[int]:
         if not self._lengths:
             return list(range(len(self._items)))
-        pairs = [
-            (idx, self._length_bucket(self._lengths[idx]))
-            for idx in range(len(self._items))
-        ]
+        pairs = [(idx, self._length_bucket(self._lengths[idx])) for idx in range(len(self._items))]
         pairs.sort(key=lambda pair: (pair[1], pair[0]))
         return [idx for idx, _ in pairs]
 
@@ -1806,7 +1545,9 @@ def _run_manifest(argv: Sequence[str]) -> int:
             print(f"- {stage}: total={data['total']} duration_s={data['duration_s']}")
             status_map = data.get("statuses", {})
             if status_map:
-                statuses = ", ".join(f"{name}={count}" for name, count in sorted(status_map.items()))
+                statuses = ", ".join(
+                    f"{name}={count}" for name, count in sorted(status_map.items())
+                )
                 print(f"  statuses: {statuses}")
 
     log_event(

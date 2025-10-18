@@ -4,7 +4,7 @@
 #   "purpose": "PMC resolver implementation",
 #   "sections": [
 #     {
-#       "id": "pmc-resolver",
+#       "id": "pmcresolver",
 #       "name": "PmcResolver",
 #       "anchor": "class-pmcresolver",
 #       "kind": "class"
@@ -25,8 +25,14 @@ import requests as _requests
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi, normalize_pmcid
 
-from .base import RegisteredResolver, ResolverEvent, ResolverEventReason, ResolverResult, _absolute_url
-from .base import request_with_retries
+from .base import (
+    RegisteredResolver,
+    ResolverEvent,
+    ResolverEventReason,
+    ResolverResult,
+    _absolute_url,
+    request_with_retries,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
@@ -42,6 +48,15 @@ class PmcResolver(RegisteredResolver):
     name = "pmc"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when PMC identifiers or DOI metadata are available.
+
+        Args:
+            config: Resolver configuration (unused for enablement checks).
+            artifact: Work record containing identifiers such as DOI, PMID, or PMCID.
+
+        Returns:
+            bool: Whether the resolver should attempt the work.
+        """
         return bool(artifact.pmcid or artifact.pmid or artifact.doi)
 
     def _lookup_pmcids(
@@ -96,6 +111,16 @@ class PmcResolver(RegisteredResolver):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield PubMed Central PDF URLs matched to ``artifact``.
+
+        Args:
+            session: Requests session for HTTP requests.
+            config: Resolver configuration providing timeouts and headers.
+            artifact: Work metadata supplying PMC identifiers.
+
+        Yields:
+            ResolverResult: Candidate PDF URLs or diagnostic events.
+        """
         pmcids: List[str] = []
         if artifact.pmcid:
             pmcids.append(normalize_pmcid(artifact.pmcid))

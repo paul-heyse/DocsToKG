@@ -87,7 +87,7 @@
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="coerce-kind-kind">
 <h3><code class="docutils literal notranslate"><span class="pre">_coerce_kind(kind)</span></code><a class="headerlink" href="#coerce-kind-kind" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Normalise raw schema identifiers to <code class="docutils literal notranslate"><span class="pre">SchemaKind</span></code> enums.</p>
 </section>
 <section id="get-default-schema-version-kind">
 <h3><code class="docutils literal notranslate"><span class="pre">get_default_schema_version(kind)</span></code><a class="headerlink" href="#get-default-schema-version-kind" title="Link to this heading"></a></h3>
@@ -100,6 +100,13 @@
 <section id="validate-schema-version-version-kind">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_schema_version(version,</span> <span class="pre">kind)</span></code><a class="headerlink" href="#validate-schema-version-version-kind" title="Link to this heading"></a></h3>
 <p>Validate that <code class="docutils literal notranslate"><span class="pre">version</span></code> is compatible for <code class="docutils literal notranslate"><span class="pre">kind</span></code>.</p>
+</section>
+<section id="ensure-chunk-schema-rec">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_chunk_schema(rec)</span></code><a class="headerlink" href="#ensure-chunk-schema-rec" title="Link to this heading"></a></h3>
+<p>Ensure <code class="docutils literal notranslate"><span class="pre">rec</span></code> declares a compatible chunk schema version.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">schema_version</span></code> is missing it is populated with <code class="docutils literal notranslate"><span class="pre">default_version</span></code>
+(or :data:<code class="docutils literal notranslate"><span class="pre">CHUNK_SCHEMA_VERSION</span></code> when unspecified). When present it is
+validated against the chunk compatibility set.</p>
 </section>
 <section id="validate-vector-row-row">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_vector_row(row)</span></code><a class="headerlink" href="#validate-vector-row-row" title="Link to this heading"></a></h3>

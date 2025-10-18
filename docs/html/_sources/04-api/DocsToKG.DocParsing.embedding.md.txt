@@ -33,6 +33,10 @@ Dependencies:
 
 Best-effort shutdown for a cached Qwen LLM instance.
 
+### `flush_llm_cache()`
+
+Explicitly clear the cached Qwen LLM instances.
+
 ### `close_all_qwen()`
 
 Release all cached Qwen LLM instances.
@@ -108,20 +112,6 @@ Returns:
 ### `_legacy_chunk_uuid(doc_id, source_chunk_idxs, text_value)`
 
 Derive the historical UUID used before deterministic start offsets.
-
-### `ensure_chunk_schema(rows, source)`
-
-Assert that chunk rows declare a compatible schema version.
-
-Args:
-rows: Iterable of chunk dictionaries to validate.
-source: Path to the originating chunk file, used for error context.
-
-Returns:
-None
-
-Raises:
-ValueError: Propagated when an incompatible schema version is detected.
 
 ### `tokens(text)`
 
@@ -243,6 +233,10 @@ enabled.
 Yields:
 Lists of row dictionaries containing at most ``batch_size`` entries.
 
+### `_validate_chunk_file_schema(path)`
+
+Stream chunk file rows and assert schema compatibility.
+
 ### `iter_chunk_files(directory)`
 
 Deprecated shim that forwards to :func:`iter_chunks`.
@@ -350,6 +344,34 @@ int: Exit code where ``0`` indicates success.
 Raises:
 ValueError: If invalid runtime parameters (such as batch sizes) are supplied.
 
+### `get(self, key)`
+
+Return the cached value for ``key`` or ``None`` when absent.
+
+### `put(self, key, value)`
+
+Insert ``value`` for ``key`` and evict least-recently-used entries.
+
+### `clear(self)`
+
+Discard all cached values, invoking the closer for each.
+
+### `items(self)`
+
+Return a snapshot of ``(key, value)`` pairs ordered by recency.
+
+### `values(self)`
+
+Return cached values ordered from least to most recently used.
+
+### `_evict_if_needed(self)`
+
+*No documentation available.*
+
+### `_close(self, value)`
+
+*No documentation available.*
+
 ### `from_env(cls, defaults)`
 
 Construct configuration from environment variables.
@@ -435,15 +457,43 @@ Close the atomic writer context, propagating exceptions.
 
 Append ``rows`` to the active JSONL artifact created by ``__enter__``.
 
+### `tqdm(iterable)`
+
+Fallback tqdm implementation returning a lightweight iterator.
+
 ### `_process_entry(entry)`
 
 Encode vectors for a chunk file and report per-file metrics.
+
+### `__iter__(self)`
+
+*No documentation available.*
+
+### `update(self)`
+
+Mirror tqdm's update interface without tracking state.
+
+### `close(self)`
+
+Provide a noop close hook for compatibility.
+
+### `__enter__(self)`
+
+*No documentation available.*
+
+### `__exit__(self, exc_type, exc_value, traceback)`
+
+*No documentation available.*
 
 ### `_embed_batch(batch_texts)`
 
 *No documentation available.*
 
 ## 3. Classes
+
+### `_LRUCache`
+
+Simple LRU cache that automatically closes evicted entries.
 
 ### `EmbedCfg`
 
@@ -493,3 +543,7 @@ Abstract base class for vector writers.
 ### `JsonlVectorWriter`
 
 Context manager that writes vector rows to JSONL atomically.
+
+### `_TqdmFallback`
+
+Lightweight iterator wrapper used when tqdm is unavailable.

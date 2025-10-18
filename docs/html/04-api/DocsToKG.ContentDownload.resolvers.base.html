@@ -1,0 +1,218 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: base &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: base</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.ContentDownload.resolvers.base.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-base">
+<h1>1. Module: base<a class="headerlink" href="#module-base" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.base</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Shared resolver primitives and helpers for the content download pipeline.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="absolute-url-base-href">
+<h3><code class="docutils literal notranslate"><span class="pre">_absolute_url(base,</span> <span class="pre">href)</span></code><a class="headerlink" href="#absolute-url-base-href" title="Link to this heading"></a></h3>
+<p>Resolve relative <code class="docutils literal notranslate"><span class="pre">href</span></code> values against <code class="docutils literal notranslate"><span class="pre">base</span></code> to obtain absolute URLs.</p>
+</section>
+<section id="collect-candidate-urls-node-results">
+<h3><code class="docutils literal notranslate"><span class="pre">_collect_candidate_urls(node,</span> <span class="pre">results)</span></code><a class="headerlink" href="#collect-candidate-urls-node-results" title="Link to this heading"></a></h3>
+<p>Recursively collect HTTP(S) URLs from nested response payloads.</p>
+</section>
+<section id="find-pdf-via-meta-soup-base-url">
+<h3><code class="docutils literal notranslate"><span class="pre">find_pdf_via_meta(soup,</span> <span class="pre">base_url)</span></code><a class="headerlink" href="#find-pdf-via-meta-soup-base-url" title="Link to this heading"></a></h3>
+<p>Return PDF URL declared via <code class="docutils literal notranslate"><span class="pre">citation_pdf_url</span></code> meta tags.</p>
+</section>
+<section id="find-pdf-via-link-soup-base-url">
+<h3><code class="docutils literal notranslate"><span class="pre">find_pdf_via_link(soup,</span> <span class="pre">base_url)</span></code><a class="headerlink" href="#find-pdf-via-link-soup-base-url" title="Link to this heading"></a></h3>
+<p>Return PDF URL advertised through alternate link tags.</p>
+</section>
+<section id="find-pdf-via-anchor-soup-base-url">
+<h3><code class="docutils literal notranslate"><span class="pre">find_pdf_via_anchor(soup,</span> <span class="pre">base_url)</span></code><a class="headerlink" href="#find-pdf-via-anchor-soup-base-url" title="Link to this heading"></a></h3>
+<p>Return PDF URL inferred from anchor elements mentioning PDFs.</p>
+</section>
+<section id="fetch-semantic-scholar-data-session-config-doi">
+<h3><code class="docutils literal notranslate"><span class="pre">_fetch_semantic_scholar_data(session,</span> <span class="pre">config,</span> <span class="pre">doi)</span></code><a class="headerlink" href="#fetch-semantic-scholar-data-session-config-doi" title="Link to this heading"></a></h3>
+<p>Return Semantic Scholar metadata for <code class="docutils literal notranslate"><span class="pre">doi</span></code> using configured headers.</p>
+</section>
+<section id="fetch-unpaywall-data-session-config-doi">
+<h3><code class="docutils literal notranslate"><span class="pre">_fetch_unpaywall_data(session,</span> <span class="pre">config,</span> <span class="pre">doi)</span></code><a class="headerlink" href="#fetch-unpaywall-data-session-config-doi" title="Link to this heading"></a></h3>
+<p>Return Unpaywall metadata for <code class="docutils literal notranslate"><span class="pre">doi</span></code> using configured headers.</p>
+</section>
+<section id="post-init-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="is-event-self">
+<h3><code class="docutils literal notranslate"><span class="pre">is_event(self)</span></code><a class="headerlink" href="#is-event-self" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when this result represents an informational event.</p>
+</section>
+<section id="from-wire-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">from_wire(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#from-wire-cls-value" title="Link to this heading"></a></h3>
+<p>Coerce serialized event values into :class:<code class="docutils literal notranslate"><span class="pre">ResolverEvent</span></code> members.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">from_wire(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Coerce serialized reason values into :class:<code class="docutils literal notranslate"><span class="pre">ResolverEventReason</span></code> members.</p>
+</section>
+<section id="is-enabled-self-config-artifact">
+<h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#is-enabled-self-config-artifact" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> if this resolver should run for the given artifact.</p>
+</section>
+<section id="iter-urls-self-session-config-artifact">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#iter-urls-self-session-config-artifact" title="Link to this heading"></a></h3>
+<p>Yield candidate URLs or events for the given artifact.</p>
+</section>
+<section id="register-cls-resolver-cls">
+<h3><code class="docutils literal notranslate"><span class="pre">register(cls,</span> <span class="pre">resolver_cls)</span></code><a class="headerlink" href="#register-cls-resolver-cls" title="Link to this heading"></a></h3>
+<p>Register a resolver class under its declared <code class="docutils literal notranslate"><span class="pre">name</span></code> attribute.</p>
+</section>
+<section id="create-default-cls">
+<h3><code class="docutils literal notranslate"><span class="pre">create_default(cls)</span></code><a class="headerlink" href="#create-default-cls" title="Link to this heading"></a></h3>
+<p>Instantiate resolver instances in priority order.</p>
+</section>
+<section id="init-subclass-cls-register">
+<h3><code class="docutils literal notranslate"><span class="pre">__init_subclass__(cls,</span> <span class="pre">register)</span></code><a class="headerlink" href="#init-subclass-cls-register" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="request-json-self-session-method-url">
+<h3><code class="docutils literal notranslate"><span class="pre">_request_json(self,</span> <span class="pre">session,</span> <span class="pre">method,</span> <span class="pre">url)</span></code><a class="headerlink" href="#request-json-self-session-method-url" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="resolverresult">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code><a class="headerlink" href="#resolverresult" title="Link to this heading"></a></h3>
+<p>Either a candidate download URL or an informational resolver event.</p>
+</section>
+<section id="resolverevent">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolverEvent</span></code><a class="headerlink" href="#resolverevent" title="Link to this heading"></a></h3>
+<p>Structured event taxonomy emitted by resolvers.</p>
+</section>
+<section id="resolvereventreason">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolverEventReason</span></code><a class="headerlink" href="#resolvereventreason" title="Link to this heading"></a></h3>
+<p>Structured reason taxonomy for resolver events.</p>
+</section>
+<section id="resolver">
+<h3><code class="docutils literal notranslate"><span class="pre">Resolver</span></code><a class="headerlink" href="#resolver" title="Link to this heading"></a></h3>
+<p>Protocol that resolver implementations must follow.</p>
+</section>
+<section id="resolverregistry">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolverRegistry</span></code><a class="headerlink" href="#resolverregistry" title="Link to this heading"></a></h3>
+<p>Registry tracking resolver classes by their <code class="docutils literal notranslate"><span class="pre">name</span></code> attribute.</p>
+</section>
+<section id="registeredresolver">
+<h3><code class="docutils literal notranslate"><span class="pre">RegisteredResolver</span></code><a class="headerlink" href="#registeredresolver" title="Link to this heading"></a></h3>
+<p>Mixin ensuring subclasses register with :class:<code class="docutils literal notranslate"><span class="pre">ResolverRegistry</span></code>.</p>
+</section>
+<section id="apiresolverbase">
+<h3><code class="docutils literal notranslate"><span class="pre">ApiResolverBase</span></code><a class="headerlink" href="#apiresolverbase" title="Link to this heading"></a></h3>
+<p>Shared helper for resolvers interacting with JSON-based HTTP APIs.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -122,6 +122,22 @@ embedding stage.
 <section id="validate-chunk-files-files-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">_validate_chunk_files(files,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-chunk-files-files-logger" title="Link to this heading"></a></h3>
 <p>Validate chunk JSONL rows across supplied files.</p>
+<p>Returns a dictionary summarising file, row, and quarantine counts. Detailed
+log events for individual errors are emitted within the function; callers
+are responsible for logging the aggregate summary so they can attach
+run-specific context.</p>
+</section>
+<section id="chunk-log-context-chunk">
+<h3><code class="docutils literal notranslate"><span class="pre">_chunk_log_context(chunk)</span></code><a class="headerlink" href="#chunk-log-context-chunk" title="Link to this heading"></a></h3>
+<p>Return structured logging context for <code class="docutils literal notranslate"><span class="pre">chunk</span></code>.</p>
+</section>
+<section id="log-chunk-metadata-issue-level-message">
+<h3><code class="docutils literal notranslate"><span class="pre">_log_chunk_metadata_issue(level,</span> <span class="pre">message)</span></code><a class="headerlink" href="#log-chunk-metadata-issue-level-message" title="Link to this heading"></a></h3>
+<p>Emit a structured log record describing chunk metadata issues.</p>
+</section>
+<section id="collect-doc-items-chunk">
+<h3><code class="docutils literal notranslate"><span class="pre">_collect_doc_items(chunk)</span></code><a class="headerlink" href="#collect-doc-items-chunk" title="Link to this heading"></a></h3>
+<p>Return DocTags items associated with <code class="docutils literal notranslate"><span class="pre">chunk</span></code>.</p>
 </section>
 <section id="read-utf8-p">
 <h3><code class="docutils literal notranslate"><span class="pre">read_utf8(p)</span></code><a class="headerlink" href="#read-utf8-p" title="Link to this heading"></a></h3>
@@ -143,12 +159,6 @@ Loaded DoclingDocument ready for chunking.</p>
 <section id="extract-refs-and-pages-chunk">
 <h3><code class="docutils literal notranslate"><span class="pre">extract_refs_and_pages(chunk)</span></code><a class="headerlink" href="#extract-refs-and-pages-chunk" title="Link to this heading"></a></h3>
 <p>Collect self-references and page numbers associated with a chunk.</p>
-<p>Args:
-chunk: Chunk object produced by the hybrid chunker.</p>
-<p>Returns:
-Tuple containing a list of reference identifiers and sorted page numbers.</p>
-<p>Raises:
-None</p>
 </section>
 <section id="summarize-image-metadata-chunk-text">
 <h3><code class="docutils literal notranslate"><span class="pre">summarize_image_metadata(chunk,</span> <span class="pre">text)</span></code><a class="headerlink" href="#summarize-image-metadata-chunk-text" title="Link to this heading"></a></h3>
@@ -287,6 +297,10 @@ int: Exit code where <code class="docutils literal notranslate"><span class="pre
 idx: Index of the chunk under evaluation.</p>
 <p>Returns:
 True if the chunk length is less than <code class="docutils literal notranslate"><span class="pre">min_tokens</span></code>, else False.</p>
+</section>
+<section id="merge-without-recount-left-right">
+<h3><code class="docutils literal notranslate"><span class="pre">merge_without_recount(left,</span> <span class="pre">right)</span></code><a class="headerlink" href="#merge-without-recount-left-right" title="Link to this heading"></a></h3>
+<p>Merge two chunk records without recomputing token counts.</p>
 </section>
 <section id="handle-result-result">
 <h3><code class="docutils literal notranslate"><span class="pre">handle_result(result)</span></code><a class="headerlink" href="#handle-result-result" title="Link to this heading"></a></h3>

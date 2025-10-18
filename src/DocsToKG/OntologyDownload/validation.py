@@ -22,6 +22,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
+from threading import BoundedSemaphore, RLock
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -37,23 +38,21 @@ from typing import (
     Union,
 )
 
-from threading import BoundedSemaphore
-
 import psutil
 
 from . import plugins as _plugins
-from .plugins import get_validator_registry
 from .io import log_memory_usage
 from .settings import ResolvedConfig, get_owlready2, get_pronto, get_rdflib
 
 metadata = _plugins.metadata
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from .plugins import ResolverPlugin, ValidatorPlugin
+    from .plugins import ValidatorPlugin
 
 _PROCESS = psutil.Process()
 _VALIDATOR_SEMAPHORE_CACHE: Dict[int, BoundedSemaphore] = {}
-_VALIDATOR_PLUGINS_LOADED = False
+_VALIDATOR_LOAD_LOCK = RLock()
+_VALIDATOR_REGISTRY_CACHE: Optional[MutableMapping[str, "ValidatorPlugin"]] = None
 
 
 def _current_memory_mb() -> float:
@@ -78,6 +77,7 @@ def _acquire_validator_slot(config: ResolvedConfig) -> BoundedSemaphore:
         _VALIDATOR_SEMAPHORE_CACHE[limit] = semaphore
     return semaphore
 
+
 rdflib = get_rdflib()
 pronto = get_pronto()
 owlready2 = get_owlready2()
@@ -91,10 +91,14 @@ def load_validator_plugins(
 ) -> None:
     """Load validator plugins while tracking module-level load state."""
 
-    global _VALIDATOR_PLUGINS_LOADED
-    should_reload = reload or not _VALIDATOR_PLUGINS_LOADED
-    _plugins.load_validator_plugins(registry, logger=logger, reload=should_reload)
-    _VALIDATOR_PLUGINS_LOADED = True
+    global _VALIDATOR_REGISTRY_CACHE  # noqa: PLW0603
+
+    with _VALIDATOR_LOAD_LOCK:
+        _, validators = _plugins.ensure_plugins_loaded(logger=logger, reload=reload)
+        _VALIDATOR_REGISTRY_CACHE = validators
+        if registry is not validators:
+            registry.clear()
+            registry.update(validators)
 
 
 @dataclass(slots=True)
@@ -474,6 +478,7 @@ def normalize_streaming(
     if return_header_hash:
         return content_hash, header_hash
     return content_hash
+
 
 class ValidatorSubprocessError(RuntimeError):
     """Raised when a validator subprocess exits unsuccessfully.
@@ -1064,8 +1069,7 @@ VALIDATORS = {
 
 
 _plugins.register_plugin_registry("validator", VALIDATORS)
-get_validator_registry()
-_VALIDATOR_PLUGINS_LOADED = True
+load_validator_plugins(VALIDATORS)
 
 
 def _run_validator_task(
@@ -1085,7 +1089,9 @@ def _run_validator_task(
     if semaphore is not None:
         acquired = semaphore.acquire(timeout=request.config.defaults.validation.parser_timeout_sec)
         if not acquired:
-            raise ValidationTimeout("validator concurrency limit prevented start")  # pragma: no cover
+            raise ValidationTimeout(
+                "validator concurrency limit prevented start"
+            )  # pragma: no cover
     try:
         result = validator(request, logger)
     except Exception as exc:  # pylint: disable=broad-except
@@ -1188,7 +1194,9 @@ def run_validators(
                 if isinstance(name, str):
                     process_validator_names.add(name.strip().lower())
 
-    thread_jobs: List[Tuple[Callable[[ValidationRequest, logging.Logger], ValidationResult], ValidationRequest]] = []
+    thread_jobs: List[
+        Tuple[Callable[[ValidationRequest, logging.Logger], ValidationResult], ValidationRequest]
+    ] = []
     process_requests: List[ValidationRequest] = []
     for request in request_list:
         validator = VALIDATORS.get(request.name)

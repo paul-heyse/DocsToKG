@@ -28,12 +28,6 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "dedupe-preserve-order",
-#       "name": "_dedupe_preserve_order",
-#       "anchor": "function-dedupe-preserve-order",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "normalize-served-model-names",
 #       "name": "_normalize_served_model_names",
 #       "anchor": "function-normalize-served-model-names",
@@ -305,19 +299,19 @@ from DocsToKG.DocParsing.config import (
     parse_args_with_overrides,
 )
 from DocsToKG.DocParsing.core import (
-    PDF_MODEL_SUBDIR,
+    DEFAULT_HTTP_TIMEOUT,
     CLIOption,
+    ResumeController,
     acquire_lock,
     build_subcommand,
-    DEFAULT_HTTP_TIMEOUT,
     derive_doc_id_and_doctags_path,
     find_free_port,
     get_http_session,
     normalize_http_timeout,
     set_spawn_or_warn,
-    ResumeController,
 )
 from DocsToKG.DocParsing.env import (
+    PDF_MODEL_SUBDIR,
     data_doctags,
     data_html,
     data_manifests,
@@ -335,7 +329,6 @@ from DocsToKG.DocParsing.io import (
     dedupe_preserve_order,
     load_manifest_index,
     manifest_append,
-    relative_path,
     resolve_attempts_path,
     resolve_manifest_path,
 )
@@ -533,9 +526,7 @@ class DoctagsCfg(StageConfigBase):
         self.log_level = str(self.log_level or "INFO").upper()
         sanitizer = str(self.html_sanitizer or "balanced").lower()
         if sanitizer not in HTML_SANITIZER_CHOICES:
-            raise ValueError(
-                f"html_sanitizer must be one of {', '.join(HTML_SANITIZER_CHOICES)}"
-            )
+            raise ValueError(f"html_sanitizer must be one of {', '.join(HTML_SANITIZER_CHOICES)}")
         self.html_sanitizer = sanitizer
         served = StageConfigBase._coerce_str_tuple(self.served_model_names, None)
         if served:

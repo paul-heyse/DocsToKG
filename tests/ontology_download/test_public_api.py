@@ -51,4 +51,3 @@ def test_removed_symbols_are_not_exported() -> None:
 
     for symbol in {"list_plugins", "about", "cli_main"}:
         assert not hasattr(pkg, symbol)
-

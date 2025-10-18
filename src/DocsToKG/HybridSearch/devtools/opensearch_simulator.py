@@ -219,9 +219,7 @@ class OpenSearchSchemaManager:
             )
         analyzer = text_config.get("analyzer")
         if analyzer is not None and str(analyzer).lower() == "keyword":
-            raise ValueError(
-                f"template {namespace!r}: field 'text' must not use analyzer=keyword"
-            )
+            raise ValueError(f"template {namespace!r}: field 'text' must not use analyzer=keyword")
 
         splade_config = properties.get("splade")
         if not isinstance(splade_config, Mapping) or splade_config.get("type") != "rank_features":

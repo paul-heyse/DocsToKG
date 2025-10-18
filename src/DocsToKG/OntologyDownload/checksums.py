@@ -113,9 +113,7 @@ def parse_checksum_url_extra(
         algorithm = None
         if algorithm_value is not None:
             if not isinstance(algorithm_value, str):
-                raise error_cls(
-                    f"{context}: checksum_url algorithm must be a string when provided"
-                )
+                raise error_cls(f"{context}: checksum_url algorithm must be a string when provided")
             algorithm = _normalize_algorithm(
                 algorithm_value,
                 context=context,
@@ -170,7 +168,7 @@ def _fetch_checksum_from_url(
                         },
                     )
                     return digest
-                tail = buffer[-_CHECKSUM_STREAM_TAIL_BYTES :]
+                tail = buffer[-_CHECKSUM_STREAM_TAIL_BYTES:]
     except requests.RequestException as exc:
         raise OntologyDownloadError(f"Failed to fetch checksum from {secure_url}: {exc}") from exc
     raise OntologyDownloadError(f"Unable to parse checksum from {secure_url}")
@@ -191,12 +189,16 @@ def resolve_expected_checksum(
     plan_checksum: Optional[Tuple[str, str]] = None
     if getattr(plan, "checksum", None):
         algorithm = getattr(plan, "checksum_algorithm", None) or "sha256"
-        plan_checksum = _normalize_checksum(algorithm, plan.checksum, context=context, error_cls=error_cls)
+        plan_checksum = _normalize_checksum(
+            algorithm, plan.checksum, context=context, error_cls=error_cls
+        )
 
     spec_checksum = (None, None)
     extras = getattr(spec, "extras", {})
     if isinstance(extras, Mapping):
-        spec_checksum = parse_checksum_extra(extras.get("checksum"), context=context, error_cls=error_cls)
+        spec_checksum = parse_checksum_extra(
+            extras.get("checksum"), context=context, error_cls=error_cls
+        )
     if (
         spec_checksum[1] is not None
         and plan_checksum is not None

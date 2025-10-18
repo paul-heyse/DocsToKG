@@ -4,7 +4,7 @@
 #   "purpose": "Crossref resolver implementation",
 #   "sections": [
 #     {
-#       "id": "crossref-resolver",
+#       "id": "crossrefresolver",
 #       "name": "CrossrefResolver",
 #       "anchor": "class-crossrefresolver",
 #       "kind": "class"
@@ -17,10 +17,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple
+from urllib.parse import quote
 
 import requests as _requests
-
-from urllib.parse import quote
 
 from DocsToKG.ContentDownload.core import normalize_doi, normalize_url
 
@@ -38,6 +37,15 @@ class CrossrefResolver(ApiResolverBase):
     api_display_name = "Crossref"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the work exposes a DOI Crossref can query.
+
+        Args:
+            config: Resolver configuration (unused, required for signature).
+            artifact: Work record under consideration.
+
+        Returns:
+            bool: Whether the resolver should attempt this work.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -46,6 +54,16 @@ class CrossrefResolver(ApiResolverBase):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield PDF URLs referenced by Crossref metadata for ``artifact``.
+
+        Args:
+            session: Requests session for outbound HTTP calls.
+            config: Resolver configuration controlling behaviour.
+            artifact: Work record containing DOI and other metadata.
+
+        Yields:
+            ResolverResult: Candidate download URLs or skip events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(
@@ -77,11 +95,7 @@ class CrossrefResolver(ApiResolverBase):
             if not isinstance(entry, dict):
                 continue
             url = entry.get("URL") or entry.get("url")
-            content_type = (
-                entry.get("content-type")
-                or entry.get("content_type")
-                or ""
-            ).lower()
+            content_type = (entry.get("content-type") or entry.get("content_type") or "").lower()
             if not url or "application/pdf" not in content_type:
                 continue
             pdf_candidates.append((url, entry))
@@ -91,11 +105,7 @@ class CrossrefResolver(ApiResolverBase):
 
         def _score(candidate: Tuple[str, Dict[str, Any]]) -> int:
             _, meta = candidate
-            version = (
-                meta.get("content-version")
-                or meta.get("content_version")
-                or ""
-            ).lower()
+            version = (meta.get("content-version") or meta.get("content_version") or "").lower()
             return 1 if version == "vor" else 0
 
         pdf_candidates.sort(key=_score, reverse=True)
@@ -110,9 +120,7 @@ class CrossrefResolver(ApiResolverBase):
                 url=normalized,
                 metadata={
                     "source": "crossref",
-                    "content-version": meta.get("content-version")
-                    or meta.get("content_version"),
-                    "content_type": meta.get("content-type")
-                    or meta.get("content_type"),
+                    "content-version": meta.get("content-version") or meta.get("content_version"),
+                    "content_type": meta.get("content-type") or meta.get("content_type"),
                 },
             )

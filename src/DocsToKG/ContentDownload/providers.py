@@ -88,7 +88,9 @@ class OpenAlexWorkProvider:
             yield from iter(self._works_iterable)
             return
         if self._query is None:
-            raise RuntimeError("OpenAlexWorkProvider requires a query when no iterable is supplied.")
+            raise RuntimeError(
+                "OpenAlexWorkProvider requires a query when no iterable is supplied."
+            )
         yield from self._iterate_openalex()
 
 

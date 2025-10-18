@@ -852,7 +852,9 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
     metrics = resolvers.ResolverMetrics()
 
     class _StubPipeline:
-        def run(self, session, artifact, context=None, session_factory=None):  # pragma: no cover - interface shim
+        def run(
+            self, session, artifact, context=None, session_factory=None
+        ):  # pragma: no cover - interface shim
             return resolvers.PipelineResult(
                 success=True,
                 resolver_name="stub",
@@ -903,7 +905,9 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
 
 
 class _NoopPipeline:
-    def run(self, session, artifact, context=None, session_factory=None):  # pragma: no cover - should not run
+    def run(
+        self, session, artifact, context=None, session_factory=None
+    ):  # pragma: no cover - should not run
         raise AssertionError("Pipeline should not execute when resume skips work")
 
 
@@ -1182,7 +1186,14 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
 
     class RecordingPipeline:
         def __init__(
-            self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **kwargs
+            self,
+            *,
+            resolvers=None,
+            config=None,
+            download_func=None,
+            logger=None,
+            metrics=None,
+            **kwargs,
         ):
             self.config = config
             self.logger = logger
@@ -1426,7 +1437,14 @@ def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, 
 
     class RecordingPipeline:
         def __init__(
-            self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **kwargs
+            self,
+            *,
+            resolvers=None,
+            config=None,
+            download_func=None,
+            logger=None,
+            metrics=None,
+            **kwargs,
         ):
             self.resolvers = resolvers or []
             self.logger = logger

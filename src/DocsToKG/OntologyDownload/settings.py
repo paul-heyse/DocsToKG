@@ -10,6 +10,7 @@ import re
 import shutil
 import stat
 import sys
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -456,6 +457,33 @@ class ResolvedConfig(BaseModel):
         "validate_assignment": True,
         "arbitrary_types_allowed": True,
     }
+
+
+_DEFAULT_CONFIG_LOCK = threading.RLock()
+_DEFAULT_CONFIG_CACHE: Optional[ResolvedConfig] = None
+
+
+def get_default_config(*, copy: bool = False) -> ResolvedConfig:
+    """Return a memoised :class:`ResolvedConfig` constructed from defaults."""
+
+    global _DEFAULT_CONFIG_CACHE  # noqa: PLW0603
+
+    with _DEFAULT_CONFIG_LOCK:
+        if _DEFAULT_CONFIG_CACHE is None:
+            _DEFAULT_CONFIG_CACHE = ResolvedConfig.from_defaults()
+        cached = _DEFAULT_CONFIG_CACHE
+    if copy:
+        return cached.model_copy(deep=True)
+    return cached
+
+
+def invalidate_default_config_cache() -> None:
+    """Invalidate the cached default configuration."""
+
+    global _DEFAULT_CONFIG_CACHE  # noqa: PLW0603
+
+    with _DEFAULT_CONFIG_LOCK:
+        _DEFAULT_CONFIG_CACHE = None
 
 
 class EnvironmentOverrides(BaseSettings):

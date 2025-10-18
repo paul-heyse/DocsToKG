@@ -4,23 +4,31 @@ from typing import Any, Dict, Optional
 
 import pytest
 
-requests = pytest.importorskip("requests")
+try:
+    import requests
+except ModuleNotFoundError:
+    pytest.skip("requests is required for these tests", allow_module_level=True)
+
+try:
+    from bs4 import BeautifulSoup  # type: ignore
+except ModuleNotFoundError:
+    pytest.skip("bs4 is required for these tests", allow_module_level=True)
 
 from DocsToKG.ContentDownload.core import Classification, WorkArtifact
-from DocsToKG.ContentDownload.pipeline import (  # noqa: E402
+from DocsToKG.ContentDownload.pipeline import (
     ResolverConfig,
+    ResolverEvent,
+    ResolverEventReason,
     ResolverMetrics,
     ResolverPipeline,
     ResolverResult,
-    ResolverEvent,
-    ResolverEventReason,
 )
-from DocsToKG.ContentDownload.resolvers import (  # noqa: E402
+from DocsToKG.ContentDownload.resolvers import (
     find_pdf_via_anchor,
     find_pdf_via_link,
     find_pdf_via_meta,
 )
-from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
+from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
     JsonlSink,
     ManifestEntry,
@@ -28,9 +36,6 @@ from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
     load_manifest_url_index,
     load_previous_manifest,
 )
-
-bs4 = pytest.importorskip("bs4")
-from bs4 import BeautifulSoup  # type: ignore  # noqa: E402
 
 
 class _CaptureLogger:
@@ -106,7 +111,9 @@ def test_manifest_entry_roundtrip_matches_golden(tmp_path: Path) -> None:
     sqlite_sink.log_manifest(entry)
     sqlite_sink.close()
 
-    lines = [line.strip() for line in jsonl_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    lines = [
+        line.strip() for line in jsonl_path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
     assert len(lines) == 1
     jsonl_record = json.loads(lines[0])
     per_work, completed = load_previous_manifest(jsonl_path)

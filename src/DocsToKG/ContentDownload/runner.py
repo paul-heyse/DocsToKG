@@ -1,3 +1,5 @@
+"""Execution harness for DocsToKG content download runs."""
+
 from __future__ import annotations
 
 import contextlib
@@ -12,6 +14,7 @@ import requests
 from pyalex import Works
 
 from DocsToKG.ContentDownload.args import ResolvedConfig
+from DocsToKG.ContentDownload.core import WorkArtifact, atomic_write_text
 from DocsToKG.ContentDownload.download import (
     DownloadOptions,
     RobotsCache,
@@ -33,11 +36,10 @@ from DocsToKG.ContentDownload.telemetry import (
     MultiSink,
     RotatingJsonlSink,
     RunTelemetry,
-    SummarySink,
     SqliteSink,
+    SummarySink,
     load_previous_manifest,
 )
-from DocsToKG.ContentDownload.core import WorkArtifact, atomic_write_text
 
 __all__ = ["DownloadRun", "iterate_openalex", "run"]
 

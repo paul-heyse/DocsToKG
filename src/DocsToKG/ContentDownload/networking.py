@@ -4,6 +4,18 @@
 #   "purpose": "HTTP session, retry, and conditional request helpers",
 #   "sections": [
 #     {
+#       "id": "threadlocalsessionfactory",
+#       "name": "ThreadLocalSessionFactory",
+#       "anchor": "class-threadlocalsessionfactory",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-thread-session",
+#       "name": "get_thread_session",
+#       "anchor": "function-get-thread-session",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "create-session",
 #       "name": "create_session",
 #       "anchor": "function-create-session",

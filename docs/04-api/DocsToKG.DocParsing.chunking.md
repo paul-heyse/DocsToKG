@@ -46,6 +46,23 @@ Return the serializer provider class referenced by ``spec``.
 
 Validate chunk JSONL rows across supplied files.
 
+Returns a dictionary summarising file, row, and quarantine counts. Detailed
+log events for individual errors are emitted within the function; callers
+are responsible for logging the aggregate summary so they can attach
+run-specific context.
+
+### `_chunk_log_context(chunk)`
+
+Return structured logging context for ``chunk``.
+
+### `_log_chunk_metadata_issue(level, message)`
+
+Emit a structured log record describing chunk metadata issues.
+
+### `_collect_doc_items(chunk)`
+
+Return DocTags items associated with ``chunk``.
+
 ### `read_utf8(p)`
 
 Load text from disk using UTF-8 with replacement for invalid bytes.
@@ -70,15 +87,6 @@ Loaded DoclingDocument ready for chunking.
 ### `extract_refs_and_pages(chunk)`
 
 Collect self-references and page numbers associated with a chunk.
-
-Args:
-chunk: Chunk object produced by the hybrid chunker.
-
-Returns:
-Tuple containing a list of reference identifiers and sorted page numbers.
-
-Raises:
-None
 
 ### `summarize_image_metadata(chunk, text)`
 
@@ -229,6 +237,10 @@ idx: Index of the chunk under evaluation.
 
 Returns:
 True if the chunk length is less than `min_tokens`, else False.
+
+### `merge_without_recount(left, right)`
+
+Merge two chunk records without recomputing token counts.
 
 ### `handle_result(result)`
 

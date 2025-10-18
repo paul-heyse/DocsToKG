@@ -1,4 +1,3 @@
-
 import pytest
 
 from DocsToKG.ContentDownload.networking import CircuitBreaker

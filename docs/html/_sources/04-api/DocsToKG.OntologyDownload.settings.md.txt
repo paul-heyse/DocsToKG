@@ -8,7 +8,7 @@ Configuration, optional dependency, and storage utilities for ontology downloads
 
 ## 2. Functions
 
-### `ensure_python_version()`
+### `ensure_python_version(min_major, min_minor)`
 
 Ensure the interpreter meets the minimum supported Python version.
 
@@ -19,6 +19,14 @@ Ensure the interpreter meets the minimum supported Python version.
 ### `parse_rate_limit_to_rps(limit_str)`
 
 Convert a rate limit expression into requests-per-second.
+
+### `get_default_config()`
+
+Return a memoised :class:`ResolvedConfig` constructed from defaults.
+
+### `invalidate_default_config_cache()`
+
+Invalidate the cached default configuration.
 
 ### `get_env_overrides()`
 

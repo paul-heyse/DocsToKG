@@ -110,6 +110,10 @@ python -m DocsToKG.DocParsing.embedding –resume</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_shutdown_llm_instance(llm)</span></code><a class="headerlink" href="#shutdown-llm-instance-llm" title="Link to this heading"></a></h3>
 <p>Best-effort shutdown for a cached Qwen LLM instance.</p>
 </section>
+<section id="flush-llm-cache">
+<h3><code class="docutils literal notranslate"><span class="pre">flush_llm_cache()</span></code><a class="headerlink" href="#flush-llm-cache" title="Link to this heading"></a></h3>
+<p>Explicitly clear the cached Qwen LLM instances.</p>
+</section>
 <section id="close-all-qwen">
 <h3><code class="docutils literal notranslate"><span class="pre">close_all_qwen()</span></code><a class="headerlink" href="#close-all-qwen" title="Link to this heading"></a></h3>
 <p>Release all cached Qwen LLM instances.</p>
@@ -175,17 +179,6 @@ rows: Chunk dictionaries to normalise. Each row may include <code class="docutil
 <section id="legacy-chunk-uuid-doc-id-source-chunk-idxs-text-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_legacy_chunk_uuid(doc_id,</span> <span class="pre">source_chunk_idxs,</span> <span class="pre">text_value)</span></code><a class="headerlink" href="#legacy-chunk-uuid-doc-id-source-chunk-idxs-text-value" title="Link to this heading"></a></h3>
 <p>Derive the historical UUID used before deterministic start offsets.</p>
-</section>
-<section id="ensure-chunk-schema-rows-source">
-<h3><code class="docutils literal notranslate"><span class="pre">ensure_chunk_schema(rows,</span> <span class="pre">source)</span></code><a class="headerlink" href="#ensure-chunk-schema-rows-source" title="Link to this heading"></a></h3>
-<p>Assert that chunk rows declare a compatible schema version.</p>
-<p>Args:
-rows: Iterable of chunk dictionaries to validate.
-source: Path to the originating chunk file, used for error context.</p>
-<p>Returns:
-None</p>
-<p>Raises:
-ValueError: Propagated when an incompatible schema version is detected.</p>
 </section>
 <section id="tokens-text">
 <h3><code class="docutils literal notranslate"><span class="pre">tokens(text)</span></code><a class="headerlink" href="#tokens-text" title="Link to this heading"></a></h3>
@@ -288,6 +281,10 @@ enabled.</p>
 <p>Yields:
 Lists of row dictionaries containing at most <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> entries.</p>
 </section>
+<section id="validate-chunk-file-schema-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_chunk_file_schema(path)</span></code><a class="headerlink" href="#validate-chunk-file-schema-path" title="Link to this heading"></a></h3>
+<p>Stream chunk file rows and assert schema compatibility.</p>
+</section>
 <section id="iter-chunk-files-directory">
 <h3><code class="docutils literal notranslate"><span class="pre">iter_chunk_files(directory)</span></code><a class="headerlink" href="#iter-chunk-files-directory" title="Link to this heading"></a></h3>
 <p>Deprecated shim that forwards to :func:<code class="docutils literal notranslate"><span class="pre">iter_chunks</span></code>.</p>
@@ -377,6 +374,34 @@ int: Exit code where <code class="docutils literal notranslate"><span class="pre
 <p>Raises:
 ValueError: If invalid runtime parameters (such as batch sizes) are supplied.</p>
 </section>
+<section id="get-self-key">
+<h3><code class="docutils literal notranslate"><span class="pre">get(self,</span> <span class="pre">key)</span></code><a class="headerlink" href="#get-self-key" title="Link to this heading"></a></h3>
+<p>Return the cached value for <code class="docutils literal notranslate"><span class="pre">key</span></code> or <code class="docutils literal notranslate"><span class="pre">None</span></code> when absent.</p>
+</section>
+<section id="put-self-key-value">
+<h3><code class="docutils literal notranslate"><span class="pre">put(self,</span> <span class="pre">key,</span> <span class="pre">value)</span></code><a class="headerlink" href="#put-self-key-value" title="Link to this heading"></a></h3>
+<p>Insert <code class="docutils literal notranslate"><span class="pre">value</span></code> for <code class="docutils literal notranslate"><span class="pre">key</span></code> and evict least-recently-used entries.</p>
+</section>
+<section id="clear-self">
+<h3><code class="docutils literal notranslate"><span class="pre">clear(self)</span></code><a class="headerlink" href="#clear-self" title="Link to this heading"></a></h3>
+<p>Discard all cached values, invoking the closer for each.</p>
+</section>
+<section id="items-self">
+<h3><code class="docutils literal notranslate"><span class="pre">items(self)</span></code><a class="headerlink" href="#items-self" title="Link to this heading"></a></h3>
+<p>Return a snapshot of <code class="docutils literal notranslate"><span class="pre">(key,</span> <span class="pre">value)</span></code> pairs ordered by recency.</p>
+</section>
+<section id="values-self">
+<h3><code class="docutils literal notranslate"><span class="pre">values(self)</span></code><a class="headerlink" href="#values-self" title="Link to this heading"></a></h3>
+<p>Return cached values ordered from least to most recently used.</p>
+</section>
+<section id="evict-if-needed-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_evict_if_needed(self)</span></code><a class="headerlink" href="#evict-if-needed-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="close-self-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_close(self,</span> <span class="pre">value)</span></code><a class="headerlink" href="#close-self-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="from-env-cls-defaults">
 <h3><code class="docutils literal notranslate"><span class="pre">from_env(cls,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#from-env-cls-defaults" title="Link to this heading"></a></h3>
 <p>Construct configuration from environment variables.</p>
@@ -453,9 +478,33 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">write_rows(self,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
 <p>Append <code class="docutils literal notranslate"><span class="pre">rows</span></code> to the active JSONL artifact created by <code class="docutils literal notranslate"><span class="pre">__enter__</span></code>.</p>
 </section>
+<section id="tqdm-iterable">
+<h3><code class="docutils literal notranslate"><span class="pre">tqdm(iterable)</span></code><a class="headerlink" href="#tqdm-iterable" title="Link to this heading"></a></h3>
+<p>Fallback tqdm implementation returning a lightweight iterator.</p>
+</section>
 <section id="process-entry-entry">
 <h3><code class="docutils literal notranslate"><span class="pre">_process_entry(entry)</span></code><a class="headerlink" href="#process-entry-entry" title="Link to this heading"></a></h3>
 <p>Encode vectors for a chunk file and report per-file metrics.</p>
+</section>
+<section id="iter-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__iter__(self)</span></code><a class="headerlink" href="#iter-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="update-self">
+<h3><code class="docutils literal notranslate"><span class="pre">update(self)</span></code><a class="headerlink" href="#update-self" title="Link to this heading"></a></h3>
+<p>Mirror tqdm’s update interface without tracking state.</p>
+</section>
+<section id="close-self">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#close-self" title="Link to this heading"></a></h3>
+<p>Provide a noop close hook for compatibility.</p>
+</section>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="exit-self-exc-type-exc-value-traceback">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc_value,</span> <span class="pre">traceback)</span></code><a class="headerlink" href="#exit-self-exc-type-exc-value-traceback" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="embed-batch-batch-texts">
 <h3><code class="docutils literal notranslate"><span class="pre">_embed_batch(batch_texts)</span></code><a class="headerlink" href="#embed-batch-batch-texts" title="Link to this heading"></a></h3>
@@ -464,6 +513,10 @@ None</p>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="lrucache">
+<h3><code class="docutils literal notranslate"><span class="pre">_LRUCache</span></code><a class="headerlink" href="#lrucache" title="Link to this heading"></a></h3>
+<p>Simple LRU cache that automatically closes evicted entries.</p>
+</section>
 <section id="embedcfg">
 <h3><code class="docutils literal notranslate"><span class="pre">EmbedCfg</span></code><a class="headerlink" href="#embedcfg" title="Link to this heading"></a></h3>
 <p>Stage configuration container for the embedding pipeline.</p>
@@ -520,6 +573,10 @@ validator.total_chunks
 <section id="jsonlvectorwriter">
 <h3><code class="docutils literal notranslate"><span class="pre">JsonlVectorWriter</span></code><a class="headerlink" href="#jsonlvectorwriter" title="Link to this heading"></a></h3>
 <p>Context manager that writes vector rows to JSONL atomically.</p>
+</section>
+<section id="tqdmfallback">
+<h3><code class="docutils literal notranslate"><span class="pre">_TqdmFallback</span></code><a class="headerlink" href="#tqdmfallback" title="Link to this heading"></a></h3>
+<p>Lightweight iterator wrapper used when tqdm is unavailable.</p>
 </section>
 </section>
 </section>

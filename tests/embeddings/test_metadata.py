@@ -123,7 +123,6 @@ from typing import Any, Dict, List
 import pytest
 
 from DocsToKG.DocParsing.io import iter_jsonl
-
 from tests._stubs import dependency_stubs
 
 # --- Helper Functions ---
@@ -620,7 +619,6 @@ def test_summary_manifest_includes_splade_backend_metadata(
     assert summary["sparsity_warn_threshold_pct"] == pytest.approx(1.0)
 
 
-
 def test_model_dirs_follow_environment_defaults(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -686,6 +684,7 @@ def test_cli_model_dirs_override_environment(
     cfg = embed_module.EmbedCfg.from_args(args)
     assert cfg.splade_model_dir == cli_splade.resolve()
     assert cfg.qwen_model_dir == cli_qwen.resolve()
+
 
 def test_offline_requires_local_models(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Offline mode should fail fast when local models are absent."""

@@ -1,11 +1,19 @@
+"""Command-line argument parsing for DocsToKG content downloads.
+
+Provides helpers that transform CLI inputs into structured configuration
+objects used by the downloader. The utilities here manage resolver bootstrap,
+run directory preparation, and OpenAlex query assembly without triggering any
+network activity at import time.
+"""
+
 from __future__ import annotations
 
 import argparse
 import logging
 import uuid
 from dataclasses import dataclass
-from functools import lru_cache
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -21,7 +29,7 @@ from DocsToKG.ContentDownload.core import (
 )
 from DocsToKG.ContentDownload.download import RobotsCache, ensure_dir
 from DocsToKG.ContentDownload.pipeline import load_resolver_config
-from DocsToKG.ContentDownload.resolvers import default_resolvers
+from DocsToKG.ContentDownload.resolvers import DEFAULT_RESOLVER_ORDER, default_resolvers
 from DocsToKG.ContentDownload.telemetry import load_manifest_url_index
 
 __all__ = [
@@ -451,7 +459,7 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
                 "wayback",
             ]
         else:
-            preset = list(getattr(resolvers, "DEFAULT_RESOLVER_ORDER", resolver_names))
+            preset = list(DEFAULT_RESOLVER_ORDER)
         resolver_order_override = _normalise_order(preset)
 
     try:

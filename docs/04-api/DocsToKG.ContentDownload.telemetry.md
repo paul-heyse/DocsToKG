@@ -107,6 +107,57 @@ Enter the runtime context for the sink.
 
 Exit the runtime context for the sink.
 
+### `log_attempt(self, record)`
+
+Proxy attempt logging to the underlying sink.
+
+Args:
+record: Resolver attempt payload to record.
+timestamp: Optional ISO-8601 timestamp overriding ``datetime.utcnow``.
+
+### `log_manifest(self, entry)`
+
+Forward manifest entries to the configured sink.
+
+### `log_summary(self, summary)`
+
+Publish the final run summary to downstream sinks.
+
+### `close(self)`
+
+Release sink resources and flush buffered telemetry.
+
+### `record_manifest(self, artifact)`
+
+Construct and emit a manifest entry for ``artifact``.
+
+Args:
+artifact: Work artifact being recorded.
+resolver: Name of the resolver that produced the outcome.
+url: Final URL that yielded the content.
+outcome: Download outcome describing classification and metadata.
+html_paths: HTML artefacts captured alongside the document.
+dry_run: Whether the pipeline ran in dry-run mode.
+run_id: Unique identifier for this pipeline execution.
+reason: Optional diagnostic reason code.
+reason_detail: Optional human-readable reason detail.
+
+Returns:
+ManifestEntry: Structured manifest entry persisted via the sink.
+
+### `record_pipeline_result(self, artifact, result)`
+
+Record pipeline output, normalising reason metadata on the way out.
+
+Args:
+artifact: Work artifact that was processed.
+result: Pipeline result encapsulating resolver outcome details.
+dry_run: Whether side effects were suppressed.
+run_id: Unique identifier for the current pipeline execution.
+
+Returns:
+ManifestEntry: Manifest record produced for downstream sinks.
+
 ### `_write(self, payload)`
 
 *No documentation available.*
@@ -430,6 +481,10 @@ Examples:
 ...         pass
 >>> isinstance(InMemorySink(), AttemptSink)
 True
+
+### `RunTelemetry`
+
+Telemetry coordinator that centralises manifest aggregation and delegation.
 
 ### `JsonlSink`
 

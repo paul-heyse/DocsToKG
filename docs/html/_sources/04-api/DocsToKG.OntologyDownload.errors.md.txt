@@ -12,6 +12,10 @@ Shared exception hierarchy for DocsToKG ontology downloads.
 
 Base exception for ontology planning, download, or validation failures.
 
+### `UnsupportedPythonError`
+
+Raised when the active interpreter is older than the supported minimum.
+
 ### `ConfigurationError`
 
 Raised when configuration inputs or manifests are invalid.

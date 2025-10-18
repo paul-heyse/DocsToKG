@@ -135,6 +135,15 @@ from docling_core.types.doc.document import (
 from docling_core.types.doc.document import DoclingDocument as _Doc
 from typing_extensions import override
 
+from DocsToKG.DocParsing.schemas import (
+    CHUNK_SCHEMA_VERSION,
+    COMPATIBLE_CHUNK_VERSIONS,
+    COMPATIBLE_VECTOR_VERSIONS,
+    VECTOR_SCHEMA_VERSION,
+    SchemaKind,
+    validate_schema_version,
+)
+
 # --- Globals ---
 
 PYDANTIC_AVAILABLE = True
@@ -296,14 +305,10 @@ def _missing_pydantic_message() -> str:
     )
 
 
-from DocsToKG.DocParsing.schemas import (
-    CHUNK_SCHEMA_VERSION,
-    COMPATIBLE_CHUNK_VERSIONS,
-    COMPATIBLE_VECTOR_VERSIONS,
-    VECTOR_SCHEMA_VERSION,
-    SchemaKind,
-    validate_schema_version,
-)
+# isort: off
+
+
+# isort: on
 
 # --- Globals ---
 

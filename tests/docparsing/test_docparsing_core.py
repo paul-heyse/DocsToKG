@@ -291,6 +291,7 @@ import argparse
 import contextlib
 import importlib
 import json
+import logging
 import socket
 import sys
 import uuid
@@ -416,8 +417,8 @@ class _DummyTqdm:
         return iter(self._iterable)
 
 
-import DocsToKG.DocParsing.config as doc_config  # noqa: E402
 import DocsToKG.DocParsing.chunking as doc_chunking  # noqa: E402
+import DocsToKG.DocParsing.config as doc_config  # noqa: E402
 import DocsToKG.DocParsing.env as doc_env  # noqa: E402
 import DocsToKG.DocParsing.io as doc_io  # noqa: E402
 import DocsToKG.DocParsing.logging as doc_logging  # noqa: E402
@@ -597,7 +598,7 @@ def test_jsonl_append_iter_non_atomic(tmp_path: Path) -> None:
     assert [row["value"] for row in records] == ["initial", "later"]
 
 
-def test_extract_refs_and_pages_handles_invalid_metadata(capsys) -> None:
+def test_extract_refs_and_pages_handles_invalid_metadata() -> None:
     chunk = SimpleNamespace(
         meta=SimpleNamespace(
             document_id="doc-1",
@@ -613,13 +614,28 @@ def test_extract_refs_and_pages_handles_invalid_metadata(capsys) -> None:
         )
     )
 
-    capsys.readouterr()
-    refs, pages = doc_chunking.extract_refs_and_pages(chunk)
-    stderr = capsys.readouterr().err
+    class _Capture(logging.Handler):
+        def __init__(self) -> None:
+            super().__init__()
+            self.records: list[logging.LogRecord] = []
+
+        def emit(self, record: logging.LogRecord) -> None:
+            self.records.append(record)
+
+    handler = _Capture()
+    logger = doc_chunking._LOGGER.logger
+    logger.addHandler(handler)
+    try:
+        refs, pages = doc_chunking.extract_refs_and_pages(chunk)
+    finally:
+        logger.removeHandler(handler)
 
     assert refs == ["ref-1"]
     assert pages == [2]
-    assert '"error_code": "CHUNK_PAGE_INVALID"' in stderr
+    error_codes = {
+        getattr(record, "extra_fields", {}).get("error_code") for record in handler.records
+    }
+    assert "CHUNK_PAGE_INVALID" in error_codes
 
 
 def test_extract_refs_and_pages_surfaces_doc_items_failures() -> None:
@@ -636,7 +652,7 @@ def test_extract_refs_and_pages_surfaces_doc_items_failures() -> None:
         doc_chunking.extract_refs_and_pages(chunk)
 
 
-def test_summarize_image_metadata_logs_non_iterable_sources(capsys) -> None:
+def test_summarize_image_metadata_logs_non_iterable_sources() -> None:
     non_iterable_annotations = object()
     predicted_holder = SimpleNamespace(predicted_classes=object())
     doc_items = [
@@ -663,22 +679,39 @@ def test_summarize_image_metadata_logs_non_iterable_sources(capsys) -> None:
     ]
     chunk = SimpleNamespace(meta=SimpleNamespace(document_id="doc-annot", doc_items=doc_items))
 
-    capsys.readouterr()
-    has_caption, has_classification, num_images, confidence, metadata = doc_chunking.summarize_image_metadata(
-        chunk, "Figure caption: sample text"
-    )
-    stderr = capsys.readouterr().err
+    class _Capture(logging.Handler):
+        def __init__(self) -> None:
+            super().__init__()
+            self.records: list[logging.LogRecord] = []
+
+        def emit(self, record: logging.LogRecord) -> None:
+            self.records.append(record)
+
+    handler = _Capture()
+    logger = doc_chunking._LOGGER.logger
+    logger.addHandler(handler)
+    try:
+        has_caption, has_classification, num_images, confidence, metadata = (
+            doc_chunking.summarize_image_metadata(chunk, "Figure caption: sample text")
+        )
+    finally:
+        logger.removeHandler(handler)
 
     assert has_caption is True
     assert has_classification is False
     assert num_images == 1
     assert confidence == 0.7
     assert metadata == []
-    assert '"error_code": "CHUNK_ANNOTATIONS_NON_ITERABLE"' in stderr
-    assert '"error_code": "CHUNK_PREDICTED_CLASSES_NON_ITERABLE"' in stderr
+    error_codes = {
+        getattr(record, "extra_fields", {}).get("error_code") for record in handler.records
+    }
+    assert "CHUNK_ANNOTATIONS_NON_ITERABLE" in error_codes
+    assert "CHUNK_PREDICTED_CLASSES_NON_ITERABLE" in error_codes
 
 
-def test_telemetry_sink_uses_lock_and_jsonl_append(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_telemetry_sink_uses_lock_and_jsonl_append(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     attempts_path = tmp_path / "telemetry" / "attempts.jsonl"
     manifest_path = tmp_path / "telemetry" / "manifest.jsonl"
 
@@ -720,12 +753,10 @@ def test_telemetry_sink_uses_lock_and_jsonl_append(tmp_path: Path, monkeypatch: 
     )
 
     attempts_records = [
-        json.loads(line)
-        for line in attempts_path.read_text(encoding="utf-8").splitlines()
+        json.loads(line) for line in attempts_path.read_text(encoding="utf-8").splitlines()
     ]
     manifest_records = [
-        json.loads(line)
-        for line in manifest_path.read_text(encoding="utf-8").splitlines()
+        json.loads(line) for line in manifest_path.read_text(encoding="utf-8").splitlines()
     ]
 
     assert attempts_records == [
@@ -1339,7 +1370,7 @@ def test_pdf_pipeline_mirrors_output_paths(tmp_path: Path, monkeypatch: pytest.M
     monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
 
     monkeypatch.setattr(pipelines, "ensure_vllm", lambda *args, **kwargs: (8000, None, False))
-    monkeypatch.setattr(pipelines, "probe_metrics", lambda port: (True, 200))
+    monkeypatch.setattr(pipelines, "probe_metrics", lambda *args, **kwargs: (True, 200))
     monkeypatch.setattr(pipelines, "detect_vllm_version", lambda: "test")
 
     class ImmediateExecutor:
@@ -1421,7 +1452,9 @@ def test_pdf_pipeline_mirrors_output_paths(tmp_path: Path, monkeypatch: pytest.M
     manifest_path = data_root / "Manifests" / "docparse.doctags-pdf.manifest.jsonl"
     assert manifest_path.exists()
     records = [json.loads(line) for line in manifest_path.read_text(encoding="utf-8").splitlines()]
-    doc_ids = {rec["doc_id"] for rec in records if rec.get("doc_id") != "__service__"}
+    doc_ids = {
+        rec["doc_id"] for rec in records if rec.get("doc_id") not in {"__service__", "__config__"}
+    }
     assert doc_ids == {"teamA/report.pdf", "teamB/report.pdf"}
 
     args.resume = True
@@ -1445,7 +1478,9 @@ def test_pdf_pipeline_mirrors_output_paths(tmp_path: Path, monkeypatch: pytest.M
 
     records = [json.loads(line) for line in manifest_path.read_text(encoding="utf-8").splitlines()]
     skip_entries = [rec for rec in records if rec.get("status") == "skip"]
-    assert {rec["doc_id"] for rec in skip_entries if rec["doc_id"] != "__service__"} == {
+    assert {
+        rec["doc_id"] for rec in skip_entries if rec["doc_id"] not in {"__service__", "__config__"}
+    } == {
         "teamA/report.pdf",
         "teamB/report.pdf",
     }

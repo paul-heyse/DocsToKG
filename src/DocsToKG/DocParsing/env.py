@@ -14,7 +14,6 @@ import os
 from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple
 
-
 PDF_MODEL_SUBDIR = Path("granite-docling-258M")
 
 SPLADE_DEPENDENCY_MESSAGE = (
@@ -231,6 +230,7 @@ def _ensure_dir(path: Path) -> Path:
 
     path.mkdir(parents=True, exist_ok=True)
     return path.resolve()
+
 
 def _resolve_data_path(root: Optional[Path], name: str) -> Path:
     """Resolve ``name`` relative to the DocsToKG data root without creating it."""

@@ -10,7 +10,7 @@ Schema constants and validation helpers shared across DocParsing stages.
 
 ### `_coerce_kind(kind)`
 
-*No documentation available.*
+Normalise raw schema identifiers to ``SchemaKind`` enums.
 
 ### `get_default_schema_version(kind)`
 
@@ -23,6 +23,14 @@ Return the tuple of compatible versions for ``kind``.
 ### `validate_schema_version(version, kind)`
 
 Validate that ``version`` is compatible for ``kind``.
+
+### `ensure_chunk_schema(rec)`
+
+Ensure ``rec`` declares a compatible chunk schema version.
+
+When ``schema_version`` is missing it is populated with ``default_version``
+(or :data:`CHUNK_SCHEMA_VERSION` when unspecified). When present it is
+validated against the chunk compatibility set.
 
 ### `validate_vector_row(row)`
 

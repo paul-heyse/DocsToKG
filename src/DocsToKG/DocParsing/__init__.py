@@ -16,9 +16,9 @@ from . import core as _core
 from . import doctags as _doctags
 from . import embedding as _embedding
 from . import formats as _formats
-from . import token_profiles as _token_profiles
 from . import io as _io
 from . import logging as _logging
+from . import token_profiles as _token_profiles
 
 __all__ = [
     "core",

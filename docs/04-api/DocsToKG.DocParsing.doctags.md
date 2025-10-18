@@ -71,20 +71,6 @@ Examples:
 >>> sorted(action.dest for action in parser._actions if action.option_strings)
 ['force', 'help', 'resume']
 
-### `_dedupe_preserve_order(names)`
-
-Return a list containing ``names`` without duplicates while preserving order.
-
-Args:
-names: Iterable of candidate names that may include duplicates or empty values.
-
-Returns:
-List of unique names in their original encounter order.
-
-Examples:
->>> _dedupe_preserve_order(["a", "b", "a", "c"])
-['a', 'b', 'c']
-
 ### `_normalize_served_model_names(raw)`
 
 Flatten CLI-provided served model names into a deduplicated tuple.

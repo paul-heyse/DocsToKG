@@ -1,0 +1,262 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: download &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: download</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.ContentDownload.download.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-download">
+<h1>1. Module: download<a class="headerlink" href="#module-download" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.download</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Download orchestration helpers for the content acquisition pipeline.</p>
+<p>This module coordinates the streaming download workflow, tying together
+resolver outputs, HTTP policy enforcement, and telemetry reporting. It exposes
+utilities that transform resolver candidates into stored artifacts while
+respecting retry budgets, robots.txt directives, and classification rules.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="ensure-dir-path">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_dir(path)</span></code><a class="headerlink" href="#ensure-dir-path" title="Link to this heading"></a></h3>
+<p>Create a directory if it does not already exist.</p>
+<p>Args:
+path: Directory path to create when absent.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+OSError: If the directory cannot be created because of permissions.</p>
+</section>
+<section id="build-download-outcome">
+<h3><code class="docutils literal notranslate"><span class="pre">_build_download_outcome()</span></code><a class="headerlink" href="#build-download-outcome" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="validate-cached-artifact-result">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_cached_artifact(result)</span></code><a class="headerlink" href="#validate-cached-artifact-result" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when cached artefact metadata matches on-disk state.</p>
+</section>
+<section id="apply-content-addressed-storage-dest-path-sha256">
+<h3><code class="docutils literal notranslate"><span class="pre">_apply_content_addressed_storage(dest_path,</span> <span class="pre">sha256)</span></code><a class="headerlink" href="#apply-content-addressed-storage-dest-path-sha256" title="Link to this heading"></a></h3>
+<p>Move <code class="docutils literal notranslate"><span class="pre">dest_path</span></code> into a content-addressed location and create a symlink.</p>
+</section>
+<section id="collect-location-urls-work">
+<h3><code class="docutils literal notranslate"><span class="pre">_collect_location_urls(work)</span></code><a class="headerlink" href="#collect-location-urls-work" title="Link to this heading"></a></h3>
+<p>Return landing/PDF/source URL collections derived from OpenAlex metadata.</p>
+<p>Args:
+work: OpenAlex work payload as returned by the Works API.</p>
+<p>Returns:
+Dictionary containing <code class="docutils literal notranslate"><span class="pre">landing</span></code>, <code class="docutils literal notranslate"><span class="pre">pdf</span></code>, and <code class="docutils literal notranslate"><span class="pre">sources</span></code> URL lists.</p>
+</section>
+<section id="cohort-order-for-artifact">
+<h3><code class="docutils literal notranslate"><span class="pre">_cohort_order_for(artifact)</span></code><a class="headerlink" href="#cohort-order-for-artifact" title="Link to this heading"></a></h3>
+<p>Return a resolver order tailored to the artifact’s identifiers.</p>
+</section>
+<section id="create-artifact-work-pdf-dir-html-dir-xml-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">create_artifact(work,</span> <span class="pre">pdf_dir,</span> <span class="pre">html_dir,</span> <span class="pre">xml_dir)</span></code><a class="headerlink" href="#create-artifact-work-pdf-dir-html-dir-xml-dir" title="Link to this heading"></a></h3>
+<p>Normalize an OpenAlex work into a WorkArtifact instance.</p>
+<p>Args:
+work: Raw OpenAlex work payload.
+pdf_dir: Directory where PDFs should be stored.
+html_dir: Directory where HTML resources should be stored.
+xml_dir: Directory where XML resources should be stored.</p>
+<p>Returns:
+WorkArtifact describing the work and candidate URLs.</p>
+<p>Raises:
+KeyError: If required identifiers are missing from the work payload.</p>
+</section>
+<section id="download-candidate-session-artifact-url-referer-timeout-context-head-precheck-passed">
+<h3><code class="docutils literal notranslate"><span class="pre">download_candidate(session,</span> <span class="pre">artifact,</span> <span class="pre">url,</span> <span class="pre">referer,</span> <span class="pre">timeout,</span> <span class="pre">context,</span> <span class="pre">head_precheck_passed)</span></code><a class="headerlink" href="#download-candidate-session-artifact-url-referer-timeout-context-head-precheck-passed" title="Link to this heading"></a></h3>
+<p>Download a single candidate URL and classify the payload.</p>
+<p>Args:
+session: HTTP session capable of issuing retried requests via the
+centralised :func:<code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> helper.
+artifact: Work metadata and output directory handles for the current record.
+url: Candidate download URL discovered by a resolver.
+referer: Optional referer header override provided by the resolver.
+timeout: Per-request timeout in seconds.
+context: :class:<code class="docutils literal notranslate"><span class="pre">DownloadContext</span></code> (or mapping convertible to it) containing
+<code class="docutils literal notranslate"><span class="pre">dry_run</span></code>, <code class="docutils literal notranslate"><span class="pre">extract_html_text</span></code>, prior manifest lookups, and optional
+<code class="docutils literal notranslate"><span class="pre">progress_callback</span></code>.</p>
+<p>Progress callback signature: <code class="docutils literal notranslate"><span class="pre">callback(bytes_downloaded,</span> <span class="pre">total_bytes,</span> <span class="pre">url)</span></code>
+where <code class="docutils literal notranslate"><span class="pre">total_bytes</span></code> may be <code class="docutils literal notranslate"><span class="pre">None</span></code> if Content-Length is unavailable.</p>
+<p>Returns:
+DownloadOutcome describing the result of the download attempt including
+streaming hash metadata when available.</p>
+<p>Notes:
+A lightweight HEAD preflight is issued when the caller has not already
+validated the URL. This mirrors the resolver pipeline behaviour and
+keeps dry-run tests deterministic.</p>
+<p>Progress callbacks are invoked approximately every 128KB to balance
+responsiveness with performance overhead.</p>
+<p>Raises:
+OSError: If writing the downloaded payload to disk fails.
+TypeError: If conditional response parsing returns unexpected objects.</p>
+</section>
+<section id="process-one-work-work-session-pdf-dir-html-dir-xml-dir-pipeline-logger-metrics">
+<h3><code class="docutils literal notranslate"><span class="pre">process_one_work(work,</span> <span class="pre">session,</span> <span class="pre">pdf_dir,</span> <span class="pre">html_dir,</span> <span class="pre">xml_dir,</span> <span class="pre">pipeline,</span> <span class="pre">logger,</span> <span class="pre">metrics)</span></code><a class="headerlink" href="#process-one-work-work-session-pdf-dir-html-dir-xml-dir-pipeline-logger-metrics" title="Link to this heading"></a></h3>
+<p>Process a single work artifact through the resolver pipeline.</p>
+<p>Args:
+work: Either a preconstructed :class:<code class="docutils literal notranslate"><span class="pre">WorkArtifact</span></code> or a raw OpenAlex
+work payload. Raw payloads are normalised via :func:<code class="docutils literal notranslate"><span class="pre">create_artifact</span></code>.
+session: Requests session configured for resolver usage.
+pdf_dir: Directory where PDF artefacts are written.
+html_dir: Directory where HTML artefacts are written.
+xml_dir: Directory where XML artefacts are written.
+pipeline: Resolver pipeline orchestrating downstream resolvers.
+logger: Structured attempt logger capturing manifest records.
+metrics: Resolver metrics collector.
+options: :class:<code class="docutils literal notranslate"><span class="pre">DownloadOptions</span></code> describing download behaviour for the work.
+session_factory: Optional callable returning a thread-local session for
+resolver execution when concurrency is enabled.</p>
+<p>Returns:
+Dictionary summarizing the outcome (saved/html_only/skipped flags).</p>
+<p>Raises:
+requests.RequestException: Propagated if resolver HTTP requests fail
+unexpectedly outside guarded sections.
+Exception: Bubbling from resolver pipeline internals when not handled.</p>
+</section>
+<section id="is-allowed-self-session-url-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">is_allowed(self,</span> <span class="pre">session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#is-allowed-self-session-url-timeout" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">False</span></code> when robots.txt forbids fetching <code class="docutils literal notranslate"><span class="pre">url</span></code>.</p>
+</section>
+<section id="lookup-parser-self-session-origin-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">_lookup_parser(self,</span> <span class="pre">session,</span> <span class="pre">origin,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#lookup-parser-self-session-origin-timeout" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="fetch-self-session-origin-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">_fetch(self,</span> <span class="pre">session,</span> <span class="pre">origin,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#fetch-self-session-origin-timeout" title="Link to this heading"></a></h3>
+<p>Fetch and parse the robots.txt policy for <code class="docutils literal notranslate"><span class="pre">origin</span></code>.</p>
+</section>
+<section id="append-location-loc">
+<h3><code class="docutils literal notranslate"><span class="pre">_append_location(loc)</span></code><a class="headerlink" href="#append-location-loc" title="Link to this heading"></a></h3>
+<p>Accumulate location URLs from a single OpenAlex location record.</p>
+<p>Args:
+loc: Location dictionary as returned by OpenAlex (may be None).</p>
+</section>
+<section id="stream-chunks">
+<h3><code class="docutils literal notranslate"><span class="pre">_stream_chunks()</span></code><a class="headerlink" href="#stream-chunks" title="Link to this heading"></a></h3>
+<p>Optimized streaming: write prefetched chunks inline to avoid double storage.</p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="downloadoptions">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadOptions</span></code><a class="headerlink" href="#downloadoptions" title="Link to this heading"></a></h3>
+<p>Stable collection of per-run download settings applied to each work item.</p>
+</section>
+<section id="downloadstate">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadState</span></code><a class="headerlink" href="#downloadstate" title="Link to this heading"></a></h3>
+<p>State machine for streaming downloads.</p>
+</section>
+<section id="maxbytesexceeded">
+<h3><code class="docutils literal notranslate"><span class="pre">_MaxBytesExceeded</span></code><a class="headerlink" href="#maxbytesexceeded" title="Link to this heading"></a></h3>
+<p>Internal signal raised when the stream exceeds the configured byte budget.</p>
+</section>
+<section id="robotscache">
+<h3><code class="docutils literal notranslate"><span class="pre">RobotsCache</span></code><a class="headerlink" href="#robotscache" title="Link to this heading"></a></h3>
+<p>Cache robots.txt policies per host and evaluate allowed URLs with TTL.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

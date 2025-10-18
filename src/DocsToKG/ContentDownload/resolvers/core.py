@@ -4,7 +4,7 @@
 #   "purpose": "CORE API resolver implementation",
 #   "sections": [
 #     {
-#       "id": "core-resolver",
+#       "id": "coreresolver",
 #       "name": "CoreResolver",
 #       "anchor": "class-coreresolver",
 #       "kind": "class"
@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Iterable
+from typing import TYPE_CHECKING, Iterable
 
 import requests as _requests
 
@@ -36,6 +36,16 @@ class CoreResolver(ApiResolverBase):
     api_display_name = "CORE"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when a DOI is present and the CORE API is configured.
+
+        Args:
+            config: Resolver configuration containing API credentials.
+            artifact: Work record under consideration.
+
+        Returns:
+            bool: ``True`` if the resolver can operate for this work.
+        """
+
         return bool(config.core_api_key and artifact.doi)
 
     def iter_urls(
@@ -44,6 +54,17 @@ class CoreResolver(ApiResolverBase):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield download URLs discovered via the CORE search API.
+
+        Args:
+            session: Requests session to execute HTTP calls.
+            config: Resolver configuration with credentials and limits.
+            artifact: Work record providing identifiers.
+
+        Yields:
+            ResolverResult: Candidate download URLs or diagnostic events.
+        """
+
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(

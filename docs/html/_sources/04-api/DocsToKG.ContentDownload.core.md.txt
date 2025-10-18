@@ -18,6 +18,10 @@ simplifying imports for both the CLI and resolver pipeline.
 
 Atomically write ``chunks`` to ``path`` and return the byte count.
 
+Performance Note:
+When ``hasher`` is provided, uses an optimized code path that avoids
+conditional checks in the hot loop for better throughput on large files.
+
 ### `atomic_write_bytes(path, chunks)`
 
 Backward-compatible wrapper for :func:`atomic_write`.
@@ -25,6 +29,14 @@ Backward-compatible wrapper for :func:`atomic_write`.
 ### `atomic_write_text(path, text)`
 
 Atomically write ``text`` to ``path`` using :func:`atomic_write`.
+
+### `normalize_classification(value)`
+
+Return a normalized classification token preserving unknown custom codes.
+
+### `normalize_reason(value)`
+
+Return a normalized reason token preserving unknown custom codes.
 
 ### `classify_payload(head_bytes, content_type, url)`
 
@@ -90,6 +102,46 @@ Return a canonicalised version of ``url`` suitable for deduplication.
 
 *No documentation available.*
 
+### `__post_init__(self)`
+
+*No documentation available.*
+
+### `from_mapping(cls, data)`
+
+Construct a context instance from a mapping-based payload.
+
+### `mark_explicit(self)`
+
+Record that the given fields were explicitly provided by the caller.
+
+### `is_explicit(self, field)`
+
+Return ``True`` when ``field`` was explicitly provided by the caller.
+
+### `to_dict(self)`
+
+Serialize the context to a mapping for legacy integrations.
+
+### `clone_for_download(self)`
+
+Return a shallow clone suitable for per-download mutation.
+
+### `_normalize_sequence(value)`
+
+*No documentation available.*
+
+### `_normalize_mapping(value)`
+
+*No documentation available.*
+
+### `_coerce_optional_positive(value)`
+
+*No documentation available.*
+
+### `_coerce_non_negative(value, default)`
+
+*No documentation available.*
+
 ### `from_wire(cls, value)`
 
 Return the enum member when ``value`` matches a known code.
@@ -98,11 +150,19 @@ Return the enum member when ``value`` matches a known code.
 
 Return the matching enum member or ``UNKNOWN``.
 
+### `_pop(name, default)`
+
+*No documentation available.*
+
 ## 3. Classes
 
 ### `WorkArtifact`
 
 Normalized artifact describing an OpenAlex work to process.
+
+### `DownloadContext`
+
+Typed execution context shared by the CLI and resolver pipeline.
 
 ### `Classification`
 

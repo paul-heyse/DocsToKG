@@ -4,7 +4,7 @@
 #   "purpose": "Semantic Scholar resolver implementation",
 #   "sections": [
 #     {
-#       "id": "semantic-scholar-resolver",
+#       "id": "semanticscholarresolver",
 #       "name": "SemanticScholarResolver",
 #       "anchor": "class-semanticscholarresolver",
 #       "kind": "class"
@@ -46,6 +46,15 @@ class SemanticScholarResolver(RegisteredResolver):
     name = "semantic_scholar"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when a DOI is available for Semantic Scholar queries.
+
+        Args:
+            config: Resolver configuration containing API credentials.
+            artifact: Work record being processed.
+
+        Returns:
+            bool: Whether the resolver should attempt to fetch metadata.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -54,6 +63,16 @@ class SemanticScholarResolver(RegisteredResolver):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield Semantic Scholar hosted PDFs linked to ``artifact``.
+
+        Args:
+            session: Requests session for outbound HTTP calls.
+            config: Resolver configuration with API keys and limits.
+            artifact: Work metadata containing DOI information.
+
+        Yields:
+            ResolverResult: Candidate download URLs or diagnostic events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(

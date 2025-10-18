@@ -106,6 +106,7 @@ pytest.importorskip("pydantic_settings")
 import DocsToKG.OntologyDownload.planning as pipeline_mod
 from DocsToKG.OntologyDownload import api as core
 from DocsToKG.OntologyDownload import settings as settings_mod
+from DocsToKG.OntologyDownload.errors import PolicyError
 from DocsToKG.OntologyDownload.io import DownloadResult
 from DocsToKG.OntologyDownload.planning import RESOLVERS, FetchPlan, ResolverError
 from DocsToKG.OntologyDownload.settings import (
@@ -115,7 +116,6 @@ from DocsToKG.OntologyDownload.settings import (
     DownloadFailure,
     ResolvedConfig,
 )
-from DocsToKG.OntologyDownload.errors import PolicyError
 from DocsToKG.OntologyDownload.validation import ValidationResult
 
 storage_mod = settings_mod
