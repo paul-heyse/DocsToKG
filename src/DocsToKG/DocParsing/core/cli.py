@@ -331,7 +331,11 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         dest="stages",
         action="append",
         default=None,
-        help="Manifest stage to inspect (repeatable). Defaults to doctags, chunk, embeddings.",
+        help=(
+            "Manifest stage to inspect (repeatable). Defaults to stages discovered"
+            " from manifest files; falls back to embeddings when no manifests are"
+            " present."
+        ),
     )
     parser.add_argument(
         "--data-root",

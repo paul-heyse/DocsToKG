@@ -189,3 +189,19 @@ def test_manifest_rejects_unknown_stage(monkeypatch: pytest.MonkeyPatch, tmp_pat
     error = excinfo.value
     assert error.option == "--stage"
     assert "invalid" in error.message
+
+
+def test_manifest_help_describes_stage_default(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The manifest help text documents the discovery default and fallback."""
+
+    _prepare_runtime(monkeypatch)
+    from DocsToKG.DocParsing.core import cli
+
+    with pytest.raises(SystemExit):
+        cli.manifest(["--help"])
+
+    output = " ".join(capsys.readouterr().out.split())
+    assert "Defaults to stages discovered from manifest files" in output
+    assert "falls back to embeddings when no manifests are present." in output
