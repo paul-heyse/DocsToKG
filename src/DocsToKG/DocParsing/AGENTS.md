@@ -1,6 +1,6 @@
 # Agents Guide - DocParsing
 
-Last updated: 2025-10-18
+Last updated: 2025-10-20
 
 ## Mission and Scope
 - Mission: Produce deterministic DocTags → chunk → embedding pipelines that scale to large corpora while preserving provenance, manifests, and schema contracts.
@@ -28,12 +28,12 @@ flowchart LR
   - `chunking.hybrid_chunker.generate_chunks()` — token windowing and structural merge loops.
   - `formats.manifest_writer.write_entry()` — manifests for thousands of docs; ensure buffered I/O.
   - `core.pipeline.execute_stage()` — orchestrates resume/force semantics.
-- Typical payload sizes: DocTags 1–10 MB per doc; chunk JSONL tens of KB per chunk; embeddings: dense vector length 768–1536 float32, sparse maps ~100 entries (TODO verify actual numbers).
+- Typical payload sizes: DocTags ~200 KB per document, chunk JSONL ~100 KB per document, and vector payloads ~500 KB per document with Qwen3-4B dense dimension 2560 (float32) plus SPLADE/BM25 sparse data (see `openspec/changes/archive/2025-10-15-refactor-docparsing-pipeline/design.md`).
 - Key schemas/models: `formats.CHUNK_ROW_SCHEMA`, `formats.VECTOR_ROW_SCHEMA`, `config.ChunkingConfig`, `config.EmbeddingConfig`, `types.ChunkPayload`.
 
 ## Performance Objectives & Baselines
-- Targets: TODO capture Stage P50/P95 (DocTags < N s, chunk < M s, embed throughput > X docs/min). Throughput goals should reflect GPU availability.
-- Known baseline: TODO reference latest synthetic benchmark in `tests/docparsing/test_synthetic_benchmark.py`.
+- Targets: Stage throughput baselines—HTML → DocTags 30–50 docs/min on a 12-core CPU, PDF → DocTags 5–10 docs/min on an A100, chunking 10–20 docs/min on an 8-core CPU, embeddings 5–8 docs/min on an A100 (see `openspec/changes/archive/2025-10-15-refactor-docparsing-pipeline/design.md`). Keep embedding `--validate-only` P50 ≤2.2 s per document, matching the DocParsing README SLO.
+- Known baseline: The synthetic benchmark (`tests/docparsing/test_synthetic_benchmark.py`) models streaming embeddings for 512 chunks × 384 tokens at dense dim 2560 and reports ~1.72× throughput gain with ~58 % memory reduction (`tests/docparsing/synthetic.py`).
 - Measurement recipe:
   ```bash
   direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q
@@ -61,7 +61,7 @@ flowchart LR
 
 ## I/O, Caching & Concurrency
 - I/O: read/write JSONL from `Data/…` directories; use append-only manifests and atomic file writes.
-- Cache keys: resume logic keyed by content hash + manifest entry; embedding caches keyed by doc id (TODO detail location).
+- Cache keys: resume logic keyed by content hash + manifest entry; embedding cache tuples produced via `_qwen_cache_key` in `embedding/runtime.py` (model_dir, dtype, tensor-parallelism, GPU util, quantization).
 - Concurrency: `doctags` uses process pool (spawn) for PDFs, `chunk`/`embed` may use thread/process pools; avoid manual threads around GPU contexts without spawn semantics.
 
 ## Invariants to Preserve (change with caution)
@@ -89,9 +89,9 @@ direnv exec . mypy src/DocsToKG/DocParsing
 direnv exec . pytest tests/docparsing -q
 direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # performance smoke
 ```
-- Golden files: TODO identify canonical chunk/embedding fixtures in `tests/docparsing/fixtures/`.
+- Golden files: Canonical chunk/vector fixtures live under `tests/data/docparsing/golden/` (`sample.chunks.jsonl`, `sample.vectors.jsonl`) and are guarded by `tests/docparsing/test_cli_and_tripwires.py`.
 - Stress test: chunk/embedding pipeline on synthetic corpora (`test_synthetic_benchmark`).
-- Coverage expectation: TODO (target or skip).
+- Coverage expectation: Maintain ≥85 % coverage for new DocParsing utility modules per the refactor success metrics (`openspec/changes/archive/2025-10-15-refactor-docparsing-pipeline/design.md`).
 
 ## Failure Modes & Debug Hints
 | Symptom | Likely cause | Quick checks |
@@ -116,8 +116,8 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only --chu
 - Schemas/contracts: `formats.py`, `schemas.py`, `config.py` dataclasses.
 
 ## Ownership & Documentation Links
-- Owners/reviewers: TODO_OWNERS (check repository `CODEOWNERS` for `src/DocsToKG/DocParsing/`).
-- Related docs: `src/DocsToKG/DocParsing/README.md`, `docs/…` (TODO populate), architecture ADRs if available.
+- Owners/reviewers: Owning team `docs-to-kg`, codeowner `@paul-heyse` (see `src/DocsToKG/DocParsing/README.md` front matter).
+- Related docs: `src/DocsToKG/DocParsing/README.md`, `docs/06-operations/docparsing-changelog.md`, and OpenSpec archives under `openspec/changes/`.
 
 ## Changelog and Update Procedure
 - Update hot paths, baselines, and schema references when CLI flags or output formats change.
