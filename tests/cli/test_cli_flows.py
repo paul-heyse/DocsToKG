@@ -151,6 +151,7 @@ import pytest
 from DocsToKG.ContentDownload import cli as downloader
 from DocsToKG.ContentDownload import pipeline as resolvers
 from DocsToKG.ContentDownload.core import Classification, DownloadContext
+from DocsToKG.ContentDownload.download import DownloadConfig
 from DocsToKG.ContentDownload.telemetry import MANIFEST_SCHEMA_VERSION, build_manifest_entry
 from tools.manifest_to_index import convert_manifest_to_index
 
@@ -930,7 +931,7 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
                 html_paths=[],
             )
 
-    options = downloader.DownloadOptions(
+    options = DownloadConfig(
         dry_run=True,
         list_only=False,
         extract_html_text=False,
@@ -996,7 +997,7 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
         "open_access": {"oa_url": None},
     }
 
-    options = downloader.DownloadOptions(
+    options = DownloadConfig(
         dry_run=False,
         list_only=False,
         extract_html_text=False,

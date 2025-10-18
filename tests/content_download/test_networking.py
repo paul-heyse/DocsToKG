@@ -602,12 +602,12 @@ from DocsToKG.ContentDownload.cli import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
     DEFAULT_TAIL_CHECK_BYTES,
-    DownloadOptions,
     WorkArtifact,
     build_download_outcome,
     download_candidate,
     process_one_work,
 )
+from DocsToKG.ContentDownload.download import DownloadConfig
 from DocsToKG.ContentDownload.core import (
     Classification,
     DownloadContext,
@@ -3501,7 +3501,7 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
         [StubResolver()], config, fake_download, logger, metrics, run_id="test-run"
     )
 
-    options = DownloadOptions(
+    options = DownloadConfig(
         dry_run=False,
         list_only=False,
         extract_html_text=False,
