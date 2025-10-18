@@ -5,6 +5,7 @@ from typing import Optional, Sequence
 
 from DocsToKG.ContentDownload import pipeline as resolvers
 from DocsToKG.ContentDownload.args import (
+    bootstrap_run_environment,
     build_parser,
     parse_args,
     resolve_config,
@@ -53,43 +54,43 @@ from DocsToKG.ContentDownload.telemetry import (
 from pyalex import config as oa_config
 
 __all__ = (
-    'AttemptSink',
-    'CsvSink',
-    'DEFAULT_MIN_PDF_BYTES',
-    'DEFAULT_SNIFF_BYTES',
-    'DEFAULT_TAIL_CHECK_BYTES',
-    'DownloadState',
-    'JsonlSink',
-    'LastAttemptCsvSink',
-    'ManifestEntry',
-    'RunTelemetry',
-    'ManifestIndexSink',
-    'MultiSink',
-    'MANIFEST_SCHEMA_VERSION',
-    'WorkArtifact',
-    'WorkProvider',
-    'OpenAlexWorkProvider',
-    'resolvers',
-    'apply_config_overrides',
-    'default_resolvers',
-    'build_query',
-    'classify_payload',
-    'create_artifact',
-    'download_candidate',
-    'ensure_dir',
-    'iterate_openalex',
-    'load_previous_manifest',
-    'load_resolver_config',
-    'main',
-    'process_one_work',
-    'read_resolver_config',
-    'resolve_topic_id_if_needed',
-    'slugify',
-    'DownloadOptions',
-    'oa_config',
+    "AttemptSink",
+    "CsvSink",
+    "DEFAULT_MIN_PDF_BYTES",
+    "DEFAULT_SNIFF_BYTES",
+    "DEFAULT_TAIL_CHECK_BYTES",
+    "DownloadState",
+    "JsonlSink",
+    "LastAttemptCsvSink",
+    "ManifestEntry",
+    "RunTelemetry",
+    "ManifestIndexSink",
+    "MultiSink",
+    "MANIFEST_SCHEMA_VERSION",
+    "WorkArtifact",
+    "WorkProvider",
+    "OpenAlexWorkProvider",
+    "resolvers",
+    "apply_config_overrides",
+    "default_resolvers",
+    "build_query",
+    "classify_payload",
+    "create_artifact",
+    "download_candidate",
+    "ensure_dir",
+    "iterate_openalex",
+    "load_previous_manifest",
+    "load_resolver_config",
+    "main",
+    "process_one_work",
+    "read_resolver_config",
+    "resolve_topic_id_if_needed",
+    "slugify",
+    "DownloadOptions",
+    "oa_config",
 )
 
-LOGGER = logging.getLogger('DocsToKG.ContentDownload')
+LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
 
 def main(argv: Optional[Sequence[str]] = None) -> RunResult:
@@ -99,10 +100,11 @@ def main(argv: Optional[Sequence[str]] = None) -> RunResult:
     parser = build_parser()
     args = parse_args(parser, argv)
     resolved = resolve_config(args, parser)
+    bootstrap_run_environment(resolved)
     result = run(resolved)
     emit_console_summary(result, dry_run=args.dry_run)
     return result
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -37,9 +37,10 @@ from DocsToKG.ContentDownload.telemetry import (
 )
 from DocsToKG.ContentDownload.core import WorkArtifact, atomic_write_text
 
-__all__ = ['iterate_openalex', 'run']
+__all__ = ["iterate_openalex", "run"]
 
-LOGGER = logging.getLogger('DocsToKG.ContentDownload')
+LOGGER = logging.getLogger("DocsToKG.ContentDownload")
+
 
 def iterate_openalex(
     query: Works, per_page: int, max_results: Optional[int]
@@ -103,18 +104,18 @@ def run(resolved: ResolvedConfig) -> RunResult:
             jsonl_sink = stack.enter_context(JsonlSink(manifest_path))
         sinks.append(jsonl_sink)
 
-        index_path = manifest_path.with_suffix('.index.json')
+        index_path = manifest_path.with_suffix(".index.json")
         index_sink = stack.enter_context(ManifestIndexSink(index_path))
         sinks.append(index_sink)
 
-        last_attempt_path = manifest_path.with_suffix('.last.csv')
+        last_attempt_path = manifest_path.with_suffix(".last.csv")
         last_attempt_sink = stack.enter_context(LastAttemptCsvSink(last_attempt_path))
         sinks.append(last_attempt_sink)
 
         sqlite_sink = stack.enter_context(SqliteSink(sqlite_path))
         sinks.append(sqlite_sink)
 
-        summary_path = manifest_path.with_suffix('.summary.json')
+        summary_path = manifest_path.with_suffix(".summary.json")
         summary_sink = stack.enter_context(SummarySink(summary_path))
         sinks.append(summary_sink)
 
@@ -129,7 +130,7 @@ def run(resolved: ResolvedConfig) -> RunResult:
         download_options = DownloadOptions(
             dry_run=args.dry_run,
             list_only=args.list_only,
-            extract_html_text=args.extract_html_text,
+            extract_html_text=resolved.extract_html_text,
             run_id=run_id,
             previous_lookup=resume_lookup,
             resume_completed=resume_completed,
@@ -186,15 +187,15 @@ def run(resolved: ResolvedConfig) -> RunResult:
         def _record_result(res: Dict[str, Any]) -> None:
             nonlocal processed, saved, html_only, xml_only, skipped, total_downloaded_bytes
             processed += 1
-            if res.get('saved'):
+            if res.get("saved"):
                 saved += 1
-            if res.get('html_only'):
+            if res.get("html_only"):
                 html_only += 1
-            if res.get('xml_only'):
+            if res.get("xml_only"):
                 xml_only += 1
-            if res.get('skipped'):
+            if res.get("skipped"):
                 skipped += 1
-            downloaded = res.get('downloaded_bytes') or 0
+            downloaded = res.get("downloaded_bytes") or 0
             try:
                 total_downloaded_bytes += int(downloaded)
             except (TypeError, ValueError):
@@ -254,7 +255,7 @@ def run(resolved: ResolvedConfig) -> RunResult:
 
                     def _submit(work_item: WorkArtifact) -> Future[Dict[str, Any]]:
                         future = executor.submit(_runner, work_item)
-                        future_work_ids[future] = getattr(work_item, 'work_id', None)
+                        future_work_ids[future] = getattr(work_item, "work_id", None)
                         return future
 
                     def _handle_future(completed_future: Future[Dict[str, Any]]) -> None:
@@ -264,14 +265,14 @@ def run(resolved: ResolvedConfig) -> RunResult:
                             result = completed_future.result()
                         except Exception as exc:
                             worker_failures += 1
-                            extra_fields: Dict[str, Any] = {'error': str(exc)}
+                            extra_fields: Dict[str, Any] = {"error": str(exc)}
                             if work_id:
-                                extra_fields['work_id'] = work_id
+                                extra_fields["work_id"] = work_id
                             LOGGER.exception(
-                                'worker_crash',
-                                extra={'extra_fields': extra_fields},
+                                "worker_crash",
+                                extra={"extra_fields": extra_fields},
                             )
-                            _record_result({'skipped': True})
+                            _record_result({"skipped": True})
                             if not stop_due_to_budget and _should_stop():
                                 stop_due_to_budget = True
                             return
@@ -301,13 +302,13 @@ def run(resolved: ResolvedConfig) -> RunResult:
         else:
             if stop_due_to_budget:
                 LOGGER.info(
-                    'Stopping due to budget exhaustion',
+                    "Stopping due to budget exhaustion",
                     extra={
-                        'extra_fields': {
-                            'budget_requests': budget_requests,
-                            'budget_bytes': budget_bytes,
-                            'processed': processed,
-                            'bytes_downloaded': total_downloaded_bytes,
+                        "extra_fields": {
+                            "budget_requests": budget_requests,
+                            "budget_bytes": budget_bytes,
+                            "processed": processed,
+                            "bytes_downloaded": total_downloaded_bytes,
                         }
                     },
                 )
@@ -329,8 +330,8 @@ def run(resolved: ResolvedConfig) -> RunResult:
             try:
                 attempt_logger.log_summary(summary_record)
             except Exception:
-                LOGGER.warning('Failed to log summary record', exc_info=True)
-            metrics_path = manifest_path.with_suffix('.metrics.json')
+                LOGGER.warning("Failed to log summary record", exc_info=True)
+            metrics_path = manifest_path.with_suffix(".metrics.json")
             try:
                 ensure_dir(metrics_path.parent)
                 atomic_write_text(
@@ -338,7 +339,7 @@ def run(resolved: ResolvedConfig) -> RunResult:
                     json.dumps(summary_record, indent=2, sort_keys=True) + "\n",
                 )
             except Exception:
-                LOGGER.warning('Failed to write metrics sidecar %s', metrics_path, exc_info=True)
+                LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
         finally:
             session_factory.close_all()
 
