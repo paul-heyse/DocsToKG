@@ -201,8 +201,8 @@ def test_display_plan_stream_output() -> None:
         {
             "stage": "doctags",
             "mode": "html",
-            "process": ["a"],
-            "skip": [],
+            "process": {"count": 1, "preview": ["a"]},
+            "skip": {"count": 0, "preview": []},
             "input_dir": "/input/doc",
             "output_dir": "/output/doc",
             "notes": ["Ready"],
@@ -210,8 +210,8 @@ def test_display_plan_stream_output() -> None:
         {
             "stage": "embed",
             "action": "validate",
-            "validate": ["x"],
-            "missing": [],
+            "validate": {"count": 1, "preview": ["x"]},
+            "missing": {"count": 0, "preview": []},
             "chunks_dir": "/chunks",
             "vectors_dir": "/vectors",
             "notes": [],
@@ -224,4 +224,24 @@ def test_display_plan_stream_output() -> None:
     assert lines[-1] == ""
     assert "docparse all plan" in rendered[0]
     assert any("doctags" in line for line in rendered)
+    assert any("process 1" in line for line in rendered)
     assert any("embed (validate-only)" in line for line in rendered)
+
+
+def test_display_plan_preview_limits() -> None:
+    """Preview rendering includes remainder hints when totals exceed limit."""
+
+    plans = [
+        {
+            "stage": "chunk",
+            "process": {"count": 7, "preview": ["d1", "d2", "d3", "d4", "d5"]},
+            "skip": {"count": 0, "preview": []},
+            "input_dir": "/chunks/in",
+            "output_dir": "/chunks/out",
+            "notes": [],
+        }
+    ]
+    lines = display_plan(plans)
+    assert any("process 7" in line for line in lines)
+    assert any("d1" in line for line in lines)
+    assert any("... (+2 more)" in line for line in lines)

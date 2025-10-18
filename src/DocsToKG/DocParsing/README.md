@@ -58,6 +58,13 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --resume
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only
 ```
 
+### Planner previews
+- `--plan-only` mode reports total document counts per bucket and shows up to
+  five representative IDs for each category (`process`, `skip`, `validate`,
+  etc.). Larger plans keep the counts accurate while truncating previews with a
+  `... (+N more)` suffix so operators can gauge scale without loading thousands
+  of identifiers.
+
 ## Folder map
 - `cli_errors.py` – Structured CLI exception types.
 - `config.py` / `config_loaders.py` – Pydantic-style configuration loaders (YAML/JSON/TOML) for chunking/embedding.
