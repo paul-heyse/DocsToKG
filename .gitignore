@@ -27,6 +27,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.wheelhouse/
 
 # Testing
 .pytest_cache/
@@ -131,3 +132,5 @@ $RECYCLE.BIN/
 
 # Linux-specific
 *~
+
+.wheelhouse/
