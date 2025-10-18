@@ -401,6 +401,16 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         )
         return 0
 
+    discovered: List[str] = []
+    for path in sorted(manifest_dir.glob("docparse.*.manifest.jsonl")):
+        parts = path.name.split(".")
+        if len(parts) >= 4:
+            stage = parts[1]
+            if stage not in discovered:
+                discovered.append(stage)
+
+    allowed_stage_set = set(known_stage_set).union(discovered)
+
     if args.stages:
         seen: List[str] = []
         for raw_stage in args.stages:
@@ -415,7 +425,9 @@ def manifest(argv: Sequence[str] | None = None) -> int:
                 raise CLIValidationError(
                     option="--stage",
                     message=(
-                        f"Unsupported stage '{trimmed}'. Expected one of: {expected}"
+                        "Unsupported stage "
+                        f"'{trimmed}'. Canonical stages: {canonical_list}. "
+                        f"Discovered stages: {discovered_list}"
                     ),
                     hint="Choose a supported manifest stage.",
                 )
@@ -424,13 +436,6 @@ def manifest(argv: Sequence[str] | None = None) -> int:
                     seen.append(stage)
         stages = seen
     else:
-        discovered: List[str] = []
-        for path in sorted(manifest_dir.glob("docparse.*.manifest.jsonl")):
-            parts = path.name.split(".")
-            if len(parts) >= 4:
-                stage = parts[1]
-                if stage not in discovered:
-                    discovered.append(stage)
         stages = discovered
     if not stages:
         stages = ["embeddings"]
