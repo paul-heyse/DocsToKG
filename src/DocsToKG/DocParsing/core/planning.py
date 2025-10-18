@@ -214,7 +214,6 @@ def plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
             "notes": ["DocTags directory missing"],
         }
 
-    files = list(iter_doctags(in_dir))
     manifest_index = (
         load_manifest_index(chunk_module.MANIFEST_STAGE, resolved_root) if args.resume else {}
     )
@@ -222,7 +221,7 @@ def plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
     planned = _new_bucket()
     skipped = _new_bucket()
 
-    for path in files:
+    for path in iter_doctags(in_dir):
         rel_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
         manifest_entry = resume_controller.entry(rel_id)
         should_hash = bool(args.resume and not args.force and manifest_entry)
@@ -302,7 +301,6 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
             "notes": [],
         }
 
-    files = list(iter_chunks(chunks_dir))
     manifest_index = (
         load_manifest_index(embedding_module.MANIFEST_STAGE, resolved_root) if args.resume else {}
     )

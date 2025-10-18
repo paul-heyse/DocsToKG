@@ -40,7 +40,7 @@ def test_manifest_accepts_known_stage(monkeypatch, tmp_path) -> None:
     exit_code = cli.manifest(["--stage", "doctags", "--data-root", str(tmp_path)])
 
     assert exit_code == 0
-    assert captured["stages"] == ["doctags"]
+    assert captured["stages"] == ["doctags-html", "doctags-pdf"]
     assert captured["data_root"] == tmp_path
 
     with pytest.raises(CLIValidationError) as excinfo:
