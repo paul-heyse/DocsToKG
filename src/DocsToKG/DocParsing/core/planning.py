@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, TextIO
 
+from DocsToKG.DocParsing.cli_errors import DoctagsCLIValidationError
 from DocsToKG.DocParsing.env import (
     data_chunks,
     data_doctags,
-    data_html,
-    data_pdfs,
     data_vectors,
     detect_data_root,
 )
@@ -19,13 +19,7 @@ from DocsToKG.DocParsing.io import (
     load_manifest_index,
 )
 
-from .cli_utils import (
-    HTML_SUFFIXES,
-    PDF_SUFFIXES,
-    detect_mode,
-    directory_contains_suffixes,
-    preview_list,
-)
+from .cli_utils import preview_list
 from .discovery import (
     derive_doc_id_and_chunks_path,
     derive_doc_id_and_doctags_path,
@@ -47,37 +41,32 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
 
     from DocsToKG.DocParsing import doctags as doctags_module
 
-    from .cli import build_doctags_parser
+    from .cli import _resolve_doctags_paths, build_doctags_parser
 
     parser = build_doctags_parser()
 
     args, _unknown = parser.parse_known_args(argv)
-    resolved_root = (
-        detect_data_root(args.data_root) if args.data_root is not None else detect_data_root()
-    )
 
-    html_default_in = data_html(resolved_root, ensure=False)
-    pdf_default_in = data_pdfs(resolved_root, ensure=False)
-    doctags_default_out = data_doctags(resolved_root, ensure=False)
+    try:
+        mode, input_dir, output_dir, resolved_root_str = _resolve_doctags_paths(args)
+    except DoctagsCLIValidationError as exc:
+        hint_suffix = f" (Hint: {exc.hint})" if exc.hint else ""
+        return {
+            "stage": "doctags",
+            "mode": args.mode,
+            "input_dir": str(args.in_dir) if args.in_dir is not None else None,
+            "output_dir": str(args.out_dir) if args.out_dir is not None else None,
+            "process": [],
+            "skip": [],
+            "notes": [f"{exc.message}{hint_suffix}"],
+            "error": {
+                "option": exc.option,
+                "message": exc.message,
+                "hint": exc.hint,
+            },
+        }
 
-    mode = args.mode
-    if args.in_dir is not None:
-        input_dir = args.in_dir.resolve()
-        if mode == "auto":
-            mode = detect_mode(input_dir)
-    else:
-        if mode == "auto":
-            html_present = directory_contains_suffixes(html_default_in, HTML_SUFFIXES)
-            pdf_present = directory_contains_suffixes(pdf_default_in, PDF_SUFFIXES)
-            if html_present and not pdf_present:
-                mode = "html"
-            elif pdf_present and not html_present:
-                mode = "pdf"
-            else:
-                raise ValueError("Cannot auto-detect mode: specify --mode or --input explicitly")
-        input_dir = html_default_in if mode == "html" else pdf_default_in
-
-    output_dir = args.out_dir.resolve() if args.out_dir is not None else doctags_default_out
+    resolved_root = Path(resolved_root_str)
 
     if not input_dir.exists():
         return {
@@ -99,7 +88,9 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
         manifest_stage = doctags_module.MANIFEST_STAGE
         overwrite = False
 
-    manifest_index = load_manifest_index(manifest_stage, resolved_root) if args.resume else {}
+    manifest_index = (
+        load_manifest_index(manifest_stage, resolved_root) if args.resume else {}
+    )
     resume_controller = ResumeController(args.resume, args.force, manifest_index)
     planned: List[str] = []
     skipped: List[str] = []

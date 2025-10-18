@@ -25,7 +25,7 @@ from DocsToKG.DocParsing.core import (
 from DocsToKG.DocParsing.core import cli as core_cli
 from DocsToKG.DocParsing.core.cli_utils import merge_args, preview_list
 from DocsToKG.DocParsing.core.http import get_http_session
-from DocsToKG.DocParsing.core.planning import display_plan
+from DocsToKG.DocParsing.core.planning import display_plan, plan_doctags
 
 
 def test_normalize_http_timeout_scalar_and_iterables() -> None:
@@ -225,3 +225,28 @@ def test_display_plan_stream_output() -> None:
     assert "docparse all plan" in rendered[0]
     assert any("doctags" in line for line in rendered)
     assert any("embed (validate-only)" in line for line in rendered)
+
+
+def test_plan_doctags_auto_detection_conflict(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """DocTags planner surfaces auto-detection conflicts as friendly notes."""
+
+    data_root = tmp_path / "Data"
+    html_dir = data_root / "HTML"
+    pdf_dir = data_root / "PDFs"
+    html_dir.mkdir(parents=True)
+    pdf_dir.mkdir(parents=True)
+    (html_dir / "doc.html").write_text("<html></html>", encoding="utf-8")
+    (pdf_dir / "doc.pdf").write_bytes(b"%PDF-1.4\n")
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+
+    plan = plan_doctags(["--mode", "auto"])
+
+    assert plan["stage"] == "doctags"
+    assert plan["process"] == [] and plan["skip"] == []
+    assert plan["notes"], "Expected an explanatory note when mode detection fails"
+    note = plan["notes"][0]
+    assert "Cannot auto-detect mode" in note
+    assert "Hint:" in note
