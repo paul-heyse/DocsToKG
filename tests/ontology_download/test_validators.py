@@ -188,8 +188,8 @@ from DocsToKG.OntologyDownload.validation import (
 )
 
 
-def _reset_validator_state(patch_stack) -> None:
-    patch_stack.setattr(plugins_mod, "_PLUGINS_INITIALIZED", False, raising=False)
+def _reset_validator_state() -> None:
+    plugins_mod._PLUGINS_INITIALIZED = False
     plugins_mod._PLUGIN_REGISTRIES.clear()
     plugins_mod._RESOLVER_REGISTRY.clear()
     plugins_mod._VALIDATOR_REGISTRY.clear()

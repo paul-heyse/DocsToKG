@@ -321,10 +321,12 @@ Usage:
     pytest tests/ontology_download/test_download.py
 """
 
+import contextlib
 import io
 import json
 import logging
 import re
+import socket
 import stat
 import tarfile
 import threading
@@ -332,6 +334,7 @@ import time
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import requests
@@ -422,15 +425,11 @@ class DummySession:
         return None
 
 
-def make_session(patch_stack, responses, head_responses=None):
+def make_session(responses, head_responses=None):
     session = DummySession(list(responses), head_responses)
-
-    def _factory():
-        return session
-
-    patch_stack.setattr(requests, "Session", _factory)
-    patch_stack.setattr(network_mod.requests, "Session", _factory, raising=False)
-    return session
+    config = DownloadConfiguration()
+    config.set_session_factory(lambda: session)
+    return config, session
 
 
 @pytest.fixture(autouse=True)
@@ -447,17 +446,17 @@ def clear_token_buckets():
 # --- Test Cases ---
 
 
-def test_download_stream_success(patch_stack, tmp_path):
+def test_download_stream_success(tmp_path):
     content = b"ontology"
     response = DummyResponse(200, content, {"ETag": "abc", "Last-Modified": "yesterday"})
-    make_session(patch_stack, [response])
+    config, session = make_session([response])
     destination = tmp_path / "file.owl"
     result = download.download_stream(
         url="https://example.org/file.owl",
         destination=destination,
         headers={},
         previous_manifest=None,
-        http_config=DownloadConfiguration(),
+        http_config=config,
         cache_dir=tmp_path / "cache",
         logger=_noop_logger(),
     )
@@ -466,17 +465,17 @@ def test_download_stream_success(patch_stack, tmp_path):
     assert result.etag == "abc"
 
 
-def test_download_stream_uses_cache_on_304(patch_stack, tmp_path):
+def test_download_stream_uses_cache_on_304(tmp_path):
     destination = tmp_path / "file.owl"
     destination.write_bytes(b"cached")
     response = DummyResponse(304, b"", {"ETag": "abc"})
-    session = make_session(patch_stack, [response])
+    config, session = make_session([response])
     result = download.download_stream(
         url="https://example.org/file.owl",
         destination=destination,
         headers={},
         previous_manifest={"etag": "abc"},
-        http_config=DownloadConfiguration(),
+        http_config=config,
         cache_dir=tmp_path / "cache",
         logger=_noop_logger(),
     )
@@ -484,20 +483,20 @@ def test_download_stream_uses_cache_on_304(patch_stack, tmp_path):
     assert session.calls[0]["If-None-Match"] == "abc"
 
 
-def test_download_stream_resumes_from_partial(patch_stack, tmp_path):
+def test_download_stream_resumes_from_partial(tmp_path):
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     part = cache_dir / "file.owl.part"
     part.write_bytes(b"hello")
     response = DummyResponse(206, b" world", {"ETag": "abc"})
-    make_session(patch_stack, [response])
+    config, _session = make_session([response])
     destination = tmp_path / "file.owl"
     result = download.download_stream(
         url="https://example.org/file.owl",
         destination=destination,
         headers={},
         previous_manifest=None,
-        http_config=DownloadConfiguration(),
+        http_config=config,
         cache_dir=cache_dir,
         logger=_noop_logger(),
     )
@@ -506,7 +505,7 @@ def test_download_stream_resumes_from_partial(patch_stack, tmp_path):
     assert result.status == "updated"
 
 
-def test_streaming_downloader_handles_cached_response(patch_stack, tmp_path):
+def test_streaming_downloader_handles_cached_response(tmp_path):
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     output_file = cache_dir / "cache_entry"
@@ -524,11 +523,11 @@ def test_streaming_downloader_handles_cached_response(patch_stack, tmp_path):
         b"",
         {"ETag": "new-tag", "Last-Modified": "Thu, 02 Jan 2024 00:00:00 GMT"},
     )
-    session = make_session(patch_stack, [response])
+    config, session = make_session([response])
     downloader = download.StreamingDownloader(
         destination=destination,
         headers={},
-        http_config=DownloadConfiguration(),
+        http_config=config,
         previous_manifest=previous_manifest,
         logger=_noop_logger(),
     )
@@ -547,18 +546,18 @@ def test_streaming_downloader_handles_cached_response(patch_stack, tmp_path):
     assert session.calls[0]["Range"] == f"bytes={len(initial)}-"
 
 
-def test_streaming_downloader_skips_invalid_conditional_headers(patch_stack, tmp_path):
+def test_streaming_downloader_skips_invalid_conditional_headers(tmp_path):
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     output_file = cache_dir / "conditional_entry"
     destination = tmp_path / "destination.owl"
     previous_manifest = {"etag": None, "last_modified": "   "}
     response = DummyResponse(200, b"fresh", {})
-    session = make_session(patch_stack, [response])
+    config, session = make_session([response])
     downloader = download.StreamingDownloader(
         destination=destination,
         headers={},
-        http_config=DownloadConfiguration(),
+        http_config=config,
         previous_manifest=previous_manifest,
         logger=_noop_logger(),
     )
@@ -572,7 +571,7 @@ def test_streaming_downloader_skips_invalid_conditional_headers(patch_stack, tmp
     assert session.calls[0].get("If-Modified-Since") is None
 
 
-def test_streaming_downloader_resumes_range_request(patch_stack, tmp_path):
+def test_streaming_downloader_resumes_range_request(tmp_path):
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     output_file = cache_dir / "resume_entry"
@@ -584,11 +583,11 @@ def test_streaming_downloader_resumes_range_request(patch_stack, tmp_path):
         b"data",
         {"ETag": "etag-206", "Last-Modified": "Fri, 03 Jan 2024 00:00:00 GMT"},
     )
-    session = make_session(patch_stack, [response])
+    config, session = make_session([response])
     downloader = download.StreamingDownloader(
         destination=tmp_path / "destination.owl",
         headers={},
-        http_config=DownloadConfiguration(),
+        http_config=config,
         previous_manifest=None,
         logger=_noop_logger(),
     )
@@ -606,7 +605,7 @@ def test_streaming_downloader_resumes_range_request(patch_stack, tmp_path):
     assert session.calls[0]["Range"] == f"bytes={len(initial)}-"
 
 
-def test_streaming_downloader_records_fresh_response_metadata(patch_stack, tmp_path):
+def test_streaming_downloader_records_fresh_response_metadata(tmp_path):
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     output_file = cache_dir / "fresh_entry"
@@ -615,11 +614,11 @@ def test_streaming_downloader_records_fresh_response_metadata(patch_stack, tmp_p
         b"fresh-data",
         {"ETag": "fresh-tag", "Last-Modified": "Sat, 04 Jan 2024 00:00:00 GMT"},
     )
-    session = make_session(patch_stack, [response])
+    config, session = make_session([response])
     downloader = download.StreamingDownloader(
         destination=tmp_path / "destination.owl",
         headers={},
-        http_config=DownloadConfiguration(),
+        http_config=config,
         previous_manifest=None,
         logger=_noop_logger(),
     )
@@ -637,50 +636,55 @@ def test_streaming_downloader_records_fresh_response_metadata(patch_stack, tmp_p
     assert session.calls[0].get("If-None-Match") is None
 
 
-def test_download_stream_retries(patch_stack, tmp_path):
+def test_download_stream_retries(tmp_path):
     error_response = DummyResponse(500, b"", {}, raise_error=True)
     success_response = DummyResponse(200, b"data", {})
-    make_session(patch_stack, [error_response, success_response])
-    patch_stack.setattr(network_mod.time, "sleep", lambda _: None)
+    config, _session = make_session([error_response, success_response])
     destination = tmp_path / "file.owl"
-    result = download.download_stream(
-        url="https://example.org/file.owl",
-        destination=destination,
-        headers={},
-        previous_manifest=None,
-        http_config=DownloadConfiguration(max_retries=2, backoff_factor=0.1),
-        cache_dir=tmp_path / "cache",
-        logger=_noop_logger(),
-    )
+    with patch("DocsToKG.OntologyDownload.io.network.time.sleep", lambda _: None):
+        config.max_retries = 2
+        config.backoff_factor = 0.1
+        result = download.download_stream(
+            url="https://example.org/file.owl",
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=tmp_path / "cache",
+            logger=_noop_logger(),
+        )
     assert result.status == "fresh"
     assert destination.read_bytes() == b"data"
 
 
-def test_download_stream_rate_limiting(patch_stack, tmp_path):
+def test_download_stream_rate_limiting(tmp_path):
     response = DummyResponse(200, b"data", {})
-    make_session(patch_stack, [response])
+    config, _session = make_session([response])
     consumed = []
 
     class StubBucket:
-        def consume(self):
-            consumed.append(True)
+        def consume(self, tokens=1.0):
+            consumed.append(tokens)
 
-    patch_stack.setattr(download, "get_bucket", lambda **_kwargs: StubBucket())
-    patch_stack.setattr(network_mod, "get_bucket", lambda **_kwargs: StubBucket(), raising=False)
+        @property
+        def lock(self):
+            return contextlib.nullcontext()
+
+    config.set_bucket_provider(lambda service, cfg, host: StubBucket())
     destination = tmp_path / "file.owl"
     download.download_stream(
         url="https://example.org/file.owl",
         destination=destination,
         headers={},
         previous_manifest=None,
-        http_config=DownloadConfiguration(),
+        http_config=config,
         cache_dir=tmp_path / "cache",
         logger=_noop_logger(),
     )
     assert consumed
 
 
-def test_download_stream_sets_known_hash(patch_stack, tmp_path):
+def test_download_stream_sets_known_hash(tmp_path):
     recorded = {}
 
     def fake_retrieve(url, path, fname, known_hash, downloader, progressbar):
@@ -690,21 +694,22 @@ def test_download_stream_sets_known_hash(patch_stack, tmp_path):
         cache_path.write_bytes(b"payload")
         return cache_path
 
-    patch_stack.setattr(network_mod.pooch, "retrieve", fake_retrieve)
+    config, _session = make_session([DummyResponse(200, b"payload", {})])
     destination = tmp_path / "file.owl"
 
     expected_digest = "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5"
 
-    result = download.download_stream(
-        url="https://example.org/file.owl",
-        destination=destination,
-        headers={},
-        previous_manifest=None,
-        http_config=DownloadConfiguration(),
-        cache_dir=tmp_path / "cache",
-        logger=_noop_logger(),
-        expected_hash=f"sha256:{expected_digest}",
-    )
+    with patch.object(network_mod.pooch, "retrieve", fake_retrieve):
+        result = download.download_stream(
+            url="https://example.org/file.owl",
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=tmp_path / "cache",
+            logger=_noop_logger(),
+            expected_hash=f"sha256:{expected_digest}",
+        )
 
     assert recorded["known_hash"] == f"sha256:{expected_digest}"
     assert destination.exists()
@@ -768,17 +773,17 @@ def test_shared_token_bucket_persists_state(tmp_path):
     assert expected_path.exists()
 
 
-def test_head_check_success(patch_stack, tmp_path):
+def test_head_check_success(tmp_path):
     head_response = DummyResponse(
         200,
         b"",
         {"Content-Type": "application/rdf+xml", "Content-Length": "1024"},
     )
-    session = make_session(patch_stack, [], head_responses=[head_response])
+    config, session = make_session([], head_responses=[head_response])
     downloader = download.StreamingDownloader(
         destination=tmp_path / "file.owl",
         headers={},
-        http_config=DownloadConfiguration(),
+        http_config=config,
         previous_manifest=None,
         logger=_noop_logger(),
         expected_media_type="application/rdf+xml",
@@ -791,13 +796,13 @@ def test_head_check_success(patch_stack, tmp_path):
     assert content_length == 1024
 
 
-def test_head_check_graceful_on_405(patch_stack, tmp_path):
+def test_head_check_graceful_on_405(tmp_path):
     head_response = DummyResponse(405, b"", {})
-    session = make_session(patch_stack, [], head_responses=[head_response])
+    config, session = make_session([], head_responses=[head_response])
     downloader = download.StreamingDownloader(
         destination=tmp_path / "file.owl",
         headers={},
-        http_config=DownloadConfiguration(),
+        http_config=config,
         previous_manifest=None,
         logger=_noop_logger(),
     )
@@ -1039,24 +1044,25 @@ def test_extract_tar_detects_compression_bomb(tmp_path):
     assert "compression ratio" in str(exc_info.value)
 
 
-def test_download_stream_http_error(patch_stack, tmp_path):
+def test_download_stream_http_error(tmp_path):
     response = DummyResponse(500, b"", {}, raise_error=True)
-    make_session(patch_stack, [response])
+    config, _session = make_session([response])
+    config.max_retries = 0
     with pytest.raises(DownloadFailure):
         download.download_stream(
             url="https://example.org/file.owl",
             destination=tmp_path / "file.owl",
             headers={},
             previous_manifest=None,
-            http_config=DownloadConfiguration(max_retries=0),
+            http_config=config,
             cache_dir=tmp_path / "cache",
             logger=_noop_logger(),
         )
 
 
-def test_download_stream_no_space(patch_stack, tmp_path):
+def test_download_stream_no_space(tmp_path):
     response = DummyResponse(200, b"data", {})
-    make_session(patch_stack, [response])
+    config, _session = make_session([response])
     original_open = Path.open
 
     def failing_open(self, mode="r", *args, **kwargs):
@@ -1064,32 +1070,32 @@ def test_download_stream_no_space(patch_stack, tmp_path):
             raise OSError("No space left on device")
         return original_open(self, mode, *args, **kwargs)
 
-    patch_stack.setattr(Path, "open", failing_open)
-    with pytest.raises(OntologyDownloadError):
-        download.download_stream(
-            url="https://example.org/file.owl",
-            destination=tmp_path / "file.owl",
-            headers={},
-            previous_manifest=None,
-            http_config=DownloadConfiguration(),
-            cache_dir=tmp_path / "cache",
-            logger=_noop_logger(),
-        )
+    with patch.object(Path, "open", failing_open):
+        with pytest.raises(OntologyDownloadError):
+            download.download_stream(
+                url="https://example.org/file.owl",
+                destination=tmp_path / "file.owl",
+                headers={},
+                previous_manifest=None,
+                http_config=config,
+                cache_dir=tmp_path / "cache",
+                logger=_noop_logger(),
+            )
 
 
-def test_download_stream_hash_mismatch_triggers_retry(patch_stack, tmp_path):
+def test_download_stream_hash_mismatch_triggers_retry(tmp_path):
     responses = [
         DummyResponse(200, b"first", {}),
         DummyResponse(200, b"second", {}),
     ]
-    session = make_session(patch_stack, responses)
+    config, session = make_session(responses)
     destination = tmp_path / "file.owl"
     result = download.download_stream(
         url="https://example.org/file.owl",
         destination=destination,
         headers={},
         previous_manifest={"sha256": "mismatch"},
-        http_config=DownloadConfiguration(),
+        http_config=config,
         cache_dir=tmp_path / "cache",
         logger=_noop_logger(),
     )
@@ -1103,31 +1109,24 @@ def test_validate_url_security_rejects_private_ip():
         download.validate_url_security("https://127.0.0.1/ontology.owl")
 
 
-def test_validate_url_security_upgrades_http(patch_stack):
-    network_mod._DNS_CACHE.clear()
-    patch_stack.setattr(
-        network_mod.socket,
-        "getaddrinfo",
-        lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
+def test_validate_url_security_upgrades_http():
+    network_mod.clear_dns_stubs()
+    network_mod.register_dns_stub(
+        "example.org", lambda host: [(None, None, None, None, ("93.184.216.34", 0))]
     )
     secure_url = download.validate_url_security("http://example.org/ontology.owl")
     assert secure_url.startswith("https://example.org")
 
 
-def test_validate_url_security_respects_allowlist(patch_stack):
-    network_mod._DNS_CACHE.clear()
-    looked_up = {}
-
-    def fake_getaddrinfo(host, *_args, **_kwargs):
-        looked_up["host"] = host
-        return [(None, None, None, None, ("93.184.216.34", 0))]
-
-    patch_stack.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
+def test_validate_url_security_respects_allowlist():
+    network_mod.clear_dns_stubs()
+    network_mod.register_dns_stub(
+        "purl.obolibrary.org", lambda host: [(None, None, None, None, ("93.184.216.34", 0))]
+    )
     config = DownloadConfiguration(allowed_hosts=["example.org", "purl.obolibrary.org"])
 
     secure_url = download.validate_url_security("https://purl.obolibrary.org/ontology.owl", config)
 
-    assert looked_up["host"] == "purl.obolibrary.org"
     assert secure_url.startswith("https://purl.obolibrary.org")
 
 
@@ -1138,20 +1137,16 @@ def test_validate_url_security_blocks_disallowed_host():
         download.validate_url_security("https://malicious.com/evil.owl", config)
 
 
-def test_validate_url_security_normalizes_idn(patch_stack):
-    network_mod._DNS_CACHE.clear()
-    looked_up = {}
-
-    def fake_getaddrinfo(host, *_args, **_kwargs):
-        looked_up["host"] = host
-        return [(None, None, None, None, ("93.184.216.34", 0))]
-
-    patch_stack.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
+def test_validate_url_security_normalizes_idn():
+    network_mod.clear_dns_stubs()
+    network_mod.register_dns_stub(
+        "xn--mnchen-3ya.example.org",
+        lambda host: [(None, None, None, None, ("93.184.216.34", 0))],
+    )
 
     config = DownloadConfiguration()
     secure_url = download.validate_url_security("https://münchen.example.org/ontology.owl", config)
 
-    assert looked_up["host"] == "xn--mnchen-3ya.example.org"
     assert secure_url.startswith("https://xn--mnchen-3ya.example.org")
 
 
@@ -1160,13 +1155,11 @@ def test_validate_url_security_rejects_mixed_script_idn():
         download.validate_url_security("https://раураl.com/ontology.owl")
 
 
-def test_validate_url_security_respects_wildcard_allowlist(patch_stack):
-    network_mod._DNS_CACHE.clear()
-
-    def fake_getaddrinfo(host, *_args, **_kwargs):
-        return [(None, None, None, None, ("93.184.216.34", 0))]
-
-    patch_stack.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
+def test_validate_url_security_respects_wildcard_allowlist():
+    network_mod.clear_dns_stubs()
+    network_mod.register_dns_stub(
+        "sub.example.org", lambda host: [(None, None, None, None, ("93.184.216.34", 0))]
+    )
     config = DownloadConfiguration(allowed_hosts=["*.example.org"])
 
     secure_url = download.validate_url_security("https://sub.example.org/ontology.owl", config)
@@ -1184,13 +1177,10 @@ def test_validate_url_security_enforces_default_ports() -> None:
         download.validate_url_security("https://example.org:8443/ontology.owl")
 
 
-def test_validate_url_security_allows_configured_port(patch_stack):
-    network_mod._DNS_CACHE.clear()
-
-    patch_stack.setattr(
-        network_mod.socket,
-        "getaddrinfo",
-        lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
+def test_validate_url_security_allows_configured_port():
+    network_mod.clear_dns_stubs()
+    network_mod.register_dns_stub(
+        "example.org", lambda host: [(None, None, None, None, ("93.184.216.34", 0))]
     )
 
     config = DownloadConfiguration(allowed_ports=[8443])
@@ -1199,13 +1189,10 @@ def test_validate_url_security_allows_configured_port(patch_stack):
     assert secure_url.startswith("https://example.org:8443")
 
 
-def test_validate_url_security_allows_host_specific_port(patch_stack):
-    network_mod._DNS_CACHE.clear()
-
-    patch_stack.setattr(
-        network_mod.socket,
-        "getaddrinfo",
-        lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
+def test_validate_url_security_allows_host_specific_port():
+    network_mod.clear_dns_stubs()
+    network_mod.register_dns_stub(
+        "example.org", lambda host: [(None, None, None, None, ("93.184.216.34", 0))]
     )
 
     config = DownloadConfiguration(allowed_hosts=["example.org:8443"])
@@ -1214,15 +1201,15 @@ def test_validate_url_security_allows_host_specific_port(patch_stack):
     assert secure_url.startswith("https://example.org:8443")
 
 
-def test_validate_url_security_dns_lookup_cached(patch_stack):
-    network_mod._DNS_CACHE.clear()
+def test_validate_url_security_dns_lookup_cached():
+    network_mod.clear_dns_stubs()
     calls = {"count": 0}
 
-    def fake_getaddrinfo(host, *_args, **_kwargs):
+    def fake_getaddrinfo(host):
         calls["count"] += 1
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    patch_stack.setattr(network_mod.socket, "getaddrinfo", fake_getaddrinfo)
+    network_mod.register_dns_stub("example.org", fake_getaddrinfo)
 
     config = DownloadConfiguration()
     url = "https://example.org/ontology.owl"
@@ -1301,7 +1288,7 @@ def test_migrate_manifest_warns_unknown_version(caplog):
     assert any("unknown manifest schema version" in record.getMessage() for record in captured)
 
 
-def test_read_manifest_applies_migration(tmp_path, patch_stack):
+def test_read_manifest_applies_migration(tmp_path):
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps({"schema_version": "0.9"}))
 
@@ -1311,9 +1298,8 @@ def test_read_manifest_applies_migration(tmp_path, patch_stack):
         observed["schema_version"] = payload.get("schema_version")
         observed["resolver_attempts"] = payload.get("resolver_attempts")
 
-    patch_stack.setattr(pipeline_mod, "validate_manifest_dict", _validate)
-
-    payload = pipeline_mod._read_manifest(manifest_path)
+    with patch.object(pipeline_mod, "validate_manifest_dict", _validate):
+        payload = pipeline_mod._read_manifest(manifest_path)
     assert payload["schema_version"] == "1.0"
     assert payload["resolver_attempts"] == []
     assert observed == {"schema_version": "1.0", "resolver_attempts": []}
