@@ -357,7 +357,26 @@ def manifest(argv: Sequence[str] | None = None) -> int:
     )
 
     args = parser.parse_args([] if argv is None else list(argv))
-    manifest_dir = data_manifests(args.data_root)
+    manifest_dir = data_manifests(args.data_root, ensure=False)
+    logger = get_logger(__name__, base_fields={"stage": "manifest"})
+
+    if not manifest_dir.exists():
+        log_event(
+            logger,
+            "warning",
+            "Manifest directory is missing",
+            stage="manifest",
+            doc_id="__aggregate__",
+            input_hash=None,
+            error_code="MANIFEST_DIR_MISSING",
+            manifest_dir=str(manifest_dir),
+            data_root=str(args.data_root) if args.data_root is not None else None,
+        )
+        print(
+            "No manifest directory found. Run a DocParsing stage to generate manifests.",
+        )
+        return 0
+
     if args.stages:
         seen: List[str] = []
         for stage in args.stages:
@@ -376,8 +395,6 @@ def manifest(argv: Sequence[str] | None = None) -> int:
         stages = discovered
     if not stages:
         stages = ["embeddings"]
-
-    logger = get_logger(__name__, base_fields={"stage": "manifest"})
 
     tail_count = max(0, int(args.tail))
     need_summary = bool(args.summarize or not tail_count)

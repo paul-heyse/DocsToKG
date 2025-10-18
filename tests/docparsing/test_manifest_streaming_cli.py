@@ -11,12 +11,15 @@ import pytest
 from tests.docparsing.stubs import dependency_stubs
 
 
-@pytest.mark.parametrize("tail", [7])
-def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -> None:
-    """Ensure ``manifest`` streams large iterators while keeping tail accuracy."""
+def _prepare_manifest_cli_stubs(monkeypatch) -> None:
+    """Install shared dependency stubs required to import the DocParsing CLI."""
 
-    total_entries = 10_050
-    stage_name = "chunk"
+    if "tests.docparsing.fake_deps.vllm" not in sys.modules:
+        monkeypatch.setitem(
+            sys.modules,
+            "tests.docparsing.fake_deps.vllm",
+            types.ModuleType("tests.docparsing.fake_deps.vllm"),
+        )
 
     dependency_stubs()
 
@@ -33,6 +36,16 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
 
     yaml_stub = types.SimpleNamespace(safe_load=lambda *_args, **_kwargs: {}, YAMLError=Exception)
     monkeypatch.setitem(sys.modules, "yaml", yaml_stub)
+
+
+@pytest.mark.parametrize("tail", [7])
+def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -> None:
+    """Ensure ``manifest`` streams large iterators while keeping tail accuracy."""
+
+    total_entries = 10_050
+    stage_name = "chunk"
+
+    _prepare_manifest_cli_stubs(monkeypatch)
 
     vllm_module = types.ModuleType("vllm")
 
@@ -128,7 +141,9 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
         "iter_manifest_entries",
         fake_iter_manifest_entries,
     )
-    monkeypatch.setattr(cli, "data_manifests", lambda data_root: tmp_path)
+    monkeypatch.setattr(
+        cli, "data_manifests", lambda data_root, *, ensure=True: tmp_path
+    )
 
     exit_code = cli.manifest(
         [
@@ -159,3 +174,32 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
 
     status_line = stdout[manifest_header_index + 2]
     assert status_line == "  statuses: failure=6, success=10044"
+
+
+def test_manifest_missing_directory_read_only(tmp_path, monkeypatch, capsys) -> None:
+    """CLI should warn when the manifest directory is absent without creating it."""
+
+    _prepare_manifest_cli_stubs(monkeypatch)
+
+    from DocsToKG.DocParsing.core import cli
+
+    read_only_root = tmp_path / "readonly"
+    read_only_root.mkdir()
+    manifests_dir = read_only_root / "Manifests"
+
+    def _fail_iter(*_args, **_kwargs):
+        raise AssertionError("iter_manifest_entries should not run when manifests are missing")
+
+    monkeypatch.setattr(cli, "iter_manifest_entries", _fail_iter)
+
+    read_only_root.chmod(0o555)
+    try:
+        exit_code = cli.manifest(["--data-root", str(read_only_root)])
+    finally:
+        read_only_root.chmod(0o755)
+
+    assert exit_code == 0
+    assert not manifests_dir.exists()
+
+    output = capsys.readouterr()
+    assert "No manifest directory found" in output.out
