@@ -1394,3 +1394,40 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
             if args.json:
                 json.dump(report, sys.stdout, indent=2)
                 sys.stdout.write("\n")
+            else:
+                status = "passed" if report["ok"] else "failed"
+                print(
+                    f"Configuration {status} ({report['ontologies']} ontologies) -> {report['path']}"
+                )
+        elif args.command == "doctor":
+            report = _doctor_report()
+            fixes: List[str] = []
+            if getattr(args, "fix", False):
+                fixes = _apply_doctor_fixes(report)
+                report = _doctor_report()
+                if fixes:
+                    report["fixes"] = fixes
+            if args.json:
+                json.dump(report, sys.stdout, indent=2)
+                sys.stdout.write("\n")
+            else:
+                _print_doctor_report(report)
+                if fixes:
+                    print("\nApplied fixes:")
+                    for action in fixes:
+                        print(f"  - {action}")
+        else:  # pragma: no cover - argparse should prevent unknown commands
+            parser.error(f"Unsupported command: {args.command}")
+        return 0
+    except ConfigError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    except UnsupportedPythonError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    except OntologyDownloadError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:  # pylint: disable=broad-except
+        print(f"Unexpected error: {exc}", file=sys.stderr)
+        return 1

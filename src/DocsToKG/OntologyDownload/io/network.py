@@ -1,37 +1,41 @@
-"""Filesystem safety, rate limiting, and networking helpers for ontology downloads."""
+"""Networking utilities for ontology downloads."""
 
 from __future__ import annotations
 
-import hashlib
 import ipaddress
 import json
 import logging
 import os
 import random
-import re
-import shutil
 import socket
-import stat
-import tarfile
 import threading
 import time
 import unicodedata
-import uuid
-import zipfile
 from collections import OrderedDict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from pathlib import Path, PurePosixPath
-from typing import Callable, Dict, Iterator, List, Optional, Set, Tuple, TypeVar
+from pathlib import Path
+from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Set, Tuple, TypeVar
 from urllib.parse import ParseResult, urlparse, urlunparse
 
 import pooch
 import requests
 
-from .errors import ConfigError, DownloadFailure, OntologyDownloadError, PolicyError
-from .settings import DownloadConfiguration, get_default_config
+from ..errors import ConfigError, DownloadFailure, OntologyDownloadError, PolicyError
+from ..settings import DownloadConfiguration
+from .filesystem import (
+    extract_archive_safe,
+    format_bytes,
+    generate_correlation_id,
+    mask_sensitive_data,
+    sanitize_filename,
+    sha256_file,
+    _compute_file_hash,
+    _materialize_cached_file,
+)
+from .rate_limit import get_bucket, apply_retry_after
 
 try:  # pragma: no cover - psutil may be unavailable in minimal environments
     import psutil  # type: ignore[import]
@@ -49,79 +53,31 @@ _DNS_CACHE_MAX_ENTRIES = 4096
 _DNS_CACHE_LOCK = threading.Lock()
 _DNS_CACHE: "OrderedDict[str, Tuple[float, List[Tuple]]]" = OrderedDict()
 
+_RDF_FORMAT_LABELS = {
+    "application/rdf+xml": "RDF/XML",
+    "text/turtle": "Turtle",
+    "application/n-triples": "N-Triples",
+    "application/trig": "TriG",
+    "application/ld+json": "JSON-LD",
+}
+_RDF_ALIAS_GROUPS = {
+    "application/rdf+xml": {"application/rdf+xml", "application/xml", "text/xml"},
+    "text/turtle": {"text/turtle", "application/x-turtle"},
+    "application/n-triples": {"application/n-triples", "text/plain"},
+    "application/trig": {"application/trig"},
+    "application/ld+json": {"application/ld+json"},
+}
+RDF_MIME_ALIASES: set[str] = set()
+RDF_MIME_FORMAT_LABELS: Dict[str, str] = {}
+for canonical, aliases in _RDF_ALIAS_GROUPS.items():
+    label = _RDF_FORMAT_LABELS[canonical]
+    for alias in aliases:
+        RDF_MIME_ALIASES.add(alias)
+        RDF_MIME_FORMAT_LABELS[alias] = label
 
-def _resolve_max_uncompressed_bytes(limit: Optional[int]) -> Optional[int]:
-    """Return the effective archive expansion limit, honoring runtime overrides."""
+SESSION_POOL_CACHE_DEFAULT = 2
 
-    if limit is not None:
-        return limit
-    return get_default_config().defaults.http.max_uncompressed_bytes()
-
-
-def sanitize_filename(filename: str) -> str:
-    """Return a filesystem-safe filename derived from ``filename``."""
-
-    original = filename
-    safe = filename.replace(os.sep, "_").replace("/", "_").replace("\\", "_")
-    safe = re.sub(r"[^A-Za-z0-9._-]", "_", safe)
-    safe = safe.strip("._") or "ontology"
-    if len(safe) > 255:
-        safe = safe[:255]
-    if safe != original:
-        logging.getLogger("DocsToKG.OntologyDownload").warning(
-            "sanitized unsafe filename",
-            extra={"stage": "sanitize", "original": original, "sanitized": safe},
-        )
-    return safe
-
-
-def generate_correlation_id() -> str:
-    """Return a short-lived identifier that links related log entries."""
-
-    return uuid.uuid4().hex[:12]
-
-
-def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
-    """Return a copy of ``payload`` with common secret fields masked."""
-
-    sensitive_keys = {"authorization", "api_key", "apikey", "token", "secret", "password"}
-    token_pattern = re.compile(r"^[A-Za-z0-9+/=_-]{32,}$")
-
-    def _mask_value(value: object, key_hint: Optional[str] = None) -> object:
-        if isinstance(value, dict):
-            return {
-                sub_key: _mask_value(sub_value, sub_key.lower())
-                for sub_key, sub_value in value.items()
-            }
-        if isinstance(value, list):
-            return [_mask_value(item, key_hint) for item in value]
-        if isinstance(value, tuple):
-            return tuple(_mask_value(item, key_hint) for item in value)
-        if isinstance(value, set):
-            return {_mask_value(item, key_hint) for item in value}
-        if isinstance(value, str):
-            lowered = value.lower()
-            if key_hint in sensitive_keys:
-                return "***masked***"
-            if "apikey" in lowered:
-                return "***masked***"
-            if key_hint == "authorization":
-                token = value.strip()
-                if "bearer " in lowered or token_pattern.match(token):
-                    return "***masked***"
-            if "bearer " in lowered:
-                return "***masked***"
-        return value
-
-    masked: Dict[str, object] = {}
-    for key, value in payload.items():
-        lower = key.lower()
-        if lower in sensitive_keys:
-            masked[key] = "***masked***"
-        else:
-            masked[key] = _mask_value(value, lower)
-    return masked
-
+T = TypeVar("T")
 
 def _enforce_idn_safety(host: str) -> None:
     """Validate internationalized hostnames and reject suspicious patterns."""
@@ -153,7 +109,6 @@ def _enforce_idn_safety(host: str) -> None:
     if len(scripts) > 1:
         raise ConfigError("Internationalized host mixes multiple scripts")
 
-
 def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
     """Reconstruct URL netloc with a normalized hostname."""
 
@@ -163,7 +118,6 @@ def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
 
     port = f":{parsed.port}" if parsed.port else ""
     return f"{host_component}{port}"
-
 
 def _cached_getaddrinfo(host: str) -> List[Tuple]:
     """Resolve *host* using an expiring LRU cache to avoid repeated DNS lookups."""
@@ -188,7 +142,6 @@ def _cached_getaddrinfo(host: str) -> List[Tuple]:
         _prune_dns_cache(now)
     return results
 
-
 def _prune_dns_cache(current_time: float) -> None:
     """Expire stale DNS entries and enforce the cache size bound."""
 
@@ -200,7 +153,6 @@ def _prune_dns_cache(current_time: float) -> None:
 
     while len(_DNS_CACHE) > _DNS_CACHE_MAX_ENTRIES:
         _DNS_CACHE.popitem(last=False)
-
 
 def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
     """Validate URLs to avoid SSRF, enforce HTTPS, normalize IDNs, and honor host allowlists."""
@@ -308,395 +260,6 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
 
     return urlunparse(parsed)
 
-
-def sha256_file(path: Path) -> str:
-    """Compute the SHA-256 digest for the provided file."""
-
-    hasher = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1 << 20), b""):
-            hasher.update(chunk)
-    return hasher.hexdigest()
-
-
-def _compute_file_hash(path: Path, algorithm: str) -> str:
-    """Compute ``algorithm`` digest for ``path``."""
-
-    try:
-        hasher = hashlib.new(algorithm)
-    except ValueError as exc:  # pragma: no cover - defensive guard for unsupported algs
-        raise ValueError(f"Unsupported checksum algorithm '{algorithm}'") from exc
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1 << 20), b""):
-            hasher.update(chunk)
-    return hasher.hexdigest()
-
-
-_MAX_COMPRESSION_RATIO = 10.0
-
-
-def _validate_member_path(member_name: str) -> Path:
-    """Validate archive member paths to prevent traversal attacks."""
-
-    normalized = member_name.replace("\\", "/")
-    relative = PurePosixPath(normalized)
-    if relative.is_absolute():
-        raise ConfigError(f"Unsafe absolute path detected in archive: {member_name}")
-    if not relative.parts:
-        raise ConfigError(f"Empty path detected in archive: {member_name}")
-    if any(part in {"", ".", ".."} for part in relative.parts):
-        raise ConfigError(f"Unsafe path detected in archive: {member_name}")
-    return Path(*relative.parts)
-
-
-def _check_compression_ratio(
-    *,
-    total_uncompressed: int,
-    compressed_size: int,
-    archive: Path,
-    logger: Optional[logging.Logger],
-    archive_type: str,
-) -> None:
-    """Ensure compressed archives do not expand beyond the permitted ratio."""
-
-    if compressed_size <= 0:
-        return
-    ratio = total_uncompressed / float(compressed_size)
-    if ratio > _MAX_COMPRESSION_RATIO:
-        if logger:
-            logger.error(
-                "archive compression ratio too high",
-                extra={
-                    "stage": "extract",
-                    "archive": str(archive),
-                    "ratio": round(ratio, 2),
-                    "compressed_bytes": compressed_size,
-                    "uncompressed_bytes": total_uncompressed,
-                    "limit": _MAX_COMPRESSION_RATIO,
-                },
-            )
-        raise ConfigError(
-            f"{archive_type} archive {archive} expands to {total_uncompressed} bytes, "
-            f"exceeding {_MAX_COMPRESSION_RATIO}:1 compression ratio"
-        )
-
-
-def _enforce_uncompressed_ceiling(
-    *,
-    total_uncompressed: int,
-    limit_bytes: Optional[int],
-    archive: Path,
-    logger: Optional[logging.Logger],
-    archive_type: str,
-) -> None:
-    """Ensure uncompressed payload stays within configured limits."""
-
-    if limit_bytes is None or limit_bytes <= 0:
-        return
-    if total_uncompressed <= limit_bytes:
-        return
-    if logger:
-        logger.error(
-            "archive uncompressed size exceeds limit",
-            extra={
-                "stage": "extract",
-                "archive": str(archive),
-                "uncompressed_bytes": total_uncompressed,
-                "limit_bytes": limit_bytes,
-                "archive_type": archive_type,
-            },
-        )
-    raise ConfigError(
-        f"{archive_type} archive {archive} expands to {total_uncompressed} bytes, "
-        f"exceeding configured ceiling of {limit_bytes} bytes"
-    )
-
-
-def extract_zip_safe(
-    zip_path: Path,
-    destination: Path,
-    *,
-    logger: Optional[logging.Logger] = None,
-    max_uncompressed_bytes: Optional[int] = None,
-) -> List[Path]:
-    """Extract a ZIP archive while preventing traversal and compression bombs."""
-
-    if not zip_path.exists():
-        raise ConfigError(f"ZIP archive not found: {zip_path}")
-    destination.mkdir(parents=True, exist_ok=True)
-    extracted: List[Path] = []
-    limit_bytes = _resolve_max_uncompressed_bytes(max_uncompressed_bytes)
-    with zipfile.ZipFile(zip_path) as archive:
-        members = archive.infolist()
-        safe_members: List[tuple[zipfile.ZipInfo, Path]] = []
-        total_uncompressed = 0
-        for member in members:
-            member_path = _validate_member_path(member.filename)
-            mode = (member.external_attr >> 16) & 0xFFFF
-            if stat.S_IFMT(mode) == stat.S_IFLNK:
-                raise ConfigError(f"Unsafe link detected in archive: {member.filename}")
-            if member.is_dir():
-                safe_members.append((member, member_path))
-                continue
-            total_uncompressed += int(member.file_size)
-            safe_members.append((member, member_path))
-        compressed_size = max(
-            zip_path.stat().st_size,
-            sum(int(member.compress_size) for member in members) or 0,
-        )
-        _check_compression_ratio(
-            total_uncompressed=total_uncompressed,
-            compressed_size=compressed_size,
-            archive=zip_path,
-            logger=logger,
-            archive_type="ZIP",
-        )
-        _enforce_uncompressed_ceiling(
-            total_uncompressed=total_uncompressed,
-            limit_bytes=limit_bytes,
-            archive=zip_path,
-            logger=logger,
-            archive_type="ZIP",
-        )
-        for member, member_path in safe_members:
-            target_path = destination / member_path
-            if member.is_dir():
-                target_path.mkdir(parents=True, exist_ok=True)
-                continue
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            with archive.open(member, "r") as source, target_path.open("wb") as target:
-                shutil.copyfileobj(source, target)
-            extracted.append(target_path)
-    if logger:
-        logger.info(
-            "extracted zip archive",
-            extra={"stage": "extract", "archive": str(zip_path), "files": len(extracted)},
-        )
-    return extracted
-
-
-def extract_tar_safe(
-    tar_path: Path,
-    destination: Path,
-    *,
-    logger: Optional[logging.Logger] = None,
-    max_uncompressed_bytes: Optional[int] = None,
-) -> List[Path]:
-    """Safely extract tar archives (tar, tar.gz, tar.xz) with traversal and compression checks."""
-
-    if not tar_path.exists():
-        raise ConfigError(f"TAR archive not found: {tar_path}")
-    destination.mkdir(parents=True, exist_ok=True)
-    extracted: List[Path] = []
-    limit_bytes = _resolve_max_uncompressed_bytes(max_uncompressed_bytes)
-    try:
-        with tarfile.open(tar_path, mode="r:*") as archive:
-            members = archive.getmembers()
-            safe_members: List[tuple[tarfile.TarInfo, Path]] = []
-            total_uncompressed = 0
-            for member in members:
-                member_path = _validate_member_path(member.name)
-                if member.isdir():
-                    safe_members.append((member, member_path))
-                    continue
-                if member.islnk() or member.issym():
-                    raise ConfigError(f"Unsafe link detected in archive: {member.name}")
-                if member.isdev():
-                    raise ConfigError(
-                        f"Unsupported special file detected in archive: {member.name}"
-                    )
-                if not member.isfile():
-                    raise ConfigError(f"Unsupported tar member type encountered: {member.name}")
-                total_uncompressed += int(member.size)
-                safe_members.append((member, member_path))
-            compressed_size = tar_path.stat().st_size
-            _check_compression_ratio(
-                total_uncompressed=total_uncompressed,
-                compressed_size=compressed_size,
-                archive=tar_path,
-                logger=logger,
-                archive_type="TAR",
-            )
-            _enforce_uncompressed_ceiling(
-                total_uncompressed=total_uncompressed,
-                limit_bytes=limit_bytes,
-                archive=tar_path,
-                logger=logger,
-                archive_type="TAR",
-            )
-            for member, member_path in safe_members:
-                if member.isdir():
-                    (destination / member_path).mkdir(parents=True, exist_ok=True)
-                    continue
-                target_path = destination / member_path
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                extracted_file = archive.extractfile(member)
-                if extracted_file is None:
-                    raise ConfigError(f"Failed to extract member: {member.name}")
-                with extracted_file as source, target_path.open("wb") as target:
-                    shutil.copyfileobj(source, target)
-                extracted.append(target_path)
-    except tarfile.TarError as exc:
-        raise ConfigError(f"Failed to extract tar archive {tar_path}: {exc}") from exc
-    if logger:
-        logger.info(
-            "extracted tar archive",
-            extra={"stage": "extract", "archive": str(tar_path), "files": len(extracted)},
-        )
-    return extracted
-
-
-_TAR_SUFFIXES = (".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2")
-
-
-def extract_archive_safe(
-    archive_path: Path,
-    destination: Path,
-    *,
-    logger: Optional[logging.Logger] = None,
-    max_uncompressed_bytes: Optional[int] = None,
-) -> List[Path]:
-    """Extract archives by dispatching to the appropriate safe handler."""
-
-    lower_name = archive_path.name.lower()
-    limit_bytes = _resolve_max_uncompressed_bytes(max_uncompressed_bytes)
-    if lower_name.endswith(".zip"):
-        return extract_zip_safe(
-            archive_path,
-            destination,
-            logger=logger,
-            max_uncompressed_bytes=limit_bytes,
-        )
-    if any(lower_name.endswith(suffix) for suffix in _TAR_SUFFIXES):
-        return extract_tar_safe(
-            archive_path,
-            destination,
-            logger=logger,
-            max_uncompressed_bytes=limit_bytes,
-        )
-    raise ConfigError(f"Unsupported archive format: {archive_path}")
-
-
-# --- Rate limiter utilities merged from ratelimit.py ---
-
-try:  # pragma: no cover - POSIX only
-    import fcntl  # type: ignore
-except ImportError:  # pragma: no cover - Windows fallback
-    fcntl = None  # type: ignore[assignment]
-
-try:  # pragma: no cover - Windows only
-    import msvcrt  # type: ignore
-except ImportError:  # pragma: no cover - POSIX fallback
-    msvcrt = None  # type: ignore[assignment]
-
-
-class TokenBucket:
-    """Token bucket used to enforce per-host and per-service rate limits."""
-
-    def __init__(self, rate_per_sec: float, capacity: Optional[float] = None) -> None:
-        self.rate = rate_per_sec
-        self.capacity = capacity or rate_per_sec
-        self.tokens = self.capacity
-        self.timestamp = time.monotonic()
-        self.lock = threading.Lock()
-
-    def consume(self, tokens: float = 1.0) -> None:
-        """Consume tokens from the bucket, sleeping until capacity is available."""
-
-        while True:
-            with self.lock:
-                now = time.monotonic()
-                delta = now - self.timestamp
-                self.timestamp = now
-                self.tokens = min(self.capacity, self.tokens + delta * self.rate)
-                if self.tokens >= tokens:
-                    self.tokens -= tokens
-                    return
-                needed = tokens - self.tokens
-            time.sleep(max(needed / self.rate, 0.0))
-
-
-class SharedTokenBucket(TokenBucket):
-    """Token bucket backed by a filesystem state file for multi-process usage."""
-
-    def __init__(
-        self,
-        *,
-        rate_per_sec: float,
-        capacity: float,
-        state_path: Path,
-    ) -> None:
-        super().__init__(rate_per_sec=rate_per_sec, capacity=capacity)
-        self.state_path = state_path
-        self.state_path.parent.mkdir(parents=True, exist_ok=True)
-
-    def _acquire_file_lock(self, handle) -> None:
-        if fcntl is not None:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)  # type: ignore[attr-defined]
-        elif msvcrt is not None:
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)  # type: ignore[attr-defined]
-
-    def _release_file_lock(self, handle) -> None:
-        if fcntl is not None:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)  # type: ignore[attr-defined]
-        elif msvcrt is not None:
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)  # type: ignore[attr-defined]
-
-    def _read_state(self, handle) -> Tuple[float, float]:
-        try:
-            handle.seek(0)
-            raw = handle.read()
-            if not raw:
-                return self.capacity, time.monotonic()
-            data = json.loads(raw)
-            return data.get("tokens", self.capacity), data.get("timestamp", time.monotonic())
-        except (json.JSONDecodeError, OSError):
-            return self.capacity, time.monotonic()
-
-    def _write_state(self, handle, state) -> None:
-        handle.seek(0)
-        handle.truncate()
-        handle.write(json.dumps(state))
-        handle.flush()
-
-    def _try_consume(self, tokens: float) -> Optional[float]:
-        locked = False
-        handle = None
-        try:
-            handle = self.state_path.open("a+")
-            self._acquire_file_lock(handle)
-            locked = True
-            available, timestamp = self._read_state(handle)
-            now = time.monotonic()
-            delta = now - timestamp
-            available = min(self.capacity, available + delta * self.rate)
-            if available >= tokens:
-                available -= tokens
-                state = {"tokens": available, "timestamp": now}
-                self._write_state(handle, state)
-                return None
-            state = {"tokens": available, "timestamp": now}
-            self._write_state(handle, state)
-            return tokens - available
-        finally:
-            if handle is not None:
-                if locked:
-                    self._release_file_lock(handle)
-                handle.close()
-
-    def consume(self, tokens: float = 1.0) -> None:  # type: ignore[override]
-        """Consume tokens from the shared bucket, waiting when insufficient."""
-
-        while True:
-            with self.lock:
-                needed = self._try_consume(tokens)
-            if needed is None:
-                return
-            time.sleep(max(needed / self.rate, 0.0))
-
-
 class SessionPool:
     """Lightweight pool that reuses requests sessions per (service, host)."""
 
@@ -749,153 +312,6 @@ class SessionPool:
                     session.close()
             self._pool.clear()
 
-
-def _shared_bucket_path(http_config: DownloadConfiguration, key: str) -> Optional[Path]:
-    """Return the filesystem path for the shared token bucket state."""
-
-    root = getattr(http_config, "shared_rate_limit_dir", None)
-    if not root:
-        return None
-    base = Path(root).expanduser()
-    token = re.sub(r"[^A-Za-z0-9._-]", "_", key).strip("._")
-    if not token:
-        token = "bucket"
-    return base / f"{token}.json"
-
-
-@dataclass(slots=True)
-class _BucketEntry:
-    bucket: TokenBucket
-    rate: float
-    capacity: float
-    shared_path: Optional[Path]
-
-
-class RateLimiterRegistry:
-    """Manage shared token buckets keyed by (service, host)."""
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._buckets: Dict[Tuple[str, str], _BucketEntry] = {}
-
-    def _qualify(self, service: Optional[str], host: Optional[str]) -> Tuple[str, str]:
-        service_key = (service or "_").lower()
-        host_key = (host or "default").lower()
-        return service_key, host_key
-
-    def _normalize_rate(
-        self, *, http_config: DownloadConfiguration, service: Optional[str]
-    ) -> Tuple[float, float]:
-        rate = http_config.rate_limit_per_second()
-        if service:
-            service_rate = http_config.parse_service_rate_limit(service)
-            if service_rate:
-                rate = service_rate
-        rate = max(rate, 0.1)
-        capacity = max(rate, 1.0)
-        return rate, capacity
-
-    def get_bucket(
-        self,
-        *,
-        http_config: DownloadConfiguration,
-        service: Optional[str],
-        host: Optional[str],
-    ) -> TokenBucket:
-        """Return a token bucket for ``service``/``host`` using shared registry."""
-
-        key = self._qualify(service, host)
-        rate, capacity = self._normalize_rate(http_config=http_config, service=service)
-        path_key = f"{key[0]}:{key[1]}"
-        shared_path = _shared_bucket_path(http_config, path_key)
-        with self._lock:
-            entry = self._buckets.get(key)
-            if (
-                entry is None
-                or entry.rate != rate
-                or entry.capacity != capacity
-                or entry.shared_path != shared_path
-            ):
-                if shared_path is not None:
-                    bucket = SharedTokenBucket(
-                        rate_per_sec=rate,
-                        capacity=capacity,
-                        state_path=shared_path,
-                    )
-                else:
-                    bucket = TokenBucket(rate_per_sec=rate, capacity=capacity)
-                entry = _BucketEntry(
-                    bucket=bucket, rate=rate, capacity=capacity, shared_path=shared_path
-                )
-                self._buckets[key] = entry
-            return entry.bucket
-
-    def apply_retry_after(
-        self,
-        *,
-        http_config: DownloadConfiguration,
-        service: Optional[str],
-        host: Optional[str],
-        delay: float,
-    ) -> None:
-        """Reduce available tokens to honor server-provided retry-after hints."""
-
-        if delay <= 0:
-            return
-        bucket = self.get_bucket(http_config=http_config, service=service, host=host)
-        with bucket.lock:
-            bucket.tokens = min(bucket.tokens, max(bucket.tokens - delay * bucket.rate, 0.0))
-            bucket.timestamp = time.monotonic()
-
-    def reset(self) -> None:
-        """Clear all registered buckets (used in tests)."""
-
-        with self._lock:
-            self._buckets.clear()
-
-
-REGISTRY = RateLimiterRegistry()
-SESSION_POOL = SessionPool()
-
-
-def get_bucket(
-    *,
-    http_config: DownloadConfiguration,
-    service: Optional[str],
-    host: Optional[str],
-) -> TokenBucket:
-    """Return a registry-managed bucket."""
-
-    return REGISTRY.get_bucket(http_config=http_config, service=service, host=host)
-
-
-def apply_retry_after(
-    *,
-    http_config: DownloadConfiguration,
-    service: Optional[str],
-    host: Optional[str],
-    delay: float,
-) -> None:
-    """Adjust bucket capacity after receiving a Retry-After hint."""
-
-    REGISTRY.apply_retry_after(
-        http_config=http_config,
-        service=service,
-        host=host,
-        delay=delay,
-    )
-
-
-def reset() -> None:
-    """Clear all buckets (testing hook)."""
-
-    REGISTRY.reset()
-    SESSION_POOL.clear()
-
-
-T = TypeVar("T")
-
-
 def retry_with_backoff(
     func: Callable[[], T],
     *,
@@ -942,7 +358,6 @@ def retry_with_backoff(
                     pass
             sleep(max(delay, 0.0))
 
-
 def log_memory_usage(
     logger: logging.Logger,
     *,
@@ -969,8 +384,6 @@ def log_memory_usage(
         extra["validator"] = validator
     logger.debug("memory usage", extra=extra)
 
-
-@dataclass(slots=True)
 class DownloadResult:
     """Result metadata for a completed download operation.
 
@@ -997,10 +410,6 @@ class DownloadResult:
     content_type: Optional[str]
     content_length: Optional[int]
 
-
-_RETRYABLE_HTTP_STATUSES = {403, 408, 425, 429, 500, 502, 503, 504}
-
-
 def _parse_retry_after(value: Optional[str]) -> Optional[float]:
     if not value:
         return None
@@ -1022,14 +431,12 @@ def _parse_retry_after(value: Optional[str]) -> Optional[float]:
         seconds = (retry_time - now).total_seconds()
     return max(seconds, 0.0)
 
-
 def _is_retryable_status(status_code: Optional[int]) -> bool:
     if status_code is None:
         return True
     if status_code >= 500:
         return True
     return status_code in _RETRYABLE_HTTP_STATUSES
-
 
 def is_retryable_error(exc: BaseException) -> bool:
     """Return ``True`` when ``exc`` represents a retryable network failure."""
@@ -1053,28 +460,7 @@ def is_retryable_error(exc: BaseException) -> bool:
         return True
     return False
 
-
-_RDF_FORMAT_LABELS = {
-    "application/rdf+xml": "RDF/XML",
-    "text/turtle": "Turtle",
-    "application/n-triples": "N-Triples",
-    "application/trig": "TriG",
-    "application/ld+json": "JSON-LD",
-}
-_RDF_ALIAS_GROUPS = {
-    "application/rdf+xml": {"application/rdf+xml", "application/xml", "text/xml"},
-    "text/turtle": {"text/turtle", "application/x-turtle"},
-    "application/n-triples": {"application/n-triples", "text/plain"},
-    "application/trig": {"application/trig"},
-    "application/ld+json": {"application/ld+json"},
-}
-RDF_MIME_ALIASES: Set[str] = set()
-RDF_MIME_FORMAT_LABELS: Dict[str, str] = {}
-for canonical, aliases in _RDF_ALIAS_GROUPS.items():
-    label = _RDF_FORMAT_LABELS[canonical]
-    for alias in aliases:
-        RDF_MIME_ALIASES.add(alias)
-        RDF_MIME_FORMAT_LABELS[alias] = label
+SESSION_POOL = SessionPool()
 
 
 class StreamingDownloader(pooch.HTTPDownloader):
@@ -1595,39 +981,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
         part_path.replace(Path(output_file))
         destination_part_path.unlink(missing_ok=True)
 
-
-def _materialize_cached_file(source: Path, destination: Path) -> tuple[Path, Path]:
-    """Link or move ``source`` into ``destination`` without redundant copies.
-
-    Returns a tuple ``(artifact_path, cache_path)`` where ``artifact_path`` is the final
-    destination path and ``cache_path`` points to the retained cache file (which may be
-    identical to ``artifact_path`` when the cache entry is moved instead of linked).
-    """
-
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if source == destination:
-        return destination, destination
-    if destination.exists():
-        try:
-            if destination.samefile(source):
-                return destination, source
-        except (FileNotFoundError, OSError):
-            pass
-    temp_path = destination.with_suffix(destination.suffix + ".tmpdownload")
-    temp_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path.unlink(missing_ok=True)
-    try:
-        os.link(source, temp_path)
-        os.replace(temp_path, destination)
-        return destination, source
-    except OSError:
-        shutil.move(str(source), str(temp_path))
-        os.replace(temp_path, destination)
-        return destination, destination
-    finally:
-        temp_path.unlink(missing_ok=True)
-
-
 def _extract_correlation_id(logger: logging.Logger) -> Optional[str]:
     extra = getattr(logger, "extra", None)
     if isinstance(extra, dict):
@@ -1635,7 +988,6 @@ def _extract_correlation_id(logger: logging.Logger) -> Optional[str]:
         if isinstance(value, str):
             return value
     return None
-
 
 def download_stream(
     *,
@@ -1925,58 +1277,3 @@ def download_stream(
     raise OntologyDownloadError(
         f"checksum mismatch after {max_checksum_attempts} attempts: {secure_url}"
     )
-
-
-__all__ = [
-    "sanitize_filename",
-    "generate_correlation_id",
-    "mask_sensitive_data",
-    "validate_url_security",
-    "sha256_file",
-    "extract_zip_safe",
-    "extract_tar_safe",
-    "extract_archive_safe",
-    "TokenBucket",
-    "SharedTokenBucket",
-    "RateLimiterRegistry",
-    "REGISTRY",
-    "SessionPool",
-    "SESSION_POOL",
-    "get_bucket",
-    "apply_retry_after",
-    "reset",
-    "is_retryable_error",
-    "retry_with_backoff",
-    "DownloadResult",
-    "DownloadFailure",
-    "StreamingDownloader",
-    "download_stream",
-    "log_memory_usage",
-    "RDF_MIME_ALIASES",
-    "RDF_MIME_FORMAT_LABELS",
-    "format_bytes",
-]
-
-
-def __getattr__(name: str):
-    """Lazily proxy pipeline helpers without incurring import cycles."""
-
-    if name == "validate_manifest_dict":
-        from .planning import validate_manifest_dict as _validate_manifest_dict
-
-        return _validate_manifest_dict
-    raise AttributeError(name)
-
-
-# --- Lightweight helpers merged from utils.py ---
-
-
-def format_bytes(num: int) -> str:
-    """Return a human-readable representation for ``num`` bytes."""
-
-    value = float(num)
-    for unit in ("B", "KB", "MB", "GB", "TB"):
-        if value < 1024.0 or unit == "TB":
-            return f"{value:.2f} {unit}"
-        value /= 1024.0
-    return f"{value:.2f} TB"

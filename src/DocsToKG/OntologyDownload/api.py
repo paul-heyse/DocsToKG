@@ -316,7 +316,7 @@ from .errors import (
     PolicyError,
     UnsupportedPythonError,
 )
-from .exports import PUBLIC_EXPORT_NAMES
+from .exports import PUBLIC_API_MANIFEST as EXPORT_MANIFEST, PUBLIC_EXPORT_NAMES
 from .io import (
     validate_url_security as _validate_url_security,
 )
