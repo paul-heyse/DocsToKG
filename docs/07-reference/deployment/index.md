@@ -73,7 +73,7 @@ direnv exec . docparse embed \
   --batch-size-qwen 96
 ```
 
-- Relies on `torch`, `xformers`, and `cupy` wheels installed during bootstrap; confirm CUDA 12.9 drivers for GPU use.
+- Relies on `torch`, `xformers`, and `cupy-cuda12x` wheels installed during bootstrap; confirm CUDA 12.9 drivers for GPU use.
 - Optional VLLM acceleration can be toggled via `--execution-backend=vllm` once the cluster has GPU capacity.
 
 ### 4.4 Hybrid Search Indexing

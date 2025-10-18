@@ -39,7 +39,7 @@ The bootstrap script:
 
 - Creates `.venv/` with CPython 3.13.
 - Installs DocsToKG in editable mode and applies the pinned `requirements.txt`.
-- Reuses local wheels (`torch`, `torchaudio`, `torchvision`, `faiss`, `vllm`, `cupy`) from `ci/wheels/`.
+- Reuses local wheels (`torch`, `torchaudio`, `torchvision`, `faiss`, `vllm`, `cupy-cuda12x`) from `ci/wheels/`.
 
 Use `./scripts/dev.sh exec <command>` in environments where `direnv` cannot be installed.
 

@@ -292,7 +292,6 @@ cuda-toolkit[cublas,curand,cusolver,cusparse]==12.9.1
     #   DocsToKG (pyproject.toml)
     #   libcuvs-cu12
     #   libraft-cu12
-cupy @ file:ci/wheels/cupy-14.0.0a1-cp313-cp313-linux_x86_64.whl
 cupy-cuda12x @ file:ci/wheels/cupy_cuda12x-14.0.0a1-cp313-cp313-manylinux2014_x86_64.whl
     # via
     #   DocsToKG (pyproject.toml)

@@ -114,7 +114,7 @@ def test_manifest_accepts_known_stage(monkeypatch, tmp_path) -> None:
     assert captured["data_root"] == tmp_path
 
     with pytest.raises(CLIValidationError) as excinfo:
-        cli.manifest(["--stage", "unknown-stage", "--data-root", str(tmp_path)])
+        cli._manifest_main(["--stage", "unknown-stage", "--data-root", str(tmp_path)])
 
     assert "Unsupported stage" in str(excinfo.value)
     assert call_count["value"] == 1

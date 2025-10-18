@@ -41,7 +41,7 @@ Repository defaults (hook versions, excludes) live in `docs/05-development/index
 
 | Utility | Location | Description |
 |---------|----------|-------------|
-| `scripts/bootstrap_env.sh` | `scripts/` | Creates/refreshes `.venv`, installs bundled wheels (`torch`, `faiss`, `cupy`, `vllm`), and installs DocsToKG in editable mode. |
+| `scripts/bootstrap_env.sh` | `scripts/` | Creates/refreshes `.venv`, installs bundled wheels (`torch`, `faiss`, `cupy-cuda12x`, `vllm`), and installs DocsToKG in editable mode. |
 | `scripts/dev.sh` | `scripts/` | Convenience wrapper for running commands inside the project environment when `direnv` is unavailable (`./scripts/dev.sh exec pytest -q`). |
 | `openspec` CLI | `openspec/` | Specification management (`openspec validate <change-id> --strict`) used for proposal review and implementation tracking. |
 

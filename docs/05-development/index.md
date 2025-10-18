@@ -7,7 +7,7 @@ Welcome to the DocsToKG development community! This guide will help you contribu
 ### 1. Set Up Development Environment
 
 1. Follow the [Setup Guide](../02-setup/index.md).
-2. Run `./scripts/bootstrap_env.sh` to create `.venv` with Python 3.13 and install bundled wheels (`torch`, `faiss`, `vllm`, `cupy`).
+2. Run `./scripts/bootstrap_env.sh` to create `.venv` with Python 3.13 and install bundled wheels (`torch`, `faiss`, `vllm`, `cupy-cuda12x`).
 3. Approve `.envrc` with `direnv allow` so shells inherit the virtualenv and `PYTHONPATH`.
 4. Optional: `./scripts/dev.sh exec <command>` when `direnv` is unavailable.
 

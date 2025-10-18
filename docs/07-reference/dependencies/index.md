@@ -19,7 +19,7 @@ auditing environments or troubleshooting dependency conflicts.
 | Ontology download | `oaklib==0.6.23`, `ontoportal-client`, `ols-client`, `bioregistry`, `rdflib`, `owlready2`, `pronto`, `arelle` | Power `DocsToKG.OntologyDownload.*` workflows, including validators that exercise multiple ontology formats. |
 | Content acquisition | `pyalex==0.18`, `requests`, `beautifulsoup4`, `trafilatura` *(optional)*, `tenacity`, `pydantic` | Used by `DocsToKG.ContentDownload` resolver pipeline, manifest telemetry, and HTML fallback extraction. |
 | Doc parsing & chunking | `docling-core`, `transformers`, `tokenizers`, `sentencepiece`, `pydantic`, `structlog` | Back the DocTags ingestion, hybrid chunker, and telemetry instrumentation. |
-| Hybrid search & embeddings | `faiss`, `numpy`, `scikit-learn`, `torch`, `xformers`, `cupy`, `cupy-cuda12x` | Deployed by `DocsToKG.HybridSearch` to build FAISS indexes and run embedding evaluation. |
+| Hybrid search & embeddings | `faiss`, `numpy`, `scikit-learn`, `torch`, `xformers`, `cupy-cuda12x` | Deployed by `DocsToKG.HybridSearch` to build FAISS indexes and run embedding evaluation. |
 | Services & CLI | `typer`, `click`, `rich`, `uvicorn`, `fastapi`, `pydantic-settings` | Provide command-line helpers and service endpoints across the project. |
 
 All pins live in `requirements.txt`; use `./scripts/bootstrap_env.sh` to install the curated set together with the project in editable mode.
@@ -31,7 +31,7 @@ Custom wheels are stored under `ci/wheels/` and installed automatically when the
 - `torch==2.8.0+cu129`, `torchvision==0.23.0+cu129`, `torchaudio==2.8.0+cu129`
 - `vllm==0.11.0rc2.dev449+g134f70b3e.d20251014.cu129`
 - `faiss==1.12.0` (Python wheel)
-- `cupy==14.0.0a1` and `cupy-cuda12x==14.0.0a1`
+- `cupy-cuda12x==14.0.0a1`
 
 Because these wheels are bundled, installations do **not** hit external package indexes—ensure `git lfs pull` has populated the wheel directory before bootstrapping.
 

@@ -80,11 +80,6 @@ from DocsToKG.ContentDownload.pipeline import (
     ResolverMetrics,
     ResolverPipeline,
 )
-from DocsToKG.ContentDownload.download_execution import (
-    finalize_candidate_download,
-    prepare_candidate_download,
-    stream_candidate_payload,
-)
 from DocsToKG.ContentDownload.telemetry import RunTelemetry
 
 __all__ = [
