@@ -4,13 +4,13 @@ on:
   push:
     paths:
       - "src/DocsToKG/DocParsing/**"
-      - "tests/test_docparsing_*.py"
+      - "tests/docparsing/**"
       - ".github/workflows/docparsing-tests.yml"
       - "openspec/changes/refactor-docparsing-pipeline/**"
   pull_request:
     paths:
       - "src/DocsToKG/DocParsing/**"
-      - "tests/test_docparsing_*.py"
+      - "tests/docparsing/**"
       - ".github/workflows/docparsing-tests.yml"
       - "openspec/changes/refactor-docparsing-pipeline/**"
 
@@ -38,4 +38,4 @@ jobs:
 
       - name: Run DocParsing test suite
         run: |
-          pytest tests/test_docparsing_*.py -v --cov=src/DocsToKG/DocParsing
+          pytest tests/docparsing -v --cov=src/DocsToKG/DocParsing
