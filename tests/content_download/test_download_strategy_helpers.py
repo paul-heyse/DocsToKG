@@ -161,6 +161,73 @@ def test_build_download_outcome_flags_small_pdf(tmp_path: Path, artifact: WorkAr
     assert outcome.reason is ReasonCode.PDF_TOO_SMALL
 
 
+def test_build_download_outcome_success_reason_none(tmp_path: Path, artifact: WorkArtifact) -> None:
+    pdf_path = tmp_path / "example.pdf"
+    pdf_bytes = b"%PDF-1.4\n" + (b"x" * 32) + b"\n%%EOF\n"
+    pdf_path.write_bytes(pdf_bytes)
+    response = _build_response()
+    outcome = downloader.build_download_outcome(
+        artifact=artifact,
+        classification=Classification.PDF,
+        dest_path=pdf_path,
+        response=response,
+        elapsed_ms=12.5,
+        flagged_unknown=False,
+        sha256="abc123",
+        content_length=len(pdf_bytes),
+        etag=None,
+        last_modified=None,
+        extracted_text_path=None,
+        dry_run=False,
+        tail_bytes=b"%%EOF",
+        head_precheck_passed=True,
+        min_pdf_bytes=8,
+        tail_check_bytes=2048,
+        retry_after=None,
+        options=downloader.DownloadOptions(
+            dry_run=False,
+            list_only=False,
+            extract_html_text=False,
+            run_id="run",
+        ),
+    )
+    assert outcome.classification is Classification.PDF
+    assert outcome.reason is None
+    assert outcome.reason_detail is None
+
+
+def test_build_download_outcome_conditional_reason(tmp_path: Path, artifact: WorkArtifact) -> None:
+    response = _FakeResponse(b"", status=304)
+    outcome = downloader.build_download_outcome(
+        artifact=artifact,
+        classification=Classification.CACHED,
+        dest_path=None,
+        response=response,
+        elapsed_ms=3.2,
+        flagged_unknown=False,
+        sha256="def456",
+        content_length=1024,
+        etag='"etag"',
+        last_modified="Wed, 03 Jan 2024 00:00:00 GMT",
+        extracted_text_path=None,
+        dry_run=True,
+        tail_bytes=None,
+        head_precheck_passed=True,
+        min_pdf_bytes=8,
+        tail_check_bytes=2048,
+        retry_after=None,
+        options=downloader.DownloadOptions(
+            dry_run=True,
+            list_only=False,
+            extract_html_text=False,
+            run_id="run",
+        ),
+    )
+    assert outcome.classification is Classification.CACHED
+    assert outcome.reason is ReasonCode.CONDITIONAL_NOT_MODIFIED
+    assert outcome.reason_detail == "not-modified"
+
+
 def test_pdf_strategy_finalize_returns_pdf(tmp_path: Path, artifact: WorkArtifact) -> None:
     dest_path = tmp_path / "example.pdf"
     dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -187,6 +254,7 @@ def test_pdf_strategy_finalize_returns_pdf(tmp_path: Path, artifact: WorkArtifac
     strategy = downloader.PdfDownloadStrategy()
     outcome = strategy.finalize_artifact(artifact, Classification.PDF, context)
     assert outcome.classification is Classification.PDF
+    assert outcome.reason is None
 
 
 def test_html_strategy_finalize_handles_html(tmp_path: Path, artifact: WorkArtifact) -> None:

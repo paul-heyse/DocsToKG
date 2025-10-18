@@ -808,14 +808,23 @@ def build_download_outcome(
             retry_after=retry_after,
         )
 
+    status_code = getattr(response, "status_code", None)
+    try:
+        normalized_status = int(status_code) if status_code is not None else None
+    except (TypeError, ValueError):
+        normalized_status = None
+
+    conditional_hit = normalized_status == 304 or classification_code is Classification.CACHED
+
     reason_code: Optional[ReasonCode] = None
     reason_detail: Optional[str] = None
     if flagged_unknown and classification_code is Classification.PDF:
         reason_code = ReasonCode.PDF_SNIFF_UNKNOWN
         reason_detail = "pdf-sniff-unknown"
-
-    if reason_code is None and classification_code in PDF_LIKE:
+    elif conditional_hit:
         reason_code = ReasonCode.CONDITIONAL_NOT_MODIFIED
+        if reason_detail is None:
+            reason_detail = "not-modified"
 
     path_str = str(dest_path) if dest_path else None
 
@@ -1069,11 +1078,27 @@ def download_candidate(
         headers["Referer"] = referer
     base_headers = dict(headers)
 
-    # Support for resuming partial downloads via HTTP Range requests
-    # Note: Full resume support requires atomic_write to handle append mode
-    # and rehashing from partial file state. Currently infrastructure is in place
-    # but feature is disabled by default pending append-mode implementation.
-    enable_resume = ctx.enable_range_resume
+    # Range resume support is deprecated and disabled until append-safe writes land.
+    resume_requested = bool(getattr(ctx, "enable_range_resume", False))
+    if resume_requested:
+        ctx.extra["resume_disabled"] = True
+        if not ctx.extra.get("resume_warning_logged"):
+            LOGGER.warning(
+                "Range resume requested for %s; feature is deprecated and will be ignored.",
+                url,
+                extra={
+                    "reason": "resume-disabled",
+                    "extra_fields": {
+                        "url": url,
+                        "work_id": artifact.work_id,
+                    },
+                },
+            )
+            ctx.extra["resume_warning_logged"] = True
+    else:
+        ctx.extra.pop("resume_disabled", None)
+    ctx.enable_range_resume = False
+    enable_resume = False
     resume_bytes_offset: Optional[int] = None
     accept_overrides = ctx.host_accept_overrides
     accept_value: Optional[str] = None

@@ -2,9 +2,29 @@
 
 from __future__ import annotations
 
+import argparse
 import builtins
+import sys
+import types
 
 import pytest
+
+sys.modules.pop("DocsToKG.DocParsing.embedding", None)
+
+if "DocsToKG.DocParsing.chunking" not in sys.modules:
+    chunk_stub = types.ModuleType("DocsToKG.DocParsing.chunking")
+
+    def _stub_build_parser() -> argparse.ArgumentParser:
+        return argparse.ArgumentParser()
+
+    def _stub_main(_: argparse.Namespace) -> int:
+        return 0
+
+    chunk_stub.build_parser = _stub_build_parser
+    chunk_stub.main = _stub_main
+    chunk_stub.MANIFEST_STAGE = "chunk"
+    chunk_stub.__all__ = ["build_parser", "main", "MANIFEST_STAGE"]
+    sys.modules["DocsToKG.DocParsing.chunking"] = chunk_stub
 
 import DocsToKG.DocParsing.embedding.runtime as embedding_runtime
 

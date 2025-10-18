@@ -101,6 +101,15 @@ manage structural-marker inventories outside the CLI. Use
 input) to deserialize marker documents before passing the resulting dictionaries
 into `load_structural_marker_profile`.
 
+### Core module layout
+
+The legacy `DocsToKG.DocParsing.core` monolith has been decomposed into
+focused modules under `DocsToKG.DocParsing.core.*` (for example,
+`core.discovery`, `core.http`, `core.manifest`, `core.planning`,
+`core.cli_utils`). Importers should continue to rely on
+`DocsToKG.DocParsing.core` which re-exports the stable surface while the
+submodules carry cohesive implementations.
+
 ### CLI validation behaviour
 
 All DocParsing CLIs normalise invalid argument handling through

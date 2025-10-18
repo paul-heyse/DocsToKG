@@ -45,6 +45,7 @@ import pytest
 
 from DocsToKG.ContentDownload import cli as downloader
 from DocsToKG.ContentDownload import pipeline as resolvers
+from DocsToKG.ContentDownload.telemetry import build_manifest_entry
 
 # --- Test Cases ---
 
@@ -83,7 +84,7 @@ def test_manifest_entry_schema_backward_compatible(tmp_path: Path):
         last_modified="Mon, 01 Jan 2024 00:00:00 GMT",
     )
 
-    entry = downloader.build_manifest_entry(
+    entry = build_manifest_entry(
         artifact,
         resolver="stub",
         url="https://example.org/schema.pdf",

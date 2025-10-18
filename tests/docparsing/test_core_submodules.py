@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import sys
 import types
 from pathlib import Path
@@ -77,6 +78,7 @@ _configure_embedding_stub()
 
 import DocsToKG.DocParsing.core.http as core_http
 from DocsToKG.DocParsing.core import cli as core_cli
+from DocsToKG.DocParsing.core.planning import display_plan
 from DocsToKG.DocParsing.core import (
     ResumeController,
     compute_relative_doc_id,
@@ -254,3 +256,35 @@ def test_embed_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> Non
     assert exit_code == 2
     assert "--plan-only" in captured.err
     assert "cannot be combined" in captured.err
+
+def test_display_plan_stream_output() -> None:
+    """Planner display writes to injected stream and returns lines."""
+
+    plans = [
+        {
+            "stage": "doctags",
+            "mode": "html",
+            "process": ["a"],
+            "skip": [],
+            "input_dir": "/input/doc",
+            "output_dir": "/output/doc",
+            "notes": ["Ready"],
+        },
+        {
+            "stage": "embed",
+            "action": "validate",
+            "validate": ["x"],
+            "missing": [],
+            "chunks_dir": "/chunks",
+            "vectors_dir": "/vectors",
+            "notes": [],
+        },
+    ]
+    buffer = io.StringIO()
+    lines = display_plan(plans, stream=buffer)
+    rendered = buffer.getvalue().splitlines()
+    assert lines == rendered
+    assert lines[-1] == ""
+    assert "docparse all plan" in rendered[0]
+    assert any("doctags" in line for line in rendered)
+    assert any("embed (validate-only)" in line for line in rendered)

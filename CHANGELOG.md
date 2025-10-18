@@ -14,6 +14,20 @@ All notable changes to DocsToKG are documented in this file.
   `cleanup_sidecar_files`, `build_download_outcome`) with comprehensive unit
   coverage to support artifact-specific logic.
 
+### Changed
+- DocParsing core modules are split into focused packages (`core.discovery`,
+  `core.http`, `core.manifest`, `core.planning`, `core.cli_utils`) with a thin
+  facade maintaining the stable import surface.
+- Structural marker configuration loaders are exported via
+  `DocsToKG.DocParsing.config_loaders` / `DocsToKG.DocParsing.config`, including
+  stricter error reporting and new unit coverage.
+- DocParsing CLIs surface invalid argument combinations via a shared
+  `CLIValidationError` hierarchy, producing `[stage] --option: message` failures
+  instead of Python tracebacks.
+- Embedding runtime now defers imports of optional dependencies (SPLADE and
+  vLLM) until required, raising actionable errors when packages are absent and
+  supporting import without the heavy extras installed.
+
 ### Documentation
 - Migration notes outlining the removal of deprecated content download shims,
   new `ApiResolverBase` guidance for resolver authors, staging directory usage,

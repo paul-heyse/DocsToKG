@@ -151,7 +151,7 @@ import pytest
 from DocsToKG.ContentDownload import cli as downloader
 from DocsToKG.ContentDownload import pipeline as resolvers
 from DocsToKG.ContentDownload.core import Classification, DownloadContext
-from DocsToKG.ContentDownload.telemetry import MANIFEST_SCHEMA_VERSION
+from DocsToKG.ContentDownload.telemetry import MANIFEST_SCHEMA_VERSION, build_manifest_entry
 from tools.manifest_to_index import convert_manifest_to_index
 
 # --- Globals ---
@@ -1478,7 +1478,7 @@ def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, 
             )
             if self.logger is not None:
                 self.logger.log_manifest(
-                    downloader.build_manifest_entry(
+                    build_manifest_entry(
                         artifact,
                         resolver="gamma",
                         url="https://example.org/gamma.pdf",

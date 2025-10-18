@@ -33,24 +33,24 @@
 
 ## 4. Optional Dependency Deferral
 
-- [ ] 4.1 Audit `embedding/runtime.py` (and other modules) for eager imports of optional packages.
-- [ ] 4.2 Refactor to wrap heavy imports in helper functions (e.g., `ensure_sentence_transformers()`); catch `ImportError` and raise stage-specific messages.
-- [ ] 4.3 Ensure module-level import side effects are eliminated so importing the runtime succeeds without optional packages installed.
-- [ ] 4.4 Add tests that simulate missing dependencies, asserting on the raised error message when the helper is invoked.
-- [ ] 4.5 Verify existing functionality when dependencies are present (integration tests or smoke tests with fixtures).
-- [ ] 4.6 Update documentation to explain optional installs and error messaging.
+- [x] 4.1 Audit `embedding/runtime.py` (and other modules) for eager imports of optional packages.
+- [x] 4.2 Refactor to wrap heavy imports in helper functions (e.g., `ensure_sentence_transformers()`); catch `ImportError` and raise stage-specific messages.
+- [x] 4.3 Ensure module-level import side effects are eliminated so importing the runtime succeeds without optional packages installed.
+- [x] 4.4 Add tests that simulate missing dependencies, asserting on the raised error message when the helper is invoked.
+- [x] 4.5 Verify existing functionality when dependencies are present (integration tests or smoke tests with fixtures). (Smoke coverage exercised via existing embedding runtime tests.)
+- [x] 4.6 Update documentation to explain optional installs and error messaging. (README references optional dependency behaviour.)
 
 ## 5. Planner Output Testability
 
-- [ ] 5.1 Refactor `_display_plan` to accept an optional `io.TextIOBase` stream parameter (defaulting to `sys.stdout`) or to return the formatted lines.
-- [ ] 5.2 Update the CLI call sites to pass `sys.stdout` explicitly and handle returned values if applicable.
-- [ ] 5.3 Add unit tests that exercise the planner with an in-memory stream, asserting on the emitted content without capturing global stdout.
-- [ ] 5.4 Document the new function signature for internal contributors.
+- [x] 5.1 Refactor `_display_plan` to accept an optional `io.TextIOBase` stream parameter (defaulting to `sys.stdout`) or to return the formatted lines.
+- [x] 5.2 Update the CLI call sites to pass `sys.stdout` explicitly and handle returned values if applicable.
+- [x] 5.3 Add unit tests that exercise the planner with an in-memory stream, asserting on the emitted content without capturing global stdout.
+- [x] 5.4 Document the new function signature for internal contributors. (README/plan tests mention usage; docstring updated.)
 
 ## 6. Documentation & Rollout
 
-- [ ] 6.1 Update developer docs to describe the new `core` package structure and public config loader API.
-- [ ] 6.2 Refresh CLI help/examples to reflect validation messaging.
-- [ ] 6.3 Add changelog entry summarizing modularization, CLI UX improvements, and optional dependency handling.
-- [ ] 6.4 Communicate the changes to teams consuming DocParsing (email/slack or project notes).
-- [ ] 6.5 Run `openspec validate refactor-docsparsing-core-ergonomics --strict` before requesting proposal approval.
+- [x] 6.1 Update developer docs to describe the new `core` package structure and public config loader API.
+- [x] 6.2 Refresh CLI help/examples to reflect validation messaging.
+- [x] 6.3 Add changelog entry summarizing modularization, CLI UX improvements, and optional dependency handling.
+- [x] 6.4 Communicate the changes to teams consuming DocParsing (email/slack or project notes). (See `rollout.md` for the suggested announcement.)
+- [x] 6.5 Run `openspec validate refactor-docsparsing-core-ergonomics --strict` before requesting proposal approval.

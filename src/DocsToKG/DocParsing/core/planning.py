@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence, TextIO
+
+import sys
 
 from DocsToKG.DocParsing.env import (
     data_chunks,
@@ -271,10 +273,12 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     }
 
 
-def display_plan(plans: Sequence[Dict[str, Any]]) -> None:
-    """Pretty-print plan summaries to stdout."""
+def display_plan(
+    plans: Sequence[Dict[str, Any]], stream: Optional[TextIO] = None
+) -> List[str]:
+    """Pretty-print plan summaries and return the rendered lines."""
 
-    print("docparse all plan")
+    lines: List[str] = ["docparse all plan"]
     for entry in plans:
         stage = entry.get("stage", "unknown")
         notes = entry.get("notes", [])
@@ -282,47 +286,52 @@ def display_plan(plans: Sequence[Dict[str, Any]]) -> None:
             desc = f"doctags (mode={entry.get('mode')})"
             process = entry.get("process", [])
             skip = entry.get("skip", [])
-            print(f"- {desc}: process {len(process)}, skip {len(skip)}")
-            print(f"  input:  {entry.get('input_dir')}")
-            print(f"  output: {entry.get('output_dir')}")
+            lines.append(f"- {desc}: process {len(process)}, skip {len(skip)}")
+            lines.append(f"  input:  {entry.get('input_dir')}")
+            lines.append(f"  output: {entry.get('output_dir')}")
             if process:
-                print("  process preview:", ", ".join(preview_list(process)))
+                lines.append("  process preview: " + ", ".join(preview_list(process)))
             if skip:
-                print("  skip preview:", ", ".join(preview_list(skip)))
+                lines.append("  skip preview: " + ", ".join(preview_list(skip)))
         elif stage == "chunk":
             process = entry.get("process", [])
             skip = entry.get("skip", [])
-            print(f"- chunk: process {len(process)}, skip {len(skip)}")
-            print(f"  input:  {entry.get('input_dir')}")
-            print(f"  output: {entry.get('output_dir')}")
+            lines.append(f"- chunk: process {len(process)}, skip {len(skip)}")
+            lines.append(f"  input:  {entry.get('input_dir')}")
+            lines.append(f"  output: {entry.get('output_dir')}")
             if process:
-                print("  process preview:", ", ".join(preview_list(process)))
+                lines.append("  process preview: " + ", ".join(preview_list(process)))
             if skip:
-                print("  skip preview:", ", ".join(preview_list(skip)))
+                lines.append("  skip preview: " + ", ".join(preview_list(skip)))
         elif stage == "embed" and entry.get("action") == "validate":
             validate = entry.get("validate", [])
             missing = entry.get("missing", [])
-            print(
+            lines.append(
                 f"- embed (validate-only): validate {len(validate)}, missing vectors {len(missing)}"
             )
-            print(f"  chunks:  {entry.get('chunks_dir')}")
-            print(f"  vectors: {entry.get('vectors_dir')}")
+            lines.append(f"  chunks:  {entry.get('chunks_dir')}")
+            lines.append(f"  vectors: {entry.get('vectors_dir')}")
             if validate:
-                print("  validate preview:", ", ".join(preview_list(validate)))
+                lines.append("  validate preview: " + ", ".join(preview_list(validate)))
             if missing:
-                print("  missing preview:", ", ".join(preview_list(missing)))
+                lines.append("  missing preview: " + ", ".join(preview_list(missing)))
         elif stage == "embed":
             process = entry.get("process", [])
             skip = entry.get("skip", [])
-            print(f"- embed: process {len(process)}, skip {len(skip)}")
-            print(f"  chunks:  {entry.get('chunks_dir')}")
-            print(f"  vectors: {entry.get('vectors_dir')}")
+            lines.append(f"- embed: process {len(process)}, skip {len(skip)}")
+            lines.append(f"  chunks:  {entry.get('chunks_dir')}")
+            lines.append(f"  vectors: {entry.get('vectors_dir')}")
             if process:
-                print("  process preview:", ", ".join(preview_list(process)))
+                lines.append("  process preview: " + ", ".join(preview_list(process)))
             if skip:
-                print("  skip preview:", ", ".join(preview_list(skip)))
+                lines.append("  skip preview: " + ", ".join(preview_list(skip)))
         else:
-            print(f"- {stage}: no actionable items")
+            lines.append(f"- {stage}: no actionable items")
         if notes:
-            print("  notes:", "; ".join(notes))
-    print()
+            lines.append("  notes: " + "; ".join(notes))
+    lines.append("")
+
+    output = stream or sys.stdout
+    for line in lines:
+        print(line, file=output)
+    return lines

@@ -579,6 +579,7 @@ import hashlib
 import json
 import logging
 import math
+import sqlite3
 import sys
 import threading
 import time
@@ -596,6 +597,7 @@ import pytest
 import requests
 
 from DocsToKG.ContentDownload import cli as downloader
+from DocsToKG.ContentDownload import download as download_impl
 from DocsToKG.ContentDownload.cli import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
@@ -608,6 +610,7 @@ from DocsToKG.ContentDownload.cli import (
 )
 from DocsToKG.ContentDownload.core import (
     Classification,
+    DownloadContext,
     ReasonCode,
     classify_payload,
     dedupe,
@@ -626,6 +629,7 @@ from DocsToKG.ContentDownload.networking import (
     request_with_retries,
 )
 from DocsToKG.ContentDownload.pipeline import (
+    AttemptRecord,
     DownloadOutcome,
     OpenAlexResolver,
     ResolverConfig,
@@ -637,6 +641,7 @@ from DocsToKG.ContentDownload.pipeline import (
 from DocsToKG.ContentDownload.telemetry import (
     JsonlSink,
     RunTelemetry,
+    ManifestEntry,
     SqliteSink,
     load_manifest_url_index,
 )
@@ -2324,7 +2329,8 @@ def stub_requests(
         response = mapping[key]
         return response() if callable(response) else response
 
-    monkeypatch.setattr(downloader, "request_with_retries", fake_request)
+    monkeypatch.setattr(downloader, "request_with_retries", fake_request, raising=False)
+    monkeypatch.setattr(download_impl, "request_with_retries", fake_request)
 
 
 # --- test_download_outcomes.py ---
@@ -2618,7 +2624,7 @@ def test_build_manifest_entry_includes_download_metadata(tmp_path):
         extracted_text_path=str(artifact.html_dir / "saved.txt"),
     )
 
-    entry = downloader.build_manifest_entry(
+    entry = build_manifest_entry(
         artifact,
         "figshare",
         "https://example.org/paper.pdf",
@@ -2634,6 +2640,180 @@ def test_build_manifest_entry_includes_download_metadata(tmp_path):
     assert entry.last_modified == "Fri, 05 Jan 2024 00:00:00 GMT"
     assert entry.extracted_text_path == str(artifact.html_dir / "saved.txt")
     assert entry.run_id == "test-run"
+
+
+def test_manifest_entry_serializes_null_reason(tmp_path):
+    artifact = make_artifact(tmp_path)
+    saved_path = artifact.pdf_dir / "saved.pdf"
+    pdf_bytes = b"%PDF-1.4\n" + (b"y" * 64) + b"\n%%EOF"
+    saved_path.write_bytes(pdf_bytes)
+    outcome = DownloadOutcome(
+        classification="pdf",
+        path=str(saved_path),
+        http_status=200,
+        content_type="application/pdf",
+        elapsed_ms=42.0,
+        reason=None,
+        sha256="abc123",
+        content_length=len(pdf_bytes),
+        etag=None,
+        last_modified=None,
+        extracted_text_path=None,
+    )
+
+    entry = build_manifest_entry(
+        artifact,
+        "figshare",
+        "https://example.org/paper.pdf",
+        outcome,
+        html_paths=[],
+        dry_run=False,
+        run_id="null-reason-test",
+    )
+
+    assert entry.reason is None
+
+    db_path = tmp_path / "telemetry.sqlite3"
+    with SqliteSink(db_path) as sink:
+        sink.log_manifest(entry)
+
+    conn = sqlite3.connect(db_path)
+    try:
+        reason_value = conn.execute("SELECT reason FROM manifests").fetchone()[0]
+        assert reason_value is None
+    finally:
+        conn.close()
+
+
+def test_resume_requested_triggers_full_download(tmp_path, monkeypatch):
+    artifact = make_artifact(tmp_path)
+    url = "https://example.org/resume.pdf"
+    dest_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
+    partial_path = dest_path.with_suffix(".pdf.part")
+    full_bytes = b"%PDF-1.4\n" + (b"a" * 4096) + b"\n%%EOF"
+    partial_path.write_bytes(full_bytes[:1024])
+    expected_sha = hashlib.sha256(full_bytes).hexdigest()
+
+    captured_headers: Dict[str, str] = {}
+
+    def fake_request(session, method, req_url, **kwargs):
+        captured_headers.clear()
+        captured_headers.update(dict(kwargs.get("headers") or {}))
+        return FakeResponse(
+            200,
+            headers={"Content-Type": "application/pdf"},
+            chunks=[full_bytes[:2048], full_bytes[2048:]],
+        )
+
+    monkeypatch.setattr(downloader, "request_with_retries", fake_request, raising=False)
+    monkeypatch.setattr(download_impl, "request_with_retries", fake_request)
+
+    ctx = DownloadContext.from_mapping(
+        {
+            "skip_head_precheck": True,
+            "enable_range_resume": True,
+            "previous": {
+                normalize_url(url): {
+                    "path": str(dest_path),
+                    "content_length": len(full_bytes),
+                }
+            },
+        }
+    )
+
+    session = requests.Session()
+    outcome = downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context=ctx,
+    )
+
+    assert "Range" not in captured_headers
+    assert ctx.extra.get("resume_disabled") is True
+    assert outcome.classification is Classification.PDF
+    assert outcome.reason is None
+    assert outcome.path is not None
+    stored = Path(outcome.path)
+    assert stored.read_bytes() == full_bytes
+    assert outcome.sha256 == expected_sha
+
+
+def test_pipeline_records_resume_disabled_metadata(tmp_path):
+    class RecordingLogger:
+        def __init__(self) -> None:
+            self.attempts: List[AttemptRecord] = []
+
+        def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+            self.attempts.append(record)
+
+        def log_manifest(self, entry: ManifestEntry) -> None:  # pragma: no cover - not used
+            return None
+
+        def log_summary(self, summary: Dict[str, Any]) -> None:  # pragma: no cover - not used
+            return None
+
+    class StubResolver:
+        name = "stub"
+
+        def is_enabled(self, config: ResolverConfig, artifact: WorkArtifact) -> bool:
+            return True
+
+        def iter_urls(
+            self,
+            session: requests.Session,
+            config: ResolverConfig,
+            artifact: WorkArtifact,
+        ) -> Iterable[ResolverResult]:
+            yield ResolverResult(url="https://example.org/stub.pdf")
+
+    def stub_download(
+        session: requests.Session,
+        artifact: WorkArtifact,
+        url: str,
+        referer: Optional[str],
+        timeout: float,
+        context: DownloadContext,
+        **kwargs: Any,
+    ) -> DownloadOutcome:
+        context.extra["resume_disabled"] = True
+        fake_path = tmp_path / "stub.pdf"
+        fake_path.write_bytes(b"%PDF-1.4\n%%EOF")
+        outcome = DownloadOutcome(
+            classification=Classification.PDF,
+            path=str(fake_path),
+            http_status=200,
+            content_type="application/pdf",
+            elapsed_ms=5.0,
+        )
+        outcome.metadata["resume_disabled"] = True
+        return outcome
+
+    logger = RecordingLogger()
+    config = ResolverConfig()
+    config.resolver_order = ["stub"]
+    config.resolver_toggles["stub"] = True
+    metrics = ResolverMetrics()
+    pipeline = ResolverPipeline(
+        resolvers=[StubResolver()],
+        config=config,
+        download_func=stub_download,
+        logger=logger,
+        metrics=metrics,
+    )
+
+    artifact = make_artifact(tmp_path)
+    session = requests.Session()
+    pipeline.run(
+        session,
+        artifact,
+        context=DownloadContext(skip_head_precheck=True, dry_run=False),
+    )
+
+    assert logger.attempts
+    assert logger.attempts[0].metadata.get("resume_disabled") is True
 
 
 # --- test_download_outcomes.py ---

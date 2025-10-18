@@ -938,6 +938,7 @@ class DownloadOutcome:
     last_modified: Optional[str] = None
     extracted_text_path: Optional[str] = None
     retry_after: Optional[float] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
 
     @property
@@ -961,6 +962,11 @@ class DownloadOutcome:
             self.classification = Classification.from_wire(normalized_status)
 
         self.reason = normalize_reason(self.reason)
+        metadata_value = self.metadata
+        if metadata_value is None:
+            self.metadata = {}
+        elif not isinstance(metadata_value, dict):
+            self.metadata = dict(metadata_value)
 
 
 @dataclass
@@ -2309,6 +2315,17 @@ class ResolverPipeline:
             if retry_after_hint is None and domain_wait > 0:
                 retry_after_hint = domain_wait
 
+            metadata_payload: Dict[str, Any] = {}
+            resolver_metadata = getattr(result, "metadata", None)
+            if isinstance(resolver_metadata, dict):
+                metadata_payload.update(resolver_metadata)
+            outcome_metadata = getattr(outcome, "metadata", None)
+            if isinstance(outcome_metadata, dict):
+                metadata_payload.update(outcome_metadata)
+            extra_context = getattr(download_context, "extra", None)
+            if isinstance(extra_context, dict) and extra_context.get("resume_disabled"):
+                metadata_payload["resume_disabled"] = True
+
             self._emit_attempt(
                 AttemptRecord(
                     run_id=self._run_id,
@@ -2322,7 +2339,7 @@ class ResolverPipeline:
                     elapsed_ms=outcome.elapsed_ms,
                     reason=outcome.reason,
                     reason_detail=outcome.reason_detail,
-                    metadata=result.metadata,
+                    metadata=metadata_payload,
                     sha256=outcome.sha256,
                     content_length=outcome.content_length,
                     dry_run=state.dry_run,

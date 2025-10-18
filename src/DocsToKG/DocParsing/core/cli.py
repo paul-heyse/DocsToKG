@@ -589,7 +589,7 @@ def run_all(argv: Sequence[str] | None = None) -> int:
                     "notes": [f"Embed plan unavailable ({exc})"],
                 }
             )
-        display_plan(plans)
+        display_plan(plans, stream=sys.stdout)
         return 0
 
     exit_code = doctags(doctags_args)
