@@ -977,6 +977,7 @@ if HAS_PYALEX:
         assert outcome.classification is Classification.SKIPPED
         assert outcome.reason is ReasonCode.DOMAIN_DISALLOWED_MIME
 
+
 def test_download_candidate_cleans_partial_on_stream_failure(tmp_path: Path, monkeypatch):
     artifact = _make_artifact(tmp_path)
     artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
@@ -1026,62 +1027,63 @@ def test_download_candidate_cleans_partial_on_stream_failure(tmp_path: Path, mon
 
 
 def test_skip_large_downloads_emit_voluntary_reason(tmp_path: Path, patcher) -> None:
-        artifact = _make_artifact(tmp_path)
-        url = "https://example.org/oversized.pdf"
+    artifact = _make_artifact(tmp_path)
+    url = "https://example.org/oversized.pdf"
 
-        class _Response:
-            def __init__(self) -> None:
-                self.status_code = 200
-                self.headers = {
-                    "Content-Type": "application/pdf",
-                    "Content-Length": str(25 * 1024 * 1024),
-                }
+    class _Response:
+        def __init__(self) -> None:
+            self.status_code = 200
+            self.headers = {
+                "Content-Type": "application/pdf",
+                "Content-Length": str(25 * 1024 * 1024),
+            }
 
-            def __enter__(self) -> "_Response":
-                return self
+        def __enter__(self) -> "_Response":
+            return self
 
-            def __exit__(self, exc_type, exc, tb) -> None:
-                self.close()
+        def __exit__(self, exc_type, exc, tb) -> None:
+            self.close()
 
-            def iter_content(self, chunk_size: int = 1024):
-                yield b"%PDF-1.4\n"
-                yield b"data"
-                yield b"%%EOF"
+        def iter_content(self, chunk_size: int = 1024):
+            yield b"%PDF-1.4\n"
+            yield b"data"
+            yield b"%%EOF"
 
-            def close(self) -> None:
-                return None
+        def close(self) -> None:
+            return None
 
-        class _Session:
-            def request(self, *, method: str, url: str, **kwargs: Any) -> _Response:
-                assert method == "GET"
-                return _Response()
+    class _Session:
+        def request(self, *, method: str, url: str, **kwargs: Any) -> _Response:
+            assert method == "GET"
+            return _Response()
 
-        # Ensure range resume code paths use patched request helper
-        patcher.setattr(
-            downloader, "request_with_retries", lambda *args, **kwargs: _Response(), raising=False
-        )
-        patcher.setattr(download_impl, "request_with_retries", lambda *args, **kwargs: _Response())
+    # Ensure range resume code paths use patched request helper
+    patcher.setattr(
+        downloader, "request_with_retries", lambda *args, **kwargs: _Response(), raising=False
+    )
+    patcher.setattr(download_impl, "request_with_retries", lambda *args, **kwargs: _Response())
 
-        context = {
-            "previous": {},
-            "skip_head_precheck": True,
-            "skip_large_downloads": True,
-            "size_warning_threshold": 5 * 1024 * 1024,
-        }
+    context = {
+        "previous": {},
+        "skip_head_precheck": True,
+        "skip_large_downloads": True,
+        "size_warning_threshold": 5 * 1024 * 1024,
+    }
 
-        outcome = download_candidate(
-            _Session(),
-            artifact,
-            url,
-            referer=None,
-            timeout=5.0,
-            context=context,
-        )
+    outcome = download_candidate(
+        _Session(),
+        artifact,
+        url,
+        referer=None,
+        timeout=5.0,
+        context=context,
+    )
 
-        assert outcome.classification is Classification.SKIPPED
-        assert outcome.reason is ReasonCode.SKIP_LARGE_DOWNLOAD
-        assert outcome.reason_detail is not None
-        assert outcome.path is None
+    assert outcome.classification is Classification.SKIPPED
+    assert outcome.reason is ReasonCode.SKIP_LARGE_DOWNLOAD
+    assert outcome.reason_detail is not None
+    assert outcome.path is None
+
 
 def test_build_download_outcome_accepts_small_pdf_with_head_pass(tmp_path: Path) -> None:
     artifact = _make_artifact(tmp_path)
@@ -1109,7 +1111,8 @@ def test_build_download_outcome_accepts_small_pdf_with_head_pass(tmp_path: Path)
         retry_after=None,
     )
     assert outcome.classification is Classification.PDF
-        assert outcome.path == str(pdf_path.resolve())
+    assert outcome.path == str(pdf_path.resolve())
+
 
 def test_build_download_outcome_rejects_small_pdf_without_head(tmp_path: Path) -> None:
     artifact = _make_artifact(tmp_path)
@@ -1139,6 +1142,7 @@ def test_build_download_outcome_rejects_small_pdf_without_head(tmp_path: Path) -
     assert outcome.classification is Classification.MISS
     assert outcome.path is None
     assert outcome.reason is ReasonCode.PDF_TOO_SMALL
+
 
 def test_manifest_entry_preserves_conditional_headers() -> None:
     outcome = DownloadOutcome(
@@ -1403,6 +1407,7 @@ def test_interpret_response_requires_response_shape() -> None:
 
 # --- test_download_retries.py ---
 
+
 class _SequencedHandler(BaseHTTPRequestHandler):
     statuses: list[int] = []
     retry_after: int | None = None
@@ -1493,9 +1498,7 @@ def _download(
         ),
     )
 
-
-# --- test_download_retries.py ---
-
+    # --- test_download_retries.py ---
 
     def _edge_artifact(tmp_path: Path, **overrides: Any) -> WorkArtifact:
         params: Dict[str, Any] = {
@@ -1511,34 +1514,31 @@ def _download(
         }
         params.update(overrides)
         return _make_artifact(tmp_path, **params)
-    
-    
+
     class _ListAttemptSink:
         """In-memory telemetry sink satisfying the :class:`AttemptSink` protocol."""
-    
+
         def __init__(self) -> None:
             self.attempts: List[AttemptRecord] = []
             self.manifests: List[ManifestEntry] = []
             self.summaries: List[Dict[str, Any]] = []
             self.closed = False
-    
-        def log_attempt(
-            self, record: AttemptRecord, *, timestamp: Optional[str] = None
-        ) -> None:
+
+        def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
             self.attempts.append(record)
-    
+
         def log_manifest(self, entry: ManifestEntry) -> None:
             self.manifests.append(entry)
-    
+
         def log_summary(self, summary: Dict[str, Any]) -> None:
             self.summaries.append(summary)
-    
+
         def close(self) -> None:  # pragma: no cover - nothing to release
             self.closed = True
-    
+
         def __enter__(self) -> "_ListAttemptSink":
             return self
-    
+
         def __exit__(
             self,
             exc_type: Optional[type[BaseException]],
@@ -1547,8 +1547,7 @@ def _download(
         ) -> Optional[bool]:
             self.close()
             return None
-    
-    
+
     def test_run_telemetry_context_manager_closes_sink() -> None:
         sink = _ListAttemptSink()
         attempt = AttemptRecord(
@@ -1561,14 +1560,13 @@ def _download(
             content_type="application/pdf",
             elapsed_ms=10.0,
         )
-    
+
         with RunTelemetry(sink) as telemetry:
             telemetry.log_attempt(attempt)
-    
+
         assert sink.closed is True
         assert sink.attempts == [attempt]
-    
-    
+
     @pytest.mark.parametrize("statuses", [[503, 503, 200]])
     def test_download_candidate_retries_on_transient_errors(http_server, tmp_path, statuses):
         handler, server = http_server
@@ -1576,7 +1574,7 @@ def _download(
         handler.calls = []
         handler.retry_after = None
         url = f"http://127.0.0.1:{server.server_address[1]}/test.pdf"
-    
+
         artifact, session, context, outcome = _download(url, tmp_path)
         try:
             assert outcome.classification is Classification.PDF
@@ -1585,24 +1583,22 @@ def _download(
             assert Path(outcome.path).exists()
         finally:
             session.close()
-    
-    
+
     # --- test_download_retries.py ---
-    
-    
+
     def test_retry_after_header_respected(patcher, http_server, tmp_path):
         handler, server = http_server
         handler.statuses = [429, 200]
         handler.retry_after = 2
         handler.calls = []
         sleep_calls: list[float] = []
-    
+
         def fake_sleep(seconds: float) -> None:
             sleep_calls.append(seconds)
-    
+
         patcher.setattr(time, "sleep", fake_sleep)
         url = f"http://127.0.0.1:{server.server_address[1]}/test.pdf"
-    
+
         artifact, session, context, outcome = _download(url, tmp_path)
         try:
             assert outcome.classification is Classification.PDF
@@ -1610,17 +1606,15 @@ def _download(
             assert sleep_calls and sleep_calls[0] >= handler.retry_after
         finally:
             session.close()
-    
-    
+
     # --- test_download_retries.py ---
-    
-    
+
     def test_non_retryable_errors_do_not_retry(http_server, tmp_path):
         handler, server = http_server
         handler.statuses = [404]
         handler.retry_after = None
         url = f"http://127.0.0.1:{server.server_address[1]}/test.pdf"
-    
+
         artifact = _make_artifact(tmp_path)
         context = {"dry_run": False, "extract_html_text": False, "previous": {}}
         session = create_session({})
@@ -1637,19 +1631,17 @@ def _download(
             session.close()
         assert outcome.classification is Classification.HTTP_ERROR
         assert handler.calls == [404]
-    
-    
+
     # --- test_download_retries.py ---
-    
-    
+
     def test_download_candidate_avoids_per_request_head(http_server, tmp_path):
         """Ensure download path relies solely on GET without redundant HEAD calls."""
-    
+
         handler, server = http_server
         handler.statuses = [200]
         handler.content = b"%PDF-1.4\n" + (b"1" * 4096) + b"\n%%EOF"
         url = f"http://127.0.0.1:{server.server_address[1]}/asset.pdf"
-    
+
         _, session, _, outcome = _download(url, tmp_path)
         try:
             assert outcome.classification is Classification.PDF
@@ -1657,37 +1649,33 @@ def _download(
             assert handler.calls == [200]
         finally:
             session.close()
-    
-    
+
     # --- test_head_precheck.py ---
-    
-    
+
     def test_head_precheck_allows_pdf(patcher):
         head_response = Mock(status_code=200, headers={"Content-Type": "application/pdf"})
         head_response.close = Mock()
-    
+
         patcher.setattr(
             "DocsToKG.ContentDownload.networking.request_with_retries",
             lambda *args, **kwargs: head_response,
         )
-    
+
         assert head_precheck(Mock(), "https://example.org/file.pdf", timeout=10.0)
         head_response.close.assert_called_once()
-    
-    
+
     def test_head_precheck_rejects_html(patcher):
         head_response = Mock(status_code=200, headers={"Content-Type": "text/html"})
         head_response.close = Mock()
-    
+
         patcher.setattr(
             "DocsToKG.ContentDownload.networking.request_with_retries",
             lambda *args, **kwargs: head_response,
         )
-    
+
         assert not head_precheck(Mock(), "https://example.org/page", timeout=10.0)
         head_response.close.assert_called_once()
-    
-    
+
     @pytest.mark.parametrize("status", [405, 501])
     def test_head_precheck_degrades_to_get_pdf(patcher, status):
         class _StreamResponse:
@@ -1695,73 +1683,71 @@ def _download(
                 self.status_code = 200
                 self.headers = {"Content-Type": "application/pdf"}
                 self.closed = False
-    
+
             def __enter__(self):
                 return self
-    
+
             def __exit__(self, exc_type, exc, tb):
                 self.close()
-    
+
             def iter_content(self, chunk_size: int = 1024):
                 yield b"%PDF"
-    
+
             def close(self) -> None:
                 self.closed = True
-    
+
         head_response = Mock(status_code=status, headers={})
         head_response.close = Mock()
         stream_response = _StreamResponse()
-    
+
         responses = [head_response, stream_response]
-    
+
         def fake_request(*args, **kwargs):
             return responses.pop(0)
-    
+
         patcher.setattr(
             "DocsToKG.ContentDownload.networking.request_with_retries",
             fake_request,
         )
-    
+
         assert head_precheck(Mock(), "https://example.org/pdf", timeout=10.0)
         assert stream_response.closed is True
-    
-    
+
     @pytest.mark.parametrize("status", [405, 501])
     def test_head_precheck_degrades_to_get_html(patcher, status):
         class _StreamResponse:
             def __init__(self) -> None:
                 self.status_code = 200
                 self.headers = {"Content-Type": "text/html"}
-    
+
             def __enter__(self):
                 return self
-    
+
             def __exit__(self, exc_type, exc, tb):
                 self.close()
-    
+
             def iter_content(self, chunk_size: int = 1024):
                 yield b"<html></html>"
-    
+
             def close(self) -> None:
                 return None
-    
+
         head_response = Mock(status_code=status, headers={})
         head_response.close = Mock()
         stream_response = _StreamResponse()
-    
+
         responses = [head_response, stream_response]
-    
+
         def fake_request(*args, **kwargs):
             return responses.pop(0)
-    
+
         patcher.setattr(
             "DocsToKG.ContentDownload.networking.request_with_retries",
             fake_request,
         )
-    
+
         assert not head_precheck(Mock(), "https://example.org/html", timeout=10.0)
-    
-    
+
     @pytest.mark.parametrize(
         "exc",
         [requests.Timeout("boom"), requests.ConnectionError("boom")],
@@ -1771,18 +1757,16 @@ def _download(
             "DocsToKG.ContentDownload.networking.request_with_retries",
             Mock(side_effect=exc),
         )
-    
+
         assert head_precheck(Mock(), "https://example.org/err", timeout=5.0)
-    
-    
+
     def test_conditional_request_build_headers_requires_complete_metadata(caplog) -> None:
         helper = ConditionalRequestHelper(prior_etag="abc", prior_last_modified=None)
         with caplog.at_level("WARNING", logger="DocsToKG.ContentDownload.network"):
             headers = helper.build_headers()
         assert headers == {}
         assert "resume-metadata-incomplete" in caplog.text
-    
-    
+
     def test_conditional_request_build_headers_accepts_complete_metadata() -> None:
         helper = ConditionalRequestHelper(
             prior_etag="etag",
@@ -1796,27 +1780,25 @@ def _download(
             "If-None-Match": "etag",
             "If-Modified-Since": "Mon, 01 Jan 2024 00:00:00 GMT",
         }
-    
-    
+
     # --- test_download_retries.py ---
-    
-    
+
     def test_retry_determinism_matches_request_with_retries(patcher, http_server, tmp_path):
         """Verify retry budget and timing are governed exclusively by the helper."""
-    
+
         handler, server = http_server
         handler.statuses = [429, 429, 200]
         url = f"http://127.0.0.1:{server.server_address[1]}/rate-limited.pdf"
-    
+
         patcher.setattr("DocsToKG.ContentDownload.networking.random.random", lambda: 0.0)
-    
+
         sleep_durations: list[float] = []
-    
+
         def _capture_sleep(delay: float) -> None:
             sleep_durations.append(delay)
-    
+
         patcher.setattr("DocsToKG.ContentDownload.networking.time.sleep", _capture_sleep)
-    
+
         _, session, _, outcome = _download(url, tmp_path)
         try:
             assert outcome.classification is Classification.PDF
@@ -1827,60 +1809,53 @@ def _download(
             assert sleep_durations == [0.75, 1.5]
         finally:
             session.close()
-    
-    
+
     # --- test_http_retry.py ---
-    
+
     try:
         import hypothesis
         from hypothesis import strategies as st  # type: ignore
     except ImportError:  # pragma: no cover - optional dependency
         pytest.skip("hypothesis is required for these tests", allow_module_level=True)
-    
+
     # --- test_http_retry.py ---
-    
+
     given = hypothesis.given
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def _mock_response(status: int, headers: Optional[Dict[str, str]] = None) -> Mock:
         response = Mock(spec=requests.Response)
         response.status_code = status
         response.headers = headers or {}
         return response
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_successful_request_no_retries():
         """Verify successful request completes immediately without retries."""
-    
+
         session = Mock(spec=requests.Session)
         response = _mock_response(200)
         session.request.return_value = response
-    
+
         result = request_with_retries(session, "GET", "https://example.org/test")
-    
+
         assert result is response
         session.request.assert_called_once_with(method="GET", url="https://example.org/test")
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     @patch("DocsToKG.ContentDownload.networking.random.random", return_value=0.0)
     @patch("DocsToKG.ContentDownload.networking.time.sleep")
     def test_transient_503_with_exponential_backoff(mock_sleep: Mock, _: Mock) -> None:
         """Verify exponential backoff timing for transient 503 errors."""
-    
+
         session = Mock(spec=requests.Session)
         response_503 = _mock_response(503, headers={})
         response_200 = _mock_response(200)
         session.request.side_effect = [response_503, response_503, response_200]
-    
+
         result = request_with_retries(
             session,
             "GET",
@@ -1888,66 +1863,56 @@ def _download(
             max_retries=3,
             backoff_factor=0.5,
         )
-    
+
         assert result is response_200
         assert session.request.call_count == 3
         assert mock_sleep.call_args_list == [call(0.5), call(1.0)]
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_parse_retry_after_header_integer() -> None:
         response = requests.Response()
         response.headers = {"Retry-After": "5"}
-    
+
         assert parse_retry_after_header(response) == 5.0
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_parse_retry_after_header_http_date() -> None:
         future = datetime.now(timezone.utc) + timedelta(seconds=30)
         header_value = future.strftime("%a, %d %b %Y %H:%M:%S GMT")
         response = requests.Response()
         response.headers = {"Retry-After": header_value}
-    
+
         wait = parse_retry_after_header(response)
         assert wait is not None
         assert 0.0 < wait <= 30.0
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_parse_retry_after_header_invalid_date() -> None:
         response = requests.Response()
         response.headers = {"Retry-After": "Thu, 32 Foo 2024 00:00:00 GMT"}
-    
+
         assert parse_retry_after_header(response) is None
-    
-    
+
     def test_parse_retry_after_header_rejects_non_positive_seconds() -> None:
         response_zero = requests.Response()
         response_zero.headers = {"Retry-After": "0"}
         response_negative = requests.Response()
         response_negative.headers = {"Retry-After": "-1"}
-    
+
         assert parse_retry_after_header(response_zero) is None
         assert parse_retry_after_header(response_negative) is None
-    
-    
+
     def test_parse_retry_after_header_rejects_nan() -> None:
         response = requests.Response()
         response.headers = {"Retry-After": "NaN"}
-    
+
         assert parse_retry_after_header(response) is None
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     @patch("DocsToKG.ContentDownload.networking.random.random", return_value=0.0)
     @patch("DocsToKG.ContentDownload.networking.time.sleep")
     def test_retry_after_header_overrides_backoff(mock_sleep: Mock, _: Mock) -> None:
@@ -1956,7 +1921,7 @@ def _download(
         response_retry = _mock_response(429, headers=retry_headers)
         response_success = _mock_response(200)
         session.request.side_effect = [response_retry, response_success]
-    
+
         result = request_with_retries(
             session,
             "GET",
@@ -1964,112 +1929,98 @@ def _download(
             backoff_factor=0.1,
             max_retries=2,
         )
-    
+
         assert result is response_success
         assert mock_sleep.call_args_list == [call(10.0)]
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     @patch("DocsToKG.ContentDownload.networking.time.sleep")
     def test_request_exception_raises_after_retries(mock_sleep: Mock) -> None:
         session = Mock(spec=requests.Session)
         error = requests.RequestException("boom")
         session.request.side_effect = error
-    
+
         with pytest.raises(requests.RequestException):
             request_with_retries(session, "GET", "https://example.org/test", max_retries=1)
-    
+
         assert mock_sleep.call_count == 1
         assert session.request.call_count == 2
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     @patch("DocsToKG.ContentDownload.networking.time.sleep")
     def test_timeout_retry_handling(mock_sleep: Mock) -> None:
         session = Mock(spec=requests.Session)
         session.request.side_effect = [requests.Timeout("slow"), _mock_response(200)]
-    
+
         result = request_with_retries(session, "GET", "https://example.org/timeout", max_retries=1)
-    
+
         assert result.status_code == 200
         assert mock_sleep.call_count == 1
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     @patch("DocsToKG.ContentDownload.networking.time.sleep")
     def test_connection_error_retry_handling(mock_sleep: Mock) -> None:
         session = Mock(spec=requests.Session)
         session.request.side_effect = [requests.ConnectionError("down"), _mock_response(200)]
-    
+
         result = request_with_retries(session, "GET", "https://example.org/conn", max_retries=1)
-    
+
         assert result.status_code == 200
         assert mock_sleep.call_count == 1
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     @patch("DocsToKG.ContentDownload.networking.time.sleep")
     def test_timeout_raises_after_exhaustion(mock_sleep: Mock) -> None:
         """Ensure timeout retries raise after exhausting the retry budget."""
-    
+
         session = Mock(spec=requests.Session)
         session.request.side_effect = requests.Timeout("slow")
-    
+
         with pytest.raises(requests.Timeout):
             request_with_retries(session, "GET", "https://example.org/timeout", max_retries=1)
-    
+
         # Only the non-terminal attempt sleeps before re-raising on the final attempt.
         assert mock_sleep.call_count == 1
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     @patch("DocsToKG.ContentDownload.networking.time.sleep")
     def test_connection_error_raises_after_exhaustion(mock_sleep: Mock) -> None:
         """Ensure connection errors propagate when retries are exhausted."""
-    
+
         session = Mock(spec=requests.Session)
         session.request.side_effect = requests.ConnectionError("down")
-    
+
         with pytest.raises(requests.ConnectionError):
             request_with_retries(session, "GET", "https://example.org/conn", max_retries=1)
-    
+
         assert mock_sleep.call_count == 1
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     @given(st.text())
     def test_parse_retry_after_header_property(value: str) -> None:
         response = requests.Response()
         response.headers = {"Retry-After": value}
-    
+
         result = parse_retry_after_header(response)
-    
+
         if result is not None:
             assert result > 0.0
             assert math.isfinite(result)
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_request_with_custom_retry_statuses() -> None:
         session = Mock(spec=requests.Session)
         failing = _mock_response(404)
         success = _mock_response(200)
         session.request.side_effect = [failing, success]
-    
+
         result = request_with_retries(
             session,
             "GET",
@@ -2077,108 +2028,94 @@ def _download(
             retry_statuses={404},
             max_retries=1,
         )
-    
+
         assert result is success
         assert session.request.call_count == 2
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_request_returns_after_exhausting_single_attempt() -> None:
         session = Mock(spec=requests.Session)
         retry_response = _mock_response(503)
         session.request.return_value = retry_response
-    
+
         result = request_with_retries(
             session,
             "GET",
             "https://example.org/test",
             max_retries=0,
         )
-    
+
         assert result is retry_response
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_request_with_retries_rejects_negative_retries() -> None:
         session = Mock(spec=requests.Session)
-    
+
         with pytest.raises(ValueError):
             request_with_retries(session, "GET", "https://example.org/test", max_retries=-1)
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_request_with_retries_rejects_negative_backoff() -> None:
         session = Mock(spec=requests.Session)
-    
+
         with pytest.raises(ValueError):
             request_with_retries(session, "GET", "https://example.org/test", backoff_factor=-0.1)
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_request_with_retries_requires_method_and_url() -> None:
         session = Mock(spec=requests.Session)
-    
+
         with pytest.raises(ValueError):
             request_with_retries(session, "", "https://example.org/test")
-    
+
         with pytest.raises(ValueError):
             request_with_retries(session, "GET", "")
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_request_with_retries_uses_method_fallback() -> None:
         session = Mock(spec=requests.Session)
         response = Mock(spec=requests.Response)
         response.status_code = 200
         response.headers = {}
         session.request.return_value = response
-    
+
         response = request_with_retries(session, "GET", "https://example.org/fallback")
-    
+
         assert response.status_code == 200
         session.request.assert_called_once_with(method="GET", url="https://example.org/fallback")
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_request_with_retries_errors_when_no_callable_available() -> None:
         class _MinimalSession:
             pass
-    
+
         with pytest.raises(AttributeError):
             request_with_retries(_MinimalSession(), "GET", "https://example.org/fail")
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     @patch("DocsToKG.ContentDownload.networking.time.sleep")
     def test_retry_after_header_prefers_longer_delay(mock_sleep: Mock) -> None:
         """Verify Retry-After header longer than backoff takes precedence."""
-    
+
         session = Mock(spec=requests.Session)
-    
+
         retry_response = requests.Response()
         retry_response.status_code = 429
         retry_response.headers = {"Retry-After": "4"}
-    
+
         success_response = requests.Response()
         success_response.status_code = 200
         success_response.headers = {}
-    
+
         session.request.side_effect = [retry_response, success_response]
-    
+
         result = request_with_retries(
             session,
             "GET",
@@ -2186,26 +2123,24 @@ def _download(
             backoff_factor=0.1,
             max_retries=2,
         )
-    
+
         assert result.status_code == 200
         mock_sleep.assert_called_once()
         sleep_arg = mock_sleep.call_args[0][0]
         assert pytest.approx(sleep_arg, rel=0.01) == 4.0
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     @patch("DocsToKG.ContentDownload.networking.time.sleep")
     @patch("DocsToKG.ContentDownload.networking.parse_retry_after_header")
     def test_respect_retry_after_false_skips_header(mock_parse: Mock, mock_sleep: Mock) -> None:
         """Ensure disabling respect_retry_after bypasses header parsing."""
-    
+
         session = Mock(spec=requests.Session)
         retry_response = _mock_response(503)
         success_response = _mock_response(200)
         session.request.side_effect = [retry_response, success_response]
-    
+
         result = request_with_retries(
             session,
             "GET",
@@ -2214,83 +2149,73 @@ def _download(
             max_retries=1,
             backoff_factor=0.1,
         )
-    
+
         assert result is success_response
         mock_parse.assert_not_called()
         mock_sleep.assert_called_once()
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_parse_retry_after_header_naive_datetime() -> None:
         future = datetime.now(timezone.utc) + timedelta(seconds=45)
         header_value = future.replace(tzinfo=None).strftime("%a, %d %b %Y %H:%M:%S")
         response = requests.Response()
         response.headers = {"Retry-After": header_value}
-    
+
         wait = parse_retry_after_header(response)
         assert wait is not None
         assert 0.0 < wait <= 45.0
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_parse_retry_after_header_handles_parse_errors(patcher) -> None:
         response = requests.Response()
         response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
-    
+
         patcher.setattr(
             "DocsToKG.ContentDownload.networking.parsedate_to_datetime",
             Mock(side_effect=TypeError("boom")),
         )
-    
+
         assert parse_retry_after_header(response) is None
-    
-    
+
     # --- test_http_retry.py ---
-    
-    
+
     def test_parse_retry_after_header_returns_none_when_parser_returns_none(patcher) -> None:
         response = requests.Response()
         response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
-    
+
         patcher.setattr(
             "DocsToKG.ContentDownload.networking.parsedate_to_datetime",
             Mock(return_value=None),
         )
-    
+
         assert parse_retry_after_header(response) is None
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     class FakeResponse:
         def __init__(self, status_code: int, headers=None, chunks=None):
             self.status_code = status_code
             self.headers = headers or {}
             self._chunks = list(chunks or [])
-    
+
         def __enter__(self):
             return self
-    
+
         def __exit__(self, exc_type, exc, tb):
             self.close()
             return False
-    
+
         def iter_content(self, chunk_size: int):
             for chunk in self._chunks:
                 yield chunk
-    
+
         def close(self):
             pass
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
         artifact = downloader.WorkArtifact(
             work_id="W-DOWNLOAD",
@@ -2313,11 +2238,9 @@ def _download(
         artifact.html_dir.mkdir(parents=True, exist_ok=True)
         artifact.xml_dir.mkdir(parents=True, exist_ok=True)
         return artifact
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def stub_requests(
         patcher, mapping: Dict[Tuple[str, str], Callable[[], FakeResponse] | FakeResponse]
     ):
@@ -2327,20 +2250,18 @@ def _download(
                 raise AssertionError(f"Unexpected request {key}")
             response = mapping[key]
             return response() if callable(response) else response
-    
+
         patcher.setattr(downloader, "request_with_retries", fake_request, raising=False)
         patcher.setattr(download_impl, "request_with_retries", fake_request)
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def test_successful_pdf_download_populates_metadata(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/paper.pdf"
         pdf_bytes = b"%PDF-1.4\n" + (b"x" * 2048) + b"\n%%EOF"
         expected_sha = hashlib.sha256(pdf_bytes).hexdigest()
-    
+
         mapping = {
             ("GET", url): lambda: FakeResponse(
                 200,
@@ -2353,7 +2274,7 @@ def _download(
             ),
         }
         stub_requests(patcher, mapping)
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -2363,7 +2284,7 @@ def _download(
             timeout=10.0,
             context={"skip_head_precheck": True},
         )
-    
+
         assert outcome.classification is Classification.PDF
         assert outcome.path is not None
         stored = Path(outcome.path)
@@ -2376,11 +2297,9 @@ def _download(
         assert outcome.extracted_text_path is None
         rehashed = hashlib.sha256(stored.read_bytes()).hexdigest()
         assert rehashed == expected_sha
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def test_cached_response_preserves_prior_metadata(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/paper.pdf"
@@ -2402,7 +2321,7 @@ def _download(
                 }
             }
         }
-    
+
         mapping = {
             ("GET", url): lambda: FakeResponse(
                 304,
@@ -2410,12 +2329,12 @@ def _download(
             ),
         }
         stub_requests(patcher, mapping)
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session, artifact, url, None, timeout=10.0, context=context
         )
-    
+
         assert outcome.classification is Classification.CACHED
         assert outcome.path == str(cached_file.resolve())
         assert outcome.sha256 == cached_sha
@@ -2424,11 +2343,9 @@ def _download(
         assert outcome.last_modified == "Tue, 02 Jan 2024 00:00:00 GMT"
         assert outcome.reason is ReasonCode.CONDITIONAL_NOT_MODIFIED
         assert outcome.metadata.get("cache_validation_mode") == "fast_path"
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def test_cache_validation_fast_path_skips_digest(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/cached-fast.pdf"
@@ -2437,15 +2354,17 @@ def _download(
         cached_path.write_bytes(cached_bytes)
         cached_sha = hashlib.sha256(cached_bytes).hexdigest()
         cached_mtime = cached_path.stat().st_mtime_ns
-    
-        mapping = {("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})}
+
+        mapping = {
+            ("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})
+        }
         stub_requests(patcher, mapping)
-    
+
         def raise_if_digest(signature):
             raise AssertionError("Digest computation should not run for fast-path validation")
-    
+
         patcher.setattr(download_impl, "_cached_sha256", raise_if_digest)
-    
+
         context = {
             "previous": {
                 url: {
@@ -2459,7 +2378,7 @@ def _download(
                 }
             }
         }
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -2469,12 +2388,11 @@ def _download(
             timeout=10.0,
             context=context,
         )
-    
+
         assert outcome.classification is Classification.CACHED
         assert outcome.reason is ReasonCode.CONDITIONAL_NOT_MODIFIED
         assert outcome.metadata.get("cache_validation_mode") == "fast_path"
-    
-    
+
     def test_cache_validation_forced_digest(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/cached-digest.pdf"
@@ -2483,18 +2401,20 @@ def _download(
         cached_path.write_bytes(cached_bytes)
         cached_sha = hashlib.sha256(cached_bytes).hexdigest()
         cached_mtime = cached_path.stat().st_mtime_ns
-    
-        mapping = {("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})}
+
+        mapping = {
+            ("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})
+        }
         stub_requests(patcher, mapping)
-    
+
         digest_calls: List[Tuple[str, int, int]] = []
-    
+
         def record_digest(signature: Tuple[str, int, int]) -> Optional[str]:
             digest_calls.append(signature)
             return cached_sha
-    
+
         patcher.setattr(download_impl, "_cached_sha256", record_digest)
-    
+
         context = {
             "previous": {
                 url: {
@@ -2509,7 +2429,7 @@ def _download(
             },
             "verify_cache_digest": True,
         }
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -2519,12 +2439,11 @@ def _download(
             timeout=10.0,
             context=context,
         )
-    
+
         assert digest_calls
         assert outcome.classification is Classification.CACHED
         assert outcome.metadata.get("cache_validation_mode") == "digest"
-    
-    
+
     def test_cache_validation_digest_mismatch_triggers_refetch(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/cached-mismatch.pdf"
@@ -2533,28 +2452,28 @@ def _download(
         cached_path.write_bytes(cached_bytes)
         cached_sha = hashlib.sha256(cached_bytes).hexdigest()
         cached_mtime = cached_path.stat().st_mtime_ns
-    
+
         new_bytes = b"%PDF-1.4\n" + (b"1" * 2048) + b"\n%%EOF\n"
-    
+
         class _StreamingResponse:
             def __init__(self, status_code: int, headers: Dict[str, str], chunks: List[bytes]):
                 self.status_code = status_code
                 self.headers = headers
                 self._chunks = list(chunks)
-    
+
             def __enter__(self) -> "_StreamingResponse":
                 return self
-    
+
             def __exit__(self, exc_type, exc, tb) -> None:
                 self.close()
-    
+
             def iter_content(self, chunk_size: int = 1024):
                 for chunk in self._chunks:
                     yield chunk
-    
+
             def close(self) -> None:
                 return None
-    
+
         responses: List[_StreamingResponse] = [
             _StreamingResponse(304, {"Content-Type": "application/pdf"}, []),
             _StreamingResponse(
@@ -2563,20 +2482,20 @@ def _download(
                 [new_bytes],
             ),
         ]
-    
+
         def sequenced_request(*args, **kwargs):
             if not responses:
                 raise AssertionError("Unexpected additional request")
             return responses.pop(0)
-    
+
         patcher.setattr(download_impl, "request_with_retries", sequenced_request)
         patcher.setattr(downloader, "request_with_retries", sequenced_request, raising=False)
-    
+
         def mismatched_digest(signature: Tuple[str, int, int]) -> Optional[str]:
             return "deadbeef"
-    
+
         patcher.setattr(download_impl, "_cached_sha256", mismatched_digest)
-    
+
         recorded_mtime = max(cached_mtime - 1, 0)
         context = {
             "previous": {
@@ -2591,7 +2510,7 @@ def _download(
                 }
             }
         }
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -2601,14 +2520,13 @@ def _download(
             timeout=10.0,
             context=context,
         )
-    
+
         assert outcome.classification is Classification.PDF
         assert outcome.reason is None
         assert outcome.path is not None
         downloaded = Path(outcome.path).read_bytes()
         assert downloaded == new_bytes
-    
-    
+
     def test_cache_validation_digest_cache_reuse(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/cached-cache.pdf"
@@ -2617,12 +2535,14 @@ def _download(
         cached_path.write_bytes(cached_bytes)
         cached_sha = hashlib.sha256(cached_bytes).hexdigest()
         cached_mtime = cached_path.stat().st_mtime_ns
-    
-        mapping = {("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})}
+
+        mapping = {
+            ("GET", url): lambda: FakeResponse(304, headers={"Content-Type": "application/pdf"})
+        }
         stub_requests(patcher, mapping)
-    
+
         download_impl._cached_sha256.cache_clear()
-    
+
         context = {
             "previous": {
                 url: {
@@ -2637,7 +2557,7 @@ def _download(
             },
             "verify_cache_digest": True,
         }
-    
+
         session = requests.Session()
         downloader.download_candidate(
             session,
@@ -2648,7 +2568,7 @@ def _download(
             context=context,
         )
         first_info = download_impl._cached_sha256.cache_info()
-    
+
         downloader.download_candidate(
             session,
             artifact,
@@ -2658,21 +2578,20 @@ def _download(
             context=context,
         )
         second_info = download_impl._cached_sha256.cache_info()
-    
+
         assert second_info.hits >= first_info.hits + 1
-    
+
         download_impl._cached_sha256.cache_clear()
-    
-    
+
     def test_http_error_sets_metadata_to_none(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/paper.pdf"
-    
+
         mapping = {
             ("GET", url): lambda: FakeResponse(404, headers={"Content-Type": "text/html"}),
         }
         stub_requests(patcher, mapping)
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -2682,7 +2601,7 @@ def _download(
             timeout=10.0,
             context={"min_pdf_bytes": 1, "previous": {}, "extract_html_text": True},
         )
-    
+
         assert outcome.classification is Classification.HTTP_ERROR
         assert outcome.path is None
         assert outcome.sha256 is None
@@ -2690,19 +2609,17 @@ def _download(
         assert outcome.etag is None
         assert outcome.last_modified is None
         assert outcome.reason is None
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def test_html_download_with_text_extraction(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/page.html"
         html_bytes = b"<!DOCTYPE html><html><body><p>Hello</p></body></html>"
-    
+
         html_extractor = SimpleNamespace(extract=lambda text: "Hello")
         patcher.setitem(sys.modules, "trafilatura", html_extractor)
-    
+
         mapping = {
             ("GET", url): lambda: FakeResponse(
                 200,
@@ -2715,7 +2632,7 @@ def _download(
             ),
         }
         stub_requests(patcher, mapping)
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -2725,7 +2642,7 @@ def _download(
             timeout=10.0,
             context={"extract_html_text": True},
         )
-    
+
         assert outcome.classification is Classification.HTML
         assert outcome.path is not None and outcome.path.endswith(".html")
         assert outcome.extracted_text_path is not None
@@ -2735,16 +2652,14 @@ def _download(
         assert outcome.sha256 is not None
         assert outcome.etag == '"etag-html"'
         assert outcome.last_modified == "Wed, 03 Jan 2024 00:00:00 GMT"
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def test_dry_run_preserves_metadata_without_files(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/paper.pdf"
         pdf_bytes = b"%PDF-1.4\n" + (b"y" * 2048) + b"\n%%EOF"
-    
+
         mapping = {
             ("GET", url): lambda: FakeResponse(
                 200,
@@ -2757,7 +2672,7 @@ def _download(
             ),
         }
         stub_requests(patcher, mapping)
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -2767,7 +2682,7 @@ def _download(
             timeout=10.0,
             context={"dry_run": True},
         )
-    
+
         assert outcome.classification is Classification.PDF
         assert outcome.path is None
         assert outcome.sha256 is None
@@ -2775,16 +2690,14 @@ def _download(
         assert outcome.extracted_text_path is None
         assert outcome.etag == '"etag-dry"'
         assert outcome.last_modified == "Thu, 04 Jan 2024 00:00:00 GMT"
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def test_small_pdf_detected_as_corrupt(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/tiny.pdf"
         tiny_pdf = b"%PDF-1.4\n1 0 obj<<>>\nendobj\n%%EOF"
-    
+
         mapping = {
             ("GET", url): lambda: FakeResponse(
                 200,
@@ -2793,7 +2706,7 @@ def _download(
             )
         }
         stub_requests(patcher, mapping)
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -2803,21 +2716,19 @@ def _download(
             timeout=10.0,
             context={"skip_head_precheck": True},
         )
-    
+
         assert outcome.classification is Classification.MISS
         assert outcome.path is None
         assert outcome.reason is ReasonCode.PDF_TOO_SMALL
         assert not any(artifact.pdf_dir.glob("*.pdf"))
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def test_html_tail_in_pdf_marks_corruption(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/error.pdf"
         payload = b"%PDF-1.4\nstream\n<html>Error page</html>"
-    
+
         mapping = {
             ("GET", url): lambda: FakeResponse(
                 200,
@@ -2826,7 +2737,7 @@ def _download(
             )
         }
         stub_requests(patcher, mapping)
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -2836,16 +2747,14 @@ def _download(
             timeout=10.0,
             context={"min_pdf_bytes": 1, "previous": {}, "extract_html_text": True},
         )
-    
+
         assert outcome.classification is Classification.MISS
         assert outcome.path is None
         assert outcome.reason is ReasonCode.HTML_TAIL_DETECTED
         assert not any(artifact.pdf_dir.glob("*.pdf"))
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def test_build_manifest_entry_includes_download_metadata(tmp_path):
         artifact = make_artifact(tmp_path)
         download_path = str(artifact.pdf_dir / "saved.pdf")
@@ -2861,7 +2770,7 @@ def _download(
             last_modified="Fri, 05 Jan 2024 00:00:00 GMT",
             extracted_text_path=str(artifact.html_dir / "saved.txt"),
         )
-    
+
         entry = build_manifest_entry(
             artifact,
             "figshare",
@@ -2871,15 +2780,14 @@ def _download(
             dry_run=False,
             run_id="test-run",
         )
-    
+
         assert entry.sha256 == "abc123"
         assert entry.content_length == 4096
         assert entry.etag == '"etag-manifest"'
         assert entry.last_modified == "Fri, 05 Jan 2024 00:00:00 GMT"
         assert entry.extracted_text_path == str(artifact.html_dir / "saved.txt")
         assert entry.run_id == "test-run"
-    
-    
+
     def test_manifest_entry_serializes_null_reason(tmp_path):
         artifact = make_artifact(tmp_path)
         saved_path = artifact.pdf_dir / "saved.pdf"
@@ -2898,7 +2806,7 @@ def _download(
             last_modified=None,
             extracted_text_path=None,
         )
-    
+
         entry = build_manifest_entry(
             artifact,
             "figshare",
@@ -2908,21 +2816,20 @@ def _download(
             dry_run=False,
             run_id="null-reason-test",
         )
-    
+
         assert entry.reason is None
-    
+
         db_path = tmp_path / "telemetry.sqlite3"
         with SqliteSink(db_path) as sink:
             sink.log_manifest(entry)
-    
+
         conn = sqlite3.connect(db_path)
         try:
             reason_value = conn.execute("SELECT reason FROM manifests").fetchone()[0]
             assert reason_value is None
         finally:
             conn.close()
-    
-    
+
     def test_resume_requested_triggers_full_download(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/resume.pdf"
@@ -2931,9 +2838,9 @@ def _download(
         full_bytes = b"%PDF-1.4\n" + (b"a" * 4096) + b"\n%%EOF"
         partial_path.write_bytes(full_bytes[:1024])
         expected_sha = hashlib.sha256(full_bytes).hexdigest()
-    
+
         captured_headers: Dict[str, str] = {}
-    
+
         def fake_request(session, method, req_url, **kwargs):
             captured_headers.clear()
             captured_headers.update(dict(kwargs.get("headers") or {}))
@@ -2942,10 +2849,10 @@ def _download(
                 headers={"Content-Type": "application/pdf"},
                 chunks=[full_bytes[:2048], full_bytes[2048:]],
             )
-    
+
         patcher.setattr(downloader, "request_with_retries", fake_request, raising=False)
         patcher.setattr(download_impl, "request_with_retries", fake_request)
-    
+
         ctx = DownloadContext.from_mapping(
             {
                 "skip_head_precheck": True,
@@ -2958,7 +2865,7 @@ def _download(
                 },
             }
         )
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -2968,7 +2875,7 @@ def _download(
             timeout=10.0,
             context=ctx,
         )
-    
+
         assert "Range" not in captured_headers
         assert ctx.extra.get("resume_disabled") is True
         assert outcome.classification is Classification.PDF
@@ -2977,8 +2884,7 @@ def _download(
         stored = Path(outcome.path)
         assert stored.read_bytes() == full_bytes
         assert outcome.sha256 == expected_sha
-    
-    
+
     def test_pipeline_records_resume_disabled_metadata(tmp_path: Path) -> None:
         sink = _ListAttemptSink()
         metrics = ResolverMetrics()
@@ -2996,7 +2902,7 @@ def _download(
                 artifact: WorkArtifact,
             ) -> Iterable[ResolverResult]:
                 yield ResolverResult(url="https://example.org/stub.pdf")
-    
+
         def stub_download(
             session: requests.Session,
             artifact: WorkArtifact,
@@ -3020,7 +2926,7 @@ def _download(
             )
             outcome.metadata["resume_disabled"] = True
             return outcome
-    
+
         config = ResolverConfig()
         config.resolver_order = ["stub"]
         config.resolver_toggles["stub"] = True
@@ -3043,16 +2949,14 @@ def _download(
 
         assert sink.attempts
         assert sink.attempts[0].metadata.get("resume_disabled") is True
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def test_rfc5987_filename_suffix(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/no-extension"
         pdf_bytes = b"%PDF-1.4\n" + (b"z" * 2048) + b"\n%%EOF"
-    
+
         mapping = {
             ("GET", url): lambda: FakeResponse(
                 200,
@@ -3064,7 +2968,7 @@ def _download(
             )
         }
         stub_requests(patcher, mapping)
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -3074,20 +2978,18 @@ def _download(
             timeout=10.0,
             context={"min_pdf_bytes": 1, "previous": {}, "extract_html_text": True},
         )
-    
+
         assert outcome.classification is Classification.PDF
         assert outcome.path is not None
         assert outcome.path.endswith(".pdf")
-    
-    
+
     # --- test_download_outcomes.py ---
-    
-    
+
     def test_html_filename_suffix_from_disposition(tmp_path, patcher):
         artifact = make_artifact(tmp_path)
         url = "https://example.org/content"
         html_bytes = b"<html><body>Hi</body></html>"
-    
+
         mapping = {
             ("GET", url): lambda: FakeResponse(
                 200,
@@ -3099,7 +3001,7 @@ def _download(
             )
         }
         stub_requests(patcher, mapping)
-    
+
         session = requests.Session()
         outcome = downloader.download_candidate(
             session,
@@ -3109,26 +3011,22 @@ def _download(
             timeout=10.0,
             context={"min_pdf_bytes": 1, "previous": {}, "extract_html_text": True},
         )
-    
+
         assert outcome.classification is Classification.HTML
         assert outcome.path is not None
         assert outcome.path.endswith(".xhtml")
-    
-    
+
     # --- test_download_utils.py ---
-    
+
     # --- test_download_utils.py ---
-    
-    
+
     def test_slugify_truncates_and_normalises():
         assert downloader.slugify("Hello, World!", keep=8) == "Hello_Wo"
         assert downloader.slugify("   ", keep=10) == "untitled"
         assert downloader.slugify("Study: B-cells & growth", keep=40) == "Study_Bcells_growth"
-    
-    
+
     # --- test_download_utils.py ---
-    
-    
+
     @pytest.mark.parametrize(
         "payload,ctype,url,expected",
         [
@@ -3142,11 +3040,9 @@ def _download(
     def test_classify_payload_variants(payload, ctype, url, expected):
         expected_cls = Classification.from_wire(expected)
         assert classify_payload(payload, ctype, url) is expected_cls
-    
-    
+
     # --- test_download_utils.py ---
-    
-    
+
     def test_collect_location_urls_dedupes_and_tracks_sources(tmp_path: Path):
         work = {
             "best_oa_location": {
@@ -3185,11 +3081,9 @@ def _download(
             "https://oa.example/paper.pdf",
         ]
         assert artifact.source_display_names == ["Host", "Mirror"]
-    
-    
+
     # --- test_download_utils.py ---
-    
-    
+
     @pytest.mark.parametrize(
         "value,expected",
         [
@@ -3200,11 +3094,9 @@ def _download(
     )
     def test_normalize_doi(value, expected):
         assert normalize_doi(value) == expected
-    
-    
+
     # --- test_download_utils.py ---
-    
-    
+
     @pytest.mark.parametrize(
         "value,expected",
         [
@@ -3215,11 +3107,9 @@ def _download(
     )
     def test_normalize_pmid(value, expected):
         assert normalize_pmid(value) == expected
-    
-    
+
     # --- test_download_utils.py ---
-    
-    
+
     @pytest.mark.parametrize(
         "value,expected",
         [
@@ -3231,11 +3121,9 @@ def _download(
     )
     def test_normalize_pmcid(value, expected):
         assert normalize_pmcid(value) == expected
-    
-    
+
     # --- test_download_utils.py ---
-    
-    
+
     @pytest.mark.parametrize(
         "value,expected",
         [
@@ -3246,52 +3134,41 @@ def _download(
     )
     def test_normalize_arxiv(value, expected):
         assert normalize_arxiv(value) == expected
-    
-    
+
     # --- test_content_download_utils.py ---
-    
+
     try:
         import hypothesis
         from hypothesis import strategies as st  # type: ignore
     except ImportError:  # pragma: no cover - optional dependency
         pytest.skip("hypothesis is required for these tests", allow_module_level=True)
-    
+
     # --- test_content_download_utils.py ---
-    
+
     given = hypothesis.given
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     def test_normalize_doi_with_https_prefix() -> None:
         assert normalize_doi("https://doi.org/10.1234/abc") == "10.1234/abc"
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     def test_normalize_doi_without_prefix() -> None:
         assert normalize_doi("10.1234/abc") == "10.1234/abc"
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     def test_normalize_doi_with_whitespace() -> None:
         assert normalize_doi("  10.1234/abc  ") == "10.1234/abc"
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     def test_normalize_doi_none() -> None:
         assert normalize_doi(None) is None
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     @pytest.mark.parametrize(
         "prefix",
         [
@@ -3306,53 +3183,39 @@ def _download(
     def test_normalize_doi_prefix_variants(prefix: str) -> None:
         canonical = "10.1234/Example"
         assert normalize_doi(f"{prefix}{canonical}") == canonical
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     def test_normalize_pmcid_with_pmc_prefix() -> None:
         assert normalize_pmcid("PMC123456") == "PMC123456"
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     def test_normalize_pmcid_without_prefix_adds_prefix() -> None:
         assert normalize_pmcid("123456") == "PMC123456"
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     def test_normalize_pmcid_lowercase() -> None:
         assert normalize_pmcid("pmc123456") == "PMC123456"
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     def test_strip_prefix_case_insensitive() -> None:
         assert strip_prefix("ARXIV:2301.12345", "arxiv:") == "2301.12345"
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     def test_dedupe_preserves_order() -> None:
         assert dedupe(["b", "a", "b", "c"]) == ["b", "a", "c"]
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     def test_dedupe_filters_falsey_values() -> None:
         assert dedupe(["a", "", None, "a"]) == ["a"]
-    
-    
+
     # --- test_content_download_utils.py ---
-    
-    
+
     @given(st.lists(st.text()))
     def test_dedupe_property(values: List[str]) -> None:
         expected = []
@@ -3361,26 +3224,23 @@ def _download(
             if item and item not in seen:
                 expected.append(item)
                 seen.add(item)
-    
+
         assert dedupe(values) == expected
-    
-    
+
     # --- test_edge_cases.py ---
-    
+
     responses = pytest.importorskip("responses")
-    
-    
+
     # --- test_edge_cases.py ---
     # --- test_edge_cases.py ---
-    
-    
+
     @responses.activate
     def test_html_classification_overrides_misleading_content_type(tmp_path: Path) -> None:
         artifact = _make_artifact(tmp_path)
         url = artifact.pdf_urls[0]
         responses.add(responses.HEAD, url, status=200, headers={"Content-Type": "application/pdf"})
         responses.add(responses.GET, url, status=200, body="<html><body>Fake PDF</body></html>")
-    
+
         outcome = download_candidate(
             requests.Session(),
             artifact,
@@ -3389,14 +3249,12 @@ def _download(
             timeout=10.0,
             context={"dry_run": False, "extract_html_text": True, "previous": {}},
         )
-    
+
         assert outcome.classification is Classification.HTML
         assert outcome.path and outcome.path.endswith(".html")
-    
-    
+
     # --- test_edge_cases.py ---
-    
-    
+
     @responses.activate
     def test_wayback_resolver_skips_unavailable_archives(tmp_path: Path) -> None:
         artifact = _edge_artifact(tmp_path, pdf_urls=[])
@@ -3407,18 +3265,18 @@ def _download(
             responses.GET,
             "https://archive.org/wayback/available",
             json={
-                "archived_snapshots": {"closest": {"available": False, "url": "https://archive.org"}}
+                "archived_snapshots": {
+                    "closest": {"available": False, "url": "https://archive.org"}
+                }
             },
             status=200,
         )
-    
+
         results = list(WaybackResolver().iter_urls(session, config, artifact))
         assert results == []
-    
-    
+
     # --- test_edge_cases.py ---
-    
-    
+
     def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
         work = {
             "id": "https://openalex.org/WEDGE",
@@ -3532,19 +3390,18 @@ def _download(
         assert manifests[0]["run_id"] == "test-run"
         assert manifests[0]["path"].endswith("resolver.pdf")
         assert Path(manifests[0]["path"]).exists()
-    
-    
+
     def test_retry_after_updates_breakers(tmp_path: Path) -> None:
         sink = JsonlSink(tmp_path / "breaker.jsonl")
         logger = RunTelemetry(sink)
         metrics = ResolverMetrics()
-    
+
         class StubResolver:
             name = "stub"
-    
+
             def is_enabled(self, config: ResolverConfig, artifact: WorkArtifact) -> bool:
                 return True
-    
+
             def iter_urls(
                 self,
                 session: requests.Session,
@@ -3552,7 +3409,7 @@ def _download(
                 artifact: WorkArtifact,
             ) -> Iterable[ResolverResult]:
                 yield ResolverResult(url="https://resolver.example/paper.pdf")
-    
+
         config = ResolverConfig(
             resolver_order=["stub"],
             resolver_toggles={"stub": True},
@@ -3568,9 +3425,14 @@ def _download(
             },
         )
         pipeline = ResolverPipeline(
-            [StubResolver()], config, lambda *args, **kwargs: None, logger, metrics, run_id="test-run"
+            [StubResolver()],
+            config,
+            lambda *args, **kwargs: None,
+            logger,
+            metrics,
+            run_id="test-run",
         )
-    
+
         outcome = DownloadOutcome(
             classification=Classification.HTTP_ERROR,
             path=None,
@@ -3581,23 +3443,21 @@ def _download(
             reason_detail="500",
             retry_after=7.5,
         )
-    
+
         pipeline._update_breakers("stub", "resolver.example", outcome)
-    
+
         resolver_breaker = pipeline._resolver_breakers["stub"]
         assert resolver_breaker.allow() is False
         assert resolver_breaker.cooldown_remaining() >= 7.0
-    
+
         host_breaker = pipeline._ensure_host_breaker("resolver.example")
         assert host_breaker.allow() is False
         assert host_breaker.cooldown_remaining() >= 7.0
-    
+
         logger.close()
-    
-    
+
     # --- test_edge_cases.py ---
-    
-    
+
     def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
         artifact = _edge_artifact(tmp_path)
         sink = _ListAttemptSink()
@@ -3626,7 +3486,7 @@ def _download(
                 elapsed_ms=1.0,
                 reason=ReasonCode.REQUEST_EXCEPTION,
             )
-    
+
         config = ResolverConfig(
             resolver_order=["openalex"],
             resolver_toggles={"openalex": True},
@@ -3644,11 +3504,9 @@ def _download(
         pipeline.run(session, artifact)
 
         assert observed == ["EdgeTester/1.0"]
-    
-    
+
     # --- test_edge_cases.py ---
-    
-    
+
     def test_retry_budget_honours_max_attempts(tmp_path: Path) -> None:
         artifact = _edge_artifact(tmp_path)
         config = ResolverConfig(
@@ -3709,8 +3567,7 @@ def _download(
         result = pipeline.run(requests.Session(), artifact)
         assert result.success is False
         assert len(calls) == config.max_attempts_per_work
-    
-    
+
     def test_load_manifest_url_index_reads_sqlite(tmp_path: Path) -> None:
         db_path = tmp_path / "manifest.sqlite3"
         sink = SqliteSink(db_path)
@@ -3744,8 +3601,7 @@ def _download(
         assert record["sha256"] == entry.sha256
         assert record["etag"] == entry.etag
         assert record["content_length"] == entry.content_length
-    
-    
+
     def test_manifest_url_index_lazy_get_does_not_trigger_full_load(tmp_path: Path, patcher):
         db_path = tmp_path / "manifest.sqlite3"
         sink = SqliteSink(db_path)
@@ -3772,21 +3628,22 @@ def _download(
         )
         sink.log_manifest(entry)
         sink.close()
-    
+
         def _fail_loader(path):
-            raise AssertionError("ManifestUrlIndex should not eager-load via load_manifest_url_index")
-    
+            raise AssertionError(
+                "ManifestUrlIndex should not eager-load via load_manifest_url_index"
+            )
+
         patcher.setattr("DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _fail_loader)
-    
+
         index = ManifestUrlIndex(db_path, eager=False)
         record = index.get(entry.url)
         assert record is not None
         assert record["sha256"] == entry.sha256
-    
+
         with pytest.raises(AssertionError):
             index.as_dict()
-    
-    
+
     def test_manifest_url_index_iter_existing_filters_missing_paths(tmp_path: Path) -> None:
         db_path = tmp_path / "manifest.sqlite3"
         sink = SqliteSink(db_path)
@@ -3837,7 +3694,7 @@ def _download(
         sink.log_manifest(present_entry)
         sink.log_manifest(missing_entry)
         sink.close()
-    
+
         index = ManifestUrlIndex(db_path)
         existing_items = list(index.iter_existing_paths())
         assert len(existing_items) == 1

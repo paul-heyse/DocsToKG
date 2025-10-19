@@ -306,12 +306,15 @@ class ManifestUrlIndex:
                     continue
                 if not stored_path:
                     continue
-                if not Path(stored_path).exists():
+                # Resolve path relative to manifest directory, consistent with _fetch_one
+                base_dir = self._path.parent if self._path else None
+                resolved_path = normalize_manifest_path(stored_path, base=base_dir)
+                if not resolved_path or not Path(resolved_path).exists():
                     continue
 
                 payload = {
                     "url": url,
-                    "path": stored_path,
+                    "path": resolved_path,
                     "sha256": sha256,
                     "classification": classification,
                     "etag": etag,
@@ -667,7 +670,9 @@ class JsonlSink:
                 "reason": (
                     record.reason.value
                     if isinstance(record.reason, ReasonCode)
-                    else record.reason if record.reason is not None else None
+                    else record.reason
+                    if record.reason is not None
+                    else None
                 ),
                 "reason_detail": getattr(record, "reason_detail", None),
                 "metadata": record.metadata,
@@ -853,7 +858,9 @@ class CsvSink:
             "reason": (
                 record.reason.value
                 if isinstance(record.reason, ReasonCode)
-                else record.reason if record.reason is not None else None
+                else record.reason
+                if record.reason is not None
+                else None
             ),
             "reason_detail": getattr(record, "reason_detail", None) or "",
             "sha256": record.sha256,
@@ -1212,7 +1219,9 @@ class SqliteSink:
                     (
                         record.reason.value
                         if isinstance(record.reason, ReasonCode)
-                        else record.reason if record.reason is not None else None
+                        else record.reason
+                        if record.reason is not None
+                        else None
                     ),
                     getattr(record, "reason_detail", None),
                     metadata_json,
@@ -1348,7 +1357,9 @@ class SqliteSink:
                 try:
                     alias.unlink()
                 except OSError:
-                    logger.debug("Failed to remove stale legacy SQLite alias at %s", alias, exc_info=True)
+                    logger.debug(
+                        "Failed to remove stale legacy SQLite alias at %s", alias, exc_info=True
+                    )
                     return
             try:
                 os.symlink(target, alias)
@@ -1356,7 +1367,12 @@ class SqliteSink:
                 try:
                     shutil.copy2(target, alias)
                 except OSError:
-                    logger.debug("Failed to copy legacy SQLite alias from %s to %s", target, alias, exc_info=True)
+                    logger.debug(
+                        "Failed to copy legacy SQLite alias from %s to %s",
+                        target,
+                        alias,
+                        exc_info=True,
+                    )
         except Exception:
             logger.debug("Unable to create legacy SQLite alias for %s", alias, exc_info=True)
 
@@ -1639,10 +1655,7 @@ def looks_like_csv_resume_target(path: Path) -> bool:
                 if stripped.startswith("{") or stripped.startswith("["):
                     return False
                 if "," in stripped:
-                    header = {
-                        column.strip().strip('"').lower()
-                        for column in stripped.split(",")
-                    }
+                    header = {column.strip().strip('"').lower() for column in stripped.split(",")}
                     if CSV_HEADER_TOKENS.issubset(header):
                         return True
                 break
@@ -1676,8 +1689,10 @@ def iter_previous_manifest_entries(
 ) -> Iterator[Tuple[str, str, Dict[str, Any], bool]]:
     """Yield resume manifest entries lazily, preferring SQLite when available."""
 
-    if sqlite_path and sqlite_path.exists() and (
-        not path or not path.exists() or looks_like_sqlite_resume_target(path)
+    if (
+        sqlite_path
+        and sqlite_path.exists()
+        and (not path or not path.exists() or looks_like_sqlite_resume_target(path))
     ):
         yield from _iter_resume_rows_from_sqlite(sqlite_path)
         return
@@ -1704,8 +1719,9 @@ def iter_previous_manifest_entries(
             return
         raise ValueError(
             "Resume manifest '{path}' appears to be a CSV attempts log but no SQLite cache was found. "
-            "Provide the matching manifest.sqlite or manifest.sqlite3 file, or resume from a JSONL manifest."
-            .format(path=path)
+            "Provide the matching manifest.sqlite or manifest.sqlite3 file, or resume from a JSONL manifest.".format(
+                path=path
+            )
         )
 
     prefix = f"{path.name}."
@@ -1725,13 +1741,10 @@ def iter_previous_manifest_entries(
         if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
             yield from _iter_resume_rows_from_sqlite(sqlite_path)
             return
-        file_error = FileNotFoundError(
-            f"No manifest files found for resume path {path!s}"
-        )
+        file_error = FileNotFoundError(f"No manifest files found for resume path {path!s}")
         raise ValueError(
             "Resume manifest '{path}' does not exist and no rotated segments were found. "
-            "Double-check the --resume-from path or omit it to start a fresh run."
-            .format(path=path)
+            "Double-check the --resume-from path or omit it to start a fresh run.".format(path=path)
         ) from file_error
 
     yielded_any = False
@@ -1774,7 +1787,9 @@ def iter_previous_manifest_entries(
                         qualifier = (
                             "newer"
                             if schema_version > MANIFEST_SCHEMA_VERSION
-                            else "older" if schema_version < MANIFEST_SCHEMA_VERSION else "unknown"
+                            else "older"
+                            if schema_version < MANIFEST_SCHEMA_VERSION
+                            else "unknown"
                         )
                         raise ValueError(
                             "Unsupported manifest schema_version {observed} ({qualifier}); expected version {expected}. "
@@ -1830,9 +1845,7 @@ def iter_previous_manifest_entries(
         except Exception as exc:
             location = f"{file_path}:{line_number}" if line_number is not None else str(file_path)
             if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
-                logger.warning(
-                    "Failed to parse resume manifest at %s", location, exc_info=exc
-                )
+                logger.warning("Failed to parse resume manifest at %s", location, exc_info=exc)
                 logger.warning(
                     "Falling back to SQLite resume cache '%s' after manifest parse failure at %s.",
                     sqlite_path,
@@ -1840,9 +1853,7 @@ def iter_previous_manifest_entries(
                 )
                 yield from _iter_resume_rows_from_sqlite(sqlite_path)
                 return
-            raise ValueError(
-                f"Failed to parse resume manifest at {location}: {exc}"
-            ) from exc
+            raise ValueError(f"Failed to parse resume manifest at {location}: {exc}") from exc
 
         for item in buffered:
             yielded_any = True
@@ -1940,9 +1951,7 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
             if self._closed:
                 return len(self._cache)
             try:
-                row = self._conn.execute(
-                    "SELECT COUNT(DISTINCT work_id) FROM manifests"
-                ).fetchone()
+                row = self._conn.execute("SELECT COUNT(DISTINCT work_id) FROM manifests").fetchone()
             except sqlite3.OperationalError:
                 row = None
         total = int(row[0]) if row and row[0] is not None else 0

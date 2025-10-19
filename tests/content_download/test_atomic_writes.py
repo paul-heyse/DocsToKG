@@ -168,7 +168,6 @@ if DOWNLOAD_DEPS_AVAILABLE:
         def __init__(self) -> None:
             super().__init__(status_code=200)
 
-
     class _FailingResponse(_BaseDummyResponse):
         def iter_content(self, chunk_size: int):  # noqa: D401 - streaming interface
             yield b"%PDF-1.4\n"
@@ -675,6 +674,7 @@ def configure_embeddings_stubs(patcher):
         args,
         validator,
         logger,
+        content_hasher=None,
     ):
         crash_limit = getattr(embeddings, "_crash_after_write", None)
         if crash_limit is None:

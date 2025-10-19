@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import sqlite3
+import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
@@ -13,7 +14,8 @@ import pytest
 import requests
 
 from DocsToKG.ContentDownload.args import ResolvedConfig, bootstrap_run_environment
-from DocsToKG.ContentDownload.core import Classification, WorkArtifact
+from DocsToKG.ContentDownload.core import Classification, ReasonCode, WorkArtifact
+from DocsToKG.ContentDownload.download import handle_resume_logic
 from DocsToKG.ContentDownload.networking import ThreadLocalSessionFactory
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.providers import WorkProvider
@@ -315,9 +317,7 @@ def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
     assert "--resume-from" in message
 
 
-def test_setup_download_state_expands_user_resume_path(
-    tmp_path, patcher, monkeypatch
-):
+def test_setup_download_state_expands_user_resume_path(tmp_path, patcher, monkeypatch):
     resolved = make_resolved_config(tmp_path, csv=False)
     bootstrap_run_environment(resolved)
 
@@ -821,8 +821,12 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, m
     resume_entry = next(iter(previous_lookup.values()))
     cached_path = resume_entry["path"]
     assert cached_path is not None
-    assert Path(cached_path).is_absolute()
-    assert Path(cached_path).exists()
+    # Paths in manifests are stored as relative paths
+    assert not Path(cached_path).is_absolute()
+    # The path should exist relative to the manifest directory (first), not current working directory (second)
+    manifest_dir = resume_target.parent
+    resolved_path = manifest_dir / cached_path
+    assert resolved_path.exists()
 
     artifact = _make_artifact(resolved, "W-ABS")
     decision = handle_resume_logic(
@@ -1267,4 +1271,3 @@ def test_worker_crash_records_manifest_reason(patcher, tmp_path):
     assert failure_record["classification"] == Classification.SKIPPED.value
     assert failure_record["reason"] == ReasonCode.WORKER_EXCEPTION.value
     assert failure_record["reason_detail"] == "worker-crash"
-

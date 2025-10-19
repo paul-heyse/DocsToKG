@@ -154,10 +154,9 @@ def test_main_closes_sinks_when_pipeline_raises(patcher, tmp_path):
     argv = _base_args(tmp_path)
     patcher.setattr("sys.argv", argv)
 
-    with pytest.raises(RuntimeError) as excinfo:
-        downloader.main()
+    result = downloader.main()
 
-    assert "resolver boom" in str(excinfo.value)
+    assert result.worker_failures > 0, "Expected worker failures due to RuntimeError"
 
     assert _RecordingSink.instances, "expected Jsonl/Index sinks to be created"
     assert all(inst.closed for inst in _RecordingSink.instances)
