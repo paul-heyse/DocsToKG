@@ -60,6 +60,32 @@ def test_cli_pull_json_uses_harness(ontology_env, capsys):
     assert output[0]["status"] in {"fresh", "updated", "cached"}
 
 
+def test_cli_defaults_to_pull_when_subcommand_missing(ontology_env, capsys):
+    """Calling the CLI without a subcommand should behave like ``pull``."""
+
+    resolver_name, resolver = _static_resolver_for(
+        ontology_env,
+        name="hp-default",
+        filename="hp-default.owl",
+    )
+    with temporary_resolver(resolver_name, resolver):
+        exit_code = cli_module.cli_main(
+            [
+                "hp",  # positional ontology id without explicit subcommand
+                "--resolver",
+                resolver_name,
+                "--allowed-hosts",
+                _allowed_hosts_arg(ontology_env),
+                "--json",
+            ]
+        )
+
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output[0]["id"] == "hp"
+    assert output[0]["status"] in {"fresh", "updated", "cached"}
+
+
 def test_cli_plan_json_respects_resolver(ontology_env, capsys, tmp_path):
     """`ontofetch plan` should surface resolver details using the harness environment."""
 
