@@ -4,6 +4,7 @@ import pytest
 
 from DocsToKG.OntologyDownload.errors import DownloadFailure, PolicyError
 from DocsToKG.OntologyDownload.io import network as network_mod
+from DocsToKG.OntologyDownload.io.rate_limit import TokenBucket
 from DocsToKG.OntologyDownload.testing import ResponseSpec
 
 
@@ -112,6 +113,48 @@ def test_get_redirect_to_disallowed_host(ontology_env, tmp_path):
     assert [record.method for record in ontology_env.requests] == ["HEAD", "GET"]
 
 
+class _BucketSpy(TokenBucket):
+    """Deterministic token bucket that records consumption without sleeping."""
+
+    def __init__(self) -> None:
+        super().__init__(rate_per_sec=1000.0, capacity=1000.0)
+        self.calls: list[float] = []
+
+    def consume(self, tokens: float = 1.0) -> None:  # type: ignore[override]
+        self.calls.append(tokens)
+
+
+def test_download_stream_consumes_tokens_for_head_and_get(ontology_env, tmp_path):
+    """Both HEAD and GET requests must consume rate-limit tokens when available."""
+
+    bucket = _BucketSpy()
+    config = ontology_env.build_download_config()
+    config.set_bucket_provider(lambda service, http_config, host: bucket)
+
+    fixture_url = ontology_env.register_fixture(
+        "bucket-consumption.owl",
+        b"rate-limit-body",
+        media_type="application/rdf+xml",
+    )
+
+    destination = tmp_path / "bucket-consumption.owl"
+
+    network_mod.download_stream(
+        url=fixture_url,
+        destination=destination,
+        headers={},
+        previous_manifest=None,
+        http_config=config,
+        cache_dir=ontology_env.cache_dir,
+        logger=_logger(),
+        expected_media_type="application/rdf+xml",
+        service="test-service",
+    )
+
+    assert destination.exists()
+    assert destination.read_bytes() == b"rate-limit-body"
+    assert bucket.calls == [1.0, 1.0]
+    assert [record.method for record in ontology_env.requests] == ["HEAD", "GET"]
 def test_download_timeout_aborts_retries(ontology_env, tmp_path, caplog):
     """Downloads exceeding the configured timeout must fail without retrying."""
 
