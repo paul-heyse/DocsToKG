@@ -14,6 +14,7 @@ from DocsToKG.DocParsing.logging import get_logger, log_event
 
 __all__ = [
     "acquire_lock",
+    "ReservedPort",
     "find_free_port",
     "set_spawn_or_warn",
 ]
@@ -104,28 +105,103 @@ def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
         )
 
 
-def find_free_port(start: int = 8000, span: int = 32) -> int:
-    """Locate an available TCP port on localhost within a range."""
+class ReservedPort(contextlib.AbstractContextManager["ReservedPort"]):
+    """Context manager representing a reserved TCP port."""
 
-    for port in range(start, start + span):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(0.2)
-            if sock.connect_ex(("127.0.0.1", port)) != 0:
-                return port
+    def __init__(self, sock: socket.socket, host: str) -> None:
+        self._socket = sock
+        self._host = host
+        self._closed = False
+
+    def __enter__(self) -> "ReservedPort":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> Optional[bool]:
+        self.close()
+        return None
+
+    @property
+    def socket(self) -> socket.socket:
+        """Return the underlying socket that keeps the reservation alive."""
+
+        return self._socket
+
+    @property
+    def port(self) -> int:
+        """Return the port reserved by this context."""
+
+        return self._socket.getsockname()[1]
+
+    @property
+    def host(self) -> str:
+        """Return the host interface the reservation is bound to."""
+
+        return self._host
+
+    def close(self) -> None:
+        """Release the reservation if it is currently held."""
+
+        if not self._closed:
+            try:
+                self._socket.close()
+            finally:
+                self._closed = True
+
+
+def _bind_reserved_socket(host: str, port: int) -> Optional[socket.socket]:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind((host, port))
+        sock.listen()
+        return sock
+    except OSError:
+        sock.close()
+        return None
+
+
+def find_free_port(
+    start: int = 8000,
+    span: int = 32,
+    *,
+    host: str = "127.0.0.1",
+    retry_interval: float = 0.05,
+    max_attempts: int = 100,
+) -> ReservedPort:
+    """Reserve an available TCP port and return a context manager guarding it.
+
+    The returned context manager keeps the port reserved by holding an open
+    listening socket. Callers should release the reservation (either by exiting
+    the context or invoking :meth:`ReservedPort.close`) only when the consumer
+    of the port is ready to bind and accept connections.
+    """
+
+    if span <= 0:
+        raise ValueError("span must be positive")
+
+    attempts = 0
+    while attempts < max_attempts:
+        for port in range(start, start + span):
+            sock = _bind_reserved_socket(host, port)
+            if sock is not None:
+                return ReservedPort(sock, host)
+        attempts += 1
+        time.sleep(retry_interval)
 
     logger = get_logger(__name__)
     log_event(
         logger,
         "warning",
-        "Port scan exhausted",
+        "Port scan exhausted; falling back to ephemeral port",
         stage="core",
         doc_id="__system__",
         input_hash=None,
         error_code="PORT_SCAN_EXHAUSTED",
         start=start,
         span=span,
+        attempts=attempts,
         action="ephemeral_port",
     )
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
+    fallback = _bind_reserved_socket(host, 0)
+    if fallback is None:  # pragma: no cover - defensive
+        raise RuntimeError("Failed to bind to an ephemeral port")
+    return ReservedPort(fallback, host)
