@@ -480,7 +480,7 @@ Hex digest string.
 Examples:
 >>> tmp = Path("/tmp/hash.txt")
 >>> _ = tmp.write_text("hello", encoding="utf-8")
->>> compute_content_hash(tmp) == hashlib.sha1(b"hello").hexdigest()
+>>> compute_content_hash(tmp) == hashlib.sha256(b"hello").hexdigest()
 True
 
 ### `load_manifest_index(stage, root)`

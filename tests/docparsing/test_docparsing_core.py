@@ -948,7 +948,7 @@ def test_make_hasher_prefers_explicit_algorithm(caplog: pytest.LogCaptureFixture
 
 def test_resolve_hash_algorithm_defaults() -> None:
     os.environ.pop("DOCSTOKG_HASH_ALG", None)
-    assert doc_io.resolve_hash_algorithm() == "sha1"
+    assert doc_io.resolve_hash_algorithm() == "sha256"
     os.environ["DOCSTOKG_HASH_ALG"] = "sha256"
     assert doc_io.resolve_hash_algorithm() == "sha256"
 

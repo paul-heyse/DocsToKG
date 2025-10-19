@@ -486,7 +486,7 @@ def _select_hash_algorithm(requested: Optional[str], default: Optional[str]) -> 
     return fallback
 
 
-def resolve_hash_algorithm(default: str = "sha1") -> str:
+def resolve_hash_algorithm(default: str = _SAFE_HASH_ALGORITHM) -> str:
     """Return the active content hash algorithm, guarding invalid overrides."""
 
     return _select_hash_algorithm(requested=None, default=default)
@@ -504,7 +504,7 @@ def compute_chunk_uuid(
     start_offset: int,
     text: str,
     *,
-    algorithm: str = "sha1",
+    algorithm: str = _SAFE_HASH_ALGORITHM,
 ) -> str:
     """Compute a deterministic UUID for a chunk of text."""
 
@@ -603,7 +603,9 @@ def quarantine_artifact(
     return candidate
 
 
-def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
+def compute_content_hash(
+    path: Path, algorithm: str = _SAFE_HASH_ALGORITHM
+) -> str:
     """Compute a content hash for ``path`` using the requested algorithm."""
 
     hasher = make_hasher(name=algorithm)
