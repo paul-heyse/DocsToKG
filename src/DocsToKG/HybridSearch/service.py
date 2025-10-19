@@ -3219,9 +3219,157 @@ class HybridSearchValidator:
 
         if faiss is None:
             raise RuntimeError("faiss is required for validation checks")
-        if self._validation_resources is None:
-            self._validation_resources = faiss.StandardGpuResources()
-        return self._validation_resources
+        if self._validation_resources is not None:
+            return self._validation_resources
+
+        def _extract_gpu_resources(store: object) -> Optional["faiss.StandardGpuResources"]:
+            if store is None:
+                return None
+            getter = getattr(store, "get_gpu_resources", None)
+            if not callable(getter):
+                return None
+            try:
+                return getter()
+            except Exception:
+                return None
+
+        # Prefer reusing GPU resources already configured on the active store.
+        store_resource = _extract_gpu_resources(getattr(self._service, "_faiss", None))
+        if store_resource is None:
+            ingestion_store = getattr(self._ingestion, "faiss_index", None)
+            store_resource = _extract_gpu_resources(ingestion_store)
+        if store_resource is not None:
+            self._validation_resources = store_resource
+            return store_resource
+
+        config_manager = getattr(self._service, "_config_manager", None)
+        dense_cfg: DenseIndexConfig
+        try:
+            config = config_manager.get() if config_manager is not None else None
+            dense_cfg = getattr(config, "dense", DenseIndexConfig()) if config else DenseIndexConfig()
+        except Exception:
+            dense_cfg = DenseIndexConfig()
+
+        resource = faiss.StandardGpuResources()
+        self._configure_validation_resource(resource, dense_cfg)
+        self._record_validation_resource_configuration(dense_cfg)
+        self._validation_resources = resource
+        return resource
+
+    def _configure_validation_resource(
+        self,
+        resource: "faiss.StandardGpuResources",
+        dense_cfg: DenseIndexConfig,
+    ) -> None:
+        """Apply DenseIndexConfig knobs to validation GPU resources."""
+
+        observability = getattr(self._service, "_observability", None)
+        logger = getattr(observability, "logger", None)
+
+        temp_memory = getattr(dense_cfg, "gpu_temp_memory_bytes", None)
+        if temp_memory is not None and hasattr(resource, "setTempMemory"):
+            try:
+                resource.setTempMemory(int(temp_memory))
+            except Exception:
+                if logger is not None:
+                    logger.debug("validation-gpu-resource-temp-memory", exc_info=True)
+
+        pinned_memory = getattr(dense_cfg, "gpu_pinned_memory_bytes", None)
+        if pinned_memory is not None and hasattr(resource, "setPinnedMemory"):
+            try:
+                resource.setPinnedMemory(int(pinned_memory))
+            except Exception:
+                if logger is not None:
+                    logger.debug("validation-gpu-resource-pinned-memory", exc_info=True)
+
+        use_all_devices = bool(
+            getattr(dense_cfg, "gpu_use_default_null_stream_all_devices", False)
+        )
+        use_single_device = bool(getattr(dense_cfg, "gpu_use_default_null_stream", False))
+
+        if use_all_devices:
+            method_all = getattr(resource, "setDefaultNullStreamAllDevices", None)
+            if callable(method_all):
+                try:
+                    method_all()
+                    use_single_device = False
+                except Exception:
+                    use_single_device = True
+                    if logger is not None:
+                        logger.debug(
+                            "validation-gpu-resource-null-stream-all-devices", exc_info=True
+                        )
+
+        if not use_single_device:
+            return
+
+        method_single = getattr(resource, "setDefaultNullStream", None)
+        if not callable(method_single):
+            return
+
+        device = getattr(dense_cfg, "device", None)
+        try:
+            if device is not None:
+                method_single(int(device))
+            else:
+                method_single()
+        except TypeError:
+            try:
+                method_single()
+            except Exception:
+                if logger is not None:
+                    logger.debug("validation-gpu-resource-null-stream", exc_info=True)
+        except Exception:
+            if logger is not None:
+                logger.debug("validation-gpu-resource-null-stream", exc_info=True)
+
+    def _record_validation_resource_configuration(self, dense_cfg: DenseIndexConfig) -> None:
+        """Emit observability breadcrumbs for validation GPU resource settings."""
+
+        observability = getattr(self._service, "_observability", None)
+        if observability is None:
+            return
+
+        metrics = getattr(observability, "metrics", None)
+        if metrics is not None:
+            temp_memory = getattr(dense_cfg, "gpu_temp_memory_bytes", None)
+            if temp_memory is not None:
+                metrics.set_gauge(
+                    "faiss_gpu_temp_memory_bytes", float(temp_memory), scope="validation"
+                )
+            metrics.set_gauge(
+                "faiss_gpu_default_null_stream",
+                1.0 if getattr(dense_cfg, "gpu_use_default_null_stream", False) else 0.0,
+                scope="validation",
+            )
+            metrics.set_gauge(
+                "faiss_gpu_default_null_stream_all_devices",
+                1.0
+                if getattr(dense_cfg, "gpu_use_default_null_stream_all_devices", False)
+                else 0.0,
+                scope="validation",
+            )
+
+        logger = getattr(observability, "logger", None)
+        if logger is None:
+            return
+
+        logger.info(
+            "faiss-gpu-resource-configured",
+            extra={
+                "event": {
+                    "device": int(getattr(dense_cfg, "device", 0)),
+                    "temp_memory_bytes": getattr(dense_cfg, "gpu_temp_memory_bytes", None),
+                    "default_null_stream": bool(
+                        getattr(dense_cfg, "gpu_use_default_null_stream", False)
+                    ),
+                    "default_null_stream_all_devices": bool(
+                        getattr(dense_cfg, "gpu_use_default_null_stream_all_devices", False)
+                    ),
+                    "scope": "validation",
+                }
+            },
+        )
 
     def _percentile(self, values: Sequence[float], percentile: float) -> float:
         """Return percentile value for a sequence; defaults to 0.0 when empty.
