@@ -55,6 +55,12 @@
 # }
 # === /NAVMAP ===
 
+"""Utility-function regression coverage for planners/settings.
+
+Exercises rate-limit parsing, timestamp inference, directory size helpers, and
+other small utilities that power manifest generation and telemetry.
+"""
+
 import datetime as dt
 from pathlib import Path
 

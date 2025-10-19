@@ -215,6 +215,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "iter-rows-in-batches-with-hash",
+#       "name": "iter_rows_in_batches_with_hash",
+#       "anchor": "function-iter-rows-in-batches-with-hash",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "validate-chunk-file-schema",
 #       "name": "_validate_chunk_file_schema",
 #       "anchor": "function-validate-chunk-file-schema",
@@ -224,6 +230,12 @@
 #       "id": "iter-chunk-files",
 #       "name": "iter_chunk_files",
 #       "anchor": "function-iter-chunk-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-chunks-or-empty",
+#       "name": "_iter_chunks_or_empty",
+#       "anchor": "function-iter-chunks-or-empty",
 #       "kind": "function"
 #     },
 #     {
@@ -449,6 +461,7 @@ from DocsToKG.DocParsing.formats import (
     VectorRow as _VectorRow,
 )
 from DocsToKG.DocParsing.io import (
+    StreamingContentHasher,
     atomic_write,
     compute_chunk_uuid,
     compute_content_hash,
@@ -458,8 +471,8 @@ from DocsToKG.DocParsing.io import (
     relative_path,
     resolve_attempts_path,
     resolve_manifest_path,
-    StreamingContentHasher,
 )
+from DocsToKG.DocParsing.io import manifest_append as _manifest_append
 from DocsToKG.DocParsing.logging import (
     get_logger,
     log_event,
@@ -474,7 +487,6 @@ from DocsToKG.DocParsing.logging import (
 from DocsToKG.DocParsing.logging import (
     manifest_log_success as _logging_manifest_log_success,
 )
-from DocsToKG.DocParsing.io import manifest_append as _manifest_append
 from DocsToKG.DocParsing.schemas import (
     SchemaKind,
     ensure_chunk_schema,
@@ -1935,9 +1947,9 @@ def write_vectors(
                 doc_id=doc_id,
                 duration_s=0.0,
                 schema_version=VECTOR_SCHEMA_VERSION,
-                input_path=row.get("source_path", "unknown")
-                if isinstance(row, dict)
-                else "unknown",
+                input_path=(
+                    row.get("source_path", "unknown") if isinstance(row, dict) else "unknown"
+                ),
                 input_hash=row.get("input_hash", "") if isinstance(row, dict) else "",
                 output_path=output_ref,
                 error=str(exc),

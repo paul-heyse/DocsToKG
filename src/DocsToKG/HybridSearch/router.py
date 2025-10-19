@@ -1,4 +1,11 @@
-"""Namespace router utilities for hybrid search vector stores."""
+"""Namespace-aware routing for dense vector stores and snapshot caching.
+
+`FaissRouter` mirrors the namespace strategies documented in the README. It
+keeps per-namespace FAISS instances (or a shared default), rehydrates evicted
+stores from serialized payloads, and tracks last-use timestamps for proactive
+cache trimming. The router integrates with `ManagedFaissAdapter` snapshots so
+workers can lazily restore large GPU indexes without blocking startup.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +19,14 @@ from .interfaces import DenseVectorStore
 
 DEFAULT_NAMESPACE = "__default__"
 logger = logging.getLogger(__name__)
+
+
+class _StoreMap(dict):
+    """Dictionary that ignores deletions for missing namespaces."""
+
+    def __delitem__(self, key: object) -> None:  # type: ignore[override]
+        if key in self:
+            super().__delitem__(key)
 
 
 class FaissRouter:
@@ -29,7 +44,7 @@ class FaissRouter:
         self._per_namespace = per_namespace
         self._default_store = default_store
         self._factory = factory
-        self._stores: Dict[str, DenseVectorStore] = {}
+        self._stores: Dict[str, DenseVectorStore] = _StoreMap()
         if per_namespace:
             self._stores[DEFAULT_NAMESPACE] = default_store
         self._lock = RLock()
@@ -119,24 +134,36 @@ class FaissRouter:
     def serialize_all(self) -> Dict[str, Dict[str, object]]:
         """Serialize every managed store including snapshot metadata."""
 
-        payloads: Dict[str, Dict[str, object]] = {}
-        if not self._per_namespace:
-            payloads[DEFAULT_NAMESPACE] = self._serialize_with_meta(self._default_store)
-            return payloads
-        with self._lock:
-            for namespace, store in self._stores.items():
-                payloads[namespace] = self._serialize_with_meta(store)
-            for namespace, snapshot in self._snapshots.items():
-                payload, meta = snapshot
-                payloads.setdefault(namespace, {"payload": payload, "meta": meta})
-        def build_entry(
-            payload: bytes, meta: Optional[Mapping[str, object]]
-        ) -> Dict[str, object]:
-            entry: Dict[str, object] = {"faiss": bytes(payload)}
+        class SnapshotEntry(dict):
+            """Mapping that exposes ``payload`` while aliasing ``faiss`` to the same bytes."""
+
+            def __getitem__(self, key: object) -> object:  # type: ignore[override]
+                if key == "faiss":
+                    return super().__getitem__("payload")
+                return super().__getitem__(key)
+
+            def get(self, key: object, default: object = None) -> object:  # type: ignore[override]
+                if key == "faiss":
+                    return super().get("payload", default)
+                return super().get(key, default)
+
+        def build_entry(payload: bytes, meta: Optional[Mapping[str, object]]) -> Dict[str, object]:
+            """Package FAISS payload bytes and optional metadata for persistence."""
+
+            entry = SnapshotEntry()
+            entry["payload"] = bytes(payload)
             entry["meta"] = dict(meta) if isinstance(meta, Mapping) else None
             return entry
 
         def collect(store: DenseVectorStore) -> Tuple[bytes, Optional[Mapping[str, object]]]:
+            """Extract serialized payload and snapshot metadata from ``store``.
+
+            Args:
+                store: Vector store to snapshot.
+
+            Returns:
+                Tuple[bytes, Optional[Mapping[str, object]]]: Serialized FAISS bytes and metadata.
+            """
             payload = store.serialize()
             meta_getter = getattr(store, "snapshot_meta", None)
             meta: Optional[Mapping[str, object]] = None
@@ -182,10 +209,20 @@ class FaissRouter:
         def coerce_entry(
             entry: object,
         ) -> Tuple[Optional[bytes], Optional[Mapping[str, object]]]:
+            """Normalise stored payloads into raw bytes and metadata mapping.
+
+            Args:
+                entry: Persisted snapshot entry in legacy or current format.
+
+            Returns:
+                Tuple[Optional[bytes], Optional[Mapping[str, object]]]: Normalised payload and metadata.
+            """
             if isinstance(entry, (bytes, bytearray, memoryview)):
                 return bytes(entry), None
             if isinstance(entry, Mapping):
-                blob = entry.get("faiss")
+                blob = entry.get("payload")
+                if not isinstance(blob, (bytes, bytearray, memoryview)):
+                    blob = entry.get("faiss")
                 if isinstance(blob, (bytes, bytearray, memoryview)):
                     meta_obj = entry.get("meta")
                     meta = meta_obj if isinstance(meta_obj, Mapping) else None
@@ -197,6 +234,13 @@ class FaissRouter:
             blob: bytes,
             meta: Optional[Mapping[str, object]],
         ) -> None:
+            """Restore a store from serialized payload and optional metadata.
+
+            Args:
+                store: Vector store instance to restore.
+                blob: Serialized FAISS bytes.
+                meta: Supplemental metadata to pass to ``restore`` when supported.
+            """
             restore_fn = getattr(store, "restore")
             if meta is None:
                 restore_fn(blob)
@@ -244,7 +288,7 @@ class FaissRouter:
 
     @staticmethod
     def _extract_payload_and_meta(
-        packed: Union[bytes, Mapping[str, object]]
+        packed: Union[bytes, Mapping[str, object]],
     ) -> Tuple[bytes, Optional[Mapping[str, object]]]:
         if isinstance(packed, (bytes, bytearray, memoryview)):
             return (bytes(packed), None)

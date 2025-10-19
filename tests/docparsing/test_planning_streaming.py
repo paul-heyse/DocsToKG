@@ -1,4 +1,11 @@
-"""Regression coverage ensuring planning iterators remain streaming."""
+"""Regression coverage ensuring plan iterators remain streaming and memory-safe.
+
+Planning must scan large DocTags inventories without materialising everything in
+memory. These tests stub configuration loaders and confirm that the generators
+returned by `plan_doctags`, `plan_chunk`, and related helpers maintain streaming
+behaviour, drop references promptly, and honour skip/force flags even when YAML
+or Pydantic dependencies are faked out.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +15,7 @@ import types
 from pathlib import Path
 from typing import Dict
 
-import pytest
+from tests.conftest import PatchManager
 
 if "yaml" not in sys.modules:
     yaml_stub = types.ModuleType("yaml")
@@ -192,7 +199,7 @@ class _StreamingStub:
         tracker["active"] -= 1
 
 
-def test_plan_chunk_streams_doctags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_plan_chunk_streams_doctags(patcher: PatchManager, tmp_path: Path) -> None:
     total = 64
     tracker = {"active": 0, "max_active": 0}
     skips = {idx for idx in range(total) if idx % 5 == 0}
@@ -221,18 +228,16 @@ def test_plan_chunk_streams_doctags(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 
     import DocsToKG.DocParsing.chunking as chunking_module
 
-    monkeypatch.setattr(
-        chunking_module, "MANIFEST_STAGE", "docparse.chunks.manifest", raising=False
-    )
+    patcher.setattr(chunking_module, "MANIFEST_STAGE", "docparse.chunks.manifest", raising=False)
     manifest = {
         f"doc-{idx}": {"input_hash": f"hash-{idx}", "status": "success"} for idx in range(total)
     }
 
-    monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
-    monkeypatch.setattr(planning, "iter_doctags", fake_iter_doctags)
-    monkeypatch.setattr(planning, "derive_doc_id_and_chunks_path", fake_derive)
-    monkeypatch.setattr(planning, "compute_content_hash", fake_hash)
-    monkeypatch.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
+    patcher.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
+    patcher.setattr(planning, "iter_doctags", fake_iter_doctags)
+    patcher.setattr(planning, "derive_doc_id_and_chunks_path", fake_derive)
+    patcher.setattr(planning, "compute_content_hash", fake_hash)
+    patcher.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
 
     result = planning.plan_chunk(["--data-root", str(data_root), "--resume"])
 
@@ -245,7 +250,7 @@ def test_plan_chunk_streams_doctags(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert result["skip"]["count"] == expected_skip
 
 
-def test_plan_embed_streams_chunks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_plan_embed_streams_chunks(patcher: PatchManager, tmp_path: Path) -> None:
     total = 72
     tracker = {"active": 0, "max_active": 0}
     skips = {idx for idx in range(total) if idx % 4 == 0}
@@ -288,18 +293,18 @@ def test_plan_embed_streams_chunks(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
     import DocsToKG.DocParsing.embedding as embedding_module
 
-    monkeypatch.setattr(
+    patcher.setattr(
         embedding_module, "MANIFEST_STAGE", "docparse.embeddings.manifest", raising=False
     )
     manifest = {
         f"doc-{idx}": {"input_hash": f"hash-{idx}", "status": "success"} for idx in range(total)
     }
 
-    monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
-    monkeypatch.setattr(planning, "iter_chunks", fake_iter_chunks)
-    monkeypatch.setattr(planning, "derive_doc_id_and_vectors_path", fake_derive)
-    monkeypatch.setattr(planning, "compute_content_hash", fake_hash)
-    monkeypatch.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
+    patcher.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
+    patcher.setattr(planning, "iter_chunks", fake_iter_chunks)
+    patcher.setattr(planning, "derive_doc_id_and_vectors_path", fake_derive)
+    patcher.setattr(planning, "compute_content_hash", fake_hash)
+    patcher.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
 
     result = planning.plan_embed(["--data-root", str(data_root), "--resume"])
 
@@ -312,9 +317,7 @@ def test_plan_embed_streams_chunks(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert result["skip"]["count"] == expected_skip
 
 
-def test_plan_chunk_missing_output_skips_hash(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_plan_chunk_missing_output_skips_hash(patcher: PatchManager, tmp_path: Path) -> None:
     data_root = tmp_path / "Data"
     doctags_dir = data_root / "DocTagsFiles"
     chunks_dir = data_root / "ChunkedDocTagFiles"
@@ -329,20 +332,18 @@ def test_plan_chunk_missing_output_skips_hash(
 
     import DocsToKG.DocParsing.chunking as chunking_module
 
-    monkeypatch.setattr(
-        chunking_module, "MANIFEST_STAGE", "docparse.chunks.manifest", raising=False
-    )
+    patcher.setattr(chunking_module, "MANIFEST_STAGE", "docparse.chunks.manifest", raising=False)
 
-    monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
-    monkeypatch.setattr(planning, "iter_doctags", lambda _directory: [doc_path])
-    monkeypatch.setattr(
+    patcher.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
+    patcher.setattr(planning, "iter_doctags", lambda _directory: [doc_path])
+    patcher.setattr(
         planning,
         "derive_doc_id_and_chunks_path",
         lambda _path, _in_dir, _out_dir: (doc_id, out_path),
     )
 
     manifest = {doc_id: {"input_hash": "previous"}}
-    monkeypatch.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
+    patcher.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
 
     calls = {"count": 0}
 
@@ -350,7 +351,7 @@ def test_plan_chunk_missing_output_skips_hash(
         calls["count"] += 1
         return "new-hash"
 
-    monkeypatch.setattr(planning, "compute_content_hash", _fake_hash)
+    patcher.setattr(planning, "compute_content_hash", _fake_hash)
 
     result = planning.plan_chunk(["--data-root", str(data_root), "--resume"])
 
@@ -359,9 +360,7 @@ def test_plan_chunk_missing_output_skips_hash(
     assert calls["count"] == 0
 
 
-def test_plan_embed_missing_output_skips_hash(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_plan_embed_missing_output_skips_hash(patcher: PatchManager, tmp_path: Path) -> None:
     data_root = tmp_path / "Data"
     chunks_dir = data_root / "ChunkedDocTagFiles"
     vectors_dir = data_root / "Embeddings"
@@ -377,20 +376,20 @@ def test_plan_embed_missing_output_skips_hash(
 
     import DocsToKG.DocParsing.embedding as embedding_module
 
-    monkeypatch.setattr(
+    patcher.setattr(
         embedding_module, "MANIFEST_STAGE", "docparse.embeddings.manifest", raising=False
     )
 
-    monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
-    monkeypatch.setattr(planning, "iter_chunks", lambda _directory: [chunk_entry])
-    monkeypatch.setattr(
+    patcher.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
+    patcher.setattr(planning, "iter_chunks", lambda _directory: [chunk_entry])
+    patcher.setattr(
         planning,
         "derive_doc_id_and_vectors_path",
         lambda _path, _chunks_dir, _vectors_dir: (doc_id, vector_path),
     )
 
     manifest = {doc_id: {"input_hash": "previous"}}
-    monkeypatch.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
+    patcher.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
 
     calls = {"count": 0}
 
@@ -398,7 +397,7 @@ def test_plan_embed_missing_output_skips_hash(
         calls["count"] += 1
         return "new-hash"
 
-    monkeypatch.setattr(planning, "compute_content_hash", _fake_hash)
+    patcher.setattr(planning, "compute_content_hash", _fake_hash)
 
     result = planning.plan_embed(["--data-root", str(data_root), "--resume"])
 
@@ -407,10 +406,8 @@ def test_plan_embed_missing_output_skips_hash(
     assert calls["count"] == 0
 
 
-def test_plan_chunk_handles_symlinked_doctags(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.delenv("DOCSTOKG_DATA_ROOT", raising=False)
+def test_plan_chunk_handles_symlinked_doctags(tmp_path: Path, patcher: PatchManager) -> None:
+    patcher.delenv("DOCSTOKG_DATA_ROOT", raising=False)
 
     isolated_root = tmp_path / "IsolatedData"
     data_root = isolated_root / "Data"
@@ -436,9 +433,9 @@ def test_plan_chunk_handles_symlinked_doctags(
     assert result["process"]["preview"] == ["linked/report.doctags"]
 
 
-def test_plan_embed_handles_symlinked_chunks(tmp_path: Path, monkeypatch) -> None:
+def test_plan_embed_handles_symlinked_chunks(tmp_path: Path, patcher) -> None:
     # Temporarily disable the shared DOCSTOKG_DATA_ROOT to avoid interference from other tests
-    monkeypatch.delenv("DOCSTOKG_DATA_ROOT", raising=False)
+    patcher.delenv("DOCSTOKG_DATA_ROOT", raising=False)
 
     # Use a completely isolated data root to avoid interference from other tests
     isolated_root = tmp_path / "IsolatedData"

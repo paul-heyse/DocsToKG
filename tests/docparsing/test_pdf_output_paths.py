@@ -19,7 +19,13 @@
 # }
 # === /NAVMAP ===
 
-"""Test PDF output path mirroring to prevent basename collisions."""
+"""Ensure DocTags PDF tasks mirror input directories and forward vLLM params.
+
+PDF conversion must reproduce the source directory layout to avoid filename
+collisions and propagate CLI-provided vLLM parameters to downstream workers.
+These tests create nested inputs, exercise `PdfTask`, and confirm output paths
+and vLLM options are forwarded intact.
+"""
 
 import tempfile
 from pathlib import Path

@@ -47,12 +47,12 @@ class _StubManifestIndex:
 
 
 @pytest.fixture(autouse=True)
-def _patch_dependencies(monkeypatch):
+def _patch_dependencies(patcher):
     """Replace heavy dependencies with lightweight test doubles."""
 
-    monkeypatch.setattr(download_args, "Works", _StubWorks)
-    monkeypatch.setattr(download_args, "default_resolvers", lambda: [SimpleNamespace(name="openalex")])
-    monkeypatch.setattr(
+    patcher.setattr(download_args, "Works", _StubWorks)
+    patcher.setattr(download_args, "default_resolvers", lambda: [SimpleNamespace(name="openalex")])
+    patcher.setattr(
         download_args,
         "load_resolver_config",
         lambda *_: SimpleNamespace(
@@ -61,7 +61,7 @@ def _patch_dependencies(monkeypatch):
             enable_global_url_dedup=True,
         ),
     )
-    monkeypatch.setattr(download_args, "ManifestUrlIndex", _StubManifestIndex)
+    patcher.setattr(download_args, "ManifestUrlIndex", _StubManifestIndex)
 
 
 @pytest.fixture
@@ -188,10 +188,10 @@ def test_resolve_config_accepts_non_negative_max(parser, max_value):
     assert resolved.args.max == max_value
 
 
-def test_resolve_config_sets_pyalex_email_from_config(parser, monkeypatch):
+def test_resolve_config_sets_pyalex_email_from_config(parser, patcher):
     from pyalex import config as oa_config
 
-    monkeypatch.setattr(
+    patcher.setattr(
         download_args,
         "load_resolver_config",
         lambda *_: SimpleNamespace(
@@ -201,7 +201,7 @@ def test_resolve_config_sets_pyalex_email_from_config(parser, monkeypatch):
             enable_global_url_dedup=True,
         ),
     )
-    monkeypatch.setattr(oa_config, "email", "initial@example.org", raising=False)
+    patcher.setattr(oa_config, "email", "initial@example.org", raising=False)
 
     args = download_args.parse_args(parser, _base_args())
     download_args.resolve_config(args, parser)
@@ -209,7 +209,7 @@ def test_resolve_config_sets_pyalex_email_from_config(parser, monkeypatch):
     assert oa_config.email == "config@example.org"
 
 
-def test_resolve_config_skips_manifest_scan_when_dedupe_disabled(parser, monkeypatch):
+def test_resolve_config_skips_manifest_scan_when_dedupe_disabled(parser, patcher):
     entries = [
         ("https://example.org/pdf", {"classification": Classification.PDF.value}),
     ]
@@ -231,8 +231,8 @@ def test_resolve_config_skips_manifest_scan_when_dedupe_disabled(parser, monkeyp
         def iter_existing(self):
             return self.iter_existing_paths()
 
-    monkeypatch.setattr(download_args, "ManifestUrlIndex", _TrackingManifestIndex)
-    monkeypatch.setattr(
+    patcher.setattr(download_args, "ManifestUrlIndex", _TrackingManifestIndex)
+    patcher.setattr(
         download_args,
         "load_resolver_config",
         lambda *_: SimpleNamespace(
@@ -249,7 +249,7 @@ def test_resolve_config_skips_manifest_scan_when_dedupe_disabled(parser, monkeyp
     assert _TrackingManifestIndex.instances and _TrackingManifestIndex.instances[0].iter_calls == 0
 
 
-def test_resolve_config_hydrates_persistent_seen_urls_with_cap(parser, monkeypatch):
+def test_resolve_config_hydrates_persistent_seen_urls_with_cap(parser, patcher):
     entries = [
         ("https://example.org/a.pdf", {"classification": Classification.PDF.value}),
         ("https://example.org/b.pdf", {"classification": Classification.CACHED.value}),
@@ -273,7 +273,7 @@ def test_resolve_config_hydrates_persistent_seen_urls_with_cap(parser, monkeypat
         def iter_existing(self):
             return self.iter_existing_paths()
 
-    monkeypatch.setattr(download_args, "ManifestUrlIndex", _TrackingManifestIndex)
+    patcher.setattr(download_args, "ManifestUrlIndex", _TrackingManifestIndex)
 
     args = download_args.parse_args(
         parser,

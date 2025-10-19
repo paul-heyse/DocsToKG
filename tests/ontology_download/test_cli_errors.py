@@ -1,4 +1,9 @@
-"""Regression coverage for CLI batch failure handling."""
+"""Failure-mode coverage for ``ontofetch`` CLI error handling.
+
+These tests orchestrate resolvers that raise planner or download exceptions,
+exercise allowlist violations, and confirm the CLI surfaces actionable exit
+codes plus JSON diagnostics while leaving manifests in a consistent state.
+"""
 
 from __future__ import annotations
 

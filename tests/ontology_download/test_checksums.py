@@ -1,4 +1,11 @@
-"""Tests for checksum parsing and resolution helpers."""
+"""Regression matrix for checksum parsing, normalization, and resolution.
+
+These tests cover how ``DocsToKG.OntologyDownload.checksums`` pulls digests
+from configuration extras, resolver metadata, and remote checksum manifests.
+They verify algorithm coercion, precedence rules between spec and plan hints,
+error propagation when downloads fail, and caching behaviour used by the
+planner while constructing manifests.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +14,7 @@ from typing import Dict, Optional
 from urllib.parse import urlparse
 
 import pytest
+import requests
 
 from DocsToKG.OntologyDownload.checksums import (
     ExpectedChecksum,
@@ -18,7 +26,6 @@ from DocsToKG.OntologyDownload.checksums import (
 from DocsToKG.OntologyDownload.errors import OntologyDownloadError
 from DocsToKG.OntologyDownload.planning import FetchSpec
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
-import requests
 
 
 @pytest.mark.parametrize(
@@ -198,9 +205,7 @@ def test_fetch_checksum_retries_consume_bucket(ontology_env, download_config) ->
     assert len(get_requests) == 1
 
 
-def test_fetch_checksum_aborts_when_limit_exceeded(
-    ontology_env, download_config, caplog
-) -> None:
+def test_fetch_checksum_aborts_when_limit_exceeded(ontology_env, download_config, caplog) -> None:
     """Ensure oversized checksum payloads are aborted and logged."""
 
     config = download_config.model_copy()

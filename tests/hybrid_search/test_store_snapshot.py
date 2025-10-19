@@ -1,4 +1,9 @@
-"""Regression tests for :func:`DocsToKG.HybridSearch.store.restore_state`."""
+"""Snapshot serialization/restore regression tests.
+
+Exercises ``serialize_state`` output, encrypted payload handling, metadata
+round-tripping, and error paths during ``restore_state`` to guarantee hybrid
+search clusters can persist and reload FAISS indices safely.
+"""
 
 from __future__ import annotations
 
@@ -17,9 +22,7 @@ class _RecordingVectorStore:
     def __init__(self) -> None:
         self.calls: List[Tuple[bytes, Optional[Mapping[str, object]]]] = []
 
-    def restore(
-        self, payload: bytes, *, meta: Mapping[str, object] | None = None
-    ) -> None:
+    def restore(self, payload: bytes, *, meta: Mapping[str, object] | None = None) -> None:
         materialised_meta: Optional[Mapping[str, object]]
         if meta is None:
             materialised_meta = None
@@ -32,7 +35,9 @@ def _encode_snapshot(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
-def test_restore_state_accepts_legacy_payload_by_default(caplog: "pytest.LogCaptureFixture") -> None:
+def test_restore_state_accepts_legacy_payload_by_default(
+    caplog: "pytest.LogCaptureFixture",
+) -> None:
     """Legacy payloads lacking metadata should restore successfully and emit a warning."""
 
     store = _RecordingVectorStore()

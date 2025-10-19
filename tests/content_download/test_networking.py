@@ -571,6 +571,15 @@
 # }
 # === /NAVMAP ===
 
+"""Comprehensive tests for networking, caching, and retry primitives.
+
+This module stress-tests `request_with_retries`, conditional request helpers,
+cached/modified result handling, manifest URL indices, and the download pipeline
+under a wide array of HTTP behaviours. It combines in-memory servers, property
+tests, and stubs to ensure token buckets, retry-after parsing, cache validation,
+and manifest bookkeeping all behave consistently across regressions.
+"""
+
 """Consolidated content download networking tests."""
 
 from __future__ import annotations
@@ -978,7 +987,7 @@ if HAS_PYALEX:
         assert outcome.reason is ReasonCode.DOMAIN_DISALLOWED_MIME
 
 
-def test_download_candidate_cleans_partial_on_stream_failure(tmp_path: Path, monkeypatch):
+def test_download_candidate_cleans_partial_on_stream_failure(tmp_path: Path, patcher):
     artifact = _make_artifact(tmp_path)
     artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1011,7 +1020,7 @@ def test_download_candidate_cleans_partial_on_stream_failure(tmp_path: Path, mon
         part_path.write_bytes(b"partial")
         raise requests.exceptions.ChunkedEncodingError("stream interrupted")
 
-    monkeypatch.setattr(download_impl, "atomic_write", _failing_atomic_write)
+    patcher.setattr(download_impl, "atomic_write", _failing_atomic_write)
 
     outcome = download_candidate(
         _Session(),
@@ -1873,21 +1882,15 @@ def _download(
 
         from DocsToKG.ContentDownload.networking import _calculate_equal_jitter_delay
 
-        patcher.setattr(
-            "DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: a
-        )
+        patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: a)
         lower = _calculate_equal_jitter_delay(2, backoff_factor=0.8, backoff_max=10.0)
         assert lower == pytest.approx(0.8 * (2**2) / 2)
 
-        patcher.setattr(
-            "DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b
-        )
+        patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b)
         upper = _calculate_equal_jitter_delay(2, backoff_factor=0.8, backoff_max=10.0)
         assert upper == pytest.approx(0.8 * (2**2))
 
-        patcher.setattr(
-            "DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b
-        )
+        patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b)
         capped = _calculate_equal_jitter_delay(4, backoff_factor=1.0, backoff_max=3.0)
         assert capped == pytest.approx(3.0)
 

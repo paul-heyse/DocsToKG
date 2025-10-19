@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-settings">
 <h1>1. Module: settings<a class="headerlink" href="#module-settings" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.settings</span></code>.</p>
@@ -96,6 +96,22 @@
 <section id="parse-rate-limit-to-rps-limit-str">
 <h3><code class="docutils literal notranslate"><span class="pre">parse_rate_limit_to_rps(limit_str)</span></code><a class="headerlink" href="#parse-rate-limit-to-rps-limit-str" title="Link to this heading"></a></h3>
 <p>Convert a rate limit expression into requests-per-second.</p>
+</section>
+<section id="read-env-value-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_read_env_value(name)</span></code><a class="headerlink" href="#read-env-value-name" title="Link to this heading"></a></h3>
+<p>Fetch and normalise an environment variable, treating empty values as absent.</p>
+</section>
+<section id="read-env-int-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_read_env_int(name)</span></code><a class="headerlink" href="#read-env-int-name" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="read-env-float-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_read_env_float(name)</span></code><a class="headerlink" href="#read-env-float-name" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="read-env-path-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_read_env_path(name)</span></code><a class="headerlink" href="#read-env-path-name" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="get-default-config">
 <h3><code class="docutils literal notranslate"><span class="pre">get_default_config()</span></code><a class="headerlink" href="#get-default-config" title="Link to this heading"></a></h3>
@@ -219,13 +235,13 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 <h3><code class="docutils literal notranslate"><span class="pre">rate_limit_per_second(self)</span></code><a class="headerlink" href="#rate-limit-per-second-self" title="Link to this heading"></a></h3>
 <p>Return the configured per-host rate limit in requests per second.</p>
 </section>
-<section id="max-download-bytes-self">
-<h3><code class="docutils literal notranslate"><span class="pre">max_download_bytes(self)</span></code><a class="headerlink" href="#max-download-bytes-self" title="Link to this heading"></a></h3>
-<p>Return the maximum allowed download payload size in bytes.</p>
-</section>
 <section id="max-uncompressed-bytes-self">
 <h3><code class="docutils literal notranslate"><span class="pre">max_uncompressed_bytes(self)</span></code><a class="headerlink" href="#max-uncompressed-bytes-self" title="Link to this heading"></a></h3>
 <p>Return the maximum allowed uncompressed archive size in bytes.</p>
+</section>
+<section id="max-checksum-bytes-self">
+<h3><code class="docutils literal notranslate"><span class="pre">max_checksum_bytes(self)</span></code><a class="headerlink" href="#max-checksum-bytes-self" title="Link to this heading"></a></h3>
+<p>Return the configured ceiling for checksum downloads in bytes.</p>
 </section>
 <section id="parse-service-rate-limit-self-service">
 <h3><code class="docutils literal notranslate"><span class="pre">parse_service_rate_limit(self,</span> <span class="pre">service)</span></code><a class="headerlink" href="#parse-service-rate-limit-self-service" title="Link to this heading"></a></h3>
@@ -242,6 +258,26 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 <section id="polite-http-headers-self">
 <h3><code class="docutils literal notranslate"><span class="pre">polite_http_headers(self)</span></code><a class="headerlink" href="#polite-http-headers-self" title="Link to this heading"></a></h3>
 <p>Compute polite HTTP headers for outbound resolver requests.</p>
+</section>
+<section id="set-session-factory-self-factory">
+<h3><code class="docutils literal notranslate"><span class="pre">set_session_factory(self,</span> <span class="pre">factory)</span></code><a class="headerlink" href="#set-session-factory-self-factory" title="Link to this heading"></a></h3>
+<p>Set a custom factory used to construct HTTP sessions.</p>
+</section>
+<section id="get-session-factory-self">
+<h3><code class="docutils literal notranslate"><span class="pre">get_session_factory(self)</span></code><a class="headerlink" href="#get-session-factory-self" title="Link to this heading"></a></h3>
+<p>Return the custom session factory, if one has been configured.</p>
+</section>
+<section id="set-bucket-provider-self-provider">
+<h3><code class="docutils literal notranslate"><span class="pre">set_bucket_provider(self,</span> <span class="pre">provider)</span></code><a class="headerlink" href="#set-bucket-provider-self-provider" title="Link to this heading"></a></h3>
+<p>Set a custom provider responsible for returning token buckets.</p>
+</section>
+<section id="get-bucket-provider-self">
+<h3><code class="docutils literal notranslate"><span class="pre">get_bucket_provider(self)</span></code><a class="headerlink" href="#get-bucket-provider-self" title="Link to this heading"></a></h3>
+<p>Return the configured token bucket provider, if present.</p>
+</section>
+<section id="model-copy-self">
+<h3><code class="docutils literal notranslate"><span class="pre">model_copy(self)</span></code><a class="headerlink" href="#model-copy-self" title="Link to this heading"></a></h3>
+<p>Copy the model ensuring private attributes propagate.</p>
 </section>
 <section id="validate-prefer-source-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_prefer_source(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-prefer-source-cls-value" title="Link to this heading"></a></h3>
@@ -298,6 +334,22 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 <section id="join">
 <h3><code class="docutils literal notranslate"><span class="pre">join()</span></code><a class="headerlink" href="#join" title="Link to this heading"></a></h3>
 <p>Mimic :func:<code class="docutils literal notranslate"><span class="pre">pystow.join</span></code> by joining segments onto the stub root.</p>
+</section>
+<section id="module">
+<h3><code class="docutils literal notranslate"><span class="pre">module()</span></code><a class="headerlink" href="#module" title="Link to this heading"></a></h3>
+<p>Return a child directory while optionally creating it.</p>
+</section>
+<section id="joinpath">
+<h3><code class="docutils literal notranslate"><span class="pre">joinpath()</span></code><a class="headerlink" href="#joinpath" title="Link to this heading"></a></h3>
+<p>Compatibility alias for :func:<code class="docutils literal notranslate"><span class="pre">join</span></code>.</p>
+</section>
+<section id="ensure">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure()</span></code><a class="headerlink" href="#ensure" title="Link to this heading"></a></h3>
+<p>Ensure a file or directory exists beneath the stub root.</p>
+</section>
+<section id="get-config-module-key">
+<h3><code class="docutils literal notranslate"><span class="pre">get_config(_module,</span> <span class="pre">_key)</span></code><a class="headerlink" href="#get-config-module-key" title="Link to this heading"></a></h3>
+<p>Return default configuration values.</p>
 </section>
 <section id="get-ontology-iri">
 <h3><code class="docutils literal notranslate"><span class="pre">get_ontology(iri)</span></code><a class="headerlink" href="#get-ontology-iri" title="Link to this heading"></a></h3>
@@ -411,6 +463,15 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 <h3><code class="docutils literal notranslate"><span class="pre">mirror_cas_artifact(self,</span> <span class="pre">algorithm,</span> <span class="pre">digest,</span> <span class="pre">source)</span></code><a class="headerlink" href="#id17" title="Link to this heading"></a></h3>
 <p>Mirror CAS artefact locally and to remote storage.</p>
 </section>
+<section id="model-dump-self">
+<h3><code class="docutils literal notranslate"><span class="pre">model_dump(self)</span></code><a class="headerlink" href="#model-dump-self" title="Link to this heading"></a></h3>
+<p>Return environment-derived overrides mirroring <code class="docutils literal notranslate"><span class="pre">BaseSettings.model_dump</span></code>.</p>
+<p>Args:
+by_alias: Included for API parity; ignored by the fallback implementation.
+exclude_none: When <code class="docutils literal notranslate"><span class="pre">True</span></code>, omit keys whose values evaluate to <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<p>Returns:
+Dict[str, object]: Mapping of configuration keys to environment-provided values.</p>
+</section>
 <section id="terms-self">
 <h3><code class="docutils literal notranslate"><span class="pre">terms(self)</span></code><a class="headerlink" href="#terms-self" title="Link to this heading"></a></h3>
 <p>Return a deterministic collection of ontology term identifiers.</p>
@@ -442,6 +503,10 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 <h3><code class="docutils literal notranslate"><span class="pre">DownloadConfiguration</span></code><a class="headerlink" href="#downloadconfiguration" title="Link to this heading"></a></h3>
 <p>HTTP download, retry, and politeness settings for resolvers.</p>
 </section>
+<section id="plannerconfig">
+<h3><code class="docutils literal notranslate"><span class="pre">PlannerConfig</span></code><a class="headerlink" href="#plannerconfig" title="Link to this heading"></a></h3>
+<p>Planner-specific HTTP probing behaviour.</p>
+</section>
 <section id="defaultsconfig">
 <h3><code class="docutils literal notranslate"><span class="pre">DefaultsConfig</span></code><a class="headerlink" href="#defaultsconfig" title="Link to this heading"></a></h3>
 <p>Composite configuration applied when no per-spec overrides exist.</p>
@@ -449,10 +514,6 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 <section id="resolvedconfig">
 <h3><code class="docutils literal notranslate"><span class="pre">ResolvedConfig</span></code><a class="headerlink" href="#resolvedconfig" title="Link to this heading"></a></h3>
 <p>Materialised configuration combining defaults and fetch specifications.</p>
-</section>
-<section id="environmentoverrides">
-<h3><code class="docutils literal notranslate"><span class="pre">EnvironmentOverrides</span></code><a class="headerlink" href="#environmentoverrides" title="Link to this heading"></a></h3>
-<p>Pydantic settings model exposing environment-derived overrides.</p>
 </section>
 <section id="stubnamespace">
 <h3><code class="docutils literal notranslate"><span class="pre">_StubNamespace</span></code><a class="headerlink" href="#stubnamespace" title="Link to this heading"></a></h3>
@@ -478,12 +539,20 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 <h3><code class="docutils literal notranslate"><span class="pre">FsspecStorageBackend</span></code><a class="headerlink" href="#fsspecstoragebackend" title="Link to this heading"></a></h3>
 <p>Hybrid backend that mirrors artefacts to an fsspec location.</p>
 </section>
+<section id="environmentoverrides">
+<h3><code class="docutils literal notranslate"><span class="pre">EnvironmentOverrides</span></code><a class="headerlink" href="#environmentoverrides" title="Link to this heading"></a></h3>
+<p>Pydantic settings model exposing environment-derived overrides.</p>
+</section>
+<section id="id18">
+<h3><code class="docutils literal notranslate"><span class="pre">EnvironmentOverrides</span></code><a class="headerlink" href="#id18" title="Link to this heading"></a></h3>
+<p>Fallback environment reader when <code class="docutils literal notranslate"><span class="pre">pydantic-settings</span></code> is unavailable.</p>
+</section>
 <section id="stubontology">
 <h3><code class="docutils literal notranslate"><span class="pre">_StubOntology</span></code><a class="headerlink" href="#stubontology" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="id18">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubOntology</span></code><a class="headerlink" href="#id18" title="Link to this heading"></a></h3>
+<section id="id19">
+<h3><code class="docutils literal notranslate"><span class="pre">_StubOntology</span></code><a class="headerlink" href="#id19" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 </section>
@@ -503,7 +572,7 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -514,7 +583,7 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

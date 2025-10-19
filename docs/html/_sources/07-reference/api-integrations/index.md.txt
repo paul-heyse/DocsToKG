@@ -18,16 +18,15 @@ them with downstream systems.
 - **Response**: Ranked list containing document metadata, highlight spans, fused score
   diagnostics, and pagination cursor.
 
-Use the generated documentation in `docs/04-api/DocsToKG.HybridSearch.service.md` and `docs/04-api/DocsToKG.HybridSearch.retrieval.md` for attribute-level detail.
+Use the generated documentation in `docs/04-api/DocsToKG.HybridSearch.service.md` and `docs/04-api/DocsToKG.HybridSearch.types.md` for attribute-level detail.
 
 ## 3. Python Service Layer
 
-`HybridSearchService` in `DocsToKG.HybridSearch.retrieval` exposes a `search` method
-returning strongly-typed response models (`HybridSearchResponse`, `HybridSearchResult`).
+`HybridSearchService` in `DocsToKG.HybridSearch.service` exposes a `search` method returning strongly-typed response models (`HybridSearchResponse`, `HybridSearchResult` defined in `types.py`).
 Use this interface when embedding DocsToKG within other Python services.
 
 ```python
-from DocsToKG.HybridSearch.retrieval import HybridSearchRequest
+from DocsToKG.HybridSearch.types import HybridSearchRequest
 from my_project.hybrid import build_hybrid_service  # assemble service per docs/06-operations/index.md
 
 service = build_hybrid_service()
@@ -39,8 +38,9 @@ for hit in response.results:
 
 ## 4. CLI Utilities
 
-- `python -m DocsToKG.ContentDownload.cli` – Batch download scholarly PDFs from the Pyalex API.
-- `python -m DocsToKG.DocParsing.html_pipeline` – Parallel HTML parsing into DocTags structures.
+- `python -m DocsToKG.ContentDownload.cli` – Batch download scholarly PDFs from Pyalex and other resolvers.
+- `docparse chunk` – Convert DocTags into chunked Markdown/metadata (see `--validate-only` and profile flags).
+- `docparse embed` – Generate dense embeddings for chunked output.
 - `python -m DocsToKG.OntologyDownload.cli pull` – Download and validate ontologies described in `sources.yaml`.
 
 Each CLI supports `--help` for flags and is documented in `docs/06-operations/index.md`.

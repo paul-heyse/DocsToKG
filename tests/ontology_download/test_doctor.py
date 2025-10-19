@@ -1,4 +1,9 @@
-"""Doctor command regression tests."""
+"""Deep coverage for the ``ontofetch doctor`` remediation workflow.
+
+Validates log rotation, dependency reporting, cache inspection, and error exit
+codes when the operator requests automated fixes. Guards against regressions in
+the interactive troubleshooting experience.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +19,7 @@ def test_doctor_fix_rotates_jsonl(ontology_env, capsys):
 
     log_dir = ontology_env.log_dir
     stale_log = log_dir / "ontofetch-20240101.jsonl"
-    stale_log.write_text("{\"message\": \"stale\"}\n")
+    stale_log.write_text('{"message": "stale"}\n')
     expired_time = datetime.now(timezone.utc) - timedelta(days=31)
     os.utime(stale_log, (expired_time.timestamp(), expired_time.timestamp()))
 

@@ -1,4 +1,10 @@
-"""Filesystem helpers for ontology downloads."""
+"""Filesystem helpers for ontology downloads.
+
+Responsibilities include sanitising filenames, generating correlation IDs for
+log entries, computing file hashes, and safely extracting archives while
+enforcing expansion limits.  These utilities are shared by both the planner and
+validator stages to ensure consistent handling of artefacts on disk.
+"""
 
 from __future__ import annotations
 

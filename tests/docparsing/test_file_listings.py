@@ -1,4 +1,10 @@
-"""Tests for lazy, ordered file listing helpers."""
+"""Ensure DocTags file listing helpers remain deterministic and lazy.
+
+Chunking and planning rely on the listing helpers in `doctags` to stream PDF/HTML
+inputs without loading entire directory trees. These tests assert that the helpers
+filter extensions correctly, yield results in lexical order, and behave lazily so
+large corpora do not consume unnecessary resources.
+"""
 
 from collections.abc import Iterator
 from itertools import islice
@@ -32,8 +38,7 @@ def test_list_pdfs_returns_sorted_iterator(tmp_path: Path) -> None:
     assert isinstance(iterator, Iterator)
 
     expected = [
-        (tmp_path / rel).relative_to(tmp_path).as_posix()
-        for rel in sorted(expected_relatives)
+        (tmp_path / rel).relative_to(tmp_path).as_posix() for rel in sorted(expected_relatives)
     ]
     actual = [path.relative_to(tmp_path).as_posix() for path in iterator]
 
@@ -60,10 +65,7 @@ def test_list_htmls_filters_and_sorts(tmp_path: Path) -> None:
     iterator = list_htmls(tmp_path)
     assert isinstance(iterator, Iterator)
 
-    expected = [
-        (tmp_path / rel).relative_to(tmp_path).as_posix()
-        for rel in sorted(html_files)
-    ]
+    expected = [(tmp_path / rel).relative_to(tmp_path).as_posix() for rel in sorted(html_files)]
     actual = [path.relative_to(tmp_path).as_posix() for path in iterator]
 
     assert actual == expected
@@ -86,12 +88,12 @@ def test_list_helpers_enumerate_without_error(tmp_path: Path) -> None:
     for relative in {*pdf_targets, *html_targets}:
         _write(tmp_path / relative)
 
-    assert {
-        path.relative_to(tmp_path).as_posix() for path in list_pdfs(tmp_path)
-    } == {Path(rel).as_posix() for rel in sorted(pdf_targets)}
-    assert {
-        path.relative_to(tmp_path).as_posix() for path in list_htmls(tmp_path)
-    } == {Path(rel).as_posix() for rel in sorted(html_targets)}
+    assert {path.relative_to(tmp_path).as_posix() for path in list_pdfs(tmp_path)} == {
+        Path(rel).as_posix() for rel in sorted(pdf_targets)
+    }
+    assert {path.relative_to(tmp_path).as_posix() for path in list_htmls(tmp_path)} == {
+        Path(rel).as_posix() for rel in sorted(html_targets)
+    }
 
 
 def test_list_generators_scale_streaming(tmp_path: Path) -> None:
@@ -116,6 +118,4 @@ def test_list_generators_scale_streaming(tmp_path: Path) -> None:
 
     # Ensure normalized HTML derivatives are never yielded even when plentiful.
     _write(tmp_path / "group9999/doc9999.normalized.html")
-    assert all(
-        not path.name.endswith(".normalized.html") for path in list_htmls(tmp_path)
-    )
+    assert all(not path.name.endswith(".normalized.html") for path in list_htmls(tmp_path))

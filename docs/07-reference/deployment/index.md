@@ -79,13 +79,17 @@ direnv exec . docparse embed \
 ### 4.4 Hybrid Search Indexing
 
 ```python
+import json
 from pathlib import Path
 
-from DocsToKG.HybridSearch import Observability
+from DocsToKG.HybridSearch import (
+    ChunkIngestionPipeline,
+    FaissVectorStore,
+    Observability,
+    serialize_state,
+)
 from DocsToKG.HybridSearch.config import HybridSearchConfigManager
-from DocsToKG.HybridSearch.ingest import ChunkIngestionPipeline
-from DocsToKG.HybridSearch.store import FaissVectorStore, ChunkRegistry, serialize_state
-from DocsToKG.HybridSearch.storage import OpenSearchSimulator
+from DocsToKG.HybridSearch.store import ChunkRegistry, OpenSearchSimulator
 from DocsToKG.HybridSearch.types import DocumentInput
 
 config = HybridSearchConfigManager(Path("/etc/docstokg/hybrid_config.json")).get()
@@ -108,11 +112,11 @@ pipeline.upsert_documents([
     )
 ])
 snapshot = serialize_state(faiss, registry)
-Path("/srv/docstokg/faiss.snapshot.json").write_text(snapshot.model_dump_json())
+Path("/srv/docstokg/faiss.snapshot.json").write_text(json.dumps(snapshot))
 ```
 
 - Promote the FAISS snapshot (and registry manifest) to durable object storage after each ingestion.
-- For production OpenSearch/Elastic backends replace `OpenSearchSimulator` with the real adapter from `DocsToKG.HybridSearch.storage`.
+- For production OpenSearch/Elastic backends replace `OpenSearchSimulator` with an implementation of `LexicalIndex` (see `DocsToKG.HybridSearch.interfaces`).
 
 ### 4.5 Ontology Downloads
 
@@ -139,7 +143,7 @@ direnv exec . python -m DocsToKG.OntologyDownload.cli validate hp latest
    direnv exec . uvicorn myproject.app:app --host 0.0.0.0 --port 8080
    ```
    - The `FastAPI` example in `docs/06-operations/index.md` wraps `HybridSearchAPI`.
-   - Warm caches by issuing representative search requests (`DocsToKG.HybridSearch.validation.run_smoke_suite`).
+  - Warm caches by issuing representative search requests (mirror the fixtures in `tests/hybrid_search/test_suite.py`).
 
 3. **Scheduled Jobs**
    - Use Airflow/cron/Kubernetes Jobs to invoke:
@@ -150,14 +154,14 @@ direnv exec . python -m DocsToKG.OntologyDownload.cli validate hp latest
 
 ## 6. Validation Before Flip
 
-- `direnv exec . python -m DocsToKG.HybridSearch.validation` (runs fusion, SPLADE, and dense recall checks).
+- `direnv exec . pytest tests/hybrid_search/test_suite.py` (runs fusion, SPLADE, and dense recall checks).
 - `direnv exec . pytest -m "hybrid_search or ontology"` to exercise storage, telemetry, and CLI shims.
 - `direnv exec . python docs/scripts/validate_code_annotations.py` and `docs/scripts/validate_docs.py` keep auto-generated documentation in sync.
 - Issue smoke searches against `/v1/hybrid-search` (expect 200/JSON payload). Confirm telemetry shipping via Prometheus exporter if enabled (`prometheus-fastapi-instrumentator`).
 
 ## 7. Rollback and Recovery
 
-- **FAISS Snapshot**: Rehydrate the previous snapshot with `DocsToKG.HybridSearch.vectorstore.restore_state`.
+- **FAISS Snapshot**: Rehydrate the previous snapshot with `DocsToKG.HybridSearch.restore_state`.
 - **Ontology Artifacts**: Re-run `cli prune --dry-run` to identify erroneous downloads, then redeploy the prior manifest version.
 - **Service Config**: Revert `hybrid_config.json` in configuration management and restart the API pods.
 - See `docs/hybrid_search_runbook.md` for a deeper incident response checklist (cache warming, feature flag rollbacks, data root restoration).

@@ -1,4 +1,9 @@
-"""Unit tests for :mod:`DocsToKG.HybridSearch.store` FaissVectorStore helpers."""
+"""Extensive coverage for :class:`DocsToKG.HybridSearch.store.FaissVectorStore`.
+
+Exercises concurrency guards, vector normalization, retry loops, background
+threads, observability counters, and adapter behaviours to ensure the dense
+store remains thread-safe and resilient under load.
+"""
 
 from __future__ import annotations
 
@@ -11,10 +16,11 @@ from typing import Sequence
 import numpy as np
 import pytest
 
-from DocsToKG.HybridSearch.config import DenseIndexConfig
 from DocsToKG.HybridSearch import store as store_module
+from DocsToKG.HybridSearch.config import DenseIndexConfig
 from DocsToKG.HybridSearch.pipeline import Observability
 from DocsToKG.HybridSearch.store import FaissVectorStore
+from tests.conftest import PatchManager
 
 
 class _DummyMetrics:
@@ -41,12 +47,12 @@ class _NullContext:
         return False
 
 
-def test_resolve_cuvs_state_handles_missing_should_use(monkeypatch: "pytest.MonkeyPatch") -> None:
+def test_resolve_cuvs_state_handles_missing_should_use(patcher: "PatchManager") -> None:
     """cuVS availability should be reported as unavailable when the probe is missing."""
 
-    monkeypatch.setattr(store_module, "_FAISS_AVAILABLE", True, raising=False)
+    patcher.setattr(store_module, "_FAISS_AVAILABLE", True, raising=False)
     stub_faiss = SimpleNamespace(knn_gpu=object())
-    monkeypatch.setattr(store_module, "faiss", stub_faiss, raising=False)
+    patcher.setattr(store_module, "faiss", stub_faiss, raising=False)
 
     enabled, available, reported = store_module.resolve_cuvs_state(requested=None)
 
@@ -54,7 +60,7 @@ def test_resolve_cuvs_state_handles_missing_should_use(monkeypatch: "pytest.Monk
 
 
 def test_faiss_vector_store_search_batch_preserves_queries(
-    monkeypatch: "pytest.MonkeyPatch",
+    patcher: "PatchManager",
 ) -> None:
     """Ensure ``search_batch`` does not mutate the caller-provided query matrix."""
 
@@ -62,7 +68,7 @@ def test_faiss_vector_store_search_batch_preserves_queries(
         matrix += 1.0
         return matrix
 
-    monkeypatch.setattr(store_module, "normalize_rows", fake_normalize_rows)
+    patcher.setattr(store_module, "normalize_rows", fake_normalize_rows)
 
     store = FaissVectorStore.__new__(FaissVectorStore)
     store._dim = 3  # type: ignore[attr-defined]
@@ -86,7 +92,7 @@ def test_faiss_vector_store_search_batch_preserves_queries(
     assert not np.may_share_memory(captured["matrix"], queries)
 
 
-def test_coerce_batch_allows_opt_out_of_normalization(monkeypatch: "pytest.MonkeyPatch") -> None:
+def test_coerce_batch_allows_opt_out_of_normalization(patcher: "PatchManager") -> None:
     """``_coerce_batch`` should only normalise rows when explicitly requested."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -99,17 +105,17 @@ def test_coerce_batch_allows_opt_out_of_normalization(monkeypatch: "pytest.Monke
         calls.append(matrix.copy())
         return original_normalize(matrix)
 
-    monkeypatch.setattr(store_module, "normalize_rows", recording_normalize)
+    patcher.setattr(store_module, "normalize_rows", recording_normalize)
 
     if store_module.faiss is None:
-        monkeypatch.setattr(store_module, "faiss", SimpleNamespace(), raising=False)
+        patcher.setattr(store_module, "faiss", SimpleNamespace(), raising=False)
 
     def fake_normalize(matrix: np.ndarray) -> None:
         norms = np.linalg.norm(matrix, axis=1, keepdims=True)
         norms[norms == 0.0] = 1.0
         matrix /= norms
 
-    monkeypatch.setattr(store_module.faiss, "normalize_L2", fake_normalize, raising=False)
+    patcher.setattr(store_module.faiss, "normalize_L2", fake_normalize, raising=False)
 
     vectors = np.array([[1.0, 2.0, 0.5, 0.75], [0.1, 0.2, 0.3, 0.4]], dtype=np.float32)
 
@@ -126,7 +132,7 @@ def test_coerce_batch_allows_opt_out_of_normalization(monkeypatch: "pytest.Monke
     assert not np.allclose(norms, np.ones_like(norms)), "Vectors should remain unnormalised"
 
 
-def test_apply_cloner_reservation_scales_per_gpu(monkeypatch: "pytest.MonkeyPatch") -> None:
+def test_apply_cloner_reservation_scales_per_gpu(patcher: "PatchManager") -> None:
     """Reserve vectors should scale based on GPU participation in shard mode."""
 
     class FakeIntVector(list):
@@ -150,7 +156,7 @@ def test_apply_cloner_reservation_scales_per_gpu(monkeypatch: "pytest.MonkeyPatc
             self.set_calls.append(list(int(v) for v in values))
 
     fake_faiss = SimpleNamespace(IntVector=FakeIntVector)
-    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+    patcher.setattr(store_module, "faiss", fake_faiss, raising=False)
 
     def make_store(mode: str, expected: int) -> FaissVectorStore:
         store = FaissVectorStore.__new__(FaissVectorStore)
@@ -179,7 +185,7 @@ def test_apply_cloner_reservation_scales_per_gpu(monkeypatch: "pytest.MonkeyPatc
     assert tiny_cloner.eachReserveVecs == [1, 1, 1]
 
 
-def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> None:
+def test_add_calls_faiss_normalize_once(patcher: "PatchManager") -> None:
     """``add`` should rely on FAISS to normalise vectors exactly once per batch."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -217,7 +223,7 @@ def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> No
 
     # Ensure FAISS helpers exist even when the optional dependency is absent.
     if store_module.faiss is None:
-        monkeypatch.setattr(store_module, "faiss", SimpleNamespace(), raising=False)
+        patcher.setattr(store_module, "faiss", SimpleNamespace(), raising=False)
 
     normalize_calls: list[np.ndarray] = []
 
@@ -229,8 +235,8 @@ def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> No
         matrix[:] = copied
         normalize_calls.append(copied)
 
-    monkeypatch.setattr(store_module.faiss, "normalize_L2", fake_normalize, raising=False)
-    monkeypatch.setattr(store_module.faiss, "downcast_index", lambda index: index, raising=False)
+    patcher.setattr(store_module.faiss, "normalize_L2", fake_normalize, raising=False)
+    patcher.setattr(store_module.faiss, "downcast_index", lambda index: index, raising=False)
 
     original_coerce = FaissVectorStore._coerce_batch
     normalize_flags: list[bool] = []
@@ -260,7 +266,7 @@ def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> No
 
 @pytest.mark.parametrize("requested, expected", [(True, True), (False, False)])
 def test_maybe_distribute_applies_cuvs_flag(
-    monkeypatch: "pytest.MonkeyPatch", requested: bool, expected: bool
+    patcher: "PatchManager", requested: bool, expected: bool
 ) -> None:
     """GpuParameterSpace should receive ``use_cuvs`` updates for every index variant."""
 
@@ -302,9 +308,9 @@ def test_maybe_distribute_applies_cuvs_flag(
         downcast_index=lambda index: index,
         describe_index=lambda index: "mock",
     )
-    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+    patcher.setattr(store_module, "faiss", fake_faiss, raising=False)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         store_module,
         "resolve_cuvs_state",
         lambda value: (expected, True, expected),
@@ -326,7 +332,7 @@ def test_maybe_distribute_applies_cuvs_flag(
     assert store._last_applied_cuvs == expected
 
 
-def test_add_dedupe_rejects_scaled_duplicates(monkeypatch: "pytest.MonkeyPatch") -> None:
+def test_add_dedupe_rejects_scaled_duplicates(patcher: "PatchManager") -> None:
     """Scaled duplicates should be rejected when the dedupe threshold is strict."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -349,7 +355,9 @@ def test_add_dedupe_rejects_scaled_duplicates(monkeypatch: "pytest.MonkeyPatch")
             self.ntotal = 1
             self.add_calls: list[tuple[np.ndarray, np.ndarray]] = []
 
-        def add_with_ids(self, matrix: np.ndarray, ids: np.ndarray) -> None:  # pragma: no cover - sanity guard
+        def add_with_ids(
+            self, matrix: np.ndarray, ids: np.ndarray
+        ) -> None:  # pragma: no cover - sanity guard
             self.add_calls.append((matrix.copy(), ids.copy()))
 
     store._index = RecordingIndex()  # type: ignore[attr-defined]
@@ -374,7 +382,7 @@ def test_add_dedupe_rejects_scaled_duplicates(monkeypatch: "pytest.MonkeyPatch")
         matrix[:] = copied
         normalize_calls.append(copied)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         store_module,
         "faiss",
         SimpleNamespace(normalize_L2=fake_normalize),
@@ -395,7 +403,7 @@ def test_add_dedupe_rejects_scaled_duplicates(monkeypatch: "pytest.MonkeyPatch")
     np.testing.assert_array_equal(payload, original_vector)
 
 
-def test_search_batch_impl_normalizes_once(monkeypatch: "pytest.MonkeyPatch") -> None:
+def test_search_batch_impl_normalizes_once(patcher: "PatchManager") -> None:
     """``_search_batch_impl`` should bypass redundant normalisation steps."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -432,7 +440,7 @@ def test_search_batch_impl_normalizes_once(monkeypatch: "pytest.MonkeyPatch") ->
     store._resolve_search_results = MethodType(fake_resolve, store)  # type: ignore[attr-defined]
 
     if store_module.faiss is None:
-        monkeypatch.setattr(store_module, "faiss", SimpleNamespace(), raising=False)
+        patcher.setattr(store_module, "faiss", SimpleNamespace(), raising=False)
 
     normalize_calls: list[np.ndarray] = []
 
@@ -444,7 +452,7 @@ def test_search_batch_impl_normalizes_once(monkeypatch: "pytest.MonkeyPatch") ->
         matrix[:] = copied
         normalize_calls.append(copied)
 
-    monkeypatch.setattr(store_module.faiss, "normalize_L2", fake_normalize, raising=False)
+    patcher.setattr(store_module.faiss, "normalize_L2", fake_normalize, raising=False)
 
     original_coerce = FaissVectorStore._coerce_batch
     normalize_flags: list[bool] = []
@@ -472,7 +480,7 @@ def test_search_batch_impl_normalizes_once(monkeypatch: "pytest.MonkeyPatch") ->
     assert results and all(results)
 
 
-def test_coerce_batch_normalize_flag_benchmark(monkeypatch: "pytest.MonkeyPatch") -> None:
+def test_coerce_batch_normalize_flag_benchmark(patcher: "PatchManager") -> None:
     """Skipping in-method normalisation should yield a measurable CPU win."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -482,7 +490,7 @@ def test_coerce_batch_normalize_flag_benchmark(monkeypatch: "pytest.MonkeyPatch"
         time.sleep(0.0002)
         return matrix
 
-    monkeypatch.setattr(store_module, "normalize_rows", slow_normalize)
+    patcher.setattr(store_module, "normalize_rows", slow_normalize)
 
     batch = np.random.rand(256, store._dim).astype(np.float32)
 
@@ -499,7 +507,7 @@ def test_coerce_batch_normalize_flag_benchmark(monkeypatch: "pytest.MonkeyPatch"
     assert bypass_duration < normalized_duration * 0.5
 
 
-def test_set_nprobe_initializes_gpu_parameter_space(monkeypatch: "pytest.MonkeyPatch") -> None:
+def test_set_nprobe_initializes_gpu_parameter_space(patcher: "PatchManager") -> None:
     """Ensure GPU parameter tuning initializes replica shards before configuration."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -570,7 +578,7 @@ def test_set_nprobe_initializes_gpu_parameter_space(monkeypatch: "pytest.MonkeyP
         GpuParameterSpace=FakeGpuParameterSpace,
         describe_index=lambda index: "recording-index",
     )
-    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+    patcher.setattr(store_module, "faiss", fake_faiss, raising=False)
 
     store._log_index_configuration = MethodType(lambda self, _: None, store)  # type: ignore[attr-defined]
 
@@ -586,7 +594,7 @@ def test_set_nprobe_initializes_gpu_parameter_space(monkeypatch: "pytest.MonkeyP
 
 
 def test_set_nprobe_short_circuits_when_value_unchanged(
-    monkeypatch: "pytest.MonkeyPatch",
+    patcher: "PatchManager",
 ) -> None:
     """``_set_nprobe`` should avoid redundant FAISS parameter updates."""
 
@@ -612,7 +620,7 @@ def test_set_nprobe_short_circuits_when_value_unchanged(
         GpuParameterSpace=FakeGpuParameterSpace,
         describe_index=lambda index: "recording-index",
     )
-    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+    patcher.setattr(store_module, "faiss", fake_faiss, raising=False)
 
     store._reset_nprobe_cache()  # type: ignore[attr-defined]
     store._set_nprobe()  # type: ignore[attr-defined]
@@ -716,7 +724,7 @@ def test_remove_ids_is_atomic_across_threads() -> None:
 
 
 @pytest.mark.parametrize("use_all_devices", [False, True])
-def test_init_gpu_configures_resource_knobs(monkeypatch, caplog, use_all_devices: bool) -> None:
+def test_init_gpu_configures_resource_knobs(patcher, caplog, use_all_devices: bool) -> None:
     """Ensure GPU init applies DenseIndexConfig resource tuning on single GPU."""
 
     temp_memory = 8 << 20
@@ -765,7 +773,7 @@ def test_init_gpu_configures_resource_knobs(monkeypatch, caplog, use_all_devices
         StandardGpuResources=RecordingResource,
         get_num_gpus=lambda: 1,
     )
-    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+    patcher.setattr(store_module, "faiss", fake_faiss, raising=False)
 
     caplog.set_level(logging.INFO, logger="DocsToKG.HybridSearch")
 
@@ -798,7 +806,7 @@ def test_init_gpu_configures_resource_knobs(monkeypatch, caplog, use_all_devices
     assert payload.get("default_null_stream_all_devices") is use_all_devices
 
 
-def test_maybe_to_gpu_applies_expected_reserve_vecs(monkeypatch: "pytest.MonkeyPatch") -> None:
+def test_maybe_to_gpu_applies_expected_reserve_vecs(patcher: "PatchManager") -> None:
     """``_maybe_to_gpu`` should propagate expected reservations to cloner options."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -836,7 +844,7 @@ def test_maybe_to_gpu_applies_expected_reserve_vecs(monkeypatch: "pytest.MonkeyP
         INDICES_32_BIT=13,
     )
 
-    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+    patcher.setattr(store_module, "faiss", fake_faiss, raising=False)
 
     result = store._maybe_to_gpu(object())
 

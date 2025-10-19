@@ -17,6 +17,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "hash-doctags-text",
+#       "name": "_hash_doctags_text",
+#       "anchor": "function-hash-doctags-text",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "build-doc",
 #       "name": "build_doc",
 #       "anchor": "function-build-doc",
@@ -68,6 +74,18 @@
 #       "id": "process-chunk-task",
 #       "name": "_process_chunk_task",
 #       "anchor": "function-process-chunk-task",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process-indexed-chunk-task",
+#       "name": "_process_indexed_chunk_task",
+#       "anchor": "function-process-indexed-chunk-task",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ordered-results",
+#       "name": "_ordered_results",
+#       "anchor": "function-ordered-results",
 #       "kind": "function"
 #     },
 #     {
@@ -157,8 +175,8 @@ import itertools
 import json
 import logging
 import statistics
-import unicodedata
 import time
+import unicodedata
 import uuid
 from dataclasses import dataclass, fields
 from multiprocessing import get_context
@@ -231,8 +249,8 @@ from DocsToKG.DocParsing.io import (
     compute_chunk_uuid,
     compute_content_hash,
     iter_doctags,
-    make_hasher,
     load_manifest_index,
+    make_hasher,
     quarantine_artifact,
     relative_path,
     resolve_attempts_path,
@@ -1277,13 +1295,10 @@ def _main_inner(
         def iter_chunk_tasks() -> Iterator[ChunkTask]:
             """Generate chunk tasks for processing, respecting resume/force settings."""
             resume_enabled = bool(args.resume)
-            force_enabled = bool(args.force)
-            resume_needs_hash = resume_enabled and not force_enabled
             for path in files:
                 doc_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
                 name = path.stem
                 manifest_entry = resume_controller.entry(doc_id) if resume_enabled else None
-                output_exists = out_path.exists() if resume_enabled else False
                 should_hash = resume_enabled
                 input_hash = compute_content_hash(path) if should_hash else ""
                 parse_engine = parse_engine_lookup.get(doc_id, "docling-html")

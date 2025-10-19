@@ -4,7 +4,7 @@ This section contains subsystem deep-dives, integration guides, and operational 
 
 ## 2. Reference Materials
 
-- 🔗 **[FAISS Integration](./faiss/index.md)** – GPU/CPU deployment notes, wheel provenance, and index lifecycle management aligned with `DocsToKG.HybridSearch.vectorstore`.
+- 🔗 **[FAISS Integration](./faiss/index.md)** – GPU/CPU deployment notes, wheel provenance, and index lifecycle management aligned with `DocsToKG.HybridSearch.store`.
 - 📚 **[External Dependencies](./dependencies/index.md)** – Curated list of Python packages, CUDA wheels, and upstream services used across the repo (`DocsToKG.ContentDownload`, `DocParsing`, `HybridSearch`, `OntologyDownload`).
 - 📖 **[Glossary](./glossary.md)** – Definitions covering terminology surfaced in manifests, telemetry events, and hybrid search scoring.
 

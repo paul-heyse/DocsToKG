@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from DocsToKG.ContentDownload.download import DownloadConfig
-from DocsToKG.ContentDownload.telemetry import JsonlResumeLookup, MANIFEST_SCHEMA_VERSION
+from DocsToKG.ContentDownload.telemetry import MANIFEST_SCHEMA_VERSION, JsonlResumeLookup
 
 MEMORY_CAP_BYTES = 32 * 1024 * 1024
 

@@ -1,4 +1,10 @@
-"""Deprecated structural marker helpers retained for backwards compatibility."""
+"""Shim layer preserving legacy structural marker helper imports.
+
+Earlier releases exposed structural marker utilities from ``formats.markers``.
+Those helpers now live in ``DocParsing.core`` but we retain this module to avoid
+breaking external automation. It re-exports the public constants and helper
+functions so callers receive deprecation coverage while migrating.
+"""
 
 from __future__ import annotations
 

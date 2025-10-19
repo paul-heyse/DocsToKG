@@ -20,6 +20,22 @@ Ensure the interpreter meets the minimum supported Python version.
 
 Convert a rate limit expression into requests-per-second.
 
+### `_read_env_value(name)`
+
+Fetch and normalise an environment variable, treating empty values as absent.
+
+### `_read_env_int(name)`
+
+*No documentation available.*
+
+### `_read_env_float(name)`
+
+*No documentation available.*
+
+### `_read_env_path(name)`
+
+*No documentation available.*
+
 ### `get_default_config()`
 
 Return a memoised :class:`ResolvedConfig` constructed from defaults.
@@ -149,6 +165,10 @@ Return the configured per-host rate limit in requests per second.
 
 Return the maximum allowed uncompressed archive size in bytes.
 
+### `max_checksum_bytes(self)`
+
+Return the configured ceiling for checksum downloads in bytes.
+
 ### `parse_service_rate_limit(self, service)`
 
 Return service-specific rate limits expressed as requests per second.
@@ -164,6 +184,26 @@ Split allowed host list into exact domains, wildcard suffixes, and per-host port
 ### `polite_http_headers(self)`
 
 Compute polite HTTP headers for outbound resolver requests.
+
+### `set_session_factory(self, factory)`
+
+Set a custom factory used to construct HTTP sessions.
+
+### `get_session_factory(self)`
+
+Return the custom session factory, if one has been configured.
+
+### `set_bucket_provider(self, provider)`
+
+Set a custom provider responsible for returning token buckets.
+
+### `get_bucket_provider(self)`
+
+Return the configured token bucket provider, if present.
+
+### `model_copy(self)`
+
+Copy the model ensuring private attributes propagate.
 
 ### `validate_prefer_source(cls, value)`
 
@@ -220,6 +260,22 @@ Yield namespace bindings previously registered via :meth:`bind`.
 ### `join()`
 
 Mimic :func:`pystow.join` by joining segments onto the stub root.
+
+### `module()`
+
+Return a child directory while optionally creating it.
+
+### `joinpath()`
+
+Compatibility alias for :func:`join`.
+
+### `ensure()`
+
+Ensure a file or directory exists beneath the stub root.
+
+### `get_config(_module, _key)`
+
+Return default configuration values.
 
 ### `get_ontology(iri)`
 
@@ -333,6 +389,17 @@ Remove local and remote artefacts for ``ontology_id``/``version``.
 
 Mirror CAS artefact locally and to remote storage.
 
+### `model_dump(self)`
+
+Return environment-derived overrides mirroring ``BaseSettings.model_dump``.
+
+Args:
+by_alias: Included for API parity; ignored by the fallback implementation.
+exclude_none: When ``True``, omit keys whose values evaluate to ``None``.
+
+Returns:
+Dict[str, object]: Mapping of configuration keys to environment-provided values.
+
 ### `terms(self)`
 
 Return a deterministic collection of ontology term identifiers.
@@ -363,6 +430,10 @@ Settings controlling ontology validation throughput and limits.
 
 HTTP download, retry, and politeness settings for resolvers.
 
+### `PlannerConfig`
+
+Planner-specific HTTP probing behaviour.
+
 ### `DefaultsConfig`
 
 Composite configuration applied when no per-spec overrides exist.
@@ -370,10 +441,6 @@ Composite configuration applied when no per-spec overrides exist.
 ### `ResolvedConfig`
 
 Materialised configuration combining defaults and fetch specifications.
-
-### `EnvironmentOverrides`
-
-Pydantic settings model exposing environment-derived overrides.
 
 ### `_StubNamespace`
 
@@ -398,6 +465,14 @@ Storage backend that keeps artefacts on the local filesystem.
 ### `FsspecStorageBackend`
 
 Hybrid backend that mirrors artefacts to an fsspec location.
+
+### `EnvironmentOverrides`
+
+Pydantic settings model exposing environment-derived overrides.
+
+### `EnvironmentOverrides`
+
+Fallback environment reader when ``pydantic-settings`` is unavailable.
 
 ### `_StubOntology`
 

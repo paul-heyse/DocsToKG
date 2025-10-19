@@ -28,4 +28,3 @@ class Works:
 
     def works(self, **_kwargs: Any) -> Dict[str, Any]:
         return self.data or {"results": []}
-

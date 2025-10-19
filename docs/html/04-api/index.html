@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -21,17 +21,17 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="1. Development Guide" href="../05-development/index.html" />
-    <link rel="prev" title="1. Architecture Guide" href="../03-architecture/index.html" />
+    <link rel="prev" title="1. Architecture Guide" href="../03-architecture/index.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -90,7 +90,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="api-reference">
 <h1>1. API Reference<a class="headerlink" href="#api-reference" title="Link to this heading"></a></h1>
 <p>DocsToKG exposes a single HTTP-style interface for hybrid search through the
@@ -252,8 +252,7 @@ request/response schema and shows how to integrate the API into a web service.</
 </pre></div>
 </div>
 <p>Cursor chains are stable across requests unless the underlying index changes significantly.
-Use <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service.verify_pagination</span></code> during integration tests to ensure
-continuity.</p>
+Use <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service.verify_pagination</span></code> during integration tests to ensure continuity.</p>
 </section>
 <section id="diagnostics">
 <h2>4. Diagnostics<a class="headerlink" href="#diagnostics" title="Link to this heading"></a></h2>
@@ -296,14 +295,14 @@ ranking audits.</p>
 <section id="local-service-usage-no-http">
 <h2>6. Local Service Usage (No HTTP)<a class="headerlink" href="#local-service-usage-no-http" title="Link to this heading"></a></h2>
 <p>When embedding DocsToKG directly inside Python code, call the service layer once you have constructed it (see <code class="docutils literal notranslate"><span class="pre">docs/06-operations/index.md</span></code> for a full build walkthrough):</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.retrieval</span><span class="w"> </span><span class="kn">import</span> <span class="n">HybridSearchRequest</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">HybridSearchRequest</span>
 
 <span class="n">service</span> <span class="o">=</span> <span class="n">build_hybrid_service</span><span class="p">()</span>
 <span class="n">request</span> <span class="o">=</span> <span class="n">HybridSearchRequest</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="s2">&quot;ontology mapping pipeline&quot;</span><span class="p">)</span>
 <span class="n">response</span> <span class="o">=</span> <span class="n">service</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Working examples of service assembly live in <code class="docutils literal notranslate"><span class="pre">tests/conftest.py</span></code> and <code class="docutils literal notranslate"><span class="pre">tests/test_hybrid_search.py</span></code>.</p>
+<p>Working examples of service assembly live in <code class="docutils literal notranslate"><span class="pre">tests/conftest.py</span></code> and <code class="docutils literal notranslate"><span class="pre">tests/hybrid_search/test_suite.py</span></code>.</p>
 </section>
 <section id="related-resources">
 <h2>7. Related Resources<a class="headerlink" href="#related-resources" title="Link to this heading"></a></h2>
@@ -332,7 +331,7 @@ ranking audits.</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -343,7 +342,7 @@ ranking audits.</p>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

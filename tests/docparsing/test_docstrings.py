@@ -25,6 +25,14 @@
 # }
 # === /NAVMAP ===
 
+"""Enforce docstring coverage across DocParsing modules.
+
+This file walks every Python module beneath `DocsToKG.DocParsing` to confirm that
+modules, classes, and functions expose descriptive docstrings that power the
+documentation tooling. It acts as a guardrail whenever new code is added or
+existing helpers are refactored without updating their annotations.
+"""
+
 from __future__ import annotations
 
 import ast

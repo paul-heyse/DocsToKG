@@ -85,7 +85,24 @@
 # }
 # === /NAVMAP ===
 
-"""Resolver implementations for DocsToKG ontology downloads."""
+"""Resolver implementations and registry wiring for ontology downloads.
+
+The resolver layer turns a logical ontology specification into concrete fetch
+plans.  This module defines:
+
+- the resolver registry and plugin integration used to discover third-party
+  resolvers,
+- shared mixins and the :class:`BaseResolver` contract that implement retry,
+  license, and checksum enforcement,
+- concrete resolvers for OBO, OLS, BioPortal, LOV, SKOS, Ontobee, XBRL, and
+  direct-download sources,
+- utilities such as :func:`normalize_license_to_spdx` that harmonise metadata
+  before manifests are written.
+
+Resolvers are invoked by :mod:`DocsToKG.OntologyDownload.planning` to produce
+robust fallback chains and by the validation pipeline to understand the
+provenance of downloaded artefacts.
+"""
 
 from __future__ import annotations
 

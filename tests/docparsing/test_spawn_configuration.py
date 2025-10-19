@@ -49,7 +49,13 @@
 # }
 # === /NAVMAP ===
 
-"""Test multiprocessing spawn setup for CUDA safety."""
+"""Exercise multiprocessing spawn configuration helpers for CUDA safety.
+
+Embedding pipelines require the `spawn` start method on certain platforms. These
+tests patch multiprocessing contexts to confirm `set_spawn_or_warn` updates the
+start method when needed, logs warnings for incompatible configurations, and
+remains robust when CUDA tooling or logging hooks are absent.
+"""
 
 import logging
 from unittest.mock import Mock, patch

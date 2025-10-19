@@ -21,6 +21,9 @@ embeddings: Optional dense embedding matrix aligned with ``fused_candidates``.
 device: GPU device id when leveraging FAISS GPU routines.
 resources: Optional FAISS GPU resources handle reused across calls.
 block_rows: Corpus rows processed per block when estimating diversity on GPU.
+use_cuvs: Optional override that controls cuVS usage during GPU similarity
+lookups. ``None`` defers to runtime detection; ``True`` forces cuVS when
+supported and ``False`` disables it.
 
 Returns:
 List of diversified `FusionCandidate` objects.
@@ -188,6 +191,10 @@ RequestValidationError: If ``request`` fails validation checks.
 *No documentation available.*
 
 ### `_assert_managed_store(store)`
+
+*No documentation available.*
+
+### `_flush_dense_snapshots(self)`
 
 *No documentation available.*
 

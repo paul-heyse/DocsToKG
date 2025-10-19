@@ -13,6 +13,18 @@ dependencies.
 
 ## 2. Functions
 
+### `_partition_normalisation_buffer(buffer)`
+
+Split ``buffer`` into a flushable prefix and a retained suffix.
+
+The suffix preserves the trailing grapheme cluster so that Unicode
+normalisation remains stable when additional combining marks are read from
+subsequent chunks.
+
+### `_iter_normalised_text_chunks(handle)`
+
+Yield UTF-8 encoded NFKC-normalised chunks from ``handle``.
+
 ### `atomic_write(path)`
 
 Write to a temporary file and atomically replace the destination.
@@ -50,10 +62,12 @@ Return newline-aligned byte ranges that partition ``path``.
 
 ### `iter_doctags(directory)`
 
-Yield DocTags files within ``directory`` and subdirectories while preserving
-their logical locations beneath the provided root. Entries that resolve to the
-same filesystem target are emitted once, preferring real files over symbolic
-links and returning results sorted by their logical path.
+Yield DocTags files within ``directory`` and subdirectories.
+
+The returned paths retain their logical location beneath ``directory`` even
+when they are symbolic links. Files that resolve to the same on-disk target
+are emitted once, preferring concrete files over symlinks and ordering the
+results lexicographically by their logical (relative) path.
 
 ### `_iter_jsonl_records(path)`
 
@@ -87,9 +101,21 @@ Return the attempts log path for ``stage`` relative to ``root``.
 
 Normalise algorithm names for comparison against hashlib.
 
+### `_hash_algorithms_available()`
+
+Return the cached set of available hashlib algorithms.
+
 ### `_select_hash_algorithm(requested, default)`
 
 Return a supported hash algorithm honouring env overrides and defaults.
+
+### `_select_hash_algorithm_uncached(requested, default, env_override)`
+
+Resolve a hash algorithm without consulting the selection cache.
+
+### `_clear_hash_algorithm_cache()`
+
+Reset memoized hash algorithm selections (intended for testing).
 
 ### `resolve_hash_algorithm(default)`
 
@@ -119,10 +145,52 @@ Compute a content hash for ``path`` using the requested algorithm.
 
 Load the latest manifest entries for a specific pipeline stage.
 
-### `iter_manifest_entries(stages, root, *, limit=None)`
+### `_manifest_timestamp_key(entry)`
 
-Yield manifest entries for the requested ``stages`` sorted by timestamp.
+Return a sortable timestamp key or ``None`` when unavailable.
 
-When ``limit`` is provided the reader only loads the newest ``limit`` rows from
-each manifest file using bounded tail windows, which avoids scanning the full
-history for tail-only inspections.
+### `_iter_manifest_tail_lines(path, limit)`
+
+Yield the newest ``limit`` JSONL lines from ``path`` in chronological order.
+
+### `_iter_manifest_file(path, stage)`
+
+Yield manifest entries for a single stage file.
+
+### `iter_manifest_entries(stages, root)`
+
+Yield manifest entries for ``stages`` sorted by timestamp.
+
+When ``limit`` is provided, only the newest ``limit`` rows per manifest file are
+read using bounded tail windows, reducing the amount of history that needs to
+be scanned.
+
+### `update(self, text)`
+
+Ingest ``text`` into the hash while preserving Unicode normalisation semantics.
+
+### `hexdigest(self)`
+
+Finalize the digest and return the hexadecimal representation.
+
+### `__lt__(self, other)`
+
+*No documentation available.*
+
+### `__eq__(self, other)`
+
+*No documentation available.*
+
+### `_push_entry(entry, stream)`
+
+*No documentation available.*
+
+## 3. Classes
+
+### `StreamingContentHasher`
+
+Incrementally compute a content hash that mirrors :func:`compute_content_hash`.
+
+### `_ManifestHeapKey`
+
+Comparable key that preserves manifest order when timestamps are missing.

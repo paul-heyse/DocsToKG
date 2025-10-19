@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
 
-
+  
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" />
+    <link rel="search" title="Search" href="search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="adding-custom-content-download-resolvers">
 <h1>1. Adding Custom Content Download Resolvers<a class="headerlink" href="#adding-custom-content-download-resolvers" title="Link to this heading"></a></h1>
 <p>This guide explains how to extend the DocsToKG content download pipeline with
@@ -83,10 +83,9 @@ project-specific resolver providers. The numbered sections walk through the
 steps required to implement, register, and validate a new resolver.</p>
 <section id="create-the-resolver-template">
 <h2>1. Create the Resolver Template<a class="headerlink" href="#create-the-resolver-template" title="Link to this heading"></a></h2>
-<p>Create a new module (for example,
-<code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolver_my_provider.py</span></code>) or extend
-<code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolvers.py</span></code>. Implement the public surface
-expected by <code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code> using the shared types exposed from the
+<p>Create a new module under <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolvers/</span></code> (for
+example, <code class="docutils literal notranslate"><span class="pre">resolvers/my_provider.py</span></code>). Implement the public surface expected by
+<code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code> using the shared types exposed from the
 <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline</span></code> module:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
@@ -191,15 +190,17 @@ longer implement this logic.</p>
 </section>
 <section id="register-the-resolver">
 <h2>2. Register the Resolver<a class="headerlink" href="#register-the-resolver" title="Link to this heading"></a></h2>
-<p>If the class lives outside <code class="docutils literal notranslate"><span class="pre">resolvers.py</span></code>, ensure it is imported somewhere
-during start-up so the <code class="docutils literal notranslate"><span class="pre">RegisteredResolver</span></code> mixin can register it. To include
-the resolver in the default ordering, add it to <code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code> inside
-<code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolvers.py</span></code>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload</span><span class="w"> </span><span class="kn">import</span> <span class="n">pipeline</span>
+<p>Import the module during start-up so the <code class="docutils literal notranslate"><span class="pre">RegisteredResolver</span></code> mixin can add it
+to the registry. Placing the file inside <code class="docutils literal notranslate"><span class="pre">ContentDownload/resolvers/</span></code> and
+importing it from <code class="docutils literal notranslate"><span class="pre">resolvers/__init__.py</span></code> follows the convention used by the
+built-in resolvers. To include the resolver in the default ordering, append an
+instance inside <code class="docutils literal notranslate"><span class="pre">resolvers/__init__.py</span></code> or modify the list returned by
+<code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code> in your own entry point:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_resolvers</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">default_resolvers</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Resolver</span><span class="p">]:</span>
-    <span class="n">base</span> <span class="o">=</span> <span class="n">resolvers</span><span class="o">.</span><span class="n">ResolverRegistry</span><span class="o">.</span><span class="n">create_default</span><span class="p">()</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">patched_resolvers</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Resolver</span><span class="p">]:</span>
+    <span class="n">base</span> <span class="o">=</span> <span class="n">default_resolvers</span><span class="p">()</span>
     <span class="n">base</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">MyResolver</span><span class="p">())</span>
     <span class="k">return</span> <span class="n">base</span>
 </pre></div>
@@ -285,7 +286,7 @@ help operators adopt the new behaviour.
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -296,7 +297,7 @@ help operators adopt the new behaviour.
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

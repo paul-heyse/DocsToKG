@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,55 +75,16 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-cli">
 <h1>1. Module: cli<a class="headerlink" href="#module-cli" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.cli</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Ontology downloader CLI entry points.</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">ontofetch</span></code> command exposes planning, pull, validation, diagnostics, and
-storage management workflows described in the ontology download refactor.
-Operators can override concurrency and host allowlists from the CLI, diff plan
-outputs, prune historical versions, and run comprehensive <code class="docutils literal notranslate"><span class="pre">doctor</span></code> diagnostics
-without editing configuration files. JSON output modes support automation while
-rich ASCII tables summarise resolver fallback chains and validator results.</p>
+<p>Command-line orchestration for DocsToKG OntologyDownload.</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="format-table-headers-rows">
-<h3><code class="docutils literal notranslate"><span class="pre">format_table(headers,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#format-table-headers-rows" title="Link to this heading"></a></h3>
-<p>Render a padded ASCII table.</p>
-<p>Args:
-headers: Column headers rendered on the first row.
-rows: Iterable of table rows; each row must match the header length.</p>
-<p>Returns:
-Formatted table as a multi-line string.</p>
-</section>
-<section id="format-plan-rows-plans">
-<h3><code class="docutils literal notranslate"><span class="pre">format_plan_rows(plans)</span></code><a class="headerlink" href="#format-plan-rows-plans" title="Link to this heading"></a></h3>
-<p>Convert planner output into rows for table rendering.</p>
-<p>Args:
-plans: Planned fetch objects emitted by the planner.</p>
-<p>Returns:
-List of tuples suitable for :func:<code class="docutils literal notranslate"><span class="pre">format_table</span></code>.</p>
-</section>
-<section id="format-results-table-results">
-<h3><code class="docutils literal notranslate"><span class="pre">format_results_table(results)</span></code><a class="headerlink" href="#format-results-table-results" title="Link to this heading"></a></h3>
-<p>Render download results as a table summarizing status and file paths.</p>
-<p>Args:
-results: Download results produced by :func:<code class="docutils literal notranslate"><span class="pre">fetch_all</span></code>.</p>
-<p>Returns:
-Formatted table summarizing ontology downloads.</p>
-</section>
-<section id="format-validation-summary-results">
-<h3><code class="docutils literal notranslate"><span class="pre">format_validation_summary(results)</span></code><a class="headerlink" href="#format-validation-summary-results" title="Link to this heading"></a></h3>
-<p>Summarise validator outcomes in a compact status table.</p>
-<p>Args:
-results: Mapping of validator names to structured result payloads.</p>
-<p>Returns:
-Table highlighting validator status and notable detail messages.</p>
-</section>
 <section id="build-parser">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
 <p>Configure the top-level CLI parser and subcommands.</p>
@@ -182,14 +143,6 @@ value: Either a string date or a pre-parsed datetime.</p>
 <p>Returns:
 Normalized datetime in UTC, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when not supplied.</p>
 </section>
-<section id="format-bytes-num">
-<h3><code class="docutils literal notranslate"><span class="pre">_format_bytes(num)</span></code><a class="headerlink" href="#format-bytes-num" title="Link to this heading"></a></h3>
-<p>Return human-readable byte count representation.</p>
-<p>Args:
-num: Byte count to format.</p>
-<p>Returns:
-String describing the size using binary units.</p>
-</section>
 <section id="apply-cli-overrides-config-args">
 <h3><code class="docutils literal notranslate"><span class="pre">_apply_cli_overrides(config,</span> <span class="pre">args)</span></code><a class="headerlink" href="#apply-cli-overrides-config-args" title="Link to this heading"></a></h3>
 <p>Mutate resolved configuration based on CLI override arguments.</p>
@@ -197,81 +150,9 @@ String describing the size using binary units.</p>
 config: Resolved configuration subject to mutation.
 args: Parsed CLI namespace containing override values.</p>
 </section>
-<section id="results-to-dict-result">
-<h3><code class="docutils literal notranslate"><span class="pre">_results_to_dict(result)</span></code><a class="headerlink" href="#results-to-dict-result" title="Link to this heading"></a></h3>
-<p>Convert a <code class="docutils literal notranslate"><span class="pre">FetchResult</span></code> instance into a JSON-friendly mapping.</p>
-<p>Args:
-result: Completed fetch result returned by :func:<code class="docutils literal notranslate"><span class="pre">fetch_one</span></code>.</p>
-<p>Returns:
-Dictionary containing resolver metadata, manifest location, and artifact list.</p>
-</section>
-<section id="compute-plan-diff-baseline-current">
-<h3><code class="docutils literal notranslate"><span class="pre">_compute_plan_diff(baseline,</span> <span class="pre">current)</span></code><a class="headerlink" href="#compute-plan-diff-baseline-current" title="Link to this heading"></a></h3>
-<p>Compute additions, removals, and modifications between plan snapshots.</p>
-</section>
-<section id="format-plan-diff-diff">
-<h3><code class="docutils literal notranslate"><span class="pre">_format_plan_diff(diff)</span></code><a class="headerlink" href="#format-plan-diff-diff" title="Link to this heading"></a></h3>
-<p>Render human-readable diff lines from plan comparison.</p>
-</section>
-<section id="plan-to-dict-plan">
-<h3><code class="docutils literal notranslate"><span class="pre">_plan_to_dict(plan)</span></code><a class="headerlink" href="#plan-to-dict-plan" title="Link to this heading"></a></h3>
-<p>Convert a planned fetch into a JSON-friendly dictionary.</p>
-<p>Args:
-plan: Planned fetch data produced by :func:<code class="docutils literal notranslate"><span class="pre">plan_one</span></code> or :func:<code class="docutils literal notranslate"><span class="pre">plan_all</span></code>.</p>
-<p>Returns:
-Mapping containing resolver metadata and planned download details suitable
-for serialization.</p>
-</section>
-<section id="infer-version-timestamp-version">
-<h3><code class="docutils literal notranslate"><span class="pre">_infer_version_timestamp(version)</span></code><a class="headerlink" href="#infer-version-timestamp-version" title="Link to this heading"></a></h3>
-<p>Attempt to derive a datetime from a version string.</p>
-<p>Args:
-version: Version identifier emitted by upstream resolvers.</p>
-<p>Returns:
-Datetime derived from the version string, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when no format matches.</p>
-</section>
-<section id="resolve-version-metadata-ontology-id-version">
-<h3><code class="docutils literal notranslate"><span class="pre">_resolve_version_metadata(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#resolve-version-metadata-ontology-id-version" title="Link to this heading"></a></h3>
-<p>Return path, timestamp, and size metadata for a stored version.</p>
-</section>
-<section id="ensure-manifest-path-ontology-id-version">
-<h3><code class="docutils literal notranslate"><span class="pre">_ensure_manifest_path(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#ensure-manifest-path-ontology-id-version" title="Link to this heading"></a></h3>
-<p>Return the manifest path for a given ontology and version.</p>
-<p>Args:
-ontology_id: Identifier for the ontology whose manifest is requested.
-version: Optional version string; when omitted the latest available is used.</p>
-<p>Returns:
-Path to the manifest JSON file on disk.</p>
-<p>Raises:
-ConfigError: If the ontology or manifest cannot be located locally.</p>
-</section>
-<section id="load-manifest-manifest-path">
-<h3><code class="docutils literal notranslate"><span class="pre">_load_manifest(manifest_path)</span></code><a class="headerlink" href="#load-manifest-manifest-path" title="Link to this heading"></a></h3>
-<p>Read and parse a manifest JSON document from disk.</p>
-<p>Args:
-manifest_path: Filesystem location of the manifest file.</p>
-<p>Returns:
-Dictionary representation of the manifest contents.</p>
-</section>
-<section id="collect-version-metadata-ontology-id">
-<h3><code class="docutils literal notranslate"><span class="pre">_collect_version_metadata(ontology_id)</span></code><a class="headerlink" href="#collect-version-metadata-ontology-id" title="Link to this heading"></a></h3>
-<p>Return sorted metadata entries for stored ontology versions.</p>
-<p>Args:
-ontology_id: Identifier of the ontology to inspect.</p>
-<p>Returns:
-List of metadata dictionaries ordered by most recent timestamp first.</p>
-</section>
 <section id="resolve-specs-from-args-args-base-config">
 <h3><code class="docutils literal notranslate"><span class="pre">_resolve_specs_from_args(args,</span> <span class="pre">base_config)</span></code><a class="headerlink" href="#resolve-specs-from-args-args-base-config" title="Link to this heading"></a></h3>
 <p>Return configuration and fetch specifications derived from CLI arguments.</p>
-<p>Args:
-args: Parsed command-line arguments for <code class="docutils literal notranslate"><span class="pre">pull</span></code>/<code class="docutils literal notranslate"><span class="pre">plan</span></code> commands.
-base_config: Optional pre-loaded configuration used when no spec file is supplied.</p>
-<p>Returns:
-Tuple containing the active resolved configuration and the list of fetch specs
-that should be processed.</p>
-<p>Raises:
-ConfigError: If neither explicit IDs nor a configuration file are provided.</p>
 </section>
 <section id="handle-pull-args-base-config">
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_pull(args,</span> <span class="pre">base_config)</span></code><a class="headerlink" href="#handle-pull-args-base-config" title="Link to this heading"></a></h3>
@@ -285,15 +166,32 @@ ConfigError: If neither explicit IDs nor a configuration file are provided.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_plan_diff(args,</span> <span class="pre">base_config)</span></code><a class="headerlink" href="#handle-plan-diff-args-base-config" title="Link to this heading"></a></h3>
 <p>Compare current plan output against a baseline plan file.</p>
 </section>
+<section id="handle-plugins-args">
+<h3><code class="docutils literal notranslate"><span class="pre">_handle_plugins(args)</span></code><a class="headerlink" href="#handle-plugins-args" title="Link to this heading"></a></h3>
+<p>Return plugin inventory for the requested kind.</p>
+</section>
 <section id="handle-prune-args-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_prune(args,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#handle-prune-args-logger" title="Link to this heading"></a></h3>
-<p>Delete surplus ontology versions based on <code class="docutils literal notranslate"><span class="pre">--keep</span></code> parameter.</p>
+<p>Delete surplus ontology versions based on <code class="docutils literal notranslate"><span class="pre">--keep</span></code> and age filters.</p>
+</section>
+<section id="read-api-key-status-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_read_api_key_status(path)</span></code><a class="headerlink" href="#read-api-key-status-path" title="Link to this heading"></a></h3>
+<p>Return diagnostic metadata for an API key file.</p>
+<p>Args:
+path: Target file path to inspect.</p>
+<p>Returns:
+Mapping including the path, whether it exists, configuration status, and
+any error encountered while reading the contents.</p>
 </section>
 <section id="doctor-report">
 <h3><code class="docutils literal notranslate"><span class="pre">_doctor_report()</span></code><a class="headerlink" href="#doctor-report" title="Link to this heading"></a></h3>
 <p>Collect diagnostic information for the <code class="docutils literal notranslate"><span class="pre">doctor</span></code> command.</p>
 <p>Returns:
 Mapping capturing disk, dependency, network, and configuration status.</p>
+</section>
+<section id="apply-doctor-fixes-report">
+<h3><code class="docutils literal notranslate"><span class="pre">_apply_doctor_fixes(report)</span></code><a class="headerlink" href="#apply-doctor-fixes-report" title="Link to this heading"></a></h3>
+<p>Attempt to remediate common doctor issues and return action notes.</p>
 </section>
 <section id="print-doctor-report-report">
 <h3><code class="docutils literal notranslate"><span class="pre">_print_doctor_report(report)</span></code><a class="headerlink" href="#print-doctor-report-report" title="Link to this heading"></a></h3>
@@ -346,8 +244,12 @@ path: Filesystem path to the configuration file under validation.</p>
 <p>Returns:
 Dictionary describing validation status, ontology count, and file path.</p>
 </section>
-<section id="main-argv">
-<h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>
+<section id="emit-batch-failure-exc-args">
+<h3><code class="docutils literal notranslate"><span class="pre">_emit_batch_failure(exc,</span> <span class="pre">args)</span></code><a class="headerlink" href="#emit-batch-failure-exc-args" title="Link to this heading"></a></h3>
+<p>Print a concise error message and optionally serialize partial results.</p>
+</section>
+<section id="cli-main-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">cli_main(argv)</span></code><a class="headerlink" href="#cli-main-argv" title="Link to this heading"></a></h3>
 <p>Entry point for the ontology downloader CLI.</p>
 <p>Args:
 argv: Optional argument vector supplied for testing or scripting.</p>
@@ -357,9 +259,13 @@ Process exit code indicating success (<code class="docutils literal notranslate"
 ConfigError: If configuration files are invalid or unsafe to overwrite.
 OntologyDownloadError: If download or validation operations fail.</p>
 </section>
-<section id="format-row-values">
-<h3><code class="docutils literal notranslate"><span class="pre">_format_row(values)</span></code><a class="headerlink" href="#format-row-values" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<section id="apply-resolver-override-specs">
+<h3><code class="docutils literal notranslate"><span class="pre">apply_resolver_override(specs)</span></code><a class="headerlink" href="#apply-resolver-override-specs" title="Link to this heading"></a></h3>
+<p>Force all <code class="docutils literal notranslate"><span class="pre">specs</span></code> to use the resolver override when one is provided.</p>
+<p>Args:
+specs: Iterable of fetch specifications to adjust.</p>
+<p>Returns:
+List[FetchSpec]: Normalised fetch specs that honour the override selection.</p>
 </section>
 </section>
 </section>
@@ -378,7 +284,7 @@ OntologyDownloadError: If download or validation operations fail.</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -389,7 +295,7 @@ OntologyDownloadError: If download or validation operations fail.</p>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

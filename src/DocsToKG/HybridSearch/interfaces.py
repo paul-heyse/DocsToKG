@@ -1,13 +1,12 @@
-"""Protocols defining hybrid-search integration points.
+"""Protocols describing hybrid-search integration points.
 
-Args:
-    None
-
-Returns:
-    None
-
-Raises:
-    None
+Implementations of these protocols plug into the ingestion (`pipeline`) and
+query (`service`) paths outlined in the README. `LexicalIndex` covers sparse
+search backends (BM25/SPLADE/OpenSearch), while `DenseVectorStore` describes
+the FAISS-based dense index used by `ManagedFaissAdapter`. Keeping the
+interfaces explicit allows agents to swap implementations—e.g., replacing the
+OpenSearch simulator or introducing a different FAISS GPU configuration—without
+rewriting ingestion or fusion logic.
 """
 
 from __future__ import annotations
@@ -192,9 +191,7 @@ class DenseVectorStore(Protocol):
     def serialize(self) -> bytes:
         """Return a serialised representation of the index."""
 
-    def restore(
-        self, payload: bytes, *, meta: Optional[Mapping[str, object]] = None
-    ) -> None:
+    def restore(self, payload: bytes, *, meta: Optional[Mapping[str, object]] = None) -> None:
         """Restore index state from ``payload``."""
 
     def flush_snapshot(self, *, reason: str = "flush") -> None:

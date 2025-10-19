@@ -31,7 +31,13 @@
 # }
 # === /NAVMAP ===
 
-"""Test Qwen LLM caching effectiveness and output consistency."""
+"""Ensure the Qwen embedding runtime caches LLM instances effectively.
+
+The embedding stage memoises Qwen model instances to avoid repeated start-up
+costs. These tests assert that cache keys incorporate configuration details,
+that caches initialise correctly on first use, and that cached instances are
+reused for subsequent calls without cross-talk between different configurations.
+"""
 
 import tempfile
 from pathlib import Path

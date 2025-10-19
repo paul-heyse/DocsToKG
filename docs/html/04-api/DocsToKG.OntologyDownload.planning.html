@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-planning">
 <h1>1. Module: planning<a class="headerlink" href="#module-planning" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.planning</span></code>.</p>
@@ -85,6 +85,10 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="log-with-extra-logger-level-message-extra">
+<h3><code class="docutils literal notranslate"><span class="pre">_log_with_extra(logger,</span> <span class="pre">level,</span> <span class="pre">message,</span> <span class="pre">extra)</span></code><a class="headerlink" href="#log-with-extra-logger-level-message-extra" title="Link to this heading"></a></h3>
+<p>Log <code class="docutils literal notranslate"><span class="pre">message</span></code> with structured <code class="docutils literal notranslate"><span class="pre">extra</span></code> supporting LoggerAdapters.</p>
+</section>
 <section id="get-manifest-schema">
 <h3><code class="docutils literal notranslate"><span class="pre">get_manifest_schema()</span></code><a class="headerlink" href="#get-manifest-schema" title="Link to this heading"></a></h3>
 <p>Return a deep copy of the manifest JSON Schema definition.</p>
@@ -115,6 +119,14 @@ ConfigurationError: If validation fails.</p>
 <section id="cancel-pending-futures-futures">
 <h3><code class="docutils literal notranslate"><span class="pre">_cancel_pending_futures(futures)</span></code><a class="headerlink" href="#cancel-pending-futures-futures" title="Link to this heading"></a></h3>
 <p>Cancel any futures that are still pending execution.</p>
+</section>
+<section id="executor-is-shutting-down-executor">
+<h3><code class="docutils literal notranslate"><span class="pre">_executor_is_shutting_down(executor)</span></code><a class="headerlink" href="#executor-is-shutting-down-executor" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when <em>executor</em> has begun shutdown processing.</p>
+</section>
+<section id="shutdown-executor-nowait-executor">
+<h3><code class="docutils literal notranslate"><span class="pre">_shutdown_executor_nowait(executor)</span></code><a class="headerlink" href="#shutdown-executor-nowait-executor" title="Link to this heading"></a></h3>
+<p>Request non-blocking shutdown with cancellation for <em>executor</em>.</p>
 </section>
 <section id="parse-http-datetime-value">
 <h3><code class="docutils literal notranslate"><span class="pre">parse_http_datetime(value)</span></code><a class="headerlink" href="#parse-http-datetime-value" title="Link to this heading"></a></h3>
@@ -172,6 +184,12 @@ None: Returns <code class="docutils literal notranslate"><span class="pre">None<
 <h3><code class="docutils literal notranslate"><span class="pre">_select_validators(media_type)</span></code><a class="headerlink" href="#select-validators-media-type" title="Link to this heading"></a></h3>
 <p>Return validator names appropriate for <code class="docutils literal notranslate"><span class="pre">media_type</span></code>.</p>
 </section>
+<section id="planner-http-probe">
+<h3><code class="docutils literal notranslate"><span class="pre">planner_http_probe()</span></code><a class="headerlink" href="#planner-http-probe" title="Link to this heading"></a></h3>
+<p>Issue a polite planner probe using shared networking primitives.</p>
+<p>Call graph: :func:<code class="docutils literal notranslate"><span class="pre">plan_one</span></code>/ :func:<code class="docutils literal notranslate"><span class="pre">plan_all</span></code> → :func:<code class="docutils literal notranslate"><span class="pre">_populate_plan_metadata</span></code> /
+:func:<code class="docutils literal notranslate"><span class="pre">_fetch_last_modified</span></code> → :func:<code class="docutils literal notranslate"><span class="pre">planner_http_probe</span></code> → :func:<code class="docutils literal notranslate"><span class="pre">SESSION_POOL.lease</span></code>.</p>
+</section>
 <section id="populate-plan-metadata-planned-config-adapter">
 <h3><code class="docutils literal notranslate"><span class="pre">_populate_plan_metadata(planned,</span> <span class="pre">config,</span> <span class="pre">adapter)</span></code><a class="headerlink" href="#populate-plan-metadata-planned-config-adapter" title="Link to this heading"></a></h3>
 <p>Augment planned fetch with HTTP metadata when available.</p>
@@ -217,7 +235,11 @@ manifest: Manifest describing the downloaded ontology artifact.</p>
 </section>
 <section id="append-index-entry-ontology-dir-entry">
 <h3><code class="docutils literal notranslate"><span class="pre">_append_index_entry(ontology_dir,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#append-index-entry-ontology-dir-entry" title="Link to this heading"></a></h3>
-<p>Append or update the ontology-level <code class="docutils literal notranslate"><span class="pre">index.json</span></code> with <code class="docutils literal notranslate"><span class="pre">entry</span></code>.</p>
+<p>Append or update the ontology-level <code class="docutils literal notranslate"><span class="pre">index.json</span></code> with <code class="docutils literal notranslate"><span class="pre">entry</span></code> safely.</p>
+</section>
+<section id="ontology-index-lock-ontology-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_ontology_index_lock(ontology_dir)</span></code><a class="headerlink" href="#ontology-index-lock-ontology-dir" title="Link to this heading"></a></h3>
+<p>Serialize ontology index mutations across versions for the same ontology.</p>
 </section>
 <section id="mirror-to-cas-if-enabled">
 <h3><code class="docutils literal notranslate"><span class="pre">_mirror_to_cas_if_enabled()</span></code><a class="headerlink" href="#mirror-to-cas-if-enabled" title="Link to this heading"></a></h3>
@@ -259,7 +281,8 @@ spec: Ontology fetch specification describing sources and formats.
 config: Optional resolved configuration overriding global defaults.
 correlation_id: Correlation identifier for structured logging.
 logger: Optional logger to reuse instead of configuring a new one.
-force: When <code class="docutils literal notranslate"><span class="pre">True</span></code>, bypass local cache checks and redownload artifacts.</p>
+force: When <code class="docutils literal notranslate"><span class="pre">True</span></code>, bypass local cache checks and redownload artifacts.
+cancellation_token: Optional token for cooperative cancellation.</p>
 <p>Returns:
 FetchResult: Structured result containing manifest metadata and resolver attempts.</p>
 <p>Raises:
@@ -272,7 +295,8 @@ ResolverError: If all resolver candidates fail to retrieve the ontology.</p>
 spec: Fetch specification describing the ontology to plan.
 config: Optional resolved configuration providing defaults and limits.
 correlation_id: Correlation identifier reused for logging context.
-logger: Logger instance used to emit resolver telemetry.</p>
+logger: Logger instance used to emit resolver telemetry.
+cancellation_token: Optional token for cooperative cancellation.</p>
 <p>Returns:
 PlannedFetch containing the normalized spec, resolver name, and plan.</p>
 <p>Raises:
@@ -286,7 +310,10 @@ ConfigurationError: If licence checks reject the planned ontology.</p>
 specs: Iterable of fetch specifications to resolve.
 config: Optional resolved configuration reused across plans.
 logger: Logger instance used for annotation-aware logging.
-since: Optional cutoff date; plans older than this timestamp are filtered out.</p>
+since: Optional cutoff date; plans older than this timestamp are filtered out.
+total: Optional total number of specifications, used for progress metadata when
+the iterable cannot be sized cheaply.
+cancellation_token_group: Optional group of cancellation tokens for cooperative cancellation.</p>
 <p>Returns:
 List of PlannedFetch entries describing each ontology plan.</p>
 <p>Raises:
@@ -300,7 +327,10 @@ ConfigurationError: When licence enforcement rejects a planned ontology.</p>
 specs: Iterable of fetch specifications to process.
 config: Optional resolved configuration shared across downloads.
 logger: Logger used to emit progress and error events.
-force: When True, skip manifest reuse and download everything again.</p>
+force: When True, skip manifest reuse and download everything again.
+total: Optional total number of specifications for progress metadata when
+the iterable cannot be cheaply materialised.
+cancellation_token_group: Optional group of cancellation tokens for cooperative cancellation.</p>
 <p>Returns:
 List of FetchResult entries corresponding to completed downloads.</p>
 <p>Raises:
@@ -339,8 +369,28 @@ JSON document encoding the manifest metadata.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_add(name)</span></code><a class="headerlink" href="#add-name" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="submit-spec-index">
+<h3><code class="docutils literal notranslate"><span class="pre">_submit(spec,</span> <span class="pre">index)</span></code><a class="headerlink" href="#submit-spec-index" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">_submit(spec,</span> <span class="pre">index)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="issue-current-method">
+<h3><code class="docutils literal notranslate"><span class="pre">_issue(current_method)</span></code><a class="headerlink" href="#issue-current-method" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="execute-candidate">
 <h3><code class="docutils literal notranslate"><span class="pre">_execute_candidate()</span></code><a class="headerlink" href="#execute-candidate" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="perform-once">
+<h3><code class="docutils literal notranslate"><span class="pre">_perform_once()</span></code><a class="headerlink" href="#perform-once" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="on-retry-attempt-exc-delay">
+<h3><code class="docutils literal notranslate"><span class="pre">_on_retry(attempt,</span> <span class="pre">exc,</span> <span class="pre">delay)</span></code><a class="headerlink" href="#on-retry-attempt-exc-delay" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 </section>
@@ -507,6 +557,10 @@ fetch_plan.resolver
 </div></blockquote>
 </div></blockquote>
 </section>
+<section id="plannerproberesult">
+<h3><code class="docutils literal notranslate"><span class="pre">PlannerProbeResult</span></code><a class="headerlink" href="#plannerproberesult" title="Link to this heading"></a></h3>
+<p>Normalized response metadata produced by planner HTTP probes.</p>
+</section>
 </section>
 </section>
 
@@ -524,7 +578,7 @@ fetch_plan.resolver
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -535,7 +589,7 @@ fetch_plan.resolver
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

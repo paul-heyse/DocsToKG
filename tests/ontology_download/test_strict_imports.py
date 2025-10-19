@@ -6,7 +6,12 @@
 # }
 # === /NAVMAP ===
 
-"""Tests for ONTOFETCH_STRICT_IMPORTS behavior on compatibility shims."""
+"""Strict import flag behaviour for optional shims.
+
+Validates that setting ``ONTOFETCH_STRICT_IMPORTS`` causes legacy shim modules
+to raise immediate errors while core modules continue importing, protecting
+against silently degraded environments.
+"""
 
 from __future__ import annotations
 

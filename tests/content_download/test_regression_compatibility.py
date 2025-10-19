@@ -43,14 +43,22 @@
 # }
 # === /NAVMAP ===
 
+"""Compatibility regression tests for ContentDownload public contracts.
+
+The suite locks down resolver ordering, manifest schema invariants, resume
+behaviour when legacy JSONL segments are missing, and configuration migrations.
+It acts as an early warning when schema bumps or default toggles risk breaking
+downstream tooling that depends on stable manifests and config semantics.
+"""
+
 """Regression compatibility tests for the ContentDownload refactor."""
 
 from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict
 import sqlite3
+from dataclasses import asdict
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Dict, List
@@ -136,6 +144,7 @@ def _seed_sqlite_resume(sqlite_path: Path) -> None:
         conn.commit()
     finally:
         conn.close()
+
 
 # --- Test Cases ---
 
@@ -328,9 +337,7 @@ def test_load_previous_manifest_truncated_jsonl_uses_sqlite_fallback(
     assert first_entry["path"] == "/data/stored.pdf"
 
 
-def test_load_previous_manifest_sqlite_path_has_no_warning(
-    tmp_path: Path, caplog
-) -> None:
+def test_load_previous_manifest_sqlite_path_has_no_warning(tmp_path: Path, caplog) -> None:
     sqlite_path = tmp_path / "resume.sqlite3"
     _seed_sqlite_resume(sqlite_path)
 

@@ -67,7 +67,28 @@
 # }
 # === /NAVMAP ===
 
-"""Ingestion pipeline, feature generation, and observability utilities."""
+"""Hybrid-search ingestion pipeline, feature normalisation, and observability.
+
+This module is the operational counterpart to the HybridSearch README section on
+chunk ingestion. It streams DocParsing outputs (`*.chunk.jsonl` + embeddings),
+derives lexical/dense features, and applies namespace routing while emitting
+structured telemetry. Key responsibilities include:
+
+- Loading chunk + vector artifacts in lockstep, validating manifests, and
+  invoking `LexicalIndex` / `DenseVectorStore` adapters to keep sparse and dense
+  stores synchronised.
+- Normalising lexical payloads (BM25 stats, SPLADE weights) and dense vectors so
+  the downstream FAISS store can assume contiguous `float32` tensors.
+- Surfacing ingestion metrics through `Observability`—latency histograms, batch
+  counters, GPU utilisation snapshots—mirroring the “Observability” guidance in
+  the package README.
+- Providing retryable error classes to distinguish between transient ingestion
+  issues (e.g., FAISS temp-memory exhaustion) and terminal data problems.
+
+Agents extending ingestion should consult this module together with
+`faiss-gpu-wheel-reference.md` to understand how dense features flow into the
+custom FAISS GPU wheel managed by `store.ManagedFaissAdapter`.
+"""
 
 from __future__ import annotations
 

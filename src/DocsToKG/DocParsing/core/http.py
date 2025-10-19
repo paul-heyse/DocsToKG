@@ -1,4 +1,11 @@
-"""HTTP client helpers for DocParsing."""
+"""Shared HTTP session management for DocParsing network interactions.
+
+Certain DocParsing stages—particularly DocTags conversion when downloading
+checkpoint models—perform lightweight HTTP calls. This module wraps the
+``requests`` session setup with retry/backoff defaults, timeout normalisation,
+and thread-safe caching so callers can use a hardened client without duplicating
+connection pooling logic.
+"""
 
 from __future__ import annotations
 

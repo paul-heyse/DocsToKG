@@ -1,4 +1,12 @@
-"""Checksum parsing and resolution helpers."""
+"""Checksum parsing, normalisation, and verification helpers.
+
+Configuration files and resolver payloads may describe expected digests in a
+variety of formats.  This module normalises those declarations, validates the
+algorithms that callers request, and exposes streaming utilities that compute
+hashes without materialising entire ontology archives in memory.  The helpers
+are used by the planner when constructing manifests and by the downloader to
+enforce tamper-detection policies prior to ingestion.
+"""
 
 from __future__ import annotations
 
@@ -189,9 +197,7 @@ def _fetch_checksum_from_url(
                             f"Checksum response from {secure_url} exceeded {max_bytes} bytes"
                         )
                     buffer = tail + chunk
-                    match = _DIGEST_PATTERN.search(
-                        buffer.decode("utf-8", errors="ignore")
-                    )
+                    match = _DIGEST_PATTERN.search(buffer.decode("utf-8", errors="ignore"))
                     if match:
                         digest = match.group(1).lower()
                         logger.info(

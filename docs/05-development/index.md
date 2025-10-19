@@ -201,10 +201,10 @@ def process_document(
 
 **Test Structure**:
 
-- Hybrid search suites: `tests/test_hybrid_search.py`, `tests/test_hybrid_search_real_vectors.py`, `tests/test_hybrid_search_scale.py`
-- Ontology tooling: `tests/ontology_download/` and `tests/test_resolver_pipeline.py`
-- Parsing and ingestion: `tests/test_pipeline_behaviour.py`, `tests/test_content_download_utils.py`
-- CLI coverage: `tests/test_cli.py`, `tests/test_download_utils.py`
+- Hybrid search suites: `tests/hybrid_search/` (ranking fusion, FAISS vector store, GPU distribution).
+- Ontology tooling: `tests/ontology_download/` (CLI flows, validators, storage adapters).
+- Parsing and ingestion: `tests/content_download/`, `tests/docparsing/`, `tests/embeddings/`.
+- CLI & orchestration: `tests/cli/`, `tests/pipeline/test_execution.py`.
 
 **Test Coverage**:
 

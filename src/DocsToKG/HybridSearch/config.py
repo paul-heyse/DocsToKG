@@ -43,12 +43,13 @@
 # }
 # === /NAVMAP ===
 
-"""
-Configuration models and manager for hybrid search.
+"""Configuration models and manager for hybrid search.
 
-This module provides comprehensive configuration management for DocsToKG's
-hybrid search capabilities, including chunking, indexing, fusion, and
-retrieval parameters with thread-safe configuration management.
+These Pydantic dataclasses correspond to the YAML/JSON snippets in the README
+(“Configuration quick reference”). They coordinate ingestion locations, FAISS
+GPU settings (replication, memory pools, cuVS toggles), fusion budgets, and
+retrieval weights. `HybridSearchConfigManager` adds thread-safe load/save and
+snapshot helpers so agents can persist configs alongside FAISS snapshots.
 """
 
 from __future__ import annotations

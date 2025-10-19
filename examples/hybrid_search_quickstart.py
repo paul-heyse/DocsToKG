@@ -190,10 +190,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     top = response.results[0]
-    print(
-        f"[hybrid-quickstart] Top result doc_id={top.doc_id} "
-        f"(fused score={top.score:.3f})"
-    )
+    print(f"[hybrid-quickstart] Top result doc_id={top.doc_id} " f"(fused score={top.score:.3f})")
     for idx, result in enumerate(response.results, start=1):
         diagnostics = result.diagnostics
         print(

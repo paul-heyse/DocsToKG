@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-runner">
 <h1>1. Module: runner<a class="headerlink" href="#module-runner" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.runner</span></code>.</p>
@@ -85,9 +85,15 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="calculate-equal-jitter-delay-attempt">
+<h3><code class="docutils literal notranslate"><span class="pre">_calculate_equal_jitter_delay(attempt)</span></code><a class="headerlink" href="#calculate-equal-jitter-delay-attempt" title="Link to this heading"></a></h3>
+<p>Return an exponential backoff delay using equal jitter.</p>
+</section>
 <section id="iterate-openalex-query-per-page-max-results">
 <h3><code class="docutils literal notranslate"><span class="pre">iterate_openalex(query,</span> <span class="pre">per_page,</span> <span class="pre">max_results)</span></code><a class="headerlink" href="#iterate-openalex-query-per-page-max-results" title="Link to this heading"></a></h3>
-<p>Iterate over OpenAlex works respecting pagination and limits.</p>
+<p>Iterate over OpenAlex works respecting pagination, limits, and retry policy.</p>
+<p>Retries honour <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> headers while applying an equal-jitter
+exponential backoff capped by <code class="docutils literal notranslate"><span class="pre">retry_max_delay</span></code> to avoid unbounded sleeps.</p>
 </section>
 <section id="run-resolved">
 <h3><code class="docutils literal notranslate"><span class="pre">run(resolved)</span></code><a class="headerlink" href="#run-resolved" title="Link to this heading"></a></h3>
@@ -96,6 +102,10 @@
 <section id="update-from-result-self-result">
 <h3><code class="docutils literal notranslate"><span class="pre">update_from_result(self,</span> <span class="pre">result)</span></code><a class="headerlink" href="#update-from-result-self-result" title="Link to this heading"></a></h3>
 <p>Update aggregate counters from an individual work result.</p>
+</section>
+<section id="record-worker-failure-self">
+<h3><code class="docutils literal notranslate"><span class="pre">record_worker_failure(self)</span></code><a class="headerlink" href="#record-worker-failure-self" title="Link to this heading"></a></h3>
+<p>Increment the worker failure counter in a thread-safe manner.</p>
 </section>
 <section id="enter-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#enter-self" title="Link to this heading"></a></h3>
@@ -125,6 +135,10 @@
 <h3><code class="docutils literal notranslate"><span class="pre">setup_download_state(self,</span> <span class="pre">session_factory,</span> <span class="pre">robots_cache)</span></code><a class="headerlink" href="#setup-download-state-self-session-factory-robots-cache" title="Link to this heading"></a></h3>
 <p>Initialise download options and counters for the run.</p>
 </section>
+<section id="load-resume-state-self-resume-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_resume_state(self,</span> <span class="pre">resume_path)</span></code><a class="headerlink" href="#load-resume-state-self-resume-path" title="Link to this heading"></a></h3>
+<p>Load resume metadata from JSON manifests with SQLite fallback.</p>
+</section>
 <section id="setup-worker-pool-self">
 <h3><code class="docutils literal notranslate"><span class="pre">setup_worker_pool(self)</span></code><a class="headerlink" href="#setup-worker-pool-self" title="Link to this heading"></a></h3>
 <p>Create a thread pool when concurrency is enabled.</p>
@@ -133,13 +147,29 @@
 <h3><code class="docutils literal notranslate"><span class="pre">process_work_item(self,</span> <span class="pre">work,</span> <span class="pre">options,</span> <span class="pre">session)</span></code><a class="headerlink" href="#process-work-item-self-work-options-session" title="Link to this heading"></a></h3>
 <p>Process a single work artefact and update aggregate counters.</p>
 </section>
-<section id="check-budget-limits-self">
-<h3><code class="docutils literal notranslate"><span class="pre">check_budget_limits(self)</span></code><a class="headerlink" href="#check-budget-limits-self" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when request or byte budgets have been exhausted.</p>
+<section id="record-worker-crash-manifest-self-artifact-context-exc">
+<h3><code class="docutils literal notranslate"><span class="pre">_record_worker_crash_manifest(self,</span> <span class="pre">artifact_context,</span> <span class="pre">exc)</span></code><a class="headerlink" href="#record-worker-crash-manifest-self-artifact-context-exc" title="Link to this heading"></a></h3>
+<p>Record a manifest entry for a worker crash if telemetry is available.</p>
+</section>
+<section id="handle-worker-exception-self-state-exc">
+<h3><code class="docutils literal notranslate"><span class="pre">_handle_worker_exception(self,</span> <span class="pre">state,</span> <span class="pre">exc)</span></code><a class="headerlink" href="#handle-worker-exception-self-state-exc" title="Link to this heading"></a></h3>
+<p>Apply consistent crash handling for sequential and threaded workers.</p>
 </section>
 <section id="run-self">
 <h3><code class="docutils literal notranslate"><span class="pre">run(self)</span></code><a class="headerlink" href="#run-self" title="Link to this heading"></a></h3>
 <p>Execute the content download pipeline and return the aggregate result.</p>
+</section>
+<section id="retry-after-seconds-exc">
+<h3><code class="docutils literal notranslate"><span class="pre">_retry_after_seconds(exc)</span></code><a class="headerlink" href="#retry-after-seconds-exc" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="jittered-delay-attempt-number">
+<h3><code class="docutils literal notranslate"><span class="pre">_jittered_delay(attempt_number)</span></code><a class="headerlink" href="#jittered-delay-attempt-number" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="build-json-lookup">
+<h3><code class="docutils literal notranslate"><span class="pre">_build_json_lookup()</span></code><a class="headerlink" href="#build-json-lookup" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="build-thread-session">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_thread_session()</span></code><a class="headerlink" href="#build-thread-session" title="Link to this heading"></a></h3>
@@ -151,6 +181,10 @@
 </section>
 <section id="handle-future-completed-future">
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_future(completed_future)</span></code><a class="headerlink" href="#handle-future-completed-future" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="runner">
+<h3><code class="docutils literal notranslate"><span class="pre">_runner()</span></code><a class="headerlink" href="#runner" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 </section>
@@ -181,7 +215,7 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -192,7 +226,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

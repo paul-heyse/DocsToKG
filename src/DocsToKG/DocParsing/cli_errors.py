@@ -1,4 +1,12 @@
-"""Shared CLI validation error types for DocParsing entry points."""
+"""Exception types and formatting helpers shared by DocParsing CLIs.
+
+The CLI layers for DocTags, chunking, and embedding all surface validation
+failures through a common set of lightweight exceptions so that callers receive
+consistent error messaging regardless of the stage they are invoking. This
+module defines those stage-specific subclasses, embeds hints for remediation,
+and provides rendering helpers that the unified CLI uses to keep terminal output
+predictable for both humans and automation.
+"""
 
 from __future__ import annotations
 

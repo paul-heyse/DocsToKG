@@ -1,4 +1,18 @@
-"""Command-line orchestration for DocsToKG OntologyDownload."""
+"""Command-line orchestration for DocsToKG ontology lifecycle management.
+
+The CLI is the operational surface for planning, pulling, validating, and
+pruning ontology collections.  It wires argument parsing to the planner,
+resolver, formatter, and manifest layers so operators can:
+
+- inspect fetch plans and diff them against previous lockfiles,
+- execute downloads with retry, checksum, and security enforcement,
+- run syntax/semantic validators in parallel with resource budgeting,
+- rotate manifests, logs, and cached artefacts for repeatable deployments.
+
+Every sub-command ultimately delegates to the functions exposed in
+:mod:`DocsToKG.OntologyDownload.api`, keeping parity between scripted and
+programmatic usage.
+"""
 
 from __future__ import annotations
 
@@ -558,6 +572,14 @@ def _resolve_specs_from_args(
         raise ConfigError("Unknown resolver(s) specified: " + resolver_override)
 
     def apply_resolver_override(specs: Sequence[FetchSpec]) -> List[FetchSpec]:
+        """Force all ``specs`` to use the resolver override when one is provided.
+
+        Args:
+            specs: Iterable of fetch specifications to adjust.
+
+        Returns:
+            List[FetchSpec]: Normalised fetch specs that honour the override selection.
+        """
         if not resolver_override:
             return list(specs)
         return [
@@ -613,9 +635,7 @@ def _resolve_specs_from_args(
             default_resolver = config.defaults.prefer_source[0]
         fallback_resolver = resolver_override or default_resolver or "obo"
         fallback_formats = (
-            tuple(target_formats)
-            if target_formats
-            else tuple(config.defaults.normalize_to)
+            tuple(target_formats) if target_formats else tuple(config.defaults.normalize_to)
         )
 
         specs_by_id = {spec.id: spec for spec in config.specs or []}
@@ -817,10 +837,7 @@ def _handle_prune(args, logger) -> Dict[str, object]:
                 f"{ordered}"
             )
         else:
-            messages.append(
-                "[DRY-RUN] Requested ontologies (order preserved): "
-                f"{ordered}"
-            )
+            messages.append("[DRY-RUN] Requested ontologies (order preserved): " f"{ordered}")
 
     for ontology_id in target_ids:
         raw_metadata = collect_version_metadata(ontology_id)
@@ -1172,7 +1189,7 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
 
     # Import LOG_DIR at runtime to respect TestingEnvironment patches
     from DocsToKG.OntologyDownload.settings import LOG_DIR as runtime_log_dir
-    
+
     if runtime_log_dir.exists():
         retention_days = ResolvedConfig.from_defaults().defaults.logging.retention_days
         try:
@@ -1180,7 +1197,7 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
             actions.extend(rotations)
         except OSError as exc:
             actions.append(f"Failed to rotate logs in {runtime_log_dir}: {exc}")
-    
+
     placeholders = {
         CONFIG_DIR / "bioportal_api_key.txt": "Add your BioPortal API key here\n",
         CONFIG_DIR / "ols_api_token.txt": "Add your OLS API token here\n",
@@ -1221,9 +1238,7 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
     disk_path = disk.get("path")
     label = f"Disk space ({disk_path})" if disk_path else "Disk space"
     if "free_gb" in disk and "total_gb" in disk:
-        print(
-            f"{label}: {disk['free_gb']:.2f} GB free / {disk['total_gb']:.2f} GB total"
-        )
+        print(f"{label}: {disk['free_gb']:.2f} GB free / {disk['total_gb']:.2f} GB total")
         if disk.get("warning"):
             threshold_gb = disk["threshold_bytes"] / 1_000_000_000
             print(
@@ -1489,7 +1504,9 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
         )
         if getattr(args, "json", False):
             for handler in logger.handlers:
-                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                if isinstance(handler, logging.StreamHandler) and not isinstance(
+                    handler, logging.FileHandler
+                ):
                     handler.setStream(sys.stderr)
         if args.command == "pull":
             if getattr(args, "dry_run", False):

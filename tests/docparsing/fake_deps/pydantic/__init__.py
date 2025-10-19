@@ -19,7 +19,9 @@ T = TypeVar("T")
 
 
 class _FieldInfo:
-    def __init__(self, *, default: Any = _FIELD_UNSET, default_factory: Callable[[], Any] | None = None) -> None:
+    def __init__(
+        self, *, default: Any = _FIELD_UNSET, default_factory: Callable[[], Any] | None = None
+    ) -> None:
         self.default = default
         self.default_factory = default_factory
 
@@ -115,6 +117,7 @@ class BaseModel(metaclass=_PydanticMeta):
 
 class ValidationError(Exception):
     """Compatibility shim for pydantic.ValidationError."""
+
 
 def PrivateAttr(default: Any = None) -> Any:
     """Return the supplied default for compatibility with pydantic."""

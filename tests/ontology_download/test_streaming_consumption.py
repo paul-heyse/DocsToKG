@@ -1,10 +1,15 @@
-"""Streaming behaviour tests for planner and fetcher."""
+"""Streaming planner/fetcher behaviour tests.
+
+Ensures ``plan_all`` and ``fetch_all`` consume iterators lazily, honour
+cancellation semantics, and propagate validation results while running under
+multi-threaded harness scenarios.
+"""
 
 from __future__ import annotations
 
-from contextlib import ExitStack
 import logging
 import threading
+from contextlib import ExitStack
 from typing import Iterator
 
 from DocsToKG.OntologyDownload.planning import FetchSpec, fetch_all, plan_all

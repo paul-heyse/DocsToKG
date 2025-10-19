@@ -68,6 +68,11 @@ integration:
 - Additional keys may appear under `resolvers` in future releases; treat absent
   keys as zero.
 - Files are indented and sorted for readability and deterministic diffs.
+- Voluntary skips now emit `reason="skip_large_download"` so dashboards can
+  separate operator-driven limits from domain budget enforcement.
+- When a caller requests HTTP range resume, the downloader annotates attempts
+  with `metadata.resume_disabled=true` to signal that the legacy flag was
+  ignored for safety.
 
 ## 4. Streaming Hash Performance Benefits
 
@@ -88,3 +93,6 @@ gains because disk seeks no longer dominate the tail of the pipeline.
 - Logging infrastructure applies per-instance locks to JSONL and CSV writers,
   ensuring multi-worker runs produce well-formed records (see
   `tests/test_jsonl_logging.py` for stress coverage).
+- Manifest warm-up is lazy by default, keeping startup memory under 200 MB even
+  for 250 k+ row manifests. Operators can opt back into eager loading via
+  `--warm-manifest-cache` when working on small datasets.

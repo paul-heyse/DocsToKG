@@ -13,14 +13,6 @@ testing less cumbersome and prevents import-time side effects.
 
 ## 2. Functions
 
-### `_load_yaml_markers(raw)`
-
-Deserialize YAML configuration content, raising for missing dependencies.
-
-### `_load_toml_markers(raw)`
-
-Deserialize TOML configuration content with compatibility fallbacks.
-
 ### `load_config_mapping(path)`
 
 Load a configuration mapping from JSON, YAML, or TOML.

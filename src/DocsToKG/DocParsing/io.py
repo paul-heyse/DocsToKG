@@ -491,9 +491,7 @@ def _hash_algorithms_available() -> frozenset[str]:
     return _HASH_ALGORITHMS_AVAILABLE
 
 
-def _select_hash_algorithm(
-    requested: Optional[str], default: Optional[str]
-) -> str:
+def _select_hash_algorithm(requested: Optional[str], default: Optional[str]) -> str:
     """Return a supported hash algorithm honouring env overrides and defaults."""
 
     env_override = os.getenv(_HASH_ALG_ENV_VAR)
@@ -760,10 +758,12 @@ class _ManifestHeapKey:
     __slots__ = ("timestamp", "order")
 
     def __init__(self, timestamp: Optional[str], order: int) -> None:
+        """Initialize a heap key with the original timestamp and insertion order."""
         self.timestamp = timestamp
         self.order = order
 
     def __lt__(self, other: object) -> bool:
+        """Compare heap keys using timestamp when available, falling back to sequence order."""
         if not isinstance(other, _ManifestHeapKey):
             return NotImplemented
         if self.timestamp is not None and other.timestamp is not None:
@@ -772,6 +772,7 @@ class _ManifestHeapKey:
         return self.order < other.order
 
     def __eq__(self, other: object) -> bool:
+        """Equality comparison that mirrors the ordering semantics."""
         if not isinstance(other, _ManifestHeapKey):
             return NotImplemented
         return self.timestamp == other.timestamp and self.order == other.order
@@ -878,6 +879,7 @@ def iter_manifest_entries(
     unique = count()
 
     def _push_entry(entry: dict, stream: Iterator[dict]) -> None:
+        """Insert the next ``entry`` from ``stream`` into the merge heap."""
         order = next(unique)
         key = _ManifestHeapKey(_manifest_timestamp_key(entry), order)
         heapq.heappush(heap, (key, order, entry, stream))

@@ -51,7 +51,12 @@ True
 
 ### `add_resume_force_options(parser)`
 
-Attach ``--resume`` and ``--force`` switches to a CLI parser.
+Attach resume-related switches to a CLI parser.
+
+``--verify-hash`` was added so operators can opt into recomputing input
+hashes when resuming pipelines. This keeps the fast path free from
+filesystem hashing while still providing an escape hatch for manifest
+verification.
 
 Args:
 parser (argparse.ArgumentParser): Parser being configured.
@@ -275,15 +280,32 @@ Raises:
 RuntimeError: If the launched or reused server does not expose the expected
 model aliases, indicating a misconfiguration.
 
+### `_iter_sorted_paths(root, predicate)`
+
+Yield ``Path`` objects that satisfy ``predicate`` in lexicographic order.
+
+### `_iter_directory_files(root, suffixes)`
+
+Yield files beneath ``root`` whose suffix is in ``suffixes``.
+
+When ``suffixes`` is ``None`` all files are considered before applying the
+optional ``exclude`` predicate.
+
+The traversal is performed in a deterministic, lexicographically sorted
+order while avoiding materialising the full file list in memory. Hidden
+directories are not skipped to maintain parity with ``Path.rglob``.
+
+### `iter_pdfs(root)`
+
+Iterate over PDF files beneath ``root`` lazily.
+
+### `_peek_iterable(iterable)`
+
+Return an iterator that includes the first element and the first element itself.
+
 ### `list_pdfs(root)`
 
-Collect PDF files under a directory recursively.
-
-Args:
-root: Directory whose subtree should be scanned for PDFs.
-
-Returns:
-Sorted list of paths to PDF files.
+Iterate over PDF files under *root* in deterministic lexical order.
 
 ### `pdf_convert_one(task)`
 
@@ -343,13 +365,7 @@ Instantiate and cache a Docling HTML converter per worker process.
 
 ### `list_htmls(root)`
 
-Enumerate HTML-like files beneath a directory tree.
-
-Args:
-root: Directory whose subtree should be searched for HTML files.
-
-Returns:
-Sorted list of discovered HTML file paths excluding normalized outputs.
+Iterate over HTML-like files beneath *root* in deterministic lexical order.
 
 ### `_sanitize_html_file(path, profile)`
 
@@ -401,6 +417,14 @@ Create a configuration by merging env vars, optional config files, and CLI argum
 ### `finalize(self)`
 
 Normalise derived fields after configuration sources are applied.
+
+### `_enqueue_directory(directory)`
+
+*No documentation available.*
+
+### `_is_html_candidate(path)`
+
+*No documentation available.*
 
 ### `convert(self)`
 

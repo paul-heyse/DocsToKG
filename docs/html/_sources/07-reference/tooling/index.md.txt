@@ -1,57 +1,68 @@
 # 1. Tool Configuration
 
-DocsToKG ships helper scripts and third-party tooling to maintain documentation quality and developer workflows. Configure them as follows.
+DocsToKG bundles helper scripts and third-party tooling to keep documentation, code quality, and automation workflows aligned with the current repository structure.
 
 ## 2. Documentation Automation
 
-| Script | Location | Purpose | Usage |
-|--------|----------|---------|-------|
-| `generate_all_docs.py` | `docs/scripts/` | Orchestrates API generation, Sphinx build, validation, and link checks | `python docs/scripts/generate_all_docs.py` |
-| `generate_api_docs.py` | `docs/scripts/` | Extracts docstrings from `src/` into `docs/04-api/` | `python docs/scripts/generate_api_docs.py` |
-| `validate_docs.py` | `docs/scripts/` | Style, structure, and internal link validation | `python docs/scripts/validate_docs.py` |
-| `check_links.py` | `docs/scripts/` | Asynchronous external link checker | `python docs/scripts/check_links.py --timeout 10` |
-| `build_docs.py` | `docs/scripts/` | Wrapper for Sphinx builds and linkcheck targets | `python docs/scripts/build_docs.py --format html` |
+| Script | Location | Purpose | Example |
+|--------|----------|---------|---------|
+| `generate_all_docs.py` | `docs/scripts/` | Runs API extraction, Sphinx builds, link checks, and validation in a single pass. | `direnv exec . python docs/scripts/generate_all_docs.py` |
+| `generate_api_docs.py` | `docs/scripts/` | Pulls docstrings from `src/` into `docs/04-api/`. | `direnv exec . python docs/scripts/generate_api_docs.py` |
+| `validate_docs.py` | `docs/scripts/` | Ensures structure, headings, and inline references comply with the style guide. | `direnv exec . python docs/scripts/validate_docs.py` |
+| `validate_code_annotations.py` | `docs/scripts/` | Confirms NAVMAP blocks and docstrings follow `CODE_ANNOTATION_STANDARDS.md`. | `direnv exec . python docs/scripts/validate_code_annotations.py` |
+| `check_links.py` | `docs/scripts/` | Concurrent HTTP link checker with retry/back-off controls. | `direnv exec . python docs/scripts/check_links.py --timeout 10` |
+| `build_docs.py` | `docs/scripts/` | Wrapper around Sphinx builders (`html`, `linkcheck`, `doctest`). | `direnv exec . python docs/scripts/build_docs.py --format html` |
 
-Install Sphinx dependencies via:
-
-```bash
-pip install -r docs/build/sphinx/requirements.txt
-```
-
-## 3. Code Quality
-
-Recommended formatting and linting stack:
-
-- `ruff` for linting and import ordering (`pyproject.toml` enables `extend-select = ["I"]`)
-- `black` with line length 100
-- `mypy --strict` aligned with project type hints
-
-Configure pre-commit hooks:
+Install documentation dependencies with:
 
 ```bash
-pip install pre-commit
-pre-commit install
+direnv exec . pip install -r docs/build/sphinx/requirements.txt
 ```
 
-Suggested `.pre-commit-config.yaml` snippets are maintained in the development guide.
+## 3. Code Quality Stack
 
-## 4. Vale (Optional)
+- `ruff` – linting, import sorting, and select auto-fixes (`pyproject.toml` enables the `I` import rules and `E`, `F`, `UP`, `RUF` families).
+- `black` – formatting with a 100-character line length (referenced in CI configuration).
+- `mypy --strict` – type checking aligned with the settings in `pyproject.toml`.
+- `pytest` markers:
+  - `-m smoke` for deployment spot-checks.
+  - `-m hybrid_search` / `-m ontology` for subsystem suites.
+
+Install and wire pre-commit hooks:
+
+```bash
+direnv exec . pip install pre-commit
+direnv exec . pre-commit install
+```
+
+Repository defaults (hook versions, excludes) live in `docs/05-development/index.md`.
+
+## 4. Developer Utilities
+
+| Utility | Location | Description |
+|---------|----------|-------------|
+| `scripts/bootstrap_env.sh` | `scripts/` | Creates/refreshes `.venv`, installs bundled wheels (`torch`, `faiss`, `cupy-cuda12x`, `vllm`), and installs DocsToKG in editable mode. |
+| `scripts/dev.sh` | `scripts/` | Convenience wrapper for running commands inside the project environment when `direnv` is unavailable (`./scripts/dev.sh exec pytest -q`). |
+| `openspec` CLI | `openspec/` | Specification management (`openspec validate <change-id> --strict`) used for proposal review and implementation tracking. |
+
+## 5. Vale (Optional)
 
 Use [Vale](https://vale.sh/) for prose linting:
 
 ```bash
-brew install vale  # or download a release binary
-vale docs/
+brew install vale  # or download from Vale releases
+direnv exec . vale docs/
 ```
 
-Rules can be extended by dropping configurations into `docs/.vale/` (see Style Guide for conventions).
+Rules live under `docs/.vale/` and align with the guidance in `docs/05-development/index.md`.
 
-## 5. Environment Variables
+## 6. Environment Variables
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `DOCSTOKG_DATA_ROOT` | Base directory for downloaded artifacts | `~/.cache/docstokg` |
-| `ONTOLOGY_FETCHER_CONFIG` | Override path to `sources.yaml` | `~/.data/ontology-fetcher/configs/sources.yaml` |
-| `HYBRID_SEARCH_CONFIG` | Path to hybrid search runtime config | `config/hybrid_config.json` |
+| Variable | Purpose | Typical value |
+|----------|---------|---------------|
+| `DOCSTOKG_DATA_ROOT` | Root directory for downloads, manifests, and chunk outputs. | `/srv/docstokg` or project-local `./Data` |
+| `ONTOLOGY_FETCHER_CONFIG` | Path to ontology `sources.yaml`. | `/etc/docstokg/sources.yaml` |
+| `HYBRID_SEARCH_CONFIG` | Hybrid search runtime configuration consumed by `HybridSearchConfigManager`. | `config/hybrid_config.json` |
+| `PA_ALEX_KEY` | OpenAlex API key used by content download pipelines. | Retrieved from secrets manager |
 
-Keep these variables in `.env` files when scripting to ensure reproducible runs.
+Store these variables in an `.env` file or platform-specific secret store, then let `.envrc` surface them during deployment (`direnv exec . …`).

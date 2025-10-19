@@ -1,4 +1,9 @@
-"""Regression coverage for the ``ontofetch validate`` handler."""
+"""Regression suite for the ``ontofetch validate`` CLI handler.
+
+Confirms validation results are written atomically, cache directories are
+discovered, exit codes reflect validator failures, and JSON output mirrors the
+structure consumed by operational dashboards.
+"""
 
 from __future__ import annotations
 
@@ -21,8 +26,9 @@ def test_handle_validate_persists_results_atomically() -> None:
         version = "2024-10-20"
         storage_delegate = cli_module.STORAGE._delegate
 
-        with patch.object(cli_module, "STORAGE", storage_delegate), patch(
-            "DocsToKG.OntologyDownload.manifests.STORAGE", storage_delegate
+        with (
+            patch.object(cli_module, "STORAGE", storage_delegate),
+            patch("DocsToKG.OntologyDownload.manifests.STORAGE", storage_delegate),
         ):
             version_dir = storage_delegate.prepare_version(ontology_id, version)
             manifest_path = version_dir / "manifest.json"
@@ -65,11 +71,14 @@ def test_handle_validate_persists_results_atomically() -> None:
                 assert logger is not None
                 return {"rdflib": DummyResult()}
 
-            with patch.object(cli_module, "run_validators", side_effect=fake_run) as run_mock, patch.object(
-                cli_module,
-                "write_json_atomic",
-                wraps=real_write_json_atomic,
-            ) as write_mock:
+            with (
+                patch.object(cli_module, "run_validators", side_effect=fake_run) as run_mock,
+                patch.object(
+                    cli_module,
+                    "write_json_atomic",
+                    wraps=real_write_json_atomic,
+                ) as write_mock,
+            ):
                 validation_summary = cli_module._handle_validate(args, config)
 
             run_mock.assert_called_once()

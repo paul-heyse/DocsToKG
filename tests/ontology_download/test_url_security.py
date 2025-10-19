@@ -1,4 +1,9 @@
-"""URL safety tests for validate_url_security."""
+"""URL safety and allowlist enforcement tests.
+
+Exercises ``validate_url_security`` against IPv4/v6 edge cases, private ranges,
+port overrides, IPv6 literals, and DNS stubbing to ensure resolvers can only
+contact approved endpoints.
+"""
 
 from __future__ import annotations
 

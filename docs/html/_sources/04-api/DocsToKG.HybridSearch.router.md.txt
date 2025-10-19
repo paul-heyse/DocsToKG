@@ -30,11 +30,23 @@ Return stats for all managed stores (namespaced and aggregate).
 
 ### `serialize_all(self)`
 
-Serialize every managed store (namespace -> payload).
+Serialize every managed store including snapshot metadata.
+
+### `_serialize_with_meta(store)`
+
+*No documentation available.*
+
+### `iter_stores(self)`
+
+Return a snapshot of managed stores keyed by namespace.
 
 ### `restore_all(self, payloads)`
 
-Restore stores from serialized payloads.
+Restore stores from serialized payloads and metadata.
+
+### `_extract_payload_and_meta(packed)`
+
+*No documentation available.*
 
 ### `rebuild_if_needed(self)`
 
@@ -67,6 +79,46 @@ Mapping of namespace to maintenance actions performed.
 ### `_maintain_store(self, namespace, store, training_sampler)`
 
 *No documentation available.*
+
+### `build_entry(payload, meta)`
+
+Package FAISS payload bytes and optional metadata for persistence.
+
+Args:
+payload: Serialized FAISS index bytes.
+meta: Supplemental metadata returned by the store snapshot.
+
+Returns:
+Dict[str, object]: Mapping with ``faiss`` bytes and optional ``meta`` payload.
+
+### `collect(store)`
+
+Extract serialized payload and snapshot metadata from ``store``.
+
+Args:
+store: Vector store to snapshot.
+
+Returns:
+Tuple[bytes, Optional[Mapping[str, object]]]: Serialized FAISS bytes and metadata.
+
+### `coerce_entry(entry)`
+
+Normalise stored payloads into raw bytes and metadata mapping.
+
+Args:
+entry: Persisted snapshot entry in legacy or current format.
+
+Returns:
+Tuple[Optional[bytes], Optional[Mapping[str, object]]]: Normalised payload and metadata.
+
+### `restore_store(store, blob, meta)`
+
+Restore a store from serialized payload and optional metadata.
+
+Args:
+store: Vector store instance to restore.
+blob: Serialized FAISS bytes.
+meta: Supplemental metadata to pass to ``restore`` when supported.
 
 ## 3. Classes
 

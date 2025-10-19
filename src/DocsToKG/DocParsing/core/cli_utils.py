@@ -1,4 +1,11 @@
-"""Reusable CLI assembly helpers for DocParsing."""
+"""Shared CLI building blocks for DocParsing subcommands.
+
+Controllers across DocTags, chunking, and embedding rely on the same option
+shapes, directory heuristics, and preview formatting. This module packages
+those behaviours into small helpers—such as declarative ``CLIOption`` records,
+mode detection utilities, and directory scanners—so each stage can compose
+parsers quickly while still delivering consistent UX and validation.
+"""
 
 from __future__ import annotations
 

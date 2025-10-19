@@ -48,6 +48,7 @@ Usage:
 
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import os
 import sys
@@ -59,7 +60,6 @@ from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-from unittest import mock
 
 import pytest
 
@@ -167,10 +167,39 @@ _UNSET = object()
 
 
 class PatchManager:
-    """Lightweight patch helper that mirrors pytest's monkeypatch API."""
+    """Lightweight patch helper that mirrors pytest's patcher API."""
 
     def __init__(self) -> None:
         self._stack = ExitStack()
+
+    @staticmethod
+    def _resolve_attr_target(target: Any, name: str | None) -> tuple[Any, str]:
+        if isinstance(target, str):
+            if name is not None:
+                raise TypeError("name must be None when patching by dotted path")
+            module_path = target
+            attribute_chain: list[str] = []
+            while True:
+                try:
+                    module = importlib.import_module(module_path)
+                    break
+                except ModuleNotFoundError as exc:
+                    parent, sep, remainder = module_path.rpartition(".")
+                    if not sep:
+                        raise exc
+                    attribute_chain.insert(0, remainder)
+                    module_path = parent
+
+            if not attribute_chain:
+                raise TypeError("target must include an attribute name")
+
+            obj: Any = module
+            for attr_name in attribute_chain[:-1]:
+                obj = getattr(obj, attr_name)
+            return obj, attribute_chain[-1]
+        if name is None:
+            raise TypeError("name must be provided when patching objects")
+        return target, name
 
     def setattr(
         self,
@@ -181,17 +210,32 @@ class PatchManager:
         raising: bool = True,
     ) -> Any:
         if isinstance(target, str):
-            new_value = value if value is not _UNSET else name
+            new_value = name if value is _UNSET else value
             if new_value is _UNSET:
                 raise TypeError("value must be provided when patching by dotted path")
-            context = mock.patch(target, new=new_value, create=not raising)
+            obj, attr = self._resolve_attr_target(target, None)
         else:
             if name is None:
                 raise TypeError("name must be provided when patching objects")
             if value is _UNSET:
                 raise TypeError("value must be provided when patching objects")
-            context = mock.patch.object(target, name, value, create=not raising)
-        return self._stack.enter_context(context)
+            obj, attr = self._resolve_attr_target(target, name)
+            new_value = value
+
+        original = getattr(obj, attr, _UNSET)
+        if original is _UNSET and raising:
+            raise AttributeError(attr)
+
+        setattr(obj, attr, new_value)
+
+        def restore() -> None:
+            if original is _UNSET:
+                delattr(obj, attr)
+            else:
+                setattr(obj, attr, original)
+
+        self._stack.callback(restore)
+        return new_value
 
     def setitem(
         self,
@@ -230,6 +274,92 @@ class PatchManager:
 
         self._stack.callback(restore)
         return value
+
+    def delitem(
+        self,
+        mapping: MutableMapping[Any, Any],
+        key: Any,
+        *,
+        raising: bool = True,
+    ) -> None:
+        original = mapping.pop(key, _UNSET)
+        if original is _UNSET and raising:
+            raise KeyError(key)
+
+        def restore() -> None:
+            if original is _UNSET:
+                return
+            mapping[key] = original
+
+        self._stack.callback(restore)
+
+    def delattr(
+        self,
+        target: Any,
+        name: str | None = None,
+        *,
+        raising: bool = True,
+    ) -> None:
+        obj, attr = self._resolve_attr_target(target, name)
+        original = getattr(obj, attr, _UNSET)
+        if original is _UNSET:
+            if raising:
+                raise AttributeError(attr)
+
+            def restore_missing() -> None:
+                if hasattr(obj, attr):
+                    delattr(obj, attr)
+
+            self._stack.callback(restore_missing)
+            return
+
+        delattr(obj, attr)
+
+        def restore() -> None:
+            setattr(obj, attr, original)
+
+        self._stack.callback(restore)
+
+    def delenv(
+        self,
+        name: str,
+        *,
+        env: MutableMapping[str, str] | None = None,
+        raising: bool = True,
+    ) -> None:
+        target_env = env or os.environ
+        original = target_env.pop(name, _UNSET)
+        if original is _UNSET and raising:
+            raise KeyError(name)
+
+        def restore() -> None:
+            if original is _UNSET:
+                return
+            target_env[name] = original
+
+        self._stack.callback(restore)
+
+    def syspath_prepend(self, path: str | os.PathLike[str]) -> None:
+        str_path = os.fspath(path)
+        sys_path = sys.path
+        sys_path.insert(0, str_path)
+
+        def restore() -> None:
+            try:
+                sys_path.remove(str_path)
+            except ValueError:
+                pass
+
+        self._stack.callback(restore)
+
+    def chdir(self, path: str | os.PathLike[str]) -> None:
+        original = Path.cwd()
+        os.chdir(path)
+
+        def restore() -> None:
+            os.chdir(original)
+
+        self._stack.callback(restore)
 
     def close(self) -> None:
         self._stack.close()

@@ -1,9 +1,24 @@
-"""Command-line argument parsing for DocsToKG content downloads.
+"""CLI argument resolution and run bootstrap for DocsToKG content downloads.
 
-Provides helpers that transform CLI inputs into structured configuration
-objects used by the downloader. The utilities here manage resolver bootstrap,
-run directory preparation, and OpenAlex query assembly without triggering any
-network activity at import time.
+Responsibilities
+----------------
+- Define the public parser surface that maps CLI flags onto a typed
+  :class:`ResolvedConfig` snapshot consumed by the runner.
+- Assemble OpenAlex ``Works`` queries (or topic lookups) from user input while
+  deferring all network traffic until execution time.
+- Provision output directories, manifest destinations, and resolver instances
+  via helpers such as :func:`bootstrap_run_environment` and
+  :func:`resolve_config`.
+- Expose compatibility shims (``build_query()``, ``resolve_topic_id_if_needed``)
+  that tests and automation can exercise without pulling in the full CLI stack.
+
+Design Notes
+------------
+- Import-time side effects are intentionally avoided so the module can be
+  reused in unit tests and other tooling without hitting the network.
+- The dataclasses defined here are immutable to keep configuration hand-offs
+  explicit; stateful operations live in ``DocsToKG.ContentDownload.runner`` and
+  downstream modules.
 """
 
 from __future__ import annotations

@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-optdeps">
 <h1>1. Module: optdeps<a class="headerlink" href="#module-optdeps" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.optdeps</span></code>.</p>
@@ -85,143 +85,40 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="create-stub-module-name-attrs">
-<h3><code class="docutils literal notranslate"><span class="pre">_create_stub_module(name,</span> <span class="pre">attrs)</span></code><a class="headerlink" href="#create-stub-module-name-attrs" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="create-stub-bnode-value">
-<h3><code class="docutils literal notranslate"><span class="pre">_create_stub_bnode(value)</span></code><a class="headerlink" href="#create-stub-bnode-value" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="create-stub-literal-value">
-<h3><code class="docutils literal notranslate"><span class="pre">_create_stub_literal(value)</span></code><a class="headerlink" href="#create-stub-literal-value" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="create-stub-uri-value">
-<h3><code class="docutils literal notranslate"><span class="pre">_create_stub_uri(value)</span></code><a class="headerlink" href="#create-stub-uri-value" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
 <section id="import-module-name">
 <h3><code class="docutils literal notranslate"><span class="pre">_import_module(name)</span></code><a class="headerlink" href="#import-module-name" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="create-pystow-stub-root">
-<h3><code class="docutils literal notranslate"><span class="pre">_create_pystow_stub(root)</span></code><a class="headerlink" href="#create-pystow-stub-root" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="create-rdflib-stub">
-<h3><code class="docutils literal notranslate"><span class="pre">_create_rdflib_stub()</span></code><a class="headerlink" href="#create-rdflib-stub" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="create-pronto-stub">
-<h3><code class="docutils literal notranslate"><span class="pre">_create_pronto_stub()</span></code><a class="headerlink" href="#create-pronto-stub" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="create-owlready-stub">
-<h3><code class="docutils literal notranslate"><span class="pre">_create_owlready_stub()</span></code><a class="headerlink" href="#create-owlready-stub" title="Link to this heading"></a></h3>
+<section id="call-with-override-callback-cache-key">
+<h3><code class="docutils literal notranslate"><span class="pre">_call_with_override(callback,</span> <span class="pre">cache_key)</span></code><a class="headerlink" href="#call-with-override-callback-cache-key" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="get-pystow">
 <h3><code class="docutils literal notranslate"><span class="pre">get_pystow()</span></code><a class="headerlink" href="#get-pystow" title="Link to this heading"></a></h3>
-<p>Return the <code class="docutils literal notranslate"><span class="pre">pystow</span></code> module, supplying a stub when unavailable.</p>
+<p>Return the <code class="docutils literal notranslate"><span class="pre">pystow</span></code> module, loading a stub when optional deps are missing.</p>
+<p>Returns:
+Any: Imported <code class="docutils literal notranslate"><span class="pre">pystow</span></code> module or fallback stub.</p>
 </section>
 <section id="get-rdflib">
 <h3><code class="docutils literal notranslate"><span class="pre">get_rdflib()</span></code><a class="headerlink" href="#get-rdflib" title="Link to this heading"></a></h3>
-<p>Return the <code class="docutils literal notranslate"><span class="pre">rdflib</span></code> module, supplying a stub when unavailable.</p>
+<p>Return an <code class="docutils literal notranslate"><span class="pre">rdflib</span></code> module or stub <code class="docutils literal notranslate"><span class="pre">Graph</span></code> implementation for testing.</p>
+<p>Returns:
+Any: Real <code class="docutils literal notranslate"><span class="pre">rdflib</span></code> module or a stub with a <code class="docutils literal notranslate"><span class="pre">Graph</span></code> attribute.</p>
 </section>
 <section id="get-pronto">
 <h3><code class="docutils literal notranslate"><span class="pre">get_pronto()</span></code><a class="headerlink" href="#get-pronto" title="Link to this heading"></a></h3>
-<p>Return the <code class="docutils literal notranslate"><span class="pre">pronto</span></code> module, supplying a stub when unavailable.</p>
+<p>Return the <code class="docutils literal notranslate"><span class="pre">pronto</span></code> module, respecting optional dependency overrides.</p>
+<p>Returns:
+Any: Imported <code class="docutils literal notranslate"><span class="pre">pronto</span></code> module or stub.</p>
 </section>
 <section id="get-owlready2">
 <h3><code class="docutils literal notranslate"><span class="pre">get_owlready2()</span></code><a class="headerlink" href="#get-owlready2" title="Link to this heading"></a></h3>
-<p>Return the <code class="docutils literal notranslate"><span class="pre">owlready2</span></code> module, supplying a stub when unavailable.</p>
+<p>Return the <code class="docutils literal notranslate"><span class="pre">owlready2</span></code> module, applying opt-dependency fallbacks when needed.</p>
+<p>Returns:
+Any: Imported <code class="docutils literal notranslate"><span class="pre">owlready2</span></code> module or fallback stub.</p>
 </section>
-<section id="getitem-self-key">
-<h3><code class="docutils literal notranslate"><span class="pre">__getitem__(self,</span> <span class="pre">key)</span></code><a class="headerlink" href="#getitem-self-key" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="bind-self-prefix-namespace">
-<h3><code class="docutils literal notranslate"><span class="pre">bind(self,</span> <span class="pre">prefix,</span> <span class="pre">namespace)</span></code><a class="headerlink" href="#bind-self-prefix-namespace" title="Link to this heading"></a></h3>
-<p>Register a namespace binding in the lightweight stub manager.</p>
-</section>
-<section id="namespaces-self">
-<h3><code class="docutils literal notranslate"><span class="pre">namespaces(self)</span></code><a class="headerlink" href="#namespaces-self" title="Link to this heading"></a></h3>
-<p>Yield currently registered <code class="docutils literal notranslate"><span class="pre">(prefix,</span> <span class="pre">namespace)</span></code> pairs.</p>
-</section>
-<section id="parse-self-source-format">
-<h3><code class="docutils literal notranslate"><span class="pre">parse(self,</span> <span class="pre">source,</span> <span class="pre">format)</span></code><a class="headerlink" href="#parse-self-source-format" title="Link to this heading"></a></h3>
-<p>Parse a Turtle-like text file into an in-memory triple list.</p>
-</section>
-<section id="serialize-self-destination-format">
-<h3><code class="docutils literal notranslate"><span class="pre">serialize(self,</span> <span class="pre">destination,</span> <span class="pre">format)</span></code><a class="headerlink" href="#serialize-self-destination-format" title="Link to this heading"></a></h3>
-<p>Serialise parsed triples to the supplied destination.</p>
-</section>
-<section id="add-self-triple">
-<h3><code class="docutils literal notranslate"><span class="pre">add(self,</span> <span class="pre">triple)</span></code><a class="headerlink" href="#add-self-triple" title="Link to this heading"></a></h3>
-<p>Append a triple to the stub graph, mirroring rdflib behaviour.</p>
-</section>
-<section id="id1">
-<h3><code class="docutils literal notranslate"><span class="pre">bind(self,</span> <span class="pre">prefix,</span> <span class="pre">namespace)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
-<p>Register a namespace binding within the stub graph.</p>
-</section>
-<section id="id2">
-<h3><code class="docutils literal notranslate"><span class="pre">namespaces(self)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
-<p>Yield namespace bindings previously registered via :meth:<code class="docutils literal notranslate"><span class="pre">bind</span></code>.</p>
-</section>
-<section id="len-self">
-<h3><code class="docutils literal notranslate"><span class="pre">__len__(self)</span></code><a class="headerlink" href="#len-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="iter-self">
-<h3><code class="docutils literal notranslate"><span class="pre">__iter__(self)</span></code><a class="headerlink" href="#iter-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="join">
-<h3><code class="docutils literal notranslate"><span class="pre">join()</span></code><a class="headerlink" href="#join" title="Link to this heading"></a></h3>
-<p>Mimic :func:<code class="docutils literal notranslate"><span class="pre">pystow.join</span></code> by joining segments onto the stub root.</p>
-</section>
-<section id="get-ontology-iri">
-<h3><code class="docutils literal notranslate"><span class="pre">get_ontology(iri)</span></code><a class="headerlink" href="#get-ontology-iri" title="Link to this heading"></a></h3>
-<p>Return a stub ontology instance for the provided IRI.</p>
-</section>
-<section id="terms-self">
-<h3><code class="docutils literal notranslate"><span class="pre">terms(self)</span></code><a class="headerlink" href="#terms-self" title="Link to this heading"></a></h3>
-<p>Return a deterministic collection of ontology term identifiers.</p>
-</section>
-<section id="dump-self-destination-format">
-<h3><code class="docutils literal notranslate"><span class="pre">dump(self,</span> <span class="pre">destination,</span> <span class="pre">format)</span></code><a class="headerlink" href="#dump-self-destination-format" title="Link to this heading"></a></h3>
-<p>Write minimal ontology contents to <code class="docutils literal notranslate"><span class="pre">destination</span></code> for tests.</p>
-</section>
-<section id="load-self">
-<h3><code class="docutils literal notranslate"><span class="pre">load(self)</span></code><a class="headerlink" href="#load-self" title="Link to this heading"></a></h3>
-<p>Provide fluent API parity with owlready2 ontologies.</p>
-</section>
-<section id="classes-self">
-<h3><code class="docutils literal notranslate"><span class="pre">classes(self)</span></code><a class="headerlink" href="#classes-self" title="Link to this heading"></a></h3>
-<p>Return example ontology classes for tests and fallbacks.</p>
-</section>
-</section>
-<section id="classes">
-<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="stubnamespace">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubNamespace</span></code><a class="headerlink" href="#stubnamespace" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="stubnamespacemanager">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubNamespaceManager</span></code><a class="headerlink" href="#stubnamespacemanager" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="stubgraph">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubGraph</span></code><a class="headerlink" href="#stubgraph" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="stubontology">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubOntology</span></code><a class="headerlink" href="#stubontology" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="id3">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubOntology</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<section id="wrapped-import-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_wrapped_import(name)</span></code><a class="headerlink" href="#wrapped-import-name" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 </section>
@@ -241,7 +138,7 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -252,7 +149,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

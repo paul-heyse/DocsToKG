@@ -1,4 +1,10 @@
-"""Rate limiting primitives for ontology downloads."""
+"""Rate limiting primitives for ontology downloads.
+
+Resolvers often talk to public APIs with strict quotas.  This module implements
+token-bucket and shared-registry abstractions that throttle requests across
+processes and machines, persisting state when necessary.  It is used by the
+networking layer to honour ``defaults.http`` policies declared in configuration.
+"""
 
 from __future__ import annotations
 

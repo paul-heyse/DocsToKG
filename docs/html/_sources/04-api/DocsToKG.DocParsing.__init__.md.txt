@@ -4,52 +4,54 @@ This reference documents the DocsToKG module ``DocsToKG.DocParsing.__init__``.
 
 ## 1. Overview
 
-High-level facade exposing consolidated DocParsing modules and compatibility shims.
+High-level facade exposing consolidated DocParsing modules.
 
 ## 2. Functions
 
-### `_populate_forwarding_module(module, target)`
+### `_import_module(module_name)`
 
-Populate ``module`` so that it forwards attributes to ``target``.
+Wrapper around :func:`import_module` for monkeypatch-friendly indirection.
 
-### `_populate_cli_module(module)`
+### `_load_module(name)`
 
-Populate the legacy ``cli`` module shim.
+Load a module by name, using cache for performance.
 
-### `_populate_pdf_pipeline_module(module)`
+### `__getattr__(name)`
 
-Populate the legacy ``pdf_pipeline`` module shim with a deprecation warning.
+Dynamically import submodules only when they are requested.
 
-### `__getattr__(attr)`
+### `__dir__()`
 
-Delegate attribute lookups to the replacement module populated above.
+Ensure lazily exposed attributes appear in :func:`dir` results.
 
-### `parse_args(argv)`
+### `plan()`
 
-Legacy CLI argument parser for backwards-compatible imports.
+Proxy to :func:`DocsToKG.DocParsing.core.plan` with lazy loading.
 
-### `main(args)`
+### `manifest()`
 
-Legacy entry point delegating to :mod:`DocsToKG.DocParsing.doctags`.
+Proxy to :func:`DocsToKG.DocParsing.core.manifest` with lazy loading.
 
-### `create_module(self, spec)`
+### `pdf_build_parser()`
 
-Create a new module instance that will be populated by the shim.
+Proxy to :func:`DocsToKG.DocParsing.doctags.pdf_build_parser`.
 
-### `exec_module(self, module)`
+### `pdf_parse_args()`
 
-Execute the shim builder to populate ``module``.
+Proxy to :func:`DocsToKG.DocParsing.doctags.pdf_parse_args`.
 
-### `find_spec(self, fullname, path, target)`
+### `pdf_main()`
 
-Return a module spec when ``fullname`` matches a supported shim.
+Proxy to :func:`DocsToKG.DocParsing.doctags.pdf_main`.
 
-## 3. Classes
+### `html_build_parser()`
 
-### `_DocParsingShimLoader`
+Proxy to :func:`DocsToKG.DocParsing.doctags.html_build_parser`.
 
-Loader that populates deprecated DocParsing modules on demand.
+### `html_parse_args()`
 
-### `_DocParsingShimFinder`
+Proxy to :func:`DocsToKG.DocParsing.doctags.html_parse_args`.
 
-Meta-path finder that serves the compatibility shims defined above.
+### `html_main()`
+
+Proxy to :func:`DocsToKG.DocParsing.doctags.html_main`.

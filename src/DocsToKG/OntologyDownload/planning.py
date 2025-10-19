@@ -1,4 +1,12 @@
-"""Download planning and orchestration helpers for ontology fetching."""
+"""Download planning, execution orchestration, and manifest production.
+
+The planner converts configuration and resolver metadata into concrete fetch
+plans, executes parallel downloads with retry/backoff controls, and records the
+outcomes into manifests.  It also enforces security policies (checksum
+verification, allowed hosts, archive sanity checks) and coordinates validator
+invocations once artefacts land on disk.  The CLI and public API both rely on
+these routines to produce deterministic results.
+"""
 
 from __future__ import annotations
 
@@ -31,12 +39,11 @@ except ImportError:  # pragma: no cover - non-windows
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 
 import requests
-
-from .cancellation import CancellationToken, CancellationTokenGroup
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 from requests.structures import CaseInsensitiveDict
 
+from .cancellation import CancellationToken, CancellationTokenGroup
 from .checksums import ExpectedChecksum, resolve_expected_checksum
 from .errors import (
     ConfigurationError,

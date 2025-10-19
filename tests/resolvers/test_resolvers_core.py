@@ -3299,9 +3299,7 @@ def test_crossref_resolver_uses_central_retry_logic(patcher, tmp_path) -> None:
             self.calls.append(response.status_code)
             return response
 
-    patcher.setattr(
-        "DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b
-    )
+    patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b)
     sleep_calls: list[float] = []
     patcher.setattr(
         "DocsToKG.ContentDownload.networking.time.sleep", lambda delay: sleep_calls.append(delay)
@@ -3679,7 +3677,11 @@ def test_openaire_resolver_json_error(patcher, tmp_path) -> None:
         lambda *args, **kwargs: _StubResponse(text="{", json_data=ValueError("bad")),
     )
 
-    result = next(OpenAireResolver().iter_urls(_mock_session(_StubResponse(text="{", json_data=ValueError("bad"))), config, artifact))
+    result = next(
+        OpenAireResolver().iter_urls(
+            _mock_session(_StubResponse(text="{", json_data=ValueError("bad"))), config, artifact
+        )
+    )
 
     assert result.event_reason is ResolverEventReason.JSON_ERROR
 
@@ -3714,7 +3716,14 @@ def test_openaire_resolver_fallback_json_load(patcher, tmp_path) -> None:
         ),
     )
 
-    urls = [result.url for result in OpenAireResolver().iter_urls(_mock_session(_StubResponse(json_data=ValueError("bad"), text=json.dumps(payload))), config, artifact)]
+    urls = [
+        result.url
+        for result in OpenAireResolver().iter_urls(
+            _mock_session(_StubResponse(json_data=ValueError("bad"), text=json.dumps(payload))),
+            config,
+            artifact,
+        )
+    ]
 
     assert urls == ["https://openaire.example/alt.pdf"]
 
@@ -3875,7 +3884,12 @@ def test_unpaywall_resolver_cached_success(patcher, tmp_path) -> None:
         Mock(return_value=payload),
     )
 
-    urls = [result.url for result in UnpaywallResolver().iter_urls(_mock_session(_StubResponse()), config, artifact)]
+    urls = [
+        result.url
+        for result in UnpaywallResolver().iter_urls(
+            _mock_session(_StubResponse()), config, artifact
+        )
+    ]
 
     assert urls == [
         "https://unpaywall.example/best.pdf",
@@ -3974,7 +3988,9 @@ def test_semantic_scholar_resolver_http_error(patcher, tmp_path) -> None:
         Mock(side_effect=http_error),
     )
 
-    result = next(SemanticScholarResolver().iter_urls(_mock_session(_StubResponse()), config, artifact))
+    result = next(
+        SemanticScholarResolver().iter_urls(_mock_session(_StubResponse()), config, artifact)
+    )
 
     assert result.event_reason is ResolverEventReason.HTTP_ERROR
     assert result.http_status == 503
@@ -4020,7 +4036,9 @@ def test_semantic_scholar_resolver_json_error(patcher, tmp_path) -> None:
         Mock(side_effect=ValueError("bad")),
     )
 
-    result = next(SemanticScholarResolver().iter_urls(_mock_session(_StubResponse()), config, artifact))
+    result = next(
+        SemanticScholarResolver().iter_urls(_mock_session(_StubResponse()), config, artifact)
+    )
 
     assert result.event_reason is ResolverEventReason.JSON_ERROR
 
@@ -4037,7 +4055,9 @@ def test_semantic_scholar_resolver_no_open_access(patcher, tmp_path) -> None:
         Mock(return_value={"openAccessPdf": {}}),
     )
 
-    result = next(SemanticScholarResolver().iter_urls(_mock_session(_StubResponse()), config, artifact))
+    result = next(
+        SemanticScholarResolver().iter_urls(_mock_session(_StubResponse()), config, artifact)
+    )
 
     assert result.event_reason is ResolverEventReason.NO_OPENACCESS_PDF
 
@@ -4111,7 +4131,12 @@ def test_pmc_resolver_success(patcher, tmp_path) -> None:
         Mock(return_value=_StubResponse(text=oa_html)),
     )
 
-    urls = [result.url for result in PmcResolver().iter_urls(_mock_session(_StubResponse(text=oa_html)), config, artifact)]
+    urls = [
+        result.url
+        for result in PmcResolver().iter_urls(
+            _mock_session(_StubResponse(text=oa_html)), config, artifact
+        )
+    ]
 
     assert "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC123456/pdf/123.pdf" in urls
     assert urls[-1] == "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC123456/pdf/"
@@ -4200,7 +4225,11 @@ def test_wayback_resolver_returns_archive(patcher, tmp_path) -> None:
         lambda *args, **kwargs: _StubResponse(json_data=payload),
     )
 
-    results = list(WaybackResolver().iter_urls(_mock_session(_StubResponse(json_data=payload)), config, artifact))
+    results = list(
+        WaybackResolver().iter_urls(
+            _mock_session(_StubResponse(json_data=payload)), config, artifact
+        )
+    )
 
     assert results[0].url.startswith("https://web.archive.org/")
     assert results[0].metadata["timestamp"] == "20200101000000"

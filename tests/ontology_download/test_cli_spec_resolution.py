@@ -19,14 +19,19 @@
 # }
 # === /NAVMAP ===
 
-"""Regression tests for CLI fetch specification resolution."""
+"""Comprehensive coverage for CLI fetch-spec override semantics.
+
+Verifies that CLI-supplied target formats, resolver choices, and ad-hoc
+ontology IDs correctly override YAML configuration defaults without mutating
+the on-disk config. Ensures validation errors surface for incompatible
+combinations and that plan/pull commands honour the resolved specification.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
 import textwrap
-from typing import Iterable
 from pathlib import Path
 
 import pytest
@@ -90,28 +95,22 @@ def test_pull_spec_applies_resolver_override(tmp_path: Path) -> None:
     """`ontofetch pull --spec <file> hp --resolver direct` should override the resolver."""
 
     config_path = _write_sources_yaml(tmp_path / "sources.yaml")
-    args = argparse.Namespace(
+    args = _make_args(
         command="pull",
         ids=["hp"],
         spec=config_path,
         resolver="direct",
         target_formats="ttl",
-        log_level="INFO",
-        lock=None,
-        json=False,
-        dry_run=False,
-        force=False,
-        concurrent_downloads=None,
-        concurrent_plans=None,
-        allowed_hosts=None,
-        planner_probes=None,
-        since=None,
-        no_lock=False,
-        lock_output=None,
-        baseline=Path("baseline.json"),
-        use_manifest=True,
-        update_baseline=False,
     )
+
+    _, specs = cli_module._resolve_specs_from_args(args, base_config=None)
+
+    assert len(specs) == 1
+    spec = specs[0]
+    assert spec.id == "hp"
+    assert spec.resolver == "direct"
+    assert spec.extras == {"acronym": "HP"}
+    assert tuple(spec.target_formats) == ("ttl",)
 
 
 def test_pull_spec_cli_target_formats_override(tmp_path: Path) -> None:

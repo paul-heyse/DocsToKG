@@ -283,7 +283,14 @@
 # }
 # === /NAVMAP ===
 
-"""Core DocParsing utility and schema validation tests."""
+"""Broadly validate DocParsing core utilities, pipelines, and schemas.
+
+This mega-suite exercises the central pieces of DocParsing: data-root discovery,
+atomic writes, HTTP session handling, plan builders, DocTags/chunk/embedding
+pipelines, and schema guards. By running against extensive stubs and golden
+fixtures it ensures refactors to the core package do not break CLI invocation,
+resume semantics, tokenizer/LLM caching, or schema compatibility guarantees.
+"""
 
 from __future__ import annotations
 
@@ -295,8 +302,8 @@ import json
 import logging
 import os
 import socket
-import threading
 import sys
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -306,6 +313,8 @@ from typing import Any, ClassVar, Dict, Tuple
 from unittest import mock
 
 import pytest
+
+from tests.conftest import PatchManager
 
 
 class _RequestsResponse:
@@ -963,10 +972,10 @@ def test_iter_jsonl_batches(tmp_path: Path) -> None:
 
 
 def test_make_hasher_invalid_env_fallback(
-    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    caplog: pytest.LogCaptureFixture, patcher: PatchManager
 ) -> None:
     doc_io._clear_hash_algorithm_cache()
-    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha-1")
+    patcher.setenv("DOCSTOKG_HASH_ALG", "sha-1")
     with caplog.at_level("WARNING"):
         hasher = doc_io.make_hasher()
     assert hasher.name == "sha256"
@@ -976,10 +985,10 @@ def test_make_hasher_invalid_env_fallback(
 
 
 def test_make_hasher_prefers_explicit_algorithm(
-    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    caplog: pytest.LogCaptureFixture, patcher: PatchManager
 ) -> None:
     doc_io._clear_hash_algorithm_cache()
-    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha-1")
+    patcher.setenv("DOCSTOKG_HASH_ALG", "sha-1")
     with caplog.at_level("WARNING"):
         hasher = doc_io.make_hasher(name="sha256")
     assert hasher.name == "sha256"
@@ -988,21 +997,21 @@ def test_make_hasher_prefers_explicit_algorithm(
     doc_io._clear_hash_algorithm_cache()
 
 
-def test_resolve_hash_algorithm_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_hash_algorithm_defaults(patcher: PatchManager) -> None:
     doc_io._clear_hash_algorithm_cache()
-    monkeypatch.delenv("DOCSTOKG_HASH_ALG", raising=False)
+    patcher.delenv("DOCSTOKG_HASH_ALG", raising=False)
     assert doc_io.resolve_hash_algorithm() == "sha256"
     doc_io._clear_hash_algorithm_cache()
-    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha256")
+    patcher.setenv("DOCSTOKG_HASH_ALG", "sha256")
     assert doc_io.resolve_hash_algorithm() == "sha256"
     doc_io._clear_hash_algorithm_cache()
 
 
 def test_resolve_hash_algorithm_invalid_env_warns_once(
-    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    caplog: pytest.LogCaptureFixture, patcher: PatchManager
 ) -> None:
     doc_io._clear_hash_algorithm_cache()
-    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha-1")
+    patcher.setenv("DOCSTOKG_HASH_ALG", "sha-1")
     with caplog.at_level("WARNING"):
         first = doc_io.resolve_hash_algorithm()
         second = doc_io.resolve_hash_algorithm()
@@ -1071,7 +1080,7 @@ def test_manifest_append_respects_atomic_flag(tmp_path: Path) -> None:
 
 
 def test_jsonl_append_iter_atomic_failure_preserves_manifest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, patcher: PatchManager
 ) -> None:
     manifest = tmp_path / "docparse.chunks.manifest.jsonl"
     manifest.write_text(json.dumps({"doc_id": "seed"}) + "\n", encoding="utf-8")
@@ -1079,7 +1088,7 @@ def test_jsonl_append_iter_atomic_failure_preserves_manifest(
     def failing_write(fd: int, data: bytes) -> int:
         raise OSError("simulated interruption")
 
-    monkeypatch.setattr(doc_io.os, "write", failing_write)
+    patcher.setattr(doc_io.os, "write", failing_write)
 
     with pytest.raises(OSError):
         doc_io.jsonl_append_iter(manifest, [{"doc_id": "new"}], atomic=True)

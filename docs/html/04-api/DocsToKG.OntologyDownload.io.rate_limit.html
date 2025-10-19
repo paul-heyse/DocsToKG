@@ -1,0 +1,202 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: rate_limit &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: rate_limit</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.OntologyDownload.io.rate_limit.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-rate-limit">
+<h1>1. Module: rate_limit<a class="headerlink" href="#module-rate-limit" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.io.rate_limit</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Rate limiting primitives for ontology downloads.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="shared-bucket-path-http-config-key">
+<h3><code class="docutils literal notranslate"><span class="pre">_shared_bucket_path(http_config,</span> <span class="pre">key)</span></code><a class="headerlink" href="#shared-bucket-path-http-config-key" title="Link to this heading"></a></h3>
+<p>Return the filesystem path for the shared token bucket state.</p>
+</section>
+<section id="get-bucket">
+<h3><code class="docutils literal notranslate"><span class="pre">get_bucket()</span></code><a class="headerlink" href="#get-bucket" title="Link to this heading"></a></h3>
+<p>Return a registry-managed bucket.</p>
+</section>
+<section id="apply-retry-after">
+<h3><code class="docutils literal notranslate"><span class="pre">apply_retry_after()</span></code><a class="headerlink" href="#apply-retry-after" title="Link to this heading"></a></h3>
+<p>Adjust bucket capacity after receiving a Retry-After hint.</p>
+</section>
+<section id="reset">
+<h3><code class="docutils literal notranslate"><span class="pre">reset()</span></code><a class="headerlink" href="#reset" title="Link to this heading"></a></h3>
+<p>Clear all buckets (testing hook).</p>
+</section>
+<section id="consume-self-tokens">
+<h3><code class="docutils literal notranslate"><span class="pre">consume(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#consume-self-tokens" title="Link to this heading"></a></h3>
+<p>Consume tokens from the bucket, sleeping until capacity is available.</p>
+</section>
+<section id="acquire-file-lock-self-handle">
+<h3><code class="docutils literal notranslate"><span class="pre">_acquire_file_lock(self,</span> <span class="pre">handle)</span></code><a class="headerlink" href="#acquire-file-lock-self-handle" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="release-file-lock-self-handle">
+<h3><code class="docutils literal notranslate"><span class="pre">_release_file_lock(self,</span> <span class="pre">handle)</span></code><a class="headerlink" href="#release-file-lock-self-handle" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="read-state-self-handle">
+<h3><code class="docutils literal notranslate"><span class="pre">_read_state(self,</span> <span class="pre">handle)</span></code><a class="headerlink" href="#read-state-self-handle" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="write-state-self-handle-state">
+<h3><code class="docutils literal notranslate"><span class="pre">_write_state(self,</span> <span class="pre">handle,</span> <span class="pre">state)</span></code><a class="headerlink" href="#write-state-self-handle-state" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="try-consume-self-tokens">
+<h3><code class="docutils literal notranslate"><span class="pre">_try_consume(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#try-consume-self-tokens" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">consume(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Consume tokens from the shared bucket, waiting when insufficient.</p>
+</section>
+<section id="qualify-self-service-host">
+<h3><code class="docutils literal notranslate"><span class="pre">_qualify(self,</span> <span class="pre">service,</span> <span class="pre">host)</span></code><a class="headerlink" href="#qualify-self-service-host" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="normalize-rate-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_rate(self)</span></code><a class="headerlink" href="#normalize-rate-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="get-bucket-self">
+<h3><code class="docutils literal notranslate"><span class="pre">get_bucket(self)</span></code><a class="headerlink" href="#get-bucket-self" title="Link to this heading"></a></h3>
+<p>Return a token bucket for <code class="docutils literal notranslate"><span class="pre">service</span></code>/<code class="docutils literal notranslate"><span class="pre">host</span></code> using shared registry.</p>
+</section>
+<section id="apply-retry-after-self">
+<h3><code class="docutils literal notranslate"><span class="pre">apply_retry_after(self)</span></code><a class="headerlink" href="#apply-retry-after-self" title="Link to this heading"></a></h3>
+<p>Reduce available tokens to honor server-provided retry-after hints.</p>
+</section>
+<section id="reset-self">
+<h3><code class="docutils literal notranslate"><span class="pre">reset(self)</span></code><a class="headerlink" href="#reset-self" title="Link to this heading"></a></h3>
+<p>Clear all registered buckets (used in tests).</p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="tokenbucket">
+<h3><code class="docutils literal notranslate"><span class="pre">TokenBucket</span></code><a class="headerlink" href="#tokenbucket" title="Link to this heading"></a></h3>
+<p>Token bucket used to enforce per-host and per-service rate limits.</p>
+</section>
+<section id="sharedtokenbucket">
+<h3><code class="docutils literal notranslate"><span class="pre">SharedTokenBucket</span></code><a class="headerlink" href="#sharedtokenbucket" title="Link to this heading"></a></h3>
+<p>Token bucket backed by a filesystem state file for multi-process usage.</p>
+</section>
+<section id="bucketentry">
+<h3><code class="docutils literal notranslate"><span class="pre">_BucketEntry</span></code><a class="headerlink" href="#bucketentry" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="ratelimiterregistry">
+<h3><code class="docutils literal notranslate"><span class="pre">RateLimiterRegistry</span></code><a class="headerlink" href="#ratelimiterregistry" title="Link to this heading"></a></h3>
+<p>Manage shared token buckets keyed by (service, host).</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

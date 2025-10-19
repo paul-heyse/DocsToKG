@@ -27,7 +27,7 @@ DocsToKG pipelines touch external APIs, locally cached artifacts, and hybrid sea
 - **Principle of least privilege** – run ingestion (`DocsToKG.ContentDownload.cli`) and ontology pipelines with service identities that only access required buckets, queues, or credential scopes.
 - **Network hygiene** – outbound resolver requests use `requests` + `tenacity` retry logic. Configure egress rules (proxy, firewall) to restrict unfamiliar domains; maintain allowlists in resolver config.
 - **TLS everywhere** – terminate TLS at the gateway and use mTLS or service mesh policies for internal calls. Validate upstream certificates when custom resolvers are added.
-- **Logging & monitoring** – ship manifest and telemetry logs to central observability. Leverage `DocsToKG.HybridSearch.observability.Observability` hooks to forward metrics. Set alerts for unusual query rates or ontology validation failures.
+- **Logging & monitoring** – ship manifest and telemetry logs to central observability. Leverage `DocsToKG.HybridSearch.Observability` hooks to forward metrics. Set alerts for unusual query rates or ontology validation failures.
 
 ## 6. Incident Response & Recovery
 

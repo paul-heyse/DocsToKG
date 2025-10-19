@@ -1,3 +1,11 @@
+"""Contract tests for manifest, resolver events, and HTML discovery helpers.
+
+These tests validate that manifest entries and resolver attempt events serialise
+according to the documented schema and that HTML scraping utilities (`find_pdf_*`)
+continue to locate PDF links in representative publisher markup. Any changes to
+the manifest schema or resolver telemetry should extend these cases first.
+"""
+
 import json
 from pathlib import Path
 from typing import Any, Dict, Optional

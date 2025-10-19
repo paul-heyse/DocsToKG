@@ -1,4 +1,11 @@
-"""Embedding stage package with modular subcomponents."""
+"""Embedding stage namespace exposing CLI, config, and runtime adapters.
+
+Importing this package provides convenient access to the embedding CLI builder,
+profile presets, manifest logging helpers, and backwards-compatible runtime
+exports. It keeps dense, sparse, and lexical vector generation features grouped
+together so downstream code can configure or invoke embedding runs without
+reaching into submodules individually.
+"""
 
 from DocsToKG.DocParsing.formats import BM25Vector, DenseVector, SPLADEVector, VectorRow
 from DocsToKG.DocParsing.logging import (

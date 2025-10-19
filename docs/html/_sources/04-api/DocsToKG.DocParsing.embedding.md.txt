@@ -1,6 +1,6 @@
-# 1. Module: embedding
+# 1. Module: embedding.runtime
 
-This reference documents the DocsToKG module ``DocsToKG.DocParsing.embedding``.
+This reference documents the DocsToKG module ``DocsToKG.DocParsing.embedding.runtime``.
 
 ## 1. Overview
 
@@ -20,7 +20,7 @@ Key Features:
 - Explain SPLADE attention backend fallbacks (auto→FlashAttention2→SDPA→eager)
 
 Usage:
-    python -m DocsToKG.DocParsing.embedding --resume
+    python -m DocsToKG.DocParsing.core embed --resume
 
 Dependencies:
 - sentence_transformers (optional): Provides SPLADE sparse encoders.

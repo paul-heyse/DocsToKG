@@ -49,7 +49,21 @@
 # }
 # === /NAVMAP ===
 
-"""Public facade aggregating ontology downloader modules."""
+"""High-level orchestration helpers for ontology download workflows.
+
+This module glues together the planner, resolver, manifest, and validation
+subsystems exposed throughout ``DocsToKG.OntologyDownload``.  It provides the
+functions that sit behind the CLI, including helpers to:
+
+- translate plan and validation results into table-friendly structures,
+- enumerate registered resolvers and validators with their metadata,
+- execute downloads and validation pipelines while honouring security checks,
+- surface convenience entry points consumed by ``DocsToKG.OntologyDownload.cli``.
+
+External callers typically import from :mod:`DocsToKG.OntologyDownload` which
+re-exports the public symbols defined here; keeping this module cohesive
+ensures the CLI and programmatic APIs stay in sync.
+"""
 
 from __future__ import annotations
 

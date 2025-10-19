@@ -26,9 +26,6 @@ conditional checks in the hot loop for better throughput on large files.
 
 Atomically write ``text`` to ``path`` using :func:`atomic_write`.
 
-The previous ``atomic_write_bytes`` alias has been removed; callers should
-depend on ``atomic_write`` directly for streaming writes.
-
 ### `normalize_classification(value)`
 
 Return a normalized classification token preserving unknown custom codes.

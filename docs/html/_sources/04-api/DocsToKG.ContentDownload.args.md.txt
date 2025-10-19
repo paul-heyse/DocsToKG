@@ -25,7 +25,7 @@ Create and return the CLI argument parser.
 
 Parse CLI arguments using ``parser`` and optional argv override.
 
-### `resolve_config(args, parser)`
+### `resolve_config(args, parser, resolver_factory)`
 
 Validate arguments, resolve configuration, and prepare run state.
 
@@ -46,17 +46,9 @@ Tuple containing the normalized domain name and interval seconds.
 Raises:
 argparse.ArgumentTypeError: If the argument is malformed or negative.
 
-### `_parse_domain_bytes_budget(value)`
-
-Parse ``DOMAIN=BYTES`` CLI arguments for domain byte budgets.
-
 ### `_parse_domain_token_bucket(value)`
 
 Parse ``DOMAIN=RPS[:capacity=X]`` specifications into bucket configs.
-
-### `_parse_budget(value)`
-
-Parse ``requests=N`` or ``bytes=N`` budget specifications.
 
 ### `build_query(args)`
 
@@ -81,6 +73,10 @@ topic_text: Free-form topic text supplied via CLI.
 
 Returns:
 OpenAlex topic identifier string if resolved, else None.
+
+### `_expand_path(value)`
+
+*No documentation available.*
 
 ### `_normalise_order(order)`
 

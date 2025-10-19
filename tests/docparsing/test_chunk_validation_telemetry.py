@@ -1,4 +1,11 @@
-"""Tests for chunk validation telemetry metadata enrichment."""
+"""Validate telemetry enrichment emitted during chunk validation flows.
+
+Chunk validation generates structured telemetry that downstream monitoring expects.
+These tests construct lightweight tokenizer stubs and inspect emitted telemetry
+records to ensure metadata such as chunk counts, token spans, and checksum
+details are captured. By mocking third-party dependencies we verify enrichment
+logic without requiring GPU or Docling assets.
+"""
 
 from __future__ import annotations
 
@@ -23,18 +30,14 @@ if "transformers" not in sys.modules:
     sys.modules["transformers"] = transformers_stub
 
 if "docling_core.transforms.chunker.tokenizer.huggingface" not in sys.modules:
-    huggingface_stub = types.ModuleType(
-        "docling_core.transforms.chunker.tokenizer.huggingface"
-    )
+    huggingface_stub = types.ModuleType("docling_core.transforms.chunker.tokenizer.huggingface")
 
     class _HuggingFaceTokenizer:  # pragma: no cover - test stub
         def __init__(self, *args, **kwargs) -> None:
             self.tokenizer = kwargs.get("tokenizer")
 
     huggingface_stub.HuggingFaceTokenizer = _HuggingFaceTokenizer
-    sys.modules[
-        "docling_core.transforms.chunker.tokenizer.huggingface"
-    ] = huggingface_stub
+    sys.modules["docling_core.transforms.chunker.tokenizer.huggingface"] = huggingface_stub
 
 from DocsToKG.DocParsing.chunking import runtime
 from DocsToKG.DocParsing.io import resolve_hash_algorithm
@@ -46,7 +49,7 @@ def test_validate_chunk_files_failure_logs_status_and_hash_alg(tmp_path) -> None
     """Invalid chunk files should record status and hash algorithm metadata."""
 
     chunk_file = tmp_path / "invalid.chunks.jsonl"
-    chunk_file.write_text("{\"bad\": }\n", encoding="utf-8")
+    chunk_file.write_text('{"bad": }\n', encoding="utf-8")
 
     attempts_path = tmp_path / "attempts.jsonl"
     manifest_path = tmp_path / "manifest.jsonl"

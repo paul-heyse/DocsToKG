@@ -1,0 +1,155 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: planning &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: planning</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.DocParsing.core.planning.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-planning">
+<h1>1. Module: planning<a class="headerlink" href="#module-planning" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.core.planning</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Planner orchestration utilities for DocParsing stages.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="new-bucket">
+<h3><code class="docutils literal notranslate"><span class="pre">_new_bucket()</span></code><a class="headerlink" href="#new-bucket" title="Link to this heading"></a></h3>
+<p>Return a new mutable bucket for tracking plan membership.</p>
+</section>
+<section id="record-bucket-bucket-doc-id">
+<h3><code class="docutils literal notranslate"><span class="pre">_record_bucket(bucket,</span> <span class="pre">doc_id)</span></code><a class="headerlink" href="#record-bucket-bucket-doc-id" title="Link to this heading"></a></h3>
+<p>Update <code class="docutils literal notranslate"><span class="pre">bucket</span></code> with <code class="docutils literal notranslate"><span class="pre">doc_id</span></code> while respecting preview bounds.</p>
+</section>
+<section id="bucket-counts-entry-key">
+<h3><code class="docutils literal notranslate"><span class="pre">_bucket_counts(entry,</span> <span class="pre">key)</span></code><a class="headerlink" href="#bucket-counts-entry-key" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">(count,</span> <span class="pre">preview)</span></code> for <code class="docutils literal notranslate"><span class="pre">key</span></code> within <code class="docutils literal notranslate"><span class="pre">entry</span></code>.</p>
+</section>
+<section id="manifest-hash-requirements-manifest-entry">
+<h3><code class="docutils literal notranslate"><span class="pre">_manifest_hash_requirements(manifest_entry)</span></code><a class="headerlink" href="#manifest-hash-requirements-manifest-entry" title="Link to this heading"></a></h3>
+<p>Return manifest hash metadata when both entry and hash are present.</p>
+</section>
+<section id="render-preview-preview-count">
+<h3><code class="docutils literal notranslate"><span class="pre">_render_preview(preview,</span> <span class="pre">count)</span></code><a class="headerlink" href="#render-preview-preview-count" title="Link to this heading"></a></h3>
+<p>Render a preview string that includes remainder hints when applicable.</p>
+</section>
+<section id="plan-doctags-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">plan_doctags(argv)</span></code><a class="headerlink" href="#plan-doctags-argv" title="Link to this heading"></a></h3>
+<p>Compute which DocTags inputs would be processed.</p>
+</section>
+<section id="plan-chunk-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">plan_chunk(argv)</span></code><a class="headerlink" href="#plan-chunk-argv" title="Link to this heading"></a></h3>
+<p>Compute which DocTags files the chunk stage would touch.</p>
+</section>
+<section id="plan-embed-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">plan_embed(argv)</span></code><a class="headerlink" href="#plan-embed-argv" title="Link to this heading"></a></h3>
+<p>Compute which chunk files the embed stage would process or validate.</p>
+</section>
+<section id="display-plan-plans-stream">
+<h3><code class="docutils literal notranslate"><span class="pre">display_plan(plans,</span> <span class="pre">stream)</span></code><a class="headerlink" href="#display-plan-plans-stream" title="Link to this heading"></a></h3>
+<p>Pretty-print plan summaries and return the rendered lines.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,13 +1,13 @@
-# 1. Module: chunking
+# 1. Module: chunking.runtime
 
-This reference documents the DocsToKG module ``DocsToKG.DocParsing.chunking``.
+This reference documents the DocsToKG module ``DocsToKG.DocParsing.chunking.runtime``.
 
 ## 1. Overview
 
 Docling Hybrid Chunker with Minimum Token Coalescence
 
 Transforms DocTags documents into chunked records with topic-aware coalescence.
-The module exposes a CLI (`python -m DocsToKG.DocParsing.chunking`)
+The module exposes a CLI (``docparse chunk`` / ``python -m DocsToKG.DocParsing.core chunk``)
 and reusable helpers for other pipelines.
 
 Key Features:
@@ -21,7 +21,7 @@ Dependencies:
 - tqdm: Optional progress reporting when imported by callers.
 
 Usage:
-    python -m DocsToKG.DocParsing.chunking \
+    python -m DocsToKG.DocParsing.core chunk \
         --data-root /datasets/Data --min-tokens 256 --max-tokens 512
 
 Tokenizer Alignment:

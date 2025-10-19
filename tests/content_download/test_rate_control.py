@@ -1,3 +1,12 @@
+"""Rate control regression tests for resolver orchestration.
+
+These tests exercise the low-level throttling primitives used by
+`ResolverPipeline._respect_domain_limit` and the networking `CircuitBreaker`.
+They verify that domain-level token buckets enforce back-off via the monotonic
+clock, and that circuit breakers honour cooldown windows before accepting
+additional requests.
+"""
+
 import pytest
 
 from DocsToKG.ContentDownload.networking import CircuitBreaker

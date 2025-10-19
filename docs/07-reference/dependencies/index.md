@@ -6,7 +6,7 @@ auditing environments or troubleshooting dependency conflicts.
 
 ## 2. Runtime Requirements
 
-- **Python**: 3.12 or newer (the `bootstrap_env.sh` script provisions CPython 3.13 inside `.venv`)
+- **Python**: 3.13 (the `bootstrap_env.sh` script provisions CPython 3.13 inside `.venv`)
 - **pip**: 25.x+ recommended; `bootstrap_env.sh` upgrades pip automatically
 - **direnv**: 2.32 or newer so `.envrc` can expose the virtualenv PATH and `PYTHONPATH`
 - **System libraries**: `git-lfs` (for bundled wheels) and `libopenblas0` (runtime dependency for FAISS)

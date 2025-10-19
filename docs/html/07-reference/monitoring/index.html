@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css" />
 
-
+  
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
-    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="monitoring-observability">
 <h1>1. Monitoring &amp; Observability<a class="headerlink" href="#monitoring-observability" title="Link to this heading"></a></h1>
 <p>Proactive monitoring keeps ingestion pipelines, ontology downloaders, and hybrid search responsive.</p>
@@ -89,32 +89,48 @@
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">hybrid_search.query_latency_ms</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.observability</span></code></p></td>
-<td><p>End-to-end latency per namespace</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">hybrid_search_timings_total_ms</span></code> (histogram)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code></p></td>
+<td><p>End-to-end latency per request; label by namespace.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">hybrid_search.self_hit_accuracy</span></code></p></td>
-<td><p>Validation harness output</p></td>
-<td><p>Accuracy drift indicator</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">hybrid_search_results</span></code> (histogram)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">HybridSearchService</span></code></p></td>
+<td><p>Number of results emitted per query.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">faiss.index_size</span></code></p></td>
-<td><p>FAISS manager</p></td>
-<td><p>Number of vectors stored in the dense index</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">hybrid_lexical_hit_rate</span></code> (histogram)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">HybridSearchService</span></code></p></td>
+<td><p>Ratio of lexical hits per request, useful for adaptive weighting.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">faiss.rebuild_required</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">should_rebuild_index</span></code> flag</p></td>
-<td><p>Signals when to rebuild dense index</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">faiss_ntotal</span></code> (gauge)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.store</span></code></p></td>
+<td><p>Total vectors stored in the FAISS index.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ontology.download_success_rate</span></code></p></td>
-<td><p>Ontology CLI logs</p></td>
-<td><p>Successful fetch percentage</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">faiss_gpu_bytes</span></code> / <code class="docutils literal notranslate"><span class="pre">faiss_gpu_mem_free_bytes</span></code> (gauges)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">FaissVectorStore.stats()</span></code></p></td>
+<td><p>GPU memory footprint and headroom for the dense index.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ingestion.documents_processed</span></code></p></td>
-<td><p>Content pipeline logs</p></td>
-<td><p>Document throughput</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">faiss_rebuilds</span></code> / <code class="docutils literal notranslate"><span class="pre">faiss_nprobe</span></code> (counters/gauges)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">FaissVectorStore</span></code></p></td>
+<td><p>Tracks rebuild events and effective <code class="docutils literal notranslate"><span class="pre">nprobe</span></code> tuning.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ingestion.chunks_upserted</span></code> (counter)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ChunkIngestionPipeline.metrics</span></code></p></td>
+<td><p>Number of chunks processed per ingestion run.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ontology.download_success_rate</span></code></p></td>
+<td><p>Ontology CLI summaries</p></td>
+<td><p>Successful fetch percentage across sources.</p></td>
 </tr>
 </tbody>
 </table>
+<section id="content-download-telemetry">
+<h3>Content Download Telemetry<a class="headerlink" href="#content-download-telemetry" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Aggregate reason codes from manifest/attempt logs to distinguish conditional hits (<code class="docutils literal notranslate"><span class="pre">conditional_not_modified</span></code>) and voluntary skips (<code class="docutils literal notranslate"><span class="pre">skip_large_download</span></code>).</p></li>
+<li><p>Surface the <code class="docutils literal notranslate"><span class="pre">resume_disabled</span></code> flag emitted in attempt metadata when callers still request HTTP range resume—the downloader ignores the flag but the tag helps spot outdated automation.</p></li>
+<li><p>Treat missing reason codes as successful downloads in dashboards and notebooks.</p></li>
+</ul>
+</section>
 </section>
 <section id="dashboards">
 <h2>3. Dashboards<a class="headerlink" href="#dashboards" title="Link to this heading"></a></h2>
@@ -158,7 +174,7 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -169,7 +185,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

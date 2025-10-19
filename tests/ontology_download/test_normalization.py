@@ -49,6 +49,14 @@
 # }
 # === /NAVMAP ===
 
+"""Normalization pipeline regression tests.
+
+Focuses on the streaming normalization stage: rdflib/skos transformations,
+archive extraction, temporary directory handling, and manifest metadata
+updates. Ensures the pipeline produces consistent outputs across ontology
+formats and handles validator failures gracefully.
+"""
+
 """Normalization determinism tests for streaming and in-memory pipelines."""
 
 from __future__ import annotations

@@ -1,4 +1,12 @@
-"""DocParsing core facade exposing shared utilities across stages."""
+"""Core namespace aggregating shared DocParsing orchestration helpers.
+
+This package surface brings together the reusable CLI builders, batching and
+planning utilities, manifest writers, filesystem helpers, and environment
+bootstrap logic that power every DocParsing stage. Downstream code can import
+from ``DocsToKG.DocParsing.core`` to access opinionated defaults, advisory
+locks, resume-safe JSONL writers, and tokenizer/embedding initialisation
+routines without needing to know which submodule provides each feature.
+"""
 
 from __future__ import annotations
 

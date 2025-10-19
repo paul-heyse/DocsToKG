@@ -1,3 +1,13 @@
+"""End-to-end exercises for download execution primitives.
+
+The tests simulate robots enforcement, range-resume, cached payload reuse,
+streaming failures, and manifest bookkeeping. They cover both the low-level
+streaming helpers (`stream_candidate_payload`, `finalize_candidate_download`)
+and orchestration utilities (`download_candidate`, `process_one_work`) to ensure
+partial files, digests, and HTML sidecars are managed correctly under success
+and error conditions.
+"""
+
 from __future__ import annotations
 
 import hashlib
@@ -18,6 +28,7 @@ from DocsToKG.ContentDownload.download import (
 )
 from DocsToKG.ContentDownload.networking import CachedResult, ConditionalRequestHelper
 from DocsToKG.ContentDownload.pipeline import PipelineResult, ResolverMetrics
+from tests.conftest import PatchManager
 
 requests = downloader.requests
 CaseInsensitiveDict = downloader.requests.structures.CaseInsensitiveDict
@@ -85,16 +96,22 @@ def test_prepare_candidate_download_blocks_robots(artifact: WorkArtifact) -> Non
     assert plan.skip_outcome.reason is ReasonCode.ROBOTS_DISALLOWED
 
 
-def test_prepare_candidate_download_skip_head_precheck(monkeypatch: pytest.MonkeyPatch, artifact: WorkArtifact) -> None:
+def test_prepare_candidate_download_skip_head_precheck(
+    patcher: PatchManager, artifact: WorkArtifact
+) -> None:
     calls: List[str] = []
 
     def fake_head(
-        session: requests.Session, url: str, timeout: float, *, content_policy: Optional[Dict[str, Any]] = None
+        session: requests.Session,
+        url: str,
+        timeout: float,
+        *,
+        content_policy: Optional[Dict[str, Any]] = None,
     ) -> bool:
         calls.append(url)
         return True
 
-    monkeypatch.setattr(downloader, "head_precheck", fake_head)
+    patcher.setattr(downloader, "head_precheck", fake_head)
     config = DownloadConfig(run_id="run", skip_head_precheck=True)
     ctx = config.to_context({})
     plan = prepare_candidate_download(
@@ -136,13 +153,17 @@ def test_range_resume_warning_emitted_once(
         )
 
     warning_messages = [
-        record.getMessage() for record in caplog.records if "Range resume requested" in record.getMessage()
+        record.getMessage()
+        for record in caplog.records
+        if "Range resume requested" in record.getMessage()
     ]
     assert len(warning_messages) == 1
     assert config.extra.get("range_resume_warning_emitted") is True
 
 
-def test_stream_candidate_payload_returns_cached(monkeypatch: pytest.MonkeyPatch, artifact: WorkArtifact, tmp_path: Path) -> None:
+def test_stream_candidate_payload_returns_cached(
+    patcher: PatchManager, artifact: WorkArtifact, tmp_path: Path
+) -> None:
     config = DownloadConfig(run_id="run")
     ctx = config.to_context({})
     plan = prepare_candidate_download(
@@ -180,7 +201,7 @@ def test_stream_candidate_payload_returns_cached(monkeypatch: pytest.MonkeyPatch
         def __exit__(self, exc_type, exc, tb) -> bool:
             return False
 
-    monkeypatch.setattr(downloader, "request_with_retries", lambda *args, **kwargs: CachedResponse())
+    patcher.setattr(downloader, "request_with_retries", lambda *args, **kwargs: CachedResponse())
     result = stream_candidate_payload(plan)
     assert result.outcome is not None
     assert result.outcome.classification is Classification.CACHED
@@ -188,7 +209,9 @@ def test_stream_candidate_payload_returns_cached(monkeypatch: pytest.MonkeyPatch
     assert result.outcome.reason_detail == "not-modified"
 
 
-def test_stream_candidate_payload_streams_pdf(monkeypatch: pytest.MonkeyPatch, artifact: WorkArtifact) -> None:
+def test_stream_candidate_payload_streams_pdf(
+    patcher: PatchManager, artifact: WorkArtifact
+) -> None:
     progress: List[int] = []
 
     config = DownloadConfig(
@@ -216,7 +239,7 @@ def test_stream_candidate_payload_streams_pdf(monkeypatch: pytest.MonkeyPatch, a
         def __exit__(self, exc_type, exc, tb) -> bool:
             return False
 
-    monkeypatch.setattr(downloader, "request_with_retries", lambda *args, **kwargs: OkResponse())
+    patcher.setattr(downloader, "request_with_retries", lambda *args, **kwargs: OkResponse())
     result = stream_candidate_payload(plan)
     assert result.outcome is None
     assert result.strategy is not None
@@ -228,7 +251,7 @@ def test_stream_candidate_payload_streams_pdf(monkeypatch: pytest.MonkeyPatch, a
 
 
 def test_download_candidate_retries_and_cleans_partial(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     artifact: WorkArtifact,
 ) -> None:
     pdf_bytes = b"%PDF-1.4\n" + (b"y" * 64) + b"\n%%EOF\n"
@@ -240,7 +263,7 @@ def test_download_candidate_retries_and_cleans_partial(
         def __exit__(self, exc_type, exc, tb) -> bool:
             return False
 
-    monkeypatch.setattr(downloader, "request_with_retries", lambda *args, **kwargs: OkResponse())
+    patcher.setattr(downloader, "request_with_retries", lambda *args, **kwargs: OkResponse())
 
     call_state = {"count": 0}
 
@@ -261,7 +284,7 @@ def test_download_candidate_retries_and_cleans_partial(
         dest_path.write_bytes(data)
         part_path.unlink(missing_ok=True)
 
-    monkeypatch.setattr(downloader, "atomic_write", flaky_atomic_write)
+    patcher.setattr(downloader, "atomic_write", flaky_atomic_write)
 
     progress: List[int] = []
     config = DownloadConfig(
@@ -285,7 +308,9 @@ def test_download_candidate_retries_and_cleans_partial(
     assert progress
 
 
-def test_cleanup_sidecar_files_retains_partial_for_resume(tmp_path: Path, artifact: WorkArtifact) -> None:
+def test_cleanup_sidecar_files_retains_partial_for_resume(
+    tmp_path: Path, artifact: WorkArtifact
+) -> None:
     target = artifact.pdf_dir / "example.pdf"
     part_path = target.with_suffix(".pdf.part")
     artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
@@ -378,7 +403,7 @@ def test_build_download_outcome_html_tail_reason(tmp_path: Path, artifact: WorkA
     assert outcome.reason_detail == "html-tail-detected"
 
 
-def test_process_one_work_preserves_reason(monkeypatch: pytest.MonkeyPatch, artifact: WorkArtifact) -> None:
+def test_process_one_work_preserves_reason(patcher: PatchManager, artifact: WorkArtifact) -> None:
     class StubLogger:
         def __init__(self) -> None:
             self.manifest_reason: Optional[Any] = None
@@ -444,4 +469,3 @@ def test_process_one_work_preserves_reason(monkeypatch: pytest.MonkeyPatch, arti
     assert not result["saved"]
     assert logger.manifest_reason == ReasonCode.HTML_TAIL_DETECTED
     assert logger.manifest_detail == "html_tail_detected"
-

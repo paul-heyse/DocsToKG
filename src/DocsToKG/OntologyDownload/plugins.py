@@ -1,4 +1,11 @@
-"""Plugin discovery helpers for ontology downloader components."""
+"""Plugin discovery helpers for ontology downloader components.
+
+Resolvers and validators can be extended via entry points or test fixtures.
+This module manages the registries that load those plugins, enforces one-time
+initialisation, exposes metadata for CLI introspection, and provides context
+managers for temporarily registering test doubles.  By centralising the logic
+we keep plugin lifecycles consistent across planners, validators, and the CLI.
+"""
 
 from __future__ import annotations
 

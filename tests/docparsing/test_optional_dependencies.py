@@ -1,4 +1,10 @@
-"""Tests covering lazy optional dependency loading in embedding runtime."""
+"""Verify embedding runtime lazily loads optional dependencies with clear errors.
+
+The embedding stage defers importing heavy libraries until needed. This module
+stubs various import paths to ensure missing SPLADE, Qwen, or tqdm dependencies
+raise actionable runtime errors and that once dependencies are available the
+helpers return cached components without duplicate imports.
+"""
 
 from __future__ import annotations
 

@@ -25,7 +25,14 @@
 # }
 # === /NAVMAP ===
 
-"""Test chunk doc_id consistency with relative paths."""
+"""Validate chunk document identifier generation and stability.
+
+These tests exercise the relative doc ID utilities used by the chunking
+pipeline, confirming that the helper produces deterministic identifiers across
+different input layouts, avoids collisions when duplicate names appear in
+separate directories, and gracefully handles edge-case paths that include
+symlinks or traversal markers.
+"""
 
 import tempfile
 from pathlib import Path

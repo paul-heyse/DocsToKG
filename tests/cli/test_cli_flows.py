@@ -532,6 +532,7 @@ def test_main_with_csv_creates_expected_non_json_outputs(download_modules, patch
     assert summary_path.exists()
     assert index_path.exists()
 
+
 def test_main_with_staging_creates_timestamped_directories(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
@@ -1268,7 +1269,9 @@ def test_cli_resume_from_partial_metadata(download_modules, patcher, tmp_path):
     assert any(record.get("resolver") == "stub" for record in manifest_records)
 
 
-def test_cli_resume_from_external_csv_discovers_adjacent_sqlite(download_modules, patcher, tmp_path):
+def test_cli_resume_from_external_csv_discovers_adjacent_sqlite(
+    download_modules, patcher, tmp_path
+):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
 

@@ -1,11 +1,23 @@
-"""
-Core primitives for the DocsToKG content download pipeline.
+"""Core primitives and shared utilities for DocsToKG content downloads.
 
-This module consolidates the shared taxonomy enums, payload classification
-heuristics, and identifier normalisation helpers that were previously spread
-across ``classifications``, ``classifier``, and ``utils``. Co-locating these
-utilities keeps the public surface that other modules consume in one place,
-simplifying imports for both the CLI and resolver pipeline.
+Responsibilities
+----------------
+- Define canonical enums, dataclasses, and constants (e.g., ``Classification``,
+  ``ReasonCode``, ``DEFAULT_*`` thresholds) that the rest of the stack depends on.
+- Provide payload inspection helpers (header sniffing, tail analysis, EOF checks)
+  used to classify resolver responses and enforce size/format safeguards.
+- Offer persistent-friendly helpers such as :func:`slugify`,
+  :func:`atomic_write`, and identifier normalisation routines for DOI/PMCID/etc.
+- Centralise URL/metadata normalisation so telemetry, manifest generation, and
+  resumable caches operate over consistent keys.
+
+Design Notes
+------------
+- The abstractions here are intentionally side-effect free; file IO utilities
+  expose explicit arguments for atomic writes so higher layers can control
+  storage paths.
+- Classification heuristics operate on simple buffers/strings, making them easy
+  to exercise in isolation from the downloader.
 """
 
 from __future__ import annotations

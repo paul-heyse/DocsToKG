@@ -19,6 +19,13 @@
 # }
 # === /NAVMAP ===
 
+"""Logging helper regression coverage.
+
+Validates masking of sensitive fields, structured JSON formatting, log
+rotation/compression, and convenience functions to ensure operational telemetry
+remains safe and consumable by downstream systems.
+"""
+
 """
 Ontology Logging Tests
 

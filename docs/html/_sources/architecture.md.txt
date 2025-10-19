@@ -1,33 +1,61 @@
-# 1. Content Download Resolver Architecture
+# 1. Content Download Architecture Overview
 
 ```mermaid
 graph TD
-    Work[Work Artifact] --> Pipeline[ResolverPipeline]
-    Pipeline -->|prepare| ResolverA[Resolver A]
-    Pipeline -->|prepare| ResolverB[Resolver B]
-    Pipeline -->|prepare| ResolverN[Resolver N]
-    ResolverA -->|URL| Download[Download Function]
+    Work[Work Artifact] --> Runner[DownloadRun]
+    Runner -->|setup| Sinks[Telemetry Sinks]
+    Runner -->|setup| Pipeline[ResolverPipeline]
+    Runner -->|setup| Provider[OpenAlex Provider]
+    Pipeline --> ResolverA[Resolver A]
+    Pipeline --> ResolverB[Resolver B]
+    Pipeline --> ResolverN[Resolver N]
+    ResolverA -->|URL| Download[download_candidate]
     ResolverB -->|URL| Download
     ResolverN -->|URL| Download
-    Download --> Outcome[DownloadOutcome]
-    Pipeline --> Outcome
+    Download --> Strategy[DownloadStrategy]
+    Strategy --> Outcome[DownloadOutcome]
+    Runner --> Outcome
 ```
 
-The diagram highlights the modular DocsToKG resolver architecture. Each
-numbered section below summarises the key components.
+The diagram highlights the modular DocsToKG content download architecture. Each
+section below summarises the key components introduced by the
+``refactor-content-download-modularization`` change set.
 
-## 1. Pipeline Orchestration
+## 1. Runner Orchestration
 
-- `pipeline.py` orchestrates resolver execution, rate limiting, concurrency, and
-  logging.
-- `types.py` defines `ResolverConfig`, `ResolverResult`, `AttemptRecord`, and
-  other shared data structures.
-- `providers/` contains individual resolver implementations (Unpaywall, Crossref,
-  OpenAlex, Zenodo, Figshare, etc.) exposed via
-  `providers/__init__.py` and `default_resolvers()`.
+- ``runner.py`` now centres around :class:`DownloadRun`, a composable orchestrator
+  that stages sink creation, resolver pipeline initialisation, work provider
+  setup, download state preparation, worker pool management, and batch
+  processing.
+- Each stage is independently testable, enabling unit coverage without executing
+  the full pipeline. ``DownloadRun`` also exposes ``process_work_item`` for
+  programmatic reuse.
 
-## 2. Result Flow
+## 2. Resolver Modularisation
 
-Resolvers yield `ResolverResult` objects that flow back through the pipeline to
-produce a `DownloadOutcome`. HEAD pre-checks, conditional requests, and retry
-logic run in the pipeline before invoking the shared download function.
+- Resolver implementations live under ``ContentDownload/resolvers/`` (for example
+  ``arxiv.py``, ``openalex.py``, ``zenodo.py``). ``resolvers/__init__.py`` wires the
+  registry, shared base classes, and concrete resolvers together.
+- ``pipeline.py`` re-exports resolver classes (``OpenAlexResolver``,
+  ``UnpaywallResolver``, etc.) for backward compatibility, so historical import
+  paths continue to work while new integrations can import directly from the
+  ``resolvers`` package.
+- ``ResolverRegistry`` retains responsibility for discovery and default ordering
+  while respecting configuration toggles.
+
+## 3. Strategy-Based Downloads
+
+- ``download.py`` introduces a ``DownloadStrategy`` protocol with concrete PDF,
+  HTML, and XML implementations. Strategies control whether a download should
+  proceed, how responses are classified, and how artifacts are finalised.
+- Shared helpers (``validate_classification``, ``handle_resume_logic``,
+  ``cleanup_sidecar_files``, ``build_download_outcome``) encapsulate previously
+  inlined logic to keep strategies focused and testable.
+
+## 4. Result Flow
+
+Resolvers emit :class:`ResolverResult` instances that drive
+``download_candidate``. The download strategy processes HTTP responses,
+constructs :class:`DownloadOutcome` objects, and returns telemetry to the runner.
+HEAD pre-checks, resume logic, and corruption detection are now handled by the
+strategy helpers, reducing duplicated branching.

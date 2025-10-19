@@ -1,4 +1,10 @@
-"""Shared pytest fixtures for DocParsing test suite."""
+"""Shared pytest fixtures that provide clean, isolated environments for DocParsing tests.
+
+This module snapshots and restores process-wide state between tests—environment
+variables, working directory, and other global resources—so that the large
+DocParsing suite can safely stub dependencies and mutate configuration without
+cross-test interference.
+"""
 
 from __future__ import annotations
 

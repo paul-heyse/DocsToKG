@@ -110,7 +110,9 @@ device: GPU device ordinal for FAISS operations (0 default)
 ivfpq_use_precomputed: Use precomputed IVFPQ lookup tables (True default)
 ivfpq_float16_lut: Use float16 IVFPQ lookup tables when available (True default)
 multi_gpu_mode: Replica strategy for multi-GPU hosts ("single" default)
+replication_gpu_ids: Explicit GPU ids to target when multi-GPU replication is enabled
 gpu_temp_memory_bytes: Optional temporary memory pool size for FAISS GPU ops
+gpu_pinned_memory_bytes: Optional pinned memory pool size for faster H2D/D2H transfers
 gpu_indices_32_bit: When True, store FAISS indices in 32-bit format to save VRAM
 expected_ntotal: Hint for anticipated index size; used to pre-reserve GPU memory
 rebuild_delete_threshold: Pending delete count before forcing full rebuild
@@ -121,11 +123,16 @@ enable_replication: Allow replication to additional GPUs when configured
 enable_reserve_memory: Enable GPU memory reservation based on expected_ntotal
 use_pinned_memory: Use pinned host buffers for large add/search batches
 gpu_use_default_null_stream: Use FAISS APIs to bind CUDA's default null stream
-    for the configured device when available (False default)
+for the configured device when available (False default)
 gpu_use_default_null_stream_all_devices: Use FAISS APIs to bind the default
-    CUDA null stream across every visible GPU (False default)
+CUDA null stream across every visible GPU (False default)
+use_cuvs: Optional override to force-enable or disable cuVS acceleration
+for FAISS GPU distance kernels. ``None`` defers to FAISS heuristics
+(``faiss.should_use_cuvs``).
 ingest_dedupe_threshold: Skip ingest when cosine similarity exceeds this value (0 disables)
 persist_mode: Persistence policy ("cpu_bytes" default, disable for GPU-only runtime)
+snapshot_refresh_interval_seconds: Minimum seconds between CPU snapshot refreshes (0 disables interval throttle)
+snapshot_refresh_writes: Minimum write operations between CPU snapshot refreshes (0 disables write throttle)
 ivf_train_factor: Controls IVF training sample size per nlist shard
 
 Examples:

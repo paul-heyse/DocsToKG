@@ -55,12 +55,18 @@
 # }
 # === /NAVMAP ===
 
+"""CLI `main` lifecycle tests focused on context management.
+
+The assertions here ensure that the command-line entry point cleans up telemetry
+sinks and temporary files even when resolver setup fails or CSV logging is enabled.
+They simulate error paths to confirm we do not leak open file handles or leave
+partially-written manifests behind after the CLI exits.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List
-
-import pytest
 
 from DocsToKG.ContentDownload import cli as downloader
 

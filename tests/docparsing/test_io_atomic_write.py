@@ -1,4 +1,10 @@
-"""Regression tests for DocParsing I/O helpers."""
+"""Cover atomic JSONL writing helpers that back DocParsing manifests.
+
+These tests focus on the `jsonl_save` primitive used across DocParsing for
+manifest writes. They assert that parent directories are created implicitly and
+that writes remain atomic and idempotent, preventing partial files when multiple
+stages emit telemetry concurrently.
+"""
 
 from __future__ import annotations
 

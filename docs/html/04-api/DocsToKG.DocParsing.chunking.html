@@ -6,12 +6,12 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>1. Module: chunking &mdash; DocsToKG 1.0.0 documentation</title>
+  <title>1. Module: chunking.runtime &mdash; DocsToKG 1.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -66,7 +66,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">1. Module: chunking</li>
+      <li class="breadcrumb-item active">1. Module: chunking.runtime</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../_sources/04-api/DocsToKG.DocParsing.chunking.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -75,15 +75,15 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
-  <section id="module-chunking">
-<h1>1. Module: chunking<a class="headerlink" href="#module-chunking" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.chunking</span></code>.</p>
+             
+  <section id="module-chunking-runtime">
+<h1>1. Module: chunking.runtime<a class="headerlink" href="#module-chunking-runtime" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.chunking.runtime</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Docling Hybrid Chunker with Minimum Token Coalescence</p>
 <p>Transforms DocTags documents into chunked records with topic-aware coalescence.
-The module exposes a CLI (<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.DocParsing.chunking</span></code>)
+The module exposes a CLI (<code class="docutils literal notranslate"><span class="pre">docparse</span> <span class="pre">chunk</span></code> / <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.DocParsing.core</span> <span class="pre">chunk</span></code>)
 and reusable helpers for other pipelines.</p>
 <p>Key Features:</p>
 <ul class="simple">
@@ -98,7 +98,7 @@ and reusable helpers for other pipelines.</p>
 <li><p>tqdm: Optional progress reporting when imported by callers.</p></li>
 </ul>
 <p>Usage:
-python -m DocsToKG.DocParsing.chunking <br />
+python -m DocsToKG.DocParsing.core chunk <br />
 –data-root /datasets/Data –min-tokens 256 –max-tokens 512</p>
 <p>Tokenizer Alignment:
 The default tokenizer (<code class="docutils literal notranslate"><span class="pre">DEFAULT_TOKENIZER</span></code> from :mod:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.core</span></code>) aligns with the dense
@@ -352,7 +352,7 @@ rec.n_tok
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -363,7 +363,7 @@ rec.n_tok
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

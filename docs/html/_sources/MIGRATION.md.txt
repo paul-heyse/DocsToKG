@@ -23,6 +23,7 @@ This guide summarises the key operational updates introduced by the
 - ``--resume-from``: skips works already logged in an existing manifest JSONL.
 - ``--extract-text=html``: extracts plaintext from HTML fallbacks (requires
   ``trafilatura``).
+- HTTP range resume flags (`enable_range_resume`) are now ignored. Telemetry will record `resume_disabled=true` when the flag is supplied; remove the option from automation to avoid confusion.
 
 ## 5. Ontology Downloader API Migration (``harden-ontology-downloader-core``)
 
@@ -44,3 +45,9 @@ This guide summarises the key operational updates introduced by the
 - When bumping manifests, reuse ``_migrate_manifest_inplace`` to upgrade payloads
   in place. The helper preserves schema version ``1.0`` today and provides the
   hook for future ``1.x`` → ``2.0`` migrations without rewriting consumer code.
+
+## 6. Content Download Integrity Updates
+
+- Treat missing manifest reasons as successful downloads. Conditional hits still report ``conditional_not_modified``, while operator-triggered skips use the dedicated ``skip_large_download`` reason code.
+- Dashboards and notebooks should track ``skip_large_download`` events explicitly to distinguish voluntary limits from genuine errors.
+- Manifest warm-up is lazy by default. Use ``--warm-manifest-cache`` only for small manifests; large deployments should rely on the lazy iterator to avoid >150 MB startup spikes and long cold starts.

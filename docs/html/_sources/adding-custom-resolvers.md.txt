@@ -6,11 +6,10 @@ steps required to implement, register, and validate a new resolver.
 
 ## 1. Create the Resolver Template
 
-Create a new module (for example,
-`src/DocsToKG/ContentDownload/resolver_my_provider.py`) or extend
-`src/DocsToKG/ContentDownload/resolvers.py`. Implement the public surface
-expected by `ResolverConfig` using the shared types exposed from the
-`DocsToKG.ContentDownload.pipeline` module:
+Create a new module under ``src/DocsToKG/ContentDownload/resolvers/`` (for
+example, ``resolvers/my_provider.py``). Implement the public surface expected by
+``ResolverConfig`` using the shared types exposed from the
+``DocsToKG.ContentDownload.pipeline`` module:
 
 ```python
 from __future__ import annotations
@@ -118,17 +117,19 @@ longer implement this logic.
 
 ## 2. Register the Resolver
 
-If the class lives outside `resolvers.py`, ensure it is imported somewhere
-during start-up so the `RegisteredResolver` mixin can register it. To include
-the resolver in the default ordering, add it to `default_resolvers()` inside
-`src/DocsToKG/ContentDownload/resolvers.py`:
+Import the module during start-up so the ``RegisteredResolver`` mixin can add it
+to the registry. Placing the file inside ``ContentDownload/resolvers/`` and
+importing it from ``resolvers/__init__.py`` follows the convention used by the
+built-in resolvers. To include the resolver in the default ordering, append an
+instance inside ``resolvers/__init__.py`` or modify the list returned by
+``default_resolvers()`` in your own entry point:
 
 ```python
-from DocsToKG.ContentDownload import pipeline
+from DocsToKG.ContentDownload.resolvers import default_resolvers
 
 
-def default_resolvers() -> List[Resolver]:
-    base = resolvers.ResolverRegistry.create_default()
+def patched_resolvers() -> List[Resolver]:
+    base = default_resolvers()
     base.append(MyResolver())
     return base
 ```

@@ -26,11 +26,11 @@ Return the average of ``values`` or ``0.0`` when empty.
 
 ### `_mean_ratio(candidate, baseline)`
 
-*No documentation available.*
+Compute the average ratio between token counts for two tokenizers.
 
 ### `_scale(window, ratio)`
 
-*No documentation available.*
+Return the scaled token window as a string or ``'n/a'`` when absent.
 
 ### `_render_table(tokenizer_ids, counts, baseline_name, baseline_counts, window_min, window_max)`
 

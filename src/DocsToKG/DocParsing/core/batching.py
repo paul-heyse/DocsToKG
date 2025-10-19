@@ -1,4 +1,12 @@
-"""Batching utilities shared across DocParsing stages."""
+"""Flexible batching helpers used by DocParsing chunking and embedding flows.
+
+Chunking and embedding stages process large collections of documents, so they
+rely on deterministic batching to manage throughput without exhausting memory.
+This module provides a policy-aware ``Batcher`` iterable that can stream data in
+fixed chunks or rebalance work based on precomputed lengths (for example token
+counts). Keeping the batching logic isolated allows each stage to reuse the same
+implementation while customising parameters suited to their workloads.
+"""
 
 from __future__ import annotations
 
@@ -67,10 +75,7 @@ class Batcher(Iterable[List[T]]):
         assert self._items is not None
         if not self._lengths:
             return list(range(len(self._items)))
-        pairs = [
-            (idx, self._length_bucket(self._lengths[idx]))
-            for idx in range(len(self._items))
-        ]
+        pairs = [(idx, self._length_bucket(self._lengths[idx])) for idx in range(len(self._items))]
         pairs.sort(key=lambda pair: (pair[1], pair[0]))
         return [idx for idx, _ in pairs]
 

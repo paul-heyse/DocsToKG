@@ -1,17 +1,21 @@
-"""Download behaviour tests exercising the harness-backed HTTP server."""
+"""Streaming download behaviour against the harness HTTP server.
+
+Validates retry/backoff semantics, checksum enforcement, archive extraction
+limits, filename sanitisation, and conditional GET handling to ensure the
+downloader hardens against adversarial responses.
+"""
 
 from __future__ import annotations
 
-import io
 import hashlib
+import io
 import logging
 import tarfile
 import time
 import zipfile
 from pathlib import Path
-from urllib.parse import urlparse
-
 from unittest import mock
+from urllib.parse import urlparse
 
 import pytest
 
@@ -161,9 +165,7 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
     assert ontology_env.requests[-1].method == "HEAD"
     assert ontology_env.requests[-1].path.endswith("hp-malformed-length.owl")
     if expected_user_agent is not None:
-        assert (
-            ontology_env.requests[-1].headers.get("User-Agent") == expected_user_agent
-        )
+        assert ontology_env.requests[-1].headers.get("User-Agent") == expected_user_agent
 
 
 def test_head_request_includes_polite_and_conditional_headers(ontology_env, tmp_path):

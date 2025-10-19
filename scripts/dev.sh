@@ -13,10 +13,11 @@ usage() {
 Usage: ./scripts/dev.sh exec <command> [args...]
        ./scripts/dev.sh python [args...]
        ./scripts/dev.sh pip [args...]
+       ./scripts/dev.sh doctor
 
 Examples:
   ./scripts/dev.sh exec pytest -q
-  ./scripts/dev.sh python -m DocsToKG.DocParsing.core.cli --help
+  ./scripts/dev.sh python -m DocsToKG.DocParsing.cli --help
   ./scripts/dev.sh pip install some-package
 EOF
 }
@@ -26,13 +27,24 @@ if [[ $# -lt 1 ]]; then
     exit 1
 fi
 
-if [[ ! -d "$VENV" ]]; then
+BIN="$VENV/bin"
+SRC="$ROOT_DIR/src"
+
+if [[ ! -x "$BIN/python" ]]; then
     echo "[dev] error: missing virtual environment at $VENV" >&2
-    echo "[dev] hint: run ./scripts/bootstrap_env.sh first." >&2
+    echo "[dev] hint: python3.13 -m venv .venv && source .venv/bin/activate && pip install -e . && pip install -r requirements.txt" >&2
     exit 1
 fi
 
-BIN="$VENV/bin"
+# Compose environment similarly to .envrc
+ENV_VARS=( "PATH=$BIN:$PATH" "VIRTUAL_ENV=$VENV" "PYTHONNOUSERSITE=1" )
+if [[ -d "$SRC" ]]; then
+    if [[ -n "${PYTHONPATH:-}" ]]; then
+        ENV_VARS+=( "PYTHONPATH=$SRC:$PYTHONPATH" )
+    else
+        ENV_VARS+=( "PYTHONPATH=$SRC" )
+    fi
+fi
 
 case "$1" in
     exec)
@@ -42,7 +54,7 @@ case "$1" in
             usage
             exit 1
         fi
-        exec "$BIN/env" "PATH=$BIN:$PATH" "VIRTUAL_ENV=$VENV" "$@"
+        exec env "${ENV_VARS[@]}" "$@"
         ;;
     python)
         shift
@@ -50,7 +62,26 @@ case "$1" in
         ;;
     pip)
         shift
-        exec "$BIN/pip" "$@"
+        exec env "${ENV_VARS[@]}" PIP_REQUIRE_VIRTUALENV=1 "$BIN/pip" "$@"
+        ;;
+    doctor)
+        shift || true
+        exec "$BIN/python" - <<'PY'
+import os
+import sys
+
+print("sys.executable:", sys.executable)
+print("VIRTUAL_ENV:", os.environ.get("VIRTUAL_ENV"))
+print("PATH head:", os.environ.get("PATH", "").split(os.pathsep)[:3])
+print("PYTHONPATH head:", os.environ.get("PYTHONPATH", "").split(os.pathsep)[:3])
+print("DocsToKG importable:", end=" ")
+try:
+    import DocsToKG  # noqa: F401
+except Exception as exc:  # pragma: no cover - diagnostic aid
+    print("no ->", exc.__class__.__name__, exc)
+else:
+    print("yes")
+PY
         ;;
     help|-h|--help)
         usage

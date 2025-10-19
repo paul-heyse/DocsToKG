@@ -1,10 +1,16 @@
-"""Regression tests for GPU cosine similarity helpers."""
+"""Regression tests for GPU cosine similarity helpers.
+
+Covers dense batch cosine, blockwise top-k retrieval, buffer reuse, and error
+handling when FAISS GPU support is not compiled. Guards the hot path used by
+hybrid search during dense reranking.
+"""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
-from types import SimpleNamespace
 
 from DocsToKG.HybridSearch import store as store_module
 from DocsToKG.HybridSearch.store import cosine_batch, cosine_topk_blockwise
@@ -128,9 +134,9 @@ def _make_faiss_stub(
     return stub, state
 
 
-def test_cosine_topk_blockwise_prefers_knn_gpu(monkeypatch):
+def test_cosine_topk_blockwise_prefers_knn_gpu(patcher):
     stub, state = _make_faiss_stub(enable_knn=True)
-    monkeypatch.setattr(store_module, "faiss", stub, raising=False)
+    patcher.setattr(store_module, "faiss", stub, raising=False)
 
     q = np.random.default_rng(0).random((3, 4), dtype=np.float32)
     C = np.random.default_rng(1).random((128, 4), dtype=np.float32)
@@ -139,7 +145,7 @@ def test_cosine_topk_blockwise_prefers_knn_gpu(monkeypatch):
     def forbid_concat(*_args, **_kwargs):  # pragma: no cover - sanity guard
         raise AssertionError("np.concatenate should not run in knn path")
 
-    monkeypatch.setattr(store_module.np, "concatenate", forbid_concat)
+    patcher.setattr(store_module.np, "concatenate", forbid_concat)
 
     scores, indices = cosine_topk_blockwise(
         q,
@@ -170,9 +176,9 @@ def test_cosine_topk_blockwise_prefers_knn_gpu(monkeypatch):
     assert "use_cuvs" not in kwargs
 
 
-def test_cosine_topk_blockwise_falls_back_without_knn(monkeypatch):
+def test_cosine_topk_blockwise_falls_back_without_knn(patcher):
     stub, state = _make_faiss_stub(enable_knn=False)
-    monkeypatch.setattr(store_module, "faiss", stub, raising=False)
+    patcher.setattr(store_module, "faiss", stub, raising=False)
 
     q = np.random.default_rng(2).random((2, 3), dtype=np.float32)
     C = np.random.default_rng(3).random((17, 3), dtype=np.float32)
@@ -203,7 +209,7 @@ def test_cosine_topk_blockwise_falls_back_without_knn(monkeypatch):
     assert state["pairwise_calls"]
 
 
-def test_cosine_topk_blockwise_honors_cuvs_request(monkeypatch):
+def test_cosine_topk_blockwise_honors_cuvs_request(patcher):
     faiss = pytest.importorskip("faiss", reason="cuVS integration test requires faiss GPU runtime")
     if not hasattr(faiss, "knn_gpu") or not hasattr(faiss, "StandardGpuResources"):
         pytest.skip("faiss GPU helpers unavailable")
@@ -233,7 +239,7 @@ def test_cosine_topk_blockwise_honors_cuvs_request(monkeypatch):
         captured["kwargs"] = kwargs
         return original_knn(*args, **kwargs)
 
-    monkeypatch.setattr(store_module.faiss, "knn_gpu", wrapped_knn, raising=False)
+    patcher.setattr(store_module.faiss, "knn_gpu", wrapped_knn, raising=False)
     try:
         cosine_topk_blockwise(
             q,
@@ -244,16 +250,16 @@ def test_cosine_topk_blockwise_honors_cuvs_request(monkeypatch):
             use_cuvs=True,
         )
     finally:
-        monkeypatch.setattr(store_module.faiss, "knn_gpu", original_knn, raising=False)
+        patcher.setattr(store_module.faiss, "knn_gpu", original_knn, raising=False)
 
     kwargs = captured.get("kwargs")
     assert isinstance(kwargs, dict)
     assert kwargs.get("use_cuvs") is True
 
 
-def test_cosine_topk_blockwise_auto_block_rows_uses_memory_budget(monkeypatch):
+def test_cosine_topk_blockwise_auto_block_rows_uses_memory_budget(patcher):
     stub, state = _make_faiss_stub(enable_knn=True)
-    monkeypatch.setattr(store_module, "faiss", stub, raising=False)
+    patcher.setattr(store_module, "faiss", stub, raising=False)
 
     class ResourceStub:
         def __init__(self) -> None:
@@ -266,26 +272,7 @@ def test_cosine_topk_blockwise_auto_block_rows_uses_memory_budget(monkeypatch):
     resources = ResourceStub()
     q = np.random.default_rng(6).random((2, 4), dtype=np.float32)
     C = np.random.default_rng(7).random((128, 4), dtype=np.float32)
-
     cosine_topk_blockwise(
-def test_cosine_topk_blockwise_fp16_knn_uses_distance_params(monkeypatch):
-    stub, state = _make_faiss_stub(
-        enable_knn=True,
-        with_params=True,
-        require_params=True,
-    )
-    monkeypatch.setattr(store_module, "faiss", stub, raising=False)
-    monkeypatch.setattr(
-        store_module,
-        "resolve_cuvs_state",
-        lambda requested: (True, True, True),
-        raising=False,
-    )
-
-    q = np.random.default_rng(6).random((2, 4), dtype=np.float32)
-    C = np.random.default_rng(7).random((16, 4), dtype=np.float32)
-
-    scores, indices = cosine_topk_blockwise(
         q,
         C,
         k=3,
@@ -304,9 +291,36 @@ def test_cosine_topk_blockwise_fp16_knn_uses_distance_params(monkeypatch):
     assert isinstance(kwargs, dict)
     assert kwargs["vectorsMemoryLimit"] == expected_rows * row_bytes
     expected_query_rows = max(expected_rows, q.shape[0])
-    assert kwargs["queriesMemoryLimit"] == expected_query_rows * q.shape[1] * np.dtype(np.float32).itemsize
+    assert (
+        kwargs["queriesMemoryLimit"]
+        == expected_query_rows * q.shape[1] * np.dtype(np.float32).itemsize
+    )
     assert expected_rows < getattr(store_module, "_COSINE_TOPK_DEFAULT_BLOCK_ROWS", 65_536)
     assert resources.calls >= 1
+
+
+def test_cosine_topk_blockwise_fp16_knn_uses_distance_params(patcher):
+    stub, state = _make_faiss_stub(
+        enable_knn=True,
+        with_params=True,
+        require_params=True,
+    )
+    patcher.setattr(store_module, "faiss", stub, raising=False)
+    patcher.setattr(
+        store_module,
+        "resolve_cuvs_state",
+        lambda requested: (True, True, True),
+        raising=False,
+    )
+
+    q = np.random.default_rng(6).random((2, 4), dtype=np.float32)
+    C = np.random.default_rng(7).random((16, 4), dtype=np.float32)
+
+    scores, indices = cosine_topk_blockwise(
+        q,
+        C,
+        k=3,
+        device=0,
         resources=object(),
         use_fp16=True,
         use_cuvs=True,
@@ -333,14 +347,14 @@ def test_cosine_topk_blockwise_fp16_knn_uses_distance_params(monkeypatch):
     assert indices.dtype == np.int64
 
 
-def test_cosine_topk_blockwise_fp16_pairwise_uses_distance_params(monkeypatch):
+def test_cosine_topk_blockwise_fp16_pairwise_uses_distance_params(patcher):
     stub, state = _make_faiss_stub(
         enable_knn=False,
         with_params=True,
         require_params=True,
     )
-    monkeypatch.setattr(store_module, "faiss", stub, raising=False)
-    monkeypatch.setattr(
+    patcher.setattr(store_module, "faiss", stub, raising=False)
+    patcher.setattr(
         store_module,
         "resolve_cuvs_state",
         lambda requested: (True, True, True),

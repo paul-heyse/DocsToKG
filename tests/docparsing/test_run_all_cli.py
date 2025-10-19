@@ -1,4 +1,10 @@
-"""Run-all CLI regression tests."""
+"""Regression suite for the `docparse all` orchestrator command.
+
+The `run-all` CLI wires DocTags, chunking, and embedding stages together. These
+tests assert that orchestration forwards stage-specific flags, validates sparse
+vector thresholds, handles dry-run/plan-only modes, and propagates exit codes so
+automation can trust the aggregate behaviour.
+"""
 
 from __future__ import annotations
 
@@ -11,8 +17,9 @@ from typing import Dict, List
 
 import pytest
 
-from DocsToKG.DocParsing.core import cli as core_cli
 from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
+from DocsToKG.DocParsing.core import cli as core_cli
+from tests.conftest import PatchManager
 
 
 def _reload_core_cli() -> types.ModuleType:
@@ -22,7 +29,7 @@ def _reload_core_cli() -> types.ModuleType:
 
 
 def test_run_all_forwards_sparsity_warn_threshold_pct(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
 ) -> None:
     """The run-all orchestrator forwards sparsity threshold flags to the embed stage."""
 
@@ -38,14 +45,16 @@ def test_run_all_forwards_sparsity_warn_threshold_pct(
 
         return _runner
 
-    monkeypatch.setattr(module, "doctags", _stage("doctags"))
-    monkeypatch.setattr(module, "chunk", _stage("chunk"))
-    monkeypatch.setattr(module, "embed", _stage("embed"))
+    patcher.setattr(module, "doctags", _stage("doctags"))
+    patcher.setattr(module, "chunk", _stage("chunk"))
+    patcher.setattr(module, "embed", _stage("embed"))
 
-    exit_code = module.run_all([
-        "--sparsity-warn-threshold-pct",
-        "12.5",
-    ])
+    exit_code = module.run_all(
+        [
+            "--sparsity-warn-threshold-pct",
+            "12.5",
+        ]
+    )
 
     assert exit_code == 0
     assert call_order == ["doctags", "chunk", "embed"]
@@ -57,7 +66,7 @@ def test_run_all_forwards_sparsity_warn_threshold_pct(
 
 def test_run_all_chunk_workers_zero_triggers_validation(
     capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
 ) -> None:
     """Zero chunk workers are forwarded and rejected by the chunk stage."""
@@ -82,15 +91,13 @@ def test_run_all_chunk_workers_zero_triggers_validation(
 
     def _main(args: argparse.Namespace) -> int:
         if args.workers < 1:
-            raise ChunkingCLIValidationError(
-                option="--workers", message="must be >= 1"
-            )
+            raise ChunkingCLIValidationError(option="--workers", message="must be >= 1")
         return 0
 
     stub_chunking.build_parser = _build_parser  # type: ignore[attr-defined]
     stub_chunking.main = _main  # type: ignore[attr-defined]
 
-    monkeypatch.setitem(sys.modules, "DocsToKG.DocParsing.chunking", stub_chunking)
+    patcher.setitem(sys.modules, "DocsToKG.DocParsing.chunking", stub_chunking)
 
     original_chunk = module.chunk
 
@@ -98,8 +105,8 @@ def test_run_all_chunk_workers_zero_triggers_validation(
         stage_args["chunk"] = list(argv)
         return original_chunk(argv)
 
-    monkeypatch.setattr(module, "doctags", _doctags)
-    monkeypatch.setattr(module, "chunk", _chunk)
+    patcher.setattr(module, "doctags", _doctags)
+    patcher.setattr(module, "chunk", _chunk)
 
     data_root = tmp_path / "Data"
     doctags_dir = data_root / "DocTagsFiles"
@@ -129,9 +136,9 @@ def test_run_all_chunk_workers_zero_triggers_validation(
     assert "--workers" in captured.err
     assert "must be >= 1" in captured.err
     assert "embed" not in stage_args
-def test_doctags_forwards_vllm_wait_timeout(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+
+
+def test_doctags_forwards_vllm_wait_timeout(patcher: PatchManager, tmp_path: Path) -> None:
     """DocTags CLI forwards custom vLLM wait timeout into the PDF pipeline."""
 
     module = _reload_core_cli()
@@ -144,7 +151,7 @@ def test_doctags_forwards_vllm_wait_timeout(
         captured["namespace"] = args
         return 0
 
-    monkeypatch.setattr(doctags_module, "pdf_main", fake_pdf_main)
+    patcher.setattr(doctags_module, "pdf_main", fake_pdf_main)
 
     data_root = tmp_path / "Data"
     pdf_dir = tmp_path / "pdf"

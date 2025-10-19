@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-validation">
 <h1>1. Module: validation<a class="headerlink" href="#module-validation" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.validation</span></code>.</p>
@@ -265,8 +265,8 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_run_validator_task(validator,</span> <span class="pre">request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#run-validator-task-validator-request-logger" title="Link to this heading"></a></h3>
 <p>Execute a single validator with exception guards.</p>
 </section>
-<section id="run-validator-in-process-name-request">
-<h3><code class="docutils literal notranslate"><span class="pre">_run_validator_in_process(name,</span> <span class="pre">request)</span></code><a class="headerlink" href="#run-validator-in-process-name-request" title="Link to this heading"></a></h3>
+<section id="run-validator-in-process-name-request-budget">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_validator_in_process(name,</span> <span class="pre">request,</span> <span class="pre">budget)</span></code><a class="headerlink" href="#run-validator-in-process-name-request-budget" title="Link to this heading"></a></h3>
 <p>Execute a validator inside a worker process.</p>
 </section>
 <section id="run-validators-requests-logger">
@@ -289,6 +289,18 @@ Mapping from validator name to the corresponding ValidationResult.</p>
 None.</p>
 <p>Returns:
 None.</p>
+</section>
+<section id="limit-self">
+<h3><code class="docutils literal notranslate"><span class="pre">limit(self)</span></code><a class="headerlink" href="#limit-self" title="Link to this heading"></a></h3>
+<p>Return the maximum number of concurrent validators allowed.</p>
+</section>
+<section id="acquire-self-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">acquire(self,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#acquire-self-timeout" title="Link to this heading"></a></h3>
+<p>Acquire a budget slot, respecting an optional timeout.</p>
+</section>
+<section id="release-self">
+<h3><code class="docutils literal notranslate"><span class="pre">release(self)</span></code><a class="headerlink" href="#release-self" title="Link to this heading"></a></h3>
+<p>Release a previously acquired budget slot.</p>
 </section>
 <section id="to-dict-self">
 <h3><code class="docutils literal notranslate"><span class="pre">to_dict(self)</span></code><a class="headerlink" href="#to-dict-self" title="Link to this heading"></a></h3>
@@ -328,6 +340,10 @@ frame: Current stack frame (unused).</p>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="validatorbudget">
+<h3><code class="docutils literal notranslate"><span class="pre">_ValidatorBudget</span></code><a class="headerlink" href="#validatorbudget" title="Link to this heading"></a></h3>
+<p>Cross-process concurrency budget backed by a multiprocessing semaphore.</p>
+</section>
 <section id="validationrequest">
 <h3><code class="docutils literal notranslate"><span class="pre">ValidationRequest</span></code><a class="headerlink" href="#validationrequest" title="Link to this heading"></a></h3>
 <p>Parameters describing a single validation task.</p>
@@ -342,7 +358,7 @@ config: Resolved configuration that supplies timeout thresholds.</p>
 <div><blockquote>
 <div><blockquote>
 <div><p>from pathlib import Path
-from DocsToKG.OntologyDownload import ResolvedConfig
+from DocsToKG.OntologyDownload.settings import ResolvedConfig
 req = ValidationRequest(
 …     name=”rdflib”,
 …     file_path=Path(“ontology.owl”),
@@ -444,7 +460,7 @@ message: Optional description associated with the exception.</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -455,7 +471,7 @@ message: Optional description associated with the exception.</p>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

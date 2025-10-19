@@ -1,0 +1,190 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: cli &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: cli</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.DocParsing.core.cli.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-cli">
+<h1>1. Module: cli<a class="headerlink" href="#module-cli" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.core.cli</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Unified CLI entry points for DocParsing stages.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="run-stage-handler-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_stage(handler,</span> <span class="pre">argv)</span></code><a class="headerlink" href="#run-stage-handler-argv" title="Link to this heading"></a></h3>
+<p>Execute a stage handler while normalising CLI validation errors.</p>
+</section>
+<section id="build-doctags-parser-prog">
+<h3><code class="docutils literal notranslate"><span class="pre">build_doctags_parser(prog)</span></code><a class="headerlink" href="#build-doctags-parser-prog" title="Link to this heading"></a></h3>
+<p>Create an :mod:<code class="docutils literal notranslate"><span class="pre">argparse</span></code> parser configured for DocTags conversion.</p>
+</section>
+<section id="resolve-doctags-paths-args">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_doctags_paths(args)</span></code><a class="headerlink" href="#resolve-doctags-paths-args" title="Link to this heading"></a></h3>
+<p>Resolve DocTags input/output directories and mode.</p>
+</section>
+<section id="doctags-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">doctags(argv)</span></code><a class="headerlink" href="#doctags-argv" title="Link to this heading"></a></h3>
+<p>Execute the DocTags conversion subcommand.</p>
+</section>
+<section id="chunk-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">chunk(argv)</span></code><a class="headerlink" href="#chunk-argv" title="Link to this heading"></a></h3>
+<p>Execute the Docling chunker subcommand.</p>
+</section>
+<section id="embed-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">embed(argv)</span></code><a class="headerlink" href="#embed-argv" title="Link to this heading"></a></h3>
+<p>Execute the embedding pipeline subcommand.</p>
+</section>
+<section id="token-profiles-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">token_profiles(argv)</span></code><a class="headerlink" href="#token-profiles-argv" title="Link to this heading"></a></h3>
+<p>Execute the tokenizer profiling subcommand.</p>
+</section>
+<section id="plan-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(argv)</span></code><a class="headerlink" href="#plan-argv" title="Link to this heading"></a></h3>
+<p>Display the doctags → chunk → embed plan without executing.</p>
+</section>
+<section id="manifest-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">manifest(argv)</span></code><a class="headerlink" href="#manifest-argv" title="Link to this heading"></a></h3>
+<p>Inspect pipeline manifest artifacts via CLI.</p>
+</section>
+<section id="manifest-main-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">_manifest_main(argv)</span></code><a class="headerlink" href="#manifest-main-argv" title="Link to this heading"></a></h3>
+<p>Implementation for the <code class="docutils literal notranslate"><span class="pre">docparse</span> <span class="pre">manifest</span></code> command.</p>
+</section>
+<section id="build-stage-args-args">
+<h3><code class="docutils literal notranslate"><span class="pre">_build_stage_args(args)</span></code><a class="headerlink" href="#build-stage-args-args" title="Link to this heading"></a></h3>
+<p>Construct argument lists for doctags/chunk/embed stages.</p>
+</section>
+<section id="run-all-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">run_all(argv)</span></code><a class="headerlink" href="#run-all-argv" title="Link to this heading"></a></h3>
+<p>Execute DocTags conversion, chunking, and embedding sequentially.</p>
+</section>
+<section id="command-handler-help-text">
+<h3><code class="docutils literal notranslate"><span class="pre">_command(handler,</span> <span class="pre">help_text)</span></code><a class="headerlink" href="#command-handler-help-text" title="Link to this heading"></a></h3>
+<p>Package a handler and help text into a command descriptor.</p>
+</section>
+<section id="main-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>
+<p>Dispatch to one of the DocParsing subcommands.</p>
+</section>
+<section id="split-lines-self-text-width">
+<h3><code class="docutils literal notranslate"><span class="pre">_split_lines(self,</span> <span class="pre">text,</span> <span class="pre">width)</span></code><a class="headerlink" href="#split-lines-self-text-width" title="Link to this heading"></a></h3>
+<p>Wrap help text without breaking on intra-stage hyphens.</p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="manifesthelpformatter">
+<h3><code class="docutils literal notranslate"><span class="pre">_ManifestHelpFormatter</span></code><a class="headerlink" href="#manifesthelpformatter" title="Link to this heading"></a></h3>
+<p>Help formatter that avoids hyphenated aliases being split across lines.</p>
+</section>
+<section id="command">
+<h3><code class="docutils literal notranslate"><span class="pre">_Command</span></code><a class="headerlink" href="#command" title="Link to this heading"></a></h3>
+<p>Callable wrapper storing handler metadata for subcommands.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

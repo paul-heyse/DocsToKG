@@ -1,4 +1,9 @@
-"""Unit tests covering resolver and validator registration helpers."""
+"""Resolver/validator plugin registration regression tests.
+
+Exercises entry-point loading, manual registration/unregistration, registry
+caching, and metadata exposure so that dynamic extensions behave predictably
+across threads and repeated CLI invocations.
+"""
 
 from __future__ import annotations
 
@@ -97,7 +102,9 @@ def test_concurrent_registration_is_thread_safe():
 
     def worker(index: int) -> None:
         name = f"thread-resolver-{index}"
-        resolver = type(f"ThreadResolver{index}", (), {"NAME": name, "plan": lambda self, *a, **k: None})()
+        resolver = type(
+            f"ThreadResolver{index}", (), {"NAME": name, "plan": lambda self, *a, **k: None}
+        )()
         try:
             plugins_mod.register_resolver(name, resolver, overwrite=True)
             assert plugins_mod.get_resolver_registry()[name] is resolver

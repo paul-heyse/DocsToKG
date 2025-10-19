@@ -1,136 +1,148 @@
 # Agents Guide - ContentDownload
 
-Last updated: 2025-10-18
+Last updated: 2025-10-19
 
 ## Mission & Scope
-- Mission: Deliver resilient, high-throughput acquisition of scholarly artifacts from OpenAlex-derived metadata with deterministic manifests, retry semantics, and resumable runs.
-- Scope boundary: In-scope—resolver orchestration, download pipeline, caching/resume logic, telemetry sinks, and polite-networking safeguards. Out-of-scope—DocTags conversion, chunking/embedding, ontology-aware fetching, and downstream KG ingestion.
+- **Mission**: Coordinate resolver-driven acquisition of OpenAlex-derived scholarly artifacts into structured manifests with deterministic retry, resume, and telemetry semantics.
+- **Scope**: Resolver orchestration, download pipeline, caching/resume semantics, manifest generation, telemetry sinks, polite networking safeguards.
+- **Out-of-scope**: Knowledge-graph ingestion, DocTags conversion, ontology-aware fetching, downstream analytics/embedding.
+
+## Quickstart (same as README)
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -e ".[dev]"
+export UNPAYWALL_EMAIL=you@example.org  # polite OpenAlex/Unpaywall contact (optional)
+python -m DocsToKG.ContentDownload.cli \
+  --topic "machine learning" \
+  --year-start 2023 \
+  --year-end 2024 \
+  --mailto you@example.org \
+  --out runs/content \
+  --staging \
+  --resolver-preset fast \
+  --workers 4
+```
+- Toggle `--dry-run` to exercise resolver coverage without writes; use `--list-only` for manifest logging only.
 
 ## Architecture & Flow
 ```mermaid
 flowchart LR
-  Args[args.resolve_config] --> Run[runner.DownloadRun]
-  Run --> Sinks[telemetry.MultiSink]
-  Run --> Provider[providers.OpenAlexWorkProvider]
-  Run --> Pipeline[pipeline.ResolverPipeline]
-  Pipeline --> Download[download.process_one_work]
+  CLI[cli.main] --> Args[args.resolve_config]
+  Args --> Run[runner.DownloadRun]
+  Run --> Pipe[ResolverPipeline\npipeline.py]
+  Pipe --> Download[download.process_one_work]
   Download --> Net[networking.request_with_retries]
-  Download --> Files[PDF/HTML/XML + manifest]
+  Download --> Files[(PDF/HTML/XML + manifest)]
+  Run --> Telemetry[telemetry.MultiSink]
+  Run --> Provider[providers.OpenAlexWorkProvider]
   Provider --> OA[(OpenAlex API)]
-  Pipeline --> Resolvers[(Resolver endpoints)]
+  Pipe --> Resolvers[(Resolver endpoints)]
   classDef ext stroke:#f66,stroke-width:2px;
   class OA,Resolvers ext;
 ```
-- `cli.main()` wires argument parsing to `DownloadRun`. `ResolvedConfig` is frozen; helpers prepare filesystem layout, resolver instances, and rate-limit structures.
-- `DownloadRun.run()` initialises sinks, the resolver pipeline, the OpenAlex provider, and the thread-local session factory before iterating works sequentially or via `ThreadPoolExecutor`.
-- `ResolverPipeline.run()` coordinates resolver ordering, rate limits, token buckets, and dedupe before handing candidates to `download.download_candidate()`.
-- Telemetry flows through `RunTelemetry` into JSONL, CSV, SQLite, and summary sinks. Resume reads both JSONL (including rotated segments) and SQLite state.
+- `cli.main()` wires frozen `ResolvedConfig` into `DownloadRun`.
+- `DownloadRun.run()` initialises telemetry sinks, resolver pipeline, OpenAlex provider, then iterates works either sequentially or via `ThreadPoolExecutor`.
+- `ResolverPipeline.run()` enforces resolver ordering, token buckets, circuit breakers, global URL dedupe, and manifests attempt metadata through `AttemptRecord`.
+- Telemetry fan-out (`RunTelemetry`, `MultiSink`) writes JSONL/CSV/SQLite manifests plus summaries used for resume and analytics.
 
-## Hot Paths & Data Shapes
-- Hot paths: `runner.DownloadRun.run()`, `download.process_one_work()`, `pipeline.ResolverPipeline.run()`, `download.download_candidate()`, `networking.request_with_retries()`.
-- Core models: `core.WorkArtifact`, `pipeline.DownloadOutcome`, `telemetry.ManifestEntry`, `pipeline.AttemptRecord`.
-- Typical payload sizes: PDF 100 KB–10 MB, HTML a few KB–MB, manifest rows ~1 KB. HEAD responses kept small; downloads stream to disk to bound memory.
+## Storage Layout & Run Outputs
+- **Run identifiers**: Each invocation issues a UUID `run_id` stamped onto manifests/summaries and staging directories when `--staging` is used.
+- **Content roots**: `DownloadConfig` coordinates sibling `PDF/`, `HTML/`, `XML/` directories. `--content-addressed` adds hashed payload paths + symlinks.
+- **Resume caches**: `manifest.jsonl` (+ rotations), `manifest.index.json`, and `manifest.sqlite3` function as a unit; keep them together for resumes.
+- **Scratch space**: Streaming writes create `*.part` temp files beside the target until `finalize_candidate_download` promotes them atomically.
+- **Artifacts emitted**:
+  - `manifest.jsonl` / rotated segments (`--log-rotate`) with `record_type`.
+  - `manifest.index.json` URL index for dedupe.
+  - `manifest.summary.json`, `manifest.metrics.json`, `manifest.last.csv` quick-glance outputs.
+  - `manifest.sqlite3` backing `ManifestUrlIndex` (`SQLITE_SCHEMA_VERSION = 4`).
+  - Optional `manifest.csv` when `--log-format csv` or `--log-csv` is set.
+  - Artifact directories (`PDF/`, `HTML/`, `XML/`) with HTML text sidecars when extraction enabled.
 
-## Performance Objectives & Baselines
-- Targets (tune per provider):
-  - Resolver success rate ≥95% on recent OpenAlex topics with default stack.
-  - P95 resolver latency <5 s; pipeline enforces jittered backoff when exceeded.
-  - Worker failure count stays at 0 for dry-run smoke tests.
-- Measurement recipe:
-  ```bash
-  python -m DocsToKG.ContentDownload.cli --topic "computer vision" --year-start 2024 --year-end 2024 --max 50 --dry-run --manifest tmp/manifest.jsonl
-  python -m DocsToKG.ContentDownload.cli --topic "computer vision" --year-start 2024 --year-end 2024 --max 50 --workers 4 --resolver-preset fast --manifest tmp/full-run/manifest.jsonl
-  ```
-  Inspect `manifest.metrics.json` and `manifest.summary.json` for resolver counts, latency, and reason distributions.
+## CLI & Configuration Surfaces
+- CLI selectors: `--topic`/`--topic-id`, `--year-start`, `--year-end`.
+- Run controls: `--max`, `--dry-run`, `--list-only`, `--workers`, `--sleep`, `--resume-from`, `--verify-cache-digest`, OpenAlex retry knobs (`--openalex-retry-attempts`, `--openalex-retry-backoff`, `--openalex-max-retry-delay`).
+- Resolver controls: `--resolver-config`, `--resolver-order`, `--resolver-preset {fast,broad}`, `--enable-resolver`, `--disable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--concurrent-resolvers`, `--max-concurrent-per-host`, `--domain-min-interval`, `--domain-token-bucket`, `--global-url-dedup`, `--global-url-dedup-cap`, `--head-precheck`, `--accept`.
+- Telemetry flags: `--manifest`, `--log-format {jsonl,csv}`, `--log-csv`, `--log-rotate`, `--warm-manifest-cache`.
+- Classifier tuning: `--sniff-bytes`, `--min-pdf-bytes`, `--tail-check-bytes`, `--extract-text`.
 
-## Profiling & Optimisation Playbook
-- CPU profile single-thread run:
-  ```bash
-  python -m cProfile -m DocsToKG.ContentDownload.cli --topic "ml" --year-start 2024 --year-end 2024 --max 20 --dry-run >/tmp/profile.txt
-  ```
-- Sample-based profile (install `pyinstrument`):
-  ```bash
-  pyinstrument -r html -o profile.html -- python -m DocsToKG.ContentDownload.cli --topic "nlp" --year-start 2024 --year-end 2024 --max 20 --workers 4 --dry-run
-  ```
-- Optimisation levers:
-  - Adjust `ResolverConfig.{resolver_min_interval_s,domain_min_interval_s,domain_token_buckets}` to throttle hot hosts without stalling the pipeline.
-  - Ensure resolver implementations reuse HTTP sessions and respect `head_precheck` to filter HTML responses quickly.
-  - Tweak `DownloadConfig.sniff_bytes`/`tail_check_bytes` when classifier heuristics mislabel payloads (legacy guides may refer to `DownloadOptions`, which now subclasses `DownloadConfig`).
-  - Use `--warm-manifest-cache` for large resumes so SQLite indexes load once.
+**Resolver configuration excerpt**
+```yaml
+# resolvers/config.fast.yaml
+resolver_order:
+  - openalex
+  - unpaywall
+  - crossref
+max_concurrent_resolvers: 8
+max_concurrent_per_host: 4
+polite_headers:
+  User-Agent: "DocsToKG-Downloader/1.0 (+mailto:you@example.org)"
+  Accept: "application/pdf, text/html;q=0.9, */*;q=0.7"
+resolver_toggles:
+  wayback: false
+resolver_min_interval_s:
+  unpaywall: 0.5
+domain_token_buckets:
+  crossref.org:
+    rate_per_second: 4
+    capacity: 12
+    breaker_threshold: 15
+    breaker_cooldown: 120
+domain_content_rules:
+  arxiv.org:
+    allowed_types:
+      - application/pdf
+resolver_circuit_breakers:
+  unpaywall:
+    failure_threshold: 6
+    cooldown_seconds: 90
+```
+- Unknown keys raise `ValueError`; extend `ResolverConfig` before adding new options.
+- Domain rate limits cascade to networking token buckets; resolver toggles override defaults per provider.
 
-## Complexity & Scalability Guidance
-- Work processing is O(number_of_documents). Concurrency is bounded by `workers * max_concurrent_resolvers`; avoid exceeding provider policies even if capacity allows.
-- Memory footprint is dominated by active downloads and manifest buffers; streaming writes keep consumption near constant.
-- Large-N strategies: split topics/year ranges, enable staging runs for parallel batches, and configure per-domain token buckets to avoid hot-spot throttling.
+## Telemetry, Data Contracts & Error Handling
+- Manifest/attempt schemas defined in `telemetry.py` (`MANIFEST_SCHEMA_VERSION = 3`, `SQLITE_SCHEMA_VERSION = 4`); keep `record_type`, `run_id`, classification/reason fields stable.
+- `statistics.DownloadStatistics` + `ResolverStats` feed aggregated metrics into `summary.build_summary_record()` (`manifest.metrics.json`).
+- Error taxonomy from `errors.py` (`DownloadError`, `NetworkError`, `ContentPolicyError`, `RateLimitError`) surfaces remediation suggestions through `log_download_failure`.
+- Reason codes (`core.ReasonCode` e.g. `robots_blocked`, `content_policy_violation`) drive analytics; extend only with coordination.
+- Console output (`emit_console_summary`) mirrors JSON summary for human inspection.
 
-## I/O, Caching & Concurrency Notes
-- Artifact layout: staging runs create `RUN_ID/{PDF,HTML,XML}`. Non-staging reuses `--out` plus sibling HTML/XML directories.
-- Resume: `telemetry.load_previous_manifest()` consumes JSONL (including rotated files) and `manifest.sqlite3`. Keep `record_type` fields intact.
-- Global URL dedupe hydration only runs when `ResolverConfig.enable_global_url_dedup` is true; `--global-url-dedup-cap` bounds the manifest scan (0 disables the cap) to keep persistent resume state lightweight.
-- Robots policies: `download.RobotsCache` respects `robots.txt` unless `--ignore-robots` is set. User agent defaults derive from `ResolverConfig.polite_headers`.
-- Concurrency: `ThreadLocalSessionFactory` maintains per-thread sessions; host-level concurrency is gated by semaphores and token buckets.
+## Networking, Rate Limiting & Politeness
+- `networking.ThreadLocalSessionFactory` maintains per-thread sessions; call `close_all()` during teardown.
+- `request_with_retries()` implements exponential backoff + equal jitter, respecting `Retry-After` and CLI caps.
+- Token buckets/circuit breakers defined in `ResolverConfig` throttle host+resolver concurrency; prefer adjusting configs to hard sleeps.
+- `download.RobotsCache` enforces robots.txt unless `--ignore-robots`; override only with explicit approval.
+- `ConditionalRequestHelper` builds `If-None-Match` / `If-Modified-Since` headers for cache-conscious downloads.
+- `statistics.BandwidthTracker` (opt-in) can expose throughput for tuning `--workers`.
 
-## Invariants to Preserve
-- Keep `ResolvedConfig` frozen; pass new run metadata through helper functions or new dataclass fields with defaults.
-- Every manifest row must include `record_type`, `schema_version`, `run_id`, and normalised classifications/reasons.
-- `DownloadRun.setup_sinks()` must precede `setup_resolver_pipeline()`; pipeline logging expects fully initialised sinks.
-- Resolver registration happens through `resolvers/__init__.py` so toggles/order stay canonical.
-- `ManifestUrlIndex` schema (`SQLITE_SCHEMA_VERSION = 4`) and JSONL rotation strategy must stay backwards compatible for resume.
+## Operational Playbooks
+- **Resume interrupted run**: `python -m DocsToKG.ContentDownload.cli --resume-from runs/content/manifest.jsonl --staging --out runs/content`.
+- **CSV export**: `python scripts/export_attempts_csv.py runs/content/manifest.jsonl reports/content_attempts.csv`; keep paired SQLite cache nearby.
+- **Resolver health audit**: `jq 'select(.record_type=="attempt") | {resolver_name, reason}' runs/content/manifest.jsonl | sort | uniq -c`.
+- **Cache hygiene**: delete artifact directory and corresponding `manifest.*`/`manifest.sqlite3` together; regenerate manifests immediately if manual cleanup occurs.
+- **Concurrency validation**: run small `--dry-run --log-format jsonl` workloads, inspect `manifest.metrics.json` latency blocks before raising `--workers`.
 
-## Preferred Refactor Surfaces
-- New resolvers live under `resolvers/` and extend `ApiResolverBase`; register in `resolvers/__init__.py`.
-- Shared HTTP/polite behaviour changes belong in `networking.py` or `pipeline.ResolverConfig`.
-- Manifest/telemetry tweaks go through `telemetry.py` (update sinks + schema version) and `summary.py`.
-- Avoid large-scale rewrites of `DownloadRun` or `ResolverPipeline` without design review—tests exercise nuanced concurrency and telemetry interactions.
+## Invariants & Safe Change Surfaces
+- Leave `ResolvedConfig` frozen; add helper constructors rather than mutating runtime state.
+- `DownloadRun.setup_sinks()` must run before pipeline initialisation; telemetry depends on sink readiness.
+- Resolver registration centralised in `resolvers/__init__.py`; new resolvers extend `ApiResolverBase`.
+- Global URL dedupe depends on `ManifestUrlIndex` schema; bump `SQLITE_SCHEMA_VERSION` with downstream coordination.
+- Use `networking` or `pipeline.ResolverConfig` for shared HTTP behaviour changes; avoid bespoke rate limiting.
 
-## Code Documentation Expectations
-- Maintain NAVMAP headers in modules that already include them (`pipeline.py`, `networking.py`, `resolvers/__init__.py`, etc.).
-- Exported CLI helpers (`cli.py`, `args.py`) require docstrings describing side effects and return values.
-- Update this guide and the README when adding CLI flags, manifest fields, or resolver controls.
-- Follow `MODULE_ORGANIZATION_GUIDE.md`, `CODE_ANNOTATION_STANDARDS.md`, and `STYLE_GUIDE.md`.
-
-## Test Matrix & Quality Gates
+## Test Matrix & Diagnostics
 ```bash
 ruff check src/DocsToKG/ContentDownload tests/content_download
 mypy src/DocsToKG/ContentDownload
 pytest -q tests/cli/test_cli_flows.py
 pytest -q tests/content_download/test_runner_download_run.py
 pytest -q tests/content_download/test_rate_control.py
-pytest -q tests/pipeline/test_execution.py -k ResolverPipeline
+python -m DocsToKG.ContentDownload.cli --topic "vision" --year-start 2024 --year-end 2024 --max 5 --dry-run --manifest tmp/manifest.jsonl
 ```
-- Golden fixtures: `tests/content_download/fakes/` contains manifest and resolver stubs.
-- Stress CI suggestion: nightly `--max 200 --workers 4 --resolver-preset fast --dry-run` covering multiple topics to validate rate limiting and resume.
+- High-signal suites: `tests/content_download/test_networking.py`, `test_download_execution.py`, `test_runner_download_run.py`, `tests/cli/test_cli_flows.py`.
+- Maintain golden fakes under `tests/content_download/fakes/` when altering manifest/telemetry fields.
 
-## Failure Modes & Debug Hints
-| Symptom | Likely cause | Quick checks |
-|---|---|---|
-| Repeated HTTP 429/503 | Domain throttle misconfigured | Inspect logs for `retry_after`, adjust `domain_token_buckets` or `domain_min_interval_s`. |
-| Manifest gaps | Exceptions before telemetry flush | Ensure `RunTelemetry.record_pipeline_result` is invoked; check `DownloadRun` worker error logs. |
-| Duplicate downloads | Missing URL normalisation or disabled dedupe | Confirm `ResolverConfig.enable_global_url_dedup` and `ManifestUrlIndex` contents. |
-| robots.txt errors | User agent missing | Verify `polite_headers` and `UNPAYWALL_EMAIL`/`--mailto`. |
-| Worker crashes | Resolver exceptions propagating | Tail logs for `worker_crash`, add defensive handling in resolver or download strategy. |
-
-## Canonical Commands
-```bash
-python -m DocsToKG.ContentDownload.cli --help
-python -m DocsToKG.ContentDownload.cli --topic "oncology" --year-start 2023 --year-end 2024 --max 25 --dry-run --manifest tmp/oncology/manifest.jsonl
-python -m DocsToKG.ContentDownload.cli --topic-id https://openalex.org/T12345 --year-start 2021 --year-end 2024 --workers 4 --resolver-preset fast --manifest runs/T12345/manifest.jsonl
-python tools/manifest_to_index.py runs/T12345/manifest.jsonl runs/T12345/manifest.index.json
-python scripts/export_attempts_csv.py runs/T12345/manifest.jsonl reports/T12345_attempts.csv
-```
-
-- Pagination retries against OpenAlex are configurable via `--openalex-retry-attempts` (default 3), `--openalex-retry-backoff` (default 1.0s, exponential backoff with equal jitter), and `--openalex-max-retry-delay` (default 75s, capping jitter and `Retry-After` waits). Tests often override the backoff to 0 to avoid real sleeps.
-
-## Indexing Hints
-- Read first: `pipeline.py`, `download.py`, `runner.py`, `telemetry.py`, `networking.py`.
-- High-signal tests: `tests/cli/test_cli_flows.py`, `tests/content_download/test_runner_download_run.py`, `tests/content_download/test_rate_control.py`, `tests/content_download/test_networking.py`.
-- Schemas/contracts: `telemetry.py` (`ManifestEntry`), `pipeline.ResolverConfig`, `core.WorkArtifact`.
-
-## Ownership & Documentation Links
-- Owners/reviewers: see repo `CODEOWNERS` entry for `src/DocsToKG/ContentDownload/`.
-- Supplemental docs: `src/DocsToKG/ContentDownload/README.md`, resolver-specific docs under `src/DocsToKG/ContentDownload/resolvers/`.
-
-## Changelog & Update Procedure
-- When adding CLI flags, manifest fields, or resolver toggles: update README, AGENTS, and adjust `MANIFEST_SCHEMA_VERSION`/`SQLITE_SCHEMA_VERSION` as needed.
-- Keep Quickstart commands runnable; verify telemetry artifacts before publishing changes.
-- Refresh `Last updated` after substantial edits.
+## Reference Docs
+- `src/DocsToKG/ContentDownload/README.md`
+- Resolver-specific docs under `src/DocsToKG/ContentDownload/resolvers/`
+- Related tools: `tools/manifest_to_index.py`, `scripts/export_attempts_csv.py`

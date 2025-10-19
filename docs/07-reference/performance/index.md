@@ -27,7 +27,7 @@ and ontology ingest latency.
 Track the following metrics via `Observability.metrics_snapshot()` or exported Prometheus gauges/counters:
 
 - `hybrid_search_timings_total_ms` percentiles per namespace.
-- Recall@k from `python -m DocsToKG.HybridSearch.validation`.
+- Recall@k from `pytest tests/hybrid_search/test_suite.py`.
 - `faiss_ntotal`, `faiss_rebuilds`, and `faiss_gpu_bytes` for dense index health.
 - Ontology download success rates and transfer latency from CLI summaries.
 

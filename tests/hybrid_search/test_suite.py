@@ -271,7 +271,12 @@
 # }
 # === /NAVMAP ===
 
-"""Consolidated hybrid search test suite."""
+"""End-to-end hybrid search suite using real FAISS/BM25 pipelines.
+
+Bootstraps config, fixture data, ingestion pipeline, and query service to
+validate ranking quality, pagination, diagnostics, and API contracts. Mirrors
+the critical smoke suite used in CI and documentation.
+"""
 
 from __future__ import annotations
 
@@ -291,6 +296,7 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 import numpy as np
 import pytest
 
+import DocsToKG.HybridSearch.service as service_module
 from DocsToKG.HybridSearch import (
     ChunkIngestionPipeline,
     DocumentInput,
@@ -316,7 +322,6 @@ from DocsToKG.HybridSearch.service import (
     should_rebuild_index,
     verify_pagination,
 )
-import DocsToKG.HybridSearch.service as service_module
 from DocsToKG.HybridSearch.store import (
     ChunkRegistry,
     FaissVectorStore,
@@ -330,6 +335,7 @@ from DocsToKG.HybridSearch.types import (
     ChunkFeatures,
     ChunkPayload,
 )
+from tests.conftest import PatchManager
 
 faiss = pytest.importorskip("faiss")
 if not hasattr(faiss, "get_num_gpus") or faiss.get_num_gpus() < 1:
@@ -403,9 +409,9 @@ def stack(
         feature_generator = FeatureGenerator()
         dense_config = replace(config.dense, force_remove_ids_fallback=force_remove_ids_fallback)
         faiss_index = FaissVectorStore(dim=feature_generator.embedding_dim, config=dense_config)
-        assert faiss_index.dim == feature_generator.embedding_dim, (
-            "Faiss index dimensionality must match feature generator"
-        )
+        assert (
+            faiss_index.dim == feature_generator.embedding_dim
+        ), "Faiss index dimensionality must match feature generator"
         opensearch = OpenSearchSimulator()
         registry = ChunkRegistry()
         observability = Observability()
@@ -641,7 +647,7 @@ def test_validation_harness_reports(
 
 
 def test_validator_validation_resources_honor_null_stream_flags(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    patcher: PatchManager, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.INFO, logger="DocsToKG.HybridSearch")
 
@@ -697,7 +703,7 @@ def test_validator_validation_resources_honor_null_stream_flags(
             self.null_stream_calls.append(device)
 
     stub_faiss = SimpleNamespace(StandardGpuResources=RecordingResource)
-    monkeypatch.setattr(service_module, "faiss", stub_faiss, raising=False)
+    patcher.setattr(service_module, "faiss", stub_faiss, raising=False)
 
     resource = validator._ensure_validation_resources()
     assert isinstance(resource, RecordingResource)
@@ -866,7 +872,9 @@ def test_managed_adapter_supports_ingestion_training_sample() -> None:
         def search_bm25_true(self, *args, **kwargs):  # pragma: no cover - stub
             return [], None
 
-        def highlight(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:  # pragma: no cover - stub
+        def highlight(
+            self, chunk: ChunkPayload, query_tokens: Sequence[str]
+        ) -> List[str]:  # pragma: no cover - stub
             return []
 
         def stats(self):  # pragma: no cover - stub
@@ -1082,9 +1090,7 @@ def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput
 
 @REAL_VECTOR_MARK
 @pytest.fixture
-def stack(
-    tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]
-) -> Callable[  # noqa: F811
+def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Callable[  # noqa: F811
     ...,
     tuple[
         ChunkIngestionPipeline,
@@ -1307,7 +1313,7 @@ def test_remove_ids_cpu_fallback() -> None:
     assert manager.ntotal == 0
 
 
-def test_snapshot_refresh_throttled(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_snapshot_refresh_throttled(patcher: PatchManager) -> None:
     config = DenseIndexConfig(
         snapshot_refresh_interval_seconds=3600.0,
         snapshot_refresh_writes=3,
@@ -1320,7 +1326,7 @@ def test_snapshot_refresh_throttled(monkeypatch: pytest.MonkeyPatch) -> None:
         calls.append(1)
         return b"snapshot"
 
-    monkeypatch.setattr(FaissVectorStore, "serialize", fake_serialize)
+    patcher.setattr(FaissVectorStore, "serialize", fake_serialize)
 
     base = np.linspace(0.0, 1.0, num=8, dtype=np.float32)
     for _ in range(3):
@@ -1337,9 +1343,7 @@ def test_snapshot_refresh_throttled(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(calls) == 2, "flush_snapshot should bypass the throttle policy"
 
 
-def test_service_close_flushes_dense_snapshot(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_service_close_flushes_dense_snapshot(tmp_path: Path, patcher: PatchManager) -> None:
     config_payload = {
         "dense": {"index_type": "flat", "oversample": 2},
         "fusion": {"k0": 10.0},
@@ -1387,7 +1391,7 @@ def test_service_close_flushes_dense_snapshot(
         calls.append(1)
         return real_serialize(self)
 
-    monkeypatch.setattr(FaissVectorStore, "serialize", spy_serialize)
+    patcher.setattr(FaissVectorStore, "serialize", spy_serialize)
 
     document = _write_document_artifacts(
         tmp_path,
@@ -1444,9 +1448,7 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
 
 
 @pytest.fixture
-def scale_stack(
-    tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]
-) -> Callable[
+def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -> Callable[
     ...,
     tuple[
         ChunkIngestionPipeline,

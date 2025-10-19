@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -21,17 +21,17 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="1. Technical Reference" href="../07-reference/index.html" />
-    <link rel="prev" title="1. Development Guide" href="../05-development/index.html" />
+    <link rel="prev" title="1. Development Guide" href="../05-development/index.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -92,7 +92,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="operations-guide">
 <h1>1. Operations Guide<a class="headerlink" href="#operations-guide" title="Link to this heading"></a></h1>
 <p>This guide covers day-two operations for DocsToKG, including ingestion jobs, search service management, ontology workflows, and scheduled maintenance.</p>
@@ -109,7 +109,7 @@
 <h2>3. Running Core Pipelines<a class="headerlink" href="#running-core-pipelines" title="Link to this heading"></a></h2>
 <section id="content-acquisition">
 <h3>3.1 Content Acquisition<a class="headerlink" href="#content-acquisition" title="Link to this heading"></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.cli<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.cli<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--topic<span class="w"> </span><span class="s2">&quot;knowledge graphs&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--year-start<span class="w"> </span><span class="m">2022</span><span class="w"> </span>--year-end<span class="w"> </span><span class="m">2024</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--out<span class="w"> </span>Data/PyalexRaw<span class="w"> </span><span class="se">\</span>
@@ -124,16 +124,17 @@
 <code class="docutils literal notranslate"><span class="pre">CORE_API_KEY</span></code>, <code class="docutils literal notranslate"><span class="pre">S2_API_KEY</span></code>, <code class="docutils literal notranslate"><span class="pre">DOAJ_API_KEY</span></code>) or <code class="docutils literal notranslate"><span class="pre">.envrc</span></code>.</p></li>
 <li><p>Use <code class="docutils literal notranslate"><span class="pre">--staging</span></code> to isolate each run under a timestamped directory. After the
 run, derive sidecars with the post-processing helpers:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>tools/manifest_to_index.py<span class="w"> </span>runs/20250101_1200/manifest.jsonl<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>python<span class="w"> </span>tools/manifest_to_index.py<span class="w"> </span>runs/20250101_1200/manifest.jsonl<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>runs/20250101_1200/manifest.index.json
-python<span class="w"> </span>tools/manifest_to_csv.py<span class="w"> </span>runs/20250101_1200/manifest.jsonl<span class="w"> </span><span class="se">\</span>
+direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>python<span class="w"> </span>tools/manifest_to_csv.py<span class="w"> </span>runs/20250101_1200/manifest.jsonl<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>runs/20250101_1200/manifest.last.csv
 </pre></div>
 </div>
 </li>
-<li><p><code class="docutils literal notranslate"><span class="pre">--log-format</span> <span class="pre">csv</span></code> keeps JSONL manifests while adding a consolidated attempts
-CSV; invoke <code class="docutils literal notranslate"><span class="pre">tools/manifest_to_csv.py</span></code> to generate <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> after
-the downloader finishes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--log-format</span> <span class="pre">csv</span></code> swaps JSONL manifests for a consolidated attempts CSV; the
+downloader still writes SQLite, summary, and last-attempt artifacts for
+resumes on the same host. Invoke <code class="docutils literal notranslate"><span class="pre">tools/manifest_to_csv.py</span></code> to generate
+<code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> after the downloader finishes when running older logs.</p></li>
 <li><p>Review <code class="docutils literal notranslate"><span class="pre">docs/content-download-migration.md</span></code> when upgrading existing
 automation to the new resolver stack and logging surfaces.</p></li>
 </ul>
@@ -141,21 +142,24 @@ automation to the new resolver stack and logging surfaces.</p></li>
 <section id="document-parsing-embedding">
 <h3>3.2 Document Parsing &amp; Embedding<a class="headerlink" href="#document-parsing-embedding" title="Link to this heading"></a></h3>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Convert DocTags into chunked Markdown and metadata</span>
-python<span class="w"> </span>src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="w"> </span>Data/DocTagsFiles<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--output<span class="w"> </span>Data/ChunkedDocTagFiles<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--max-workers<span class="w"> </span><span class="m">8</span>
+direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>docparse<span class="w"> </span>chunk<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--in-dir<span class="w"> </span>Data/DocTagsFiles<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--out-dir<span class="w"> </span>Data/ChunkedDocTagFiles<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--workers<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--min-tokens<span class="w"> </span><span class="m">256</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--max-tokens<span class="w"> </span><span class="m">512</span>
 
 <span class="c1"># Generate embeddings suitable for FAISS ingestion</span>
-python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--chunks<span class="w"> </span>Data/ChunkedDocTagFiles<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--output<span class="w"> </span>Data/Embeddings<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--model<span class="w"> </span>sentence-transformers/all-mpnet-base-v2
+direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>docparse<span class="w"> </span>embed<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--chunks-dir<span class="w"> </span>Data/ChunkedDocTagFiles<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--out-dir<span class="w"> </span>Data/Embeddings<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile<span class="w"> </span>gpu-default<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--batch-size-qwen<span class="w"> </span><span class="m">96</span>
 </pre></div>
 </div>
 <ul class="simple">
-<li><p>Adjust default input/output paths via CLI flags; see script headers for environment defaults.</p></li>
-<li><p>Use the <code class="docutils literal notranslate"><span class="pre">--batch-size</span></code> option when processing large corpora on GPU hardware.</p></li>
+<li><p>Adjust default input/output paths via CLI flags; see <code class="docutils literal notranslate"><span class="pre">docparse</span> <span class="pre">chunk</span> <span class="pre">--help</span></code> and <code class="docutils literal notranslate"><span class="pre">docparse</span> <span class="pre">embed</span> <span class="pre">--help</span></code> for environment defaults.</p></li>
+<li><p>Use the <code class="docutils literal notranslate"><span class="pre">--batch-size-qwen</span></code> option when processing large corpora on GPU hardware.</p></li>
 </ul>
 </section>
 <section id="hybrid-search-indexing">
@@ -164,12 +168,11 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">HybridSearchConfigManager</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.vectorstore</span><span class="w"> </span><span class="kn">import</span> <span class="n">FaissVectorStore</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch</span><span class="w"> </span><span class="kn">import</span> <span class="n">Observability</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.ingest</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChunkIngestionPipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.store</span><span class="w"> </span><span class="kn">import</span> <span class="n">FaissVectorStore</span><span class="p">,</span> <span class="n">ChunkRegistry</span><span class="p">,</span> <span class="n">serialize_state</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenSearchSimulator</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DocumentInput</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.observability</span><span class="w"> </span><span class="kn">import</span> <span class="n">Observability</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.vectorstore</span><span class="w"> </span><span class="kn">import</span> <span class="n">serialize_state</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChunkRegistry</span><span class="p">,</span> <span class="n">OpenSearchSimulator</span>
 
 <span class="n">config_manager</span> <span class="o">=</span> <span class="n">HybridSearchConfigManager</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config/hybrid_config.json&quot;</span><span class="p">))</span>
 <span class="n">config</span> <span class="o">=</span> <span class="n">config_manager</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
@@ -184,7 +187,7 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
 <span class="p">)</span>
 
 <span class="n">snapshot_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;artifacts/faiss.snapshot.json&quot;</span><span class="p">)</span>
-<span class="n">docs</span> <span class="o">=</span> <span class="p">[</span>
+<span class="n">docs_to_upsert</span> <span class="o">=</span> <span class="p">[</span>
     <span class="n">DocumentInput</span><span class="p">(</span>
         <span class="n">doc_id</span><span class="o">=</span><span class="s2">&quot;whitepaper-001&quot;</span><span class="p">,</span>
         <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;public&quot;</span><span class="p">,</span>
@@ -193,7 +196,7 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
         <span class="n">metadata</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;pyalex&quot;</span><span class="p">},</span>
     <span class="p">)</span>
 <span class="p">]</span>
-<span class="n">pipeline</span><span class="o">.</span><span class="n">upsert_documents</span><span class="p">(</span><span class="n">docs</span><span class="p">)</span>
+<span class="n">pipeline</span><span class="o">.</span><span class="n">upsert_documents</span><span class="p">(</span><span class="n">docs_to_upsert</span><span class="p">)</span>
 <span class="n">snapshot</span> <span class="o">=</span> <span class="n">serialize_state</span><span class="p">(</span><span class="n">faiss</span><span class="p">,</span> <span class="n">registry</span><span class="p">)</span>
 <span class="n">snapshot_path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">snapshot</span><span class="p">))</span>
 </pre></div>
@@ -205,14 +208,14 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
 </section>
 <section id="ontology-downloads">
 <h3>3.4 Ontology Downloads<a class="headerlink" href="#ontology-downloads" title="Link to this heading"></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.OntologyDownload.cli<span class="w"> </span>pull<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.OntologyDownload.cli<span class="w"> </span>pull<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--spec<span class="w"> </span>configs/sources.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--force<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--json<span class="w"> </span>&gt;<span class="w"> </span>logs/ontology_pull.json
 </pre></div>
 </div>
 <ul class="simple">
-<li><p>Validate downloads with <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.OntologyDownload.cli</span> <span class="pre">validate</span> <span class="pre">&lt;id&gt;</span></code>.</p></li>
+<li><p>Validate downloads with <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">exec</span> <span class="pre">.</span> <span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.OntologyDownload.cli</span> <span class="pre">validate</span> <span class="pre">&lt;id&gt;</span></code>.</p></li>
 <li><p>Maintain configuration under version control and rotate API credentials securely.</p></li>
 <li><p>Tune validation throughput with <code class="docutils literal notranslate"><span class="pre">defaults.validation.max_concurrent_validators</span></code>
 (1-8) and switch large ontologies to streaming normalization by lowering
@@ -224,7 +227,7 @@ is a concern.</p></li>
 <section id="operating-the-hybrid-search-api">
 <h2>4. Operating the Hybrid Search API<a class="headerlink" href="#operating-the-hybrid-search-api" title="Link to this heading"></a></h2>
 <p>Integrate <code class="docutils literal notranslate"><span class="pre">HybridSearchAPI</span></code> into your preferred web framework. Example with FastAPI:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">fastapi</span><span class="w"> </span><span class="kn">import</span> <span class="n">FastAPI</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">fastapi</span><span class="w"> </span><span class="kn">import</span> <span class="n">FastAPI</span><span class="p">,</span> <span class="n">HTTPException</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch</span><span class="w"> </span><span class="kn">import</span> <span class="n">HybridSearchAPI</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">my_project.hybrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_hybrid_service</span>  <span class="c1"># assemble service as shown above</span>
@@ -236,10 +239,15 @@ is a concern.</p></li>
 <span class="nd">@app</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/v1/hybrid-search&quot;</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">hybrid_search</span><span class="p">(</span><span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
     <span class="n">status</span><span class="p">,</span> <span class="n">body</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">post_hybrid_search</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">body</span><span class="p">,</span> <span class="n">status</span>
+    <span class="k">if</span> <span class="n">status</span> <span class="o">!=</span> <span class="mi">200</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">HTTPException</span><span class="p">(</span><span class="n">status_code</span><span class="o">=</span><span class="n">status</span><span class="p">,</span> <span class="n">detail</span><span class="o">=</span><span class="n">body</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">body</span>
 </pre></div>
 </div>
 <ul class="simple">
+<li><p>During shutdown hooks call <code class="docutils literal notranslate"><span class="pre">service.close()</span></code> to persist throttled FAISS
+snapshots—this now forces a final refresh even when interval/write thresholds
+would normally defer serialization.</p></li>
 <li><p>Reload configuration dynamically using <code class="docutils literal notranslate"><span class="pre">HybridSearchConfigManager.reload</span></code>.</p></li>
 <li><p>Warm caches by issuing representative queries after startup.</p></li>
 </ul>
@@ -247,9 +255,7 @@ is a concern.</p></li>
 <section id="module-consolidation-checklist">
 <h2>5. Module Consolidation Checklist<a class="headerlink" href="#module-consolidation-checklist" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Review <code class="docutils literal notranslate"><span class="pre">docs/hybrid_search_module_migration.md</span></code> and update any automation that still
-imports from deprecated shims (<code class="docutils literal notranslate"><span class="pre">results</span></code>, <code class="docutils literal notranslate"><span class="pre">similarity</span></code>, <code class="docutils literal notranslate"><span class="pre">retrieval</span></code>, <code class="docutils literal notranslate"><span class="pre">schema</span></code>, <code class="docutils literal notranslate"><span class="pre">operations</span></code>,
-or <code class="docutils literal notranslate"><span class="pre">tools</span></code>).</p></li>
+<li><p>Review <code class="docutils literal notranslate"><span class="pre">docs/hybrid_search_module_migration.md</span></code> and update any automation that still imports from deprecated shims (<code class="docutils literal notranslate"><span class="pre">results</span></code>, <code class="docutils literal notranslate"><span class="pre">similarity</span></code>, <code class="docutils literal notranslate"><span class="pre">retrieval</span></code>, <code class="docutils literal notranslate"><span class="pre">schema</span></code>, <code class="docutils literal notranslate"><span class="pre">operations</span></code>, <code class="docutils literal notranslate"><span class="pre">tools</span></code>).</p></li>
 <li><p>Ensure CI workflows call <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.HybridSearch.validation</span></code> instead of legacy
 scripts.</p></li>
 <li><p>Watch for <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> in logs and resolve them before upgrading to DocsToKG
@@ -301,7 +307,7 @@ v0.6.0.</p></li>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -312,7 +318,7 @@ v0.6.0.</p></li>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

@@ -52,6 +52,6 @@ systems:
 
 1. Schedule ingestion jobs that populate the document registry and trigger chunk embedding.
 2. Publish HybridSearch responses to your messaging infrastructure if latency budgets require asynchronous processing.
-3. Use the observability utilities (`DocsToKG.HybridSearch.observability`) to expose metrics for downstream alerting.
+3. Use the observability utilities (`DocsToKG.HybridSearch.Observability`) to expose metrics for downstream alerting.
 
 See `docs/hybrid_search_runbook.md` for operational scenarios and rollback strategies.

@@ -13,7 +13,12 @@
 # }
 # === /NAVMAP ===
 
-"""Storage backend tests."""
+"""Storage backend regression tests.
+
+Ensures the fsspec storage delegate can persist and retrieve manifests,
+supports round-tripping artifacts, and emits helpful errors when optional
+backends are unavailable.
+"""
 
 from __future__ import annotations
 

@@ -2,119 +2,120 @@
 
 Last updated: 2025-10-19
 
-## Mission and Scope
-- Mission: Deliver deterministic, secure ontology planning, downloading, and validation that downstream pipelines can trust without rework.
-- Scope boundary: In-scope—resolver planning, HTTP fetching with integrity controls, manifest generation, validator execution. Out-of-scope—graph ingestion, vector indexing, domain-specific ontology parsing beyond integrity checks.
+## Mission & Scope
+- **Mission**: Plan, download, and validate third-party ontologies with deterministic manifests so downstream DocsToKG ingestion can trust provenance and integrity.
+- **Scope**: Resolver planning, secure HTTP streaming, manifest/lockfile generation, validator orchestration, configuration tooling.
+- **Out-of-scope**: Knowledge-graph ingestion, ontology-specific parsing beyond validation, embedding/analysis of ontology content.
 
-## High-Level Architecture & Data Flow
+## Quickstart (per README)
+```bash
+./scripts/bootstrap_env.sh
+direnv allow                     # or source .venv/bin/activate
+direnv exec . python -m DocsToKG.OntologyDownload.cli config validate configs/sources.yaml
+direnv exec . python -m DocsToKG.OntologyDownload.cli pull hp --config configs/sources.yaml --dry-run --json
+```
+- Use `pull` without `--dry-run` to write artifacts under `LOCAL_ONTOLOGY_DIR/<id>/<version>/`.
+
+## Core Capabilities & Flow
+- `planning.plan_all` expands `FetchSpec` inputs (YAML/lockfiles) into deterministic resolver attempts with allowlists and rate limits.
+- `resolvers.py` hosts first-party resolvers (OBO, BioPortal, Europe PMC, Zenodo, Wayback, XBRL, etc.) plus plugin discovery.
+- `io.network.StreamingDownloader` handles TLS enforcement, DNS pinning, token buckets, and retry-after logic (`io/rate_limit.py`).
+- `io.filesystem` manages secure extraction, SHA-256 fingerprints, sanitized filenames, and staging directories.
+- `validation.run_validators` executes ROBOT, rdflib, Arelle, schematron, etc., with cooperative cancellation (`cancellation.py`) and per-validator budgets.
+- `manifests.py` + `migrations.py` define schema version 1.0, diff helpers, persistence, and compatibility checks.
+- `settings.py` models typed configs (defaults, env, lockfiles); `optdeps.py` lazily loads optional packages.
+- `logging_utils.py` emits structured JSONL logs; `checksums.py` fetches remote checksum manifests.
 ```mermaid
 flowchart LR
-  A[configs/sources.yaml<br/>ResolvedConfig] --> B[planning.plan_all]
-  B --> C{resolvers/*}
-  C --> D[io/network.download_stream]
-  D --> E[validation.run_validators]
-  E --> F[manifests.write_lockfile<br/>validation-report.jsonl]
-  D -.-> G[((cache)]):::cache
+  C[configs/sources.yaml] --> P[planning.plan_all]
+  P --> R[resolvers/*]
+  R --> D[io/network.download_stream]
+  D --> V[validation.run_validators]
+  V --> M[manifests.write_lockfile & results_to_dict]
+  D -.-> Cache[(cache dirs)]
   classDef cache stroke-dasharray: 3 3;
+  Cache:::cache
 ```
-- Components: `cli.py` orchestrator, `planning/` deterministic planner, `resolvers/` provider adapters, `io/` hardened HTTP + filesystem, `validation/` plugin runner.
-- Primary data edges: plan items (`plan.jsonl`) → resolver fetch specs → streamed artifacts → validation results + manifests.
-- One failure path to consider: Resolver timeout cascades; ensure retry/backoff in `io/network.py` and surface status in manifests.
 
-## Hot Paths & Data Shapes
-- Hot paths: `planning.plan_all`, `resolvers.<Provider>.plan/fetch`, `io.network.download_stream`, `validation.run_validators`.
-- Typical payload sizes: individual ontologies span roughly 5 MiB–120 MiB in recent synthetic harness runs (P50 ≈ 42 MiB, P90 ≈ 102 MiB, P95 ≈ 111 MiB); manifests tens of KB; plan JSONL entries remain <1 KB.【53616f†L1-L11】
-- Key schemas/models: `manifests.py` schema (manifest v1.0), `settings.DownloadConfiguration`, `FetchSpec` dataclass, validation report JSON (see `docs/schemas/ontology-downloader-config.json`).
+## CLI Reference
+```bash
+direnv exec . python -m DocsToKG.OntologyDownload.cli pull hp
+direnv exec . python -m DocsToKG.OntologyDownload.cli plan hp
+direnv exec . python -m DocsToKG.OntologyDownload.cli plan-diff hp --lock-output ontologies.lock.json
+direnv exec . python -m DocsToKG.OntologyDownload.cli doctor
+direnv exec . python -m DocsToKG.OntologyDownload.cli prune --keep 3 --json
+direnv exec . python -m DocsToKG.OntologyDownload.cli plugins --kind resolver --json
+```
+- Additional subcommands: `config`, `show`, `init`, `validate`, `prune`, `plan-diff`, `plan`, `pull`, `doctor`, `plugins`.
 
-## Performance Objectives & Baselines
-- Targets: TODO define P50/P95 latency per download; TODO throughput target (artifacts/hour); maintain deterministic sorting <1 s for 1k specs.
-- Known baseline:
-  - `tests/ontology_download/test_download.py::test_download_stream_rate_limiting` – not currently present in tree (track for reintroduction).
-  - `tests/ontology_download/test_download_behaviour.py::test_download_stream_fetches_fixture` (closest rate-limit regression guard) – 1 passed in 2.69 s (pytest -q, 2025-10-19 sandbox run).【783aa7†L1-L3】
-  - Synthetic throughput probe via the `DocsToKG.OntologyDownload.testing.TestingEnvironment` harness (mirroring the recommended profiling path) recorded: P50 latency ≈ 459 ms, P95 latency ≈ 1.10 s, median throughput ≈ 91.5 MiB/s (P10 ≈ 67.8 MiB/s), chunk size steady at 1 MiB.【53616f†L1-L11】
-- Measurement recipe:
-  ```bash
-  direnv exec . pytest tests/ontology_download/test_download.py::test_download_stream_retries -q
-  direnv exec . python -m cProfile -m DocsToKG.OntologyDownload.cli pull hp --dry-run
-  ```
+## Folder Map Highlights
+- `api.py`: Public facade (`plan_all`, `fetch_all`, `run_validators`, `PUBLIC_API_MANIFEST`).
+- `cli.py`: Argparse entry point for `ontofetch` subcommands.
+- `planning.py`: Planner graph, lockfile writers, manifest validation.
+- `resolvers.py`: Resolver registry + third-party integrations.
+- `io/network.py`, `io/rate_limit.py`: Session pooling, retry-after, token buckets, circuit breakers.
+- `io/filesystem.py`: Archive extraction, checksum sidecars, sanitized filenames.
+- `validation.py`: Validator harness + subprocess supervision.
+- `manifests.py`, `migrations.py`: Manifest schema v1.0, diff helpers, compatibility upgrades.
+- `settings.py`: Typed config defaults, env/CLI overrides, fsspec/local storage selection.
+- `plugins.py`, `exports.py`: Entry-point discovery, public export manifest.
+- `checksums.py`: Remote checksum parsing, retry policies.
+- `logging_utils.py`: Structured logging configuration.
+- `testing/`: Fixtures and harness for pytest suites.
 
-## Profiling & Optimization Playbook
-- Quick profile:
-  ```bash
-  direnv exec . python -m cProfile -m DocsToKG.OntologyDownload.cli pull hp --dry-run
-  direnv exec . pyinstrument -r html -o profile.html python -m DocsToKG.OntologyDownload.cli pull hp
-  ```
-- Tactics:
-  - Batch resolver metadata fetches where APIs support bulk endpoints (respect rate limits).
-  - Stream downloads via `download_stream`; avoid accumulating bytes in memory.
-  - Reuse session pool (`SessionPool`) to amortize TLS handshakes.
-  - Cache checksum files and HEAD metadata (`_cached_getaddrinfo`, token buckets) judiciously.
-  - Fuse manifest transformations (normalize once, reuse across validators) to reduce JSON churn.
+## Configuration & Environment
+- Config sources: `configs/sources.yaml`, environment variables, CLI overrides.
+- Key environment variables:
+  | Variable | Purpose | Default |
+  | --- | --- | --- |
+  | `ONTOLOGY_FETCHER_CONFIG` | Override config path used by CLI. | Auto-detected `configs/sources.yaml`. |
+  | `ONTOFETCH_LOG_DIR` | Redirect JSONL logs. | `LOG_DIR` (defaults to `~/.data/ontology-fetcher/logs`). |
+  | `LOCAL_ONTOLOGY_DIR` | Artifact destination. | `~/.data/ontology-fetcher/ontologies`. |
+  | `CACHE_DIR`, `CONFIG_DIR` | Derived from pystow (`~/.data/ontology-fetcher/{cache,configs}`). | |
+  | Resolver credentials (e.g., `BIOPORTAL_API_KEY`) | Injected into resolver configs. | Required per resolver. |
+  | `PYSTOW_HOME` | Global pystow cache root. | `~/.data`. |
+- Validate config: `python -m DocsToKG.OntologyDownload.cli config validate configs/sources.yaml` or `config show`.
+- Lockfiles: `plan-diff --lock-output ontologies.lock.json` produces deterministic resolver inputs for `pull --lock`.
 
-## Complexity & Scalability Guidance
-- Planning: expected O(n log n) due to sorting fallback chains; ensure no quadratic nested loops when merging defaults/spec overrides.
-- Fetching: per artifact O(content_size); ensure linear streaming and constant memory aside from chunk buffer.
-- Memory growth: primarily bounded by concurrent downloads (`DownloadConfiguration.concurrent_downloads`) and validator temp directories; chunk buffers currently stream at 1 MiB (verified via synthetic harness).【53616f†L1-L11】
-- Large‑N strategy: paginate plan execution using `pull --plan` with sharded plan files; throttle `concurrent_plans`/`concurrent_downloads` to bound open connections.
+## Outputs & Artifacts
+| Artifact | Contents | Producer | Consumer |
+| --- | --- | --- | --- |
+| `LOCAL_ONTOLOGY_DIR/<id>/<version>/` | Extracted ontology payloads, checksum sidecars, normalized RDF/archives. | `planning.fetch_all` + `io.filesystem`. | DocParsing pipelines, downstream ingestion. |
+| `CACHE_DIR/manifests/<timestamp>.json` | Manifest with resolver attempts + validation summary. | `manifests.write_lockfile`, `results_to_dict`. | Auditing, plan diffs. |
+| `ontologies.lock.json` | Resolver URL/version metadata for deterministic replays. | `plan - lock-output`. | `pull --lock`, CI. |
+| `LOG_DIR/ontofetch-*.jsonl` | Structured logs with `stage`, `resolver`, latency metrics. | `logging_utils.setup_logging`. | Observability stack. |
+- Manifest schema: see `manifests.py`. Validators recorded as `{"name": "...", "status": "...", "duration_s": ...}`.
 
-## I/O, Caching & Concurrency
-- I/O patterns: HTTP GET/HEAD via `io/network.py`; writes to `LOCAL_ONTOLOGY_DIR/<id>/<version>/`; manifests + reports in `ARTIFACTS_DIR`.
-- Cache keys & invalidation: token bucket keyed by `(service, host)`; DNS cache TTL 120 s; `SessionPool` keyed by service+host; manual invalidation via `io.rate_limit.reset()` or clearing `SessionPool`.
-- Concurrency: safe parallelism limited to planner worker pool + download worker pool; shared state (token buckets, DNS cache, session pool) behind locks—avoid ad-hoc threading outside these utilities.
+## Error Handling & Observability
+- Structured logs (JSONL) capture retries, `sleep_sec`, error payloads; tail via `jq` for quick triage.
+- Failures appear in manifests with resolver outcomes + validator errors; use `doctor` to diagnose environment and optional dependencies.
+- Common failure cues:
+  - Repeated 429/503 → adjust `settings.DownloadConfiguration` rate limits (`domain_rate_limits`, token buckets).
+  - Checksums mismatched → clear local cache, refetch, verify `expected_checksum`.
+  - Validator OOM/timeouts → tune validator budgets in config or limit parallel validators.
 
-## Invariants to Preserve (change with caution)
-- Ordering/determinism: `plan_all` must produce stable ordering for identical inputs.
-- Idempotency: repeated `pull` on same plan should yield identical artifacts/manifests.
-- Stable IDs/hashes: manifest `fingerprint`, `sha256`, and directory naming must not change without migration.
-- Compatibility guarantees: exported API (`__all__`) and schema structure consumed by downstream pipelines.
-
-## Preferred Refactor Surfaces
-- Extension points: resolver plugins via `plugins.py`, validator loaders (`load_validator_plugins`), planning merge helpers (`merge_defaults`).
-- Low‑risk files: add config knobs in `settings.py`, extend CLI subcommands in `cli.py`, enhance logging in `logging_utils.py`.
-- High-risk areas: `io/network.py` streaming logic, manifest schema definitions, cache layout—refactor only with exhaustive tests + migration notes.
-
-## Code Documentation Requirements
-- Keep module docstrings and NAVMAP blocks (`api.py`, `resolvers.py`, `__init__.py`) aligned with actual sections.
-- Public functions/classes require docstrings covering purpose, parameters, returns, raises; include example usage in CLI docstrings.
-- When adding new resolver/validator modules, include docstring summary plus inline comments explaining rate-limit/cache behavior.
-- Cross-reference `MODULE_ORGANIZATION_GUIDE.md`, `CODE_ANNOTATION_STANDARDS.md`, and `STYLE_GUIDE.md`; ensure new NAVMAP entries remain consistent.
+## Extensibility
+- **Resolvers**: Implement `Resolver` protocol, expose via `docstokg.ontofetch.resolver` entry point, register with `plugins.register_resolver`, supply polite headers/checksum metadata.
+- **Validators**: Provide callable returning `ValidationResult`, register under `docstokg.ontofetch.validator`, respect semaphore budgets (`_ValidatorBudget`).
+- **Plugin observability**: `python -m DocsToKG.OntologyDownload.cli plugins` lists resolver/validator metadata and load issues.
 
 ## Test Matrix & Quality Gates
 ```bash
-direnv exec . just fmt && direnv exec . just lint && direnv exec . just typecheck
-direnv exec . pytest tests/ontology_download -q
-direnv exec . pytest tests/ontology_download/test_download.py::test_download_stream_rate_limiting -q
+just fmt && just lint && just typecheck   # if repo uses justfile
+pytest tests/ontology_download -q
+pytest tests/ontology_download/test_download.py::test_download_stream_retries -q
 ```
-- TODO add perf-focused test case (e.g., `pytest -q -k "benchmark_ontology_download"` when available).
-- Maintain golden fixtures under `tests/ontology_download/fixtures/` for resolvers; update alongside code.
+- High-signal suites: `tests/ontology_download/test_cli.py`, `test_download.py`, `test_resolvers.py`, `test_validators.py`.
+- Maintain fixtures under `tests/ontology_download/fixtures/` when altering resolver/validator behaviour.
 
-## Failure Modes & Debug Hints
-| Symptom | Likely cause | Quick checks |
-|---|---|---|
-| Repeated HTTP 429/503 | Rate limit misconfiguration or retry loop | Inspect `logs/ontofetch-*.jsonl` for `sleep_sec`, verify `DownloadConfiguration.rate_limits` |
-| Non-deterministic manifests | Unstable resolver ordering or timestamp usage | Re-run `plan --dry-run` twice, assert diff; audit sorting keys |
-| Validator OOM | Processing huge RDF in memory | Toggle streaming validators, increase chunking, profile `validation.run_validators` |
-| SHA mismatch | Upstream content drift or cache corruption | Clear cache directory, re-fetch, compare `expected_checksum` |
+## Operational Tips
+- Use `plan hp --json` for dry plan inspection; `plan-diff --baseline` to compare against previous runs.
+- `doctor` surfaces missing optional dependencies, rotates logs, scaffolds API key placeholders when `--fix` is passed.
+- `prune --keep N` enforces retention across versions; dry run before deleting artifacts.
+- Storage backends determined by `settings.get_storage_backend()` (`LOCAL_ONTOLOGY_DIR` or fsspec when `ONTOFETCH_STORAGE_URL` set).
+- Streaming downloader uses 1 MiB chunks; adjust rate limits rather than chunk size for performance tuning.
 
-## Canonical Commands
-```bash
-direnv exec . python -m DocsToKG.OntologyDownload.cli plan hp --json
-direnv exec . python -m DocsToKG.OntologyDownload.cli pull hp --force
-direnv exec . python -m DocsToKG.OntologyDownload.cli validate --in data/ontologies
-direnv exec . python -m DocsToKG.OntologyDownload.cli plan-diff hp --baseline artifacts/plan-baseline.json
-direnv exec . python -m DocsToKG.OntologyDownload.cli prune --keep 5 --dry-run --json
-```
-- `just` aliases (if available): `just ontology.plan`, `just ontology.pull`, `just ontology.validate`, `just ontology.doctor`.
-
-## Indexing Hints
-- Read first: `cli.py` (entry points), `planning.plan_all`, `io/network.py`, `resolvers/__init__.py`, `validation/__init__.py`.
-- High-signal tests: `tests/ontology_download/test_cli.py`, `test_download.py`, `test_resolvers.py`, `test_validators.py`.
-- Key schemas/contracts: `docs/schemas/ontology-downloader-config.json`, manifest helpers in `manifests.py`, plugin registry logic in `plugins.py`.
-
-## Ownership & Documentation Links
-- Owners/reviewers: `@paul-heyse` (primary reviewer; escalate to `#docs-to-kg` for broad visibility on risky or cross-cutting changes).
-- Additional docs: `src/DocsToKG/OntologyDownload/README.md`, `docs/04-api/DocsToKG.OntologyDownload.*`.
-
-## Changelog and Update Procedure
-- Update this guide when new resolvers/validators land, performance baselines shift, or invariants change.
-- Record updates alongside PRs touching `planning`, `io`, or schema files; bump `Last updated` date and adjust TODOs when resolved.
+## Reference Docs
+- `src/DocsToKG/OntologyDownload/README.md`
+- API docs under `docs/04-api/DocsToKG.OntologyDownload.*`
+- Schema references in `docs/schemas/ontology-downloader-config.json`

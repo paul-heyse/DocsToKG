@@ -1,18 +1,35 @@
-"""Telemetry contracts shared by DocsToKG content download tooling.
+"""Telemetry schemas, sink implementations, and resume helpers.
 
-Centralises manifest and attempt payload structures so the CLI, resolver
-pipeline, and downstream analytics speak a consistent schema. Keeping these
-definitions in one place prevents subtle drift between components while allowing
-test doubles to implement the same interfaces.
+Responsibilities
+----------------
+- Define the canonical manifest/attempt dataclasses
+  (:class:`ManifestEntry`, :class:`AttemptRecord` via ``TYPE_CHECKING``) and
+  schema constants (``MANIFEST_SCHEMA_VERSION``, ``SQLITE_SCHEMA_VERSION``) that
+  all DocsToKG components rely on.
+- Provide sink implementations (:class:`JsonlSink`, :class:`CsvSink`,
+  :class:`SqliteSink`, :class:`MultiSink`, etc.) that emit attempt records to
+  durable formats while supporting rotation and resumable lookups.
+- Offer utilities for resume-aware manifests—``normalize_manifest_path``,
+  :class:`JsonlResumeLookup`, :class:`SqliteResumeLookup`,
+  :func:`load_resume_completed_from_sqlite`—so interrupted runs can skip work.
+- Supply helper protocols (``AttemptSink``) and context managers ensuring sink
+  lifetimes are managed safely across threaded runners and tests.
 
-Args:
-    None
+Key Components
+--------------
+- ``AttemptSink`` protocol – the contract sinks implement for writing attempts.
+- ``MultiSink`` – fan-out wrapper that writes attempt payloads to multiple sinks.
+- ``RunTelemetry`` – higher-level helper that packages manifest writing and
+  metrics emission for the runner.
+- ``JsonlResumeLookup`` / ``SqliteResumeLookup`` – efficient backends used when
+  resuming runs from existing manifest logs.
 
-Returns:
-    None
-
-Raises:
-    None
+Design Notes
+------------
+- File IO helpers favour ``atomic_write_text`` to avoid tearing manifests when
+  processes crash mid-write.
+- CSV/SQLite sink schemas stay in lockstep with tooling in ``tools/`` and
+  ``scripts/``; bump the schema constants when making incompatible changes.
 """
 
 from __future__ import annotations

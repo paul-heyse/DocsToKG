@@ -157,4 +157,4 @@ Working examples of service assembly live in `tests/conftest.py` and `tests/hybr
 
 - `docs/06-operations/index.md` – Day-two operations and maintenance routines.
 - `docs/07-reference/api-integrations/index.md` – Integration best practices and CLI helpers.
-- `tests/test_hybrid_search.py` – Example assertions covering the service layer.
+- `tests/hybrid_search/test_suite.py` – End-to-end assertions covering the service layer.

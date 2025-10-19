@@ -1,4 +1,9 @@
-"""Tests covering optional dependency fallbacks used by resolvers."""
+"""Optional dependency shim coverage.
+
+Simulates missing libraries such as pystow/rdflib/pronto/owlready2 and ensures
+the helpers in ``optdeps`` raise informative errors or provide stubbed
+implementations so the CLI remains robust in minimal environments.
+"""
 
 from __future__ import annotations
 

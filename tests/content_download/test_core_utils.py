@@ -1,3 +1,12 @@
+"""Property and unit tests for core utility helpers.
+
+Coverage spans canonicalisation helpers (`normalize_url`, identifier normalisers,
+`dedupe`), payload sniffing (`classify_payload`, tail inspection), and the atomic
+write helpers used by the download pipeline. The suite combines deterministic
+cases with Hypothesis-generated inputs to guard against regressions in edge-case
+encoding, tracking parameter stripping, and file IO semantics.
+"""
+
 import string
 import tempfile
 from pathlib import Path

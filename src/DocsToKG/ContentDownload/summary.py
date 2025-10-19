@@ -1,4 +1,23 @@
-"""Utilities for summarising DocsToKG content download runs."""
+"""Run summary builders and console reporting helpers.
+
+Responsibilities
+----------------
+- Provide the :class:`RunResult` dataclass that packages the canonical metrics
+  emitted by :mod:`DocsToKG.ContentDownload.runner` for downstream consumers
+  (CLI, agents, tests).
+- Assemble structured summary payloads via :func:`build_summary_record`, ready
+  to be written into JSON/CSV manifest metrics files or emitted to telemetry
+  sinks.
+- Expose :func:`emit_console_summary` to render human-friendly progress reports
+  that mirror the metrics stored on disk, making smoke tests easy to interpret.
+
+Design Notes
+------------
+- Functions here accept plain primitives so they can be imported without
+  pulling in heavyweight dependencies; the CLI reuses them directly.
+- The console renderer intentionally mirrors the JSON payload layout so that
+  parsing logs or inspecting structured data yields the same information.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +33,7 @@ __all__ = [
 
 @dataclass
 class RunResult:
-    """Aggregated metrics captured at the end of a download run."""
+    """Aggregated metrics captured at the end of a content download run."""
 
     run_id: str
     processed: int

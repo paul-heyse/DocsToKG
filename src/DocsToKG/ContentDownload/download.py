@@ -1,9 +1,22 @@
 """Download orchestration helpers for the content acquisition pipeline.
 
-This module coordinates the streaming download workflow, tying together
-resolver outputs, HTTP policy enforcement, and telemetry reporting. It exposes
-utilities that transform resolver candidates into stored artifacts while
-respecting retry policies, robots.txt directives, and classification rules.
+Responsibilities
+----------------
+- Translate resolver candidates into persisted artifacts by enforcing robots
+  policies, executing conditional requests, and classifying payloads.
+- Maintain the :class:`DownloadState` lifecycle, including cache reuse,
+  duplicate suppression, digest verification, and directory preparation.
+- Provide hooks into telemetry (:mod:`DocsToKG.ContentDownload.telemetry`) so
+  every attempt captures consistent manifest records and retry metadata.
+- Surface helpers such as :func:`download_candidate` and
+  :func:`process_one_work` that the runner and tests can call directly.
+
+Design Notes
+------------
+- The module keeps streaming IO and checksum calculations in one place so it
+  can be unit-tested with fake responses and file systems.
+- Robots handling is encapsulated by :class:`RobotsCache`, allowing callers to
+  flip behaviour (respect/ignore) without touching networking code.
 """
 
 from __future__ import annotations

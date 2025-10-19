@@ -1,4 +1,10 @@
-"""Tests for :func:`DocsToKG.DocParsing.io.compute_content_hash`."""
+"""Verify the content hashing helper across text and binary edge cases.
+
+These tests replicate the hashing algorithm used by DocParsing manifests to
+ensure Unicode normalisation, chunked reads, and binary fallbacks all produce
+stable digests. Guarding these behaviours is critical because manifest resume
+logic hinges on the resulting hash values.
+"""
 
 from __future__ import annotations
 
@@ -38,7 +44,7 @@ def test_compute_content_hash_text_matches_reference_digest(tmp_path: Path) -> N
         + "f\u0301"  # combining acute accent crosses the chunk boundary
         + "\nemoji: 😀"
         + "\n"
-        + "A\u030A"  # NFKC composes this into Å
+        + "A\u030a"  # NFKC composes this into Å
     )
     target = tmp_path / "text.txt"
     target.write_text(content, encoding="utf-8")

@@ -1,4 +1,12 @@
-"""Feature generation helpers for DocsToKG hybrid search."""
+"""Feature generation helpers used during ingestion and synthetic tests.
+
+The ingestion pipeline expects chunk payloads to carry BM25 stats, SPLADE-style
+weights, and dense vectors. Production runs obtain these from DocParsing; test
+fixtures use the deterministic helpers in this module (`FeatureGenerator`,
+`tokenize`, `sliding_window`) to emulate the same shapes. The resulting
+structures feed directly into `ChunkIngestionPipeline` and the FAISS-backed
+store described in the README.
+"""
 
 from __future__ import annotations
 

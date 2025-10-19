@@ -1,4 +1,10 @@
-"""CLI validation tests for the ``docparse manifest`` entry point."""
+"""Validate error handling and request plumbing for `docparse manifest`.
+
+The manifest CLI exposes streaming and tailing capabilities that hinge on robust
+input validation and optional HTTP calls. This module stubs network clients and
+verifies that invalid flag combinations raise precise `CLIValidationError`
+messages while valid inputs wire up telemetry and streaming helpers correctly.
+"""
 
 from __future__ import annotations
 
@@ -9,10 +15,11 @@ from pathlib import Path
 import pytest
 
 from DocsToKG.DocParsing.cli_errors import CLIValidationError
+from tests.conftest import PatchManager
 from tests.docparsing.test_manifest_streaming_cli import _prepare_manifest_cli_stubs
 
 
-def _install_requests_stub(monkeypatch: pytest.MonkeyPatch) -> None:
+def _install_requests_stub(patcher: PatchManager) -> None:
     """Register lightweight ``requests`` modules for CLI imports."""
 
     if "requests" in sys.modules:
@@ -51,8 +58,8 @@ def _install_requests_stub(monkeypatch: pytest.MonkeyPatch) -> None:
     requests_module.adapters = adapters_module
     requests_module.exceptions = types.SimpleNamespace(SSLError=_RequestException)
 
-    monkeypatch.setitem(sys.modules, "requests", requests_module)
-    monkeypatch.setitem(sys.modules, "requests.adapters", adapters_module)
+    patcher.setitem(sys.modules, "requests", requests_module)
+    patcher.setitem(sys.modules, "requests.adapters", adapters_module)
 
     urllib3_module = types.ModuleType("urllib3")
     urllib3_util_module = types.ModuleType("urllib3.util")
@@ -66,26 +73,26 @@ def _install_requests_stub(monkeypatch: pytest.MonkeyPatch) -> None:
     urllib3_retry_module.Retry = _Retry
     urllib3_module.util = urllib3_util_module
 
-    monkeypatch.setitem(sys.modules, "urllib3", urllib3_module)
-    monkeypatch.setitem(sys.modules, "urllib3.util", urllib3_util_module)
-    monkeypatch.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
+    patcher.setitem(sys.modules, "urllib3", urllib3_module)
+    patcher.setitem(sys.modules, "urllib3.util", urllib3_util_module)
+    patcher.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
 
 
-def _load_cli(monkeypatch: pytest.MonkeyPatch):
+def _load_cli(patcher: PatchManager):
     """Prepare dependency stubs and return the CLI module."""
 
-    _prepare_manifest_cli_stubs(monkeypatch)
-    _install_requests_stub(monkeypatch)
+    _prepare_manifest_cli_stubs(patcher)
+    _install_requests_stub(patcher)
 
     from DocsToKG.DocParsing.core import cli
 
     return cli
 
 
-def test_manifest_accepts_known_stage(monkeypatch, tmp_path) -> None:
+def test_manifest_accepts_known_stage(patcher, tmp_path) -> None:
     """CLI should accept known manifest stages and reject unsupported ones."""
 
-    cli = _load_cli(monkeypatch)
+    cli = _load_cli(patcher)
 
     manifests_dir = tmp_path / "Manifests"
     manifests_dir.mkdir()
@@ -104,8 +111,8 @@ def test_manifest_accepts_known_stage(monkeypatch, tmp_path) -> None:
         captured["data_root"] = data_root
         return iter(())
 
-    monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
-    monkeypatch.setattr(
+    patcher.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
+    patcher.setattr(
         cli,
         "data_manifests",
         lambda _root, *, ensure=False: manifests_dir,
@@ -124,10 +131,10 @@ def test_manifest_accepts_known_stage(monkeypatch, tmp_path) -> None:
     assert call_count["value"] == 1
 
 
-def test_manifest_aliases_chunk_and_embed(monkeypatch, tmp_path) -> None:
+def test_manifest_aliases_chunk_and_embed(patcher, tmp_path) -> None:
     """Singular stage aliases resolve to the canonical manifest identifiers."""
 
-    cli = _load_cli(monkeypatch)
+    cli = _load_cli(patcher)
 
     manifests_dir = tmp_path / "Manifests"
     manifests_dir.mkdir()
@@ -143,8 +150,8 @@ def test_manifest_aliases_chunk_and_embed(monkeypatch, tmp_path) -> None:
         observed.append((list(stages), data_root))
         return iter(())
 
-    monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
-    monkeypatch.setattr(
+    patcher.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
+    patcher.setattr(
         cli,
         "data_manifests",
         lambda _root, *, ensure=False: manifests_dir,
@@ -158,10 +165,10 @@ def test_manifest_aliases_chunk_and_embed(monkeypatch, tmp_path) -> None:
     assert observed == [(["chunks"], tmp_path), (["embeddings"], tmp_path)]
 
 
-def test_manifest_accepts_discovered_stage(monkeypatch, tmp_path) -> None:
+def test_manifest_accepts_discovered_stage(patcher, tmp_path) -> None:
     """A manifest present on disk extends allowable ``--stage`` selections."""
 
-    cli = _load_cli(monkeypatch)
+    cli = _load_cli(patcher)
 
     manifests_dir = tmp_path / "Manifests"
     manifests_dir.mkdir()
@@ -182,8 +189,8 @@ def test_manifest_accepts_discovered_stage(monkeypatch, tmp_path) -> None:
         captured["data_root"] = data_root
         return iter(())
 
-    monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
-    monkeypatch.setattr(
+    patcher.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
+    patcher.setattr(
         cli,
         "data_manifests",
         lambda _root, *, ensure=False: manifests_dir,

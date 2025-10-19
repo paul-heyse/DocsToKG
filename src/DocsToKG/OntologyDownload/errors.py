@@ -1,4 +1,11 @@
-"""Shared exception hierarchy for DocsToKG ontology downloads."""
+"""Exception hierarchy shared across ontology planning, download, and validation.
+
+The ontology pipeline spans configuration parsing, HTTP retrieval, archive
+materialisation, and schema validation.  This module groups the failure modes
+into a tidy hierarchy so caller code can react to high-level categories (for
+example, policy violations vs. transient resolver errors) while still having
+access to specialised subclasses when finer-grained handling is required.
+"""
 
 from __future__ import annotations
 

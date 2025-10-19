@@ -6,7 +6,12 @@
 # }
 # === /NAVMAP ===
 
-"""Tests ensuring the ontology downloader package facade stays stable."""
+"""Public API surface contract tests.
+
+Verifies ``DocsToKG.OntologyDownload`` re-exports the expected symbols and
+raises informative errors when compatibility is broken. Acts as a safety net
+for semantic versioning guarantees.
+"""
 
 from __future__ import annotations
 

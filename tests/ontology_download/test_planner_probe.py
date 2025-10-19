@@ -1,4 +1,9 @@
-"""Tests for the planner HTTP probe guardrails."""
+"""Planner HTTP probe guardrail tests.
+
+Checks that the lightweight HEAD probe enforcing allowlists, header policies,
+and retry behaviour raises `PolicyError` or respects caching when encountering
+redirect chains, slow responses, or content-length anomalies.
+"""
 
 import logging
 

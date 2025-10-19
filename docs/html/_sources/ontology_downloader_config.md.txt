@@ -41,7 +41,7 @@ credentials (if required) can be stored in `~/.data/ontology-fetcher/configs/ols
 | `accept_licenses` | list of strings | Allowed license identifiers. Downloads fail closed if a license is not listed. |
 | `normalize_to` | list of strings | Formats to produce in the normalization step (e.g., `ttl`, `obographs`). |
 | `prefer_source` | list of strings | Resolver preference order for ad-hoc downloads. |
-| `http` | mapping | HTTP behaviour (`max_retries`, `timeout_sec`, `download_timeout_sec`, `backoff_factor`, `per_host_rate_limit`, `max_download_size_gb`, `concurrent_downloads`). |
+| `http` | mapping | HTTP behaviour (`max_retries`, `timeout_sec`, `download_timeout_sec`, `backoff_factor`, `per_host_rate_limit`, `concurrent_downloads`). |
 | `validation` | mapping | Validation timeouts and limits (`parser_timeout_sec`, `max_memory_mb`, `skip_reasoning_if_size_mb`, `streaming_normalization_threshold_mb`, `max_concurrent_validators`). |
 | `logging` | mapping | Structured logging configuration (`level`, `max_log_size_mb`, `retention_days`). |
 | `continue_on_error` | bool | Continue batch processing after an error (default `true`). |
@@ -66,7 +66,6 @@ defaults:
     download_timeout_sec: 300
     backoff_factor: 0.5
     per_host_rate_limit: "4/second"
-    max_download_size_gb: 5
     concurrent_downloads: 2
   validation:
     parser_timeout_sec: 60

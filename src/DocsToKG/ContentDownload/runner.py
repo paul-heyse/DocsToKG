@@ -1,4 +1,28 @@
-"""Execution harness for DocsToKG content download runs."""
+"""Execution harness coordinating DocsToKG content download runs end-to-end.
+
+Responsibilities
+----------------
+- Translate a :class:`~DocsToKG.ContentDownload.args.ResolvedConfig` snapshot
+  into an executable workflow by wiring providers, resolver pipelines, telemetry
+  sinks, and resumable state.
+- Manage lifecycle hooks for manifest streams (JSONL/CSV/SQLite),
+  concurrency-bound worker pools, and resource cleanup via
+  :class:`DownloadRun` context management.
+- Provide resumable execution by hydrating prior manifest/index snapshots and
+  skipping already-processed works before dispatching to the resolver pipeline.
+- Surface convenience helpers (:func:`run`, :func:`iterate_openalex`) that are
+  reused by tests, smoke scripts, and the CLI while returning a
+  :class:`~DocsToKG.ContentDownload.summary.RunResult`.
+
+Key Components
+--------------
+- ``DownloadRun`` – encapsulates setup, execution, and teardown for a single run.
+- ``DownloadRunState`` – aggregates counters thread-safely for telemetry output.
+- ``iterate_openalex`` – generator that pages through OpenAlex Works queries,
+  respecting CLI throttles and polite headers.
+- ``run`` – top-level helper that owns the context-manager lifetime of
+  :class:`DownloadRun` for simple scripting integrations.
+"""
 
 from __future__ import annotations
 

@@ -1,13 +1,21 @@
-"""Regression tests for chunk manifest stage resume semantics."""
+"""Exercise chunk manifest resume semantics and stage bookkeeping.
+
+The chunking pipeline relies on manifest entries to decide whether work can be
+skipped. These tests simulate real resume flows to ensure the stage labels,
+hash comparisons, and manifest indexes interact correctly—covering scenarios
+such as first-run manifests, subsequent resumptions, and staged migrations that
+replace legacy manifest names.
+"""
 
 from __future__ import annotations
 
 import json
+
 from DocsToKG.DocParsing.io import load_manifest_index
 from tests.docparsing.stubs import dependency_stubs
 
 
-def test_chunk_resume_uses_chunks_manifest_stage(monkeypatch, tmp_path):
+def test_chunk_resume_uses_chunks_manifest_stage(patcher, tmp_path):
     """Second resume run skips once manifest entries use the ``chunks`` stage."""
 
     dependency_stubs()
@@ -24,7 +32,7 @@ def test_chunk_resume_uses_chunks_manifest_stage(monkeypatch, tmp_path):
     doc_path = doctags_dir / "example.doctags"
     doc_path.write_text("{}\n", encoding="utf-8")
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
 
     processed: list[str] = []
 
@@ -53,9 +61,9 @@ def test_chunk_resume_uses_chunks_manifest_stage(monkeypatch, tmp_path):
             error=None,
         )
 
-    monkeypatch.setattr(chunk_runtime, "_chunk_worker_initializer", fake_initializer)
-    monkeypatch.setattr(chunk_runtime, "_process_chunk_task", fake_process)
-    monkeypatch.setattr(chunk_runtime, "ensure_model_environment", lambda: None)
+    patcher.setattr(chunk_runtime, "_chunk_worker_initializer", fake_initializer)
+    patcher.setattr(chunk_runtime, "_process_chunk_task", fake_process)
+    patcher.setattr(chunk_runtime, "ensure_model_environment", lambda: None)
 
     cli_args = [
         "--in-dir",
@@ -80,5 +88,8 @@ def test_chunk_resume_uses_chunks_manifest_stage(monkeypatch, tmp_path):
     assert processed == ["example.doctags"]
 
     manifest_after = load_manifest_index("chunks", data_root)
-    assert manifest_after["example.doctags"]["input_hash"] == manifest_index["example.doctags"]["input_hash"]
+    assert (
+        manifest_after["example.doctags"]["input_hash"]
+        == manifest_index["example.doctags"]["input_hash"]
+    )
     assert manifest_after["example.doctags"]["status"] == "skip"

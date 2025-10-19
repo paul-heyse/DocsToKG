@@ -67,22 +67,21 @@
 # }
 # === /NAVMAP ===
 
-"""
-Core typed structures for hybrid search components.
+"""Typed payloads, search contracts, and diagnostics for HybridSearch.
 
-This module defines the fundamental data structures used throughout the DocsToKG
-hybrid search system, including document inputs, chunk features, search requests,
-and result structures. These types ensure type safety and provide clear contracts
-for data exchange between system components.
+The ingestion and query stages rely on these dataclasses to keep DocParsing
+artifacts aligned with FAISS stores and HTTP responses:
 
-The types support both traditional text search (BM25) and modern dense retrieval
-methods, enabling seamless hybrid search capabilities across the platform.
+- Ingestion: `DocumentInput`, `ChunkFeatures`, `ChunkPayload` mirror the chunk
+  layout documented in the README ("Data inputs & expected layout").
+- Querying: `HybridSearchRequest`, `HybridSearchResponse`, and
+  `HybridSearchDiagnostics` encode the contract enforced by `HybridSearchAPI`
+  and demonstrated in the README’s JSON examples.
+- Fusion/validation: `FusionCandidate`, `ValidationReport`, `ValidationSummary`
+  support RRF/MMR scoring and regression harnesses.
 
-Key Features:
-- Type-safe data structures for all search operations
-- Immutable data classes for thread safety
-- Comprehensive validation and error handling
-- Support for both lexical and semantic search modalities
+Agents evolving schemas should update these types first to maintain explicit
+contracts across ingestion, service, and observability components.
 """
 
 from __future__ import annotations

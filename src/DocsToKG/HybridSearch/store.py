@@ -10,6 +10,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "resolve-cuvs-state",
+#       "name": "resolve_cuvs_state",
+#       "anchor": "function-resolve-cuvs-state",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "faisssearchresult",
 #       "name": "FaissSearchResult",
 #       "anchor": "class-faisssearchresult",
@@ -70,6 +76,18 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "auto-block-rows",
+#       "name": "_auto_block_rows",
+#       "anchor": "function-auto-block-rows",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-distance-params",
+#       "name": "_build_distance_params",
+#       "anchor": "function-build-distance-params",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "cosine-topk-blockwise",
 #       "name": "cosine_topk_blockwise",
 #       "anchor": "function-cosine-topk-blockwise",
@@ -103,16 +121,42 @@
 # }
 # === /NAVMAP ===
 
-"""Unified FAISS vector store, GPU similarity utilities, and state helpers."""
+"""Vector-store orchestration built atop the custom FAISS GPU wheel.
+
+This module contains the dense retrieval backbone referenced throughout the
+HybridSearch README and the `faiss-gpu-wheel-reference.md`:
+
+- `ManagedFaissAdapter` wraps FAISS GPU indexes (Flat, IVF, PQ) using the custom
+  `faiss-1.12.0` wheel. It configures `StandardGpuResources`, multi-GPU cloning,
+  sharding/replication, and index snapshot/restore consistent with the wheel’s
+  runtime prerequisites (CUDA 12, OpenBLAS, jemalloc).
+- GPU similarity helpers (`cosine_against_corpus_gpu`, `pairwise_inner_products`,
+  `cosine_topk_blockwise`) use FAISS “no-index” routines (`knn_gpu`,
+  `pairwise_distance_gpu`) and honour the optional cuVS acceleration flags noted
+  in the wheel reference (`use_cuvs`, memory limits).
+- Snapshot utilities (`serialize_state`, `restore_state`) capture FAISS binary
+  payloads alongside adapter metadata so ingestion and service processes can
+  share deterministic state, aligning with the README’s “Failure recovery &
+  snapshot management” guidance.
+- `AdapterStats` exposes GPU memory usage, index sizes, and search counters for
+  observability pipelines.
+- Fallback utilities (OpenSearch simulator, cosine batches) allow agents to test
+  retrieval logic without a GPU while keeping interface parity with the FAISS
+  implementation.
+
+When modifying this module, cross-check the FAISS loader requirements (GLIBC,
+CUDA libraries, `FAISS_OPT_LEVEL`) and multi-GPU behavioural notes from the
+reference document to remain compatible with the deployed wheel.
+"""
 
 from __future__ import annotations
 
 import base64
+import inspect
 import logging
 import time
 import uuid
 from dataclasses import asdict, dataclass, replace
-import inspect
 from pathlib import Path
 from threading import Event, RLock
 from typing import Callable, ClassVar, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
@@ -1791,7 +1835,9 @@ class FaissVectorStore(DenseVectorStore):
                     cloner_options.common_ivf_quantizer = True
 
                 self._configure_gpu_cloner_options(cloner_options)
-                self._apply_cloner_reservation(cloner_options, gpu_ids=gpu_ids)
+                self._apply_cloner_reservation(
+                    cloner_options, gpu_ids=gpu_ids, scale_with_participants=bool(shard)
+                )
 
             gpu_ids: List[int]
             if explicit_targets_configured:
@@ -1969,6 +2015,7 @@ class FaissVectorStore(DenseVectorStore):
         cloner_options: object | None,
         *,
         gpu_ids: Optional[Sequence[int]] = None,
+        scale_with_participants: bool = True,
     ) -> None:
         """Populate FAISS cloner reservation knobs when ``expected_ntotal`` is set."""
 
@@ -1977,16 +2024,21 @@ class FaissVectorStore(DenseVectorStore):
         expected = getattr(self, "_expected_ntotal", 0)
         if expected <= 0:
             return
-        reserve = int(expected)
+        reserve_total = int(expected)
         participant_count = len(gpu_ids) if gpu_ids else 0
-        if self._multi_gpu_mode == "shard":
+        per_device_reserve = reserve_total
+        if scale_with_participants and participant_count > 0 and self._multi_gpu_mode == "shard":
             participants = max(participant_count, 1)
-            reserve = max(1, (reserve + participants - 1) // participants)
+            per_device_reserve = max(1, (reserve_total + participants - 1) // participants)
+
+        reserve_attr_value = (
+            per_device_reserve if scale_with_participants and participant_count > 0 else reserve_total
+        )
 
         applied = False
         try:
             if hasattr(cloner_options, "reserveVecs"):
-                setattr(cloner_options, "reserveVecs", reserve)
+                setattr(cloner_options, "reserveVecs", reserve_attr_value)
                 applied = True
         except Exception:  # pragma: no cover - defensive guard
             logger.debug("Unable to set reserveVecs on FAISS cloner options", exc_info=True)
@@ -2001,9 +2053,9 @@ class FaissVectorStore(DenseVectorStore):
                     if vector_factory is not None:
                         reserve_vector = vector_factory()
                         for _gpu in gpu_ids:
-                            reserve_vector.push_back(reserve)
+                            reserve_vector.push_back(per_device_reserve)
                     else:
-                        reserve_vector = [reserve for _ in gpu_ids]
+                        reserve_vector = [per_device_reserve for _ in gpu_ids]
                     setattr(cloner_options, "eachReserveVecs", reserve_vector)
                     per_device_applied = True
             except Exception:  # pragma: no cover - defensive guard
@@ -2014,7 +2066,7 @@ class FaissVectorStore(DenseVectorStore):
 
             if not per_device_applied and hasattr(cloner_options, "setReserveVecs"):
                 try:  # pragma: no cover - defensive guard
-                    cloner_options.setReserveVecs([reserve for _ in gpu_ids])
+                    cloner_options.setReserveVecs([per_device_reserve for _ in gpu_ids])
                     per_device_applied = True
                 except Exception:
                     logger.debug(
@@ -2029,10 +2081,11 @@ class FaissVectorStore(DenseVectorStore):
             event: Dict[str, object] = {
                 "component": "faiss",
                 "action": "gpu_cloner_reserve",
-                "reserve_vecs": reserve,
+                "reserve_vecs": reserve_attr_value,
             }
             if gpu_ids is not None:
                 event["gpu_ids"] = tuple(int(gpu) for gpu in gpu_ids)
+                event["per_device_reserve_vecs"] = per_device_reserve
             structured_logger.info("faiss-gpu-cloner-reserve", extra={"event": event})
 
     def _to_cpu(self, index: "faiss.Index") -> "faiss.Index":
@@ -2650,6 +2703,8 @@ def _auto_block_rows(
     )
     effective = min(permitted, _COSINE_TOPK_DEFAULT_BLOCK_ROWS)
     return effective, {"free_bytes": int(free_bytes), "total_bytes": int(total_bytes)}
+
+
 def _build_distance_params(
     *,
     use_fp16: bool,
@@ -2782,17 +2837,11 @@ def cosine_topk_blockwise(
         try:
             corpus_copy = np.array(C, dtype=np.float32, copy=True, order="C")
             faiss.normalize_L2(corpus_copy)
-            corpus_view = (
-                corpus_copy.astype(np.float16, copy=False)
-                if use_fp16
-                else corpus_copy
-            )
+            corpus_view = corpus_copy.astype(np.float16, copy=False) if use_fp16 else corpus_copy
             row_bytes = np.dtype(np.float32).itemsize * C.shape[1]
             vector_limit = int(block_rows) * row_bytes
             query_rows = max(int(block_rows), q.shape[0])
-            query_limit = (
-                query_rows * np.dtype(np.float32).itemsize * q.shape[1]
-            )
+            query_limit = query_rows * np.dtype(np.float32).itemsize * q.shape[1]
             extra_kwargs: dict[str, object] = {}
             if distance_params is not None:
                 extra_kwargs["params"] = distance_params
@@ -3159,9 +3208,7 @@ class ManagedFaissAdapter(DenseVectorStore):
     ) -> "ManagedFaissAdapter":
         """Load a managed FAISS adapter from ``path``."""
 
-        inner = FaissVectorStore.load(
-            path, config=config, dim=dim, observability=observability
-        )
+        inner = FaissVectorStore.load(path, config=config, dim=dim, observability=observability)
         return cls(inner)
 
     def needs_training(self) -> bool:
@@ -3214,26 +3261,10 @@ class ManagedFaissAdapter(DenseVectorStore):
 
         return self._inner.stats()
 
-    def snapshot_meta(self) -> Mapping[str, object]:
-        """Return snapshot metadata provided by the managed store."""
-
-        return self._inner.snapshot_meta()
-
     def flush_snapshot(self, *, reason: str = "flush") -> None:
         """Forward snapshot flush requests to the managed store."""
 
         self._inner.flush_snapshot(reason=reason)
-
-    def snapshot_meta(self) -> Mapping[str, object]:
-        """Return snapshot metadata exposed by the managed store."""
-
-        meta_getter = getattr(self._inner, "snapshot_meta", None)
-        if not callable(meta_getter):
-            return {}
-        meta = meta_getter()
-        if isinstance(meta, Mapping):
-            return dict(meta)
-        return {}
 
     def get_gpu_resources(self) -> Optional["faiss.StandardGpuResources"]:
         """Return GPU resources backing the managed index (if available)."""

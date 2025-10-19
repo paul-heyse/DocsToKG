@@ -1,4 +1,9 @@
-"""Ensure validation helpers degrade gracefully when ``psutil`` is unavailable."""
+"""Validation module behaviour when ``psutil`` is missing.
+
+Simulates environments without ``psutil`` to ensure the validation entry point
+imports, registers plugins, and runs validators without optional monitoring
+capabilities.
+"""
 
 from __future__ import annotations
 
@@ -64,7 +69,9 @@ def test_validation_import_and_run_without_psutil(tmp_path: Path) -> None:
             config=config,  # type: ignore[arg-type]
         )
 
-        def stub_validator(req: validation.ValidationRequest, logger: logging.Logger) -> validation.ValidationResult:  # pragma: no cover - trivial shim
+        def stub_validator(
+            req: validation.ValidationRequest, logger: logging.Logger
+        ) -> validation.ValidationResult:  # pragma: no cover - trivial shim
             return validation.ValidationResult(ok=True, details={}, output_files=[])
 
         validation.VALIDATORS.clear()

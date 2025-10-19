@@ -1,4 +1,11 @@
-"""Path and artifact discovery helpers for DocParsing pipelines."""
+"""Filesystem discovery utilities for DocParsing manifests and artifacts.
+
+The discovery layer translates on-disk structures—DocTags, chunk JSONL files,
+and embedding vectors—into stable logical identifiers that downstream stages
+can reason about. It encapsulates structural marker loading, shard calculation,
+and relative-path hashing so resume logic remains deterministic even when input
+directories move or contain symlinks.
+"""
 
 from __future__ import annotations
 

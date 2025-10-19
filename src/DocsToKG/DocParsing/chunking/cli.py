@@ -1,4 +1,12 @@
-"""Command-line helpers for the chunking stage."""
+"""CLI builder utilities dedicated to the DocParsing chunking stage.
+
+This module combines shared CLI option metadata, argument parsers, and
+subcommand wiring so that both the standalone ``docparse`` CLI and automation
+agents can consistently configure chunking runs. It plugs the chunker-specific
+flags into the core CLI scaffolding, supports preset profiles for common worker
+and tokenizer combinations, and delegates config hydration to the shared
+``parse_args_with_overrides`` helper for parity with other DocParsing stages.
+"""
 
 from __future__ import annotations
 

@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -21,17 +21,17 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="1. Architecture Guide" href="../03-architecture/index.html" />
-    <link rel="prev" title="1. Overview" href="../01-overview/index.html" />
+    <link rel="prev" title="1. Overview" href="../01-overview/index.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -50,13 +50,13 @@
 <li class="toctree-l2"><a class="reference internal" href="#overview">2. Overview</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#prerequisites">3. Prerequisites</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#installation">4. Installation</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#clone-the-repository">1. Clone the Repository</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#create-a-virtual-environment">2. Create a Virtual Environment</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#install-dependencies">3. Install Dependencies</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#configure-environment-variables">4. Configure Environment Variables</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#prepare-local-directories">5. Prepare Local Directories</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#verify-the-installation">6. Verify the Installation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#optional-build-sphinx-html-docs">7. Optional: Build Sphinx HTML Docs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#clone-the-repository">4.1 Clone the Repository</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#bootstrap-the-environment-recommended">4.2 Bootstrap the Environment (Recommended)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#manual-setup-alternative">4.3 Manual Setup (Alternative)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configure-environment-variables">4.4 Configure Environment Variables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#prepare-local-directories">4.5 Prepare Local Directories</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#smoke-checks">4.6 Smoke Checks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#build-sphinx-html-docs-optional">4.7 Build Sphinx HTML Docs (Optional)</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#next-steps">5. Next Steps</a></li>
@@ -92,124 +92,117 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="setup-guide">
 <h1>1. Setup Guide<a class="headerlink" href="#setup-guide" title="Link to this heading"></a></h1>
 <p>Follow this guide to configure DocsToKG on a local workstation or development server.</p>
 <section id="overview">
 <h2>2. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Provision a Python 3.12+ environment with optional CUDA support.</p></li>
-<li><p>Install project dependencies (core, GPU, documentation tooling).</p></li>
-<li><p>Configure environment variables and working directories.</p></li>
+<li><p>Provision a Python 3.13 environment with optional CUDA 12.9 support.</p></li>
+<li><p>Install the curated dependency set (core, GPU wheels, documentation tooling).</p></li>
+<li><p>Configure environment variables and data directories.</p></li>
 <li><p>Run smoke checks to confirm the installation.</p></li>
 </ul>
 </section>
 <section id="prerequisites">
 <h2>3. Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><strong>Operating system</strong>: Linux or macOS preferred (Windows users should use WSL2).</p></li>
-<li><p><strong>Python</strong>: 3.12 or newer (see <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>).</p></li>
-<li><p><strong>Memory</strong>: 16 GB RAM recommended for parsing and validation workloads.</p></li>
-<li><p><strong>GPU (optional)</strong>: CUDA 12.9+ for FAISS and PyTorch acceleration (required when installing <code class="docutils literal notranslate"><span class="pre">requirements.in</span></code>).</p></li>
-<li><p><strong>Git</strong>: 2.30 or newer.</p></li>
+<li><p><strong>Operating system</strong>: Linux or macOS (Windows users should use WSL2).</p></li>
+<li><p><strong>Git</strong>: 2.30+ with Git LFS enabled (<code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">lfs</span> <span class="pre">install</span> <span class="pre">&amp;&amp;</span> <span class="pre">git</span> <span class="pre">lfs</span> <span class="pre">pull</span></code> is required to fetch bundled wheels under <code class="docutils literal notranslate"><span class="pre">ci/wheels/</span></code>).</p></li>
+<li><p><strong>Direnv</strong> <em>(recommended)</em>: <code class="docutils literal notranslate"><span class="pre">brew</span> <span class="pre">install</span> <span class="pre">direnv</span></code> or follow <a class="reference external" href="https://direnv.net/">direnv.net</a> instructions to let <code class="docutils literal notranslate"><span class="pre">.envrc</span></code> manage the virtualenv automatically.</p></li>
+<li><p><strong>Memory</strong>: 16 GB RAM recommended for Docling parsing workloads.</p></li>
+<li><p><strong>GPU (optional)</strong>: CUDA 12.9+ drivers for FAISS, PyTorch, vLLM, and CuPy acceleration.</p></li>
 </ul>
-<blockquote>
-<div><p>ℹ️  Direnv is supported via <code class="docutils literal notranslate"><span class="pre">.envrc</span></code>, but optional. Install with <code class="docutils literal notranslate"><span class="pre">brew</span> <span class="pre">install</span> <span class="pre">direnv</span></code> or follow instructions at <a class="reference external" href="https://direnv.net">direnv.net</a>.</p>
-</div></blockquote>
 </section>
 <section id="installation">
 <h2>4. Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
 <section id="clone-the-repository">
-<h3>1. Clone the Repository<a class="headerlink" href="#clone-the-repository" title="Link to this heading"></a></h3>
+<h3>4.1 Clone the Repository<a class="headerlink" href="#clone-the-repository" title="Link to this heading"></a></h3>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/paul-heyse/DocsToKG.git
 <span class="nb">cd</span><span class="w"> </span>DocsToKG
+git<span class="w"> </span>lfs<span class="w"> </span>install
+git<span class="w"> </span>lfs<span class="w"> </span>pull
 </pre></div>
 </div>
 </section>
-<section id="create-a-virtual-environment">
-<h3>2. Create a Virtual Environment<a class="headerlink" href="#create-a-virtual-environment" title="Link to this heading"></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
-<span class="nb">source</span><span class="w"> </span>.venv/bin/activate<span class="w">  </span><span class="c1"># Windows: .venv\Scripts\activate</span>
+<section id="bootstrap-the-environment-recommended">
+<h3>4.2 Bootstrap the Environment (Recommended)<a class="headerlink" href="#bootstrap-the-environment-recommended" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>./scripts/bootstrap_env.sh
+direnv<span class="w"> </span>allow<span class="w">           </span><span class="c1"># loads .envrc and activates .venv automatically</span>
 </pre></div>
 </div>
-<p>If you use direnv, run <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">allow</span></code> after activation so <code class="docutils literal notranslate"><span class="pre">.envrc</span></code> can automatically load the environment next time.</p>
-<blockquote>
-<div><p>✅ Prefer automation? Execute <code class="docutils literal notranslate"><span class="pre">./scripts/bootstrap_env.sh</span></code> from the repository root.<br>
-The script creates <code class="docutils literal notranslate"><span class="pre">.venv</span></code>, installs DocsToKG in editable mode, and reminds you to run
-<code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">allow</span></code>. The bundled <code class="docutils literal notranslate"><span class="pre">.envrc</span></code> automatically activates <code class="docutils literal notranslate"><span class="pre">.venv</span></code> and appends <code class="docutils literal notranslate"><span class="pre">src/</span></code>
-to <code class="docutils literal notranslate"><span class="pre">PYTHONPATH</span></code>, so shells or agents that rely on direnv (for example
-<code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">exec</span> <span class="pre">.</span> <span class="pre">…</span></code>) will always resolve the project package without extra flags.</p>
-</div></blockquote>
+<p>The bootstrap script:</p>
+<ul class="simple">
+<li><p>Creates <code class="docutils literal notranslate"><span class="pre">.venv/</span></code> with CPython 3.13.</p></li>
+<li><p>Installs DocsToKG in editable mode and applies the pinned <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code>.</p></li>
+<li><p>Reuses local wheels (<code class="docutils literal notranslate"><span class="pre">torch</span></code>, <code class="docutils literal notranslate"><span class="pre">torchaudio</span></code>, <code class="docutils literal notranslate"><span class="pre">torchvision</span></code>, <code class="docutils literal notranslate"><span class="pre">faiss</span></code>, <code class="docutils literal notranslate"><span class="pre">vllm</span></code>, <code class="docutils literal notranslate"><span class="pre">cupy-cuda12x</span></code>) from <code class="docutils literal notranslate"><span class="pre">ci/wheels/</span></code>.</p></li>
+</ul>
+<p>Use <code class="docutils literal notranslate"><span class="pre">./scripts/dev.sh</span> <span class="pre">exec</span> <span class="pre">&lt;command&gt;</span></code> in environments where <code class="docutils literal notranslate"><span class="pre">direnv</span></code> cannot be installed.</p>
 </section>
-<section id="install-dependencies">
-<h3>3. Install Dependencies<a class="headerlink" href="#install-dependencies" title="Link to this heading"></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Core project dependencies (editable install for development)</span>
+<section id="manual-setup-alternative">
+<h3>4.3 Manual Setup (Alternative)<a class="headerlink" href="#manual-setup-alternative" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3.13<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
+<span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
 pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
-
-<span class="c1"># Optional GPU/ML stack (requires CUDA 12.9 toolchain)</span>
-pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.in
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt<span class="w">        </span><span class="c1"># includes bundled wheels</span>
 </pre></div>
 </div>
-<p>Install documentation tooling when you plan to regenerate docs:</p>
+<p>Install documentation tooling on-demand:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>docs/build/sphinx/requirements.txt
 </pre></div>
 </div>
 </section>
 <section id="configure-environment-variables">
-<h3>4. Configure Environment Variables<a class="headerlink" href="#configure-environment-variables" title="Link to this heading"></a></h3>
-<p>Create a <code class="docutils literal notranslate"><span class="pre">.env</span></code> file in the repository root (or export variables manually):</p>
+<h3>4.4 Configure Environment Variables<a class="headerlink" href="#configure-environment-variables" title="Link to this heading"></a></h3>
+<p>Create a <code class="docutils literal notranslate"><span class="pre">.env</span></code> file (loaded by <code class="docutils literal notranslate"><span class="pre">.envrc</span></code>) or export variables through your secrets manager:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cat<span class="w"> </span>&gt;<span class="w"> </span>.env<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
-<span class="s"># Storage locations</span>
 <span class="s">DOCSTOKG_DATA_ROOT=./Data</span>
 <span class="s">HYBRID_SEARCH_CONFIG=./config/hybrid_config.json</span>
 <span class="s">ONTOLOGY_FETCHER_CONFIG=./configs/sources.yaml</span>
 
-<span class="s"># Third-party credentials</span>
 <span class="s">PA_ALEX_KEY=your-pyalex-api-key</span>
 <span class="s">BIOPORTAL_API_KEY=optional-bioportal-token</span>
 <span class="s">EOF</span>
 </pre></div>
 </div>
-<p>Load the file with <code class="docutils literal notranslate"><span class="pre">source</span> <span class="pre">.env</span></code> or rely on direnv to ingest it automatically.</p>
+<p>Direnv automatically loads <code class="docutils literal notranslate"><span class="pre">.env</span></code>; otherwise run <code class="docutils literal notranslate"><span class="pre">source</span> <span class="pre">.env</span></code>.</p>
 </section>
 <section id="prepare-local-directories">
-<h3>5. Prepare Local Directories<a class="headerlink" href="#prepare-local-directories" title="Link to this heading"></a></h3>
+<h3>4.5 Prepare Local Directories<a class="headerlink" href="#prepare-local-directories" title="Link to this heading"></a></h3>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>-p<span class="w"> </span>Data/DocTagsFiles<span class="w"> </span>Data/ChunkedDocTagFiles<span class="w"> </span>Data/Embeddings<span class="w"> </span>artifacts<span class="w"> </span>logs
 </pre></div>
 </div>
-<p>These directories store DocTags inputs, chunked outputs, embedding payloads, FAISS snapshots, and log output.</p>
+<p>These directories store DocTags inputs, chunked outputs, embeddings, FAISS snapshots, and telemetry.</p>
 </section>
-<section id="verify-the-installation">
-<h3>6. Verify the Installation<a class="headerlink" href="#verify-the-installation" title="Link to this heading"></a></h3>
-<p>Run the automated test suite:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pytest<span class="w"> </span>-q
+<section id="smoke-checks">
+<h3>4.6 Smoke Checks<a class="headerlink" href="#smoke-checks" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>pytest<span class="w"> </span>-q
+direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>python<span class="w"> </span>docs/scripts/generate_api_docs.py
+direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>python<span class="w"> </span>docs/scripts/validate_docs.py
+direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>python<span class="w"> </span>docs/scripts/validate_code_annotations.py
 </pre></div>
 </div>
-<p>Generate and validate documentation:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>docs/scripts/generate_api_docs.py
-python<span class="w"> </span>docs/scripts/validate_docs.py
-</pre></div>
-</div>
-<p>For asynchronous link checks (optional):</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>docs/scripts/check_links.py<span class="w"> </span>--timeout<span class="w"> </span><span class="m">10</span>
+<p>Optional link check:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>python<span class="w"> </span>docs/scripts/check_links.py<span class="w"> </span>--timeout<span class="w"> </span><span class="m">10</span>
 </pre></div>
 </div>
 </section>
-<section id="optional-build-sphinx-html-docs">
-<h3>7. Optional: Build Sphinx HTML Docs<a class="headerlink" href="#optional-build-sphinx-html-docs" title="Link to this heading"></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>docs/scripts/build_docs.py<span class="w"> </span>--format<span class="w"> </span>html
-open<span class="w"> </span>docs/build/_build/html/index.html<span class="w">  </span><span class="c1"># macOS</span>
+<section id="build-sphinx-html-docs-optional">
+<h3>4.7 Build Sphinx HTML Docs (Optional)<a class="headerlink" href="#build-sphinx-html-docs-optional" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>python<span class="w"> </span>docs/scripts/build_docs.py<span class="w"> </span>--format<span class="w"> </span>html
 </pre></div>
 </div>
+<p>Open <code class="docutils literal notranslate"><span class="pre">docs/build/_build/html/index.html</span></code> in your browser once the build completes.</p>
 </section>
 </section>
 <section id="next-steps">
 <h2>5. Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Ingest sample documents using the content downloaders (<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload</span></code>).</p></li>
-<li><p>Convert assets into chunked DocTags and embeddings (<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing</span></code>).</p></li>
-<li><p>Populate a FAISS index and serve hybrid search queries (<code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch</span></code>).</p></li>
+<li><p>Run content download pipelines via <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.ContentDownload.cli</span></code>.</p></li>
+<li><p>Generate DocTags and embeddings (<code class="docutils literal notranslate"><span class="pre">docparse</span> <span class="pre">chunk</span></code>, <code class="docutils literal notranslate"><span class="pre">docparse</span> <span class="pre">embed</span></code>).</p></li>
+<li><p>Ingest data into the hybrid search service and expose APIs (<code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch</span></code>).</p></li>
 </ul>
 <p>Refer to the <strong>Architecture Guide</strong> (<code class="docutils literal notranslate"><span class="pre">docs/03-architecture/index.md</span></code>) for subsystem details and the <strong>Operations Guide</strong> (<code class="docutils literal notranslate"><span class="pre">docs/06-operations/index.md</span></code>) for day-two workflows.</p>
 </section>
@@ -232,7 +225,7 @@ open<span class="w"> </span>docs/build/_build/html/index.html<span class="w">  <
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -243,7 +236,7 @@ open<span class="w"> </span>docs/build/_build/html/index.html<span class="w">  <
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

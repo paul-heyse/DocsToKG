@@ -1,4 +1,9 @@
-"""Regression tests for filesystem helpers."""
+"""Filesystem helper regression tests.
+
+Covers cached file materialisation, cross-device fallback paths, archive
+extraction safety, sanitized filenames, and correlation ID generation for
+logging. Ensures ontology artefacts are staged securely before validation.
+"""
 
 from __future__ import annotations
 

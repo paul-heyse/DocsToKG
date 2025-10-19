@@ -1,4 +1,10 @@
-"""Regression tests for manifest ordering with missing timestamps."""
+"""Regression coverage for manifest iteration order with sparse metadata.
+
+`iter_manifest_entries` merges manifest files across stages and must remain
+deterministic even when timestamps are absent. These tests craft JSONL fixtures
+with mixed timestamp coverage to confirm the iterator respects file order and
+maintains stable merges for resume tooling.
+"""
 
 from __future__ import annotations
 

@@ -6,7 +6,10 @@ Welcome to the DocsToKG development community! This guide will help you contribu
 
 ### 1. Set Up Development Environment
 
-Follow the [Setup Guide](../02-setup/index.md) to get your local environment running.
+1. Follow the [Setup Guide](../02-setup/index.md).
+2. Run `./scripts/bootstrap_env.sh` to create `.venv` with Python 3.13 and install bundled wheels (`torch`, `faiss`, `vllm`, `cupy-cuda12x`).
+3. Approve `.envrc` with `direnv allow` so shells inherit the virtualenv and `PYTHONPATH`.
+4. Optional: `./scripts/dev.sh exec <command>` when `direnv` is unavailable.
 
 ### 2. Understand the Codebase
 
@@ -14,12 +17,12 @@ Follow the [Setup Guide](../02-setup/index.md) to get your local environment run
 - **Explore the API**: Check [API Reference](../04-api/index.md) for integration points
 - **Study key modules**: Focus on `src/DocsToKG/ContentDownload`, `src/DocsToKG/DocParsing`, `src/DocsToKG/HybridSearch`, and `src/DocsToKG/OntologyDownload`
 
-### 3. Find Your First Issue
+### 3. Plan Your Change
 
-- **Good First Issues**: Look for issues labeled `good first issue` or `help wanted`
-- **Documentation**: Help improve docs, add examples, or clarify explanations
-- **Bug Fixes**: Start with straightforward bug reports
-- **Feature Requests**: Pick features that align with your interests
+- **Good First Issues**: Look for issues labeled `good first issue` or `help wanted`.
+- **Spec-heavy work**: Start by drafting an `openspec` proposal (`openspec spec list`, `openspec validate <change-id> --strict`) before writing code.
+- **Documentation tasks**: Improve `docs/` content, add examples, or keep reference material current.
+- **Bug Fixes**: Start with reproducible issues backed by failing tests or telemetry evidence.
 
 ## 3. Development Workflow
 
@@ -69,9 +72,9 @@ DocsToKG follows a **documentation-first development** approach:
 
 **Before submitting pull requests:**
 
-- [ ] Run `python docs/scripts/validate_code_annotations.py src/`
-- [ ] Run `python docs/scripts/generate_api_docs.py` to update API docs
-- [ ] Run `python docs/scripts/validate_docs.py` for content validation
+- [ ] `direnv exec . python docs/scripts/validate_code_annotations.py`
+- [ ] `direnv exec . python docs/scripts/generate_api_docs.py`
+- [ ] `direnv exec . python docs/scripts/validate_docs.py`
 - [ ] Review changes using documentation checklist
 
 ## 4. Commit Conventions
@@ -108,23 +111,24 @@ docs(architecture): update component diagram for new service
 
 ## 5. Pull Request Process
 
-1. **Create a branch** from `main` with descriptive name (e.g., `feature/hybrid-metrics`)
-2. **Make your changes** following coding standards
-3. **Write tests** for new functionality
-4. **Update documentation** for all user-facing changes
-5. **Validate documentation** using automated tools
-6. **Run tests locally** to ensure everything works
-7. **Submit PR** with clear description and link to related issues
+1. **Create a branch** from `main` with descriptive name (e.g., `feature/hybrid-metrics`).
+2. **Plan/validate spec** if required (`openspec` proposal + `openspec validate <change-id> --strict`).
+3. **Implement changes** following coding standards.
+4. **Write tests** for new functionality (extend existing suites or add focused scenarios).
+5. **Update documentation** for all user-facing changes.
+6. **Validate documentation** using automated tools (see checklist above).
+7. **Run tests locally** (`direnv exec . pytest -q` plus markers as needed).
+8. **Submit PR** with clear description and link to related issues/specs.
 
 ### 5.1 Documentation Requirements for PRs
 
 **For all code changes:**
 
-- [ ] Update docstrings for modified public interfaces
-- [ ] Add usage examples for new functionality
-- [ ] Update API documentation for endpoint changes
-- [ ] Run `python docs/scripts/validate_code_annotations.py src/`
-- [ ] Run `python docs/scripts/generate_api_docs.py`
+- [ ] Update docstrings for modified public interfaces.
+- [ ] Add usage examples for new functionality.
+- [ ] Update API documentation for endpoint changes.
+- [ ] `direnv exec . python docs/scripts/validate_code_annotations.py`.
+- [ ] `direnv exec . python docs/scripts/generate_api_docs.py`.
 
 **For new features:**
 
@@ -135,9 +139,9 @@ docs(architecture): update component diagram for new service
 
 **For bug fixes:**
 
-- [ ] Update troubleshooting documentation
-- [ ] Add test cases for the fix
-- [ ] Document workaround if applicable
+- [ ] Update troubleshooting documentation where applicable.
+- [ ] Add regression tests covering the fix.
+- [ ] Document workarounds or operational mitigations.
 
 ### 5.2 Code Review Process
 
@@ -154,12 +158,11 @@ docs(architecture): update component diagram for new service
 
 ```bash
 # Format code
-black src/ tests/
-isort src/ tests/
+direnv exec . black src/ tests/
+direnv exec . ruff check src/ tests/
 
-# Lint and type-check
-ruff check src/ tests/
-mypy src/ --strict
+# Type-check
+direnv exec . mypy src/ --strict
 ```
 
 **Documentation**:

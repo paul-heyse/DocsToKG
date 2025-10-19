@@ -34,6 +34,16 @@ Absolutely—here’s a single, consolidated set of recommendations that merges 
 
 ---
 
+# 2025-10 ContentDownload Integrity Updates
+
+- Successful downloads now emit `reason=null`, conditional hits remain `conditional_not_modified`, and voluntary skips use the new `skip_large_download` code so dashboards can distinguish operator-driven limits from enforcement.
+- Range resume is locked down: the downloader clears `enable_range_resume`, filters resolver metadata prefixed with `resume_`, and annotates telemetry with `resume_disabled=true` whenever a caller still requests the flag.
+- Manifest warm-up defaults to lazy access. `--warm-manifest-cache` restores legacy eager loading for small manifests, but on a 250 k-row catalog the lazy path holds steady under 1 MB while eager mode still consumes ~150 MB.
+- `_validate_cached_artifact` now short-circuits on matching size and mtime; forced digests remain available through `verify_cache_digest=True` and reuse an LRU to avoid repeat hashing.
+- Monitoring guidance has been updated so notebooks and dashboards treat missing reasons as success, chart `skip_large_download` separately, and surface the `resume_disabled` metadata tag.
+
+---
+
 # Detailed recommendations (with how-tos)
 
 ## P0 – Correctness & run-stoppers

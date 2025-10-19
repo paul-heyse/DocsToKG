@@ -1,13 +1,20 @@
+"""Regression tests for resolver download preflight behaviour.
+
+These tests focus on the edge case where `prepare_candidate_download` must honour
+robots.txt decisions before attempting HEAD preflights. They ensure that a disallowed
+URL short-circuits the pipeline without touching the network or mutating download
+context, preventing wasted requests and preserving accurate skip reasons.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
 from unittest import mock
 
-import pytest
-
 from DocsToKG.ContentDownload import download as downloader
 from DocsToKG.ContentDownload.core import ReasonCode, WorkArtifact
 from DocsToKG.ContentDownload.download import DownloadConfig, prepare_candidate_download
+from tests.conftest import PatchManager
 
 requests = downloader.requests
 
@@ -37,7 +44,7 @@ def _build_artifact(tmp_path: Path) -> WorkArtifact:
 
 
 def test_head_precheck_not_called_when_robots_disallow(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    patcher: PatchManager, tmp_path: Path
 ) -> None:
     calls: list[str] = []
 
@@ -45,7 +52,7 @@ def test_head_precheck_not_called_when_robots_disallow(
         calls.append("called")
         return True
 
-    monkeypatch.setattr(downloader, "head_precheck", fake_head_precheck)
+    patcher.setattr(downloader, "head_precheck", fake_head_precheck)
 
     robots_checker = mock.Mock(spec=downloader.RobotsCache)
     robots_checker.is_allowed.return_value = False

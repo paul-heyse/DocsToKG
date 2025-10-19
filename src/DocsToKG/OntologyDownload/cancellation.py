@@ -1,9 +1,17 @@
-"""Cancellation token implementation for cooperative task cancellation."""
+"""Cooperative cancellation primitives shared by long-running download tasks.
+
+The ontology downloader runs concurrent planners, resolvers, and validators.
+This module offers the light-weight :class:`CancellationToken` used to stop
+those routines gracefully, along with :class:`CancellationTokenGroup` for
+broadcast-style cancellation across related tasks (for example, all resolvers
+within a batch).  The implementation intentionally avoids thread interruption
+in favour of explicit checks so that cleanup code can persist manifests,
+diagnostics, and partial downloads predictably.
+"""
 
 from __future__ import annotations
 
 import threading
-from typing import Optional
 
 
 class CancellationToken:

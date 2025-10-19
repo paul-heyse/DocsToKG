@@ -1,4 +1,9 @@
-"""Pipeline integration tests driven by the ontology download harness."""
+"""End-to-end integration tests using the ontology download harness.
+
+Spins up temporary resolvers/validators, runs the full planning → download →
+validation → manifest pipeline, and asserts behaviour across cancellation,
+retry/backoff, error aggregation, and telemetry capture.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +15,9 @@ from contextlib import ExitStack
 from pathlib import Path
 
 import pytest
+
 from DocsToKG.OntologyDownload import api as core
+from DocsToKG.OntologyDownload.cancellation import CancellationTokenGroup
 from DocsToKG.OntologyDownload.planning import (
     BatchFetchError,
     BatchPlanningError,
@@ -18,7 +25,6 @@ from DocsToKG.OntologyDownload.planning import (
     fetch_all,
     plan_all,
 )
-from DocsToKG.OntologyDownload.cancellation import CancellationTokenGroup
 from DocsToKG.OntologyDownload.resolvers import BaseResolver, FetchPlan
 from DocsToKG.OntologyDownload.testing import ResponseSpec, temporary_resolver
 
@@ -128,7 +134,9 @@ def test_plan_all_batch_failure_cancels_blocking_workers(ontology_env):
     class _BlockingPlanResolver(BaseResolver):
         NAME = "blocking-plan"
 
-        def plan(self, spec, config, logger, *, cancellation_token=None):  # noqa: D401 - simple blocking stub
+        def plan(
+            self, spec, config, logger, *, cancellation_token=None
+        ):  # noqa: D401 - simple blocking stub
             blocking_started.set()
             # Check for cancellation periodically while waiting
             while not release_blocking.is_set():
@@ -140,7 +148,9 @@ def test_plan_all_batch_failure_cancels_blocking_workers(ontology_env):
     class _FailingPlanResolver(BaseResolver):
         NAME = "failing-plan"
 
-        def plan(self, spec, config, logger, *, cancellation_token=None):  # noqa: D401 - simple failure stub
+        def plan(
+            self, spec, config, logger, *, cancellation_token=None
+        ):  # noqa: D401 - simple failure stub
             time.sleep(0.1)
             raise RuntimeError("planner boom")
 
@@ -220,7 +230,9 @@ def test_fetch_all_batch_failure_cancels_blocking_workers(ontology_env):
     class _BlockingFetchResolver(BaseResolver):
         NAME = "blocking-fetch"
 
-        def plan(self, spec, config, logger, *, cancellation_token=None):  # noqa: D401 - simple blocking plan
+        def plan(
+            self, spec, config, logger, *, cancellation_token=None
+        ):  # noqa: D401 - simple blocking plan
             return FetchPlan(
                 url=blocking_url,
                 headers={"Accept": "application/rdf+xml"},
@@ -234,7 +246,9 @@ def test_fetch_all_batch_failure_cancels_blocking_workers(ontology_env):
     class _FailingFetchResolver(BaseResolver):
         NAME = "failing-fetch"
 
-        def plan(self, spec, config, logger, *, cancellation_token=None):  # noqa: D401 - simple failure plan
+        def plan(
+            self, spec, config, logger, *, cancellation_token=None
+        ):  # noqa: D401 - simple failure plan
             time.sleep(0.1)
             return FetchPlan(
                 url=failing_url,

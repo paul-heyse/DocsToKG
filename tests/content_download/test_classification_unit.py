@@ -25,6 +25,14 @@
 # }
 # === /NAVMAP ===
 
+"""Focused unit tests for classification and download outcome heuristics.
+
+These cases target the narrow edge conditions around MIME sniffing and the
+`build_download_outcome` helpers, ensuring octet-stream responses are classified
+only after payload inspection and that HEAD precheck metadata influences the
+final reason codes recorded in manifests.
+"""
+
 from __future__ import annotations
 
 from types import SimpleNamespace

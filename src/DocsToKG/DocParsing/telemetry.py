@@ -1,4 +1,11 @@
-"""Telemetry sink interfaces for DocParsing pipelines."""
+"""Telemetry data structures and JSONL sinks for DocParsing stages.
+
+Each stage records structured attempts and manifest entries to support resume
+logic and observability dashboards. This module defines the dataclasses used to
+represent those events plus ``TelemetrySink`` implementations that append them
+to JSONL files under advisory locks, guaranteeing atomic writes even when
+multiple processes report progress concurrently.
+"""
 
 from __future__ import annotations
 

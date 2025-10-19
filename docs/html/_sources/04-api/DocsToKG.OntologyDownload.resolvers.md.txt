@@ -16,6 +16,15 @@ Normalize common license strings to canonical SPDX identifiers.
 
 Produce a :class:`FetchPlan` describing how to retrieve ``spec``.
 
+Args:
+spec: The fetch specification to plan for.
+config: The resolved configuration.
+logger: Logger for this operation.
+cancellation_token: Optional token for cooperative cancellation.
+
+Returns:
+A fetch plan describing how to retrieve the specification.
+
 ### `_normalize_media_type(self, media_type)`
 
 *No documentation available.*

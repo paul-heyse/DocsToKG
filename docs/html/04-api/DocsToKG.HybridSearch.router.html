@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-router">
 <h1>1. Module: router<a class="headerlink" href="#module-router" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.router</span></code>.</p>
@@ -107,11 +107,23 @@
 </section>
 <section id="serialize-all-self">
 <h3><code class="docutils literal notranslate"><span class="pre">serialize_all(self)</span></code><a class="headerlink" href="#serialize-all-self" title="Link to this heading"></a></h3>
-<p>Serialize every managed store (namespace -&gt; payload).</p>
+<p>Serialize every managed store including snapshot metadata.</p>
+</section>
+<section id="serialize-with-meta-store">
+<h3><code class="docutils literal notranslate"><span class="pre">_serialize_with_meta(store)</span></code><a class="headerlink" href="#serialize-with-meta-store" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="iter-stores-self">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_stores(self)</span></code><a class="headerlink" href="#iter-stores-self" title="Link to this heading"></a></h3>
+<p>Return a snapshot of managed stores keyed by namespace.</p>
 </section>
 <section id="restore-all-self-payloads">
 <h3><code class="docutils literal notranslate"><span class="pre">restore_all(self,</span> <span class="pre">payloads)</span></code><a class="headerlink" href="#restore-all-self-payloads" title="Link to this heading"></a></h3>
-<p>Restore stores from serialized payloads.</p>
+<p>Restore stores from serialized payloads and metadata.</p>
+</section>
+<section id="extract-payload-and-meta-packed">
+<h3><code class="docutils literal notranslate"><span class="pre">_extract_payload_and_meta(packed)</span></code><a class="headerlink" href="#extract-payload-and-meta-packed" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="rebuild-if-needed-self">
 <h3><code class="docutils literal notranslate"><span class="pre">rebuild_if_needed(self)</span></code><a class="headerlink" href="#rebuild-if-needed-self" title="Link to this heading"></a></h3>
@@ -143,6 +155,39 @@ Mapping of namespace to maintenance actions performed.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_maintain_store(self,</span> <span class="pre">namespace,</span> <span class="pre">store,</span> <span class="pre">training_sampler)</span></code><a class="headerlink" href="#maintain-store-self-namespace-store-training-sampler" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="build-entry-payload-meta">
+<h3><code class="docutils literal notranslate"><span class="pre">build_entry(payload,</span> <span class="pre">meta)</span></code><a class="headerlink" href="#build-entry-payload-meta" title="Link to this heading"></a></h3>
+<p>Package FAISS payload bytes and optional metadata for persistence.</p>
+<p>Args:
+payload: Serialized FAISS index bytes.
+meta: Supplemental metadata returned by the store snapshot.</p>
+<p>Returns:
+Dict[str, object]: Mapping with <code class="docutils literal notranslate"><span class="pre">faiss</span></code> bytes and optional <code class="docutils literal notranslate"><span class="pre">meta</span></code> payload.</p>
+</section>
+<section id="collect-store">
+<h3><code class="docutils literal notranslate"><span class="pre">collect(store)</span></code><a class="headerlink" href="#collect-store" title="Link to this heading"></a></h3>
+<p>Extract serialized payload and snapshot metadata from <code class="docutils literal notranslate"><span class="pre">store</span></code>.</p>
+<p>Args:
+store: Vector store to snapshot.</p>
+<p>Returns:
+Tuple[bytes, Optional[Mapping[str, object]]]: Serialized FAISS bytes and metadata.</p>
+</section>
+<section id="coerce-entry-entry">
+<h3><code class="docutils literal notranslate"><span class="pre">coerce_entry(entry)</span></code><a class="headerlink" href="#coerce-entry-entry" title="Link to this heading"></a></h3>
+<p>Normalise stored payloads into raw bytes and metadata mapping.</p>
+<p>Args:
+entry: Persisted snapshot entry in legacy or current format.</p>
+<p>Returns:
+Tuple[Optional[bytes], Optional[Mapping[str, object]]]: Normalised payload and metadata.</p>
+</section>
+<section id="restore-store-store-blob-meta">
+<h3><code class="docutils literal notranslate"><span class="pre">restore_store(store,</span> <span class="pre">blob,</span> <span class="pre">meta)</span></code><a class="headerlink" href="#restore-store-store-blob-meta" title="Link to this heading"></a></h3>
+<p>Restore a store from serialized payload and optional metadata.</p>
+<p>Args:
+store: Vector store instance to restore.
+blob: Serialized FAISS bytes.
+meta: Supplemental metadata to pass to <code class="docutils literal notranslate"><span class="pre">restore</span></code> when supported.</p>
+</section>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
@@ -167,7 +212,7 @@ Mapping of namespace to maintenance actions performed.</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -178,7 +223,7 @@ Mapping of namespace to maintenance actions performed.</p>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

@@ -1,4 +1,10 @@
-"""CLI smoke tests executed against the harness-backed environment."""
+"""Happy-path CLI smoke tests executed against the harness sandbox.
+
+Exercises ``ontofetch`` commands (pull, plan, plugins, config) using the
+TestingEnvironment harness that spins up loopback resolvers. Validates content
+writing, manifest generation, plugin enumeration, and JSON mode to guard the
+golden path for automation and documentation snippets.
+"""
 
 from __future__ import annotations
 

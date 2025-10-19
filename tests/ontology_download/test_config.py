@@ -181,6 +181,14 @@
 # }
 # === /NAVMAP ===
 
+"""Configuration model regression tests.
+
+Exercises the layered configuration system: YAML parsing, defaults merging,
+environment overrides, validation of allowed hosts/rate limits, and backwards
+compatibility helpers. Ensures the CLI and API receive well-formed
+``ResolvedConfig`` objects and that misconfigurations raise descriptive errors.
+"""
+
 """Tests for ontology downloader configuration models and helpers."""
 
 from __future__ import annotations

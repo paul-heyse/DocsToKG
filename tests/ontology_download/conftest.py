@@ -15,11 +15,11 @@ from DocsToKG.OntologyDownload.testing import TestingEnvironment
 
 
 @pytest.fixture
-def monkeypatch() -> None:  # type: ignore[override]
-    """Disallow the built-in monkeypatch fixture inside ontology_download tests."""
+def patcher() -> None:  # type: ignore[override]
+    """Disallow the built-in patcher fixture inside ontology_download tests."""
 
     pytest.fail(
-        "The pytest.monkeypatch fixture is not permitted in ontology_download tests.\n"
+        "The pytest.patcher fixture is not permitted in ontology_download tests.\n"
         "Use DocsToKG.OntologyDownload.testing.TestingEnvironment and the provided "
         "temporary_resolver/temporary_validator helpers instead of patching internals.",
         pytrace=False,

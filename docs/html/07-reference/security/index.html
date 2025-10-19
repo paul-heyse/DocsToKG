@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css" />
 
-
+  
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
-    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,48 +75,52 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="security-considerations">
 <h1>1. Security Considerations<a class="headerlink" href="#security-considerations" title="Link to this heading"></a></h1>
-<p>DocsToKG processes potentially sensitive documents. Follow these guidelines to keep deployments secure.</p>
+<p>DocsToKG pipelines touch external APIs, locally cached artifacts, and hybrid search services that may expose sensitive metadata. This page outlines safeguards aligned with the current codebase.</p>
 <section id="data-handling">
 <h2>2. Data Handling<a class="headerlink" href="#data-handling" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Encrypt document storage (at rest) with provider-managed keys or customer-managed keys (CMK).</p></li>
-<li><p>Use dedicated namespaces per tenant and avoid cross-tenant embeddings in shared indexes.</p></li>
-<li><p>Scrub PII before propagating chunks to shared analytics destinations.</p></li>
+<li><p><strong>Storage segregation</strong> – keep <code class="docutils literal notranslate"><span class="pre">$DOCSTOKG_DATA_ROOT</span></code> partitioned per environment (for example <code class="docutils literal notranslate"><span class="pre">/srv/docstokg/{staging,prod}</span></code>) and encrypt those volumes with provider-managed or customer-managed keys.</p></li>
+<li><p><strong>Manifest hygiene</strong> – JSONL manifests written by <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.telemetry</span></code> include hashes and file paths. Do not expose these raw logs externally; export redacted views with <code class="docutils literal notranslate"><span class="pre">tools/manifest_to_csv.py</span></code>.</p></li>
+<li><p><strong>Chunk and embedding scoping</strong> – the chunking pipeline stores doc IDs and references. Use namespace prefixes (<code class="docutils literal notranslate"><span class="pre">DocumentInput.namespace</span></code>) to prevent cross-tenant FAISS ingestion.</p></li>
+<li><p><strong>Telemetry minimisation</strong> – configure sinks (<code class="docutils literal notranslate"><span class="pre">RotatingJsonlSink</span></code>, <code class="docutils literal notranslate"><span class="pre">SqliteSink</span></code>) to log only operational fields; avoid injecting PII via custom metadata or resolver overrides.</p></li>
 </ul>
 </section>
 <section id="access-control">
 <h2>3. Access Control<a class="headerlink" href="#access-control" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Restrict Hybrid Search REST endpoints behind an API gateway with JWT or OAuth2 authentication.</p></li>
-<li><p>Gate ontology download credentials and API keys via a secrets manager (<code class="docutils literal notranslate"><span class="pre">AWS</span> <span class="pre">Secrets</span> <span class="pre">Manager</span></code>, <code class="docutils literal notranslate"><span class="pre">HashiCorp</span> <span class="pre">Vault</span></code>, etc.).</p></li>
-<li><p>Limit write access to FAISS snapshot storage and configuration files.</p></li>
+<li><p><strong>Hybrid Search API</strong> – <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service.HybridSearchAPI</span></code> is unauthenticated by default. Front it with an API gateway (JWT, OAuth2) or embed within a service implementing auth middleware.</p></li>
+<li><p><strong>Secrets</strong> – manage <code class="docutils literal notranslate"><span class="pre">PA_ALEX_KEY</span></code>, ontology credentials, and storage keys in a secrets manager (AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault). The CLI modules read environment variables at runtime; never commit <code class="docutils literal notranslate"><span class="pre">.env</span></code> files.</p></li>
+<li><p><strong>Artifact writes</strong> – guard FAISS snapshot locations and ontology storage buckets with write-only roles for CI/CD principals. Audit rotations via bucket policies or object-locking rules.</p></li>
 </ul>
 </section>
-<section id="supply-chain">
-<h2>4. Supply Chain<a class="headerlink" href="#supply-chain" title="Link to this heading"></a></h2>
+<section id="supply-chain-controls">
+<h2>4. Supply Chain Controls<a class="headerlink" href="#supply-chain-controls" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Pin Python dependencies through <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> and <code class="docutils literal notranslate"><span class="pre">requirements.in</span></code>; review updates quarterly.</p></li>
-<li><p>Verify checksums of the FAISS wheel before installation (provided in <code class="docutils literal notranslate"><span class="pre">docs/07-reference/faiss/resources/</span></code>).</p></li>
-<li><p>Enable <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">--require-hashes</span></code> for deployment pipelines when possible.</p></li>
+<li><p>Dependencies are pinned in <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> and <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>; the bootstrap script installs bundled wheels (<code class="docutils literal notranslate"><span class="pre">ci/wheels/torch…whl</span></code>, <code class="docutils literal notranslate"><span class="pre">faiss…whl</span></code>, <code class="docutils literal notranslate"><span class="pre">vllm…whl</span></code>). Verify these artifacts with <code class="docutils literal notranslate"><span class="pre">sha256sum</span></code> before mirroring to private registries.</p></li>
+<li><p>Enable <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">--require-hashes</span> <span class="pre">-r</span> <span class="pre">requirements.txt</span></code> in deployment CI so supply chain tampering fails closed.</p></li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">exec</span> <span class="pre">.</span> <span class="pre">python</span> <span class="pre">docs/scripts/validate_code_annotations.py</span></code> and <code class="docutils literal notranslate"><span class="pre">validate_docs.py</span></code> in CI to surface undocumented or stale modules before release.</p></li>
+<li><p>Git LFS stores large wheels; enforce <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">lfs</span> <span class="pre">install</span></code> and <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">lfs</span> <span class="pre">pull</span></code> in build pipelines to avoid truncated dependencies.</p></li>
 </ul>
 </section>
 <section id="operational-hardening">
 <h2>5. Operational Hardening<a class="headerlink" href="#operational-hardening" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Run ingestion and search services with least-privilege IAM roles.</p></li>
-<li><p>Enable TLS end-to-end; if running locally, use HTTPS proxies for test environments.</p></li>
-<li><p>Monitor access logs for unusual query patterns and rate-limit high-volume callers.</p></li>
+<li><p><strong>Principle of least privilege</strong> – run ingestion (<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.cli</span></code>) and ontology pipelines with service identities that only access required buckets, queues, or credential scopes.</p></li>
+<li><p><strong>Network hygiene</strong> – outbound resolver requests use <code class="docutils literal notranslate"><span class="pre">requests</span></code> + <code class="docutils literal notranslate"><span class="pre">tenacity</span></code> retry logic. Configure egress rules (proxy, firewall) to restrict unfamiliar domains; maintain allowlists in resolver config.</p></li>
+<li><p><strong>TLS everywhere</strong> – terminate TLS at the gateway and use mTLS or service mesh policies for internal calls. Validate upstream certificates when custom resolvers are added.</p></li>
+<li><p><strong>Logging &amp; monitoring</strong> – ship manifest and telemetry logs to central observability. Leverage <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.observability.Observability</span></code> hooks to forward metrics. Set alerts for unusual query rates or ontology validation failures.</p></li>
 </ul>
 </section>
-<section id="incident-response">
-<h2>6. Incident Response<a class="headerlink" href="#incident-response" title="Link to this heading"></a></h2>
+<section id="incident-response-recovery">
+<h2>6. Incident Response &amp; Recovery<a class="headerlink" href="#incident-response-recovery" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Maintain weekly FAISS and ontology snapshots for rollback.</p></li>
-<li><p>Automate restoration drills (see <code class="docutils literal notranslate"><span class="pre">docs/hybrid_search_runbook.md</span></code>) and keep validation datasets available offline.</p></li>
-<li><p>Document contact points for escalation in the operations playbook (<code class="docutils literal notranslate"><span class="pre">docs/06-operations/index.md</span></code>).</p></li>
+<li><p><strong>Snapshots</strong> – create and version FAISS snapshots (<code class="docutils literal notranslate"><span class="pre">serialize_state</span></code>) and ontology manifests after each deployment. Store them in immutable buckets for 30+ days.</p></li>
+<li><p><strong>Playbooks</strong> – rehearse the rollback steps documented in <code class="docutils literal notranslate"><span class="pre">docs/hybrid_search_runbook.md</span></code>, including restoring snapshots and revoking leaked credentials.</p></li>
+<li><p><strong>Forensics</strong> – retain raw download manifests for the duration required by policy, but rotate access tokens immediately after suspicious resolver activity.</p></li>
+<li><p><strong>Contact chain</strong> – keep the escalation roster in <code class="docutils literal notranslate"><span class="pre">docs/06-operations/index.md</span></code> current so responders can coordinate cross-team fixes.</p></li>
 </ul>
 </section>
 </section>
@@ -135,7 +139,7 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -146,7 +150,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

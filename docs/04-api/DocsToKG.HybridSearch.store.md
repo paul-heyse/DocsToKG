@@ -12,6 +12,10 @@ Unified FAISS vector store, GPU similarity utilities, and state helpers.
 
 Translate a vector UUID into a FAISS-compatible 63-bit integer.
 
+### `resolve_cuvs_state(requested)`
+
+Determine whether cuVS kernels should be enabled for FAISS helpers.
+
 ### `normalize_rows(matrix)`
 
 L2-normalise each row of ``matrix`` in-place.
@@ -34,6 +38,7 @@ query: Query vector or matrix (``N x D``) to compare.
 corpus: Matrix representing the corpus (``M x D``).
 device: CUDA device id used for the computation.
 resources: FAISS GPU resources to execute the kernel.
+pairwise_fn: Optional kernel override for ``faiss.pairwise_distance_gpu``.
 
 Returns:
 numpy.ndarray: Matrix of cosine similarities with shape ``(N, M)``.
@@ -84,9 +89,18 @@ q: Query matrix (``N x D``).
 C: Corpus matrix (``M x D``).
 device: CUDA device id used for computation.
 resources: FAISS GPU resources backing the kernel.
+pairwise_fn: Optional kernel override for ``faiss.pairwise_distance_gpu``.
 
 Returns:
 numpy.ndarray: Pairwise cosine similarities with shape ``(N, M)``.
+
+### `_auto_block_rows(resources, device, dim)`
+
+Estimate a safe block row count from GPU memory metrics.
+
+### `_build_distance_params()`
+
+Construct a ``GpuDistanceParams`` instance when half precision is requested.
 
 ### `cosine_topk_blockwise(q, C)`
 
@@ -95,7 +109,9 @@ Return Top-K cosine similarities between ``q`` and ``C`` using GPU tiling.
 The helper avoids materialising the full ``(N x M)`` similarity matrix by
 iterating over ``C`` in row blocks and maintaining a running Top-K per query
 row. Inputs are copied and normalised inside the routine so callers retain
-ownership of their buffers.
+ownership of their buffers. When ``block_rows`` is left at the sentinel value
+(``-1``), the helper inspects ``resources.getMemoryInfo`` to pick a block
+size that fits comfortably within the currently free GPU memory.
 
 Args:
 q: Query vector or matrix (``N x D``).
@@ -103,7 +119,14 @@ C: Corpus matrix (``M x D``).
 k: Number of neighbours to return per query row.
 device: CUDA device ordinal used for FAISS kernels.
 resources: FAISS GPU resources backing ``pairwise_distance_gpu``.
-block_rows: Number of corpus rows processed per iteration.
+block_rows: Number of corpus rows processed per iteration. Provide a
+positive value to override the automatic sizing. The default
+sentinel (``-1``) enables adaptive sizing derived from GPU memory
+telemetry when available.
+use_fp16: Enable float16 compute for pairwise distance kernels.
+use_cuvs: Optional override forcing cuVS acceleration when supported
+(``True``) or disabling it (``False``). ``None`` defers to
+:func:`faiss.should_use_cuvs` when available.
 
 Returns:
 Tuple ``(scores, indices)`` where each has shape ``(N x K)``. Scores are
@@ -128,7 +151,7 @@ Restore the vector store from a payload produced by :func:`serialize_state`.
 Args:
 faiss_index: Vector store receiving the restored state.
 payload: Mapping with ``faiss`` (base64) and registry vector ids.
-allow_legacy: Permit payloads missing ``meta`` (emits a warning).
+allow_legacy: Permit payloads missing ``meta`` (emits a warning). Defaults to ``True``.
 
 Returns:
 None
@@ -335,6 +358,14 @@ Return a pinned-memory view of ``array`` when practical.
 
 *No documentation available.*
 
+### `flush_snapshot(self)`
+
+Force a snapshot refresh bypassing throttle safeguards.
+
+### `_maybe_refresh_snapshot(self)`
+
+*No documentation available.*
+
 ### `_refresh_cpu_replica(self)`
 
 *No documentation available.*
@@ -456,6 +487,30 @@ device id is invalid.
 Returns:
 None
 
+### `_resolve_replication_targets(self, available)`
+
+Return the filtered GPU ids that should participate in replication.
+
+### `_create_gpu_resources(self)`
+
+Instantiate ``StandardGpuResources`` for ``device`` without additional tweaks.
+
+### `_configure_gpu_resource(self, resource)`
+
+Apply configured knobs to a FAISS GPU resource manager.
+
+### `_record_gpu_resource_configuration(self)`
+
+Emit observability breadcrumbs for configured GPU resource settings.
+
+### `_requires_gpu_resource_customization(self)`
+
+Return whether replica resources need to be retained for custom settings.
+
+### `_configure_gpu_cloner_options(self, options)`
+
+Apply DenseIndexConfig-aware flags to FAISS GPU cloner options.
+
 ### `distribute_to_all_gpus(self, index)`
 
 Clone ``index`` across available GPUs when the build supports it.
@@ -471,6 +526,10 @@ Raises:
 RuntimeError: If sharding is requested but unsupported by the
 linked FAISS build.
 
+### `_maybe_distribute_multi_gpu(self, index)`
+
+Conditionally replicate or shard ``index`` based on configuration.
+
 ### `_maybe_to_gpu(self, index)`
 
 *No documentation available.*
@@ -479,13 +538,32 @@ linked FAISS build.
 
 *No documentation available.*
 
+### `_apply_cloner_reservation(self, cloner_options)`
+
+Populate FAISS cloner reservation knobs when ``expected_ntotal`` is set.
+
 ### `_to_cpu(self, index)`
 
 *No documentation available.*
 
+### `_reset_nprobe_cache(self)`
+
+Invalidate cached nprobe state applied to the active FAISS index.
+
 ### `_set_nprobe(self)`
 
 *No documentation available.*
+
+### `_apply_use_cuvs_parameter(self, index)`
+
+Propagate the cuVS toggle to ``index`` and any GPU replicas.
+
+### `_iter_gpu_index_variants(self, root)`
+
+Return FAISS index variants associated with ``root``.
+
+This walks nested wrappers (e.g. IndexIDMap2, replicas, shards) so
+parameter updates (``use_cuvs``) propagate to each GPU replica.
 
 ### `_log_index_configuration(self, index)`
 
@@ -639,6 +717,26 @@ resolver: Callable mapping FAISS ids to external identifiers.
 
 Delegate range search to the managed store.
 
+### `serialize(self)`
+
+Serialize the managed FAISS index to bytes.
+
+### `snapshot_meta(self)`
+
+Return snapshot metadata describing the managed index configuration.
+
+### `restore(self, payload)`
+
+Restore the managed FAISS index from ``payload``.
+
+### `save(self, path)`
+
+Persist the managed FAISS index to ``path``.
+
+### `load(cls, path, config, dim)`
+
+Load a managed FAISS adapter from ``path``.
+
 ### `needs_training(self)`
 
 Return ``True`` when the underlying index requires training.
@@ -646,6 +744,14 @@ Return ``True`` when the underlying index requires training.
 ### `train(self, vectors)`
 
 Train the managed index using ``vectors``.
+
+### `config(self)`
+
+Return the dense index configuration for the managed store.
+
+### `dim(self)`
+
+Return the embedding dimensionality exposed by the inner store.
 
 ### `device(self)`
 
@@ -666,6 +772,10 @@ Trigger inner index rebuild when required by FAISS heuristics.
 ### `stats(self)`
 
 Expose diagnostic statistics from the managed store.
+
+### `flush_snapshot(self)`
+
+Forward snapshot flush requests to the managed store.
 
 ### `get_gpu_resources(self)`
 

@@ -21,3 +21,4 @@ Run these steps after deploying the resolver stack to verify end-to-end behaviou
 | Average resolver latency | < 5s per attempt | Alert if ≥ 10s sustained |
 
 These expectations feed into the existing operations dashboard for content ingestion. Update alerting rules if service limits or resolver availability changes.
+

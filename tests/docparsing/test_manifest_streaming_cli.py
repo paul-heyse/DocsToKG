@@ -1,4 +1,10 @@
-"""Regression tests for manifest CLI streaming behaviour."""
+"""Regression coverage for the streaming pathways of `docparse manifest`.
+
+These tests stand up dependency stubs for requests, YAML, and logging utils,
+then exercise streaming/tail modes to ensure manifests are paged correctly, HTTP
+responses are handled gracefully, and JSON output remains well-formed even when
+chunks or embeddings emit mixed statuses.
+"""
 
 from __future__ import annotations
 
@@ -12,11 +18,11 @@ import pytest
 from tests.docparsing.stubs import dependency_stubs
 
 
-def _prepare_manifest_cli_stubs(monkeypatch) -> None:
+def _prepare_manifest_cli_stubs(patcher) -> None:
     """Install shared dependency stubs required to import the DocParsing CLI."""
 
     if "tests.docparsing.fake_deps.vllm" not in sys.modules:
-        monkeypatch.setitem(
+        patcher.setitem(
             sys.modules,
             "tests.docparsing.fake_deps.vllm",
             types.ModuleType("tests.docparsing.fake_deps.vllm"),
@@ -31,12 +37,10 @@ def _prepare_manifest_cli_stubs(monkeypatch) -> None:
             return super().format(record)
 
     logging_utils_module.JSONFormatter = _JSONFormatter
-    monkeypatch.setitem(
-        sys.modules, "DocsToKG.OntologyDownload.logging_utils", logging_utils_module
-    )
+    patcher.setitem(sys.modules, "DocsToKG.OntologyDownload.logging_utils", logging_utils_module)
 
     yaml_stub = types.SimpleNamespace(safe_load=lambda *_args, **_kwargs: {}, YAMLError=Exception)
-    monkeypatch.setitem(sys.modules, "yaml", yaml_stub)
+    patcher.setitem(sys.modules, "yaml", yaml_stub)
 
     if "requests" not in sys.modules:
         requests_module = types.ModuleType("requests")
@@ -73,7 +77,7 @@ def _prepare_manifest_cli_stubs(monkeypatch) -> None:
         requests_module.ConnectionError = _RequestException
         requests_module.Timeout = _RequestException
         requests_module.exceptions = types.SimpleNamespace(SSLError=_RequestException)
-        monkeypatch.setitem(sys.modules, "requests", requests_module)
+        patcher.setitem(sys.modules, "requests", requests_module)
 
     if "requests.adapters" not in sys.modules:
         adapters_module = types.ModuleType("requests.adapters")
@@ -84,16 +88,16 @@ def _prepare_manifest_cli_stubs(monkeypatch) -> None:
                 self.kwargs = kwargs
 
         adapters_module.HTTPAdapter = _HTTPAdapter
-        monkeypatch.setitem(sys.modules, "requests.adapters", adapters_module)
+        patcher.setitem(sys.modules, "requests.adapters", adapters_module)
         sys.modules["requests"].adapters = adapters_module  # type: ignore[index]
 
     if "urllib3" not in sys.modules:
         urllib3_module = types.ModuleType("urllib3")
-        monkeypatch.setitem(sys.modules, "urllib3", urllib3_module)
+        patcher.setitem(sys.modules, "urllib3", urllib3_module)
 
     if "urllib3.util" not in sys.modules:
         urllib3_util_module = types.ModuleType("urllib3.util")
-        monkeypatch.setitem(sys.modules, "urllib3.util", urllib3_util_module)
+        patcher.setitem(sys.modules, "urllib3.util", urllib3_util_module)
         sys.modules["urllib3"].util = urllib3_util_module  # type: ignore[index]
 
     if "urllib3.util.retry" not in sys.modules:
@@ -105,17 +109,17 @@ def _prepare_manifest_cli_stubs(monkeypatch) -> None:
                 self.kwargs = kwargs
 
         urllib3_retry_module.Retry = _Retry
-        monkeypatch.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
+        patcher.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
 
 
 @pytest.mark.parametrize("tail", [7])
-def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -> None:
+def test_manifest_streams_large_tail(patcher, tmp_path, capsys, tail: int) -> None:
     """Ensure ``manifest`` streams large iterators while keeping tail accuracy."""
 
     total_entries = 10_050
     stage_name = "chunk"
 
-    _prepare_manifest_cli_stubs(monkeypatch)
+    _prepare_manifest_cli_stubs(patcher)
 
     vllm_module = types.ModuleType("vllm")
 
@@ -138,7 +142,7 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
     vllm_module.LLM = _StubLLM
     vllm_module.DEFAULT_DENSE_DIM = 2560
     vllm_module.PoolingParams = type("PoolingParams", (), {})
-    monkeypatch.setitem(sys.modules, "vllm", vllm_module)
+    patcher.setitem(sys.modules, "vllm", vllm_module)
 
     requests_module = types.ModuleType("requests")
 
@@ -163,7 +167,7 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
     requests_module.ConnectionError = _RequestException
     requests_module.Timeout = _RequestException
     requests_module.exceptions = types.SimpleNamespace(SSLError=_RequestException)
-    monkeypatch.setitem(sys.modules, "requests", requests_module)
+    patcher.setitem(sys.modules, "requests", requests_module)
 
     adapters_module = types.ModuleType("requests.adapters")
 
@@ -173,7 +177,7 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
             self.kwargs = kwargs
 
     adapters_module.HTTPAdapter = _HTTPAdapter
-    monkeypatch.setitem(sys.modules, "requests.adapters", adapters_module)
+    patcher.setitem(sys.modules, "requests.adapters", adapters_module)
     requests_module.adapters = adapters_module
 
     urllib3_module = types.ModuleType("urllib3")
@@ -187,9 +191,9 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
 
     urllib3_retry_module.Retry = _Retry
     urllib3_module.util = urllib3_util_module
-    monkeypatch.setitem(sys.modules, "urllib3", urllib3_module)
-    monkeypatch.setitem(sys.modules, "urllib3.util", urllib3_util_module)
-    monkeypatch.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
+    patcher.setitem(sys.modules, "urllib3", urllib3_module)
+    patcher.setitem(sys.modules, "urllib3.util", urllib3_util_module)
+    patcher.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
 
     from DocsToKG.DocParsing.core import cli
 
@@ -206,16 +210,14 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
                 "duration_s": 0.5,
             }
 
-    monkeypatch.setattr(
+    patcher.setattr(
         cli,
         "iter_manifest_entries",
         fake_iter_manifest_entries,
     )
-    monkeypatch.setattr(
-        cli, "data_manifests", lambda data_root, *, ensure=True: tmp_path
-    )
-    monkeypatch.setattr(cli, "known_stages", [stage_name], raising=False)
-    monkeypatch.setattr(cli, "known_stage_set", {stage_name}, raising=False)
+    patcher.setattr(cli, "data_manifests", lambda data_root, *, ensure=True: tmp_path)
+    patcher.setattr(cli, "known_stages", [stage_name], raising=False)
+    patcher.setattr(cli, "known_stage_set", {stage_name}, raising=False)
 
     exit_code = cli.manifest(
         [
@@ -248,10 +250,10 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
     assert status_line == "  statuses: failure=6, success=10044"
 
 
-def test_manifest_summary_respects_stage_order(monkeypatch, tmp_path, capsys) -> None:
+def test_manifest_summary_respects_stage_order(patcher, tmp_path, capsys) -> None:
     """Requested stage order should be preserved in the manifest summary output."""
 
-    _prepare_manifest_cli_stubs(monkeypatch)
+    _prepare_manifest_cli_stubs(patcher)
 
     manifests_dir = tmp_path / "Manifests"
     manifests_dir.mkdir()
@@ -279,7 +281,7 @@ def test_manifest_summary_respects_stage_order(monkeypatch, tmp_path, capsys) ->
             "duration_s": 2.345,
         }
 
-    monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
+    patcher.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
 
     exit_code = cli.manifest(
         [
@@ -308,10 +310,10 @@ def test_manifest_summary_respects_stage_order(monkeypatch, tmp_path, capsys) ->
     ]
 
 
-def test_manifest_missing_directory_read_only(tmp_path, monkeypatch, capsys) -> None:
+def test_manifest_missing_directory_read_only(tmp_path, patcher, capsys) -> None:
     """CLI should warn when the manifest directory is absent without creating it."""
 
-    _prepare_manifest_cli_stubs(monkeypatch)
+    _prepare_manifest_cli_stubs(patcher)
 
     from DocsToKG.DocParsing.core import cli
 
@@ -322,9 +324,9 @@ def test_manifest_missing_directory_read_only(tmp_path, monkeypatch, capsys) -> 
     def _fail_iter(*_args, **_kwargs):
         raise AssertionError("iter_manifest_entries should not run when manifests are missing")
 
-    monkeypatch.setattr(cli, "iter_manifest_entries", _fail_iter)
-    monkeypatch.setattr(cli, "known_stages", ["chunk"], raising=False)
-    monkeypatch.setattr(cli, "known_stage_set", {"chunk"}, raising=False)
+    patcher.setattr(cli, "iter_manifest_entries", _fail_iter)
+    patcher.setattr(cli, "known_stages", ["chunk"], raising=False)
+    patcher.setattr(cli, "known_stage_set", {"chunk"}, raising=False)
 
     read_only_root.chmod(0o555)
     try:
@@ -339,10 +341,10 @@ def test_manifest_missing_directory_read_only(tmp_path, monkeypatch, capsys) -> 
     assert "No manifest directory found" in output.out
 
 
-def test_manifest_read_only_root_existing_manifests(tmp_path, monkeypatch, capsys) -> None:
+def test_manifest_read_only_root_existing_manifests(tmp_path, patcher, capsys) -> None:
     """CLI should read manifests without creating directories when root is read-only."""
 
-    _prepare_manifest_cli_stubs(monkeypatch)
+    _prepare_manifest_cli_stubs(patcher)
 
     from DocsToKG.DocParsing.core import cli
 
@@ -374,8 +376,8 @@ def test_manifest_read_only_root_existing_manifests(tmp_path, monkeypatch, capsy
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(cli, "known_stages", [stage_name], raising=False)
-    monkeypatch.setattr(cli, "known_stage_set", {stage_name}, raising=False)
+    patcher.setattr(cli, "known_stages", [stage_name], raising=False)
+    patcher.setattr(cli, "known_stage_set", {stage_name}, raising=False)
 
     expected_contents = sorted(path.name for path in read_only_root.iterdir())
 
@@ -396,10 +398,10 @@ def test_manifest_read_only_root_existing_manifests(tmp_path, monkeypatch, capsy
     assert "status=failure" in stdout[1]
 
 
-def test_manifest_tail_handles_missing_timestamps(monkeypatch, tmp_path, capsys) -> None:
+def test_manifest_tail_handles_missing_timestamps(patcher, tmp_path, capsys) -> None:
     """Tail output should respect manifest order when timestamps are missing."""
 
-    _prepare_manifest_cli_stubs(monkeypatch)
+    _prepare_manifest_cli_stubs(patcher)
 
     manifest_dir = tmp_path / "Manifests"
     manifest_dir.mkdir()

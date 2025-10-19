@@ -28,6 +28,5 @@ class RichSerializerProvider:
 
     def as_list(self) -> list[_SerializerRegistration]:
         return [
-            _SerializerRegistration(name, serializer)
-            for name, serializer in self._registry.items()
+            _SerializerRegistration(name, serializer) for name, serializer in self._registry.items()
         ]

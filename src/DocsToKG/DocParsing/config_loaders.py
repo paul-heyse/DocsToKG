@@ -1,4 +1,13 @@
-"""Public helpers for loading DocParsing configuration documents."""
+"""Utility loaders that hydrate DocParsing configs from YAML and TOML sources.
+
+DocParsing stages rely on human-editable marker files to tune structural
+heuristics and tokenizer behaviour. This module centralises the deserialisation
+logic for those documents, wrapping third-party parsers with helpful error
+messages so operators understand when optional dependencies such as PyYAML are
+required. It intentionally keeps the surface minimal—returning plain Python data
+structures—so higher level configuration modules can compose and validate them
+without inheriting parser-specific concerns.
+"""
 
 from __future__ import annotations
 

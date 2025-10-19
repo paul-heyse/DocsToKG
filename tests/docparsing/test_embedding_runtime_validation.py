@@ -1,4 +1,10 @@
-"""Tests for embedding runtime validation helpers."""
+"""Targeted validation coverage for the embedding runtime quality checks.
+
+The embedding stage performs numerous guardrails before writing vectors. These
+tests hit the validation helpers that detect missing outputs, mismatched chunk
+counts, schema violations, and corrupted manifests—ensuring the runtime raises
+clear errors and logs actionable metadata when something drifts.
+"""
 
 from __future__ import annotations
 
@@ -9,10 +15,15 @@ from typing import Any
 import pytest
 
 from DocsToKG.DocParsing.core import cli as core_cli
-from DocsToKG.DocParsing.embedding import runtime
 
 
-def test_validate_vectors_missing_logs_capped(tmp_path, monkeypatch):
+def _get_runtime():
+    """Return the current embedding runtime module instance."""
+
+    return importlib.import_module("DocsToKG.DocParsing.embedding.runtime")
+
+
+def test_validate_vectors_missing_logs_capped(tmp_path, patcher):
     """Missing vectors should log capped metadata and raise a helpful error."""
 
     chunks_dir = tmp_path / "chunks"
@@ -29,7 +40,8 @@ def test_validate_vectors_missing_logs_capped(tmp_path, monkeypatch):
     def fake_log_event(logger, level, message, **fields):
         log_calls.append((level, message, fields))
 
-    monkeypatch.setattr(runtime, "log_event", fake_log_event)
+    runtime = _get_runtime()
+    patcher.setattr(runtime, "log_event", fake_log_event)
 
     with pytest.raises(FileNotFoundError) as exc:
         runtime._validate_vectors_for_chunks(chunks_dir, vectors_dir, logger=object())
@@ -66,11 +78,12 @@ def test_validate_vectors_missing_logs_capped(tmp_path, monkeypatch):
     assert "missing" not in missing_call_fields
 
 
-def test_docparse_embed_missing_chunks_warns_and_exits(tmp_path, monkeypatch):
+def test_docparse_embed_missing_chunks_warns_and_exits(tmp_path, patcher):
     """`docparse embed` exits cleanly with a warning when chunks are absent."""
 
     import DocsToKG.DocParsing.embedding as embedding_module
 
+    runtime = _get_runtime()
     importlib.reload(runtime)
     importlib.reload(embedding_module)
 
@@ -85,38 +98,42 @@ def test_docparse_embed_missing_chunks_warns_and_exits(tmp_path, monkeypatch):
     missing_chunks = data_root / "ChunkedDocTagFiles" / "missing"
     vectors_dir = data_root / "Embeddings"
 
-    monkeypatch.setattr(runtime, "ensure_model_environment", lambda: (model_root, model_root))
+    patcher.setattr(runtime, "ensure_model_environment", lambda: (model_root, model_root))
 
     def _expand_path(candidate):
         if candidate is None:
             return model_root
         return Path(candidate).resolve()
 
-    monkeypatch.setattr(runtime, "expand_path", _expand_path)
-    monkeypatch.setattr(runtime, "_resolve_qwen_dir", lambda _root: qwen_dir)
-    monkeypatch.setattr(runtime, "_resolve_splade_dir", lambda _root: splade_dir)
-    monkeypatch.setattr(runtime, "ensure_splade_environment", lambda **_: {"device": "cpu"})
-    monkeypatch.setattr(runtime, "ensure_qwen_environment", lambda **_: {"device": "cpu", "dtype": "bfloat16"})
-    monkeypatch.setattr(runtime, "_ensure_splade_dependencies", lambda: None)
-    monkeypatch.setattr(runtime, "_ensure_qwen_dependencies", lambda: None)
+    patcher.setattr(runtime, "expand_path", _expand_path)
+    patcher.setattr(runtime, "_resolve_qwen_dir", lambda _root: qwen_dir)
+    patcher.setattr(runtime, "_resolve_splade_dir", lambda _root: splade_dir)
+    patcher.setattr(runtime, "ensure_splade_environment", lambda **_: {"device": "cpu"})
+    patcher.setattr(
+        runtime, "ensure_qwen_environment", lambda **_: {"device": "cpu", "dtype": "bfloat16"}
+    )
+    patcher.setattr(runtime, "_ensure_splade_dependencies", lambda: None)
+    patcher.setattr(runtime, "_ensure_qwen_dependencies", lambda: None)
 
     def _prepare_data_root(override, detected):
         if override is not None:
             return Path(override).resolve()
         return Path(detected).resolve()
 
-    monkeypatch.setattr(runtime, "prepare_data_root", _prepare_data_root)
-    monkeypatch.setattr(runtime, "detect_data_root", lambda: data_root)
-    monkeypatch.setattr(runtime, "data_chunks", lambda root, ensure=False: root / "ChunkedDocTagFiles")
-    monkeypatch.setattr(runtime, "data_vectors", lambda root, ensure=False: root / "Embeddings")
-    monkeypatch.setattr(runtime, "process_pass_a", lambda files, logger: runtime.BM25Stats(N=0, avgdl=0.0, df={}))
+    patcher.setattr(runtime, "prepare_data_root", _prepare_data_root)
+    patcher.setattr(runtime, "detect_data_root", lambda: data_root)
+    patcher.setattr(runtime, "data_chunks", lambda root, ensure=False: root / "ChunkedDocTagFiles")
+    patcher.setattr(runtime, "data_vectors", lambda root, ensure=False: root / "Embeddings")
+    patcher.setattr(
+        runtime, "process_pass_a", lambda files, logger: runtime.BM25Stats(N=0, avgdl=0.0, df={})
+    )
 
     events: list[tuple[str, str, dict[str, Any]]] = []
 
     def fake_log_event(logger, level, message, **fields):
         events.append((level, message, fields))
 
-    monkeypatch.setattr(runtime, "log_event", fake_log_event)
+    patcher.setattr(runtime, "log_event", fake_log_event)
 
     exit_code = core_cli._run_stage(
         core_cli.embed,

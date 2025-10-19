@@ -70,11 +70,14 @@ direnv exec . docparse embed \
 import json
 from pathlib import Path
 
+from DocsToKG.HybridSearch import (
+    ChunkIngestionPipeline,
+    FaissVectorStore,
+    Observability,
+    serialize_state,
+)
 from DocsToKG.HybridSearch.config import HybridSearchConfigManager
-from DocsToKG.HybridSearch import Observability
-from DocsToKG.HybridSearch.ingest import ChunkIngestionPipeline
-from DocsToKG.HybridSearch.store import FaissVectorStore, ChunkRegistry, serialize_state
-from DocsToKG.HybridSearch.storage import OpenSearchSimulator
+from DocsToKG.HybridSearch.store import ChunkRegistry, OpenSearchSimulator
 from DocsToKG.HybridSearch.types import DocumentInput
 
 config_manager = HybridSearchConfigManager(Path("config/hybrid_config.json"))
@@ -154,8 +157,8 @@ def hybrid_search(payload: dict):
 ## 5. Module Consolidation Checklist
 
 - Review `docs/hybrid_search_module_migration.md` and update any automation that still imports from deprecated shims (`results`, `similarity`, `retrieval`, `schema`, `operations`, `tools`).
-- Ensure CI workflows call `python -m DocsToKG.HybridSearch.validation` instead of legacy
-  scripts.
+- Ensure CI workflows exercise the hybrid search regression suite
+  (`pytest tests/hybrid_search/test_suite.py`) instead of legacy scripts.
 - Watch for `DeprecationWarning` in logs and resolve them before upgrading to DocsToKG
   v0.6.0.
 

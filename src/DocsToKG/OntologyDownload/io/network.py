@@ -1,4 +1,10 @@
-"""Networking utilities for ontology downloads."""
+"""Networking utilities for ontology downloads.
+
+This module manages resilient HTTP downloads: DNS caching, session pooling,
+range resume, provenance logging, rate limiting integration, and security
+guards around redirects and content types.  It provides the streaming helpers
+consumed by resolvers and the planner when fetching ontology artefacts.
+"""
 
 from __future__ import annotations
 

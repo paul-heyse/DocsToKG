@@ -1,4 +1,11 @@
-"""Configuration, optional dependency, and storage utilities for ontology downloads."""
+"""Configuration, optional dependency, and storage utilities for ontology downloads.
+
+This module defines the typed settings models used by the CLI, environment
+variable loading, rate-limit parsing, local cache layout, and optional
+dependency wiring.  It also exposes helpers for validating interpreter support
+and coercing user-provided configuration into strongly-typed structures that
+downstream planners and resolvers can consume safely.
+"""
 
 from __future__ import annotations
 
@@ -581,6 +588,7 @@ def invalidate_default_config_cache() -> None:
 
 
 if _HAS_PYDANTIC_SETTINGS:
+
     class EnvironmentOverrides(BaseSettings):
         """Pydantic settings model exposing environment-derived overrides."""
 
@@ -606,6 +614,7 @@ if _HAS_PYDANTIC_SETTINGS:
         )
 
 else:
+
     class EnvironmentOverrides:
         """Fallback environment reader when ``pydantic-settings`` is unavailable."""
 
@@ -633,6 +642,15 @@ else:
         def model_dump(
             self, *, by_alias: bool = False, exclude_none: bool = False
         ) -> Dict[str, object]:
+            """Return environment-derived overrides mirroring ``BaseSettings.model_dump``.
+
+            Args:
+                by_alias: Included for API parity; ignored by the fallback implementation.
+                exclude_none: When ``True``, omit keys whose values evaluate to ``None``.
+
+            Returns:
+                Dict[str, object]: Mapping of configuration keys to environment-provided values.
+            """
             data: Dict[str, object] = {
                 "max_retries": self.max_retries,
                 "timeout_sec": self.timeout_sec,

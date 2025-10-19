@@ -114,6 +114,10 @@ Return the canonical MIME type component from a Content-Type header.
 
 Raise ContentPolicyViolation when response headers violate policy.
 
+### `_calculate_equal_jitter_delay(attempt)`
+
+Return an exponential backoff delay using equal jitter.
+
 ### `request_with_retries(session, method, url)`
 
 Execute an HTTP request with exponential backoff and retry handling.
@@ -128,6 +132,8 @@ retry_statuses: HTTP status codes that should trigger a retry. Defaults to
 ``{429, 500, 502, 503, 504}``.
 backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to ``0.75``.
 respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
+retry_after_cap: Optional ceiling applied to parsed ``Retry-After`` values in seconds. When provided,
+the helper honours the lesser of the header value and this cap while still respecting ``backoff_max``.
 content_policy: Optional mapping describing allowed MIME types for the target host.
 max_retry_duration: Maximum total time to spend on retries in seconds. If exceeded, raises
 immediately. Defaults to ``None`` (no limit).
@@ -186,6 +192,10 @@ Allow instances to be used as session factories callable.
 ### `close_current(self)`
 
 Close and remove the session bound to the current thread.
+
+### `close_for_thread(self, thread_id)`
+
+Close and discard the session bound to ``thread_id`` if present.
 
 ### `close_all(self)`
 

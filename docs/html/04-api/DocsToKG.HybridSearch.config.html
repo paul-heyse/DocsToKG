@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-config">
 <h1>1. Module: config<a class="headerlink" href="#module-config" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.config</span></code>.</p>
@@ -175,7 +175,9 @@ device: GPU device ordinal for FAISS operations (0 default)
 ivfpq_use_precomputed: Use precomputed IVFPQ lookup tables (True default)
 ivfpq_float16_lut: Use float16 IVFPQ lookup tables when available (True default)
 multi_gpu_mode: Replica strategy for multi-GPU hosts (“single” default)
+replication_gpu_ids: Explicit GPU ids to target when multi-GPU replication is enabled
 gpu_temp_memory_bytes: Optional temporary memory pool size for FAISS GPU ops
+gpu_pinned_memory_bytes: Optional pinned memory pool size for faster H2D/D2H transfers
 gpu_indices_32_bit: When True, store FAISS indices in 32-bit format to save VRAM
 expected_ntotal: Hint for anticipated index size; used to pre-reserve GPU memory
 rebuild_delete_threshold: Pending delete count before forcing full rebuild
@@ -185,8 +187,17 @@ flat_use_fp16: Use float16 compute for flat indexes when available
 enable_replication: Allow replication to additional GPUs when configured
 enable_reserve_memory: Enable GPU memory reservation based on expected_ntotal
 use_pinned_memory: Use pinned host buffers for large add/search batches
+gpu_use_default_null_stream: Use FAISS APIs to bind CUDA’s default null stream
+for the configured device when available (False default)
+gpu_use_default_null_stream_all_devices: Use FAISS APIs to bind the default
+CUDA null stream across every visible GPU (False default)
+use_cuvs: Optional override to force-enable or disable cuVS acceleration
+for FAISS GPU distance kernels. <code class="docutils literal notranslate"><span class="pre">None</span></code> defers to FAISS heuristics
+(<code class="docutils literal notranslate"><span class="pre">faiss.should_use_cuvs</span></code>).
 ingest_dedupe_threshold: Skip ingest when cosine similarity exceeds this value (0 disables)
 persist_mode: Persistence policy (“cpu_bytes” default, disable for GPU-only runtime)
+snapshot_refresh_interval_seconds: Minimum seconds between CPU snapshot refreshes (0 disables interval throttle)
+snapshot_refresh_writes: Minimum write operations between CPU snapshot refreshes (0 disables write throttle)
 ivf_train_factor: Controls IVF training sample size per nlist shard</p>
 <p>Examples:</p>
 <blockquote>
@@ -315,7 +326,7 @@ True</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -326,7 +337,7 @@ True</p>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

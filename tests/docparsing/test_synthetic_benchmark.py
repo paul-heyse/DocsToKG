@@ -19,7 +19,13 @@
 # }
 # === /NAVMAP ===
 
-"""Tests for synthetic benchmarking helpers."""
+"""Exercise the synthetic benchmarking utilities used for performance tracking.
+
+The DocParsing repo ships a synthetic benchmark harness to estimate throughput
+and memory profiles without real corpora. These tests cover the helpers that
+generate synthetic chunks/vectors and summarise speedups so performance reports
+remain trustworthy.
+"""
 
 from __future__ import annotations
 

@@ -91,35 +91,38 @@
 # }
 # === /NAVMAP ===
 
-"""
-Content Download Resolver Orchestration
+"""Resolver orchestration, configuration, and metrics for content downloads.
 
-This module centralises resolver configuration, provider registration,
-pipeline orchestration, and cache helpers for the DocsToKG content download
-stack. Resolver classes encapsulate provider-specific discovery logic while
-the shared pipeline coordinates rate limiting, concurrency, and polite HTTP
-behaviour.
+Responsibilities
+----------------
+- Own the resolver registry (built-ins plus plugin hooks) and expose helpers
+  such as :func:`default_resolvers`, :func:`load_resolver_config`, and
+  :func:`apply_config_overrides` that normalise command-line overrides.
+- Define the data structures that describe pipeline activity:
+  :class:`ResolverConfig`, :class:`AttemptRecord`, :class:`DownloadOutcome`,
+  :class:`PipelineResult`, and :class:`ResolverMetrics`.
+- Coordinate threaded resolver execution via :class:`ResolverPipeline`,
+  including concurrency controls, per-domain token buckets, circuit breakers,
+  and retry logic wired into :mod:`DocsToKG.ContentDownload.networking`.
+- Track manifest/bookkeeping state (URL dedupe, cache verification, latency
+  counters) so downstream modules can persist consistent telemetry snapshots.
 
-Key Features:
-- Resolver registry supplying default provider ordering and toggles.
-- Shared retry helper integration to ensure consistent network backoff.
-- Manifest and attempt bookkeeping for detailed diagnostics.
-- Utility functions for cache invalidation and signature normalisation.
+Key Components
+--------------
+- ``ResolverConfig`` – typed view of pipeline and HTTP toggle settings.
+- ``ResolverPipeline`` – orchestrates resolver attempts, concurrency, and
+  result aggregation.
+- ``AttemptRecord`` / ``DownloadOutcome`` / ``PipelineResult`` – structured
+  payloads consumed by telemetry sinks.
+- ``load_resolver_config`` / ``read_resolver_config`` – parse YAML/JSON config
+  files and merge them with defaults and CLI toggles.
 
-Dependencies:
-- requests: Outbound HTTP traffic and session management.
-- DocsToKG.ContentDownload.resolvers: Resolver registry and implementations.
-- DocsToKG.ContentDownload.network: Shared retry and session helpers.
-
-Usage:
-    from DocsToKG.ContentDownload import pipeline
-
-    config = pipeline.ResolverConfig()
-    active_resolvers = pipeline.default_resolvers()
-    runner = pipeline.ResolverPipeline(
-        resolvers=active_resolvers,
-        config=config,
-    )
+Design Notes
+------------
+- Resolver implementations live in :mod:`DocsToKG.ContentDownload.resolvers`;
+  this module keeps orchestration logic separate from individual provider code.
+- Concurrency primitives favour cooperative cancellation and reuse fixtures
+  that the unit tests in ``tests/content_download`` exercise directly.
 """
 
 from __future__ import annotations

@@ -49,7 +49,12 @@
 # }
 # === /NAVMAP ===
 
-"""Tests for CLI formatting utilities."""
+"""Regression coverage for CLI table/summary formatting helpers.
+
+Verifies that plan/result tables, validation summaries, and inline hyperlinks
+render with correct alignment, padding, and detail aggregation. Protects the
+text output consumed by operators and documentation snippets.
+"""
 
 from __future__ import annotations
 

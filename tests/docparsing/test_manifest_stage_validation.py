@@ -1,4 +1,11 @@
-"""Validation coverage for manifest stage argument handling."""
+"""Ensure manifest CLI stage arguments are validated and informative.
+
+The manifest tooling accepts stage filters and must surface clear feedback when
+users request unsupported combinations. These tests wire in lightweight stubs to
+assert that invalid stages raise `CLIValidationError`, logging integration works
+with the OntologyDownload formatter, and valid stage lists stream entries as
+expected.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +18,7 @@ from typing import Any, Dict, Iterable, Optional
 import pytest
 
 from DocsToKG.DocParsing.cli_errors import CLIValidationError
+from tests.conftest import PatchManager
 from tests.docparsing.stubs import dependency_stubs
 
 
@@ -27,7 +35,7 @@ def _iter_stub(stages: list[str]) -> Iterable[Dict[str, Any]]:
         }
 
 
-def _install_logging_stub(monkeypatch: pytest.MonkeyPatch) -> None:
+def _install_logging_stub(patcher: PatchManager) -> None:
     """Provide the minimal logging utilities required by the CLI import."""
 
     logging_utils_module = types.ModuleType("DocsToKG.OntologyDownload.logging_utils")
@@ -37,10 +45,10 @@ def _install_logging_stub(monkeypatch: pytest.MonkeyPatch) -> None:
             return super().format(record)
 
     logging_utils_module.JSONFormatter = _JSONFormatter
-    monkeypatch.setitem(sys.modules, "DocsToKG.OntologyDownload.logging_utils", logging_utils_module)
+    patcher.setitem(sys.modules, "DocsToKG.OntologyDownload.logging_utils", logging_utils_module)
 
 
-def _install_http_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
+def _install_http_stubs(patcher: PatchManager) -> None:
     """Install lightweight HTTP client stubs used by the CLI import path."""
 
     requests_module = types.ModuleType("requests")
@@ -88,14 +96,14 @@ def _install_http_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
     urllib3_retry_module.Retry = _Retry
     urllib3_module.util = urllib3_util_module
 
-    monkeypatch.setitem(sys.modules, "requests", requests_module)
-    monkeypatch.setitem(sys.modules, "requests.adapters", adapters_module)
-    monkeypatch.setitem(sys.modules, "urllib3", urllib3_module)
-    monkeypatch.setitem(sys.modules, "urllib3.util", urllib3_util_module)
-    monkeypatch.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
+    patcher.setitem(sys.modules, "requests", requests_module)
+    patcher.setitem(sys.modules, "requests.adapters", adapters_module)
+    patcher.setitem(sys.modules, "urllib3", urllib3_module)
+    patcher.setitem(sys.modules, "urllib3.util", urllib3_util_module)
+    patcher.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
 
 
-def _install_dependency_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
+def _install_dependency_stubs(patcher: PatchManager) -> None:
     """Ensure optional dependency stubs are available before importing the CLI."""
 
     fake_vllm = types.ModuleType("tests.docparsing.fake_deps.vllm")
@@ -120,22 +128,22 @@ def _install_dependency_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_vllm.DEFAULT_DENSE_DIM = 2560
     fake_vllm.PoolingParams = type("PoolingParams", (), {})
 
-    monkeypatch.setitem(sys.modules, "tests.docparsing.fake_deps.vllm", fake_vllm)
+    patcher.setitem(sys.modules, "tests.docparsing.fake_deps.vllm", fake_vllm)
     dependency_stubs()
 
 
-def _prepare_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+def _prepare_runtime(patcher: PatchManager) -> None:
     """Install all test doubles needed to import the CLI module."""
 
-    _install_dependency_stubs(monkeypatch)
-    _install_logging_stub(monkeypatch)
-    _install_http_stubs(monkeypatch)
+    _install_dependency_stubs(patcher)
+    _install_logging_stub(patcher)
+    _install_http_stubs(patcher)
 
 
-def test_manifest_stage_normalization(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_manifest_stage_normalization(patcher: PatchManager, tmp_path: Path) -> None:
     """Mixed-case stages are normalised, deduplicated, and forwarded in order."""
 
-    _prepare_runtime(monkeypatch)
+    _prepare_runtime(patcher)
     from DocsToKG.DocParsing.core import cli
 
     observed: dict[str, Any] = {}
@@ -150,23 +158,21 @@ def test_manifest_stage_normalization(monkeypatch: pytest.MonkeyPatch, tmp_path:
         observed["data_root"] = data_root
         return _iter_stub(stages)
 
-    monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
-    monkeypatch.setattr(
-        cli, "data_manifests", lambda _root, *, ensure=True: tmp_path
-    )
-    monkeypatch.setattr(
+    patcher.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
+    patcher.setattr(cli, "data_manifests", lambda _root, *, ensure=True: tmp_path)
+    patcher.setattr(
         cli,
         "known_stages",
         ["doctags-html", "doctags-pdf", "chunks", "embeddings"],
         raising=False,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         cli,
         "known_stage_set",
         {"doctags-html", "doctags-pdf", "chunks", "embeddings"},
         raising=False,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         cli,
         "STAGE_ALIASES",
         {
@@ -199,28 +205,26 @@ def test_manifest_stage_normalization(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert observed["data_root"] == tmp_path
 
 
-def test_manifest_rejects_unknown_stage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_manifest_rejects_unknown_stage(patcher: PatchManager, tmp_path: Path) -> None:
     """An unknown ``--stage`` value raises a structured validation error."""
 
-    _prepare_runtime(monkeypatch)
+    _prepare_runtime(patcher)
     from DocsToKG.DocParsing.core import cli
 
-    monkeypatch.setattr(
-        cli, "data_manifests", lambda _root, *, ensure=True: tmp_path
-    )
-    monkeypatch.setattr(
+    patcher.setattr(cli, "data_manifests", lambda _root, *, ensure=True: tmp_path)
+    patcher.setattr(
         cli,
         "known_stages",
         ["doctags-html", "doctags-pdf", "chunk", "embeddings"],
         raising=False,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         cli,
         "known_stage_set",
         {"doctags-html", "doctags-pdf", "chunk", "embeddings"},
         raising=False,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         cli,
         "STAGE_ALIASES",
         {"doctags": ("doctags-html", "doctags-pdf")},
@@ -228,12 +232,14 @@ def test_manifest_rejects_unknown_stage(monkeypatch: pytest.MonkeyPatch, tmp_pat
     )
 
     with pytest.raises(CLIValidationError) as excinfo:
-        cli._manifest_main([
-            "--stage",
-            "invalid",
-            "--data-root",
-            str(tmp_path),
-        ])
+        cli._manifest_main(
+            [
+                "--stage",
+                "invalid",
+                "--data-root",
+                str(tmp_path),
+            ]
+        )
 
     error = excinfo.value
     assert error.option == "--stage"
@@ -242,12 +248,10 @@ def test_manifest_rejects_unknown_stage(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert "Discovered stages:" in error.message
 
 
-def test_manifest_default_includes_discovered_stage(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_manifest_default_includes_discovered_stage(patcher: PatchManager, tmp_path: Path) -> None:
     """Stages discovered from manifest filenames are selected by default."""
 
-    _prepare_runtime(monkeypatch)
+    _prepare_runtime(patcher)
     from DocsToKG.DocParsing.core import cli
 
     stage_name = "synthetic"
@@ -266,17 +270,15 @@ def test_manifest_default_includes_discovered_stage(
         observed["data_root"] = data_root
         return _iter_stub(stages)
 
-    monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
-    monkeypatch.setattr(
-        cli, "data_manifests", lambda _root, *, ensure=True: tmp_path
-    )
-    monkeypatch.setattr(
+    patcher.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
+    patcher.setattr(cli, "data_manifests", lambda _root, *, ensure=True: tmp_path)
+    patcher.setattr(
         cli,
         "known_stages",
         ["doctags", "chunk", "embeddings"],
         raising=False,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         cli,
         "known_stage_set",
         {"doctags", "chunk", "embeddings"},
@@ -290,12 +292,10 @@ def test_manifest_default_includes_discovered_stage(
     assert observed["data_root"] == tmp_path
 
 
-def test_manifest_accepts_discovered_stage_filter(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_manifest_accepts_discovered_stage_filter(patcher: PatchManager, tmp_path: Path) -> None:
     """A newly discovered stage name is accepted as a filter value."""
 
-    _prepare_runtime(monkeypatch)
+    _prepare_runtime(patcher)
     from DocsToKG.DocParsing.core import cli
 
     stage_name = "synthetic"
@@ -314,29 +314,29 @@ def test_manifest_accepts_discovered_stage_filter(
         observed["data_root"] = data_root
         return _iter_stub(stages)
 
-    monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
-    monkeypatch.setattr(
-        cli, "data_manifests", lambda _root, *, ensure=True: tmp_path
-    )
-    monkeypatch.setattr(
+    patcher.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
+    patcher.setattr(cli, "data_manifests", lambda _root, *, ensure=True: tmp_path)
+    patcher.setattr(
         cli,
         "known_stages",
         ["doctags", "chunk", "embeddings"],
         raising=False,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         cli,
         "known_stage_set",
         {"doctags", "chunk", "embeddings"},
         raising=False,
     )
 
-    exit_code = cli.manifest([
-        "--stage",
-        stage_name,
-        "--data-root",
-        str(tmp_path),
-    ])
+    exit_code = cli.manifest(
+        [
+            "--stage",
+            stage_name,
+            "--data-root",
+            str(tmp_path),
+        ]
+    )
 
     assert exit_code == 0
     assert observed["stages"] == [stage_name]
@@ -344,11 +344,11 @@ def test_manifest_accepts_discovered_stage_filter(
 
 
 def test_manifest_help_describes_stage_default(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    patcher: PatchManager, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The manifest help text documents the discovery default and fallback."""
 
-    _prepare_runtime(monkeypatch)
+    _prepare_runtime(patcher)
     from DocsToKG.DocParsing.core import cli
 
     with pytest.raises(SystemExit):
@@ -357,8 +357,7 @@ def test_manifest_help_describes_stage_default(
     output = " ".join(capsys.readouterr().out.split())
     assert "Supported stages: doctags-html, doctags-pdf, chunks, embeddings." in output
     assert (
-        "Aliases: 'doctags' selects doctags-html and doctags-pdf; 'chunk' selects chunks;"
-        in output
+        "Aliases: 'doctags' selects doctags-html and doctags-pdf; 'chunk' selects chunks;" in output
     )
     assert "'embed' selects embeddings." in output
     assert "Defaults to stages discovered from manifest files" in output

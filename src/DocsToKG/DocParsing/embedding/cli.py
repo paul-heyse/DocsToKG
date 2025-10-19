@@ -1,4 +1,11 @@
-"""Command-line integration helpers for the embedding stage."""
+"""CLI parser utilities for configuring the DocParsing embedding stage.
+
+The embedding CLI mirrors the chunking interface but introduces additional
+flags for dense/sparse backends, shard coordination, and cache management. This
+module defines the reusable option tuples and parser constructors consumed by
+``docparse embed`` and orchestration scripts so vector generation runs are
+configured consistently across environments.
+"""
 
 from __future__ import annotations
 

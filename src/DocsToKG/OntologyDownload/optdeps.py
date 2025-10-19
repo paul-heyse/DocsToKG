@@ -1,4 +1,11 @@
-"""Optional dependency helpers for the ontology downloader."""
+"""Optional dependency helpers for the ontology downloader.
+
+Several validators and resolvers rely on heavy libraries (pystow, rdflib,
+pronto, owlready2).  Importing them unconditionally would slow startup and
+break minimal deployments.  This module centralises the guarded import logic,
+provides cache-aware accessors, and exposes hooks for tests to override the
+loader behaviour.
+"""
 
 from __future__ import annotations
 
@@ -71,10 +78,22 @@ def _call_with_override(callback: Callable[[], Any], cache_key: Optional[str]) -
 
 
 def get_pystow() -> Any:
+    """Return the ``pystow`` module, loading a stub when optional deps are missing.
+
+    Returns:
+        Any: Imported ``pystow`` module or fallback stub.
+    """
+
     return _call_with_override(_settings.get_pystow, "get_pystow")
 
 
 def get_rdflib() -> Any:
+    """Return an ``rdflib`` module or stub ``Graph`` implementation for testing.
+
+    Returns:
+        Any: Real ``rdflib`` module or a stub with a ``Graph`` attribute.
+    """
+
     module = _call_with_override(_settings.get_rdflib, "get_rdflib")
     if getattr(module, "_ontofetch_stub", False):
         return module.Graph()
@@ -82,8 +101,20 @@ def get_rdflib() -> Any:
 
 
 def get_pronto() -> Any:
+    """Return the ``pronto`` module, respecting optional dependency overrides.
+
+    Returns:
+        Any: Imported ``pronto`` module or stub.
+    """
+
     return _call_with_override(_settings.get_pronto, "get_pronto")
 
 
 def get_owlready2() -> Any:
+    """Return the ``owlready2`` module, applying opt-dependency fallbacks when needed.
+
+    Returns:
+        Any: Imported ``owlready2`` module or fallback stub.
+    """
+
     return _call_with_override(_settings.get_owlready2, "get_owlready2")

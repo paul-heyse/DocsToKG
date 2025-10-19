@@ -133,6 +133,13 @@
 # }
 # === /NAVMAP ===
 
+"""Validator harness regression coverage.
+
+Exercises validator configuration parsing, resource budgeting, subprocess flow,
+and success/failure recording across robot, rdflib, pronto, owlready2, Arelle,
+and custom XBRL validators to ensure consistent manifest entries.
+"""
+
 """
 Ontology Validator Tests
 
@@ -159,9 +166,7 @@ import json
 import logging
 import multiprocessing
 import os
-import platform
 import shutil
-import signal
 import sys
 import threading
 import time
@@ -169,8 +174,8 @@ import zipfile
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
 from types import SimpleNamespace
+from typing import Optional
 from unittest.mock import patch
 
 import pytest

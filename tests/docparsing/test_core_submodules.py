@@ -1,4 +1,12 @@
-"""Unit tests covering refactored DocParsing core submodules."""
+"""Comprehensively exercise DocParsing core utilities after refactors.
+
+The core package hides numerous helper functions that power CLI orchestration,
+plan generation, and HTTP/session management. This module verifies those
+refactored helpers work together: structural marker loading, resume controllers,
+plan display, HTTP timeout normalisation, and CLI argument merging. Keeping
+these tests broad ensures the higher-level CLI flows stay stable when internal
+utilities evolve.
+"""
 
 from __future__ import annotations
 
@@ -38,10 +46,11 @@ from DocsToKG.DocParsing.core.planning import (
     plan_doctags,
     plan_embed,
 )
+from tests.conftest import PatchManager
 
 
 @pytest.fixture
-def planning_module_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
+def planning_module_stubs(patcher: PatchManager) -> None:
     """Provide lightweight DocParsing submodules for planning tests."""
 
     import DocsToKG.DocParsing as docparsing_pkg
@@ -60,11 +69,6 @@ def planning_module_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
         parser.add_argument("--force", action="store_true")
         parser.add_argument("--verify-hash", action="store_true")
 
-    def list_htmls(directory: Path):
-        return (path for path in sorted(Path(directory).rglob("*.html")))
-
-    def list_pdfs(directory: Path):
-        return (path for path in sorted(Path(directory).rglob("*.pdf")))
     def _iter_paths(
         directory: Path,
         suffixes: tuple[str, ...],
@@ -79,9 +83,7 @@ def planning_module_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
 
         if root.is_file():
             candidate = root
-            if candidate.suffix.lower() in suffix_set and (
-                include is None or include(candidate)
-            ):
+            if candidate.suffix.lower() in suffix_set and (include is None or include(candidate)):
                 yield candidate
             return
 
@@ -190,17 +192,17 @@ def planning_module_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
 
     stub_embedding.build_parser = build_embed_parser
 
-    monkeypatch.setitem(sys.modules, "DocsToKG.DocParsing.doctags", stub_doctags)
-    monkeypatch.setitem(sys.modules, "DocsToKG.DocParsing.chunking", stub_chunking)
-    monkeypatch.setitem(sys.modules, "DocsToKG.DocParsing.embedding", stub_embedding)
+    patcher.setitem(sys.modules, "DocsToKG.DocParsing.doctags", stub_doctags)
+    patcher.setitem(sys.modules, "DocsToKG.DocParsing.chunking", stub_chunking)
+    patcher.setitem(sys.modules, "DocsToKG.DocParsing.embedding", stub_embedding)
 
-    monkeypatch.setitem(docparsing_pkg._MODULE_CACHE, "doctags", stub_doctags)
-    monkeypatch.setitem(docparsing_pkg._MODULE_CACHE, "chunking", stub_chunking)
-    monkeypatch.setitem(docparsing_pkg._MODULE_CACHE, "embedding", stub_embedding)
+    patcher.setitem(docparsing_pkg._MODULE_CACHE, "doctags", stub_doctags)
+    patcher.setitem(docparsing_pkg._MODULE_CACHE, "chunking", stub_chunking)
+    patcher.setitem(docparsing_pkg._MODULE_CACHE, "embedding", stub_embedding)
 
-    monkeypatch.setattr(docparsing_pkg, "doctags", stub_doctags, raising=False)
-    monkeypatch.setattr(docparsing_pkg, "chunking", stub_chunking, raising=False)
-    monkeypatch.setattr(docparsing_pkg, "embedding", stub_embedding, raising=False)
+    patcher.setattr(docparsing_pkg, "doctags", stub_doctags, raising=False)
+    patcher.setattr(docparsing_pkg, "chunking", stub_chunking, raising=False)
+    patcher.setattr(docparsing_pkg, "embedding", stub_embedding, raising=False)
 
 
 def test_normalize_http_timeout_scalar_and_iterables() -> None:
@@ -292,7 +294,9 @@ def test_manifest_resume_controller(tmp_path: Path) -> None:
     assert should_skip_output(output, manifest_skip, "abc123", resume=True, force=False)
     assert not should_skip_output(output, manifest_failure, "abc123", resume=True, force=False)
     assert not should_skip_output(output, manifest_unknown, "abc123", resume=True, force=False)
-    assert not should_skip_output(output, manifest_missing_status, "abc123", resume=True, force=False)
+    assert not should_skip_output(
+        output, manifest_missing_status, "abc123", resume=True, force=False
+    )
 
     controller = ResumeController(
         resume=True,
@@ -414,13 +418,13 @@ def test_load_toml_markers_failure() -> None:
 
 
 def test_chunk_cli_validation_failure(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    patcher: PatchManager, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Chunk CLI surfaces validation errors without tracebacks."""
 
     import DocsToKG.DocParsing as docparsing_pkg
 
-    monkeypatch.syspath_prepend(str(Path(__file__).with_name("fake_deps")))
+    patcher.syspath_prepend(str(Path(__file__).with_name("fake_deps")))
 
     stub_chunking = types.ModuleType("DocsToKG.DocParsing.chunking")
 
@@ -437,9 +441,9 @@ def test_chunk_cli_validation_failure(
     stub_chunking.build_parser = _build_parser
     stub_chunking.main = _main
 
-    monkeypatch.setitem(sys.modules, "DocsToKG.DocParsing.chunking", stub_chunking)
-    monkeypatch.setitem(docparsing_pkg._MODULE_CACHE, "chunking", stub_chunking)
-    monkeypatch.setattr(docparsing_pkg, "chunking", stub_chunking, raising=False)
+    patcher.setitem(sys.modules, "DocsToKG.DocParsing.chunking", stub_chunking)
+    patcher.setitem(docparsing_pkg._MODULE_CACHE, "chunking", stub_chunking)
+    patcher.setattr(docparsing_pkg, "chunking", stub_chunking, raising=False)
 
     exit_code = core_cli.chunk(["--min-tokens", "-1"])
     captured = capsys.readouterr()
@@ -463,7 +467,7 @@ def test_embed_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> Non
     "ignore:Using `@model_validator`:pydantic.warnings.PydanticDeprecatedSince210"
 )
 def test_embed_plan_only_stops_after_summary(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -478,50 +482,50 @@ def test_embed_plan_only_stops_after_summary(
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
 
-    monkeypatch.setattr(embedding_runtime, "ensure_model_environment", lambda: (tmp_path, tmp_path))
+    patcher.setattr(embedding_runtime, "ensure_model_environment", lambda: (tmp_path, tmp_path))
 
     def _expand_path(path: object) -> Path:
         if path is None:
             return tmp_path
         return Path(path).expanduser().resolve()
 
-    monkeypatch.setattr(embedding_runtime, "expand_path", _expand_path)
-    monkeypatch.setattr(embedding_runtime, "_resolve_qwen_dir", lambda root: root / "qwen")
-    monkeypatch.setattr(embedding_runtime, "_resolve_splade_dir", lambda root: root / "splade")
-    monkeypatch.setattr(
+    patcher.setattr(embedding_runtime, "expand_path", _expand_path)
+    patcher.setattr(embedding_runtime, "_resolve_qwen_dir", lambda root: root / "qwen")
+    patcher.setattr(embedding_runtime, "_resolve_splade_dir", lambda root: root / "splade")
+    patcher.setattr(
         embedding_runtime,
         "ensure_splade_environment",
         lambda **_: {"device": "cpu"},
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         embedding_runtime,
         "ensure_qwen_environment",
         lambda **_: {"device": "cpu", "dtype": "fp16"},
     )
-    monkeypatch.setattr(embedding_runtime, "_ensure_splade_dependencies", lambda: None)
-    monkeypatch.setattr(embedding_runtime, "_ensure_qwen_dependencies", lambda: None)
-    monkeypatch.setattr(embedding_runtime, "prepare_data_root", lambda override, detected: tmp_path)
-    monkeypatch.setattr(embedding_runtime, "detect_data_root", lambda: tmp_path)
-    monkeypatch.setattr(embedding_runtime, "data_chunks", lambda _root, ensure=False: chunks_dir)
-    monkeypatch.setattr(embedding_runtime, "data_vectors", lambda _root, ensure=False: vectors_dir)
-    monkeypatch.setattr(
+    patcher.setattr(embedding_runtime, "_ensure_splade_dependencies", lambda: None)
+    patcher.setattr(embedding_runtime, "_ensure_qwen_dependencies", lambda: None)
+    patcher.setattr(embedding_runtime, "prepare_data_root", lambda override, detected: tmp_path)
+    patcher.setattr(embedding_runtime, "detect_data_root", lambda: tmp_path)
+    patcher.setattr(embedding_runtime, "data_chunks", lambda _root, ensure=False: chunks_dir)
+    patcher.setattr(embedding_runtime, "data_vectors", lambda _root, ensure=False: vectors_dir)
+    patcher.setattr(
         embedding_runtime,
         "resolve_pipeline_path",
         lambda cli_value, default_path, resolved_data_root, data_root_overridden, resolver: (
             cli_value or default_path
         ),
     )
-    monkeypatch.setattr(embedding_runtime, "load_manifest_index", lambda *_, **__: {})
-    monkeypatch.setattr(embedding_runtime, "manifest_log_success", lambda **_: None)
-    monkeypatch.setattr(embedding_runtime, "manifest_log_skip", lambda **_: None)
-    monkeypatch.setattr(embedding_runtime, "manifest_log_failure", lambda **_: None)
-    monkeypatch.setattr(embedding_runtime, "_validate_chunk_file_schema", lambda _path: None)
-    monkeypatch.setattr(embedding_runtime, "_handle_embedding_quarantine", lambda **_: None)
+    patcher.setattr(embedding_runtime, "load_manifest_index", lambda *_, **__: {})
+    patcher.setattr(embedding_runtime, "manifest_log_success", lambda **_: None)
+    patcher.setattr(embedding_runtime, "manifest_log_skip", lambda **_: None)
+    patcher.setattr(embedding_runtime, "manifest_log_failure", lambda **_: None)
+    patcher.setattr(embedding_runtime, "_validate_chunk_file_schema", lambda _path: None)
+    patcher.setattr(embedding_runtime, "_handle_embedding_quarantine", lambda **_: None)
 
     def _fail_process(*_args, **_kwargs):
         raise AssertionError("plan-only should not encode")
 
-    monkeypatch.setattr(embedding_runtime, "process_chunk_file_vectors", _fail_process)
+    patcher.setattr(embedding_runtime, "process_chunk_file_vectors", _fail_process)
 
     trace_state = {"tracing": False, "stop_calls": 0}
 
@@ -538,7 +542,7 @@ def test_embed_plan_only_stops_after_summary(
     def _get_traced_memory():  # type: ignore[override]
         raise AssertionError("plan-only should exit before collecting tracemalloc stats")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         embedding_runtime,
         "tracemalloc",
         types.SimpleNamespace(
@@ -567,9 +571,9 @@ def test_embed_plan_only_stops_after_summary(
     # The important behavior is that plan-only mode exits before Pass B
     # assert trace_state["stop_calls"] == 1
     # assert not trace_state["tracing"]
-def test_run_all_forwards_zero_token_bounds(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+
+
+def test_run_all_forwards_zero_token_bounds(patcher: PatchManager, tmp_path: Path) -> None:
     """Run-all CLI forwards explicit zero token bounds and shard settings."""
 
     recorded: dict[str, list[str]] = {}
@@ -585,9 +589,9 @@ def test_run_all_forwards_zero_token_bounds(
 
         return _capture
 
-    monkeypatch.setattr(core_cli, "doctags", _stage("doctags"))
-    monkeypatch.setattr(core_cli, "chunk", _stage("chunk"))
-    monkeypatch.setattr(core_cli, "embed", _stage("embed"))
+    patcher.setattr(core_cli, "doctags", _stage("doctags"))
+    patcher.setattr(core_cli, "chunk", _stage("chunk"))
+    patcher.setattr(core_cli, "embed", _stage("embed"))
 
     doctags_out_dir = tmp_path / "DocTagsFiles"
     chunk_out_dir = tmp_path / "ChunkedDocTagFiles"
@@ -642,7 +646,7 @@ def test_run_all_forwards_zero_token_bounds(
 
 
 def test_run_all_plan_reports_log_level(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     planning_module_stubs: None,
@@ -676,8 +680,8 @@ def test_run_all_plan_reports_log_level(
             "notes": [],
         }
 
-    monkeypatch.setattr(core_cli, "plan_chunk", _fake_plan_chunk)
-    monkeypatch.setattr(core_cli, "plan_embed", _fake_plan_embed)
+    patcher.setattr(core_cli, "plan_chunk", _fake_plan_chunk)
+    patcher.setattr(core_cli, "plan_embed", _fake_plan_embed)
 
     exit_code = core_cli.run_all(
         [
@@ -701,12 +705,12 @@ def test_run_all_plan_reports_log_level(
 
 
 def test_token_profiles_missing_transformers(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    capsys: pytest.CaptureFixture[str], patcher: PatchManager
 ) -> None:
     """Token profile CLI reports missing transformers dependency gracefully."""
 
-    monkeypatch.delitem(sys.modules, "DocsToKG.DocParsing.token_profiles", raising=False)
-    monkeypatch.delitem(sys.modules, "transformers", raising=False)
+    patcher.delitem(sys.modules, "DocsToKG.DocParsing.token_profiles", raising=False)
+    patcher.delitem(sys.modules, "transformers", raising=False)
 
     original_import = builtins.__import__
 
@@ -715,7 +719,7 @@ def test_token_profiles_missing_transformers(
             raise ImportError("No module named 'transformers'")
         return original_import(name, *args, **kwargs)
 
-    monkeypatch.setattr("builtins.__import__", fake_import)
+    patcher.setattr("builtins.__import__", fake_import)
 
     exit_code = core_cli.token_profiles([])
     captured = capsys.readouterr()
@@ -726,14 +730,14 @@ def test_token_profiles_missing_transformers(
 
 
 def test_chunk_missing_transformers_dependency(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    capsys: pytest.CaptureFixture[str], patcher: PatchManager
 ) -> None:
     """Chunk CLI surfaces actionable guidance when transformers is missing."""
 
     import DocsToKG.DocParsing as docparsing_pkg
 
-    monkeypatch.delitem(sys.modules, "DocsToKG.DocParsing.chunking", raising=False)
-    monkeypatch.delitem(docparsing_pkg._MODULE_CACHE, "chunking", raising=False)
+    patcher.delitem(sys.modules, "DocsToKG.DocParsing.chunking", raising=False)
+    patcher.delitem(docparsing_pkg._MODULE_CACHE, "chunking", raising=False)
 
     original_import = builtins.__import__
 
@@ -742,7 +746,7 @@ def test_chunk_missing_transformers_dependency(
             raise ImportError("No module named 'transformers'")
         return original_import(name, *args, **kwargs)
 
-    monkeypatch.setattr("builtins.__import__", fake_import)
+    patcher.setattr("builtins.__import__", fake_import)
 
     exit_code = core_cli.chunk([])
     captured = capsys.readouterr()
@@ -788,7 +792,7 @@ def test_display_plan_stream_output() -> None:
 
 
 def test_plan_doctags_auto_detection_conflict(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -802,7 +806,7 @@ def test_plan_doctags_auto_detection_conflict(
     (html_dir / "doc.html").write_text("<html></html>", encoding="utf-8")
     (pdf_dir / "doc.pdf").write_bytes(b"%PDF-1.4\n")
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
 
     plan = plan_doctags(["--mode", "auto"])
 
@@ -815,7 +819,7 @@ def test_plan_doctags_auto_detection_conflict(
 
 
 def test_plan_doctags_without_resume_skips_hash(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -827,14 +831,12 @@ def test_plan_doctags_without_resume_skips_hash(
     output_dir.mkdir()
     (html_dir / "doc.html").write_text("<html></html>", encoding="utf-8")
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
 
     def _raise_hash(_path: Path) -> str:
         raise AssertionError("compute_content_hash should not run without resume")
 
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash
-    )
+    patcher.setattr("DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash)
 
     plan = plan_doctags(
         [
@@ -852,7 +854,7 @@ def test_plan_doctags_without_resume_skips_hash(
 
 
 def test_plan_doctags_resume_manifest_missing_hash_skips_hash(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -864,41 +866,24 @@ def test_plan_doctags_resume_manifest_missing_hash_skips_hash(
     output_dir.mkdir()
     (html_dir / "doc.html").write_text("<html></html>", encoding="utf-8")
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
 
     def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
         raise AssertionError("compute_content_hash should not run when manifest hash missing")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.compute_content_hash",
         _raise_hash,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index",
         lambda *_args, **_kwargs: {"doc.html": {"doc_id": "doc.html", "status": "success"}},
-    )
-
-    manifest_index = {
-        "doc.html": {"input_hash": "old", "status": "success"},
-    }
-
-    def _raise_hash(_path: Path) -> str:
-        raise AssertionError(
-            "compute_content_hash should not run when overwrite disables resume"
-        )
-
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash
-    )
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.core.planning.load_manifest_index",
-        lambda *_args, **_kwargs: manifest_index,
     )
 
     def _boom(_directory: Path) -> list[Path]:
         raise AssertionError("list_htmls should not be invoked")
 
-    monkeypatch.setattr("DocsToKG.DocParsing.doctags.list_htmls", _boom)
+    patcher.setattr("DocsToKG.DocParsing.doctags.list_htmls", _boom)
 
     plan = plan_doctags(
         [
@@ -907,16 +892,18 @@ def test_plan_doctags_resume_manifest_missing_hash_skips_hash(
             "--in-dir",
             str(html_dir),
             "--out-dir",
-            str(out_dir),
+            str(output_dir),
+            "--resume",
         ]
     )
 
     assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
     assert plan["process"]["preview"] == ["doc.html"]
 
 
 def test_plan_doctags_resume_overwrite_skips_hash(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -930,17 +917,15 @@ def test_plan_doctags_resume_overwrite_skips_hash(
     html_path = html_dir / "doc.html"
     html_path.write_text("<html></html>", encoding="utf-8")
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
 
     manifest_index = {"doc.html": {"input_hash": "cached", "status": "success"}}
 
     def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
         raise AssertionError("compute_content_hash should not run when overwrite is set")
 
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash
-    )
-    monkeypatch.setattr(
+    patcher.setattr("DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash)
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index",
         lambda *_args, **_kwargs: manifest_index,
     )
@@ -963,7 +948,7 @@ def test_plan_doctags_resume_overwrite_skips_hash(
 
 
 def test_plan_doctags_missing_output_skips_hash(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -977,7 +962,7 @@ def test_plan_doctags_missing_output_skips_hash(
     html_path = html_dir / "doc.html"
     html_path.write_text("<html></html>", encoding="utf-8")
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
 
     manifest_index = {"doc.html": {"input_hash": "previous", "status": "success"}}
 
@@ -987,10 +972,8 @@ def test_plan_doctags_missing_output_skips_hash(
         calls["count"] += 1
         return "new"
 
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.core.planning.compute_content_hash", _fake_hash
-    )
-    monkeypatch.setattr(
+    patcher.setattr("DocsToKG.DocParsing.core.planning.compute_content_hash", _fake_hash)
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index",
         lambda *_args, **_kwargs: manifest_index,
     )
@@ -1009,11 +992,12 @@ def test_plan_doctags_missing_output_skips_hash(
 
     assert plan["process"]["count"] == 1
     assert plan["skip"]["count"] == 0
+    assert plan["process"]["preview"] == ["doc.html"]
     assert calls["count"] == 0
 
 
 def test_plan_doctags_preview_bounded_for_large_inputs(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1029,7 +1013,7 @@ def test_plan_doctags_preview_bounded_for_large_inputs(
         path = html_dir / f"doc_{idx:03d}.html"
         path.write_text("<html></html>", encoding="utf-8")
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
 
     plan = plan_doctags(
         [
@@ -1038,17 +1022,21 @@ def test_plan_doctags_preview_bounded_for_large_inputs(
             "--in-dir",
             str(html_dir),
             "--out-dir",
-            str(output_dir),
+            str(out_dir),
             "--resume",
         ]
     )
 
-    assert plan["process"]["count"] == 1
+    assert plan["process"]["count"] == total_files
     assert plan["skip"]["count"] == 0
+    preview = plan["process"]["preview"]
+    assert isinstance(preview, list)
+    assert len(preview) == PLAN_PREVIEW_LIMIT
+    assert preview == [f"doc_{idx:03d}.html" for idx in range(PLAN_PREVIEW_LIMIT)]
 
 
 def test_plan_doctags_resume_fast_path_skips_hash(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1062,11 +1050,11 @@ def test_plan_doctags_resume_fast_path_skips_hash(
     html_path.write_text("<html></html>", encoding="utf-8")
     (output_dir / "doc.doctags").write_text("{}", encoding="utf-8")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.detect_data_root",
         lambda *_args, **_kwargs: tmp_path,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index",
         lambda *_args, **_kwargs: {
             "doc.html": {
@@ -1081,7 +1069,7 @@ def test_plan_doctags_resume_fast_path_skips_hash(
     def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
         raise AssertionError("compute_content_hash should not run for fast resume")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.compute_content_hash",
         _raise_hash,
     )
@@ -1104,7 +1092,7 @@ def test_plan_doctags_resume_fast_path_skips_hash(
 
 
 def test_plan_chunk_resume_missing_manifest_skips_hash(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1120,10 +1108,8 @@ def test_plan_chunk_resume_missing_manifest_skips_hash(
     def _raise_hash(_path: Path) -> str:
         raise AssertionError("compute_content_hash should not run without manifest entry")
 
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash
-    )
-    monkeypatch.setattr(
+    patcher.setattr("DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash)
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index", lambda *_args, **_kwargs: {}
     )
 
@@ -1144,7 +1130,7 @@ def test_plan_chunk_resume_missing_manifest_skips_hash(
 
 
 def test_plan_chunk_resume_manifest_missing_hash_skips_hash(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1160,15 +1146,13 @@ def test_plan_chunk_resume_manifest_missing_hash_skips_hash(
     def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
         raise AssertionError("compute_content_hash should not run without manifest input_hash")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.compute_content_hash",
         _raise_hash,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index",
-        lambda *_args, **_kwargs: {
-            "doc1.doctags": {"doc_id": "doc1.doctags", "status": "success"}
-        },
+        lambda *_args, **_kwargs: {"doc1.doctags": {"doc_id": "doc1.doctags", "status": "success"}},
     )
 
     plan = plan_chunk(
@@ -1188,7 +1172,7 @@ def test_plan_chunk_resume_manifest_missing_hash_skips_hash(
 
 
 def test_plan_chunk_resume_fast_path_skips_hash(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1204,11 +1188,11 @@ def test_plan_chunk_resume_fast_path_skips_hash(
     doctags_path.write_text("{}", encoding="utf-8")
     (out_dir / "doc1.chunks.jsonl").write_text("{}\n", encoding="utf-8")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.detect_data_root",
         lambda *_args, **_kwargs: data_root,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index",
         lambda *_args, **_kwargs: {
             "doc1.doctags": {
@@ -1223,7 +1207,7 @@ def test_plan_chunk_resume_fast_path_skips_hash(
     def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
         raise AssertionError("compute_content_hash should not run for fast chunk resume")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.compute_content_hash",
         _raise_hash,
     )
@@ -1246,7 +1230,7 @@ def test_plan_chunk_resume_fast_path_skips_hash(
 
 
 def test_plan_embed_resume_missing_manifest_skips_hash(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1262,10 +1246,8 @@ def test_plan_embed_resume_missing_manifest_skips_hash(
     def _raise_hash(_path: Path) -> str:
         raise AssertionError("compute_content_hash should not run without manifest entry")
 
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash
-    )
-    monkeypatch.setattr(
+    patcher.setattr("DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash)
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index", lambda *_args, **_kwargs: {}
     )
 
@@ -1286,7 +1268,7 @@ def test_plan_embed_resume_missing_manifest_skips_hash(
 
 
 def test_plan_embed_resume_fast_path_skips_hash(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1302,11 +1284,11 @@ def test_plan_embed_resume_fast_path_skips_hash(
     chunk_file.write_text("{}\n", encoding="utf-8")
     (vectors_dir / "doc1.vectors.jsonl").write_text("{}\n", encoding="utf-8")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.detect_data_root",
         lambda *_args, **_kwargs: data_root,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index",
         lambda *_args, **_kwargs: {
             "doc1.doctags": {
@@ -1321,7 +1303,7 @@ def test_plan_embed_resume_fast_path_skips_hash(
     def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
         raise AssertionError("compute_content_hash should not run for fast embed resume")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.compute_content_hash",
         _raise_hash,
     )
@@ -1344,7 +1326,7 @@ def test_plan_embed_resume_fast_path_skips_hash(
 
 
 def test_plan_embed_resume_manifest_missing_hash_skips_hash(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1360,15 +1342,13 @@ def test_plan_embed_resume_manifest_missing_hash_skips_hash(
     def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
         raise AssertionError("compute_content_hash should not run when manifest hash missing")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.compute_content_hash",
         _raise_hash,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index",
-        lambda *_args, **_kwargs: {
-            "doc1.doctags": {"doc_id": "doc1.doctags", "status": "success"}
-        },
+        lambda *_args, **_kwargs: {"doc1.doctags": {"doc_id": "doc1.doctags", "status": "success"}},
     )
 
     plan = plan_embed(
@@ -1388,7 +1368,7 @@ def test_plan_embed_resume_manifest_missing_hash_skips_hash(
 
 
 def test_plan_embed_validate_only_missing_directories(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1397,16 +1377,18 @@ def test_plan_embed_validate_only_missing_directories(
     data_root = tmp_path / "data"
     data_root.mkdir()
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.detect_data_root",
         lambda *_args, **_kwargs: data_root,
     )
 
-    plan = plan_embed([
-        "--data-root",
-        str(data_root),
-        "--validate-only",
-    ])
+    plan = plan_embed(
+        [
+            "--data-root",
+            str(data_root),
+            "--validate-only",
+        ]
+    )
 
     assert plan["validate"]["count"] == 0
     assert plan["missing"]["count"] == 0
@@ -1414,7 +1396,7 @@ def test_plan_embed_validate_only_missing_directories(
 
 
 def test_plan_embed_generate_counts(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1427,7 +1409,7 @@ def test_plan_embed_generate_counts(
     vectors_dir.mkdir(parents=True)
     (chunks_dir / "doc1.chunks.jsonl").write_text("{}\n", encoding="utf-8")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.detect_data_root", lambda *_args, **_kwargs: data_root
     )
 
@@ -1447,7 +1429,7 @@ def test_plan_embed_generate_counts(
 
 
 def test_plan_embed_generate_vectors_dir_absent(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1459,7 +1441,7 @@ def test_plan_embed_generate_vectors_dir_absent(
     chunks_dir.mkdir(parents=True)
     (chunks_dir / "doc1.chunks.jsonl").write_text("{}\n", encoding="utf-8")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.detect_data_root", lambda *_args, **_kwargs: data_root
     )
 
@@ -1482,7 +1464,7 @@ def test_plan_embed_generate_vectors_dir_absent(
 
 
 def test_plan_embed_validate_only_missing_chunks_dir(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1492,7 +1474,7 @@ def test_plan_embed_validate_only_missing_chunks_dir(
     vectors_dir = data_root / "Embeddings"
     vectors_dir.mkdir(parents=True)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.detect_data_root",
         lambda *_args, **_kwargs: data_root,
     )
@@ -1515,7 +1497,7 @@ def test_plan_embed_validate_only_missing_chunks_dir(
 
 
 def test_plan_embed_accepts_file_chunks_dir(
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
@@ -1528,15 +1510,15 @@ def test_plan_embed_accepts_file_chunks_dir(
     chunk_file = tmp_path / "doc.chunks.jsonl"
     chunk_file.write_text("{}\n", encoding="utf-8")
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.detect_data_root", lambda *_args, **_kwargs: data_root
     )
 
     def _mock_data_vectors(_root: Path, *, ensure: bool = False) -> Path:
         return vectors_dir.resolve()
 
-    monkeypatch.setattr("DocsToKG.DocParsing.core.planning.data_vectors", _mock_data_vectors)
-    monkeypatch.setattr(
+    patcher.setattr("DocsToKG.DocParsing.core.planning.data_vectors", _mock_data_vectors)
+    patcher.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index", lambda *_args, **_kwargs: {}
     )
 

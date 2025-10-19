@@ -1,4 +1,24 @@
-"""Command-line entry point for DocsToKG content downloads."""
+"""Top-level command-line harness for DocsToKG content downloads.
+
+Responsibilities
+----------------
+- Wire the argument parsing layer in :mod:`DocsToKG.ContentDownload.args` to the
+  :class:`~DocsToKG.ContentDownload.runner.DownloadRun` execution engine.
+- Configure resolver pipelines, telemetry sinks, and manifest destinations
+  before handing control off to the threaded runner.
+- Provide a testable :func:`main` entry point that accepts an ``argv`` sequence
+  and returns a :class:`~DocsToKG.ContentDownload.summary.RunResult`, making it
+  simple for automation and unit tests to capture outcomes.
+- Bridge polite networking defaults (OpenAlex mailto, resolver retries) and
+  resume semantics so the CLI mirrors production runs.
+
+Key Interactions
+----------------
+- Delegates configuration synthesis to :func:`resolve_config` and
+  :func:`bootstrap_run_environment`.
+- Builds resolver pipelines via :mod:`DocsToKG.ContentDownload.pipeline` and
+  feeds progress/metrics into :mod:`DocsToKG.ContentDownload.telemetry` sinks.
+"""
 
 from __future__ import annotations
 

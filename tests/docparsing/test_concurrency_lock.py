@@ -1,4 +1,11 @@
-"""Regression tests for DocParsing concurrency utilities."""
+"""Stress-test advisory lock behaviour used throughout DocParsing.
+
+The chunking and embedding pipelines rely on `acquire_lock` to guard manifest
+writes and temporary resources. These tests spawn real processes to ensure the
+lock enforces mutual exclusion, cleans up stale lock files, and honours timeout
+semantics. By exercising cross-platform edge cases we keep concurrency bugs from
+creeping into production pipelines.
+"""
 
 from __future__ import annotations
 
@@ -103,9 +110,7 @@ def test_acquire_lock_creates_nested_directory(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("raw_pid", ["", "not-a-pid"])
-def test_acquire_lock_recovers_from_invalid_pid(
-    tmp_path: Path, raw_pid: str
-) -> None:
+def test_acquire_lock_recovers_from_invalid_pid(tmp_path: Path, raw_pid: str) -> None:
     """Invalid lock contents should be treated as stale and recovered quickly."""
 
     target_path = tmp_path / f"resource-{raw_pid or 'empty'}"

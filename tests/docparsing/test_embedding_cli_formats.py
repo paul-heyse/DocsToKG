@@ -1,4 +1,10 @@
-"""CLI coverage for embedding format selections."""
+"""Ensure the embedding CLI exposes and validates supported vector formats.
+
+These tests interrogate the argparse surface for `docparse embed`, checking that
+all advertised `--vector-format` choices parse successfully and that unexpected
+values trigger helpful errors. Keeping this coverage prevents regressions when
+new vector serialization backends are introduced.
+"""
 
 from __future__ import annotations
 

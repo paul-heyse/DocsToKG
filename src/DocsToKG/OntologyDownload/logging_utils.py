@@ -1,4 +1,11 @@
-"""Structured logging helpers shared across ontology download components."""
+"""Structured logging helpers shared across ontology download components.
+
+Ontology downloads can span multiple resolvers, retries, and validators, so
+logs need to be machine-readable and correlation-friendly.  This module
+provides JSON formatters, log rotation, and retention helpers that cooperate
+with the CLI flags.  It also exposes cleanup routines used by integration
+tests to keep fixture directories tidy.
+"""
 
 from __future__ import annotations
 

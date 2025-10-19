@@ -223,7 +223,7 @@ None
 
 Execute a single validator with exception guards.
 
-### `_run_validator_in_process(name, request)`
+### `_run_validator_in_process(name, request, budget)`
 
 Execute a validator inside a worker process.
 
@@ -251,6 +251,18 @@ None.
 
 Returns:
 None.
+
+### `limit(self)`
+
+Return the maximum number of concurrent validators allowed.
+
+### `acquire(self, timeout)`
+
+Acquire a budget slot, respecting an optional timeout.
+
+### `release(self)`
+
+Release a previously acquired budget slot.
 
 ### `to_dict(self)`
 
@@ -292,6 +304,10 @@ frame: Current stack frame (unused).
 
 ## 3. Classes
 
+### `_ValidatorBudget`
+
+Cross-process concurrency budget backed by a multiprocessing semaphore.
+
 ### `ValidationRequest`
 
 Parameters describing a single validation task.
@@ -305,7 +321,7 @@ config: Resolved configuration that supplies timeout thresholds.
 
 Examples:
 >>> from pathlib import Path
->>> from DocsToKG.OntologyDownload import ResolvedConfig
+>>> from DocsToKG.OntologyDownload.settings import ResolvedConfig
 >>> req = ValidationRequest(
 ...     name="rdflib",
 ...     file_path=Path("ontology.owl"),

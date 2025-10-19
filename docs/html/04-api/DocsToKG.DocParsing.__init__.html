@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,62 +75,63 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-init">
 <h1>1. Module: <strong>init</strong><a class="headerlink" href="#module-init" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.__init__</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>High-level facade exposing consolidated DocParsing modules and compatibility shims.</p>
+<p>High-level facade exposing consolidated DocParsing modules.</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="populate-forwarding-module-module-target">
-<h3><code class="docutils literal notranslate"><span class="pre">_populate_forwarding_module(module,</span> <span class="pre">target)</span></code><a class="headerlink" href="#populate-forwarding-module-module-target" title="Link to this heading"></a></h3>
-<p>Populate <code class="docutils literal notranslate"><span class="pre">module</span></code> so that it forwards attributes to <code class="docutils literal notranslate"><span class="pre">target</span></code>.</p>
+<section id="import-module-module-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_import_module(module_name)</span></code><a class="headerlink" href="#import-module-module-name" title="Link to this heading"></a></h3>
+<p>Wrapper around :func:<code class="docutils literal notranslate"><span class="pre">import_module</span></code> for monkeypatch-friendly indirection.</p>
 </section>
-<section id="populate-cli-module-module">
-<h3><code class="docutils literal notranslate"><span class="pre">_populate_cli_module(module)</span></code><a class="headerlink" href="#populate-cli-module-module" title="Link to this heading"></a></h3>
-<p>Populate the legacy <code class="docutils literal notranslate"><span class="pre">cli</span></code> module shim.</p>
+<section id="load-module-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_module(name)</span></code><a class="headerlink" href="#load-module-name" title="Link to this heading"></a></h3>
+<p>Load a module by name, using cache for performance.</p>
 </section>
-<section id="populate-pdf-pipeline-module-module">
-<h3><code class="docutils literal notranslate"><span class="pre">_populate_pdf_pipeline_module(module)</span></code><a class="headerlink" href="#populate-pdf-pipeline-module-module" title="Link to this heading"></a></h3>
-<p>Populate the legacy <code class="docutils literal notranslate"><span class="pre">pdf_pipeline</span></code> module shim with a deprecation warning.</p>
+<section id="getattr-name">
+<h3><code class="docutils literal notranslate"><span class="pre">__getattr__(name)</span></code><a class="headerlink" href="#getattr-name" title="Link to this heading"></a></h3>
+<p>Dynamically import submodules only when they are requested.</p>
 </section>
-<section id="getattr-attr">
-<h3><code class="docutils literal notranslate"><span class="pre">__getattr__(attr)</span></code><a class="headerlink" href="#getattr-attr" title="Link to this heading"></a></h3>
-<p>Delegate attribute lookups to the replacement module populated above.</p>
+<section id="dir">
+<h3><code class="docutils literal notranslate"><span class="pre">__dir__()</span></code><a class="headerlink" href="#dir" title="Link to this heading"></a></h3>
+<p>Ensure lazily exposed attributes appear in :func:<code class="docutils literal notranslate"><span class="pre">dir</span></code> results.</p>
 </section>
-<section id="parse-args-argv">
-<h3><code class="docutils literal notranslate"><span class="pre">parse_args(argv)</span></code><a class="headerlink" href="#parse-args-argv" title="Link to this heading"></a></h3>
-<p>Legacy CLI argument parser for backwards-compatible imports.</p>
+<section id="plan">
+<h3><code class="docutils literal notranslate"><span class="pre">plan()</span></code><a class="headerlink" href="#plan" title="Link to this heading"></a></h3>
+<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.core.plan</span></code> with lazy loading.</p>
 </section>
-<section id="main-args">
-<h3><code class="docutils literal notranslate"><span class="pre">main(args)</span></code><a class="headerlink" href="#main-args" title="Link to this heading"></a></h3>
-<p>Legacy entry point delegating to :mod:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.doctags</span></code>.</p>
+<section id="manifest">
+<h3><code class="docutils literal notranslate"><span class="pre">manifest()</span></code><a class="headerlink" href="#manifest" title="Link to this heading"></a></h3>
+<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.core.manifest</span></code> with lazy loading.</p>
 </section>
-<section id="create-module-self-spec">
-<h3><code class="docutils literal notranslate"><span class="pre">create_module(self,</span> <span class="pre">spec)</span></code><a class="headerlink" href="#create-module-self-spec" title="Link to this heading"></a></h3>
-<p>Create a new module instance that will be populated by the shim.</p>
+<section id="pdf-build-parser">
+<h3><code class="docutils literal notranslate"><span class="pre">pdf_build_parser()</span></code><a class="headerlink" href="#pdf-build-parser" title="Link to this heading"></a></h3>
+<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.doctags.pdf_build_parser</span></code>.</p>
 </section>
-<section id="exec-module-self-module">
-<h3><code class="docutils literal notranslate"><span class="pre">exec_module(self,</span> <span class="pre">module)</span></code><a class="headerlink" href="#exec-module-self-module" title="Link to this heading"></a></h3>
-<p>Execute the shim builder to populate <code class="docutils literal notranslate"><span class="pre">module</span></code>.</p>
+<section id="pdf-parse-args">
+<h3><code class="docutils literal notranslate"><span class="pre">pdf_parse_args()</span></code><a class="headerlink" href="#pdf-parse-args" title="Link to this heading"></a></h3>
+<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.doctags.pdf_parse_args</span></code>.</p>
 </section>
-<section id="find-spec-self-fullname-path-target">
-<h3><code class="docutils literal notranslate"><span class="pre">find_spec(self,</span> <span class="pre">fullname,</span> <span class="pre">path,</span> <span class="pre">target)</span></code><a class="headerlink" href="#find-spec-self-fullname-path-target" title="Link to this heading"></a></h3>
-<p>Return a module spec when <code class="docutils literal notranslate"><span class="pre">fullname</span></code> matches a supported shim.</p>
+<section id="pdf-main">
+<h3><code class="docutils literal notranslate"><span class="pre">pdf_main()</span></code><a class="headerlink" href="#pdf-main" title="Link to this heading"></a></h3>
+<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.doctags.pdf_main</span></code>.</p>
 </section>
+<section id="html-build-parser">
+<h3><code class="docutils literal notranslate"><span class="pre">html_build_parser()</span></code><a class="headerlink" href="#html-build-parser" title="Link to this heading"></a></h3>
+<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.doctags.html_build_parser</span></code>.</p>
 </section>
-<section id="classes">
-<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="docparsingshimloader">
-<h3><code class="docutils literal notranslate"><span class="pre">_DocParsingShimLoader</span></code><a class="headerlink" href="#docparsingshimloader" title="Link to this heading"></a></h3>
-<p>Loader that populates deprecated DocParsing modules on demand.</p>
+<section id="html-parse-args">
+<h3><code class="docutils literal notranslate"><span class="pre">html_parse_args()</span></code><a class="headerlink" href="#html-parse-args" title="Link to this heading"></a></h3>
+<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.doctags.html_parse_args</span></code>.</p>
 </section>
-<section id="docparsingshimfinder">
-<h3><code class="docutils literal notranslate"><span class="pre">_DocParsingShimFinder</span></code><a class="headerlink" href="#docparsingshimfinder" title="Link to this heading"></a></h3>
-<p>Meta-path finder that serves the compatibility shims defined above.</p>
+<section id="html-main">
+<h3><code class="docutils literal notranslate"><span class="pre">html_main()</span></code><a class="headerlink" href="#html-main" title="Link to this heading"></a></h3>
+<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.doctags.html_main</span></code>.</p>
 </section>
 </section>
 </section>
@@ -149,7 +150,7 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -160,7 +161,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

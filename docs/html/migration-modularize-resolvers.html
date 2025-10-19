@@ -6,12 +6,12 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>1. Migration Guide: Unified Content Download Resolvers &mdash; DocsToKG 1.0.0 documentation</title>
+  <title>1. Migration Guide: Resolver Modularisation &mdash; DocsToKG 1.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
 
-
+  
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" />
+    <link rel="search" title="Search" href="search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -66,7 +66,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">1. Migration Guide: Unified Content Download Resolvers</li>
+      <li class="breadcrumb-item active">1. Migration Guide: Resolver Modularisation</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/migration-modularize-resolvers.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -75,13 +75,13 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
-  <section id="migration-guide-unified-content-download-resolvers">
-<h1>1. Migration Guide: Unified Content Download Resolvers<a class="headerlink" href="#migration-guide-unified-content-download-resolvers" title="Link to this heading"></a></h1>
-<p>The resolver subsystem has been recomposed into a single module,
-<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline</span></code>. This guide explains how to migrate code
-that previously relied on the intermediate submodules (<code class="docutils literal notranslate"><span class="pre">.types</span></code>, <code class="docutils literal notranslate"><span class="pre">.pipeline</span></code>,
-<code class="docutils literal notranslate"><span class="pre">.providers</span></code>, <code class="docutils literal notranslate"><span class="pre">.headers</span></code>, <code class="docutils literal notranslate"><span class="pre">.cache</span></code>).</p>
+             
+  <section id="migration-guide-resolver-modularisation">
+<h1>1. Migration Guide: Resolver Modularisation<a class="headerlink" href="#migration-guide-resolver-modularisation" title="Link to this heading"></a></h1>
+<p>The resolver subsystem now lives under <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers</span></code>.
+Each resolver sits in its own module and registers with <code class="docutils literal notranslate"><span class="pre">ResolverRegistry</span></code> on
+import. <code class="docutils literal notranslate"><span class="pre">pipeline.py</span></code> continues to re-export the resolver classes for backwards
+compatibility. This guide summarises the changes needed when upgrading.</p>
 <section id="update-import-paths">
 <h2>1. Update Import Paths<a class="headerlink" href="#update-import-paths" title="Link to this heading"></a></h2>
 <table class="docutils align-default">
@@ -91,57 +91,54 @@ that previously relied on the intermediate submodules (<code class="docutils lit
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline.types</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline</span> <span class="pre">import</span> <span class="pre">OpenAlexResolver</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">OpenAlexResolver</span></code> (or retain the pipeline import for compatibility)</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline.pipeline</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline</span> <span class="pre">import</span> <span class="pre">default_resolvers</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">default_resolvers</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline.providers</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline.headers</span> <span class="pre">import</span> <span class="pre">headers_cache_key</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline</span> <span class="pre">import</span> <span class="pre">headers_cache_key</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.pipeline</span> <span class="pre">import</span> <span class="pre">RegisteredResolver</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">RegisteredResolver</span></code></p></td>
 </tr>
 </tbody>
 </table>
-<p>All resolver-related dataclasses (<code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code>, <code class="docutils literal notranslate"><span class="pre">AttemptRecord</span></code>, etc.),
-pipeline helpers, and provider implementations are now re-exported directly
-from the top-level module.</p>
-<blockquote>
-<div><p><strong>Tip:</strong> Legacy import paths will raise <code class="docutils literal notranslate"><span class="pre">ImportError</span></code>. Update your imports to
-ensure compatibility with the unified module.</p>
-</div></blockquote>
+<p>Existing imports from <code class="docutils literal notranslate"><span class="pre">pipeline</span></code> keep working because the module now
+re-exports the resolver classes. New code should prefer importing from the
+<code class="docutils literal notranslate"><span class="pre">resolvers</span></code> package to make dependencies explicit.</p>
 </section>
 <section id="registering-custom-resolvers">
 <h2>2. Registering Custom Resolvers<a class="headerlink" href="#registering-custom-resolvers" title="Link to this heading"></a></h2>
-<p>Subclass <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.pipeline.RegisteredResolver</span></code> and make sure
-the subclass is imported during start-up so it registers with the resolver
-registry. To take part in the default order, append instances to
-<code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code> inside <code class="docutils literal notranslate"><span class="pre">resolvers.py</span></code> or extend the returned list within
-your application.</p>
+<p>Place new resolvers in <code class="docutils literal notranslate"><span class="pre">ContentDownload/resolvers/</span></code> and inherit from
+<code class="docutils literal notranslate"><span class="pre">RegisteredResolver</span></code> or <code class="docutils literal notranslate"><span class="pre">ApiResolverBase</span></code>. Import the module from
+<code class="docutils literal notranslate"><span class="pre">resolvers/__init__.py</span></code> (mirroring the built-in resolvers) so registration runs
+at start-up. To participate in the default order, append an instance to the list
+returned by <code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code> in your own entry point.</p>
 </section>
-<section id="configuration-behaviour">
-<h2>3. Configuration &amp; Behaviour<a class="headerlink" href="#configuration-behaviour" title="Link to this heading"></a></h2>
-<p>No configuration keys changed during the consolidation. Existing YAML files
-that reference <code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code> fields remain valid. Behaviour such as
-centralised retries, HEAD preflight checks, and structured logging carries
-over unchanged.</p>
+<section id="behaviour-changes">
+<h2>3. Behaviour Changes<a class="headerlink" href="#behaviour-changes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ResolverRegistry</span></code> owns discovery and ordering. <code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code> now
+simply instantiates the registry.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pipeline.py</span></code> focuses on orchestration and telemetry. Resolver-specific code
+(parsing helpers, HTML scrapers, etc.) moved into <code class="docutils literal notranslate"><span class="pre">resolvers/base.py</span></code>.</p></li>
+<li><p>Strategy helpers in <code class="docutils literal notranslate"><span class="pre">download.py</span></code> now handle classification validation,
+resume logic, and corruption heuristics, so custom resolvers no longer need to
+duplicate that logic.</p></li>
+</ul>
 </section>
 <section id="testing-checklist">
 <h2>4. Testing Checklist<a class="headerlink" href="#testing-checklist" title="Link to this heading"></a></h2>
 <ol class="arabic simple">
-<li><p>Run <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/</span></code> to confirm your integration still passes the resolver
-suite.</p></li>
-<li><p>If you maintain custom resolvers, verify they are imported so registration
-occurs.</p></li>
-<li><p>Review logs for unexpected warnings after the import changes.</p></li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/content_download</span></code> to ensure resolver coverage passes.</p></li>
+<li><p>Verify custom resolvers appear in <code class="docutils literal notranslate"><span class="pre">ResolverRegistry.all()</span></code> during
+application start-up.</p></li>
+<li><p>Inspect manifests to confirm resolver names and metadata remain unchanged.</p></li>
 </ol>
 </section>
 <section id="support">
 <h2>5. Support<a class="headerlink" href="#support" title="Link to this heading"></a></h2>
-<p>Reach out in <code class="docutils literal notranslate"><span class="pre">#docs-to-kg</span></code> with stack traces, configuration snippets, and
-resolver names if you encounter migration issues.</p>
+<p>Open a discussion in <code class="docutils literal notranslate"><span class="pre">#docs-to-kg</span></code> with resolver names, stack traces, and
+configuration snippets if migration issues arise.</p>
 </section>
 </section>
 
@@ -159,7 +156,7 @@ resolver names if you encounter migration issues.</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -170,7 +167,7 @@ resolver names if you encounter migration issues.</p>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

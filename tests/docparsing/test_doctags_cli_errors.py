@@ -1,4 +1,10 @@
-"""DocTags CLI validation and error formatting behaviour."""
+"""Exercise DocTags CLI validation errors and user-facing messaging.
+
+The DocTags CLI provides structured hints when operators supply bad input.
+These tests stub optional dependencies to simulate misconfiguration and then
+assert that error messages, option names, and exit codes remain descriptive,
+protecting the UX around CLI validation.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +14,8 @@ import types
 from pathlib import Path
 
 import pytest
+
+from tests.conftest import PatchManager
 
 
 def _create_cli_stubs(tmp_path: Path) -> Path:
@@ -34,12 +42,12 @@ def _create_cli_stubs(tmp_path: Path) -> Path:
     return stub_dir
 
 
-def _prepare_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _prepare_runtime(tmp_path: Path, patcher: PatchManager) -> None:
     stub_dir = _create_cli_stubs(tmp_path)
     fake_deps = Path(__file__).resolve().parent / "fake_deps"
-    monkeypatch.syspath_prepend(str(fake_deps))
-    monkeypatch.syspath_prepend(str(stub_dir))
-    monkeypatch.setitem(
+    patcher.syspath_prepend(str(fake_deps))
+    patcher.syspath_prepend(str(stub_dir))
+    patcher.setitem(
         sys.modules,
         "pooch",
         types.SimpleNamespace(
@@ -48,6 +56,7 @@ def _prepare_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         ),
     )
     requests_module = types.ModuleType("requests")
+
     class _RequestException(Exception):
         pass
 
@@ -64,6 +73,7 @@ def _prepare_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         pass
 
     adapters_module = types.ModuleType("requests.adapters")
+
     class _HTTPAdapter:
         pass
 
@@ -75,8 +85,8 @@ def _prepare_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     requests_module.Timeout = _Timeout
     requests_module.adapters = adapters_module
     requests_module.exceptions = types.SimpleNamespace(SSLError=_RequestException)
-    monkeypatch.setitem(sys.modules, "requests", requests_module)
-    monkeypatch.setitem(sys.modules, "requests.adapters", adapters_module)
+    patcher.setitem(sys.modules, "requests", requests_module)
+    patcher.setitem(sys.modules, "requests.adapters", adapters_module)
 
     urllib3_module = types.ModuleType("urllib3")
     urllib3_util_module = types.ModuleType("urllib3.util")
@@ -92,9 +102,9 @@ def _prepare_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     urllib3_retry_module.Retry = _Retry
     urllib3_util_module.retry = urllib3_retry_module
     urllib3_module.util = urllib3_util_module
-    monkeypatch.setitem(sys.modules, "urllib3", urllib3_module)
-    monkeypatch.setitem(sys.modules, "urllib3.util", urllib3_util_module)
-    monkeypatch.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
+    patcher.setitem(sys.modules, "urllib3", urllib3_module)
+    patcher.setitem(sys.modules, "urllib3.util", urllib3_util_module)
+    patcher.setitem(sys.modules, "urllib3.util.retry", urllib3_retry_module)
 
 
 @pytest.mark.parametrize(
@@ -123,12 +133,12 @@ def test_docparse_doctags_auto_detection_defaults(
     layout: str,
     message_factory,
     hint: str,
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """docparse doctags reports friendly errors when defaults are ambiguous."""
 
-    _prepare_runtime(tmp_path, monkeypatch)
+    _prepare_runtime(tmp_path, patcher)
 
     data_root = tmp_path / "data-root"
     html_dir = data_root / "HTML"
@@ -145,7 +155,7 @@ def test_docparse_doctags_auto_detection_defaults(
     else:  # pragma: no cover - defensive branch for unexpected parametrisations
         raise AssertionError(f"Unexpected layout {layout}")
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
 
     core_cli = importlib.import_module("DocsToKG.DocParsing.core.cli")
 
@@ -161,12 +171,12 @@ def test_docparse_doctags_auto_detection_defaults(
 
 def test_docparse_doctags_auto_detection_with_mixed_input(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """docparse doctags surfaces formatted errors for mixed explicit inputs."""
 
-    _prepare_runtime(tmp_path, monkeypatch)
+    _prepare_runtime(tmp_path, patcher)
 
     data_root = tmp_path / "data-root"
     input_dir = tmp_path / "sources"
@@ -174,7 +184,7 @@ def test_docparse_doctags_auto_detection_with_mixed_input(
     (input_dir / "page.html").write_text("<html></html>", encoding="utf-8")
     (input_dir / "page.pdf").write_bytes(b"%PDF-1.4")
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
 
     core_cli = importlib.import_module("DocsToKG.DocParsing.core.cli")
 
@@ -216,12 +226,12 @@ def test_doctags_cli_structured_auto_detection_errors(
     layout: str,
     message_factory,
     hint: str,
-    monkeypatch: pytest.MonkeyPatch,
+    patcher: PatchManager,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """`core.cli.doctags` emits structured errors for auto-detection failures."""
 
-    _prepare_runtime(tmp_path, monkeypatch)
+    _prepare_runtime(tmp_path, patcher)
 
     data_root = tmp_path / "data-root"
     html_dir = data_root / "HTML"
@@ -238,7 +248,7 @@ def test_doctags_cli_structured_auto_detection_errors(
     else:  # pragma: no cover - defensive branch for unexpected parametrisations
         raise AssertionError(f"Unexpected layout {layout}")
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
 
     core_cli = importlib.import_module("DocsToKG.DocParsing.core.cli")
 

@@ -1,4 +1,10 @@
-"""Schema constants and validation helpers shared across DocParsing stages."""
+"""Schema version registry for DocParsing manifests and vectors.
+
+Chunk and embedding outputs are versioned so downstream consumers can detect
+incompatible changes. This module publishes canonical schema identifiers,
+compatibility tables, and lookup helpers used by pipelines when emitting
+manifests or validating incoming data.
+"""
 
 from __future__ import annotations
 

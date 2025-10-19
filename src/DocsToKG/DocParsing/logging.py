@@ -1,9 +1,9 @@
-"""
-Structured logging utilities and manifest logging helpers.
+"""Structured logging adapters and manifest logging helpers for DocParsing.
 
-The core CLI modules depend on these helpers to emit consistent JSON logs and to
-record structured manifest entries. By isolating the functionality here we keep
-`core.py` small and focused on orchestration code.
+Stages emit both console-friendly logs and JSON payloads that feed telemetry
+streams. This module wraps the standard logging API with adapters that attach
+correlation IDs, stage metadata, and manifest updates, enabling the CLI and
+pipelines to produce uniform logs regardless of where they run.
 """
 
 from __future__ import annotations

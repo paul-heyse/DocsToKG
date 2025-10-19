@@ -8,6 +8,10 @@ Download planning and orchestration helpers for ontology fetching.
 
 ## 2. Functions
 
+### `_log_with_extra(logger, level, message, extra)`
+
+Log ``message`` with structured ``extra`` supporting LoggerAdapters.
+
 ### `get_manifest_schema()`
 
 Return a deep copy of the manifest JSON Schema definition.
@@ -43,6 +47,14 @@ Merge user-provided specification with defaults to create a fetch spec.
 ### `_cancel_pending_futures(futures)`
 
 Cancel any futures that are still pending execution.
+
+### `_executor_is_shutting_down(executor)`
+
+Return ``True`` when *executor* has begun shutdown processing.
+
+### `_shutdown_executor_nowait(executor)`
+
+Request non-blocking shutdown with cancellation for *executor*.
 
 ### `parse_http_datetime(value)`
 
@@ -112,6 +124,13 @@ Return a normalized MIME type without parameters.
 
 Return validator names appropriate for ``media_type``.
 
+### `planner_http_probe()`
+
+Issue a polite planner probe using shared networking primitives.
+
+Call graph: :func:`plan_one`/ :func:`plan_all` → :func:`_populate_plan_metadata` /
+:func:`_fetch_last_modified` → :func:`planner_http_probe` → :func:`SESSION_POOL.lease`.
+
 ### `_populate_plan_metadata(planned, config, adapter)`
 
 Augment planned fetch with HTTP metadata when available.
@@ -162,7 +181,11 @@ manifest: Manifest describing the downloaded ontology artifact.
 
 ### `_append_index_entry(ontology_dir, entry)`
 
-Append or update the ontology-level ``index.json`` with ``entry``.
+Append or update the ontology-level ``index.json`` with ``entry`` safely.
+
+### `_ontology_index_lock(ontology_dir)`
+
+Serialize ontology index mutations across versions for the same ontology.
 
 ### `_mirror_to_cas_if_enabled()`
 
@@ -210,6 +233,7 @@ config: Optional resolved configuration overriding global defaults.
 correlation_id: Correlation identifier for structured logging.
 logger: Optional logger to reuse instead of configuring a new one.
 force: When ``True``, bypass local cache checks and redownload artifacts.
+cancellation_token: Optional token for cooperative cancellation.
 
 Returns:
 FetchResult: Structured result containing manifest metadata and resolver attempts.
@@ -226,6 +250,7 @@ spec: Fetch specification describing the ontology to plan.
 config: Optional resolved configuration providing defaults and limits.
 correlation_id: Correlation identifier reused for logging context.
 logger: Logger instance used to emit resolver telemetry.
+cancellation_token: Optional token for cooperative cancellation.
 
 Returns:
 PlannedFetch containing the normalized spec, resolver name, and plan.
@@ -243,6 +268,9 @@ specs: Iterable of fetch specifications to resolve.
 config: Optional resolved configuration reused across plans.
 logger: Logger instance used for annotation-aware logging.
 since: Optional cutoff date; plans older than this timestamp are filtered out.
+total: Optional total number of specifications, used for progress metadata when
+the iterable cannot be sized cheaply.
+cancellation_token_group: Optional group of cancellation tokens for cooperative cancellation.
 
 Returns:
 List of PlannedFetch entries describing each ontology plan.
@@ -260,6 +288,9 @@ specs: Iterable of fetch specifications to process.
 config: Optional resolved configuration shared across downloads.
 logger: Logger used to emit progress and error events.
 force: When True, skip manifest reuse and download everything again.
+total: Optional total number of specifications for progress metadata when
+the iterable cannot be cheaply materialised.
+cancellation_token_group: Optional group of cancellation tokens for cooperative cancellation.
 
 Returns:
 List of FetchResult entries corresponding to completed downloads.
@@ -304,7 +335,27 @@ JSON document encoding the manifest metadata.
 
 *No documentation available.*
 
+### `_submit(spec, index)`
+
+*No documentation available.*
+
+### `_submit(spec, index)`
+
+*No documentation available.*
+
+### `_issue(current_method)`
+
+*No documentation available.*
+
 ### `_execute_candidate()`
+
+*No documentation available.*
+
+### `_perform_once()`
+
+*No documentation available.*
+
+### `_on_retry(attempt, exc, delay)`
 
 *No documentation available.*
 
@@ -454,3 +505,7 @@ Examples:
 ... )
 >>> fetch_plan.resolver
 'obo'
+
+### `PlannerProbeResult`
+
+Normalized response metadata produced by planner HTTP probes.

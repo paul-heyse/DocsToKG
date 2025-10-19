@@ -1,3 +1,12 @@
+"""High-level tests for `DownloadRun` orchestration and resume semantics.
+
+This module validates retry behaviour for `iterate_openalex`, sink and pipeline
+setup paths, resume handling across JSONL/CSV/SQLite manifests, and the thread
+pool coordination used during downloads. It exercises worker failure handling,
+auto-resume overrides, resource cleanup, and manifest index interactions to
+ensure long-running fetch jobs remain restartable and observable.
+"""
+
 import argparse
 import contextlib
 import itertools
@@ -6,10 +15,10 @@ import logging
 import os
 import sqlite3
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -122,7 +131,7 @@ def _build_args(
         "sleep": 0.0,
         "openalex_retry_attempts": 3,
         "openalex_retry_backoff": 0.0,
-        "openalex_max_retry_delay": 75.0,
+        "openalex_retry_max_delay": 75.0,
         "retry_after_cap": None,
     }
     if overrides:
@@ -174,14 +183,14 @@ def make_resolved_config(
     )
 
 
-def test_iterate_openalex_retries_then_succeeds(monkeypatch):
+def test_iterate_openalex_retries_then_succeeds(patcher):
     works = FlakyWorks([[{"id": "W1"}, {"id": "W2"}]])
     slept: List[float] = []
 
     def _record_sleep(delay: float) -> None:
         slept.append(delay)
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.runner.time.sleep", _record_sleep)
+    patcher.setattr("DocsToKG.ContentDownload.runner.time.sleep", _record_sleep)
 
     results = list(
         iterate_openalex(
@@ -197,7 +206,7 @@ def test_iterate_openalex_retries_then_succeeds(monkeypatch):
     assert slept and slept[0] >= 1.0
 
 
-def test_iterate_openalex_uses_equal_jitter(monkeypatch):
+def test_iterate_openalex_uses_equal_jitter(patcher):
     class _JitterPager:
         def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
             self._pages = [list(page) for page in pages]
@@ -229,18 +238,18 @@ def test_iterate_openalex_uses_equal_jitter(monkeypatch):
     works = _JitterWorks([[{"id": "W1"}]])
     sleeps: List[float] = []
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.runner.random.uniform",
         lambda _a, half: 0.0,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.runner.time.sleep",
         lambda value: sleeps.append(value),
     )
 
     works = FlakyWorks([[{"id": "W1"}]], retry_after=None)
     slept: List[float] = []
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.runner.time.sleep",
         lambda seconds: slept.append(seconds),
     )
@@ -249,9 +258,9 @@ def test_iterate_openalex_uses_equal_jitter(monkeypatch):
 
     def _uniform(low: float, high: float) -> float:
         uniform_calls.append((low, high))
-        return high
+        return 0.0
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.runner.random.uniform", _uniform)
+    patcher.setattr("DocsToKG.ContentDownload.runner.random.uniform", _uniform)
 
     results = list(
         iterate_openalex(
@@ -265,10 +274,13 @@ def test_iterate_openalex_uses_equal_jitter(monkeypatch):
     )
 
     assert [item["id"] for item in results] == ["W1"]
-    assert sleeps and sleeps[0] == pytest.approx(1.0)
+    assert uniform_calls
+    assert uniform_calls[0][0] == pytest.approx(0.0)
+    assert uniform_calls[0][1] == pytest.approx(1.0)
+    assert slept and slept[0] == pytest.approx(1.0)
 
 
-def test_iterate_openalex_caps_retry_after(monkeypatch):
+def test_iterate_openalex_retry_after_exceeds_cap(patcher):
     future = datetime.now(timezone.utc) + timedelta(hours=4)
     retry_after_header = format_datetime(future)
 
@@ -308,23 +320,41 @@ def test_iterate_openalex_caps_retry_after(monkeypatch):
     works = _CappedWorks([[{"id": "W1"}]])
     sleeps: List[float] = []
 
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.runner.random.uniform",
-        lambda _a, half: 0.0,
-    )
-    monkeypatch.setattr(
+    uniform_calls: List[Tuple[float, float]] = []
+
+    def _uniform(low: float, high: float) -> float:
+        uniform_calls.append((low, high))
+        return high
+
+    patcher.setattr("DocsToKG.ContentDownload.runner.random.uniform", _uniform)
+    patcher.setattr(
         "DocsToKG.ContentDownload.runner.time.sleep",
         lambda value: sleeps.append(value),
+    )
+
+    results = list(
+        iterate_openalex(
+            works,
+            per_page=1,
+            max_results=None,
+            retry_attempts=2,
+            retry_backoff=2.0,
+            retry_max_delay=120.0,
+            retry_after_cap=90.0,
+        )
+    )
+
+    assert [item["id"] for item in results] == ["W1"]
     assert uniform_calls == [(0.0, 1.0)]
-    assert slept and slept[0] == pytest.approx(2.0)
+    assert sleeps and sleeps[0] == pytest.approx(90.0)
 
 
-def test_iterate_openalex_caps_retry_after(monkeypatch):
+def test_iterate_openalex_caps_retry_after(patcher):
     future = datetime.now(timezone.utc) + timedelta(minutes=30)
     header = format_datetime(future)
     works = FlakyWorks([[{"id": "W1"}]], retry_after=header)
     slept: List[float] = []
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.runner.time.sleep",
         lambda seconds: slept.append(seconds),
     )
@@ -342,7 +372,7 @@ def test_iterate_openalex_caps_retry_after(monkeypatch):
     )
 
     assert [item["id"] for item in results] == ["W1"]
-    assert sleeps and sleeps[0] == pytest.approx(5.0)
+    assert slept and slept[0] == pytest.approx(5.0)
 
 
 def _manifest_entry(work_id: str, *, run_id: str = "resume-run") -> str:
@@ -566,13 +596,13 @@ def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
         download_run.close()
 
 
-def test_setup_download_state_expands_user_resume_path(tmp_path, patcher, monkeypatch):
+def test_setup_download_state_expands_user_resume_path(tmp_path, patcher):
     resolved = make_resolved_config(tmp_path, csv=False)
     bootstrap_run_environment(resolved)
 
     home_dir = tmp_path / "home"
     home_dir.mkdir()
-    monkeypatch.setenv("HOME", str(home_dir))
+    patcher.setenv("HOME", str(home_dir))
 
     expected_resume = home_dir / "manifests" / "resume.jsonl"
     expected_resume.parent.mkdir(parents=True, exist_ok=True)
@@ -769,7 +799,6 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
     factory = ThreadLocalSessionFactory(requests.Session)
 
     during = None
-    after = None
     try:
         try:
             before = _count_open_fds()
@@ -781,8 +810,6 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
         assert during > before
     finally:
         download_run.close()
-        if during is not None:
-            after = _count_open_fds()
         factory.close_all()
 
 
@@ -888,9 +915,7 @@ def test_resume_cleanup_avoids_bulk_selects_for_large_resume(tmp_path):
         state.resume_cleanup()
         state.resume_cleanup = None
 
-        select_queries = [
-            sql for sql in traced if sql and sql.strip().lower().startswith("select")
-        ]
+        select_queries = [sql for sql in traced if sql and sql.strip().lower().startswith("select")]
         assert select_queries == []
     finally:
         factory.close_all()
@@ -1201,7 +1226,7 @@ def test_setup_download_state_prefers_adjacent_sqlite_for_external_csv(tmp_path)
         download_run.close()
 
 
-def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, monkeypatch):
+def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, patcher):
     run_root = tmp_path / "first"
     pdf_dir = run_root / "pdfs"
     html_dir = run_root / "html"
@@ -1226,7 +1251,7 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, m
 
     other_root = tmp_path / "second"
     other_root.mkdir()
-    monkeypatch.chdir(other_root)
+    patcher.chdir(other_root)
 
     resume_target = Path(os.path.relpath(manifest_path, other_root))
     relative_pdf_dir = Path(os.path.relpath(pdf_dir, other_root))
@@ -1298,7 +1323,7 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, m
     assert decision.outcome.classification is Classification.SKIPPED
 
 
-def test_manifest_url_index_resolves_relative_paths(tmp_path, monkeypatch):
+def test_manifest_url_index_resolves_relative_paths(tmp_path, patcher):
     run_root = tmp_path / "run"
     pdf_dir = run_root / "pdfs"
     pdf_dir.mkdir(parents=True, exist_ok=True)
@@ -1358,7 +1383,7 @@ def test_manifest_url_index_resolves_relative_paths(tmp_path, monkeypatch):
 
     other_root = tmp_path / "elsewhere"
     other_root.mkdir()
-    monkeypatch.chdir(other_root)
+    patcher.chdir(other_root)
 
     relative_sqlite = Path(os.path.relpath(sqlite_path, other_root))
     index = ManifestUrlIndex(relative_sqlite)
@@ -1795,9 +1820,7 @@ def test_single_worker_exception_discards_session(patcher, tmp_path):
         return {"saved": True, "downloaded_bytes": 1}
 
     patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
-    patcher.setattr(
-        "DocsToKG.ContentDownload.runner.create_session", fake_create_session
-    )
+    patcher.setattr("DocsToKG.ContentDownload.runner.create_session", fake_create_session)
     patcher.setattr(
         "DocsToKG.ContentDownload.runner.process_one_work",
         fake_process_one_work,
@@ -1877,9 +1900,7 @@ def test_worker_tls_failure_discards_thread_session(patcher, tmp_path):
         return {"saved": True, "downloaded_bytes": 1}
 
     patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
-    patcher.setattr(
-        "DocsToKG.ContentDownload.runner.create_session", fake_create_session
-    )
+    patcher.setattr("DocsToKG.ContentDownload.runner.create_session", fake_create_session)
     patcher.setattr(
         "DocsToKG.ContentDownload.runner.process_one_work",
         fake_process_one_work,

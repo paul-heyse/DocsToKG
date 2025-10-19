@@ -143,6 +143,10 @@ Return a serialised representation of the index.
 
 Restore index state from ``payload``.
 
+### `flush_snapshot(self)`
+
+Force a snapshot refresh bypassing throttle safeguards.
+
 ### `stats(self)`
 
 Return implementation-defined statistics.

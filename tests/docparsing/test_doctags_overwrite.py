@@ -1,18 +1,21 @@
-"""Regression tests for DocTags overwrite behaviours."""
+"""Verify DocTags overwrite semantics and resume short-circuiting.
+
+When operators re-run DocTags with overwrite flags, the pipeline should bypass
+costly hashing and manifest lookups. These tests build minimal HTML fixtures,
+simulate manifest state, and ensure the orchestrator only recomputes work when
+necessary while still emitting the correct telemetry events.
+"""
 
 from __future__ import annotations
 
 from contextlib import contextmanager
 from pathlib import Path
 
-import pytest
-
 from DocsToKG.DocParsing.doctags import HtmlConversionResult, html_main
+from tests.conftest import PatchManager
 
 
-def test_html_main_resume_overwrite_skips_hash(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_html_main_resume_overwrite_skips_hash(patcher: PatchManager, tmp_path: Path) -> None:
     """HTML execution path skips hashing when overwrite short-circuits resume."""
 
     html_dir = tmp_path / "html"
@@ -27,9 +30,7 @@ def test_html_main_resume_overwrite_skips_hash(
     events: list[tuple[str, dict[str, object]]] = []
 
     def _raise_hash(_path: Path) -> str:
-        raise AssertionError(
-            "compute_content_hash should not run when overwrite disables resume"
-        )
+        raise AssertionError("compute_content_hash should not run when overwrite disables resume")
 
     @contextmanager
     def _noop_scope(_telemetry: object) -> None:
@@ -75,53 +76,33 @@ def test_html_main_resume_overwrite_skips_hash(
         cfg.html_sanitizer = "balanced"
         cfg.http_timeout = (5.0, 30.0)
 
-    monkeypatch.setenv("DOCSTOKG_DOCTAGS_HTML_SANITIZER", "balanced")
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.doctags.compute_content_hash", _raise_hash
-    )
-    monkeypatch.setattr(
+    patcher.setenv("DOCSTOKG_DOCTAGS_HTML_SANITIZER", "balanced")
+    patcher.setattr("DocsToKG.DocParsing.doctags.compute_content_hash", _raise_hash)
+    patcher.setattr(
         "DocsToKG.DocParsing.doctags.load_manifest_index",
         lambda *_args, **_kwargs: manifest_index,
     )
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.doctags.list_htmls", lambda _path: [html_path]
-    )
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.doctags.detect_data_root", lambda: tmp_path
-    )
-    monkeypatch.setattr("DocsToKG.DocParsing.doctags.data_html", lambda _root: None)
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.doctags.data_doctags", lambda _root: None
-    )
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.doctags.telemetry_scope", _noop_scope
-    )
-    monkeypatch.setattr(
+    patcher.setattr("DocsToKG.DocParsing.doctags.list_htmls", lambda _path: [html_path])
+    patcher.setattr("DocsToKG.DocParsing.doctags.detect_data_root", lambda: tmp_path)
+    patcher.setattr("DocsToKG.DocParsing.doctags.data_html", lambda _root: None)
+    patcher.setattr("DocsToKG.DocParsing.doctags.data_doctags", lambda _root: None)
+    patcher.setattr("DocsToKG.DocParsing.doctags.telemetry_scope", _noop_scope)
+    patcher.setattr(
         "DocsToKG.DocParsing.doctags.StageTelemetry", lambda *_args, **_kwargs: object()
     )
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.doctags.TelemetrySink", lambda *_args, **_kwargs: object()
-    )
-    monkeypatch.setattr(
+    patcher.setattr("DocsToKG.DocParsing.doctags.TelemetrySink", lambda *_args, **_kwargs: object())
+    patcher.setattr(
         "DocsToKG.DocParsing.doctags.manifest_log_success",
         lambda *args, **kwargs: events.append(("success", kwargs)),
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.DocParsing.doctags.manifest_log_skip",
         lambda *args, **kwargs: events.append(("skip", kwargs)),
     )
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.doctags.DoctagsCfg.finalize", _finalize_cfg
-    )
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.doctags.ProcessPoolExecutor", _DummyExecutor
-    )
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.doctags.as_completed", lambda futures: futures
-    )
-    monkeypatch.setattr(
-        "DocsToKG.DocParsing.doctags.tqdm", lambda iterable, **_kwargs: iterable
-    )
+    patcher.setattr("DocsToKG.DocParsing.doctags.DoctagsCfg.finalize", _finalize_cfg)
+    patcher.setattr("DocsToKG.DocParsing.doctags.ProcessPoolExecutor", _DummyExecutor)
+    patcher.setattr("DocsToKG.DocParsing.doctags.as_completed", lambda futures: futures)
+    patcher.setattr("DocsToKG.DocParsing.doctags.tqdm", lambda iterable, **_kwargs: iterable)
 
     exit_code = html_main(
         [

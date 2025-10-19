@@ -44,6 +44,14 @@ Return ``algorithm:value`` string suitable for pooch known_hash.
 
 Return mapping representation for manifest and index serialization.
 
+### `_fetch_once()`
+
+*No documentation available.*
+
+### `_on_retry(attempt, exc, delay)`
+
+*No documentation available.*
+
 ## 3. Classes
 
 ### `ExpectedChecksum`

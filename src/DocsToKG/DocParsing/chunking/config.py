@@ -1,4 +1,12 @@
-"""Configuration objects for the chunking stage."""
+"""Typed configuration models and presets for the chunking stage.
+
+The chunking configuration module translates CLI arguments, environment
+overrides, and on-disk profiles into a dataclass (`ChunkerCfg`) that the runtime
+can consume without worrying about parsing logic. It also publishes shared
+defaults (for example the soft barrier margin, tokenizer presets, serializer
+providers) and validation helpers so operators can tune chunk sizing, sharding,
+and resumability with confidence across both CLI and programmatic entry points.
+"""
 
 from __future__ import annotations
 

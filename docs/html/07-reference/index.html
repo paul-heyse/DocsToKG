@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -20,17 +20,17 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="prev" title="1. Operations Guide" href="../06-operations/index.html" />
+    <link rel="prev" title="1. Operations Guide" href="../06-operations/index.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -51,29 +51,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">1. Technical Reference</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#reference-materials">2. Reference Materials</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#faiss-integration">🔗 <span class="xref myst">FAISS Integration</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#external-dependencies">📚 <span class="xref myst">External Dependencies</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#glossary">📖 <span class="xref myst">Glossary</span></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#integration-guides">3. Integration Guides</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#api-integrations">🔌 <span class="xref myst">API Integrations</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#tool-configuration">🔧 <span class="xref myst">Tool Configuration</span></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#advanced-topics">4. Advanced Topics</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#performance-optimization">🚀 <span class="xref myst">Performance Optimization</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#security-considerations">🔒 <span class="xref myst">Security Considerations</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#testing-strategies">🧪 <span class="xref myst">Testing Strategies</span></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#maintenance-and-operations">5. Maintenance and Operations</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#deployment-guide">🔄 <span class="xref myst">Deployment Guide</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#monitoring-and-observability">📊 <span class="xref myst">Monitoring and Observability</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#troubleshooting">🚨 <span class="xref myst">Troubleshooting</span></a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="#reference-materials">2. Reference Materials</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#integration-guides">3. Integration Guides</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#advanced-topics">4. Advanced Topics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#maintenance-and-operations">5. Maintenance and Operations</a></li>
 </ul>
 </li>
 </ul>
@@ -101,67 +82,41 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="technical-reference">
 <h1>1. Technical Reference<a class="headerlink" href="#technical-reference" title="Link to this heading"></a></h1>
-<p>This section contains technical references, external dependencies, and detailed implementation guides for the DocsToKG system.</p>
+<p>This section contains subsystem deep-dives, integration guides, and operational runbooks that complement the architecture and setup documentation.</p>
 <section id="reference-materials">
 <h2>2. Reference Materials<a class="headerlink" href="#reference-materials" title="Link to this heading"></a></h2>
-<section id="faiss-integration">
-<h3>🔗 <a class="reference internal" href="faiss/index.html"><span class="std std-doc">FAISS Integration</span></a><a class="headerlink" href="#faiss-integration" title="Link to this heading"></a></h3>
-<p>Comprehensive guide to FAISS vector similarity search integration, including GPU acceleration, index types, and performance optimization.</p>
-</section>
-<section id="external-dependencies">
-<h3>📚 <a class="reference internal" href="dependencies/index.html"><span class="std std-doc">External Dependencies</span></a><a class="headerlink" href="#external-dependencies" title="Link to this heading"></a></h3>
-<p>Documentation for external libraries, APIs, and services used by DocsToKG.</p>
-</section>
-<section id="glossary">
-<h3>📖 <a class="reference internal" href="glossary.html"><span class="std std-doc">Glossary</span></a><a class="headerlink" href="#glossary" title="Link to this heading"></a></h3>
-<p>Definitions of key terms, concepts, and domain-specific terminology used throughout the documentation.</p>
-</section>
+<ul class="simple">
+<li><p>🔗 <strong><a class="reference internal" href="faiss/index.html"><span class="std std-doc">FAISS Integration</span></a></strong> – GPU/CPU deployment notes, wheel provenance, and index lifecycle management aligned with <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code>.</p></li>
+<li><p>📚 <strong><a class="reference internal" href="dependencies/index.html"><span class="std std-doc">External Dependencies</span></a></strong> – Curated list of Python packages, CUDA wheels, and upstream services used across the repo (<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload</span></code>, <code class="docutils literal notranslate"><span class="pre">DocParsing</span></code>, <code class="docutils literal notranslate"><span class="pre">HybridSearch</span></code>, <code class="docutils literal notranslate"><span class="pre">OntologyDownload</span></code>).</p></li>
+<li><p>📖 <strong><a class="reference internal" href="glossary.html"><span class="std std-doc">Glossary</span></a></strong> – Definitions covering terminology surfaced in manifests, telemetry events, and hybrid search scoring.</p></li>
+</ul>
 </section>
 <section id="integration-guides">
 <h2>3. Integration Guides<a class="headerlink" href="#integration-guides" title="Link to this heading"></a></h2>
-<section id="api-integrations">
-<h3>🔌 <a class="reference internal" href="api-integrations/index.html"><span class="std std-doc">API Integrations</span></a><a class="headerlink" href="#api-integrations" title="Link to this heading"></a></h3>
-<p>How to integrate DocsToKG with external systems and services.</p>
-</section>
-<section id="tool-configuration">
-<h3>🔧 <a class="reference internal" href="tooling/index.html"><span class="std std-doc">Tool Configuration</span></a><a class="headerlink" href="#tool-configuration" title="Link to this heading"></a></h3>
-<p>Configuration guides for development tools, testing frameworks, and deployment systems.</p>
-</section>
+<ul class="simple">
+<li><p>🔌 <strong><a class="reference internal" href="api-integrations/index.html"><span class="std std-doc">API Integrations</span></a></strong> – Examples for embedding <code class="docutils literal notranslate"><span class="pre">HybridSearchAPI</span></code> into FastAPI and wiring resolver webhooks.</p></li>
+<li><p>🔧 <strong><a class="reference internal" href="tooling/index.html"><span class="std std-doc">Tool Configuration</span></a></strong> – Bootstrap, linting, and documentation automation scripts (<code class="docutils literal notranslate"><span class="pre">docs/scripts/*</span></code>, <code class="docutils literal notranslate"><span class="pre">scripts/bootstrap_env.sh</span></code>, <code class="docutils literal notranslate"><span class="pre">openspec</span></code> CLI).</p></li>
+</ul>
 </section>
 <section id="advanced-topics">
 <h2>4. Advanced Topics<a class="headerlink" href="#advanced-topics" title="Link to this heading"></a></h2>
-<section id="performance-optimization">
-<h3>🚀 <a class="reference internal" href="performance/index.html"><span class="std std-doc">Performance Optimization</span></a><a class="headerlink" href="#performance-optimization" title="Link to this heading"></a></h3>
-<p>Advanced performance tuning, scaling strategies, and optimization techniques.</p>
-</section>
-<section id="security-considerations">
-<h3>🔒 <a class="reference internal" href="security/index.html"><span class="std std-doc">Security Considerations</span></a><a class="headerlink" href="#security-considerations" title="Link to this heading"></a></h3>
-<p>Security best practices, authentication, authorization, and data protection.</p>
-</section>
-<section id="testing-strategies">
-<h3>🧪 <a class="reference internal" href="testing/index.html"><span class="std std-doc">Testing Strategies</span></a><a class="headerlink" href="#testing-strategies" title="Link to this heading"></a></h3>
-<p>Comprehensive testing approaches, frameworks, and quality assurance procedures.</p>
-</section>
+<ul class="simple">
+<li><p>🚀 <strong><a class="reference internal" href="performance/index.html"><span class="std std-doc">Performance Optimization</span></a></strong> – Chunking heuristics, FAISS tuning, and Docling configuration tweaks validated through the latest benchmarks.</p></li>
+<li><p>🔒 <strong><a class="reference internal" href="security/index.html"><span class="std std-doc">Security Considerations</span></a></strong> – Secrets management, artifact isolation, and supply-chain controls mapped to the current module layout.</p></li>
+<li><p>🧪 <strong><a class="reference internal" href="testing/index.html"><span class="std std-doc">Testing Strategies</span></a></strong> – Marker definitions, suite breakdowns, and CI recommendations for exercising optional GPU-backed flows.</p></li>
+</ul>
 </section>
 <section id="maintenance-and-operations">
 <h2>5. Maintenance and Operations<a class="headerlink" href="#maintenance-and-operations" title="Link to this heading"></a></h2>
-<section id="deployment-guide">
-<h3>🔄 <a class="reference internal" href="deployment/index.html"><span class="std std-doc">Deployment Guide</span></a><a class="headerlink" href="#deployment-guide" title="Link to this heading"></a></h3>
-<p>Production deployment instructions, environment setup, and operational procedures.</p>
-</section>
-<section id="monitoring-and-observability">
-<h3>📊 <a class="reference internal" href="monitoring/index.html"><span class="std std-doc">Monitoring and Observability</span></a><a class="headerlink" href="#monitoring-and-observability" title="Link to this heading"></a></h3>
-<p>System monitoring, logging, metrics collection, and observability practices.</p>
-</section>
-<section id="troubleshooting">
-<h3>🚨 <a class="reference internal" href="troubleshooting/index.html"><span class="std std-doc">Troubleshooting</span></a><a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h3>
-<p>Common issues, error handling, debugging techniques, and support resources.</p>
-<hr class="docutils" />
-<p><em>This reference section provides deep technical knowledge for advanced users, maintainers, and system integrators.</em></p>
-</section>
+<ul class="simple">
+<li><p>🔄 <strong><a class="reference internal" href="deployment/index.html"><span class="std std-doc">Deployment Guide</span></a></strong> – Environment bootstrap, data seeding, and release validation steps referencing the latest CLI entry points.</p></li>
+<li><p>📊 <strong><a class="reference internal" href="monitoring/index.html"><span class="std std-doc">Monitoring and Observability</span></a></strong> – Metrics, logging sinks, and dashboard recommendations for ingestion and hybrid search workloads.</p></li>
+<li><p>🚨 <strong><a class="reference internal" href="troubleshooting/index.html"><span class="std std-doc">Troubleshooting</span></a></strong> – Common failure modes (resolver throttling, ontology validation, FAISS rollbacks) with pointers to recovery commands.</p></li>
+</ul>
+<p>Explore these references alongside <code class="docutils literal notranslate"><span class="pre">docs/06-operations/index.md</span></code> for day-two operations and <code class="docutils literal notranslate"><span class="pre">docs/05-development/index.md</span></code> for contributor workflows.</p>
 </section>
 </section>
 
@@ -181,7 +136,7 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -192,7 +147,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

@@ -37,7 +37,13 @@
 # }
 # === /NAVMAP ===
 
-"""Test environment variable precedence for model paths."""
+"""Exercise environment-driven configuration resolution for DocParsing.
+
+These tests cover the helper functions in `env.py` that discover HuggingFace
+caches, model roots, and PDF model paths. They verify precedence rules between
+environment variables and defaults, handle path edge cases (relative segments,
+user expansion), and ensure downstream stages inherit consistent directories.
+"""
 
 import os
 import tempfile

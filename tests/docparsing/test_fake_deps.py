@@ -1,3 +1,11 @@
+"""Validate the fake dependency package that underpins DocParsing tests.
+
+Many DocParsing tests rely on synthetic modules to stand in for GPU-heavy
+dependencies (Docling, transformers, vLLM). This suite ensures those fakes are
+loaded and reset correctly so individual tests can opt-in to dependency stubs
+without accidental cross-test contamination.
+"""
+
 from __future__ import annotations
 
 import sys

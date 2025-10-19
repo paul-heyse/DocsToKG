@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-download">
 <h1>1. Module: download<a class="headerlink" href="#module-download" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.download</span></code>.</p>
@@ -85,7 +85,7 @@
 <p>This module coordinates the streaming download workflow, tying together
 resolver outputs, HTTP policy enforcement, and telemetry reporting. It exposes
 utilities that transform resolver candidates into stored artifacts while
-respecting retry budgets, robots.txt directives, and classification rules.</p>
+respecting retry policies, robots.txt directives, and classification rules.</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
@@ -99,17 +99,54 @@ None</p>
 <p>Raises:
 OSError: If the directory cannot be created because of permissions.</p>
 </section>
-<section id="build-download-outcome">
-<h3><code class="docutils literal notranslate"><span class="pre">_build_download_outcome()</span></code><a class="headerlink" href="#build-download-outcome" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<section id="prepare-candidate-download-session-artifact-url-referer-timeout-ctx">
+<h3><code class="docutils literal notranslate"><span class="pre">prepare_candidate_download(session,</span> <span class="pre">artifact,</span> <span class="pre">url,</span> <span class="pre">referer,</span> <span class="pre">timeout,</span> <span class="pre">ctx)</span></code><a class="headerlink" href="#prepare-candidate-download-session-artifact-url-referer-timeout-ctx" title="Link to this heading"></a></h3>
+<p>Prepare request metadata prior to streaming the download.</p>
+</section>
+<section id="stream-candidate-payload-plan">
+<h3><code class="docutils literal notranslate"><span class="pre">stream_candidate_payload(plan)</span></code><a class="headerlink" href="#stream-candidate-payload-plan" title="Link to this heading"></a></h3>
+<p>Execute the streaming phase for a prepared download plan.</p>
+</section>
+<section id="finalize-candidate-download-plan-stream">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_candidate_download(plan,</span> <span class="pre">stream)</span></code><a class="headerlink" href="#finalize-candidate-download-plan-stream" title="Link to this heading"></a></h3>
+<p>Combine streaming results into a finalized :class:<code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code>.</p>
+</section>
+<section id="get-strategy-for-classification-classification">
+<h3><code class="docutils literal notranslate"><span class="pre">get_strategy_for_classification(classification)</span></code><a class="headerlink" href="#get-strategy-for-classification-classification" title="Link to this heading"></a></h3>
+<p>Return a strategy implementation for the provided classification.</p>
+</section>
+<section id="cached-sha256-signature">
+<h3><code class="docutils literal notranslate"><span class="pre">_cached_sha256(signature)</span></code><a class="headerlink" href="#cached-sha256-signature" title="Link to this heading"></a></h3>
+<p>Compute and cache SHA-256 digests keyed by path, size, and mtime.</p>
 </section>
 <section id="validate-cached-artifact-result">
 <h3><code class="docutils literal notranslate"><span class="pre">_validate_cached_artifact(result)</span></code><a class="headerlink" href="#validate-cached-artifact-result" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when cached artefact metadata matches on-disk state.</p>
+<p>Return validation success flag and mode (<code class="docutils literal notranslate"><span class="pre">fast_path</span></code> or <code class="docutils literal notranslate"><span class="pre">digest</span></code>).</p>
 </section>
 <section id="apply-content-addressed-storage-dest-path-sha256">
 <h3><code class="docutils literal notranslate"><span class="pre">_apply_content_addressed_storage(dest_path,</span> <span class="pre">sha256)</span></code><a class="headerlink" href="#apply-content-addressed-storage-dest-path-sha256" title="Link to this heading"></a></h3>
 <p>Move <code class="docutils literal notranslate"><span class="pre">dest_path</span></code> into a content-addressed location and create a symlink.</p>
+</section>
+<section id="validate-classification-classification-artifact-options">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_classification(classification,</span> <span class="pre">artifact,</span> <span class="pre">options)</span></code><a class="headerlink" href="#validate-classification-classification-artifact-options" title="Link to this heading"></a></h3>
+<p>Validate resolver classification against configured expectations.</p>
+</section>
+<section id="handle-resume-logic-artifact-previous-index-options">
+<h3><code class="docutils literal notranslate"><span class="pre">handle_resume_logic(artifact,</span> <span class="pre">previous_index,</span> <span class="pre">options)</span></code><a class="headerlink" href="#handle-resume-logic-artifact-previous-index-options" title="Link to this heading"></a></h3>
+<p>Normalise previous attempts and detect early skip conditions.</p>
+</section>
+<section id="cleanup-sidecar-files-artifact-classification-options">
+<h3><code class="docutils literal notranslate"><span class="pre">cleanup_sidecar_files(artifact,</span> <span class="pre">classification,</span> <span class="pre">options)</span></code><a class="headerlink" href="#cleanup-sidecar-files-artifact-classification-options" title="Link to this heading"></a></h3>
+<p>Remove temporary sidecar files for the given artifact classification.</p>
+<p>When resume is explicitly enabled <em>and</em> the remote endpoint confirmed support
+(<code class="docutils literal notranslate"><span class="pre">resume_supported=True</span></code>), the partial artifact is preserved so the caller
+can retry with a <code class="docutils literal notranslate"><span class="pre">Range</span></code> request. This behaviour is documented to avoid
+surprising cleanups in the rare deployments that still experiment with
+resumable transfers.</p>
+</section>
+<section id="build-download-outcome">
+<h3><code class="docutils literal notranslate"><span class="pre">build_download_outcome()</span></code><a class="headerlink" href="#build-download-outcome" title="Link to this heading"></a></h3>
+<p>Compose a :class:<code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> with shared validation logic.</p>
 </section>
 <section id="collect-location-urls-work">
 <h3><code class="docutils literal notranslate"><span class="pre">_collect_location_urls(work)</span></code><a class="headerlink" href="#collect-location-urls-work" title="Link to this heading"></a></h3>
@@ -139,30 +176,17 @@ KeyError: If required identifiers are missing from the work payload.</p>
 <section id="download-candidate-session-artifact-url-referer-timeout-context-head-precheck-passed">
 <h3><code class="docutils literal notranslate"><span class="pre">download_candidate(session,</span> <span class="pre">artifact,</span> <span class="pre">url,</span> <span class="pre">referer,</span> <span class="pre">timeout,</span> <span class="pre">context,</span> <span class="pre">head_precheck_passed)</span></code><a class="headerlink" href="#download-candidate-session-artifact-url-referer-timeout-context-head-precheck-passed" title="Link to this heading"></a></h3>
 <p>Download a single candidate URL and classify the payload.</p>
-<p>Args:
-session: HTTP session capable of issuing retried requests via the
-centralised :func:<code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> helper.
-artifact: Work metadata and output directory handles for the current record.
-url: Candidate download URL discovered by a resolver.
-referer: Optional referer header override provided by the resolver.
-timeout: Per-request timeout in seconds.
-context: :class:<code class="docutils literal notranslate"><span class="pre">DownloadContext</span></code> (or mapping convertible to it) containing
-<code class="docutils literal notranslate"><span class="pre">dry_run</span></code>, <code class="docutils literal notranslate"><span class="pre">extract_html_text</span></code>, prior manifest lookups, and optional
-<code class="docutils literal notranslate"><span class="pre">progress_callback</span></code>.</p>
-<p>Progress callback signature: <code class="docutils literal notranslate"><span class="pre">callback(bytes_downloaded,</span> <span class="pre">total_bytes,</span> <span class="pre">url)</span></code>
-where <code class="docutils literal notranslate"><span class="pre">total_bytes</span></code> may be <code class="docutils literal notranslate"><span class="pre">None</span></code> if Content-Length is unavailable.</p>
-<p>Returns:
-DownloadOutcome describing the result of the download attempt including
-streaming hash metadata when available.</p>
-<p>Notes:
-A lightweight HEAD preflight is issued when the caller has not already
-validated the URL. This mirrors the resolver pipeline behaviour and
-keeps dry-run tests deterministic.</p>
-<p>Progress callbacks are invoked approximately every 128KB to balance
-responsiveness with performance overhead.</p>
-<p>Raises:
-OSError: If writing the downloaded payload to disk fails.
-TypeError: If conditional response parsing returns unexpected objects.</p>
+<p>Phase diagram::</p>
+<p>[prepare_candidate_download]
+|–(robots/cache skip)–&gt; outcome
+v
+[stream_candidate_payload]
+|–(cached/error)——-&gt; outcome
+v
+[finalize_candidate_download] —&gt; outcome</p>
+<p>Each helper owns a single responsibility: preflight assembles request
+context, streaming performs network I/O, and finalization converts the
+structured stream result into a manifest-ready :class:<code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code>.</p>
 </section>
 <section id="process-one-work-work-session-pdf-dir-html-dir-xml-dir-pipeline-logger-metrics">
 <h3><code class="docutils literal notranslate"><span class="pre">process_one_work(work,</span> <span class="pre">session,</span> <span class="pre">pdf_dir,</span> <span class="pre">html_dir,</span> <span class="pre">xml_dir,</span> <span class="pre">pipeline,</span> <span class="pre">logger,</span> <span class="pre">metrics)</span></code><a class="headerlink" href="#process-one-work-work-session-pdf-dir-html-dir-xml-dir-pipeline-logger-metrics" title="Link to this heading"></a></h3>
@@ -177,7 +201,7 @@ xml_dir: Directory where XML artefacts are written.
 pipeline: Resolver pipeline orchestrating downstream resolvers.
 logger: Structured attempt logger capturing manifest records.
 metrics: Resolver metrics collector.
-options: :class:<code class="docutils literal notranslate"><span class="pre">DownloadOptions</span></code> describing download behaviour for the work.
+options: :class:<code class="docutils literal notranslate"><span class="pre">DownloadConfig</span></code> describing download behaviour for the work.
 session_factory: Optional callable returning a thread-local session for
 resolver execution when concurrency is enabled.</p>
 <p>Returns:
@@ -186,6 +210,107 @@ Dictionary summarizing the outcome (saved/html_only/skipped flags).</p>
 requests.RequestException: Propagated if resolver HTTP requests fail
 unexpectedly outside guarded sections.
 Exception: Bubbling from resolver pipeline internals when not handled.</p>
+</section>
+<section id="post-init-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="normalize-mapping-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_mapping(value)</span></code><a class="headerlink" href="#normalize-mapping-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="normalize-resume-lookup-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_resume_lookup(value)</span></code><a class="headerlink" href="#normalize-resume-lookup-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="normalize-resume-completed-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_resume_completed(value)</span></code><a class="headerlink" href="#normalize-resume-completed-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="coerce-int-value-default">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_int(value,</span> <span class="pre">default)</span></code><a class="headerlink" href="#coerce-int-value-default" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="coerce-optional-positive-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_optional_positive(value)</span></code><a class="headerlink" href="#coerce-optional-positive-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="to-context-self-overrides">
+<h3><code class="docutils literal notranslate"><span class="pre">to_context(self,</span> <span class="pre">overrides)</span></code><a class="headerlink" href="#to-context-self-overrides" title="Link to this heading"></a></h3>
+<p>Convert the configuration into a :class:<code class="docutils literal notranslate"><span class="pre">DownloadContext</span></code>.</p>
+</section>
+<section id="from-options-cls-options">
+<h3><code class="docutils literal notranslate"><span class="pre">from_options(cls,</span> <span class="pre">options)</span></code><a class="headerlink" href="#from-options-cls-options" title="Link to this heading"></a></h3>
+<p>Build a configuration instance from legacy option surfaces.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">to_context(self,</span> <span class="pre">overrides)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Return a <code class="docutils literal notranslate"><span class="pre">DownloadContext</span></code> derived from this options payload.</p>
+<p>Args:
+overrides: Optional mapping of field names to values that should
+replace the existing attributes when constructing the context.</p>
+<p>Returns:
+DownloadContext: Fully-populated context object consumed by the
+content download pipeline.</p>
+</section>
+<section id="should-download-self-artifact-context">
+<h3><code class="docutils literal notranslate"><span class="pre">should_download(self,</span> <span class="pre">artifact,</span> <span class="pre">context)</span></code><a class="headerlink" href="#should-download-self-artifact-context" title="Link to this heading"></a></h3>
+<p>Decide whether the current artifact warrants a fresh download attempt.</p>
+<p>Args:
+artifact: The work artifact under consideration.
+context: Mutable state shared across download strategy phases.</p>
+<p>Returns:
+True when the strategy should perform a download, False when it should
+short-circuit the workflow (for example, due to resume state).</p>
+</section>
+<section id="process-response-self-response-artifact-context">
+<h3><code class="docutils literal notranslate"><span class="pre">process_response(self,</span> <span class="pre">response,</span> <span class="pre">artifact,</span> <span class="pre">context)</span></code><a class="headerlink" href="#process-response-self-response-artifact-context" title="Link to this heading"></a></h3>
+<p>Process the HTTP response to derive classification metadata.</p>
+<p>Args:
+response: Raw HTTP response returned by the download request.
+artifact: Work artifact metadata associated with the response.
+context: Shared strategy state that accumulates response details.</p>
+<p>Returns:
+The classification that should be assigned to the downloaded artifact.</p>
+</section>
+<section id="finalize-artifact-self-artifact-classification-context">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_artifact(self,</span> <span class="pre">artifact,</span> <span class="pre">classification,</span> <span class="pre">context)</span></code><a class="headerlink" href="#finalize-artifact-self-artifact-classification-context" title="Link to this heading"></a></h3>
+<p>Assemble the final download outcome after all processing steps.</p>
+<p>Args:
+artifact: Work artifact being finalized.
+classification: Final classification selected for the artifact.
+context: Strategy context containing response metadata and paths.</p>
+<p>Returns:
+Structured outcome describing the finalized download results.</p>
+</section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">should_download(self,</span> <span class="pre">artifact,</span> <span class="pre">context)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Evaluate whether to start a download for the provided artifact.</p>
+<p>Args:
+artifact: Work artifact describing the requested content.
+context: Mutable strategy context shared across download phases.</p>
+<p>Returns:
+False when the download is skipped due to configuration, True otherwise.</p>
+</section>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">process_response(self,</span> <span class="pre">response,</span> <span class="pre">artifact,</span> <span class="pre">context)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>Capture the response and select a classification if not already set.</p>
+<p>Args:
+response: HTTP response received for the download attempt.
+artifact: Work artifact metadata being processed.
+context: Strategy context that caches response metadata.</p>
+<p>Returns:
+Classification derived either from the response or preconfigured hints.</p>
+</section>
+<section id="id4">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_artifact(self,</span> <span class="pre">artifact,</span> <span class="pre">classification,</span> <span class="pre">context)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<p>Convert the accumulated strategy context into a download outcome.</p>
+<p>Args:
+artifact: Work artifact associated with the download.
+classification: Final classification selected for the artifact.
+context: Strategy context populated during prior phases.</p>
+<p>Returns:
+Structured <code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> describing results and metadata.</p>
 </section>
 <section id="is-allowed-self-session-url-timeout">
 <h3><code class="docutils literal notranslate"><span class="pre">is_allowed(self,</span> <span class="pre">session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#is-allowed-self-session-url-timeout" title="Link to this heading"></a></h3>
@@ -207,22 +332,62 @@ loc: Location dictionary as returned by OpenAlex (may be None).</p>
 </section>
 <section id="stream-chunks">
 <h3><code class="docutils literal notranslate"><span class="pre">_stream_chunks()</span></code><a class="headerlink" href="#stream-chunks" title="Link to this heading"></a></h3>
-<p>Optimized streaming: write prefetched chunks inline to avoid double storage.</p>
+<p><em>No documentation available.</em></p>
 </section>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="downloadconfig">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadConfig</span></code><a class="headerlink" href="#downloadconfig" title="Link to this heading"></a></h3>
+<p>Unified download configuration shared by CLI, pipeline, and runner.</p>
+</section>
 <section id="downloadoptions">
 <h3><code class="docutils literal notranslate"><span class="pre">DownloadOptions</span></code><a class="headerlink" href="#downloadoptions" title="Link to this heading"></a></h3>
-<p>Stable collection of per-run download settings applied to each work item.</p>
+<p>Compatibility shim preserving the legacy <code class="docutils literal notranslate"><span class="pre">DownloadOptions</span></code> surface.</p>
+</section>
+<section id="validationresult">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidationResult</span></code><a class="headerlink" href="#validationresult" title="Link to this heading"></a></h3>
+<p>Outcome of validating an artifact classification.</p>
+</section>
+<section id="resumedecision">
+<h3><code class="docutils literal notranslate"><span class="pre">ResumeDecision</span></code><a class="headerlink" href="#resumedecision" title="Link to this heading"></a></h3>
+<p>Decision container describing resume handling for a work artifact.</p>
+</section>
+<section id="downloadstrategycontext">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadStrategyContext</span></code><a class="headerlink" href="#downloadstrategycontext" title="Link to this heading"></a></h3>
+<p>Mutable state shared between strategy phases for a single download.</p>
+</section>
+<section id="downloadpreflightplan">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadPreflightPlan</span></code><a class="headerlink" href="#downloadpreflightplan" title="Link to this heading"></a></h3>
+<p>Prepared inputs required to stream a candidate download.</p>
+</section>
+<section id="downloadstreamresult">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadStreamResult</span></code><a class="headerlink" href="#downloadstreamresult" title="Link to this heading"></a></h3>
+<p>Structured payload returned by :func:<code class="docutils literal notranslate"><span class="pre">stream_candidate_payload</span></code>.</p>
+</section>
+<section id="downloadstrategy">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadStrategy</span></code><a class="headerlink" href="#downloadstrategy" title="Link to this heading"></a></h3>
+<p>Protocol implemented by artifact-specific download strategies.</p>
+</section>
+<section id="basedownloadstrategy">
+<h3><code class="docutils literal notranslate"><span class="pre">_BaseDownloadStrategy</span></code><a class="headerlink" href="#basedownloadstrategy" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="pdfdownloadstrategy">
+<h3><code class="docutils literal notranslate"><span class="pre">PdfDownloadStrategy</span></code><a class="headerlink" href="#pdfdownloadstrategy" title="Link to this heading"></a></h3>
+<p>Download strategy that enforces PDF-specific processing rules.</p>
+</section>
+<section id="htmldownloadstrategy">
+<h3><code class="docutils literal notranslate"><span class="pre">HtmlDownloadStrategy</span></code><a class="headerlink" href="#htmldownloadstrategy" title="Link to this heading"></a></h3>
+<p>Download strategy tailored for HTML artifacts.</p>
+</section>
+<section id="xmldownloadstrategy">
+<h3><code class="docutils literal notranslate"><span class="pre">XmlDownloadStrategy</span></code><a class="headerlink" href="#xmldownloadstrategy" title="Link to this heading"></a></h3>
+<p>Download strategy tailored for XML artifacts.</p>
 </section>
 <section id="downloadstate">
 <h3><code class="docutils literal notranslate"><span class="pre">DownloadState</span></code><a class="headerlink" href="#downloadstate" title="Link to this heading"></a></h3>
 <p>State machine for streaming downloads.</p>
-</section>
-<section id="maxbytesexceeded">
-<h3><code class="docutils literal notranslate"><span class="pre">_MaxBytesExceeded</span></code><a class="headerlink" href="#maxbytesexceeded" title="Link to this heading"></a></h3>
-<p>Internal signal raised when the stream exceeds the configured byte budget.</p>
 </section>
 <section id="robotscache">
 <h3><code class="docutils literal notranslate"><span class="pre">RobotsCache</span></code><a class="headerlink" href="#robotscache" title="Link to this heading"></a></h3>
@@ -245,7 +410,7 @@ loc: Location dictionary as returned by OpenAlex (may be None).</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -256,7 +421,7 @@ loc: Location dictionary as returned by OpenAlex (may be None).</p>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

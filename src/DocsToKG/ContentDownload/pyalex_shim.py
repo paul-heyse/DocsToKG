@@ -1,9 +1,21 @@
-"""Helpers for interacting with the pyalex configuration safely.
+"""PyAlex configuration shims for polite resolver defaults.
 
-Tests swap in fake ``pyalex`` modules (and configs) to avoid hitting the real
-network client. Import-time aliases to ``pyalex.config`` become stale when that
-swap happens later, so this module provides a small proxy and helper utilities
-that always resolve the active configuration object at call time.
+Responsibilities
+----------------
+- Resolve the active ``pyalex`` module/config at call time, even when tests or
+  harnesses monkeypatch the import after this module has loaded.
+- Provide :func:`apply_mailto` so CLI invocations can set polite contact
+  headers without depending on the pyalex import strategy used by callers.
+- Expose :class:`ConfigProxy`, a lightweight proxy that forwards attribute
+  access to the live config object, keeping resolver setup code agnostic to
+  whether ``pyalex.config`` is a module or mapping.
+
+Design Notes
+------------
+- All helpers tolerate the ``pyalex`` package being absent; optional dependencies
+  are resolved lazily to avoid hard runtime requirements during tests.
+- Attribute assignment falls back to mapping semantics to support both object
+  and dict-style configs shipped by different pyalex versions.
 """
 
 from __future__ import annotations

@@ -43,7 +43,13 @@
 # }
 # === /NAVMAP ===
 
-"""Test streaming vector writing to reduce peak RAM usage."""
+"""Validate streaming vector batching helpers for large embedding outputs.
+
+Vector generation can yield gigabytes of JSONL data. These tests cover the
+`iter_rows_in_batches` helper to ensure it skips empty lines, handles edge cases
+like tiny files or oversized batch sizes, and maintains low memory usage by
+streaming rows rather than loading entire files.
+"""
 
 import json
 import tempfile

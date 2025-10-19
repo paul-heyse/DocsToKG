@@ -1,4 +1,12 @@
-"""Validation and normalization utilities for ontology downloads."""
+"""Validation, normalisation, and resource budgeting for ontology downloads.
+
+After ontologies are fetched they must be unpacked, converted, and sanity
+checked.  This module orchestrates the validator pool, manages cross-process
+concurrency budgets, streams artefacts through rdflib/pronto/owlready2, and
+produces machine-readable validation summaries.  It powers the ``validate``
+CLI command as well as programmatic callers that need to vet ontologies before
+promotion.
+"""
 
 from __future__ import annotations
 

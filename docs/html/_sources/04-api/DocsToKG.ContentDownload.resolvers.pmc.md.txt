@@ -8,6 +8,10 @@ Resolver implementation for PubMed Central content.
 
 ## 2. Functions
 
+### `request_with_retries()`
+
+Proxy to :func:`resolvers.base.request_with_retries` for patchability.
+
 ### `is_enabled(self, config, artifact)`
 
 Return ``True`` when PMC identifiers or DOI metadata are available.

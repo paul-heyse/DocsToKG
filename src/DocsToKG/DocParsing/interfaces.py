@@ -1,4 +1,10 @@
-"""Shared protocol interfaces for DocParsing plugin points."""
+"""Protocol definitions that describe DocParsing extension points.
+
+The DocParsing pipeline supports pluggable serializers, chunk sinks, and
+embedding writers. This module codifies those contracts using ``typing.Protocol``
+so integrators can develop custom implementations with static type checking
+and runtime duck-typing via ``runtime_checkable``.
+"""
 
 from __future__ import annotations
 

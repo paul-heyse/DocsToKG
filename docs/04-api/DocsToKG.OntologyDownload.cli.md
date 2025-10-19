@@ -4,57 +4,9 @@ This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.cli``.
 
 ## 1. Overview
 
-Ontology downloader CLI entry points.
-
-The `ontofetch` command exposes planning, pull, validation, diagnostics, and
-storage management workflows described in the ontology download refactor.
-Operators can override concurrency and host allowlists from the CLI, diff plan
-outputs, prune historical versions, and run comprehensive `doctor` diagnostics
-without editing configuration files. JSON output modes support automation while
-rich ASCII tables summarise resolver fallback chains and validator results.
+Command-line orchestration for DocsToKG OntologyDownload.
 
 ## 2. Functions
-
-### `format_table(headers, rows)`
-
-Render a padded ASCII table.
-
-Args:
-headers: Column headers rendered on the first row.
-rows: Iterable of table rows; each row must match the header length.
-
-Returns:
-Formatted table as a multi-line string.
-
-### `format_plan_rows(plans)`
-
-Convert planner output into rows for table rendering.
-
-Args:
-plans: Planned fetch objects emitted by the planner.
-
-Returns:
-List of tuples suitable for :func:`format_table`.
-
-### `format_results_table(results)`
-
-Render download results as a table summarizing status and file paths.
-
-Args:
-results: Download results produced by :func:`fetch_all`.
-
-Returns:
-Formatted table summarizing ontology downloads.
-
-### `format_validation_summary(results)`
-
-Summarise validator outcomes in a compact status table.
-
-Args:
-results: Mapping of validator names to structured result payloads.
-
-Returns:
-Table highlighting validator status and notable detail messages.
 
 ### `_build_parser()`
 
@@ -129,16 +81,6 @@ value: Either a string date or a pre-parsed datetime.
 Returns:
 Normalized datetime in UTC, or ``None`` when not supplied.
 
-### `_format_bytes(num)`
-
-Return human-readable byte count representation.
-
-Args:
-num: Byte count to format.
-
-Returns:
-String describing the size using binary units.
-
 ### `_apply_cli_overrides(config, args)`
 
 Mutate resolved configuration based on CLI override arguments.
@@ -147,97 +89,9 @@ Args:
 config: Resolved configuration subject to mutation.
 args: Parsed CLI namespace containing override values.
 
-### `_results_to_dict(result)`
-
-Convert a ``FetchResult`` instance into a JSON-friendly mapping.
-
-Args:
-result: Completed fetch result returned by :func:`fetch_one`.
-
-Returns:
-Dictionary containing resolver metadata, manifest location, and artifact list.
-
-### `_compute_plan_diff(baseline, current)`
-
-Compute additions, removals, and modifications between plan snapshots.
-
-### `_format_plan_diff(diff)`
-
-Render human-readable diff lines from plan comparison.
-
-### `_plan_to_dict(plan)`
-
-Convert a planned fetch into a JSON-friendly dictionary.
-
-Args:
-plan: Planned fetch data produced by :func:`plan_one` or :func:`plan_all`.
-
-Returns:
-Mapping containing resolver metadata and planned download details suitable
-for serialization.
-
-### `_infer_version_timestamp(version)`
-
-Attempt to derive a datetime from a version string.
-
-Args:
-version: Version identifier emitted by upstream resolvers.
-
-Returns:
-Datetime derived from the version string, or ``None`` when no format matches.
-
-### `_resolve_version_metadata(ontology_id, version)`
-
-Return path, timestamp, and size metadata for a stored version.
-
-### `_ensure_manifest_path(ontology_id, version)`
-
-Return the manifest path for a given ontology and version.
-
-Args:
-ontology_id: Identifier for the ontology whose manifest is requested.
-version: Optional version string; when omitted the latest available is used.
-
-Returns:
-Path to the manifest JSON file on disk.
-
-Raises:
-ConfigError: If the ontology or manifest cannot be located locally.
-
-### `_load_manifest(manifest_path)`
-
-Read and parse a manifest JSON document from disk.
-
-Args:
-manifest_path: Filesystem location of the manifest file.
-
-Returns:
-Dictionary representation of the manifest contents.
-
-### `_collect_version_metadata(ontology_id)`
-
-Return sorted metadata entries for stored ontology versions.
-
-Args:
-ontology_id: Identifier of the ontology to inspect.
-
-Returns:
-List of metadata dictionaries ordered by most recent timestamp first.
-
 ### `_resolve_specs_from_args(args, base_config)`
 
 Return configuration and fetch specifications derived from CLI arguments.
-
-Args:
-args: Parsed command-line arguments for `pull`/`plan` commands.
-base_config: Optional pre-loaded configuration used when no spec file is supplied.
-
-Returns:
-Tuple containing the active resolved configuration and the list of fetch specs
-that should be processed.
-
-Raises:
-ConfigError: If neither explicit IDs nor a configuration file are provided.
 
 ### `_handle_pull(args, base_config)`
 
@@ -251,9 +105,24 @@ Resolve plans without executing downloads.
 
 Compare current plan output against a baseline plan file.
 
+### `_handle_plugins(args)`
+
+Return plugin inventory for the requested kind.
+
 ### `_handle_prune(args, logger)`
 
-Delete surplus ontology versions based on ``--keep`` parameter.
+Delete surplus ontology versions based on ``--keep`` and age filters.
+
+### `_read_api_key_status(path)`
+
+Return diagnostic metadata for an API key file.
+
+Args:
+path: Target file path to inspect.
+
+Returns:
+Mapping including the path, whether it exists, configuration status, and
+any error encountered while reading the contents.
 
 ### `_doctor_report()`
 
@@ -261,6 +130,10 @@ Collect diagnostic information for the ``doctor`` command.
 
 Returns:
 Mapping capturing disk, dependency, network, and configuration status.
+
+### `_apply_doctor_fixes(report)`
+
+Attempt to remediate common doctor issues and return action notes.
 
 ### `_print_doctor_report(report)`
 
@@ -326,7 +199,11 @@ path: Filesystem path to the configuration file under validation.
 Returns:
 Dictionary describing validation status, ontology count, and file path.
 
-### `main(argv)`
+### `_emit_batch_failure(exc, args)`
+
+Print a concise error message and optionally serialize partial results.
+
+### `cli_main(argv)`
 
 Entry point for the ontology downloader CLI.
 
@@ -340,6 +217,12 @@ Raises:
 ConfigError: If configuration files are invalid or unsafe to overwrite.
 OntologyDownloadError: If download or validation operations fail.
 
-### `_format_row(values)`
+### `apply_resolver_override(specs)`
 
-*No documentation available.*
+Force all ``specs`` to use the resolver override when one is provided.
+
+Args:
+specs: Iterable of fetch specifications to adjust.
+
+Returns:
+List[FetchSpec]: Normalised fetch specs that honour the override selection.

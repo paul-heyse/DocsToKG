@@ -35,9 +35,9 @@ Usage:
 
 ## 2. Functions
 
-### `_normalise_domain_bytes_budget(data)`
+### `_coerce_download_context(context)`
 
-Normalize domain byte budgets to lower-case host keys and integer byte limits.
+Normalise context-like inputs into a :class:`DownloadContext` instance.
 
 ### `_normalise_domain_content_rules(data)`
 
@@ -125,37 +125,6 @@ bool: ``True`` if the outcome corresponds to a PDF download.
 ### `__post_init__(self)`
 
 *No documentation available.*
-
-### `from_wire(cls, value)`
-
-Coerce serialized event values into :class:`ResolverEvent` members.
-
-### `from_wire(cls, value)`
-
-Coerce serialized reason values into :class:`ResolverEventReason` members.
-
-### `is_enabled(self, config, artifact)`
-
-Return ``True`` if this resolver should run for the given artifact.
-
-Args:
-config: Resolver configuration options.
-artifact: Work artifact under consideration.
-
-Returns:
-bool: ``True`` when the resolver should run for the artifact.
-
-### `iter_urls(self, session, config, artifact)`
-
-Yield candidate URLs or events for the given artifact.
-
-Args:
-session: HTTP session used for outbound _requests.
-config: Resolver configuration.
-artifact: Work artifact describing the current item.
-
-Returns:
-Iterable[ResolverResult]: Stream of download candidates or events.
 
 ### `record_attempt(self, resolver_name, outcome)`
 
@@ -245,22 +214,6 @@ Returns:
 Total seconds slept enforcing the domain policies.
 
 ### `_ensure_host_bucket(self, host)`
-
-*No documentation available.*
-
-### `_resolve_budget_host_key(self, host)`
-
-*No documentation available.*
-
-### `_domain_budget_remaining(self, host_key)`
-
-*No documentation available.*
-
-### `_estimate_outcome_bytes(self, outcome)`
-
-*No documentation available.*
-
-### `_record_domain_bytes(self, host_key, outcome)`
 
 *No documentation available.*
 
@@ -435,6 +388,7 @@ resolver_order: Ordered list of resolver names to execute.
 resolver_toggles: Mapping toggling individual resolvers on/off.
 max_attempts_per_work: Maximum number of resolver attempts per work item.
 timeout: Default HTTP timeout applied to resolvers.
+retry_after_cap: Ceiling (seconds) applied to ``Retry-After`` hints when retrying HTTP calls.
 sleep_jitter: Random jitter added between retries.
 polite_headers: HTTP headers to apply for polite crawling.
 unpaywall_email: Contact email registered with Unpaywall.
@@ -452,8 +406,7 @@ max_concurrent_resolvers: Upper bound on concurrent resolver threads per work.
 max_concurrent_per_host: Upper bound on simultaneous downloads per hostname.
 enable_global_url_dedup: Enable global URL deduplication across works when True.
 domain_token_buckets: Mapping of hostname to token bucket parameters.
-domain_bytes_budget: Mapping of hostname to maximum bytes permitted this run.
-domain_content_rules: Mapping of hostname to MIME allow-lists and max-bytes caps.
+domain_content_rules: Mapping of hostname to MIME allow-lists.
 resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
 
 Notes:
@@ -542,25 +495,6 @@ reason: Optional reason string explaining failures.
 
 Examples:
 >>> PipelineResult(success=True, resolver_name="unpaywall", url="https://example")
-
-### `ResolverEvent`
-
-Canonical resolver event categories emitted via :class:`ResolverResult`.
-
-### `ResolverEventReason`
-
-Structured reason taxonomy for resolver events.
-
-### `Resolver`
-
-Protocol that resolver implementations must follow.
-
-Attributes:
-name: Resolver identifier used within configuration.
-
-Examples:
-Concrete implementations are provided in classes such as
-:class:`UnpaywallResolver` and :class:`CrossrefResolver` below.
 
 ### `ResolverMetrics`
 

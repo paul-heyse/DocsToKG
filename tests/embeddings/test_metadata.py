@@ -125,16 +125,17 @@ import pytest
 from DocsToKG.DocParsing.core.batching import Batcher
 from DocsToKG.DocParsing.io import iter_jsonl
 from tests._stubs import dependency_stubs
+from tests.conftest import PatchManager
 
 # --- Helper Functions ---
 
 
-def _install_minimal_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
+def _install_minimal_stubs(patcher: PatchManager) -> None:
     """Install lightweight dependency stubs for embedding module tests."""
 
     tqdm_stub = ModuleType("tqdm")
     tqdm_stub.tqdm = lambda iterable=None, **_: iterable if iterable is not None else []
-    monkeypatch.setitem(sys.modules, "tqdm", tqdm_stub)
+    patcher.setitem(sys.modules, "tqdm", tqdm_stub)
 
     st_stub = ModuleType("sentence_transformers")
 
@@ -173,7 +174,7 @@ def _install_minimal_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
             return []
 
     st_stub.SparseEncoder = _SparseEncoder
-    monkeypatch.setitem(sys.modules, "sentence_transformers", st_stub)
+    patcher.setitem(sys.modules, "sentence_transformers", st_stub)
 
     vllm_stub = ModuleType("vllm")
 
@@ -196,7 +197,7 @@ def _install_minimal_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
 
     vllm_stub.LLM = _LLM
     vllm_stub.PoolingParams = _PoolingParams
-    monkeypatch.setitem(sys.modules, "vllm", vllm_stub)
+    patcher.setitem(sys.modules, "vllm", vllm_stub)
 
     original_write_text = Path.write_text
 
@@ -204,16 +205,16 @@ def _install_minimal_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
         data = "".join(args) if args else ""
         return original_write_text(path_self, data, **kwargs)
 
-    monkeypatch.setattr(Path, "write_text", _write_text)
+    patcher.setattr(Path, "write_text", _write_text)
 
 
 # --- Test Cases ---
 
 
-def test_process_pass_a_returns_stats_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_pass_a_returns_stats_only(tmp_path: Path, patcher: PatchManager) -> None:
     """`process_pass_a` should return BM25 statistics without chunk caches."""
 
-    _install_minimal_stubs(monkeypatch)
+    _install_minimal_stubs(patcher)
     import DocsToKG.DocParsing.embedding.runtime as embed_module
 
     chunk_file = tmp_path / "sample.chunks.jsonl"
@@ -226,12 +227,10 @@ def test_process_pass_a_returns_stats_only(tmp_path: Path, monkeypatch: pytest.M
     assert rows[0]["uuid"], "UUIDs should be assigned in-place"
 
 
-def test_process_chunk_file_vectors_reads_texts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_process_chunk_file_vectors_reads_texts(tmp_path: Path, patcher: PatchManager) -> None:
     """Chunk texts should be sourced directly from file rows when encoding."""
 
-    _install_minimal_stubs(monkeypatch)
+    _install_minimal_stubs(patcher)
     import DocsToKG.DocParsing.embedding.runtime as embed_module
 
     chunk_file = tmp_path / "doc.chunks.jsonl"
@@ -242,12 +241,12 @@ def test_process_chunk_file_vectors_reads_texts(
 
     captured_texts: List[str] = []
 
-    monkeypatch.setattr(
+    patcher.setattr(
         embed_module,
         "splade_encode",
         lambda cfg, texts, batch_size=None: ([["tok"] for _ in texts], [[1.0] for _ in texts]),
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         embed_module,
         "qwen_embed",
         lambda cfg, texts, batch_size=None: captured_texts.extend(texts) or [[1.0] + [0.0] * 2559],
@@ -270,7 +269,7 @@ def test_process_chunk_file_vectors_reads_texts(
         captured_write_texts.extend(texts)
         return len(uuids), [1] * len(uuids), [1.0] * len(uuids)
 
-    monkeypatch.setattr(embed_module, "write_vectors", _write_vectors)
+    patcher.setattr(embed_module, "write_vectors", _write_vectors)
 
     args = embed_module.build_parser().parse_args(
         [
@@ -339,12 +338,10 @@ def test_batcher_streams_generator_inputs() -> None:
         next(iterator)
 
 
-def test_cli_path_overrides_take_precedence(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_cli_path_overrides_take_precedence(tmp_path: Path, patcher: PatchManager) -> None:
     """CLI supplied model directories should override environment variables."""
 
-    _install_minimal_stubs(monkeypatch)
+    _install_minimal_stubs(patcher)
     dependency_stubs()
     sys.modules.pop("DocsToKG.DocParsing.embedding.runtime", None)
     import DocsToKG.DocParsing.embedding.runtime as embed_module
@@ -358,8 +355,8 @@ def test_cli_path_overrides_take_precedence(
     env_splade.mkdir()
     env_qwen.mkdir()
 
-    monkeypatch.setenv("DOCSTOKG_SPLADE_DIR", str(env_splade))
-    monkeypatch.setenv("DOCSTOKG_QWEN_DIR", str(env_qwen))
+    patcher.setenv("DOCSTOKG_SPLADE_DIR", str(env_splade))
+    patcher.setenv("DOCSTOKG_QWEN_DIR", str(env_qwen))
 
     captured: Dict[str, Path] = {}
 
@@ -376,15 +373,15 @@ def test_cli_path_overrides_take_precedence(
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(embed_module, "iter_chunk_files", lambda _: [chunk_file])
-    monkeypatch.setattr(
+    patcher.setattr(embed_module, "iter_chunk_files", lambda _: [chunk_file])
+    patcher.setattr(
         embed_module,
         "process_pass_a",
         lambda files, logger: embed_module.BM25Stats(N=1, avgdl=1.0, df={}),
     )
-    monkeypatch.setattr(embed_module, "process_chunk_file_vectors", _capture)
-    monkeypatch.setattr(embed_module, "load_manifest_index", lambda *args, **kwargs: {})
-    monkeypatch.setattr(embed_module, "compute_content_hash", lambda *_: "hash")
+    patcher.setattr(embed_module, "process_chunk_file_vectors", _capture)
+    patcher.setattr(embed_module, "load_manifest_index", lambda *args, **kwargs: {})
+    patcher.setattr(embed_module, "compute_content_hash", lambda *_: "hash")
 
     args = embed_module.parse_args(
         [
@@ -406,12 +403,10 @@ def test_cli_path_overrides_take_precedence(
     assert captured["qwen"] == cli_qwen.resolve()
 
 
-def test_offline_mode_requires_local_models(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_offline_mode_requires_local_models(tmp_path: Path, patcher: PatchManager) -> None:
     """Offline mode should raise when required models are absent."""
 
-    _install_minimal_stubs(monkeypatch)
+    _install_minimal_stubs(patcher)
     import DocsToKG.DocParsing.embedding.runtime as embed_module
 
     missing = tmp_path / "missing"
@@ -438,10 +433,10 @@ def test_offline_mode_requires_local_models(
     assert "Qwen model directory not found" in message
 
 
-def test_validate_only_mode_checks_vectors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validate_only_mode_checks_vectors(tmp_path: Path, patcher: PatchManager) -> None:
     """Validation-only flag should scan vector files without invoking models."""
 
-    embed_module = _reload_embedding_module(monkeypatch)
+    embed_module = _reload_embedding_module(patcher)
     from DocsToKG.DocParsing import schemas as _schemas
 
     vector_version = _schemas.VECTOR_SCHEMA_VERSION
@@ -472,7 +467,7 @@ def test_validate_only_mode_checks_vectors(tmp_path: Path, monkeypatch: pytest.M
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
     args = embed_module.parse_args(
         ["--chunks-dir", str(chunks_dir), "--out-dir", str(vectors_dir), "--validate-only"]
     )
@@ -488,13 +483,13 @@ def _find_action(parser, option: str):
     raise AssertionError(f"Option {option} not found in parser")
 
 
-def test_splade_attn_help_text_describes_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_splade_attn_help_text_describes_fallbacks(patcher: PatchManager) -> None:
     """The CLI help should explain attention fallbacks and explicit modes."""
 
-    embed_module = _reload_embedding_module(monkeypatch)
+    embed_module = _reload_embedding_module(patcher)
     tqdm_stub = ModuleType("tqdm")
     tqdm_stub.tqdm = lambda iterable=None, **_: iterable if iterable is not None else []
-    monkeypatch.setitem(sys.modules, "tqdm", tqdm_stub)
+    patcher.setitem(sys.modules, "tqdm", tqdm_stub)
 
     st_stub = ModuleType("sentence_transformers")
 
@@ -504,7 +499,7 @@ def test_splade_attn_help_text_describes_fallbacks(monkeypatch: pytest.MonkeyPat
             self.kwargs = kwargs
 
     st_stub.SparseEncoder = _SparseEncoder
-    monkeypatch.setitem(sys.modules, "sentence_transformers", st_stub)
+    patcher.setitem(sys.modules, "sentence_transformers", st_stub)
 
     vllm_stub = ModuleType("vllm")
 
@@ -523,7 +518,7 @@ def test_splade_attn_help_text_describes_fallbacks(monkeypatch: pytest.MonkeyPat
 
     vllm_stub.LLM = _LLM
     vllm_stub.PoolingParams = _PoolingParams
-    monkeypatch.setitem(sys.modules, "vllm", vllm_stub)
+    patcher.setitem(sys.modules, "vllm", vllm_stub)
 
     parser = embed_module.build_parser()
     action = _find_action(parser, "--splade-attn")
@@ -534,14 +529,14 @@ def test_splade_attn_help_text_describes_fallbacks(monkeypatch: pytest.MonkeyPat
 
 
 def test_summary_manifest_includes_splade_backend_metadata(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, patcher: PatchManager
 ) -> None:
     """Summary manifest entries should record SPLADE backend metadata."""
 
-    embed_module = _reload_embedding_module(monkeypatch)
+    embed_module = _reload_embedding_module(patcher)
     tqdm_stub = ModuleType("tqdm")
     tqdm_stub.tqdm = lambda iterable=None, **_: iterable if iterable is not None else []
-    monkeypatch.setitem(sys.modules, "tqdm", tqdm_stub)
+    patcher.setitem(sys.modules, "tqdm", tqdm_stub)
 
     manifests: List[Dict[str, Any]] = []
     chunk_dir = tmp_path / "chunks"
@@ -590,11 +585,11 @@ def test_summary_manifest_includes_splade_backend_metadata(
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
-    monkeypatch.setattr(embed_module, "manifest_append", record_manifest)
-    monkeypatch.setattr(embed_module, "manifest_log_success", capture_success)
-    monkeypatch.setattr(embed_module, "iter_chunk_files", lambda _: [chunk_file])
-    monkeypatch.setattr(
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+    patcher.setattr(embed_module, "manifest_append", record_manifest)
+    patcher.setattr(embed_module, "manifest_log_success", capture_success)
+    patcher.setattr(embed_module, "iter_chunk_files", lambda _: [chunk_file])
+    patcher.setattr(
         embed_module,
         "process_pass_a",
         lambda files, logger: embed_module.BM25Stats(N=1, avgdl=1.0, df={}),
@@ -606,16 +601,16 @@ def test_summary_manifest_includes_splade_backend_metadata(
         validator.validate("chunk-1", ["tok"], [1.0])
         return 1, [1], [1.0]
 
-    monkeypatch.setattr(
+    patcher.setattr(
         embed_module,
         "process_chunk_file_vectors",
         fake_process_chunk_file_vectors,
     )
-    monkeypatch.setattr(embed_module, "load_manifest_index", lambda *args, **kwargs: {})
-    monkeypatch.setattr(embed_module, "compute_content_hash", lambda *args, **kwargs: "hash")
-    monkeypatch.setattr(embed_module, "data_chunks", lambda _root, **__: chunk_dir)
-    monkeypatch.setattr(embed_module, "data_vectors", lambda _root, **__: vectors_dir)
-    monkeypatch.setattr(
+    patcher.setattr(embed_module, "load_manifest_index", lambda *args, **kwargs: {})
+    patcher.setattr(embed_module, "compute_content_hash", lambda *args, **kwargs: "hash")
+    patcher.setattr(embed_module, "data_chunks", lambda _root, **__: chunk_dir)
+    patcher.setattr(embed_module, "data_vectors", lambda _root, **__: vectors_dir)
+    patcher.setattr(
         embed_module,
         "detect_data_root",
         lambda override=None: Path(override) if override else tmp_path,
@@ -650,19 +645,17 @@ def test_summary_manifest_includes_splade_backend_metadata(
     assert summary["sparsity_warn_threshold_pct"] == pytest.approx(1.0)
 
 
-def test_model_dirs_follow_environment_defaults(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_model_dirs_follow_environment_defaults(tmp_path: Path, patcher: PatchManager) -> None:
     """Environment variables should steer model directory defaults."""
 
     env_splade = tmp_path / "env_splade"
     env_qwen = tmp_path / "env_qwen"
     env_splade.mkdir()
     env_qwen.mkdir()
-    monkeypatch.setenv("DOCSTOKG_SPLADE_DIR", str(env_splade))
-    monkeypatch.setenv("DOCSTOKG_QWEN_DIR", str(env_qwen))
+    patcher.setenv("DOCSTOKG_SPLADE_DIR", str(env_splade))
+    patcher.setenv("DOCSTOKG_QWEN_DIR", str(env_qwen))
 
-    embed_module = _reload_embedding_module(monkeypatch)
+    embed_module = _reload_embedding_module(patcher)
 
     args = embed_module.parse_args(
         [
@@ -679,24 +672,22 @@ def test_model_dirs_follow_environment_defaults(
     assert cfg.qwen_model_dir == env_qwen.resolve()
 
 
-def test_cli_model_dirs_override_environment(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_cli_model_dirs_override_environment(tmp_path: Path, patcher: PatchManager) -> None:
     """Explicit CLI arguments must override environment-provided paths."""
 
     env_splade = tmp_path / "env_splade"
     env_qwen = tmp_path / "env_qwen"
     env_splade.mkdir()
     env_qwen.mkdir()
-    monkeypatch.setenv("DOCSTOKG_SPLADE_DIR", str(env_splade))
-    monkeypatch.setenv("DOCSTOKG_QWEN_DIR", str(env_qwen))
+    patcher.setenv("DOCSTOKG_SPLADE_DIR", str(env_splade))
+    patcher.setenv("DOCSTOKG_QWEN_DIR", str(env_qwen))
 
     cli_splade = tmp_path / "cli_splade"
     cli_qwen = tmp_path / "cli_qwen"
     cli_splade.mkdir()
     cli_qwen.mkdir()
 
-    embed_module = _reload_embedding_module(monkeypatch)
+    embed_module = _reload_embedding_module(patcher)
 
     args = embed_module.parse_args(
         [
@@ -717,10 +708,10 @@ def test_cli_model_dirs_override_environment(
     assert cfg.qwen_model_dir == cli_qwen.resolve()
 
 
-def test_offline_requires_local_models(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_offline_requires_local_models(tmp_path: Path, patcher: PatchManager) -> None:
     """Offline mode should fail fast when local models are absent."""
 
-    embed_module = _reload_embedding_module(monkeypatch)
+    embed_module = _reload_embedding_module(patcher)
 
     chunk_dir = tmp_path / "chunks"
     vectors_dir = tmp_path / "vectors"
@@ -754,12 +745,10 @@ def test_offline_requires_local_models(tmp_path: Path, monkeypatch: pytest.Monke
     assert str(missing_qwen) in message
 
 
-def test_pass_a_rejects_incompatible_chunk_schema(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_pass_a_rejects_incompatible_chunk_schema(tmp_path: Path, patcher: PatchManager) -> None:
     """Pass A should fail fast when chunk schema versions are unsupported."""
 
-    embed_module = _reload_embedding_module(monkeypatch)
+    embed_module = _reload_embedding_module(patcher)
 
     chunk_file = tmp_path / "bad.chunks.jsonl"
     row = {
@@ -780,12 +769,12 @@ def test_pass_a_rejects_incompatible_chunk_schema(
         embed_module.process_pass_a([chunk_file], logger)
 
 
-def _reload_embedding_module(monkeypatch: pytest.MonkeyPatch):
+def _reload_embedding_module(patcher: PatchManager):
     """Reload EmbeddingV2 with lightweight optional dependency stubs."""
 
     tqdm_stub = ModuleType("tqdm")
     tqdm_stub.tqdm = lambda iterable=None, **_: iterable if iterable is not None else []
-    monkeypatch.setitem(sys.modules, "tqdm", tqdm_stub)
+    patcher.setitem(sys.modules, "tqdm", tqdm_stub)
 
     st_stub = ModuleType("sentence_transformers")
 
@@ -801,7 +790,7 @@ def _reload_embedding_module(monkeypatch: pytest.MonkeyPatch):
             return []
 
     st_stub.SparseEncoder = _SparseEncoder
-    monkeypatch.setitem(sys.modules, "sentence_transformers", st_stub)
+    patcher.setitem(sys.modules, "sentence_transformers", st_stub)
 
     vllm_stub = ModuleType("vllm")
 
@@ -820,7 +809,7 @@ def _reload_embedding_module(monkeypatch: pytest.MonkeyPatch):
 
     vllm_stub.LLM = _LLM
     vllm_stub.PoolingParams = _PoolingParams
-    monkeypatch.setitem(sys.modules, "vllm", vllm_stub)
+    patcher.setitem(sys.modules, "vllm", vllm_stub)
 
     original_write_text = Path.write_text
 
@@ -828,7 +817,7 @@ def _reload_embedding_module(monkeypatch: pytest.MonkeyPatch):
         data = "".join(args) if args else ""
         return original_write_text(path_self, data, **kwargs)
 
-    monkeypatch.setattr(Path, "write_text", _write_text)
+    patcher.setattr(Path, "write_text", _write_text)
 
     import DocsToKG.DocParsing.embedding.runtime as embed_module
 

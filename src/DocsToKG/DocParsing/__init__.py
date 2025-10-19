@@ -1,4 +1,14 @@
-"""High-level facade exposing consolidated DocParsing modules."""
+"""DocParsing package facade with lazy loading and optional dependency guards.
+
+This module centralises the public surface for ``DocsToKG.DocParsing`` by
+exposing the major pipeline subpackages (``core``, ``doctags``, ``chunking``,
+``embedding``) through attributes that are imported on demand. Lazy imports keep
+start-up time low for callers that only need a subset of the functionality while
+still providing helpful error messages whenever optional dependencies such as
+Docling or GPU extras are missing. The facade also caches loaded modules so
+subsequent attribute access is instantaneous, mirroring the behaviour of a
+simplified namespace package without incurring import-time side effects.
+"""
 
 from __future__ import annotations
 

@@ -12,7 +12,7 @@ and reusable helpers for other pipelines.
 
 Key Features:
 - Token-aware chunk merging that respects structural boundaries and image metadata.
-- Shared CLI configuration via :func:`DocsToKG.DocParsing.pipelines.add_data_root_option`.
+- Shared CLI configuration via :func:`DocsToKG.DocParsing.doctags.add_data_root_option`.
 - Manifest logging that records chunk counts, parsing engines, and durations.
 
 Dependencies:

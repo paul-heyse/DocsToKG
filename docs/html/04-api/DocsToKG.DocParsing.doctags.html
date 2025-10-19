@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-doctags">
 <h1>1. Module: doctags<a class="headerlink" href="#module-doctags" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.doctags</span></code>.</p>
@@ -131,7 +131,11 @@ True</p>
 </section>
 <section id="add-resume-force-options-parser">
 <h3><code class="docutils literal notranslate"><span class="pre">add_resume_force_options(parser)</span></code><a class="headerlink" href="#add-resume-force-options-parser" title="Link to this heading"></a></h3>
-<p>Attach <code class="docutils literal notranslate"><span class="pre">--resume</span></code> and <code class="docutils literal notranslate"><span class="pre">--force</span></code> switches to a CLI parser.</p>
+<p>Attach resume-related switches to a CLI parser.</p>
+<p><code class="docutils literal notranslate"><span class="pre">--verify-hash</span></code> was added so operators can opt into recomputing input
+hashes when resuming pipelines. This keeps the fast path free from
+filesystem hashing while still providing an escape hatch for manifest
+verification.</p>
 <p>Args:
 parser (argparse.ArgumentParser): Parser being configured.
 resume_help (str): Help text describing resume semantics.
@@ -326,13 +330,30 @@ managed subprocess handle (or None if reusing an existing server) and
 RuntimeError: If the launched or reused server does not expose the expected
 model aliases, indicating a misconfiguration.</p>
 </section>
+<section id="iter-sorted-paths-root-predicate">
+<h3><code class="docutils literal notranslate"><span class="pre">_iter_sorted_paths(root,</span> <span class="pre">predicate)</span></code><a class="headerlink" href="#iter-sorted-paths-root-predicate" title="Link to this heading"></a></h3>
+<p>Yield <code class="docutils literal notranslate"><span class="pre">Path</span></code> objects that satisfy <code class="docutils literal notranslate"><span class="pre">predicate</span></code> in lexicographic order.</p>
+</section>
+<section id="iter-directory-files-root-suffixes">
+<h3><code class="docutils literal notranslate"><span class="pre">_iter_directory_files(root,</span> <span class="pre">suffixes)</span></code><a class="headerlink" href="#iter-directory-files-root-suffixes" title="Link to this heading"></a></h3>
+<p>Yield files beneath <code class="docutils literal notranslate"><span class="pre">root</span></code> whose suffix is in <code class="docutils literal notranslate"><span class="pre">suffixes</span></code>.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">suffixes</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> all files are considered before applying the
+optional <code class="docutils literal notranslate"><span class="pre">exclude</span></code> predicate.</p>
+<p>The traversal is performed in a deterministic, lexicographically sorted
+order while avoiding materialising the full file list in memory. Hidden
+directories are not skipped to maintain parity with <code class="docutils literal notranslate"><span class="pre">Path.rglob</span></code>.</p>
+</section>
+<section id="iter-pdfs-root">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_pdfs(root)</span></code><a class="headerlink" href="#iter-pdfs-root" title="Link to this heading"></a></h3>
+<p>Iterate over PDF files beneath <code class="docutils literal notranslate"><span class="pre">root</span></code> lazily.</p>
+</section>
+<section id="peek-iterable-iterable">
+<h3><code class="docutils literal notranslate"><span class="pre">_peek_iterable(iterable)</span></code><a class="headerlink" href="#peek-iterable-iterable" title="Link to this heading"></a></h3>
+<p>Return an iterator that includes the first element and the first element itself.</p>
+</section>
 <section id="list-pdfs-root">
 <h3><code class="docutils literal notranslate"><span class="pre">list_pdfs(root)</span></code><a class="headerlink" href="#list-pdfs-root" title="Link to this heading"></a></h3>
-<p>Collect PDF files under a directory recursively.</p>
-<p>Args:
-root: Directory whose subtree should be scanned for PDFs.</p>
-<p>Returns:
-Sorted list of paths to PDF files.</p>
+<p>Iterate over PDF files under <em>root</em> in deterministic lexical order.</p>
 </section>
 <section id="pdf-convert-one-task">
 <h3><code class="docutils literal notranslate"><span class="pre">pdf_convert_one(task)</span></code><a class="headerlink" href="#pdf-convert-one-task" title="Link to this heading"></a></h3>
@@ -381,11 +402,7 @@ SystemExit: Propagated if <code class="docutils literal notranslate"><span class
 </section>
 <section id="list-htmls-root">
 <h3><code class="docutils literal notranslate"><span class="pre">list_htmls(root)</span></code><a class="headerlink" href="#list-htmls-root" title="Link to this heading"></a></h3>
-<p>Enumerate HTML-like files beneath a directory tree.</p>
-<p>Args:
-root: Directory whose subtree should be searched for HTML files.</p>
-<p>Returns:
-Sorted list of discovered HTML file paths excluding normalized outputs.</p>
+<p>Iterate over HTML-like files beneath <em>root</em> in deterministic lexical order.</p>
 </section>
 <section id="sanitize-html-file-path-profile">
 <h3><code class="docutils literal notranslate"><span class="pre">_sanitize_html_file(path,</span> <span class="pre">profile)</span></code><a class="headerlink" href="#sanitize-html-file-path-profile" title="Link to this heading"></a></h3>
@@ -432,6 +449,14 @@ Process exit code, where <code class="docutils literal notranslate"><span class=
 <section id="finalize-self">
 <h3><code class="docutils literal notranslate"><span class="pre">finalize(self)</span></code><a class="headerlink" href="#finalize-self" title="Link to this heading"></a></h3>
 <p>Normalise derived fields after configuration sources are applied.</p>
+</section>
+<section id="enqueue-directory-directory">
+<h3><code class="docutils literal notranslate"><span class="pre">_enqueue_directory(directory)</span></code><a class="headerlink" href="#enqueue-directory-directory" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="is-html-candidate-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_is_html_candidate(path)</span></code><a class="headerlink" href="#is-html-candidate-path" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="convert-self">
 <h3><code class="docutils literal notranslate"><span class="pre">convert(self)</span></code><a class="headerlink" href="#convert-self" title="Link to this heading"></a></h3>
@@ -618,7 +643,7 @@ HtmlConversionResult(doc_id=’doc’, status=’success’, duration_s=1.0, inp
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -629,7 +654,7 @@ HtmlConversionResult(doc_id=’doc’, status=’success’, duration_s=1.0, inp
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

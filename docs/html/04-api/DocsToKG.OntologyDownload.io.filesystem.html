@@ -1,0 +1,182 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: filesystem &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: filesystem</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.OntologyDownload.io.filesystem.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-filesystem">
+<h1>1. Module: filesystem<a class="headerlink" href="#module-filesystem" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.io.filesystem</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Filesystem helpers for ontology downloads.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="resolve-max-uncompressed-bytes-limit">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_max_uncompressed_bytes(limit)</span></code><a class="headerlink" href="#resolve-max-uncompressed-bytes-limit" title="Link to this heading"></a></h3>
+<p>Return the effective archive expansion limit, honoring runtime overrides.</p>
+</section>
+<section id="sanitize-filename-filename">
+<h3><code class="docutils literal notranslate"><span class="pre">sanitize_filename(filename)</span></code><a class="headerlink" href="#sanitize-filename-filename" title="Link to this heading"></a></h3>
+<p>Return a filesystem-safe filename derived from <code class="docutils literal notranslate"><span class="pre">filename</span></code>.</p>
+</section>
+<section id="generate-correlation-id">
+<h3><code class="docutils literal notranslate"><span class="pre">generate_correlation_id()</span></code><a class="headerlink" href="#generate-correlation-id" title="Link to this heading"></a></h3>
+<p>Return a short-lived identifier that links related log entries.</p>
+</section>
+<section id="mask-sensitive-data-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">mask_sensitive_data(payload)</span></code><a class="headerlink" href="#mask-sensitive-data-payload" title="Link to this heading"></a></h3>
+<p>Return a copy of <code class="docutils literal notranslate"><span class="pre">payload</span></code> with common secret fields masked.</p>
+</section>
+<section id="sha256-file-path">
+<h3><code class="docutils literal notranslate"><span class="pre">sha256_file(path)</span></code><a class="headerlink" href="#sha256-file-path" title="Link to this heading"></a></h3>
+<p>Compute the SHA-256 digest for the provided file.</p>
+</section>
+<section id="compute-file-hash-path-algorithm">
+<h3><code class="docutils literal notranslate"><span class="pre">_compute_file_hash(path,</span> <span class="pre">algorithm)</span></code><a class="headerlink" href="#compute-file-hash-path-algorithm" title="Link to this heading"></a></h3>
+<p>Compute <code class="docutils literal notranslate"><span class="pre">algorithm</span></code> digest for <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
+</section>
+<section id="validate-member-path-member-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_member_path(member_name)</span></code><a class="headerlink" href="#validate-member-path-member-name" title="Link to this heading"></a></h3>
+<p>Validate archive member paths to prevent traversal attacks.</p>
+</section>
+<section id="check-compression-ratio">
+<h3><code class="docutils literal notranslate"><span class="pre">_check_compression_ratio()</span></code><a class="headerlink" href="#check-compression-ratio" title="Link to this heading"></a></h3>
+<p>Ensure compressed archives do not expand beyond the permitted ratio.</p>
+</section>
+<section id="enforce-uncompressed-ceiling">
+<h3><code class="docutils literal notranslate"><span class="pre">_enforce_uncompressed_ceiling()</span></code><a class="headerlink" href="#enforce-uncompressed-ceiling" title="Link to this heading"></a></h3>
+<p>Ensure uncompressed payload stays within configured limits.</p>
+</section>
+<section id="extract-zip-safe-zip-path-destination">
+<h3><code class="docutils literal notranslate"><span class="pre">extract_zip_safe(zip_path,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#extract-zip-safe-zip-path-destination" title="Link to this heading"></a></h3>
+<p>Extract a ZIP archive while preventing traversal and compression bombs.</p>
+</section>
+<section id="extract-tar-safe-tar-path-destination">
+<h3><code class="docutils literal notranslate"><span class="pre">extract_tar_safe(tar_path,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#extract-tar-safe-tar-path-destination" title="Link to this heading"></a></h3>
+<p>Safely extract tar archives (tar, tar.gz, tar.xz) with traversal and compression checks.</p>
+</section>
+<section id="extract-archive-safe-archive-path-destination">
+<h3><code class="docutils literal notranslate"><span class="pre">extract_archive_safe(archive_path,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#extract-archive-safe-archive-path-destination" title="Link to this heading"></a></h3>
+<p>Extract archives by dispatching to the appropriate safe handler.</p>
+</section>
+<section id="materialize-cached-file-source-destination">
+<h3><code class="docutils literal notranslate"><span class="pre">_materialize_cached_file(source,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#materialize-cached-file-source-destination" title="Link to this heading"></a></h3>
+<p>Link or move <code class="docutils literal notranslate"><span class="pre">source</span></code> into <code class="docutils literal notranslate"><span class="pre">destination</span></code> without redundant copies.</p>
+<p>Returns a tuple <code class="docutils literal notranslate"><span class="pre">(artifact_path,</span> <span class="pre">cache_path)</span></code> where <code class="docutils literal notranslate"><span class="pre">artifact_path</span></code> is the final
+destination path and <code class="docutils literal notranslate"><span class="pre">cache_path</span></code> points to the retained cache file (which may be
+identical to <code class="docutils literal notranslate"><span class="pre">artifact_path</span></code> when the cache entry is moved instead of linked).</p>
+</section>
+<section id="format-bytes-num">
+<h3><code class="docutils literal notranslate"><span class="pre">format_bytes(num)</span></code><a class="headerlink" href="#format-bytes-num" title="Link to this heading"></a></h3>
+<p>Return a human-readable representation for <code class="docutils literal notranslate"><span class="pre">num</span></code> bytes.</p>
+</section>
+<section id="mask-value-value-key-hint">
+<h3><code class="docutils literal notranslate"><span class="pre">_mask_value(value,</span> <span class="pre">key_hint)</span></code><a class="headerlink" href="#mask-value-value-key-hint" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

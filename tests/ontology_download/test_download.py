@@ -1,3 +1,10 @@
+"""Edge-case coverage for the streaming downloader and redirect handling.
+
+Focuses on HTTP semantics like redirect chains, retry-after handling, and
+rate-limited token bucket resets to ensure ``io.network`` enforces security
+policies during real downloads.
+"""
+
 import logging
 import time
 
@@ -156,6 +163,8 @@ def test_download_stream_consumes_tokens_for_head_and_get(ontology_env, tmp_path
     assert destination.read_bytes() == b"rate-limit-body"
     assert bucket.calls == [1.0, 1.0]
     assert [record.method for record in ontology_env.requests] == ["HEAD", "GET"]
+
+
 def test_download_timeout_aborts_retries(ontology_env, tmp_path, caplog):
     """Downloads exceeding the configured timeout must fail without retrying."""
 

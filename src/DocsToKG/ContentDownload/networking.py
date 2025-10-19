@@ -103,26 +103,36 @@
 # }
 # === /NAVMAP ===
 
-"""
-Unified Network Utilities
+"""Networking primitives and retry policies for DocsToKG content downloads.
 
-This module consolidates HTTP retry helpers, conditional request utilities, and
-session construction logic into a single import surface. Historically these
-helpers lived in separate ``http`` and ``conditional`` modules; co-locating
-them reduces cross-module bootstrapping and ensures shared defaults remain
-aligned.
+Responsibilities
+----------------
+- Construct thread-safe, pooled :class:`requests.Session` instances with
+  consistent timeout, adapter, and header defaults via
+  :func:`create_session` and :class:`ThreadLocalSessionFactory`.
+- Implement resilient request execution through
+  :func:`request_with_retries`, combining exponential backoff, equal jitter,
+  ``Retry-After`` handling, and content-type enforcement.
+- Provide conditional request tooling (:class:`ConditionalRequestHelper`,
+  :class:`CachedResult`, :class:`ModifiedResult`) so resolvers can revalidate
+  cached artifacts without redownloading payloads unnecessarily.
+- Offer rate-limit and failure-suppression primitives
+  (:class:`TokenBucket`, :class:`CircuitBreaker`) that the pipeline threads
+  rely on to avoid overwhelming upstream services.
+- Expose diagnostic helpers such as :func:`head_precheck` and
+  :func:`parse_retry_after_header` to keep request policy decisions centralised.
 
-Key Features:
+Key Components
+--------------
+- ``ThreadLocalSessionFactory`` – manages per-thread session reuse.
+- ``create_session`` / ``get_thread_session`` – standardise session creation.
+- ``request_with_retries`` – wraps HTTP verbs with retry, backoff, and logging.
+- ``ConditionalRequestHelper`` – produces ``If-None-Match``/``If-Modified-Since`` headers.
+- ``TokenBucket`` and ``CircuitBreaker`` – stateful regulators shared across
+  resolvers and download workers.
 
-- ``create_session``: Configure ``requests.Session`` instances with pooled
-  adapters and optional header injection.
-- ``request_with_retries``: Execute resilient HTTP calls with jittered,
-  exponential backoff while honouring ``Retry-After`` directives.
-- ``ConditionalRequestHelper``: Build and validate conditional request headers
-  for polite revalidation workflows.
-
-Usage:
-
+Typical Usage
+-------------
     from DocsToKG.ContentDownload.networking import (
         ConditionalRequestHelper,
         create_session,
@@ -130,18 +140,9 @@ Usage:
     )
 
     session = create_session({"User-Agent": "DocsToKG/1.0"})
-    response = request_with_retries(session, "GET", "https://example.org/resource")
+    response = request_with_retries(session, "GET", "https://example.org")
     helper = ConditionalRequestHelper(prior_etag="abc123")
     headers = helper.build_headers()
-
-Args:
-    None.
-
-Returns:
-    None.
-
-Raises:
-    None.
 """
 
 from __future__ import annotations

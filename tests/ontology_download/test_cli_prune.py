@@ -1,4 +1,10 @@
-"""Regression tests for the ``ontofetch prune`` command."""
+"""Retention and cleanup scenarios for the ``ontofetch prune`` command.
+
+Seeds synthetic ontology versions and manifests, then verifies that prune keeps
+the desired number of versions, respects JSON reporting, and refuses dangerous
+parameters. Guards the retention workflow that operators rely on to manage
+LOCAL_ONTOLOGY_DIR size.
+"""
 
 from __future__ import annotations
 
@@ -116,8 +122,7 @@ def test_prune_preserves_custom_id_order(capsys) -> None:
 
     messages = payload["messages"]
     assert messages[0] == (
-        "[DRY-RUN] Requested ontologies (order preserved): "
-        "sigma, omega, delta"
+        "[DRY-RUN] Requested ontologies (order preserved): " "sigma, omega, delta"
     )
     assert messages[1].startswith("[DRY-RUN] sigma:")
     assert messages[2].startswith("[DRY-RUN] omega:")

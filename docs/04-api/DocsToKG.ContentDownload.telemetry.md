@@ -22,6 +22,17 @@ Raises:
 
 ## 2. Functions
 
+### `normalize_manifest_path(path)`
+
+Return an absolute filesystem path suitable for manifest storage.
+
+Older manifests stored artifact paths relative to the working directory in
+effect when the run executed. To keep those entries usable when resuming a
+run from another working directory, callers may provide ``base`` so that
+relative paths can be resolved against a known directory such as the
+manifest location. For new entries, the helper upgrades any provided path
+(``Path`` objects or strings) to an absolute representation.
+
 ### `_utc_timestamp()`
 
 Return the current time as an ISO 8601 UTC timestamp.
@@ -30,13 +41,37 @@ Return the current time as an ISO 8601 UTC timestamp.
 
 Ensure the parent directory for ``path`` exists.
 
-### `load_previous_manifest(path, *, sqlite_path=None, allow_sqlite_fallback=False)`
+### `_manifest_entry_from_sqlite_row(run_id, work_id, url, normalized_url, schema_version, classification, reason, reason_detail, path_value, path_mtime_ns, sha256, content_length, etag, last_modified)`
+
+Convert a SQLite manifest row into resume metadata.
+
+### `_iter_resume_rows_from_sqlite(sqlite_path)`
+
+Yield manifest resume rows from ``sqlite_path`` lazily.
+
+### `_load_resume_from_sqlite(sqlite_path)`
+
+Return resume metadata reconstructed from the SQLite manifest cache.
+
+### `looks_like_csv_resume_target(path)`
+
+Return True when ``path`` likely references a CSV attempts log.
+
+### `looks_like_sqlite_resume_target(path)`
+
+Return True when ``path`` likely references a SQLite manifest cache.
+
+### `iter_previous_manifest_entries(path)`
+
+Yield resume manifest entries lazily, preferring SQLite when available.
+
+### `load_previous_manifest(path)`
 
 Load manifest entries indexed by work ID and normalised URL.
 
-When ``allow_sqlite_fallback`` is true and ``sqlite_path`` exists, the helper
-reconstructs resume metadata from the SQLite cache if no JSONL manifest segments
-are available.
+### `load_resume_completed_from_sqlite(sqlite_path)`
+
+Return work identifiers completed according to the SQLite manifest cache.
 
 ### `load_manifest_url_index(path)`
 
@@ -47,6 +82,51 @@ Return a mapping of normalised URLs to manifest metadata from SQLite.
 Create a manifest entry summarising a download attempt.
 
 ### `__post_init__(self)`
+
+*No documentation available.*
+
+### `get(self, url, default)`
+
+Return manifest metadata for ``url`` if present in the SQLite cache.
+
+Args:
+url: URL whose manifest metadata should be retrieved.
+default: Fallback value returned when the URL has no cached record.
+
+Returns:
+Manifest metadata dictionary when found; otherwise ``default``.
+
+### `__contains__(self, url)`
+
+*No documentation available.*
+
+### `items(self)`
+
+Iterate over cached manifest entries keyed by normalized URL.
+
+Returns:
+Iterable of ``(normalized_url, metadata)`` pairs from the cache.
+
+### `iter_existing_paths(self)`
+
+Stream manifest entries whose artifact paths still exist on disk.
+
+### `iter_existing(self)`
+
+Yield manifest entries whose artifact paths still exist on disk.
+
+### `as_dict(self)`
+
+Return a defensive copy of the manifest cache.
+
+Returns:
+Dictionary of normalized URLs to manifest metadata.
+
+### `_ensure_loaded(self)`
+
+*No documentation available.*
+
+### `_fetch_one(self, normalized)`
 
 *No documentation available.*
 
@@ -126,6 +206,14 @@ Forward manifest entries to the configured sink.
 ### `log_summary(self, summary)`
 
 Publish the final run summary to downstream sinks.
+
+### `__enter__(self)`
+
+Enter the context manager, delegating to the underlying sink if present.
+
+### `__exit__(self, exc_type, exc, tb)`
+
+Exit the context manager, closing the sink when appropriate.
 
 ### `close(self)`
 
@@ -400,6 +488,10 @@ Commit outstanding changes and dispose of the SQLite connection.
 
 *No documentation available.*
 
+### `_ensure_legacy_alias(self)`
+
+Create a compatibility alias at ``.sqlite`` when using ``.sqlite3`` files.
+
 ### `_initialise_schema(self, current_version)`
 
 *No documentation available.*
@@ -415,6 +507,120 @@ Commit outstanding changes and dispose of the SQLite connection.
 ### `_migrate_summary_table(self)`
 
 *No documentation available.*
+
+### `_populate_normalized_urls(self)`
+
+*No documentation available.*
+
+### `_initialise_schema(self)`
+
+*No documentation available.*
+
+### `_populate_from_jsonl(self)`
+
+*No documentation available.*
+
+### `completed_work_ids(self)`
+
+Return work identifiers that completed successfully in the manifest.
+
+### `close(self)`
+
+Close the temporary SQLite database and clean up resources.
+
+### `__getitem__(self, key)`
+
+*No documentation available.*
+
+### `__iter__(self)`
+
+*No documentation available.*
+
+### `__len__(self)`
+
+*No documentation available.*
+
+### `__contains__(self, key)`
+
+*No documentation available.*
+
+### `get(self, key, default)`
+
+Return cached manifest entries for ``key`` or the provided default.
+
+Args:
+key: Work identifier to resolve.
+default: Value to return when the work ID is not present.
+
+Returns:
+Optional[Dict[str, Any]]: Mapping of normalized URLs to manifest entries, if available.
+
+### `enable_preload_on_close(self)`
+
+Load all entries into memory when :meth:`close` is invoked.
+
+### `preload_all_entries(self)`
+
+Populate the in-memory cache with every manifest entry.
+
+### `_preload_all_entries_unlocked(self)`
+
+*No documentation available.*
+
+### `__del__(self)`
+
+*No documentation available.*
+
+### `close(self)`
+
+Close the underlying SQLite connection.
+
+### `__getitem__(self, key)`
+
+*No documentation available.*
+
+### `__iter__(self)`
+
+*No documentation available.*
+
+### `__len__(self)`
+
+*No documentation available.*
+
+### `__contains__(self, key)`
+
+*No documentation available.*
+
+### `get(self, key, default)`
+
+Return work entries for ``key`` if present, otherwise ``default``.
+
+Args:
+key: Work identifier to fetch from the SQLite manifest cache.
+default: Value to return when the work ID does not exist.
+
+Returns:
+Optional[Dict[str, Any]]: Mapping of normalized URLs to manifest entries, if found.
+
+### `_fetch_work_entries(self, work_id)`
+
+*No documentation available.*
+
+### `_fetch_work_entries_unlocked(self, work_id)`
+
+Fetch work entries without acquiring lock (must be called with lock held).
+
+### `_preload_all_entries_unlocked(self)`
+
+Preload all manifest entries into the cache (must be called with lock held).
+
+### `enable_preload_on_close(self)`
+
+Enable preloading all entries when close() is called.
+
+### `preload_all_entries(self)`
+
+Preload all manifest entries into the cache for offline access after close.
 
 ## 3. Classes
 
@@ -460,6 +666,10 @@ Examples:
 ... )
 >>> entry.work_id
 'W123'
+
+### `ManifestUrlIndex`
+
+Lazy lookup helper for manifest metadata stored in SQLite.
 
 ### `AttemptSink`
 
@@ -521,3 +731,11 @@ Persist the final metrics summary for a run as JSON.
 ### `SqliteSink`
 
 Persist attempts, manifests, and summary records to a SQLite database.
+
+### `JsonlResumeLookup`
+
+Lazy resume mapping backed by a temporary SQLite index built from JSONL.
+
+### `SqliteResumeLookup`
+
+Lazy resume mapping that fetches manifest entries directly from SQLite.

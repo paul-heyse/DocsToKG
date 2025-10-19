@@ -8,6 +8,10 @@ Resolver that queries the Internet Archive Wayback Machine.
 
 ## 2. Functions
 
+### `request_with_retries()`
+
+Proxy to :func:`resolvers.base.request_with_retries` for patchability.
+
 ### `is_enabled(self, config, artifact)`
 
 Return ``True`` when prior resolver attempts have failed.

@@ -55,10 +55,10 @@ graph TD
 
 1. **Acquisition**: Download raw documents and metadata (`ContentDownload` CLI or scheduled jobs).
 2. **Parsing**: Use Docling pipelines to convert assets into DocTags, chunked Markdown, and embeddings (`DocParsing` scripts).
-3. **Indexing**: Feed chunk payloads into `HybridSearch.ingest` to update FAISS and sparse stores.
+3. **Indexing**: Feed chunk payloads into `DocsToKG.HybridSearch.ChunkIngestionPipeline` to update FAISS and sparse stores.
 4. **Serving**: Deploy `HybridSearchAPI` behind FastAPI or another HTTP framework, exposing `/v1/hybrid-search`.
 5. **Maintenance**: Run ontology downloads and validation periodically to keep terminologies synchronised with search metadata.
-6. **Monitoring**: Capture metrics from `HybridSearch.observability` and validation harnesses to detect drift.
+6. **Monitoring**: Capture metrics from `DocsToKG.HybridSearch.Observability` and validation harnesses to detect drift.
 
 ## 4. Key Integration Points
 

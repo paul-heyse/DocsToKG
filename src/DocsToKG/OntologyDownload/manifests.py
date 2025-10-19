@@ -1,4 +1,11 @@
-"""Manifest and lockfile utilities for the OntologyDownload CLI."""
+"""Manifest, lockfile, and plan-diff utilities for the ontology downloader.
+
+Download runs emit manifests that track resolver provenance, versions, and
+checksums.  This module provides helpers to write those manifests atomically,
+load historic runs, compute plan diffs for review, and materialise lockfiles
+that pin future executions to the same artefacts.  They are used extensively by
+the CLI to guarantee reproducible ingestion.
+"""
 
 from __future__ import annotations
 

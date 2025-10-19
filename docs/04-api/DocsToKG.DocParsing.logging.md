@@ -44,6 +44,10 @@ Compute status counts and durations for manifest ``entries``.
 
 Register ``stage_telemetry`` for manifest logging helpers.
 
+### `telemetry_scope(stage_telemetry)`
+
+Context manager that temporarily installs ``stage_telemetry``.
+
 ### `process(self, msg, kwargs)`
 
 Merge adapter context into ``extra`` metadata for structured output.

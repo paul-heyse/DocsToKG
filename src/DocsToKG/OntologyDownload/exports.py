@@ -1,4 +1,12 @@
-"""Central definition of public exports for DocsToKG.OntologyDownload."""
+"""Central definition of public exports for ``DocsToKG.OntologyDownload``.
+
+Import-time side effects are carefully managed in this package so that heavy
+dependencies (rdflib, owlready2, etc.) are only loaded when needed.  This
+module captures the canonical list of symbols that form the public API,
+describes where they live, and feeds the lazy export mechanism in
+``__init__.py`` as well as documentation generators.  Keeping the manifest
+here ensures CLI users, integrators, and Sphinx builds all see the same surface.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,12 @@
-"""Chunking stage package with modular subcomponents."""
+"""Chunking stage package exporting CLI, configuration, and runtime helpers.
+
+The chunking package stitches together the streaming runtime, CLI surface, and
+configuration presets that slice DocTags into topic-aware chunks. Importing this
+package provides convenient access to the canonical parser builders, reusable
+logging utilities, atomic manifest writers, and backwards-compatible runtime
+symbols so existing pipelines can adopt newer chunking features without
+rewriting their integration code.
+"""
 
 from DocsToKG.DocParsing.io import atomic_write
 from DocsToKG.DocParsing.logging import (

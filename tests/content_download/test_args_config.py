@@ -17,6 +17,7 @@ from DocsToKG.ContentDownload.args import (
 )
 from DocsToKG.ContentDownload.core import Classification
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
+from tests.conftest import PatchManager
 
 
 def _build_args(tmp_path: Path):
@@ -81,52 +82,18 @@ def test_bootstrap_run_environment_creates_directories(tmp_path: Path) -> None:
     ],
 )
 def test_resolve_config_expands_csv_path_like_manifest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, manifest_arg: str, csv_arg: str
+    tmp_path: Path, patcher: PatchManager, manifest_arg: str, csv_arg: str
 ) -> None:
     home_dir = tmp_path / "home"
     work_dir = tmp_path / "work"
     home_dir.mkdir()
     work_dir.mkdir()
-    monkeypatch.setenv("HOME", str(home_dir))
-    monkeypatch.chdir(work_dir)
+    patcher.setenv("HOME", str(home_dir))
+    patcher.chdir(work_dir)
 
     if manifest_arg.startswith("~/") or csv_arg.startswith("~/"):
         (home_dir / "logs").mkdir(exist_ok=True)
 
-def test_resolve_config_skips_manifest_index_when_dedup_disabled(
-    tmp_path: Path, monkeypatch
-) -> None:
-    parser = build_parser()
-    argv = [
-        "--topic-id",
-        "https://openalex.org/T12345",
-        "--year-start",
-        "2020",
-        "--year-end",
-        "2020",
-        "--out",
-        str(tmp_path / "pdfs"),
-        "--no-global-url-dedup",
-    ]
-    args = parse_args(parser, argv)
-
-    def _unexpected_iter(*_args, **_kwargs):
-        raise AssertionError("ManifestUrlIndex.iter_existing_paths should not be called")
-
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.args.ManifestUrlIndex.iter_existing_paths",
-        _unexpected_iter,
-    )
-
-    resolved = resolve_config(args, parser)
-
-    assert resolved.resolver_config.enable_global_url_dedup is False
-    assert resolved.persistent_seen_urls == set()
-
-
-def test_resolver_pipeline_receives_seen_urls_when_dedup_enabled(
-    tmp_path: Path, monkeypatch
-) -> None:
     parser = build_parser()
     argv = [
         "--topic-id",
@@ -153,7 +120,52 @@ def test_resolver_pipeline_receives_seen_urls_when_dedup_enabled(
 
     assert resolved.manifest_path == expected_manifest
     assert resolved.csv_path == expected_csv
+
+
+def test_resolve_config_skips_manifest_index_when_dedup_disabled(tmp_path: Path, patcher) -> None:
+    parser = build_parser()
+    argv = [
+        "--topic-id",
+        "https://openalex.org/T12345",
+        "--year-start",
+        "2020",
+        "--year-end",
+        "2020",
+        "--out",
         str(tmp_path / "pdfs"),
+        "--no-global-url-dedup",
+    ]
+    args = parse_args(parser, argv)
+
+    def _unexpected_iter(*_args, **_kwargs):
+        raise AssertionError("ManifestUrlIndex.iter_existing_paths should not be called")
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.ManifestUrlIndex.iter_existing_paths",
+        _unexpected_iter,
+    )
+
+    resolved = resolve_config(args, parser)
+
+    assert resolved.resolver_config.enable_global_url_dedup is False
+    assert resolved.persistent_seen_urls == set()
+
+
+def test_resolver_pipeline_receives_seen_urls_when_dedup_enabled(tmp_path: Path, patcher) -> None:
+    parser = build_parser()
+    manifest_path = tmp_path / "manifest.jsonl"
+    manifest_path.touch()
+    argv = [
+        "--topic-id",
+        "https://openalex.org/T12345",
+        "--year-start",
+        "2020",
+        "--year-end",
+        "2020",
+        "--out",
+        str(tmp_path / "pdfs"),
+        "--manifest",
+        str(manifest_path),
     ]
     args = parse_args(parser, argv)
 
@@ -168,7 +180,7 @@ def test_resolver_pipeline_receives_seen_urls_when_dedup_enabled(
         for entry in manifest_entries:
             yield entry
 
-    monkeypatch.setattr(
+    patcher.setattr(
         "DocsToKG.ContentDownload.args.ManifestUrlIndex.iter_existing_paths",
         _iter_existing_paths,
     )
@@ -196,7 +208,10 @@ def test_resolver_pipeline_receives_seen_urls_when_dedup_enabled(
     )
 
     assert pipeline._global_seen_urls == expected_urls
-def test_lookup_topic_id_requests_minimal_payload(monkeypatch, caplog) -> None:
+    assert pipeline._global_seen_urls == resolved.persistent_seen_urls
+
+
+def test_lookup_topic_id_requests_minimal_payload(patcher, caplog) -> None:
     args_module._lookup_topic_id.cache_clear()
 
     class FakeTopics:
@@ -220,7 +235,7 @@ def test_lookup_topic_id_requests_minimal_payload(monkeypatch, caplog) -> None:
             return [{"id": "https://openalex.org/T999"}]
 
     fake = FakeTopics()
-    monkeypatch.setattr(args_module, "Topics", lambda: fake)
+    patcher.setattr(args_module, "Topics", lambda: fake)
     caplog.set_level(logging.INFO)
     caplog.clear()
 
@@ -240,7 +255,7 @@ def test_lookup_topic_id_requests_minimal_payload(monkeypatch, caplog) -> None:
     ) in caplog.record_tuples
 
 
-def test_lookup_topic_id_handles_empty_results(monkeypatch, caplog) -> None:
+def test_lookup_topic_id_handles_empty_results(patcher, caplog) -> None:
     args_module._lookup_topic_id.cache_clear()
 
     class EmptyTopics:
@@ -264,7 +279,7 @@ def test_lookup_topic_id_handles_empty_results(monkeypatch, caplog) -> None:
             return []
 
     fake = EmptyTopics()
-    monkeypatch.setattr(args_module, "Topics", lambda: fake)
+    patcher.setattr(args_module, "Topics", lambda: fake)
     caplog.set_level(logging.INFO)
     caplog.clear()
 
@@ -283,14 +298,14 @@ def test_lookup_topic_id_handles_empty_results(monkeypatch, caplog) -> None:
     )
 
 
-def test_lookup_topic_id_handles_request_exception(monkeypatch, caplog) -> None:
+def test_lookup_topic_id_handles_request_exception(patcher, caplog) -> None:
     args_module._lookup_topic_id.cache_clear()
 
     class ErrorTopics:
         def search(self, text: str):
             raise requests.RequestException("boom")
 
-    monkeypatch.setattr(args_module, "Topics", lambda: ErrorTopics())
+    patcher.setattr(args_module, "Topics", lambda: ErrorTopics())
     caplog.set_level(logging.WARNING)
     caplog.clear()
 

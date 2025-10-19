@@ -1,59 +1,28 @@
 # 1. Technical Reference
 
-This section contains technical references, external dependencies, and detailed implementation guides for the DocsToKG system.
+This section contains subsystem deep-dives, integration guides, and operational runbooks that complement the architecture and setup documentation.
 
 ## 2. Reference Materials
 
-### 🔗 [FAISS Integration](./faiss/index.md)
-
-Comprehensive guide to FAISS vector similarity search integration, including GPU acceleration, index types, and performance optimization.
-
-### 📚 [External Dependencies](./dependencies/index.md)
-
-Documentation for external libraries, APIs, and services used by DocsToKG.
-
-### 📖 [Glossary](./glossary.md)
-
-Definitions of key terms, concepts, and domain-specific terminology used throughout the documentation.
+- 🔗 **[FAISS Integration](./faiss/index.md)** – GPU/CPU deployment notes, wheel provenance, and index lifecycle management aligned with `DocsToKG.HybridSearch.vectorstore`.
+- 📚 **[External Dependencies](./dependencies/index.md)** – Curated list of Python packages, CUDA wheels, and upstream services used across the repo (`DocsToKG.ContentDownload`, `DocParsing`, `HybridSearch`, `OntologyDownload`).
+- 📖 **[Glossary](./glossary.md)** – Definitions covering terminology surfaced in manifests, telemetry events, and hybrid search scoring.
 
 ## 3. Integration Guides
 
-### 🔌 [API Integrations](./api-integrations/index.md)
-
-How to integrate DocsToKG with external systems and services.
-
-### 🔧 [Tool Configuration](./tooling/index.md)
-
-Configuration guides for development tools, testing frameworks, and deployment systems.
+- 🔌 **[API Integrations](./api-integrations/index.md)** – Examples for embedding `HybridSearchAPI` into FastAPI and wiring resolver webhooks.
+- 🔧 **[Tool Configuration](./tooling/index.md)** – Bootstrap, linting, and documentation automation scripts (`docs/scripts/*`, `scripts/bootstrap_env.sh`, `openspec` CLI).
 
 ## 4. Advanced Topics
 
-### 🚀 [Performance Optimization](./performance/index.md)
-
-Advanced performance tuning, scaling strategies, and optimization techniques.
-
-### 🔒 [Security Considerations](./security/index.md)
-
-Security best practices, authentication, authorization, and data protection.
-
-### 🧪 [Testing Strategies](./testing/index.md)
-
-Comprehensive testing approaches, frameworks, and quality assurance procedures.
+- 🚀 **[Performance Optimization](./performance/index.md)** – Chunking heuristics, FAISS tuning, and Docling configuration tweaks validated through the latest benchmarks.
+- 🔒 **[Security Considerations](./security/index.md)** – Secrets management, artifact isolation, and supply-chain controls mapped to the current module layout.
+- 🧪 **[Testing Strategies](./testing/index.md)** – Marker definitions, suite breakdowns, and CI recommendations for exercising optional GPU-backed flows.
 
 ## 5. Maintenance and Operations
 
-### 🔄 [Deployment Guide](./deployment/index.md)
+- 🔄 **[Deployment Guide](./deployment/index.md)** – Environment bootstrap, data seeding, and release validation steps referencing the latest CLI entry points.
+- 📊 **[Monitoring and Observability](./monitoring/index.md)** – Metrics, logging sinks, and dashboard recommendations for ingestion and hybrid search workloads.
+- 🚨 **[Troubleshooting](./troubleshooting/index.md)** – Common failure modes (resolver throttling, ontology validation, FAISS rollbacks) with pointers to recovery commands.
 
-Production deployment instructions, environment setup, and operational procedures.
-
-### 📊 [Monitoring and Observability](./monitoring/index.md)
-
-System monitoring, logging, metrics collection, and observability practices.
-
-### 🚨 [Troubleshooting](./troubleshooting/index.md)
-
-Common issues, error handling, debugging techniques, and support resources.
-
----
-
-*This reference section provides deep technical knowledge for advanced users, maintainers, and system integrators.*
+Explore these references alongside `docs/06-operations/index.md` for day-two operations and `docs/05-development/index.md` for contributor workflows.

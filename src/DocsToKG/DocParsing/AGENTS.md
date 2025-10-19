@@ -2,85 +2,108 @@
 
 Last updated: 2025-10-20
 
-## Mission and Scope
-- Mission: Produce deterministic DocTags → chunk → embedding pipelines that scale to large corpora while preserving provenance, manifests, and schema contracts.
-- Scope boundary: In-scope—document conversion, chunk coalescence, embedding generation, manifest/telemetry; out-of-scope—vector store ingestion, downstream ranking, embedding model training.
+## Mission & Scope
+- **Mission**: Convert raw documents into DocTags, chunks, and embeddings with resumable manifests and deterministic hashing so downstream search pipelines can rely on consistent outputs.
+- **Scope**: DocTags conversion (PDF/HTML), chunk coalescence, embedding generation (dense/sparse/lexical), telemetry/manifests, staging utilities.
+- **Out-of-scope**: Vector-store ingestion, downstream ranking orchestration, training new embedding/DocTags models.
 
-## High-Level Architecture & Data Flow
+## Prerequisites & Optional Dependencies (aligns with README)
+- Python 3.10+, Linux recommended; GPU strongly suggested for PDF DocTags (vLLM) and Qwen embeddings.
+- Extras (`pip install`):
+  - Core pipeline: `"DocsToKG[docparse]"`
+  - PDF DocTags (vLLM + Docling extras): `"DocsToKG[docparse-pdf]"`
+  - SPLADE sparse embeddings: `sentence-transformers`
+  - Qwen dense embeddings: `vllm` + CUDA 12 libraries (`libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, `libgomp.so.1`)
+- Model caches: DocTags `granite-docling-258M` under `${DOCSTOKG_MODEL_ROOT}`; SPLADE/Qwen weights under `${DOCSTOKG_SPLADE_DIR}` / `${DOCSTOKG_QWEN_DIR}`.
+- Data directories (defaults derived from `${DOCSTOKG_DATA_ROOT}` / `--data-root`):
+  - `Data/PDFs`, `Data/HTML` inputs
+  - `Data/DocTagsFiles`, `Data/ChunkedDocTagFiles`, `Data/Embeddings`
+  - `Data/Manifests/docparse.*.manifest.jsonl`
+- Environment overrides: `DOCSTOKG_DOCTAGS_*`, `DOCSTOKG_CHUNK_*`, `DOCSTOKG_EMBED_*`, `DOCSTOKG_HASH_ALG`, etc. See configuration section below.
+
+## Quickstart (from README)
+```bash
+./scripts/bootstrap_env.sh
+direnv allow  # or source .venv/bin/activate
+
+direnv exec . python -m DocsToKG.DocParsing.core.cli plan \
+  --data-root Data \
+  --mode auto \
+  --limit 10
+
+direnv exec . python -m DocsToKG.DocParsing.core.cli doctags \
+  --mode pdf \
+  --input Data/PDFs \
+  --output Data/DocTagsFiles
+
+direnv exec . python -m DocsToKG.DocParsing.core.cli chunk \
+  --in-dir Data/DocTagsFiles \
+  --out-dir Data/ChunkedDocTagFiles
+
+direnv exec . python -m DocsToKG.DocParsing.core.cli embed \
+  --chunks-dir Data/ChunkedDocTagFiles \
+  --out-dir Data/Embeddings
+```
+- `docparse all` coordinates stages end-to-end; `--resume` reuses manifests, `--force` regenerates outputs.
+
+## Core Capabilities & Flow
+- `core.cli` entry point with subcommands: `doctags`, `chunk`, `embed`, `plan`, `manifest`, `token-profiles`, `all`.
+- DocTags conversion (`doctags.py`, Docling/vLLM integration) emits `docparse.doctags-*.manifest.jsonl`.
+- Chunking (`chunking.runtime`) performs structural + token-aware coalescence with deterministic span hashing.
+- Embedding runtime (`embedding.runtime`) supports dense (Qwen/vLLM), sparse (SPLADE), and lexical (BM25) backends with quarantine + optional dependency checks.
+- Telemetry/IO (`telemetry.py`, `io.py`) enforce append-only manifests and advisory locks for atomic writes.
 ```mermaid
 flowchart LR
-  A[Raw documents] --> B[DocTags conversion]
+  A[Raw documents (PDF/HTML/ZIP)] --> B[DocTags conversion]
   B --> C[Chunking & coalescence]
   C --> D[Embedding generation]
-  B -.-> MB[(docparse.doctags.manifest)]
-  C -.-> MC[(docparse.chunks.manifest)]
-  D -.-> ME[(docparse.embeddings.manifest)]
-  classDef cache stroke-dasharray: 3 3;
-  D:::cache
+  B -.-> MB[DocTags manifest]
+  C -.-> MC[Chunk manifest]
+  D -.-> ME[Embedding manifest]
+  classDef boundary stroke:#f00;
+  B:::boundary
+  C:::boundary
+  D:::boundary
 ```
-- Components: `doctags.py` converters, `chunking/HybridChunker`, `embedding/EmbeddingRunner`, `formats` schemas, `core` orchestration.
-- Primary data edges: DocTags files (`*.doctags`) → chunk JSONL (`*.chunks.jsonl`) → embedding JSONL (`*.vectors.jsonl`) with manifest rows at each stage.
-- One failure path to consider: embedding runner exhausting GPU memory—ensure batch sizing/resume logic handle partial outputs without corrupting manifests.
 
-## Hot Paths & Data Shapes
-- Hot paths:
-  - `embedding.runner.EmbeddingRunner.run()` — heavy GPU/CPU work for dense+ sparse vectors.
-  - `chunking.hybrid_chunker.generate_chunks()` — token windowing and structural merge loops.
-  - `formats.manifest_writer.write_entry()` — manifests for thousands of docs; ensure buffered I/O.
-  - `core.pipeline.execute_stage()` — orchestrates resume/force semantics.
-- Typical payload sizes: DocTags ~200 KB per document, chunk JSONL ~100 KB per document, and vector payloads ~500 KB per document with Qwen3-4B dense dimension 2560 (float32) plus SPLADE/BM25 sparse data (see `openspec/changes/archive/2025-10-15-refactor-docparsing-pipeline/design.md`).
-- Key schemas/models: `formats.CHUNK_ROW_SCHEMA`, `formats.VECTOR_ROW_SCHEMA`, `config.ChunkingConfig`, `config.EmbeddingConfig`, `types.ChunkPayload`.
+## Configuration Surfaces
+- Config sources: environment (`DOCSTOKG_DATA_ROOT`, `DOCSTOKG_MODEL_ROOT`, stage-specific `DOCSTOKG_DOCTAGS_*`, `DOCSTOKG_CHUNK_*`, `DOCSTOKG_EMBED_*`), CLI flags, optional YAML/TOML via `config_loaders`.
+- Shared CLI flags: `--resume`, `--force`, `--log-level`, `--data-root`, `--manifest-dir`.
+- Stage-specific highlights:
+  - `doctags`: `--mode {pdf,html,auto}`, `--vllm-wait-timeout`, `--port`, `--workers`.
+  - `chunk`: `--min-tokens`, `--max-tokens`, `--merge-threshold`, `--shard-count/index`, `--validate-only`.
+  - `embed`: `--backend {qwen,splade,bm25}`, `--batch-size-*`, `--validate-only`, `--device`, `--quantization`.
+- Content hashing defaults: `DOCSTOKG_HASH_ALG` (default SHA-256). Switching to SHA-1 is only for legacy resumes; expect manifest diff (`input_hash`, chunk UUID).
+- Validate config with `core.cli chunk --validate-only` or `embed --validate-only`.
 
-## Performance Objectives & Baselines
-- Targets: Stage throughput baselines—HTML → DocTags 30–50 docs/min on a 12-core CPU, PDF → DocTags 5–10 docs/min on an A100, chunking 10–20 docs/min on an 8-core CPU, embeddings 5–8 docs/min on an A100 (see `openspec/changes/archive/2025-10-15-refactor-docparsing-pipeline/design.md`). Keep embedding `--validate-only` P50 ≤2.2 s per document, matching the DocParsing README SLO.
-- Known baseline: The synthetic benchmark (`tests/docparsing/test_synthetic_benchmark.py`) models streaming embeddings for 512 chunks × 384 tokens at dense dim 2560 and reports ~1.72× throughput gain with ~58 % memory reduction (`tests/docparsing/synthetic.py`).
-- Measurement recipe:
-  ```bash
-  direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q
-  direnv exec . python -m cProfile -m DocsToKG.DocParsing.core.cli embed --chunks-dir Data/ChunkedDocTagFiles --out-dir /tmp/embeddings --limit 10
-  ```
+## Data Contracts & Schemas
+- Manifests: `docparse.doctags|chunk|embeddings.manifest.jsonl` (append-only, idempotent).
+- Schemas: `formats.CHUNK_ROW_SCHEMA`, `formats.VECTOR_ROW_SCHEMA`, manifest payloads in `telemetry.ManifestEntry`.
+- Outputs use consistent doc IDs/hashes across stages so resume + downstream ingestion remain deterministic.
+- Advisory locks in `telemetry.StageTelemetry` prevent concurrent writers from corrupting manifests.
 
-## Profiling & Optimization Playbook
-- Quick profile commands:
+## Observability & Operations
+- Logs: `logging.py` outputs structured JSONL (`${DOCSTOKG_LOG_DIR:-Data/Logs}/docparse-*.jsonl`) plus console; fields include `stage`, `doc_id`, durations, correlation IDs.
+- Telemetry: `telemetry.StageTelemetry` emits manifest attempts/summaries per stage; parse with `docparse manifest --stage <stage>` or `jq`.
+- SLO guidance: maintain ≥99.5 % manifest success; keep `embed --validate-only` P50 ≤2.2 s/doc (per README).
+- Operational tooling: `core.cli plan` (stage preview), `manifest` (tail JSONL), `token-profiles` (chunk diagnostics), `all --resume` (pipeline orchestrator).
+
+## Performance & Profiling
+- Pipeline baselines (README): HTML→DocTags 30–50 docs/min (CPU), PDF→DocTags 5–10 docs/min (A100), chunking 10–20 docs/min (CPU), embeddings 5–8 docs/min (A100).
+- Profiling recipes:
   ```bash
   direnv exec . python -m cProfile -m DocsToKG.DocParsing.core.cli chunk --in-dir Data/DocTagsFiles --out-dir /tmp/chunks --limit 50
   direnv exec . pyinstrument -r html -o profile.html python -m DocsToKG.DocParsing.core.cli embed --chunks-dir Data/ChunkedDocTagFiles --out-dir /tmp/embeddings --limit 50
+  direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q
   ```
-- Tactics:
-  - Stream DocTags/Chunk/Embedding data; avoid loading whole corpora into memory.
-  - Batch structural operations (tokenization, embedding inference) to minimize model warm-up.
-  - Cache tokenizer/model instances per worker; reuse Qwen/SPLADE clients.
-  - Reduce allocations by reusing buffers in chunk generator (e.g., pre-size token arrays).
-  - Avoid quadratic merges—ensure chunk coalescence only inspects neighboring spans.
-  - Parallelize across shards via `--shard-count`/`--shard-index` when CPU-bound.
+- Optimisation levers: streaming IO, batching token/embedding workloads, caching tokenizer/model instances per worker, tuning `--shard-count` and batch size, keeping merges linear.
 
-## Complexity & Scalability Guidance
-- DocTags conversion roughly O(number_of_pages); chunking O(total_tokens); embedding O(num_chunks * vector_dim). Watch for nested loops over all chunks; maintain near-linear behavior.
-- Memory grows with open DocTags/chunk batches; ensure streaming iterators and release references post-write.
-- Large-N strategy: use deterministic sharding and resume manifests; consider pipeline-level concurrency but avoid over-saturating GPU with too many workers.
-
-## I/O, Caching & Concurrency
-- I/O: read/write JSONL from `Data/…` directories; use append-only manifests and atomic file writes.
-- Cache keys: resume logic keyed by content hash + manifest entry; embedding cache tuples produced via `_qwen_cache_key` in `embedding/runtime.py` (model_dir, dtype, tensor-parallelism, GPU util, quantization).
-- Concurrency: `doctags` uses process pool (spawn) for PDFs, `chunk`/`embed` may use thread/process pools; avoid manual threads around GPU contexts without spawn semantics.
-
-## Invariants to Preserve (change with caution)
-- Directory layout: DocTags, chunks, embeddings mirror input hierarchy; altering breaks resume and hybrid search.
-- Manifest schema/order: field names, ordering, and status semantics consumed by pipeline diagnostics.
-- Deterministic chunk IDs & embedding records: rely on DocTags ordering; avoid reordering without version bump + migration.
-- Resume/force semantics: `--resume` must skip completed outputs; `--force` must regenerate without leaving stale artifacts.
-
-## Preferred Refactor Surfaces
-- Extend chunking heuristics inside `chunking/` while keeping `ChunkPayload` contract.
-- Swap embedding backends via adapters under `embedding/` (respect `EmbeddingConfig`).
-- Add manifest enrichment in `formats` / `core.pipeline` ensuring schemas updated.
-- High-risk zones: `formats` schema constants, `io.py` manifest writer, global config detection in `env.py`.
-
-## Code Documentation Requirements
-- Maintain NAVMAP headers in major modules (`core`, `chunking`, `embedding`, `formats`, `types`).
-- Public APIs (CLI entry points, chunk/embedding classes) need docstrings documenting arguments, returns, and exceptions; include staged examples.
-- Keep README/AGENTS synchronized with CLI flags and schema changes; update `schemas.py` docstrings when adding fields.
-- Follow `MODULE_ORGANIZATION_GUIDE.md`, `CODE_ANNOTATION_STANDARDS.md`, and `STYLE_GUIDE.md`; ensure tests validate docstring presence when possible.
+## Invariants & Safe Change Surfaces
+- Directory hierarchy for DocTags/chunks/embeddings mirrors input structure; resume tooling assumes this layout.
+- Manifests are append-only; always include `doc_id`, `input_hash`, `status`, `attempts`.
+- Deterministic chunk IDs/embedding hashes rely on DocTags ordering and selected hash algorithm.
+- Use `chunking/`, `embedding/`, and `formats` modules for heuristic/schema changes; coordinate schema bumps with README/AGENTS updates.
+- GPU handling uses spawn semantics; avoid manual forked CUDA processes.
 
 ## Test Matrix & Quality Gates
 ```bash
@@ -89,18 +112,17 @@ direnv exec . mypy src/DocsToKG/DocParsing
 direnv exec . pytest tests/docparsing -q
 direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # performance smoke
 ```
-- Golden files: Canonical chunk/vector fixtures live under `tests/data/docparsing/golden/` (`sample.chunks.jsonl`, `sample.vectors.jsonl`) and are guarded by `tests/docparsing/test_cli_and_tripwires.py`.
-- Stress test: chunk/embedding pipeline on synthetic corpora (`test_synthetic_benchmark`).
-- Coverage expectation: Maintain ≥85 % coverage for new DocParsing utility modules per the refactor success metrics (`openspec/changes/archive/2025-10-15-refactor-docparsing-pipeline/design.md`).
+- Golden fixtures: `tests/data/docparsing/golden/` (DocTags/chunk/vector JSONL).
+- High-signal suites: `tests/docparsing/test_cli_and_tripwires.py`, `test_docparsing_core.py`, `test_synthetic_benchmark.py`, `test_chunk_manifest_resume.py`.
 
-## Failure Modes & Debug Hints
-| Symptom | Likely cause | Quick checks |
-|---|---|---|
-| `CUDA error: reinitializing context` | Forked child touching CUDA before spawn | Ensure PDF pipeline uses spawn; reduce workers; set `CUDA_VISIBLE_DEVICES`. |
-| Chunk counts mismatch | Resume logic skipped DocTags | Inspect manifests (`docparse.chunks.manifest.jsonl`); rerun chunk with `--force` for affected doc. |
-| Embedding shape mismatch | Config `--qwen-dim` incorrect or model drift | Validate with `--validate-only`; check vector dimensionality vs config. |
-| Slow chunking | Structural markers causing quadratic merges | Profile `HybridChunker.generate_chunks`; reduce nested marker checks or adjust thresholds. |
-| Manifest corruption | Manual edits or partial writes | Use `docparse` CLI to rebuild manifests; avoid editing JSONL manually. |
+## Failure Modes & Debugging
+| Symptom | Likely Cause | Checks |
+| --- | --- | --- |
+| `CUDA error: reinitializing context` | Forked child touching CUDA before spawn | Ensure PDF DocTags workers use spawn; limit workers; configure `CUDA_VISIBLE_DEVICES`. |
+| Chunk count mismatch | Resume skipped DocTags or stale hash | Inspect `docparse.chunks.manifest.jsonl`; rerun chunk with `--force` for affected docs. |
+| Embedding dim mismatch | Wrong backend config or model upgrade | Run `embed --validate-only`; confirm vector dimension vs config. |
+| Slow chunking | Quadratic merges from markers | Profile `HybridChunker.generate_chunks`; adjust merge thresholds. |
+| Manifest corruption | Manual edits or partial writes | Rebuild via CLI; avoid editing JSONL by hand. |
 
 ## Canonical Commands
 ```bash
@@ -108,17 +130,10 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --mode pdf --input 
 direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --in-dir Data/DocTagsFiles --out-dir Data/ChunkedDocTagFiles --min-tokens 256 --max-tokens 512
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed --chunks-dir Data/ChunkedDocTagFiles --out-dir Data/Embeddings --batch-size-qwen 24
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only --chunks-dir Data/ChunkedDocTagFiles
+direnv exec . python -m DocsToKG.DocParsing.core.cli manifest --stage chunk --tail 20
 ```
 
-## Indexing Hints
-- Read first: `core/pipeline.py`, `chunking/hybrid_chunker.py`, `embedding/runner.py`, `formats/__init__.py`, `config.py`.
-- High-signal tests: `tests/docparsing/test_cli_and_tripwires.py`, `test_docparsing_core.py`, `test_synthetic_benchmark.py`.
-- Schemas/contracts: `formats.py`, `schemas.py`, `config.py` dataclasses.
-
-## Ownership & Documentation Links
-- Owners/reviewers: Owning team `docs-to-kg`, codeowner `@paul-heyse` (see `src/DocsToKG/DocParsing/README.md` front matter).
-- Related docs: `src/DocsToKG/DocParsing/README.md`, `docs/06-operations/docparsing-changelog.md`, and OpenSpec archives under `openspec/changes/`.
-
-## Changelog and Update Procedure
-- Update hot paths, baselines, and schema references when CLI flags or output formats change.
-- Keep examples runnable; refresh this guide when new stages or configs are introduced; bump "Last updated" after significant edits.
+## Reference Docs
+- `src/DocsToKG/DocParsing/README.md`
+- `docs/06-operations/docparsing-changelog.md`
+- OpenSpec archives under `openspec/changes/` for historical design notes

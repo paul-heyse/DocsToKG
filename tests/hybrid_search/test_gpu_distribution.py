@@ -1,4 +1,9 @@
-"""Tests for GPU replication helpers in :mod:`DocsToKG.HybridSearch.store`."""
+"""GPU fan-out and replication tests for FAISS adapter helpers.
+
+Validates memory sizing, stream usage, multi-GPU index sharding, and fallback
+behaviour when the FAISS GPU APIs are unavailable. Ensures hybrid search scales
+vector stores across accelerators correctly.
+"""
 
 from __future__ import annotations
 
@@ -64,7 +69,7 @@ def test_configure_gpu_resource_respects_default_null_stream_flags() -> None:
 @pytest.mark.parametrize("shard", [False, True])
 @pytest.mark.parametrize("force_legacy_path", [False, True])
 def test_distribute_to_all_gpus_configures_cloner_options(
-    monkeypatch, caplog, shard: bool, force_legacy_path: bool
+    patcher, caplog, shard: bool, force_legacy_path: bool
 ) -> None:
     """Ensure the GPU distributor forwards supported arguments only."""
 
@@ -84,8 +89,8 @@ def test_distribute_to_all_gpus_configures_cloner_options(
 
     cpu_index = faiss.IndexFlatIP(4)
 
-    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 2, raising=False)
-    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+    patcher.setattr(faiss, "get_num_gpus", lambda: 2, raising=False)
+    patcher.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
 
     captured: dict[str, object] = {}
     caplog.set_level(logging.INFO, logger="DocsToKG.HybridSearch")
@@ -113,14 +118,14 @@ def test_distribute_to_all_gpus_configures_cloner_options(
         def push_back(self, resource: RecordingResources) -> None:
             self.resources.append(resource)
 
-    monkeypatch.setattr(faiss, "StandardGpuResources", RecordingResources)
-    monkeypatch.setattr(faiss, "GpuResourcesVector", RecordingVector)
+    patcher.setattr(faiss, "StandardGpuResources", RecordingResources)
+    patcher.setattr(faiss, "GpuResourcesVector", RecordingVector)
 
     class RecordingIntVector(list):
         def push_back(self, value: int) -> None:
             self.append(int(value))
 
-    monkeypatch.setattr(faiss, "IntVector", RecordingIntVector, raising=False)
+    patcher.setattr(faiss, "IntVector", RecordingIntVector, raising=False)
 
     store._gpu_resources = faiss.StandardGpuResources()
 
@@ -134,10 +139,10 @@ def test_distribute_to_all_gpus_configures_cloner_options(
             self.useFloat16LookupTables: bool | None = None
             self.reserveVecs: int | None = None
 
-    monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", DummyClonerOptions, raising=False)
+    patcher.setattr(faiss, "GpuMultipleClonerOptions", DummyClonerOptions, raising=False)
 
     if force_legacy_path:
-        monkeypatch.delattr(faiss, "index_cpu_to_gpu_multiple", raising=False)
+        patcher.delattr(faiss, "index_cpu_to_gpu_multiple", raising=False)
 
         def fake_index_cpu_to_gpus_list(index_arg, *, gpus=None, co=None, resources=None):  # type: ignore[override]
             captured["co"] = co
@@ -145,13 +150,13 @@ def test_distribute_to_all_gpus_configures_cloner_options(
             captured["resources_vector"] = resources
             return index_arg
 
-        monkeypatch.setattr(
+        patcher.setattr(
             faiss,
             "index_cpu_to_gpus_list",
             fake_index_cpu_to_gpus_list,
             raising=False,
         )
-        monkeypatch.setattr(
+        patcher.setattr(
             faiss,
             "index_cpu_to_all_gpus",
             lambda *args, **kwargs: pytest.fail("manual resource fallback should be used"),
@@ -164,14 +169,14 @@ def test_distribute_to_all_gpus_configures_cloner_options(
             captured["resources_vector"] = resources_vector
             return index_arg
 
-        monkeypatch.setattr(faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple)
-        monkeypatch.setattr(
+        patcher.setattr(faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple)
+        patcher.setattr(
             faiss,
             "index_cpu_to_gpus_list",
             lambda *args, **kwargs: pytest.fail("gpu_multiple path should be used"),
             raising=False,
         )
-        monkeypatch.setattr(
+        patcher.setattr(
             faiss,
             "index_cpu_to_all_gpus",
             lambda *args, **kwargs: pytest.fail("legacy replication path invoked"),
@@ -200,9 +205,12 @@ def test_distribute_to_all_gpus_configures_cloner_options(
         assert getattr(cloner, "useFloat16LookupTables") is False
     if shard and hasattr(cloner, "common_ivf_quantizer"):
         assert cloner.common_ivf_quantizer is True
-    assert getattr(cloner, "reserveVecs") == store._expected_ntotal
+    expected_reserve = store._expected_ntotal
+    if shard:
+        expected_reserve = (expected_reserve + len(expected_gpu_ids) - 1) // len(expected_gpu_ids)
+    assert getattr(cloner, "reserveVecs") == expected_reserve
     if getattr(cloner, "eachReserveVecs", None) is not None:
-        assert list(cloner.eachReserveVecs) == [store._expected_ntotal] * len(expected_gpu_ids)
+        assert list(cloner.eachReserveVecs) == [expected_reserve] * len(expected_gpu_ids)
 
     counters = {
         (sample.name, tuple(sorted(sample.labels.items()))): sample.value
@@ -229,7 +237,7 @@ def test_distribute_to_all_gpus_configures_cloner_options(
     ),
     reason="faiss build missing multi-GPU replication helpers",
 )
-def test_distribute_to_all_gpus_propagates_gpu_flags(monkeypatch) -> None:
+def test_distribute_to_all_gpus_propagates_gpu_flags(patcher) -> None:
     """Replicated shards should reflect configured ID width and FP16 toggles."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -247,8 +255,8 @@ def test_distribute_to_all_gpus_propagates_gpu_flags(monkeypatch) -> None:
     store._gpu_resources = None
     store._device = 0
 
-    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 2, raising=False)
-    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+    patcher.setattr(faiss, "get_num_gpus", lambda: 2, raising=False)
+    patcher.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
 
     class RecordingResources:
         def __init__(self) -> None:
@@ -270,8 +278,8 @@ def test_distribute_to_all_gpus_propagates_gpu_flags(monkeypatch) -> None:
         def push_back(self, resource: RecordingResources) -> None:
             self.resources.append(resource)
 
-    monkeypatch.setattr(faiss, "StandardGpuResources", RecordingResources)
-    monkeypatch.setattr(faiss, "GpuResourcesVector", RecordingVector)
+    patcher.setattr(faiss, "StandardGpuResources", RecordingResources)
+    patcher.setattr(faiss, "GpuResourcesVector", RecordingVector)
 
     store._gpu_resources = faiss.StandardGpuResources()
 
@@ -284,7 +292,7 @@ def test_distribute_to_all_gpus_propagates_gpu_flags(monkeypatch) -> None:
             self.useFloat16CoarseQuantizer: bool | None = None
             self.useFloat16LookupTables: bool | None = None
 
-    monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", RecordingClonerOptions, raising=False)
+    patcher.setattr(faiss, "GpuMultipleClonerOptions", RecordingClonerOptions, raising=False)
 
     class FakeShard:
         def __init__(self, indices_option: int | None, use_fp16: bool | None) -> None:
@@ -305,14 +313,14 @@ def test_distribute_to_all_gpus_propagates_gpu_flags(monkeypatch) -> None:
         ]
         return FakeDistributedIndex(shards)
 
-    monkeypatch.setattr(faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple)
-    monkeypatch.setattr(
+    patcher.setattr(faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple)
+    patcher.setattr(
         faiss,
         "index_cpu_to_gpus_list",
         lambda *args, **kwargs: pytest.fail("gpu_multiple path should be used"),
         raising=False,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         faiss,
         "index_cpu_to_all_gpus",
         lambda *args, **kwargs: pytest.fail("index_cpu_to_all_gpus should not run"),
@@ -354,7 +362,7 @@ def test_distribute_to_all_gpus_propagates_gpu_flags(monkeypatch) -> None:
     ),
     reason="faiss build missing multi-GPU replication helpers",
 )
-def test_distribute_to_all_gpus_uses_non_contiguous_ids(monkeypatch) -> None:
+def test_distribute_to_all_gpus_uses_non_contiguous_ids(patcher) -> None:
     """Ensure explicit GPU ids are preserved when constructing resources."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -373,8 +381,8 @@ def test_distribute_to_all_gpus_uses_non_contiguous_ids(monkeypatch) -> None:
 
     cpu_index = object()
 
-    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 4, raising=False)
-    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+    patcher.setattr(faiss, "get_num_gpus", lambda: 4, raising=False)
+    patcher.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
 
     configured_devices: list[int | None] = []
 
@@ -383,9 +391,7 @@ def test_distribute_to_all_gpus_uses_non_contiguous_ids(monkeypatch) -> None:
         if hasattr(resource, "setTempMemory"):
             resource.setTempMemory(temp_memory)
 
-    monkeypatch.setattr(
-        FaissVectorStore, "_configure_gpu_resource", recording_configure, raising=False
-    )
+    patcher.setattr(FaissVectorStore, "_configure_gpu_resource", recording_configure, raising=False)
 
     class RecordingResources:
         def __init__(self) -> None:
@@ -407,8 +413,8 @@ def test_distribute_to_all_gpus_uses_non_contiguous_ids(monkeypatch) -> None:
         def push_back(self, resource: RecordingResources) -> None:
             self.resources.append(resource)
 
-    monkeypatch.setattr(faiss, "StandardGpuResources", RecordingResources)
-    monkeypatch.setattr(faiss, "GpuResourcesVector", RecordingVector)
+    patcher.setattr(faiss, "StandardGpuResources", RecordingResources)
+    patcher.setattr(faiss, "GpuResourcesVector", RecordingVector)
 
     class DummyClonerOptions:
         def __init__(self) -> None:
@@ -420,7 +426,7 @@ def test_distribute_to_all_gpus_uses_non_contiguous_ids(monkeypatch) -> None:
             self.useFloat16LookupTables: bool | None = None
             self.reserveVecs: int | None = None
 
-    monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", DummyClonerOptions, raising=False)
+    patcher.setattr(faiss, "GpuMultipleClonerOptions", DummyClonerOptions, raising=False)
 
     captured: dict[str, object] = {}
 
@@ -430,8 +436,8 @@ def test_distribute_to_all_gpus_uses_non_contiguous_ids(monkeypatch) -> None:
         captured["co"] = co
         return index_arg
 
-    monkeypatch.setattr(faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple)
-    monkeypatch.setattr(
+    patcher.setattr(faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple)
+    patcher.setattr(
         faiss,
         "index_cpu_to_all_gpus",
         lambda *args, **kwargs: pytest.fail("index_cpu_to_all_gpus should not run"),
@@ -462,7 +468,7 @@ def test_distribute_to_all_gpus_uses_non_contiguous_ids(monkeypatch) -> None:
 
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
-def test_distribute_to_all_gpus_manual_path_without_resources(monkeypatch) -> None:
+def test_distribute_to_all_gpus_manual_path_without_resources(patcher) -> None:
     """Manual replication without explicit resources must honour requested GPUs."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -481,11 +487,11 @@ def test_distribute_to_all_gpus_manual_path_without_resources(monkeypatch) -> No
 
     cpu_index = object()
 
-    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 4, raising=False)
-    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+    patcher.setattr(faiss, "get_num_gpus", lambda: 4, raising=False)
+    patcher.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
 
     if hasattr(faiss, "GpuResourcesVector"):
-        monkeypatch.delattr(faiss, "GpuResourcesVector", raising=False)
+        patcher.delattr(faiss, "GpuResourcesVector", raising=False)
 
     captured_gpus: list[int] = []
     captured_options: list[object] = []
@@ -497,8 +503,8 @@ def test_distribute_to_all_gpus_manual_path_without_resources(monkeypatch) -> No
             captured_options.append(co)
         return sentinel_index
 
-    monkeypatch.setattr(faiss, "index_cpu_to_gpus_list", fake_index_cpu_to_gpus_list, raising=False)
-    monkeypatch.setattr(
+    patcher.setattr(faiss, "index_cpu_to_gpus_list", fake_index_cpu_to_gpus_list, raising=False)
+    patcher.setattr(
         faiss,
         "index_cpu_to_all_gpus",
         lambda *args, **kwargs: pytest.fail("index_cpu_to_all_gpus should not run"),
@@ -529,7 +535,7 @@ def test_distribute_to_all_gpus_manual_path_without_resources(monkeypatch) -> No
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
 @pytest.mark.parametrize("shard", [False, True])
-def test_distribute_to_all_gpus_respects_explicit_gpu_list(monkeypatch, shard: bool) -> None:
+def test_distribute_to_all_gpus_respects_explicit_gpu_list(patcher, shard: bool) -> None:
     """Explicit replication ids should use ``index_cpu_to_gpus_list`` with filtering."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -543,8 +549,8 @@ def test_distribute_to_all_gpus_respects_explicit_gpu_list(monkeypatch, shard: b
 
     cpu_index = object()
 
-    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 3, raising=False)
-    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+    patcher.setattr(faiss, "get_num_gpus", lambda: 3, raising=False)
+    patcher.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
 
     captured: dict[str, object] = {}
 
@@ -569,9 +575,9 @@ def test_distribute_to_all_gpus_respects_explicit_gpu_list(monkeypatch, shard: b
             self.useFloat16CoarseQuantizer: bool | None = None
             self.useFloat16LookupTables: bool | None = None
 
-    monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", DummyCloner, raising=False)
-    monkeypatch.setattr(faiss, "index_cpu_to_gpus_list", fake_index_cpu_to_gpus_list, raising=False)
-    monkeypatch.setattr(faiss, "index_cpu_to_all_gpus", fake_index_cpu_to_all_gpus, raising=False)
+    patcher.setattr(faiss, "GpuMultipleClonerOptions", DummyCloner, raising=False)
+    patcher.setattr(faiss, "index_cpu_to_gpus_list", fake_index_cpu_to_gpus_list, raising=False)
+    patcher.setattr(faiss, "index_cpu_to_all_gpus", fake_index_cpu_to_all_gpus, raising=False)
 
     replicated = store.distribute_to_all_gpus(cpu_index, shard=shard)
 
@@ -594,7 +600,7 @@ def test_distribute_to_all_gpus_respects_explicit_gpu_list(monkeypatch, shard: b
 
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
-def test_distribute_to_all_gpus_skips_invalid_targets(monkeypatch, caplog) -> None:
+def test_distribute_to_all_gpus_skips_invalid_targets(patcher, caplog) -> None:
     """Invalid GPU ids should be ignored without invoking replication helpers."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -608,8 +614,8 @@ def test_distribute_to_all_gpus_skips_invalid_targets(monkeypatch, caplog) -> No
 
     cpu_index = object()
 
-    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 2, raising=False)
-    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+    patcher.setattr(faiss, "get_num_gpus", lambda: 2, raising=False)
+    patcher.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
 
     def fail_index_cpu_to_gpus_list(*args, **kwargs):  # type: ignore[override]
         pytest.fail("index_cpu_to_gpus_list should not be called when no valid GPUs remain")
@@ -617,8 +623,8 @@ def test_distribute_to_all_gpus_skips_invalid_targets(monkeypatch, caplog) -> No
     def fail_index_cpu_to_all_gpus(*args, **kwargs):  # type: ignore[override]
         pytest.fail("index_cpu_to_all_gpus should not be called for explicit GPU ids")
 
-    monkeypatch.setattr(faiss, "index_cpu_to_gpus_list", fail_index_cpu_to_gpus_list, raising=False)
-    monkeypatch.setattr(faiss, "index_cpu_to_all_gpus", fail_index_cpu_to_all_gpus, raising=False)
+    patcher.setattr(faiss, "index_cpu_to_gpus_list", fail_index_cpu_to_gpus_list, raising=False)
+    patcher.setattr(faiss, "index_cpu_to_all_gpus", fail_index_cpu_to_all_gpus, raising=False)
 
     caplog.set_level(logging.DEBUG)
     caplog.set_level(logging.INFO, logger="DocsToKG.HybridSearch")
@@ -659,7 +665,7 @@ def test_distribute_to_all_gpus_skips_invalid_targets(monkeypatch, caplog) -> No
     ],
 )
 def test_distribute_to_all_gpus_fallback_uses_gpu_count(
-    monkeypatch,
+    patcher,
     replication_ids: tuple[int, ...] | None,
     available: int,
     expected_count: int,
@@ -687,11 +693,11 @@ def test_distribute_to_all_gpus_fallback_uses_gpu_count(
     store._gpu_use_default_null_stream_all_devices = False
     store._device = 0
 
-    monkeypatch.setattr(faiss, "get_num_gpus", lambda: available, raising=False)
-    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+    patcher.setattr(faiss, "get_num_gpus", lambda: available, raising=False)
+    patcher.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
 
     if hasattr(faiss, "GpuResourcesVector"):
-        monkeypatch.delattr(faiss, "GpuResourcesVector", raising=False)
+        patcher.delattr(faiss, "GpuResourcesVector", raising=False)
 
     fallback_calls: list[dict[str, object]] = []
 
@@ -699,7 +705,7 @@ def test_distribute_to_all_gpus_fallback_uses_gpu_count(
         fallback_calls.append({"ngpu": ngpu, "co": co})
         return index_arg
 
-    monkeypatch.setattr(faiss, "index_cpu_to_all_gpus", fake_index_cpu_to_all_gpus, raising=False)
+    patcher.setattr(faiss, "index_cpu_to_all_gpus", fake_index_cpu_to_all_gpus, raising=False)
 
     captured_gpus: list[int] = []
 
@@ -709,7 +715,7 @@ def test_distribute_to_all_gpus_fallback_uses_gpu_count(
             captured_gpus.extend(list(gpus or []))
             return index_arg
 
-        monkeypatch.setattr(
+        patcher.setattr(
             faiss,
             "index_cpu_to_gpus_list",
             fake_index_cpu_to_gpus_list,
@@ -743,7 +749,7 @@ def test_distribute_to_all_gpus_fallback_uses_gpu_count(
 
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
-def test_distribute_to_all_gpus_reports_missing_manual_helper(monkeypatch, caplog) -> None:
+def test_distribute_to_all_gpus_reports_missing_manual_helper(patcher, caplog) -> None:
     """Explicit GPU targets should emit telemetry when helpers are unavailable."""
 
     if not hasattr(faiss, "index_cpu_to_gpus_list"):
@@ -760,13 +766,13 @@ def test_distribute_to_all_gpus_reports_missing_manual_helper(monkeypatch, caplo
 
     cpu_index = object()
 
-    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 2, raising=False)
-    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+    patcher.setattr(faiss, "get_num_gpus", lambda: 2, raising=False)
+    patcher.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
 
     caplog.set_level(logging.WARNING)
     caplog.set_level(logging.WARNING, logger="DocsToKG.HybridSearch")
 
-    monkeypatch.delattr(faiss, "index_cpu_to_gpus_list", raising=False)
+    patcher.delattr(faiss, "index_cpu_to_gpus_list", raising=False)
 
     replicated = store.distribute_to_all_gpus(cpu_index, shard=False)
 
@@ -795,7 +801,7 @@ def test_distribute_to_all_gpus_reports_missing_manual_helper(monkeypatch, caplo
 
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
-def test_distribute_to_all_gpus_manual_path_without_resources_vector(monkeypatch, caplog) -> None:
+def test_distribute_to_all_gpus_manual_path_without_resources_vector(patcher, caplog) -> None:
     """Manual GPU replication should respect ids even without GpuResourcesVector."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -812,11 +818,11 @@ def test_distribute_to_all_gpus_manual_path_without_resources_vector(monkeypatch
     store._replica_gpu_resources = []
     store._gpu_resources = None
 
-    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 4, raising=False)
-    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+    patcher.setattr(faiss, "get_num_gpus", lambda: 4, raising=False)
+    patcher.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
 
     if hasattr(faiss, "GpuResourcesVector"):
-        monkeypatch.delattr(faiss, "GpuResourcesVector", raising=False)
+        patcher.delattr(faiss, "GpuResourcesVector", raising=False)
 
     caplog.set_level(logging.INFO, logger="DocsToKG.HybridSearch")
 
@@ -827,13 +833,13 @@ def test_distribute_to_all_gpus_manual_path_without_resources_vector(monkeypatch
         captured_gpus.extend(list(gpus or []))
         return sentinel
 
-    monkeypatch.setattr(
+    patcher.setattr(
         faiss,
         "index_cpu_to_gpus_list",
         fake_index_cpu_to_gpus_list,
         raising=False,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         faiss,
         "index_cpu_to_all_gpus",
         lambda *args, **kwargs: pytest.fail("index_cpu_to_all_gpus should not run"),
@@ -866,13 +872,13 @@ def test_distribute_to_all_gpus_manual_path_without_resources_vector(monkeypatch
         if hasattr(resource, "setTempMemory"):
             resource.setTempMemory(temp_memory)
 
-    monkeypatch.setattr(
+    patcher.setattr(
         FaissVectorStore,
         "_create_gpu_resources",
         fake_create,
         raising=False,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         FaissVectorStore,
         "_configure_gpu_resource",
         fake_configure,

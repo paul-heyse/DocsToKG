@@ -43,6 +43,15 @@
 # }
 # === /NAVMAP ===
 
+"""Targeted unit tests for networking helper edge cases.
+
+These cases exercise lightweight scenarios that would be noisy in the broader
+`test_networking` suite: HEAD precheck fallbacks, conditional header assembly,
+retry bookkeeping, and cached response interpretation against hand-crafted
+dummy responses. They provide fast feedback while larger integration tests
+cover end-to-end download behaviour.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, Tuple
@@ -220,7 +229,6 @@ def test_circuit_breaker_open_and_cooldown(patcher):
     assert breaker.allow()
     breaker.record_success()
     assert breaker.allow()
-
 
 
 @st.composite

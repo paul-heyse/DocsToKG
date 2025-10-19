@@ -1,4 +1,9 @@
-"""Schema migration helpers for ontology download metadata."""
+"""Schema migration helpers for ontology download metadata.
+
+Manifests evolve as new provenance fields are introduced.  This module keeps
+backward-compatibility by upgrading older payloads to the latest schema version
+so that downstream tooling can rely on a consistent structure.
+"""
 
 from __future__ import annotations
 

@@ -1,13 +1,23 @@
-"""
-Source adapter interfaces for the DocsToKG content download pipeline.
+"""Source adapter interfaces for the DocsToKG content download pipeline.
 
-This module formalises the boundary between the CLI and upstream catalogues by
-exposing a :class:`WorkProvider` protocol. Providers are responsible for
-yielding :class:`~DocsToKG.ContentDownload.core.WorkArtifact` instances that
-downstream resolver components can process without needing to know which
-catalogue supplied the metadata. Today we ship an OpenAlex implementation, but
-the protocol enables future adapters (e.g., Crossref, arXiv) to plug in without
-modifying the pipeline.
+Responsibilities
+----------------
+- Define the :class:`WorkProvider` protocol that abstracts over upstream
+  catalogues and yields normalised :class:`~DocsToKG.ContentDownload.core.WorkArtifact`
+  objects for the resolver pipeline.
+- Ship a production-ready :class:`OpenAlexWorkProvider` implementation that
+  wraps pyalex pagination, converts responses into artefact directories, and
+  honours CLI limits (per-page, ``--max``).
+- Provide extension points via ``ArtifactFactory`` so tests and future data
+  sources (Crossref, arXiv, institutional APIs) can reuse the same orchestration
+  without touching the download logic.
+
+Design Notes
+------------
+- Providers remain streaming friendly—the iterator yields artifacts lazily so
+  large result sets do not load into memory.
+- The OpenAlex provider accepts either a live pyalex query or an iterable of
+  pre-fetched works, simplifying unit tests and dry-run tooling.
 """
 
 from __future__ import annotations

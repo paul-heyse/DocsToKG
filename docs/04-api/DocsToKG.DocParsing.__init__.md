@@ -1,29 +1,57 @@
 # 1. Module: __init__
 
-This reference documents the DocsToKG module ``DocsToKG.DocParsing``.
+This reference documents the DocsToKG module ``DocsToKG.DocParsing.__init__``.
 
 ## 1. Overview
 
-High-level facade exposing consolidated DocParsing modules. The package now
-provides direct imports for the canonical implementations without dynamically
-registered compatibility shims.
+High-level facade exposing consolidated DocParsing modules.
 
-## 2. Re-exported Modules
+## 2. Functions
 
-- ``core`` – unified helpers for DocTags conversion, chunking, embedding, and CLI tooling.
-- ``formats`` – Pydantic models and validation helpers for chunk/vector payloads.
-- ``doctags`` – PDF/HTML DocTags conversion pipeline and CLI parser builders.
-- ``chunking`` – Runtime utilities for Docling chunk generation.
-- ``embedding`` – Embedding runtime, configuration, and pooling helpers.
-- ``token_profiles`` – Token profile analysis for DocTags corpora.
+### `_import_module(module_name)`
 
-## 3. Convenience Functions
+Wrapper around :func:`import_module` for monkeypatch-friendly indirection.
 
-The package surfaces frequently used entry points from :mod:`DocsToKG.DocParsing.doctags`:
+### `_load_module(name)`
 
-- ``pdf_build_parser`` / ``html_build_parser`` – construct CLI parsers.
-- ``pdf_parse_args`` / ``html_parse_args`` – parse CLI arguments for DocTags conversion.
-- ``pdf_main`` / ``html_main`` – run DocTags conversion in PDF or HTML mode.
+Load a module by name, using cache for performance.
 
-The ``plan`` and ``manifest`` helpers from :mod:`DocsToKG.DocParsing.core` remain
-available as top-level attributes for convenience.
+### `__getattr__(name)`
+
+Dynamically import submodules only when they are requested.
+
+### `__dir__()`
+
+Ensure lazily exposed attributes appear in :func:`dir` results.
+
+### `plan()`
+
+Proxy to :func:`DocsToKG.DocParsing.core.plan` with lazy loading.
+
+### `manifest()`
+
+Proxy to :func:`DocsToKG.DocParsing.core.manifest` with lazy loading.
+
+### `pdf_build_parser()`
+
+Proxy to :func:`DocsToKG.DocParsing.doctags.pdf_build_parser`.
+
+### `pdf_parse_args()`
+
+Proxy to :func:`DocsToKG.DocParsing.doctags.pdf_parse_args`.
+
+### `pdf_main()`
+
+Proxy to :func:`DocsToKG.DocParsing.doctags.pdf_main`.
+
+### `html_build_parser()`
+
+Proxy to :func:`DocsToKG.DocParsing.doctags.html_build_parser`.
+
+### `html_parse_args()`
+
+Proxy to :func:`DocsToKG.DocParsing.doctags.html_parse_args`.
+
+### `html_main()`
+
+Proxy to :func:`DocsToKG.DocParsing.doctags.html_main`.

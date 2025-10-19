@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Print simple token ratio stats for DocTags samples."""
+"""CLI utility for analysing tokenizer behaviour on DocTags samples.
+
+Operators can use this module to compare multiple tokenizer vocabularies
+against their corpus before selecting chunking or embedding parameters. It
+provides configuration dataclasses, CLI wiring, and reporting helpers that
+output token length histograms and ratios for quick sanity checks.
+"""
 
 from __future__ import annotations
 

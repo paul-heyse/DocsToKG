@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -21,17 +21,17 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="1. Operations Guide" href="../06-operations/index.html" />
-    <link rel="prev" title="1. API Reference" href="../04-api/index.html" />
+    <link rel="prev" title="1. API Reference" href="../04-api/index.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -53,7 +53,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#getting-started-as-a-contributor">2. Getting Started as a Contributor</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#set-up-development-environment">1. Set Up Development Environment</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#understand-the-codebase">2. Understand the Codebase</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#find-your-first-issue">3. Find Your First Issue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#plan-your-change">3. Plan Your Change</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#development-workflow">3. Development Workflow</a><ul>
@@ -125,7 +125,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="development-guide">
 <h1>1. Development Guide<a class="headerlink" href="#development-guide" title="Link to this heading"></a></h1>
 <p>Welcome to the DocsToKG development community! This guide will help you contribute to the project effectively.</p>
@@ -133,7 +133,12 @@
 <h2>2. Getting Started as a Contributor<a class="headerlink" href="#getting-started-as-a-contributor" title="Link to this heading"></a></h2>
 <section id="set-up-development-environment">
 <h3>1. Set Up Development Environment<a class="headerlink" href="#set-up-development-environment" title="Link to this heading"></a></h3>
-<p>Follow the <a class="reference internal" href="../02-setup/index.html"><span class="std std-doc">Setup Guide</span></a> to get your local environment running.</p>
+<ol class="arabic simple">
+<li><p>Follow the <a class="reference internal" href="../02-setup/index.html"><span class="std std-doc">Setup Guide</span></a>.</p></li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">./scripts/bootstrap_env.sh</span></code> to create <code class="docutils literal notranslate"><span class="pre">.venv</span></code> with Python 3.13 and install bundled wheels (<code class="docutils literal notranslate"><span class="pre">torch</span></code>, <code class="docutils literal notranslate"><span class="pre">faiss</span></code>, <code class="docutils literal notranslate"><span class="pre">vllm</span></code>, <code class="docutils literal notranslate"><span class="pre">cupy-cuda12x</span></code>).</p></li>
+<li><p>Approve <code class="docutils literal notranslate"><span class="pre">.envrc</span></code> with <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">allow</span></code> so shells inherit the virtualenv and <code class="docutils literal notranslate"><span class="pre">PYTHONPATH</span></code>.</p></li>
+<li><p>Optional: <code class="docutils literal notranslate"><span class="pre">./scripts/dev.sh</span> <span class="pre">exec</span> <span class="pre">&lt;command&gt;</span></code> when <code class="docutils literal notranslate"><span class="pre">direnv</span></code> is unavailable.</p></li>
+</ol>
 </section>
 <section id="understand-the-codebase">
 <h3>2. Understand the Codebase<a class="headerlink" href="#understand-the-codebase" title="Link to this heading"></a></h3>
@@ -143,13 +148,13 @@
 <li><p><strong>Study key modules</strong>: Focus on <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload</span></code>, <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing</span></code>, <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/HybridSearch</span></code>, and <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/OntologyDownload</span></code></p></li>
 </ul>
 </section>
-<section id="find-your-first-issue">
-<h3>3. Find Your First Issue<a class="headerlink" href="#find-your-first-issue" title="Link to this heading"></a></h3>
+<section id="plan-your-change">
+<h3>3. Plan Your Change<a class="headerlink" href="#plan-your-change" title="Link to this heading"></a></h3>
 <ul class="simple">
-<li><p><strong>Good First Issues</strong>: Look for issues labeled <code class="docutils literal notranslate"><span class="pre">good</span> <span class="pre">first</span> <span class="pre">issue</span></code> or <code class="docutils literal notranslate"><span class="pre">help</span> <span class="pre">wanted</span></code></p></li>
-<li><p><strong>Documentation</strong>: Help improve docs, add examples, or clarify explanations</p></li>
-<li><p><strong>Bug Fixes</strong>: Start with straightforward bug reports</p></li>
-<li><p><strong>Feature Requests</strong>: Pick features that align with your interests</p></li>
+<li><p><strong>Good First Issues</strong>: Look for issues labeled <code class="docutils literal notranslate"><span class="pre">good</span> <span class="pre">first</span> <span class="pre">issue</span></code> or <code class="docutils literal notranslate"><span class="pre">help</span> <span class="pre">wanted</span></code>.</p></li>
+<li><p><strong>Spec-heavy work</strong>: Start by drafting an <code class="docutils literal notranslate"><span class="pre">openspec</span></code> proposal (<code class="docutils literal notranslate"><span class="pre">openspec</span> <span class="pre">spec</span> <span class="pre">list</span></code>, <code class="docutils literal notranslate"><span class="pre">openspec</span> <span class="pre">validate</span> <span class="pre">&lt;change-id&gt;</span> <span class="pre">--strict</span></code>) before writing code.</p></li>
+<li><p><strong>Documentation tasks</strong>: Improve <code class="docutils literal notranslate"><span class="pre">docs/</span></code> content, add examples, or keep reference material current.</p></li>
+<li><p><strong>Bug Fixes</strong>: Start with reproducible issues backed by failing tests or telemetry evidence.</p></li>
 </ul>
 </section>
 </section>
@@ -204,9 +209,9 @@
 <h4>Pre-Submission Phase<a class="headerlink" href="#pre-submission-phase" title="Link to this heading"></a></h4>
 <p><strong>Before submitting pull requests:</strong></p>
 <ul class="simple">
-<li><p>[ ] Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/validate_code_annotations.py</span> <span class="pre">src/</span></code></p></li>
-<li><p>[ ] Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/generate_api_docs.py</span></code> to update API docs</p></li>
-<li><p>[ ] Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/validate_docs.py</span></code> for content validation</p></li>
+<li><p>[ ] <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">exec</span> <span class="pre">.</span> <span class="pre">python</span> <span class="pre">docs/scripts/validate_code_annotations.py</span></code></p></li>
+<li><p>[ ] <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">exec</span> <span class="pre">.</span> <span class="pre">python</span> <span class="pre">docs/scripts/generate_api_docs.py</span></code></p></li>
+<li><p>[ ] <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">exec</span> <span class="pre">.</span> <span class="pre">python</span> <span class="pre">docs/scripts/validate_docs.py</span></code></p></li>
 <li><p>[ ] Review changes using documentation checklist</p></li>
 </ul>
 </section>
@@ -244,23 +249,24 @@
 <section id="pull-request-process">
 <h2>5. Pull Request Process<a class="headerlink" href="#pull-request-process" title="Link to this heading"></a></h2>
 <ol class="arabic simple">
-<li><p><strong>Create a branch</strong> from <code class="docutils literal notranslate"><span class="pre">main</span></code> with descriptive name (e.g., <code class="docutils literal notranslate"><span class="pre">feature/hybrid-metrics</span></code>)</p></li>
-<li><p><strong>Make your changes</strong> following coding standards</p></li>
-<li><p><strong>Write tests</strong> for new functionality</p></li>
-<li><p><strong>Update documentation</strong> for all user-facing changes</p></li>
-<li><p><strong>Validate documentation</strong> using automated tools</p></li>
-<li><p><strong>Run tests locally</strong> to ensure everything works</p></li>
-<li><p><strong>Submit PR</strong> with clear description and link to related issues</p></li>
+<li><p><strong>Create a branch</strong> from <code class="docutils literal notranslate"><span class="pre">main</span></code> with descriptive name (e.g., <code class="docutils literal notranslate"><span class="pre">feature/hybrid-metrics</span></code>).</p></li>
+<li><p><strong>Plan/validate spec</strong> if required (<code class="docutils literal notranslate"><span class="pre">openspec</span></code> proposal + <code class="docutils literal notranslate"><span class="pre">openspec</span> <span class="pre">validate</span> <span class="pre">&lt;change-id&gt;</span> <span class="pre">--strict</span></code>).</p></li>
+<li><p><strong>Implement changes</strong> following coding standards.</p></li>
+<li><p><strong>Write tests</strong> for new functionality (extend existing suites or add focused scenarios).</p></li>
+<li><p><strong>Update documentation</strong> for all user-facing changes.</p></li>
+<li><p><strong>Validate documentation</strong> using automated tools (see checklist above).</p></li>
+<li><p><strong>Run tests locally</strong> (<code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">exec</span> <span class="pre">.</span> <span class="pre">pytest</span> <span class="pre">-q</span></code> plus markers as needed).</p></li>
+<li><p><strong>Submit PR</strong> with clear description and link to related issues/specs.</p></li>
 </ol>
 <section id="documentation-requirements-for-prs">
 <h3>5.1 Documentation Requirements for PRs<a class="headerlink" href="#documentation-requirements-for-prs" title="Link to this heading"></a></h3>
 <p><strong>For all code changes:</strong></p>
 <ul class="simple">
-<li><p>[ ] Update docstrings for modified public interfaces</p></li>
-<li><p>[ ] Add usage examples for new functionality</p></li>
-<li><p>[ ] Update API documentation for endpoint changes</p></li>
-<li><p>[ ] Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/validate_code_annotations.py</span> <span class="pre">src/</span></code></p></li>
-<li><p>[ ] Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/generate_api_docs.py</span></code></p></li>
+<li><p>[ ] Update docstrings for modified public interfaces.</p></li>
+<li><p>[ ] Add usage examples for new functionality.</p></li>
+<li><p>[ ] Update API documentation for endpoint changes.</p></li>
+<li><p>[ ] <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">exec</span> <span class="pre">.</span> <span class="pre">python</span> <span class="pre">docs/scripts/validate_code_annotations.py</span></code>.</p></li>
+<li><p>[ ] <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">exec</span> <span class="pre">.</span> <span class="pre">python</span> <span class="pre">docs/scripts/generate_api_docs.py</span></code>.</p></li>
 </ul>
 <p><strong>For new features:</strong></p>
 <ul class="simple">
@@ -271,9 +277,9 @@
 </ul>
 <p><strong>For bug fixes:</strong></p>
 <ul class="simple">
-<li><p>[ ] Update troubleshooting documentation</p></li>
-<li><p>[ ] Add test cases for the fix</p></li>
-<li><p>[ ] Document workaround if applicable</p></li>
+<li><p>[ ] Update troubleshooting documentation where applicable.</p></li>
+<li><p>[ ] Add regression tests covering the fix.</p></li>
+<li><p>[ ] Document workarounds or operational mitigations.</p></li>
 </ul>
 </section>
 <section id="code-review-process">
@@ -292,12 +298,11 @@
 <h3>6.1 Python Standards<a class="headerlink" href="#python-standards" title="Link to this heading"></a></h3>
 <p><strong>Formatting</strong>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Format code</span>
-black<span class="w"> </span>src/<span class="w"> </span>tests/
-isort<span class="w"> </span>src/<span class="w"> </span>tests/
+direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>black<span class="w"> </span>src/<span class="w"> </span>tests/
+direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>ruff<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>tests/
 
-<span class="c1"># Lint and type-check</span>
-ruff<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>tests/
-mypy<span class="w"> </span>src/<span class="w"> </span>--strict
+<span class="c1"># Type-check</span>
+direnv<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>.<span class="w"> </span>mypy<span class="w"> </span>src/<span class="w"> </span>--strict
 </pre></div>
 </div>
 <p><strong>Documentation</strong>:</p>
@@ -470,7 +475,7 @@ mypy<span class="w"> </span>src/<span class="w"> </span>--strict
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -481,7 +486,7 @@ mypy<span class="w"> </span>src/<span class="w"> </span>--strict
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

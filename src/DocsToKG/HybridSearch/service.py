@@ -97,7 +97,26 @@
 # }
 # === /NAVMAP ===
 
-"""Hybrid search orchestration, pagination guards, and synchronous HTTP-style API."""
+"""Hybrid-search orchestration, fusion, pagination guards, and API surface.
+
+`service.py` binds the ingestion/storage primitives into the synchronous search
+flow described in the README (“Search API contract”). It owns:
+
+- Request validation (`HybridSearchValidator`, `HybridSearchAPI`) including
+  namespace awareness, token budgets, and pagination cursors.
+- Execution planning for dense + lexical searches, using configurable thread
+  pools to issue FAISS GPU queries and BM25/SPLADE lookups concurrently.
+- Score fusion (reciprocal rank fusion + optional MMR diversification) and
+  response shaping, with per-channel breakdowns that mirror the JSON example in
+  the README.
+- Diagnostics: latency sampling, pagination verification, rebuild heuristics,
+  and stats snapshots for health checks.
+
+The module assumes dense search runs on the custom FAISS GPU wheel documented in
+`faiss-gpu-wheel-reference.md`; when adjusting concurrency or stream behaviour,
+ensure changes remain compatible with the `StandardGpuResources` guidance
+summarised there.
+"""
 
 from __future__ import annotations
 
@@ -147,9 +166,9 @@ from .store import (
     OpenSearchSimulator,
     cosine_batch,
     cosine_topk_blockwise,
-    resolve_cuvs_state,
     normalize_rows,
     pairwise_inner_products,
+    resolve_cuvs_state,
     restore_state,
     serialize_state,
 )

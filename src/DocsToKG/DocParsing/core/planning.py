@@ -1,4 +1,12 @@
-"""Planner orchestration utilities for DocParsing stages."""
+"""Planning utilities that preview DocParsing work and surface manifests.
+
+Before operators run DocTags, chunking, or embedding at scale they often want
+to estimate workload and detect stale outputs. The planning module traverses
+input directories, inspects manifests, and groups documents into actionable
+buckets (process, skip, validate) so the CLI can present concise summaries.
+It also exports helper routines for streaming previews to stdout and for
+computing plan hashes used by dry-run workflows.
+"""
 
 from __future__ import annotations
 
@@ -66,7 +74,7 @@ def _bucket_counts(entry: Dict[str, Any], key: str) -> Tuple[int, List[str]]:
 
 
 def _manifest_hash_requirements(
-    manifest_entry: Optional[Mapping[str, object]]
+    manifest_entry: Optional[Mapping[str, object]],
 ) -> Tuple[Optional[str], Optional[str]]:
     """Return manifest hash metadata when both entry and hash are present."""
 
@@ -90,6 +98,7 @@ def _render_preview(preview: List[str], count: int) -> str:
     if remainder:
         items.append(f"... (+{remainder} more)")
     return ", ".join(items)
+
 
 __all__ = [
     "display_plan",
@@ -165,9 +174,7 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
         manifest_stage = doctags_module.MANIFEST_STAGE
         overwrite = False
 
-    manifest_index = (
-        load_manifest_index(manifest_stage, resolved_root) if args.resume else {}
-    )
+    manifest_index = load_manifest_index(manifest_stage, resolved_root) if args.resume else {}
     resume_controller = ResumeController(args.resume, args.force, manifest_index)
     planned = _new_bucket()
     skipped = _new_bucket()
@@ -352,9 +359,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
                 "notes": notes,
             }
         for chunk in iter_chunks(chunks_dir):
-            doc_id, vector_path = derive_doc_id_and_vectors_path(
-                chunk, chunks_dir, vectors_dir
-            )
+            doc_id, vector_path = derive_doc_id_and_vectors_path(chunk, chunks_dir, vectors_dir)
             if vector_path.exists():
                 _record_bucket(validate_bucket, doc_id)
             else:
@@ -394,12 +399,8 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
 
     files = iter_chunks(chunks_dir)
     for chunk in files:
-        doc_id, vector_path = derive_doc_id_and_vectors_path(
-            chunk, chunks_dir, vectors_dir
-        )
-        fast_skip, manifest_entry = resume_controller.can_skip_without_hash(
-            doc_id, vector_path
-        )
+        doc_id, vector_path = derive_doc_id_and_vectors_path(chunk, chunks_dir, vectors_dir)
+        fast_skip, manifest_entry = resume_controller.can_skip_without_hash(doc_id, vector_path)
         stored_hash, hash_algorithm = _manifest_hash_requirements(manifest_entry)
         should_verify = bool(verify_hash and stored_hash)
         skip = False
@@ -455,13 +456,10 @@ def display_plan(plans: Sequence[Dict[str, Any]], stream: Optional[TextIO] = Non
                 lines.append(f"  log_level: {log_level_value}")
             if process_count:
                 lines.append(
-                    "  process preview: "
-                    + _render_preview(process_preview, process_count)
+                    "  process preview: " + _render_preview(process_preview, process_count)
                 )
             if skip_count:
-                lines.append(
-                    "  skip preview: " + _render_preview(skip_preview, skip_count)
-                )
+                lines.append("  skip preview: " + _render_preview(skip_preview, skip_count))
         elif stage == "chunk":
             process_count, process_preview = _bucket_counts(entry, "process")
             skip_count, skip_preview = _bucket_counts(entry, "skip")
@@ -470,13 +468,10 @@ def display_plan(plans: Sequence[Dict[str, Any]], stream: Optional[TextIO] = Non
             lines.append(f"  output: {entry.get('output_dir')}")
             if process_count:
                 lines.append(
-                    "  process preview: "
-                    + _render_preview(process_preview, process_count)
+                    "  process preview: " + _render_preview(process_preview, process_count)
                 )
             if skip_count:
-                lines.append(
-                    "  skip preview: " + _render_preview(skip_preview, skip_count)
-                )
+                lines.append("  skip preview: " + _render_preview(skip_preview, skip_count))
         elif stage == "embed" and entry.get("action") == "validate":
             validate_count, validate_preview = _bucket_counts(entry, "validate")
             missing_count, missing_preview = _bucket_counts(entry, "missing")
@@ -488,13 +483,11 @@ def display_plan(plans: Sequence[Dict[str, Any]], stream: Optional[TextIO] = Non
             lines.append(f"  vectors: {entry.get('vectors_dir')}")
             if validate_count:
                 lines.append(
-                    "  validate preview: "
-                    + _render_preview(validate_preview, validate_count)
+                    "  validate preview: " + _render_preview(validate_preview, validate_count)
                 )
             if missing_count:
                 lines.append(
-                    "  missing preview: "
-                    + _render_preview(missing_preview, missing_count)
+                    "  missing preview: " + _render_preview(missing_preview, missing_count)
                 )
         elif stage == "embed":
             process_count, process_preview = _bucket_counts(entry, "process")
@@ -504,13 +497,10 @@ def display_plan(plans: Sequence[Dict[str, Any]], stream: Optional[TextIO] = Non
             lines.append(f"  vectors: {entry.get('vectors_dir')}")
             if process_count:
                 lines.append(
-                    "  process preview: "
-                    + _render_preview(process_preview, process_count)
+                    "  process preview: " + _render_preview(process_preview, process_count)
                 )
             if skip_count:
-                lines.append(
-                    "  skip preview: " + _render_preview(skip_preview, skip_count)
-                )
+                lines.append("  skip preview: " + _render_preview(skip_preview, skip_count))
         else:
             lines.append(f"- {stage}: no actionable items")
         if notes:

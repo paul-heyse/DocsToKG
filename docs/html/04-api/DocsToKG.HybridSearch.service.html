@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-service">
 <h1>1. Module: service<a class="headerlink" href="#module-service" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code>.</p>
@@ -96,7 +96,10 @@ top_k: Maximum number of diversified candidates to retain.
 embeddings: Optional dense embedding matrix aligned with <code class="docutils literal notranslate"><span class="pre">fused_candidates</span></code>.
 device: GPU device id when leveraging FAISS GPU routines.
 resources: Optional FAISS GPU resources handle reused across calls.
-block_rows: Corpus rows processed per block when estimating diversity on GPU.</p>
+block_rows: Corpus rows processed per block when estimating diversity on GPU.
+use_cuvs: Optional override that controls cuVS usage during GPU similarity
+lookups. <code class="docutils literal notranslate"><span class="pre">None</span></code> defers to runtime detection; <code class="docutils literal notranslate"><span class="pre">True</span></code> forces cuVS when
+supported and <code class="docutils literal notranslate"><span class="pre">False</span></code> disables it.</p>
 <p>Returns:
 List of diversified <code class="docutils literal notranslate"><span class="pre">FusionCandidate</span></code> objects.</p>
 </section>
@@ -246,6 +249,10 @@ RequestValidationError: If <code class="docutils literal notranslate"><span clas
 </section>
 <section id="assert-managed-store-store">
 <h3><code class="docutils literal notranslate"><span class="pre">_assert_managed_store(store)</span></code><a class="headerlink" href="#assert-managed-store-store" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="flush-dense-snapshots-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_flush_dense_snapshots(self)</span></code><a class="headerlink" href="#flush-dense-snapshots-self" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="dense-store-self-namespace">
@@ -761,7 +768,7 @@ True</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -772,7 +779,7 @@ True</p>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

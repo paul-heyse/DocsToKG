@@ -6,7 +6,12 @@
 # }
 # === /NAVMAP ===
 
-"""Import time budget tests for the ontology downloader package."""
+"""Ensures ``DocsToKG.OntologyDownload`` remains lightweight at import time.
+
+The CLI bootstraps frequently, so these tests assert the package imports within
+an acceptable latency budget and fails fast when optional dependencies are
+missing, protecting command responsiveness.
+"""
 
 from __future__ import annotations
 

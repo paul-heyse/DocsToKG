@@ -1,4 +1,11 @@
-"""Integration exercises for embedding resume + hashing behaviour."""
+"""Exercise embedding resume logic, hashing, and manifest safeguards.
+
+The embedding stage should skip work when manifests already contain matching
+hashes while still recomputing BM25 statistics and vectors when inputs change.
+These integration-style tests construct chunk fixtures, invoke the runtime, and
+validate that resume guards, manifest paths, and hash computations behave as
+expected across successive runs.
+"""
 
 from __future__ import annotations
 
@@ -6,11 +13,9 @@ import json
 from pathlib import Path
 from typing import Dict, Tuple
 
-import pytest
-
 from DocsToKG.DocParsing.core import BM25Stats
-from DocsToKG.DocParsing.io import compute_content_hash
-from DocsToKG.DocParsing.io import resolve_manifest_path
+from DocsToKG.DocParsing.io import compute_content_hash, resolve_manifest_path
+from tests.conftest import PatchManager
 
 _DOC_ID = "doc-1.doctags"
 
@@ -33,7 +38,7 @@ def _write_chunk_file(path: Path) -> None:
 
 
 def _configure_runtime(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    patcher: PatchManager, tmp_path: Path
 ) -> Tuple[object, Path, Path, Path, Path, Dict[str, int]]:
     import DocsToKG.DocParsing.embedding.runtime as runtime
 
@@ -51,32 +56,32 @@ def _configure_runtime(
     chunk_file = chunks_dir / "doc-1.chunks.jsonl"
     _write_chunk_file(chunk_file)
 
-    monkeypatch.setattr(runtime, "ensure_model_environment", lambda: (model_root, model_root))
+    patcher.setattr(runtime, "ensure_model_environment", lambda: (model_root, model_root))
 
     def _expand_path(candidate: object) -> Path:
         if candidate is None:
             return model_root
         return Path(candidate).expanduser().resolve()
 
-    monkeypatch.setattr(runtime, "expand_path", _expand_path)
-    monkeypatch.setattr(runtime, "_resolve_qwen_dir", lambda _root: qwen_dir)
-    monkeypatch.setattr(runtime, "_resolve_splade_dir", lambda _root: splade_dir)
-    monkeypatch.setattr(runtime, "ensure_splade_environment", lambda **_: {"device": "cpu"})
-    monkeypatch.setattr(
+    patcher.setattr(runtime, "expand_path", _expand_path)
+    patcher.setattr(runtime, "_resolve_qwen_dir", lambda _root: qwen_dir)
+    patcher.setattr(runtime, "_resolve_splade_dir", lambda _root: splade_dir)
+    patcher.setattr(runtime, "ensure_splade_environment", lambda **_: {"device": "cpu"})
+    patcher.setattr(
         runtime, "ensure_qwen_environment", lambda **_: {"device": "cpu", "dtype": "fp16"}
     )
-    monkeypatch.setattr(runtime, "_ensure_splade_dependencies", lambda: None)
-    monkeypatch.setattr(runtime, "_ensure_qwen_dependencies", lambda: None)
-    monkeypatch.setattr(runtime, "prepare_data_root", lambda override, detected: data_root)
-    monkeypatch.setattr(runtime, "detect_data_root", lambda: data_root)
-    monkeypatch.setattr(runtime, "data_chunks", lambda _root, ensure=False: chunks_dir)
-    monkeypatch.setattr(runtime, "data_vectors", lambda _root, ensure=False: vectors_dir)
-    monkeypatch.setattr(
+    patcher.setattr(runtime, "_ensure_splade_dependencies", lambda: None)
+    patcher.setattr(runtime, "_ensure_qwen_dependencies", lambda: None)
+    patcher.setattr(runtime, "prepare_data_root", lambda override, detected: data_root)
+    patcher.setattr(runtime, "detect_data_root", lambda: data_root)
+    patcher.setattr(runtime, "data_chunks", lambda _root, ensure=False: chunks_dir)
+    patcher.setattr(runtime, "data_vectors", lambda _root, ensure=False: vectors_dir)
+    patcher.setattr(
         runtime,
         "resolve_pipeline_path",
         lambda cli_value, default_path, **_: cli_value or default_path,
     )
-    monkeypatch.setattr(
+    patcher.setattr(
         runtime,
         "process_pass_a",
         lambda _files, _logger: BM25Stats(N=1, avgdl=1.0, df={}),
@@ -89,7 +94,7 @@ def _configure_runtime(
         counters["hash"] += 1
         return original_hash(path)
 
-    monkeypatch.setattr(runtime, "compute_content_hash", _counting_hash)
+    patcher.setattr(runtime, "compute_content_hash", _counting_hash)
 
     def _stub_process_chunk_file_vectors(
         chunk_file: Path,
@@ -127,7 +132,7 @@ def _configure_runtime(
         count = len(rows)
         return count, [0] * count, [1.0] * count
 
-    monkeypatch.setattr(runtime, "process_chunk_file_vectors", _stub_process_chunk_file_vectors)
+    patcher.setattr(runtime, "process_chunk_file_vectors", _stub_process_chunk_file_vectors)
 
     return runtime, data_root, chunks_dir, vectors_dir, chunk_file, counters
 
@@ -145,9 +150,9 @@ def _read_manifest_entries(stage: str, root: Path) -> list[dict]:
     return entries
 
 
-def test_embed_without_resume_streams_hash(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_embed_without_resume_streams_hash(patcher: PatchManager, tmp_path: Path) -> None:
     runtime, data_root, chunks_dir, vectors_dir, chunk_file, counters = _configure_runtime(
-        monkeypatch, tmp_path
+        patcher, tmp_path
     )
 
     exit_code = runtime.main(
@@ -183,9 +188,9 @@ def test_embed_without_resume_streams_hash(monkeypatch: pytest.MonkeyPatch, tmp_
     assert recorded_hash == expected_hash
 
 
-def test_embed_resume_skips_unchanged(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_embed_resume_skips_unchanged(patcher: PatchManager, tmp_path: Path) -> None:
     runtime, data_root, chunks_dir, vectors_dir, chunk_file, counters = _configure_runtime(
-        monkeypatch, tmp_path
+        patcher, tmp_path
     )
 
     base_args = [

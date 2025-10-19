@@ -1,4 +1,12 @@
-"""Formatting helpers for OntologyDownload CLI output."""
+"""Formatting helpers for turning ontology plans and results into rich tables.
+
+The CLI exposes compact tabular renderings for plan, download, and validation
+phases.  This module defines the header schemas used in those displays and
+provides formatter functions that turn structured objects into terminal-ready
+rows, while masking sensitive values and harmonising column order.  Keeping
+the logic here allows both the CLI and documentation tooling to reuse the same
+presentation semantics.
+"""
 
 from __future__ import annotations
 

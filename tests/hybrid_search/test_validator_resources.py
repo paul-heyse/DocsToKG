@@ -1,12 +1,19 @@
+"""Resource budget tests for :class:`HybridSearchValidator`.
+
+Checks GPU memory limits, pinned memory configuration, null stream handling,
+and fallback behaviour when FAISS utilities are unavailable so validation
+pipelines do not over-subscribe accelerator resources.
+"""
+
 import logging
 from types import SimpleNamespace
 
 import pytest
 
+import DocsToKG.HybridSearch.service as service_module
 from DocsToKG.HybridSearch.config import DenseIndexConfig
 from DocsToKG.HybridSearch.pipeline import Observability
 from DocsToKG.HybridSearch.service import HybridSearchValidator
-import DocsToKG.HybridSearch.service as service_module
 
 
 class _RecordingResources:
@@ -30,9 +37,9 @@ class _RecordingResources:
 
 
 @pytest.fixture
-def recording_faiss(monkeypatch):
+def recording_faiss(patcher):
     stub = SimpleNamespace(StandardGpuResources=_RecordingResources)
-    monkeypatch.setattr(service_module, "faiss", stub, raising=False)
+    patcher.setattr(service_module, "faiss", stub, raising=False)
     return stub
 
 
@@ -74,9 +81,15 @@ def test_validation_resources_apply_dense_config(caplog, recording_faiss):
         (sample["name"], tuple(sorted(sample.get("labels", {}).items()))): sample["value"]
         for sample in observability.metrics_snapshot()["gauges"]
     }
-    assert gauges[("faiss_gpu_temp_memory_bytes", (("scope", "validation"),))] == pytest.approx(512.0)
-    assert gauges[("faiss_gpu_default_null_stream", (("scope", "validation"),))] == pytest.approx(0.0)
-    assert gauges[("faiss_gpu_default_null_stream_all_devices", (("scope", "validation"),))] == pytest.approx(1.0)
+    assert gauges[("faiss_gpu_temp_memory_bytes", (("scope", "validation"),))] == pytest.approx(
+        512.0
+    )
+    assert gauges[("faiss_gpu_default_null_stream", (("scope", "validation"),))] == pytest.approx(
+        0.0
+    )
+    assert gauges[
+        ("faiss_gpu_default_null_stream_all_devices", (("scope", "validation"),))
+    ] == pytest.approx(1.0)
 
     records = [record for record in caplog.records if record.msg == "faiss-gpu-resource-configured"]
     assert records, "expected observability log for validation GPU resource configuration"

@@ -37,7 +37,12 @@
 # }
 # === /NAVMAP ===
 
-"""Synthetic data factories and benchmarking primitives for DocParsing tests."""
+"""Synthetic data factories and benchmarking primitives for DocParsing tests.
+
+This module builds lightweight chunk/vector fixtures and simulates embedding
+benchmarks so tests can reason about throughput, memory utilisation, and schema
+compatibility without downloading real corpora.
+"""
 
 from __future__ import annotations
 

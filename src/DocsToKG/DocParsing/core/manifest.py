@@ -1,4 +1,11 @@
-"""Manifest bookkeeping utilities shared across DocParsing stages."""
+"""Resume and manifest decision helpers for DocParsing stages.
+
+Chunking and embedding maintain JSONL manifests that record the hash of the
+inputs they processed. This module encapsulates the skip/resume heuristics that
+interpret those manifests, providing a ``ResumeController`` and helper
+functions so stages can avoid redundant work while still supporting ``--force``
+and manual overrides.
+"""
 
 from __future__ import annotations
 

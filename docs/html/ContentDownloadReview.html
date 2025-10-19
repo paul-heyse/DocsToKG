@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
 
-
+  
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" />
+    <link rel="search" title="Search" href="search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <p>Absolutely—here’s a single, consolidated set of recommendations that merges all four reviews into one clear plan. I’ve grouped items by priority and subsystem, included rationale, and added concrete implementation notes + code patterns your engineer can drop in.</p>
 <hr class="docutils" />
 <section id="tl-dr-prioritized">
@@ -104,6 +104,17 @@
 16) Factor a small <code class="docutils literal notranslate"><span class="pre">_record_skip(reason,</span> <span class="pre">detail)</span></code> to unify “skip” telemetry.</p>
 <p><strong>P4 – Tests</strong>
 17) Add regression tests for: resume downgrade path; NaN Retry-After; concurrent reads; response close on retries; futures raising; concurrent resolver runs.</p>
+</section>
+<hr class="docutils" />
+<section id="contentdownload-integrity-updates">
+<h1>2025-10 ContentDownload Integrity Updates<a class="headerlink" href="#contentdownload-integrity-updates" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Successful downloads now emit <code class="docutils literal notranslate"><span class="pre">reason=null</span></code>, conditional hits remain <code class="docutils literal notranslate"><span class="pre">conditional_not_modified</span></code>, and voluntary skips use the new <code class="docutils literal notranslate"><span class="pre">skip_large_download</span></code> code so dashboards can distinguish operator-driven limits from enforcement.</p></li>
+<li><p>Range resume is locked down: the downloader clears <code class="docutils literal notranslate"><span class="pre">enable_range_resume</span></code>, filters resolver metadata prefixed with <code class="docutils literal notranslate"><span class="pre">resume_</span></code>, and annotates telemetry with <code class="docutils literal notranslate"><span class="pre">resume_disabled=true</span></code> whenever a caller still requests the flag.</p></li>
+<li><p>Manifest warm-up defaults to lazy access. <code class="docutils literal notranslate"><span class="pre">--warm-manifest-cache</span></code> restores legacy eager loading for small manifests, but on a 250 k-row catalog the lazy path holds steady under 1 MB while eager mode still consumes ~150 MB.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_validate_cached_artifact</span></code> now short-circuits on matching size and mtime; forced digests remain available through <code class="docutils literal notranslate"><span class="pre">verify_cache_digest=True</span></code> and reuse an LRU to avoid repeat hashing.</p></li>
+<li><p>Monitoring guidance has been updated so notebooks and dashboards treat missing reasons as success, chart <code class="docutils literal notranslate"><span class="pre">skip_large_download</span></code> separately, and surface the <code class="docutils literal notranslate"><span class="pre">resume_disabled</span></code> metadata tag.</p></li>
+</ul>
 </section>
 <hr class="docutils" />
 <section id="detailed-recommendations-with-how-tos">
@@ -474,7 +485,7 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -485,7 +496,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

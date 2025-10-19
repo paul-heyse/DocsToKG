@@ -11,7 +11,7 @@
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
 
-
+  
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
@@ -19,17 +19,17 @@
       <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
 
-
-
+          
+          
           <a href="../index.html" class="icon icon-home">
             DocsToKG
           </a>
@@ -75,7 +75,7 @@
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-
+             
   <section id="module-net">
 <h1>1. Module: net<a class="headerlink" href="#module-net" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.net</span></code>.</p>
@@ -170,18 +170,13 @@ None</p>
 <section id="preliminary-head-check-self-url-session">
 <h3><code class="docutils literal notranslate"><span class="pre">_preliminary_head_check(self,</span> <span class="pre">url,</span> <span class="pre">session)</span></code><a class="headerlink" href="#preliminary-head-check-self-url-session" title="Link to this heading"></a></h3>
 <p>Probe the origin with HEAD to audit media type and size before downloading.</p>
-<p>The HEAD probe allows the pipeline to abort before streaming large
-payloads that exceed configured limits and to log early warnings for
-mismatched Content-Type headers reported by the origin.</p>
+<p>The HEAD probe logs early warnings for mismatched Content-Type headers reported by the origin and returns metadata that downstream components can use to inform progress reporting.</p>
 <p>Args:
 url: Fully qualified download URL resolved by the planner.
 session: Prepared requests session used for outbound calls.</p>
 <p>Returns:
 Tuple <code class="docutils literal notranslate"><span class="pre">(content_type,</span> <span class="pre">content_length)</span></code> extracted from response
 headers. Each element is <code class="docutils literal notranslate"><span class="pre">None</span></code> when the origin omits it.</p>
-<p>Raises:
-PolicyError: If the origin reports a payload larger than the
-configured <code class="docutils literal notranslate"><span class="pre">max_download_size_gb</span></code> limit.</p>
 </section>
 <section id="validate-media-type-self-actual-content-type-expected-media-type-url">
 <h3><code class="docutils literal notranslate"><span class="pre">_validate_media_type(self,</span> <span class="pre">actual_content_type,</span> <span class="pre">expected_media_type,</span> <span class="pre">url)</span></code><a class="headerlink" href="#validate-media-type-self-actual-content-type-expected-media-type-url" title="Link to this heading"></a></h3>
@@ -320,7 +315,7 @@ downloader.status
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-
+   
 
 </footer>
         </div>
@@ -331,7 +326,7 @@ downloader.status
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
 </body>
 </html>

@@ -1,4 +1,11 @@
-"""Concurrency utilities shared across DocParsing stages."""
+"""Process-safety helpers for DocParsing pipelines.
+
+Chunking and embedding stages parallelise work across processes and threads,
+so they need lightweight primitives that keep manifests and network resources
+safe. This module provides advisory lock management, portable multiprocessing
+spawn controls, and free-port discovery routines that help the CLI coordinate
+Docling/vLLM workers without relying on heavyweight dependencies.
+"""
 
 from __future__ import annotations
 
@@ -70,9 +77,10 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
                 lock_dir.mkdir(parents=True, exist_ok=True)
                 continue
 
-            with os.fdopen(fd, "w", encoding="utf-8") as lock_file:
-                lock_file.write(owning_pid)
-                lock_file.flush()
+            try:
+                os.write(fd, f"{owning_pid}\n".encode("utf-8"))
+            finally:
+                os.close(fd)
             acquired = True
             break
 

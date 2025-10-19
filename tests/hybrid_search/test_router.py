@@ -1,4 +1,9 @@
-"""Unit tests covering the FaissRouter snapshot restore workflow."""
+"""FaissRouter snapshot/restore workflow tests.
+
+Ensures routing tables rebuild correctly from serialized states, namespaces
+map to dense stores, and health checks propagate errors when adapters fail.
+Verifies concurrent refreshes and metric bookkeeping.
+"""
 
 from __future__ import annotations
 
@@ -80,9 +85,7 @@ class DummyDenseStore:
         payload = json.dumps({"ids": sorted(self._vectors.keys())})
         return payload.encode("utf-8")
 
-    def restore(
-        self, payload: bytes, *, meta: Optional[Mapping[str, object]] = None
-    ) -> None:
+    def restore(self, payload: bytes, *, meta: Optional[Mapping[str, object]] = None) -> None:
         data = json.loads(payload.decode("utf-8"))
         ids = data.get("ids", [])
         self._vectors = {vector_id: float(index) for index, vector_id in enumerate(ids)}
@@ -161,9 +164,6 @@ class RecordingFaissStore:
     def snapshot_meta(self) -> Mapping[str, object]:
         return dict(self._snapshot_meta)
 
-    def snapshot_meta(self) -> Mapping[str, object]:
-        return {"namespace": self.namespace, "dim": self._dim}
-
     def stats(self) -> Mapping[str, float | str]:
         return {"ntotal": float(self.ntotal)}
 
@@ -172,9 +172,6 @@ class RecordingFaissStore:
 
     def rebuild_if_needed(self) -> bool:
         return False
-
-    def snapshot_meta(self) -> Mapping[str, object]:
-        return {"namespace": self.namespace, "vector_count": len(self._vectors)}
 
 
 def test_restore_all_rehydrates_multiple_namespaces() -> None:
@@ -225,8 +222,9 @@ def test_managed_adapter_restores_with_snapshot_metadata() -> None:
     managed_store.add([np.zeros(3, dtype=np.float32)], ["alpha-vector"])
 
     payloads = router.serialize_all()
+    alpha_payload = payloads["alpha"]
     snapshot_meta = {"namespace": "alpha", "marker": "router-test"}
-    router._snapshots["alpha"] = (payloads["alpha"]["faiss"], snapshot_meta)
+    router._snapshots["alpha"] = (alpha_payload["faiss"], snapshot_meta)
     del router._stores["alpha"]
 
     restored_router = FaissRouter(
@@ -244,7 +242,7 @@ def test_managed_adapter_restores_with_snapshot_metadata() -> None:
 
     snapshot_meta = {"namespace": "alpha", "marker": "router-test"}
     router._snapshots["alpha"] = (
-        alpha_payload["payload"],
+        alpha_payload["faiss"],
         snapshot_meta,
     )
     del router._stores["alpha"]
@@ -254,6 +252,7 @@ def test_managed_adapter_restores_with_snapshot_metadata() -> None:
     assert isinstance(inner_rehydrated, RecordingFaissStore)
     assert inner_rehydrated.last_restore_meta == snapshot_meta
     assert inner_rehydrated._vectors == ["alpha-vector"]
+
 
 def test_serialize_and_restore_roundtrip_carries_metadata() -> None:
     """Router serialization should retain metadata for restore_all."""

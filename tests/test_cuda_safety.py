@@ -141,7 +141,7 @@ class _DummyTqdm:
         return None
 
 
-def _stub_main_setup(monkeypatch, module, tmp_path, list_return: List) -> SimpleNamespace:
+def _stub_main_setup(patcher, module, tmp_path, list_return: List) -> SimpleNamespace:
     """Prepare patched environment for invoking the PDF conversion main()."""
 
     args = module.pdf_parse_args([])
@@ -160,22 +160,20 @@ def _stub_main_setup(monkeypatch, module, tmp_path, list_return: List) -> Simple
     explicit_keys = [name for name in vars(args) if not name.startswith("_")]
     annotate_cli_overrides(args, explicit=explicit_keys, defaults={})
 
-    monkeypatch.setattr(
-        module, "ensure_vllm", lambda *_a, **_k: (module.PREFERRED_PORT, None, False)
-    )
-    monkeypatch.setattr(module, "start_vllm", lambda *_a, **_k: SimpleNamespace(poll=lambda: None))
-    monkeypatch.setattr(module, "wait_for_vllm", lambda *_a, **_k: ["stub-model"])
-    monkeypatch.setattr(module, "validate_served_models", lambda *_a, **_k: None)
-    monkeypatch.setattr(module, "stop_vllm", lambda *_a, **_k: None)
-    monkeypatch.setattr(module, "list_pdfs", lambda _dir: iter(list_return))
-    monkeypatch.setattr(module, "manifest_append", lambda *a, **k: None)
-    monkeypatch.setattr(module, "ProcessPoolExecutor", _DummyExecutor)
-    monkeypatch.setattr(module, "as_completed", _dummy_as_completed)
-    monkeypatch.setattr(module, "tqdm", lambda *a, **k: _DummyTqdm())
+    patcher.setattr(module, "ensure_vllm", lambda *_a, **_k: (module.PREFERRED_PORT, None, False))
+    patcher.setattr(module, "start_vllm", lambda *_a, **_k: SimpleNamespace(poll=lambda: None))
+    patcher.setattr(module, "wait_for_vllm", lambda *_a, **_k: ["stub-model"])
+    patcher.setattr(module, "validate_served_models", lambda *_a, **_k: None)
+    patcher.setattr(module, "stop_vllm", lambda *_a, **_k: None)
+    patcher.setattr(module, "list_pdfs", lambda _dir: iter(list_return))
+    patcher.setattr(module, "manifest_append", lambda *a, **k: None)
+    patcher.setattr(module, "ProcessPoolExecutor", _DummyExecutor)
+    patcher.setattr(module, "as_completed", _dummy_as_completed)
+    patcher.setattr(module, "tqdm", lambda *a, **k: _DummyTqdm())
     return args
 
 
-def _import_pdf_module(monkeypatch):
+def _import_pdf_module(patcher):
     """Import the PDF conversion script with external deps stubbed."""
 
     # Create a proper mock for requests that returns JSON-serializable values
@@ -195,7 +193,7 @@ def _import_pdf_module(monkeypatch):
     mock_requests.RequestException = real_requests.RequestException
     mock_requests.exceptions = real_requests.exceptions
 
-    monkeypatch.setitem(sys.modules, "requests", mock_requests)
+    patcher.setitem(sys.modules, "requests", mock_requests)
 
     class _TqdmStub:
         def __call__(self, *args, **kwargs):
@@ -210,7 +208,7 @@ def _import_pdf_module(monkeypatch):
         def update(self, *_args, **_kwargs):
             return None
 
-    monkeypatch.setitem(sys.modules, "tqdm", mock.MagicMock(tqdm=_TqdmStub()))
+    patcher.setitem(sys.modules, "tqdm", mock.MagicMock(tqdm=_TqdmStub()))
     module = importlib.import_module("DocsToKG.DocParsing.doctags")
     return importlib.reload(module)
 
@@ -218,29 +216,29 @@ def _import_pdf_module(monkeypatch):
 # --- Test Cases ---
 
 
-def test_spawn_enforced_on_main(monkeypatch, tmp_path, reset_start_method):
+def test_spawn_enforced_on_main(patcher, tmp_path, reset_start_method):
     """Calling main() must force the multiprocessing start method to spawn."""
 
-    module = _import_pdf_module(monkeypatch)
+    module = _import_pdf_module(patcher)
 
-    args = _stub_main_setup(monkeypatch, module, tmp_path, list_return=[])
+    args = _stub_main_setup(patcher, module, tmp_path, list_return=[])
 
     module.pdf_main(args)
 
     assert mp.get_start_method() == "spawn"
 
 
-def test_spawn_prevents_cuda_reinitialization(monkeypatch, tmp_path, reset_start_method):
+def test_spawn_prevents_cuda_reinitialization(patcher, tmp_path, reset_start_method):
     """Mock CUDA work should not hit fork-based reinitialization errors under spawn."""
 
-    module = _import_pdf_module(monkeypatch)
+    module = _import_pdf_module(patcher)
 
     pdf_dir = tmp_path / "input"
     pdf_dir.mkdir(parents=True, exist_ok=True)
     pdf_path = pdf_dir / "sample.pdf"
     pdf_path.write_bytes(b"%PDF-1.4 test")
 
-    args = _stub_main_setup(monkeypatch, module, tmp_path, list_return=[pdf_path])
+    args = _stub_main_setup(patcher, module, tmp_path, list_return=[pdf_path])
 
     calls = []
 
@@ -255,7 +253,7 @@ def test_spawn_prevents_cuda_reinitialization(monkeypatch, tmp_path, reset_start
             output_path=str(task.output_path),
         )
 
-    monkeypatch.setattr(module, "pdf_convert_one", _fake_convert)
+    patcher.setattr(module, "pdf_convert_one", _fake_convert)
 
     module.pdf_main(args)
 

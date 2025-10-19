@@ -1,4 +1,11 @@
-"""Performance regressions for the chunking runtime."""
+"""Guard against performance regressions in the chunking runtime.
+
+This suite focuses on behaviours that materially affect throughput: avoiding
+unnecessary hashing or manifest lookups, respecting lazy iteration over DocTags,
+and ensuring resume semantics do not trigger redundant file system operations.
+By keeping these invariants locked down we protect chunking jobs from silent
+slowdowns introduced by seemingly innocuous refactors.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import PatchManager
 from tests.docparsing.stubs import dependency_stubs
 
 
@@ -20,7 +28,7 @@ def _load_manifest_entry(path: Path, doc_id: str) -> dict[str, object]:
     raise AssertionError(f"Missing manifest entry for {doc_id}")
 
 
-def test_chunk_runtime_avoids_eager_hash(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_chunk_runtime_avoids_eager_hash(patcher: PatchManager, tmp_path: Path) -> None:
     """Chunking should not hash inputs ahead of processing when resume is disabled."""
 
     dependency_stubs()
@@ -46,7 +54,7 @@ def test_chunk_runtime_avoids_eager_hash(monkeypatch: pytest.MonkeyPatch, tmp_pa
         call_count += 1
         return original_hash(path)
 
-    monkeypatch.setattr(module, "compute_content_hash", _counting_hash)
+    patcher.setattr(module, "compute_content_hash", _counting_hash)
 
     exit_code = module._main_inner(
         [
@@ -72,9 +80,7 @@ def test_chunk_runtime_avoids_eager_hash(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert entry.get("input_hash") == expected_hash
 
 
-def test_chunk_runtime_records_manifest_failure(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_chunk_runtime_records_manifest_failure(patcher: PatchManager, tmp_path: Path) -> None:
     """Chunk failures should emit a manifest row marked with ``status=\"failure\"``."""
 
     dependency_stubs()
@@ -95,7 +101,7 @@ def test_chunk_runtime_records_manifest_failure(
     def _failing_read(path: Path) -> str:
         raise RuntimeError("forced chunk failure")
 
-    monkeypatch.setattr(module, "read_utf8", _failing_read)
+    patcher.setattr(module, "read_utf8", _failing_read)
 
     with pytest.raises(RuntimeError, match="forced chunk failure"):
         module._main_inner(

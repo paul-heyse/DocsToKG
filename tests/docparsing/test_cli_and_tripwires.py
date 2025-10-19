@@ -67,7 +67,14 @@
 # }
 # === /NAVMAP ===
 
-"""DocParsing CLI, path resolution, and trip-wire regression tests."""
+"""Comprehensive regression suite for DocParsing CLI and tripwires.
+
+This module executes the full `docparse` CLI flow against dependency stubs,
+verifying that stage orchestration respects data-root overrides, golden hash
+fixtures, and resume semantics. It also enforces tripwires around chunk
+coalescence (token counting, Unicode handling) so future changes cannot silently
+alter manifest outputs, CLI path resolution, or tokenizer heuristics.
+"""
 
 from __future__ import annotations
 
@@ -79,6 +86,8 @@ import warnings
 from pathlib import Path
 
 import pytest
+
+from tests.conftest import PatchManager
 
 warnings.filterwarnings(
     "ignore",
@@ -226,7 +235,7 @@ def test_chunk_and_embed_cli_with_dependency_stubs(tmp_path: Path) -> None:
     assert embed_exit.value.code == 0
 
 
-def test_chunk_resume_skips_unchanged_docs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_chunk_resume_skips_unchanged_docs(tmp_path: Path, patcher: PatchManager) -> None:
     """Chunk resume mode should skip unchanged inputs and retain order."""
 
     dependency_stubs()
@@ -240,10 +249,10 @@ def test_chunk_resume_skips_unchanged_docs(tmp_path: Path, monkeypatch: pytest.M
     for name in ("splade", "qwen", "models"):
         (tmp_path / name).mkdir(exist_ok=True)
 
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
-    monkeypatch.setenv("DOCSTOKG_SPLADE_DIR", str(tmp_path / "splade"))
-    monkeypatch.setenv("DOCSTOKG_QWEN_DIR", str(tmp_path / "qwen"))
-    monkeypatch.setenv("DOCSTOKG_MODEL_ROOT", str(tmp_path / "models"))
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+    patcher.setenv("DOCSTOKG_SPLADE_DIR", str(tmp_path / "splade"))
+    patcher.setenv("DOCSTOKG_QWEN_DIR", str(tmp_path / "qwen"))
+    patcher.setenv("DOCSTOKG_MODEL_ROOT", str(tmp_path / "models"))
 
     docs = {
         "alpha": {"uuid": "alpha-1", "text": "Alpha content", "doc_id": "alpha"},

@@ -1,4 +1,11 @@
-"""Lightweight data containers shared across DocParsing stages."""
+"""Typed data models used to coordinate DocParsing chunking and embedding.
+
+This module defines the small dataclasses passed between worker processes:
+chunking tasks, sparse/dense encoder configuration objects, and the corpus
+statistics needed for BM25 scoring. Centralising these definitions keeps
+serialization stable and allows tests to construct realistic payloads without
+duplicating field order or defaults.
+"""
 
 from __future__ import annotations
 

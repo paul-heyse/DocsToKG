@@ -1,4 +1,11 @@
-"""Configuration objects and presets for the embedding stage."""
+"""Embedding configuration dataclasses, presets, and validation helpers.
+
+Embedding workloads combine dense LLM inference and sparse SPLADE encoding, so
+this module captures all tunable knobs—batch sizes, tensor parallelism, cache
+directories—in a single ``EmbedCfg`` dataclass. It also publishes curated
+profiles (CPU, GPU) and validation routines that the CLI uses to translate
+YAML/JSON inputs into runtime-ready settings.
+"""
 
 from __future__ import annotations
 

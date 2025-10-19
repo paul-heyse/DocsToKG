@@ -64,6 +64,30 @@ Return mapping of plugin names to qualified identifiers for ``kind``.
 
 Return metadata captured for entry-point registered plugins.
 
+### `_store_plugin_metadata(kind, name, plugin)`
+
+*No documentation available.*
+
+### `_clear_plugin_metadata(kind, name)`
+
+*No documentation available.*
+
+### `register_resolver(name, resolver)`
+
+Register or replace a resolver in the global registry.
+
+### `unregister_resolver(name)`
+
+Remove a resolver from the global registry and return it.
+
+### `register_validator(name, validator)`
+
+Register or replace a validator in the global registry.
+
+### `unregister_validator(name)`
+
+Remove a validator from the global registry and return it.
+
 ### `plan(self)`
 
 Plan a fetch for the provided ontology specification.

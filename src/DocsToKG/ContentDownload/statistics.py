@@ -1,7 +1,22 @@
-"""Download statistics tracking and reporting for performance analysis.
+"""Lightweight runtime metrics for DocsToKG content downloads.
 
-This module provides real-time statistics collection for download operations,
-including success rates, bandwidth usage, performance metrics, and failure analysis.
+Responsibilities
+----------------
+- Collect per-resolver attempt counts, success/failure breakdowns, and latency
+  aggregates so operators can understand resolver health in real time.
+- Track bandwidth consumption over sliding windows via :class:`BandwidthTracker`
+  to inform polite throttling and smoke-test behaviour.
+- Provide snapshot-friendly reporting utilities consumed by telemetry sinks,
+  console summaries, and debugging hooks during test runs.
+
+Key Components
+--------------
+- ``ResolverStats`` – accumulates counters and derived metrics
+  (success rate, average latency, bytes transferred) per resolver.
+- ``BandwidthTracker`` – records byte samples and converts them into Mbps using
+  a thread-safe ring buffer.
+- ``DownloadStatistics`` – orchestrates the above helpers for a full run,
+  exposing convenience methods to merge resolver metrics and emit summaries.
 """
 
 from __future__ import annotations

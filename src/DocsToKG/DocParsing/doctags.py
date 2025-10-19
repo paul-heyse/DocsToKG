@@ -130,6 +130,30 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "iter-sorted-paths",
+#       "name": "_iter_sorted_paths",
+#       "anchor": "function-iter-sorted-paths",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-directory-files",
+#       "name": "_iter_directory_files",
+#       "anchor": "function-iter-directory-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-pdfs",
+#       "name": "iter_pdfs",
+#       "anchor": "function-iter-pdfs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "peek-iterable",
+#       "name": "_peek_iterable",
+#       "anchor": "function-peek-iterable",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "list-pdfs",
 #       "name": "list_pdfs",
 #       "anchor": "function-list-pdfs",
@@ -276,9 +300,9 @@ import time
 import types
 import uuid
 from collections import deque
-from itertools import chain
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, fields
+from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -307,7 +331,6 @@ from DocsToKG.DocParsing.core import (
     DEFAULT_HTTP_TIMEOUT,
     CLIOption,
     ResumeController,
-    should_skip_output,
     acquire_lock,
     build_subcommand,
     derive_doc_id_and_doctags_path,
@@ -315,6 +338,7 @@ from DocsToKG.DocParsing.core import (
     get_http_session,
     normalize_http_timeout,
     set_spawn_or_warn,
+    should_skip_output,
 )
 from DocsToKG.DocParsing.env import (
     PDF_MODEL_SUBDIR,
@@ -1421,9 +1445,8 @@ def _iter_directory_files(
 
     if root.is_file():
         candidate = root
-        if (
-            (normalized_suffixes is None or candidate.suffix.lower() in normalized_suffixes)
-            and (exclude is None or not exclude(candidate))
+        if (normalized_suffixes is None or candidate.suffix.lower() in normalized_suffixes) and (
+            exclude is None or not exclude(candidate)
         ):
             yield candidate
         return
@@ -1431,6 +1454,7 @@ def _iter_directory_files(
     heap: List[Tuple[str, Path]] = []
 
     def _enqueue_directory(directory: Path) -> None:
+        """Push directory entries onto the traversal heap in lexicographic order."""
         try:
             entries = list(directory.iterdir())
         except FileNotFoundError:  # pragma: no cover - directory removed mid-iteration
@@ -2207,6 +2231,7 @@ def list_htmls(root: Path) -> Iterator[Path]:
     allowed_suffixes = {".html", ".htm", ".xhtml"}
 
     def _is_html_candidate(path: Path) -> bool:
+        """Return ``True`` when ``path`` points to an HTML file eligible for conversion."""
         return (
             path.is_file()
             and path.suffix.lower() in allowed_suffixes

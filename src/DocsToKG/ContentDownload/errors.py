@@ -1,7 +1,23 @@
-"""Enhanced error handling and actionable error messages for content downloads.
+"""Actionable error taxonomy and logging helpers for content downloads.
 
-This module provides structured error messages with diagnostic information and
-suggested remediation steps to help users troubleshoot download failures.
+Responsibilities
+----------------
+- Define lightweight exception types (``NetworkError``, ``ContentPolicyError``,
+  ``RateLimitError``) that retain enough metadata for telemetry sinks and user
+  feedback without leaking resolver internals.
+- Provide the :class:`DownloadError` dataclass used by manifests and console
+  summaries to capture failure context consistently across resolvers.
+- Translate HTTP status codes and :class:`ReasonCode` values into user-friendly
+  remediation hints via :func:`get_actionable_error_message`.
+- Centralise structured logging through :func:`log_download_failure`, ensuring
+  failures emit the fields required by observability dashboards.
+
+Design Notes
+------------
+- The helpers avoid importing heavy dependencies so they can be used from
+  within retry handlers and error paths without risk of further exceptions.
+- Metadata dictionaries default to empty mappings to simplify serialisation
+  into telemetry payloads.
 """
 
 from __future__ import annotations

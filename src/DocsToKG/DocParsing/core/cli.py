@@ -1,4 +1,12 @@
-"""Unified CLI entry points for DocParsing stages."""
+"""Unified command-line interface orchestrating DocParsing stages.
+
+The core CLI module wires together subcommand parsers, shared validation
+logic, manifest inspection tooling, and execution helpers for the DocTags,
+chunking, embedding, planning, and diagnostics workflows. It keeps operator
+experience consistent across orchestrated runs by centralising option parsing,
+error reporting, telemetry emission, and resume handling—whether the CLI is
+invoked directly or through automation.
+"""
 
 from __future__ import annotations
 
@@ -58,6 +66,7 @@ class _ManifestHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
             wrapper = textwrap.TextWrapper(width=width, break_on_hyphens=False)
             lines.extend(wrapper.wrap(normalized))
         return lines
+
 
 # NOTE: ``known_stages`` MUST remain in sync with the manifest filenames under
 # ``Data/Manifests``. The values are derived from the canonical filenames to
@@ -260,7 +269,9 @@ def _resolve_doctags_paths(args: argparse.Namespace) -> tuple[str, Path, Path, s
                 )
         input_dir = html_default_in if mode == "html" else pdf_default_in
 
-    output_dir = args.out_dir.expanduser().resolve() if args.out_dir is not None else doctags_default_out
+    output_dir = (
+        args.out_dir.expanduser().resolve() if args.out_dir is not None else doctags_default_out
+    )
     return mode, input_dir, output_dir, str(resolved_root)
 
 
@@ -566,7 +577,12 @@ def _manifest_main(argv: Sequence[str]) -> int:
         entry_found = True
         if tail_count:
             tail_entries.append(entry)
-        if need_summary and total_entries is not None and status_counter is not None and duration_totals is not None:
+        if (
+            need_summary
+            and total_entries is not None
+            and status_counter is not None
+            and duration_totals is not None
+        ):
             stage = entry.get("stage", "unknown")
             if stage not in total_entries:
                 total_entries[stage] = 0
@@ -614,7 +630,12 @@ def _manifest_main(argv: Sequence[str]) -> int:
                     line += f" error={error}"
                 print(line)
 
-    if need_summary and total_entries is not None and status_counter is not None and duration_totals is not None:
+    if (
+        need_summary
+        and total_entries is not None
+        and status_counter is not None
+        and duration_totals is not None
+    ):
         print("\nManifest summary")
         for stage, total in total_entries.items():
             duration = round(duration_totals[stage], 3)
@@ -713,9 +734,7 @@ def _build_stage_args(args: argparse.Namespace) -> tuple[List[str], List[str], L
     if embed_shard_index is not None:
         embed_args.extend(["--shard-index", str(embed_shard_index)])
     if args.sparsity_warn_threshold_pct is not None:
-        embed_args.extend(
-            ["--sparsity-warn-threshold-pct", str(args.sparsity_warn_threshold_pct)]
-        )
+        embed_args.extend(["--sparsity-warn-threshold-pct", str(args.sparsity_warn_threshold_pct)])
 
     return doctags_args, chunk_args, embed_args
 
