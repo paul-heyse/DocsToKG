@@ -118,6 +118,18 @@ def test_resolve_config_rejects_invalid_per_page(parser, capfd, per_page):
     assert "--per-page must be between 1 and 200" in err
 
 
+def test_resolve_config_rejects_negative_sleep(parser, capfd):
+    argv = _base_args() + ["--sleep", "-1"]
+    args = download_args.parse_args(parser, argv)
+
+    with pytest.raises(SystemExit) as excinfo:
+        download_args.resolve_config(args, parser)
+
+    assert excinfo.value.code == 2
+    _, err = capfd.readouterr()
+    assert "--sleep must be greater than or equal to 0" in err
+
+
 @pytest.mark.parametrize("max_value", [-10])
 def test_resolve_config_rejects_non_positive_max(parser, capfd, max_value):
     argv = _base_args() + ["--max", str(max_value)]

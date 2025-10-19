@@ -400,6 +400,8 @@ def resolve_config(
         parser.error("--max-concurrent-per-host must be >= 0")
     if not 1 <= args.per_page <= 200:
         parser.error("--per-page must be between 1 and 200")
+    if args.sleep < 0:
+        parser.error("--sleep must be greater than or equal to 0")
     if args.max is not None and args.max < 0:
         parser.error("--max must be greater than or equal to 0")
     if args.year_start > args.year_end:
