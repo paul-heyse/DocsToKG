@@ -111,6 +111,7 @@ from typing import (
     MutableMapping,
     Optional,
     Sequence,
+    Set,
     Tuple,
 )
 
@@ -144,6 +145,8 @@ __all__ = (
     "ChunkIngestionPipeline",
     "IngestError",
     "IngestMetrics",
+    "BatchCommitResult",
+    "IngestSummary",
     "RetryableIngestError",
     "TRAINING_SAMPLE_RNG",
 )
@@ -394,6 +397,24 @@ class IngestMetrics:
     chunks_deleted: int = 0
 
 
+@dataclass(slots=True)
+class BatchCommitResult:
+    """Summary describing a single committed ingestion batch."""
+
+    chunk_count: int = 0
+    namespaces: Tuple[str, ...] = ()
+    vector_ids: Optional[Tuple[str, ...]] = None
+
+
+@dataclass(slots=True)
+class IngestSummary:
+    """Aggregate summary returned from :meth:`ChunkIngestionPipeline.upsert_documents`."""
+
+    chunk_count: int = 0
+    namespaces: Tuple[str, ...] = ()
+    vector_ids: Optional[Tuple[str, ...]] = None
+
+
 class ChunkIngestionPipeline:
     """Coordinate loading of chunk/vector artifacts and dual writes.
 
@@ -465,55 +486,59 @@ class ChunkIngestionPipeline:
         """
         return self._faiss
 
-    def upsert_documents(self, documents: Sequence[DocumentInput]) -> List[ChunkPayload]:
+    def upsert_documents(
+        self,
+        documents: Sequence[DocumentInput],
+        *,
+        collect_vector_ids: bool = False,
+    ) -> IngestSummary:
         """Ingest pre-computed chunk artifacts into FAISS and OpenSearch.
 
         Args:
             documents: Sequence of document inputs referencing chunk/vector files.
+            collect_vector_ids: When ``True`` the resulting summary includes
+                committed vector identifiers. Defaults to ``False`` to avoid
+                retaining large payload metadata in memory.
 
         Returns:
-            List of `ChunkPayload` objects that were successfully upserted.
+            IngestSummary aggregating counts and optional identifiers for the
+            committed chunks.
 
         Raises:
             RetryableIngestError: When transformation fails due to transient issues.
         """
-        new_chunks: List[ChunkPayload] = []
+
+        total_chunks = 0
+        namespaces: Set[str] = set()
+        vector_ids: List[str] | None = [] if collect_vector_ids else None
+
         try:
             for document in documents:
-                with self._observability.trace("ingest_document", namespace=document.namespace):
+                with self._observability.trace(
+                    "ingest_document", namespace=document.namespace
+                ):
                     loaded = self._load_precomputed_chunks(document)
-                    if loaded:
-                        self._delete_existing_for_doc(document.doc_id, document.namespace)
-                    new_chunks.extend(loaded)
+                if not loaded:
+                    continue
+                self._delete_existing_for_doc(document.doc_id, document.namespace)
+                batch = self._commit_batch(
+                    loaded, collect_vector_ids=collect_vector_ids
+                )
+                total_chunks += batch.chunk_count
+                namespaces.update(batch.namespaces)
+                if vector_ids is not None and batch.vector_ids:
+                    vector_ids.extend(batch.vector_ids)
         except Exception as exc:  # pragma: no cover - defensive guard
             self._observability.logger.exception(
                 "chunk-ingest-error", extra={"event": {"error": str(exc)}}
             )
             raise RetryableIngestError("Failed to transform document") from exc
 
-        if not new_chunks:
-            return []
-
-        with self._observability.trace("ingest_dual_write", count=str(len(new_chunks))):
-            self._prepare_faiss(new_chunks)
-            self._faiss.add(
-                [chunk.features.embedding for chunk in new_chunks],
-                [chunk.vector_id for chunk in new_chunks],
-            )
-            self._opensearch.bulk_upsert(new_chunks)
-            self._registry.upsert(new_chunks)
-        self._metrics.chunks_upserted += len(new_chunks)
-        self._observability.metrics.increment("ingest_chunks", len(new_chunks))
-        self._observability.logger.info(
-            "chunk-upsert",
-            extra={
-                "event": {
-                    "count": len(new_chunks),
-                    "namespaces": sorted({chunk.namespace for chunk in new_chunks}),
-                }
-            },
+        return IngestSummary(
+            chunk_count=total_chunks,
+            namespaces=tuple(sorted(namespaces)),
+            vector_ids=tuple(vector_ids) if vector_ids is not None else None,
         )
-        return new_chunks
 
     def delete_chunks(self, vector_ids: Sequence[str]) -> None:
         """Delete chunks from FAISS, OpenSearch, and the registry by vector id.
@@ -533,6 +558,52 @@ class ChunkIngestionPipeline:
             self._registry.delete(vector_ids)
         self._metrics.chunks_deleted += len(vector_ids)
         self._observability.metrics.increment("delete_chunks", len(vector_ids))
+
+    def _commit_batch(
+        self,
+        batch: Sequence[ChunkPayload],
+        *,
+        collect_vector_ids: bool = False,
+    ) -> BatchCommitResult:
+        """Persist a batch of chunks across dense, sparse, and registry stores."""
+
+        if not batch:
+            return BatchCommitResult(
+                chunk_count=0,
+                namespaces=(),
+                vector_ids=() if collect_vector_ids else None,
+            )
+
+        count = len(batch)
+        with self._observability.trace("ingest_dual_write", count=str(count)):
+            self._prepare_faiss(batch)
+            self._faiss.add(
+                [chunk.features.embedding for chunk in batch],
+                [chunk.vector_id for chunk in batch],
+            )
+            self._opensearch.bulk_upsert(batch)
+            self._registry.upsert(batch)
+
+        self._metrics.chunks_upserted += count
+        self._observability.metrics.increment("ingest_chunks", count)
+
+        namespaces = tuple(sorted({chunk.namespace for chunk in batch}))
+        self._observability.logger.info(
+            "chunk-upsert",
+            extra={"event": {"count": count, "namespaces": list(namespaces)}},
+        )
+
+        vector_ids = (
+            tuple(chunk.vector_id for chunk in batch)
+            if collect_vector_ids
+            else None
+        )
+
+        return BatchCommitResult(
+            chunk_count=count,
+            namespaces=namespaces,
+            vector_ids=vector_ids,
+        )
 
     def _prepare_faiss(self, new_chunks: Sequence[ChunkPayload]) -> None:
         """Train the FAISS index if required before adding new vectors.
