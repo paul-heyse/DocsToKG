@@ -41,6 +41,18 @@ class _NullContext:
         return False
 
 
+def test_resolve_cuvs_state_handles_missing_should_use(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """cuVS availability should be reported as unavailable when the probe is missing."""
+
+    monkeypatch.setattr(store_module, "_FAISS_AVAILABLE", True, raising=False)
+    stub_faiss = SimpleNamespace(knn_gpu=object())
+    monkeypatch.setattr(store_module, "faiss", stub_faiss, raising=False)
+
+    enabled, available, reported = store_module.resolve_cuvs_state(requested=None)
+
+    assert (enabled, available, reported) == (False, False, None)
+
+
 def test_faiss_vector_store_search_batch_preserves_queries(
     monkeypatch: "pytest.MonkeyPatch",
 ) -> None:

@@ -204,7 +204,7 @@ def resolve_cuvs_state(requested: Optional[bool]) -> tuple[bool, bool, Optional[
 
     enabled = bool(knn_runner) and enabled
     available = bool(knn_runner) and (
-        bool(reported_available) if reported_available is not None else True
+        bool(reported_available) if reported_available is not None else False
     )
     return enabled, available, reported_available
 
