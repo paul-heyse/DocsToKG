@@ -906,13 +906,14 @@ def _doctor_report() -> Dict[str, object]:
         else:
             probe_path = Path("/")
 
-    disk_usage = shutil.disk_usage(LOCAL_ONTOLOGY_DIR)
+    disk_usage = shutil.disk_usage(probe_path)
     default_floor_bytes = 10 * 1_000_000_000
     threshold_bytes = min(
         disk_usage.total,
         max(default_floor_bytes, int(disk_usage.total * 0.1)),
     )
     disk_report = {
+        "path": str(probe_path),
         "total_bytes": disk_usage.total,
         "free_bytes": disk_usage.free,
         "total_gb": round(disk_usage.total / 1_000_000_000, 2),
