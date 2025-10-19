@@ -144,15 +144,16 @@ class FaissRouter:
                 if store is None:
                     if self._factory is None:
                         continue
-                store = self._factory(namespace)
-                if self._resolver:
+                    store = self._factory(namespace)
+                    if self._resolver:
+                        store.set_id_resolver(self._resolver)
+                    self._stores[namespace] = store
+                elif self._resolver:
                     store.set_id_resolver(self._resolver)
-            self._stores[namespace] = store
-            try:
-                store.restore(blob)
-            finally:
-                self._last_used[namespace] = time.time()
-                if namespace in self._snapshots:
+                try:
+                    store.restore(blob)
+                finally:
+                    self._last_used[namespace] = time.time()
                     self._snapshots.pop(namespace, None)
 
     def rebuild_if_needed(self) -> bool:
