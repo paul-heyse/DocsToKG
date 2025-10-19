@@ -263,6 +263,10 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         self._bucket_state.clear()
 
     def _reset_network_primitives(self) -> None:
+        """Reset network caches, rate limits, and DNS stubs between tests."""
+
+        # ``clear_dns_stubs`` also evicts any stubbed cache entries ensuring subsequent
+        # lookups re-evaluate against the patched or real resolver.
         from ..io import network as network_mod  # Local import to avoid cycles
         from ..io import rate_limit as rate_mod
 

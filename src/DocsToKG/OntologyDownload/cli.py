@@ -841,18 +841,41 @@ def _doctor_report() -> Dict[str, object]:
         Mapping capturing disk, dependency, network, and configuration status.
     """
 
+    ontology_dir = LOCAL_ONTOLOGY_DIR
+    created_for_diagnostics = False
+    if not ontology_dir.exists():
+        try:
+            ontology_dir.mkdir(parents=True, exist_ok=True)
+            created_for_diagnostics = True
+        except OSError:
+            # The directory could not be created (e.g., permissions). We'll
+            # continue with fallback disk usage handling below.
+            pass
+
     directories = {}
     for name, path in {
         "configs": CONFIG_DIR,
         "cache": CACHE_DIR,
         "logs": LOG_DIR,
-        "ontologies": LOCAL_ONTOLOGY_DIR,
+        "ontologies": ontology_dir,
     }.items():
-        directories[name] = {
+        entry = {
             "path": str(path),
             "exists": path.exists(),
             "writable": os.access(path, os.W_OK),
         }
+        if name == "ontologies" and created_for_diagnostics:
+            entry["created_for_diagnostics"] = True
+        directories[name] = entry
+
+    probe_path: Path = ontology_dir
+    if not probe_path.exists():
+        for candidate in ontology_dir.parents:
+            if candidate.exists():
+                probe_path = candidate
+                break
+        else:
+            probe_path = Path("/")
 
     disk_usage = shutil.disk_usage(LOCAL_ONTOLOGY_DIR)
     default_floor_bytes = 10 * 1_000_000_000
