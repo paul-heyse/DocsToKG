@@ -136,7 +136,10 @@ def derive_doc_id_and_vectors_path(
 ) -> tuple[str, Path]:
     """Return manifest doc identifier and vectors output path for ``chunk_file``."""
 
-    relative = chunk_file.relative_to(chunks_root)
+    if chunks_root.is_file():
+        relative = Path(chunk_file.name)
+    else:
+        relative = chunk_file.relative_to(chunks_root)
     base = relative
     if base.suffix == ".jsonl":
         base = base.with_suffix("")
