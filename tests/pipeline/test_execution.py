@@ -1222,7 +1222,7 @@ def test_resolver_pipeline_downloads_pdf_end_to_end(tmp_path):
         "open_access": {"oa_url": None},
     }
     artifact = downloader.create_artifact(
-        work, pdf_dir=tmp_path / "pdf", html_dir=tmp_path / "html"
+        work, pdf_dir=tmp_path / "pdf", html_dir=tmp_path / "html", xml_dir=tmp_path / "xml"
     )
 
     pdf_url = "https://cdn.example/resolver-demo.pdf"
@@ -1284,7 +1284,7 @@ def test_download_candidate_marks_corrupt_without_eof(tmp_path):
         "open_access": {"oa_url": None},
     }
     artifact = downloader.create_artifact(
-        work, pdf_dir=tmp_path / "pdf", html_dir=tmp_path / "html"
+        work, pdf_dir=tmp_path / "pdf", html_dir=tmp_path / "html", xml_dir=tmp_path / "xml"
     )
     pdf_url = "https://cdn.example/corrupt.pdf"
     responses.add(

@@ -584,7 +584,7 @@ def _apply_env_overrides(defaults: DefaultsConfig) -> None:
     logger = logging.getLogger("DocsToKG.OntologyDownload")
 
     if env.max_retries is not None:
-        defaults.http.max_retries = env.max_retries
+        defaults.http.max_retries = int(env.max_retries)
         logger.info("Config overridden: max_retries=%s", env.max_retries, extra={"stage": "config"})
     if env.timeout_sec is not None:
         defaults.http.timeout_sec = env.timeout_sec

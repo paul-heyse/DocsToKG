@@ -17,18 +17,18 @@ Perfect—since you’ve moved **all GPU deps into the `gpu12x` extra**, here’
 
 ---
 
-# Environment Activation (Agents & Automation)
+## Environment Activation
 
 Agents default to **CPU mode** (no private wheels, no CUDA). GPU mode is available on your self-hosted runner or any machine with MinIO access.
 
-## Modes
+### Modes
 
 - **CPU mode (default):** installs `-e .` (no GPU deps). Runs the full **CPU test set**.
 - **GPU mode (local agents or opt-in):** installs `-e .[gpu12x]` from the local wheelhouse that the bootstrap syncs from **MinIO**.
 
 ---
 
-## Local agents (default to **GPU**)
+### Local agents (default to **GPU**)
 
 Local agents (running on your workstation / self-hosted box) should **prefer GPU mode** and install the `gpu12x` extra by default.
 
@@ -64,7 +64,7 @@ pytest -q -m "not gpu"
 
 ---
 
-## 0) Prereqs (one-time)
+### 0) Prereqs (one-time)
 
 - **Python:** 3.13 available as `python3.13` (bootstrap falls back to `python3`/`python`).
 - (Optional) **direnv** if you want auto-activation.
@@ -74,7 +74,7 @@ pytest -q -m "not gpu"
 
 ---
 
-## 1) CPU quickstart (agents & hosted CI)
+### 1) CPU quickstart (agents & hosted CI)
 
 ```bash
 # from repo root
@@ -87,7 +87,7 @@ This path uses `requirements.txt` (thin wrapper around `-e .` + test tools).
 
 ---
 
-## 2) GPU quickstart (self-hosted / local with MinIO)
+### 2) GPU quickstart (self-hosted / local with MinIO)
 
 **Provide MinIO creds** (choose one):
 
@@ -122,12 +122,13 @@ export MINIO_PREFIX="cp313/"
 
 ---
 
-## 3) With/without direnv
+### 3) With/without direnv
 
 ```bash
 # Recommended
 direnv allow
 direnv exec . pytest -q -m "not gpu"       # CPU mode
+direnv exec . python -m pip --version      # sanity check interpreter
 
 # Fallback
 source .venv/bin/activate
@@ -136,7 +137,7 @@ export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
 
 ---
 
-## 4) Sanity checks
+### 4) Sanity checks
 
 ```bash
 # interpreter & platform
@@ -154,7 +155,7 @@ PY
 
 ---
 
-## 5) What the bootstrap does
+### 5) What the bootstrap does
 
 - Creates `.venv`, upgrades `pip`.
 - **CPU mode:** installs from `requirements.cpu.txt` (`-e .` + test tools).

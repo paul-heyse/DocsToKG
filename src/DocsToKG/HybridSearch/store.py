@@ -1554,6 +1554,13 @@ class FaissVectorStore(DenseVectorStore):
                     )
                 return index
 
+        gpu_count = len(target_gpus) if explicit_targets_configured else available_gpus
+        gpu_ids: List[int]
+        if explicit_targets_configured:
+            gpu_ids = list(target_gpus)
+        else:
+            gpu_ids = list(range(gpu_count))
+
         try:
             base_index = index
             if hasattr(faiss, "index_gpu_to_cpu"):

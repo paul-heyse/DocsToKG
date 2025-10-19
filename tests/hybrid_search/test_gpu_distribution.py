@@ -317,3 +317,83 @@ def test_distribute_to_all_gpus_skips_invalid_targets(monkeypatch, caplog) -> No
     assert replicated is cpu_index
     assert store._replicated is False
     assert any("Insufficient GPU targets" in record.getMessage() for record in caplog.records)
+
+
+@pytest.mark.skipif(faiss is None, reason="faiss not installed")
+@pytest.mark.parametrize(
+    "replication_ids, available, expected_count, expected_selected",
+    [
+        (None, 3, 3, None),
+        ((0, 2, 7), 4, 2, [0, 2]),
+    ],
+)
+def test_distribute_to_all_gpus_fallback_uses_gpu_count(
+    monkeypatch,
+    replication_ids: tuple[int, ...] | None,
+    available: int,
+    expected_count: int,
+    expected_selected: list[int] | None,
+) -> None:
+    """Fallback replication should respect the resolved GPU ids/count."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._replication_enabled = True
+    store._replicated = False
+    store._config = (
+        DenseIndexConfig(replication_gpu_ids=replication_ids)
+        if replication_ids is not None
+        else DenseIndexConfig()
+    )
+    store._has_explicit_replication_ids = replication_ids is not None
+    store._replication_gpu_ids = tuple(replication_ids) if replication_ids is not None else None
+    store._multi_gpu_mode = "replicate"
+    store._observability = Observability()
+    store._replica_gpu_resources = []
+    store._gpu_resources = None
+    store._temp_memory_bytes = None
+    store._gpu_use_default_null_stream = False
+    store._gpu_use_default_null_stream_all_devices = False
+    store._device = 0
+
+    monkeypatch.setattr(faiss, "get_num_gpus", lambda: available, raising=False)
+    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+
+    if hasattr(faiss, "GpuResourcesVector"):
+        monkeypatch.delattr(faiss, "GpuResourcesVector", raising=False)
+
+    fallback_calls: list[dict[str, object]] = []
+
+    def fake_index_cpu_to_all_gpus(index_arg, *, co=None, ngpu=None):  # type: ignore[override]
+        fallback_calls.append({"ngpu": ngpu, "co": co})
+        return index_arg
+
+    monkeypatch.setattr(faiss, "index_cpu_to_all_gpus", fake_index_cpu_to_all_gpus, raising=False)
+
+    captured_gpus: list[int] = []
+
+    if replication_ids is not None:
+
+        def fake_index_cpu_to_gpus_list(index_arg, *, gpus=None, co=None):  # type: ignore[override]
+            captured_gpus.extend(list(gpus or []))
+            return index_arg
+
+        monkeypatch.setattr(
+            faiss,
+            "index_cpu_to_gpus_list",
+            fake_index_cpu_to_gpus_list,
+            raising=False,
+        )
+
+    cpu_index = object()
+
+    replicated = store.distribute_to_all_gpus(cpu_index, shard=False)
+
+    assert replicated is cpu_index
+    assert store._replicated is True
+    assert fallback_calls, "Expected fallback replication to invoke index_cpu_to_all_gpus"
+    assert fallback_calls[-1]["ngpu"] == expected_count
+
+    if expected_selected is not None:
+        assert captured_gpus == expected_selected
+    else:
+        assert captured_gpus == []
