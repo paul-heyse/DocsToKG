@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import requests
+import pytest
 
 from DocsToKG.ContentDownload.args import ResolvedConfig, bootstrap_run_environment
 from DocsToKG.ContentDownload.core import WorkArtifact
@@ -157,6 +158,26 @@ def test_setup_download_state_records_manifest_data(patcher, tmp_path):
 
     factory.close_all()
     download_run.close()
+
+
+def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+    missing_manifest = resolved.manifest_path
+    resolved.args.resume_from = missing_manifest
+    download_run = DownloadRun(resolved)
+
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        with pytest.raises(ValueError) as excinfo:
+            download_run.setup_download_state(factory)
+    finally:
+        factory.close_all()
+        download_run.close()
+
+    message = str(excinfo.value)
+    assert str(missing_manifest) in message
+    assert "--resume-from" in message
 
 
 def test_setup_worker_pool_creates_executor_when_parallel(tmp_path):
