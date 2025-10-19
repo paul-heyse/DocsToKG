@@ -51,6 +51,32 @@ class ResumeController:
             return None
         return self.manifest_index.get(doc_id)
 
+    def can_skip_without_hash(
+        self, doc_id: str, output_path: Path
+    ) -> Tuple[bool, Optional[Mapping[str, object]]]:
+        """Return ``True`` when manifest metadata alone justifies skipping.
+
+        The predicate implements a fast path for planners and other tooling that
+        only need to confirm that successful outputs already exist. It honours
+        the resume/force flags and checks that the manifest recorded a
+        successful or skipped status without touching the input payload.
+        """
+
+        entry = self.entry(doc_id)
+        if not self.resume or self.force:
+            return False, entry
+        if not entry or not isinstance(entry, Mapping):
+            return False, entry
+
+        status = entry.get("status")
+        if status not in {"success", "skip"}:
+            return False, entry
+
+        if not output_path.exists():
+            return False, entry
+
+        return True, entry
+
     def should_skip(
         self, doc_id: str, output_path: Path, input_hash: str
     ) -> Tuple[bool, Optional[Mapping[str, object]]]:

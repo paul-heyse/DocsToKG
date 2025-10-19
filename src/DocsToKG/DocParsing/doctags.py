@@ -765,7 +765,12 @@ def add_resume_force_options(
     resume_help: str,
     force_help: str,
 ) -> None:
-    """Attach ``--resume`` and ``--force`` switches to a CLI parser.
+    """Attach resume-related switches to a CLI parser.
+
+    ``--verify-hash`` was added so operators can opt into recomputing input
+    hashes when resuming pipelines. This keeps the fast path free from
+    filesystem hashing while still providing an escape hatch for manifest
+    verification.
 
     Args:
         parser (argparse.ArgumentParser): Parser being configured.
@@ -785,9 +790,16 @@ def add_resume_force_options(
         >>> sorted(action.dest for action in parser._actions if action.option_strings)
         ['force', 'help', 'resume']
     """
-
     parser.add_argument("--resume", action="store_true", help=resume_help)
     parser.add_argument("--force", action="store_true", help=force_help)
+    parser.add_argument(
+        "--verify-hash",
+        action="store_true",
+        help=(
+            "Recompute input hashes before skipping resumed items. "
+            "This validates manifest entries at the cost of additional I/O."
+        ),
+    )
 
 
 # --- vLLM Lifecycle ---

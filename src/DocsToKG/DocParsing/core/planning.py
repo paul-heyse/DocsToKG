@@ -172,21 +172,15 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
     planned = _new_bucket()
     skipped = _new_bucket()
 
+    verify_hash = bool(getattr(args, "verify_hash", False))
+
     for path in files:
         doc_id, out_path = derive_doc_id_and_doctags_path(path, input_dir, output_dir)
-        manifest_entry = resume_controller.entry(doc_id)
-
-        if mode == "html" and overwrite:
-            _record_bucket(planned, doc_id)
-            continue
-
+        fast_skip, manifest_entry = resume_controller.can_skip_without_hash(doc_id, out_path)
         stored_hash, hash_algorithm = _manifest_hash_requirements(manifest_entry)
-        should_hash = bool(args.resume and not args.force and stored_hash)
+        should_verify = bool(verify_hash and stored_hash)
         skip = False
-        if should_hash:
-            if not out_path.exists():
-                _record_bucket(planned, doc_id)
-                continue
+        if should_verify:
             if hash_algorithm:
                 input_hash = compute_content_hash(path, hash_algorithm)
             else:
@@ -198,6 +192,10 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
                 resume_controller.resume,
                 resume_controller.force,
             )
+        elif fast_skip:
+            skip = True
+        if mode == "html" and overwrite:
+            skip = False
         if skip:
             _record_bucket(skipped, doc_id)
         else:
@@ -262,13 +260,15 @@ def plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
     planned = _new_bucket()
     skipped = _new_bucket()
 
+    verify_hash = bool(getattr(args, "verify_hash", False))
+
     for path in iter_doctags(in_dir):
         rel_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
-        manifest_entry = resume_controller.entry(rel_id)
+        fast_skip, manifest_entry = resume_controller.can_skip_without_hash(rel_id, out_path)
         stored_hash, hash_algorithm = _manifest_hash_requirements(manifest_entry)
-        should_hash = bool(args.resume and not args.force and stored_hash)
+        should_verify = bool(verify_hash and stored_hash)
         skip = False
-        if should_hash:
+        if should_verify:
             if not out_path.exists():
                 _record_bucket(planned, rel_id)
                 continue
@@ -283,6 +283,8 @@ def plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
                 resume_controller.resume,
                 resume_controller.force,
             )
+        elif fast_skip:
+            skip = True
         if skip:
             _record_bucket(skipped, rel_id)
         else:
@@ -388,16 +390,20 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     if vectors_missing:
         notes.append("Vectors directory not found; outputs will be created during generation")
 
+    verify_hash = bool(getattr(args, "verify_hash", False))
+
     files = iter_chunks(chunks_dir)
     for chunk in files:
         doc_id, vector_path = derive_doc_id_and_vectors_path(
             chunk, chunks_dir, vectors_dir
         )
-        manifest_entry = resume_controller.entry(doc_id)
+        fast_skip, manifest_entry = resume_controller.can_skip_without_hash(
+            doc_id, vector_path
+        )
         stored_hash, hash_algorithm = _manifest_hash_requirements(manifest_entry)
-        should_hash = bool(args.resume and not args.force and stored_hash)
+        should_verify = bool(verify_hash and stored_hash)
         skip = False
-        if should_hash:
+        if should_verify:
             if not vector_path.exists():
                 _record_bucket(planned, doc_id)
                 continue
@@ -412,6 +418,8 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
                 resume_controller.resume,
                 resume_controller.force,
             )
+        elif fast_skip:
+            skip = True
         if skip:
             _record_bucket(skipped, doc_id)
         else:
