@@ -654,7 +654,20 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
         content_type = response.headers.get("Content-Type")
         content_length_header = response.headers.get("Content-Length")
-        content_length = int(content_length_header) if content_length_header else None
+        content_length: Optional[int] = None
+        if content_length_header:
+            try:
+                content_length = int(content_length_header)
+            except ValueError:
+                self.logger.debug(
+                    "malformed content length header ignored",
+                    extra={
+                        "stage": "download",
+                        "method": "HEAD",
+                        "url": url,
+                        "content_length": content_length_header,
+                    },
+                )
 
         return content_type, content_length
 
