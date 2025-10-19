@@ -50,6 +50,7 @@ from DocsToKG.ContentDownload.telemetry import (
     SqliteSink,
     SummarySink,
     load_previous_manifest,
+    looks_like_csv_resume_target,
 )
 
 __all__ = ["DownloadRun", "iterate_openalex", "run"]
@@ -300,21 +301,31 @@ class DownloadRun:
         """Load resume metadata from JSON manifests with SQLite fallback."""
 
         sqlite_path = self.resolved.sqlite_path
-        needs_warning = False
-        if not resume_path.exists():
-            prefix = f"{resume_path.name}."
-            has_rotated = any(
-                candidate.is_file() and candidate.name[len(prefix) :].isdigit()
-                for candidate in resume_path.parent.glob(f"{resume_path.name}.*")
-            )
-            needs_warning = not has_rotated and sqlite_path and sqlite_path.exists()
+        if looks_like_csv_resume_target(resume_path):
+            if sqlite_path and sqlite_path.exists():
+                LOGGER.warning(
+                    "Resume manifest %s appears to be CSV; loading resume metadata from SQLite %s.",
+                    resume_path,
+                    sqlite_path,
+                )
+        else:
+            needs_warning = False
+            if not resume_path.exists():
+                prefix = f"{resume_path.name}."
+                has_rotated = any(
+                    candidate.is_file() and candidate.name[len(prefix) :].isdigit()
+                    for candidate in resume_path.parent.glob(f"{resume_path.name}.*")
+                )
+                needs_warning = (
+                    not has_rotated and sqlite_path and sqlite_path.exists()
+                )
 
-        if needs_warning:
-            LOGGER.warning(
-                "Resume manifest %s is missing; loading resume metadata from SQLite %s.",
-                resume_path,
-                sqlite_path,
-            )
+            if needs_warning:
+                LOGGER.warning(
+                    "Resume manifest %s is missing; loading resume metadata from SQLite %s.",
+                    resume_path,
+                    sqlite_path,
+                )
 
         return load_previous_manifest(
             resume_path,
