@@ -1446,26 +1446,6 @@ def iter_pdfs(root: Path) -> Iterator[Path]:
     yield from _iter_directory_files(root, {".pdf"})
 
 
-def list_pdfs(root: Path) -> List[Path]:
-    """Collect PDF files under a directory recursively.
-
-    if root.is_file():
-        if predicate(root):
-            yield root
-        return
-
-    try:
-        entries = sorted(root.iterdir(), key=lambda entry: entry.name)
-    except (FileNotFoundError, NotADirectoryError):
-        return
-
-    for entry in entries:
-        if entry.is_dir():
-            yield from _iter_sorted_paths(entry, predicate)
-        elif predicate(entry):
-            yield entry
-
-
 def _peek_iterable(iterable: Iterable[_T]) -> tuple[Iterator[_T], Optional[_T]]:
     """Return an iterator that includes the first element and the first element itself."""
 
