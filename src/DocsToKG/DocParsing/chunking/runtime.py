@@ -575,6 +575,8 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
     caption_markers: Tuple[str, ...] = _WORKER_STATE["caption_markers"]
 
     start_time = time.perf_counter()
+    chunk_count = 0
+    total_tokens = 0
     try:
         text = read_utf8(task.doc_path)
         input_hash = task.input_hash or _hash_doctags_text(text)
@@ -617,6 +619,9 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
 
         output_path = task.output_path
         output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        chunk_count = len(merged)
+        total_tokens = sum(rec.n_tok for rec in merged)
 
         with atomic_write(output_path) as handle:
             for chunk_id, rec in enumerate(merged):
@@ -667,7 +672,8 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             input_path=task.doc_path,
             output_path=task.output_path,
             input_hash=input_hash,
-            chunk_count=len(merged),
+            chunk_count=chunk_count,
+            total_tokens=total_tokens,
             parse_engine=task.parse_engine,
             sanitizer_profile=task.sanitizer_profile,
             anchors_injected=cfg.inject_anchors,
@@ -684,6 +690,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             output_path=task.output_path,
             input_hash=input_hash,
             chunk_count=0,
+            total_tokens=0,
             parse_engine=task.parse_engine,
             sanitizer_profile=task.sanitizer_profile,
             anchors_injected=cfg.inject_anchors,
@@ -1393,7 +1400,7 @@ def _main_inner(
                 doc_id=result.doc_id,
                 input_path=result.input_path,
                 output_path=result.output_path,
-                tokens=result.chunk_count,
+                tokens=result.total_tokens,
                 schema_version=CHUNK_SCHEMA_VERSION,
                 duration_s=duration,
                 metadata={
@@ -1401,6 +1408,7 @@ def _main_inner(
                     "input_path": str(result.input_path),
                     "input_hash": result.input_hash,
                     "chunk_count": result.chunk_count,
+                    "total_tokens": result.total_tokens,
                     "parse_engine": result.parse_engine,
                     "hash_alg": resolve_hash_algorithm(),
                     "anchors_injected": result.anchors_injected,

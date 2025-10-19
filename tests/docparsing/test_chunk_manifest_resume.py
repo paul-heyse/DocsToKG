@@ -46,6 +46,7 @@ def test_chunk_resume_uses_chunks_manifest_stage(monkeypatch, tmp_path):
             output_path=output_path,
             input_hash=task.input_hash,
             chunk_count=1,
+            total_tokens=1,
             parse_engine=task.parse_engine,
             sanitizer_profile=None,
             anchors_injected=False,
