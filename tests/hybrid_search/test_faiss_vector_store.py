@@ -136,6 +136,54 @@ def test_set_nprobe_initializes_gpu_parameter_space(monkeypatch: "pytest.MonkeyP
     assert replica_index.fallback_assignments == 0
 
 
+def test_set_nprobe_short_circuits_when_value_unchanged(
+    monkeypatch: "pytest.MonkeyPatch",
+) -> None:
+    """``_set_nprobe`` should avoid redundant FAISS parameter updates."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._config = DenseIndexConfig(index_type="ivf_flat", nprobe=7)
+    store._index = SimpleNamespace()
+    store._log_index_configuration = MethodType(lambda self, _: None, store)  # type: ignore[attr-defined]
+
+    set_calls: list[tuple[object, str, int]] = []
+
+    class FakeGpuParameterSpace:
+        def __init__(self) -> None:
+            self._initialised = False
+
+        def initialize(self, index: object) -> None:
+            self._initialised = True
+
+        def set_index_parameter(self, index: object, name: str, value: int) -> None:
+            assert self._initialised, "GpuParameterSpace.initialize must run before set"
+            set_calls.append((index, name, value))
+
+    fake_faiss = SimpleNamespace(
+        GpuParameterSpace=FakeGpuParameterSpace,
+        describe_index=lambda index: "recording-index",
+    )
+    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+
+    store._reset_nprobe_cache()  # type: ignore[attr-defined]
+    store._set_nprobe()  # type: ignore[attr-defined]
+    first_timestamp = store._last_applied_nprobe_monotonic  # type: ignore[attr-defined]
+
+    assert set_calls == [(store._index, "nprobe", store._config.nprobe)]  # type: ignore[attr-defined]
+    assert store._last_applied_nprobe == store._config.nprobe  # type: ignore[attr-defined]
+    assert first_timestamp > 0.0
+
+    store._set_nprobe()  # type: ignore[attr-defined]
+    assert set_calls == [(store._index, "nprobe", store._config.nprobe)]  # type: ignore[attr-defined]
+    assert store._last_applied_nprobe_monotonic == first_timestamp  # type: ignore[attr-defined]
+
+    store._reset_nprobe_cache()  # type: ignore[attr-defined]
+    store._set_nprobe()  # type: ignore[attr-defined]
+    assert len(set_calls) == 2
+    assert set_calls[-1] == (store._index, "nprobe", store._config.nprobe)  # type: ignore[attr-defined]
+    assert store._last_applied_nprobe_monotonic > first_timestamp  # type: ignore[attr-defined]
+
+
 def test_remove_ids_is_atomic_across_threads() -> None:
     """Verify ``remove_ids`` holds the adapter lock until operations complete."""
 
