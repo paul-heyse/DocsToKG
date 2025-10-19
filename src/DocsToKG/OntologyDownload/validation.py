@@ -38,7 +38,16 @@ from typing import (
     Union,
 )
 
-import psutil
+try:  # pragma: no cover - psutil may be unavailable in minimal environments
+    import psutil  # type: ignore[import]
+except Exception:  # pragma: no cover - fallback when psutil cannot be imported
+    psutil = None  # type: ignore[assignment]
+    _PROCESS = None
+else:
+    try:
+        _PROCESS = psutil.Process()
+    except Exception:  # pragma: no cover - defensive against exotic psutil failures
+        _PROCESS = None
 
 from . import plugins as _plugins
 from .io import log_memory_usage
@@ -49,7 +58,6 @@ metadata = _plugins.metadata
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from .plugins import ValidatorPlugin
 
-_PROCESS = psutil.Process()
 _VALIDATOR_SEMAPHORE_CACHE: Dict[int, BoundedSemaphore] = {}
 _VALIDATOR_LOAD_LOCK = RLock()
 _VALIDATOR_REGISTRY_CACHE: Optional[MutableMapping[str, "ValidatorPlugin"]] = None
@@ -58,7 +66,12 @@ _VALIDATOR_REGISTRY_CACHE: Optional[MutableMapping[str, "ValidatorPlugin"]] = No
 def _current_memory_mb() -> float:
     """Return the current resident memory usage in megabytes."""
 
-    return _PROCESS.memory_info().rss / (1024**2)
+    if not psutil or _PROCESS is None:
+        return 0.0
+    try:
+        return _PROCESS.memory_info().rss / (1024**2)
+    except (psutil.Error, OSError):  # pragma: no cover - defensive guard
+        return 0.0
 
 
 def _acquire_validator_slot(config: ResolvedConfig) -> BoundedSemaphore:
