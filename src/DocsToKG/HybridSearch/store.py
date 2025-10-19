@@ -410,7 +410,16 @@ class FaissVectorStore(DenseVectorStore):
         self._search_coalescer = _SearchCoalescer(self)
         self._cpu_replica: Optional[bytes] = None
         self._cpu_replica_meta: Optional[Mapping[str, object]] = None
-        self._refresh_cpu_replica()
+        self._snapshot_refresh_interval = max(
+            0.0, float(getattr(self._config, "snapshot_refresh_interval_seconds", 0.0))
+        )
+        self._snapshot_refresh_writes = max(
+            0, int(getattr(self._config, "snapshot_refresh_writes", 0))
+        )
+        self._last_snapshot_refresh = 0.0
+        self._writes_since_snapshot = 0
+        self._snapshot_lock = RLock()
+        self._refresh_cpu_replica(reason="bootstrap", forced=True)
         self._emit_gpu_state("bootstrap", level="info")
 
     @property
@@ -584,7 +593,7 @@ class FaissVectorStore(DenseVectorStore):
             finally:
                 self._release_pinned_buffers()
         self._update_gpu_metrics()
-        self._refresh_cpu_replica()
+        self.flush_snapshot(reason="train")
 
     def needs_training(self) -> bool:
         """Return ``True`` when the current FAISS index still requires training.
@@ -655,11 +664,11 @@ class FaissVectorStore(DenseVectorStore):
                     if self._supports_remove_ids is None:
                         self._supports_remove_ids = self._probe_remove_support()
                     if self._supports_remove_ids:
-                        self.remove_ids(faiss_ids, force_flush=True)
+                        self.remove_ids(faiss_ids, force_flush=True, reason="add_dedupe")
                     else:
                         existing_ids = self._lookup_existing_ids(faiss_ids)
                         if existing_ids.size:
-                            self.remove_ids(existing_ids, force_flush=True)
+                            self.remove_ids(existing_ids, force_flush=True, reason="add_cleanup")
                     base = self._index.index if hasattr(self._index, "index") else self._index
                     train_target = base
                     if hasattr(faiss, "downcast_index"):
@@ -683,7 +692,7 @@ class FaissVectorStore(DenseVectorStore):
             inserted = matrix.shape[0]
             if inserted:
                 self._observability.metrics.increment("faiss_add_vectors", amount=float(inserted))
-                self._refresh_cpu_replica()
+                self._maybe_refresh_snapshot(writes_delta=int(inserted), reason="add")
 
     def remove(self, vector_ids: Sequence[str]) -> None:
         """Remove vectors from the index using application-level identifiers.
@@ -701,11 +710,12 @@ class FaissVectorStore(DenseVectorStore):
         with self._observability.trace("faiss_remove", count=str(count)):
             self._observability.metrics.increment("faiss_remove_vectors", amount=float(count))
             with self._lock:
-                self.remove_ids(ids, force_flush=True)
+                self.remove_ids(ids, force_flush=True, reason="remove")
         self._update_gpu_metrics()
-        self._refresh_cpu_replica()
 
-    def remove_ids(self, ids: np.ndarray, *, force_flush: bool = False) -> int:
+    def remove_ids(
+        self, ids: np.ndarray, *, force_flush: bool = False, reason: str = "remove"
+    ) -> int:
         """Remove vectors using FAISS internal ids.
 
         Args:
@@ -722,7 +732,10 @@ class FaissVectorStore(DenseVectorStore):
         self._remove_ids(ids64)
         self._flush_pending_deletes(force=force_flush)
         self._update_gpu_metrics()
-        return int(ids64.size)
+        count = int(ids64.size)
+        if count:
+            self._maybe_refresh_snapshot(writes_delta=count, reason=reason)
+        return count
 
     def _current_index_ids(self) -> np.ndarray:
         # Robustly extract id_map across wrappers / GPU clones.
@@ -897,7 +910,44 @@ class FaissVectorStore(DenseVectorStore):
         if self._pinned_buffers:
             self._pinned_buffers.clear()
 
-    def _refresh_cpu_replica(self) -> None:
+    def flush_snapshot(self, *, reason: str = "flush") -> None:
+        """Force a snapshot refresh bypassing throttle safeguards."""
+
+        self._refresh_cpu_replica(reason=reason, forced=True)
+
+    def _maybe_refresh_snapshot(self, *, writes_delta: int = 0, reason: str) -> None:
+        if getattr(self._config, "persist_mode", "cpu_bytes") == "disabled":
+            return
+        now = time.time()
+        interval = self._snapshot_refresh_interval
+        write_threshold = self._snapshot_refresh_writes
+        with self._snapshot_lock:
+            if writes_delta > 0:
+                self._writes_since_snapshot += int(writes_delta)
+            writes_since = self._writes_since_snapshot
+            last_refresh = self._last_snapshot_refresh
+        if last_refresh == 0.0:
+            self._refresh_cpu_replica(reason=reason, forced=False)
+            return
+        interval_ready = interval > 0.0 and now - last_refresh >= interval
+        writes_ready = write_threshold > 0 and writes_since >= write_threshold
+        should_refresh = False
+        if interval <= 0.0 and write_threshold <= 0:
+            should_refresh = True
+        else:
+            should_refresh = interval_ready or writes_ready
+        if should_refresh:
+            self._refresh_cpu_replica(reason=reason, forced=False)
+            return
+        age = max(0.0, now - last_refresh)
+        self._observability.metrics.set_gauge("faiss_snapshot_age_seconds", float(age))
+        self._observability.metrics.increment(
+            "faiss_snapshot_refresh_skipped",
+            amount=1.0,
+            reason=reason,
+        )
+
+    def _refresh_cpu_replica(self, *, reason: str, forced: bool = False) -> None:
         if getattr(self._config, "persist_mode", "cpu_bytes") == "disabled":
             return
         try:
@@ -905,8 +955,29 @@ class FaissVectorStore(DenseVectorStore):
         except Exception:  # pragma: no cover - best effort
             logger.debug("Unable to refresh CPU replica", exc_info=True)
             return
-        self._cpu_replica = payload
-        self._cpu_replica_meta = self.snapshot_meta()
+        meta = self.snapshot_meta()
+        with self._snapshot_lock:
+            self._cpu_replica = payload
+            self._cpu_replica_meta = meta
+            self._last_snapshot_refresh = time.time()
+            self._writes_since_snapshot = 0
+        self._observability.metrics.increment(
+            "faiss_snapshot_refresh_total",
+            amount=1.0,
+            reason=reason,
+            forced=str(bool(forced)),
+        )
+        self._observability.metrics.set_gauge("faiss_snapshot_age_seconds", 0.0)
+        self._observability.logger.info(
+            "faiss-snapshot-refresh",
+            extra={
+                "event": {
+                    "reason": reason,
+                    "forced": bool(forced),
+                    "bytes": int(len(payload)),
+                }
+            },
+        )
 
     def promote_cpu_replica(self) -> bool:
         """Promote the cached CPU replica back onto the GPU index."""
@@ -1103,8 +1174,13 @@ class FaissVectorStore(DenseVectorStore):
                 self._set_nprobe()
             self._observability.metrics.increment("faiss_restore_calls", amount=1.0)
         if getattr(self._config, "persist_mode", "cpu_bytes") != "disabled":
-            self._cpu_replica = bytes(payload)
-            self._cpu_replica_meta = self.snapshot_meta()
+            snapshot_meta = self.snapshot_meta()
+            with self._snapshot_lock:
+                self._cpu_replica = bytes(payload)
+                self._cpu_replica_meta = snapshot_meta
+                self._last_snapshot_refresh = time.time()
+                self._writes_since_snapshot = 0
+            self._observability.metrics.set_gauge("faiss_snapshot_age_seconds", 0.0)
         self._emit_gpu_state("restore", level="info")
 
     def set_nprobe(
@@ -1181,6 +1257,10 @@ class FaissVectorStore(DenseVectorStore):
             "fp16_enabled": bool(getattr(self._config, "flat_use_fp16", False)),
             "cpu_replica_cached": bool(self._cpu_replica is not None),
             "cpu_replica_bytes": float(len(self._cpu_replica)) if self._cpu_replica else 0.0,
+            "snapshot_refresh_interval_seconds": float(self._snapshot_refresh_interval),
+            "snapshot_refresh_writes": float(self._snapshot_refresh_writes),
+            "snapshot_writes_since_refresh": float(self._writes_since_snapshot),
+            "snapshot_last_refresh_epoch": float(self._last_snapshot_refresh),
         }
         if self._temp_memory_bytes is not None:
             stats["gpu_temp_memory_bytes"] = float(self._temp_memory_bytes)
@@ -1247,7 +1327,7 @@ class FaissVectorStore(DenseVectorStore):
                 self._set_nprobe()
                 self._needs_rebuild = False
             self._observability.metrics.increment("faiss_rebuilds", amount=1.0)
-            self._refresh_cpu_replica()
+            self.flush_snapshot(reason="rebuild")
             return True
 
     def init_gpu(self) -> None:

@@ -1076,6 +1076,36 @@ def test_remove_ids_cpu_fallback() -> None:
     assert manager.ntotal == 0
 
 
+def test_snapshot_refresh_throttled(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = DenseIndexConfig(
+        snapshot_refresh_interval_seconds=3600.0,
+        snapshot_refresh_writes=3,
+    )
+    manager = FaissVectorStore(dim=8, config=config)
+
+    calls: list[int] = []
+
+    def fake_serialize(self: FaissVectorStore) -> bytes:  # pragma: no cover - simple stub
+        calls.append(1)
+        return b"snapshot"
+
+    monkeypatch.setattr(FaissVectorStore, "serialize", fake_serialize)
+
+    base = np.linspace(0.0, 1.0, num=8, dtype=np.float32)
+    for _ in range(3):
+        noise = np.random.rand(8).astype(np.float32)
+        manager.add([base + noise], [str(uuid.uuid4())])
+
+    assert len(calls) == 1, "Expected throttle to coalesce the first two refresh attempts"
+
+    noise = np.random.rand(8).astype(np.float32)
+    manager.add([base + noise], [str(uuid.uuid4())])
+    assert len(calls) == 1, "Expected writes below threshold to defer additional refreshes"
+
+    manager.flush_snapshot()
+    assert len(calls) == 2, "flush_snapshot should bypass the throttle policy"
+
+
 # --- test_hybrid_search_scale.py ---
 
 DATASET_PATH = Path("Data/HybridScaleFixture/dataset.jsonl")
