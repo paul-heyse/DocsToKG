@@ -407,6 +407,35 @@ def test_plan_embed_missing_output_skips_hash(
     assert calls["count"] == 0
 
 
+def test_plan_chunk_handles_symlinked_doctags(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("DOCSTOKG_DATA_ROOT", raising=False)
+
+    isolated_root = tmp_path / "IsolatedData"
+    data_root = isolated_root / "Data"
+    doctags_dir = data_root / "DocTagsFiles"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    doctags_dir.mkdir(parents=True)
+    chunks_dir.mkdir(parents=True)
+
+    external_dir = tmp_path / "external"
+    external_dir.mkdir()
+    external_doctags = external_dir / "report.doctags"
+    external_doctags.write_text("{}", encoding="utf-8")
+
+    symlink_dir = doctags_dir / "linked"
+    symlink_dir.mkdir()
+    symlink_path = symlink_dir / "report.doctags"
+    symlink_path.symlink_to(external_doctags)
+
+    result = planning.plan_chunk(["--data-root", str(data_root)])
+
+    assert result["process"]["count"] == 1
+    assert result["skip"]["count"] == 0
+    assert result["process"]["preview"] == ["linked/report.doctags"]
+
+
 def test_plan_embed_handles_symlinked_chunks(tmp_path: Path, monkeypatch) -> None:
     # Temporarily disable the shared DOCSTOKG_DATA_ROOT to avoid interference from other tests
     monkeypatch.delenv("DOCSTOKG_DATA_ROOT", raising=False)

@@ -371,6 +371,11 @@ def resolve_config(
     """Validate arguments, resolve configuration, and prepare run state."""
     extract_html_text = args.extract_text == "html"
 
+    topic = args.topic.strip() if isinstance(args.topic, str) else args.topic
+    topic_id_input = (
+        args.topic_id.strip() if isinstance(args.topic_id, str) else args.topic_id
+    )
+
     if args.workers < 1:
         parser.error("--workers must be >= 1")
     if args.concurrent_resolvers is not None and args.concurrent_resolvers < 1:
@@ -383,7 +388,7 @@ def resolve_config(
         parser.error("--max must be greater than or equal to 0")
     if args.year_start > args.year_end:
         parser.error("--year-start must be less than or equal to --year-end")
-    if not args.topic and not args.topic_id:
+    if not topic and not topic_id_input:
         parser.error("Provide --topic or --topic-id.")
     for field_name in ("sniff_bytes", "min_pdf_bytes", "tail_check_bytes"):
         value = getattr(args, field_name, None)
@@ -393,27 +398,41 @@ def resolve_config(
     if args.mailto:
         apply_mailto(args.mailto)
 
-    topic_id = args.topic_id
-    if not topic_id and args.topic:
+    topic_id = topic_id_input
+    if not topic_id and topic:
         try:
-            topic_id = resolve_topic_id_if_needed(args.topic)
+            topic_id = resolve_topic_id_if_needed(topic)
         except Exception as exc:
-            LOGGER.warning("Failed to resolve topic ID for '%s': %s", args.topic, exc)
+            LOGGER.warning("Failed to resolve topic ID for '%s': %s", topic, exc)
             topic_id = None
     query_kwargs = vars(args).copy()
+    if topic is not None:
+        query_kwargs["topic"] = topic
     if topic_id:
         query_kwargs["topic_id"] = topic_id
     query = build_query(argparse.Namespace(**query_kwargs))
     run_id = uuid.uuid4().hex
 
-    base_pdf_dir = args.out
-    manifest_override = args.manifest
+    def _expand_path(value: Optional[Path | str]) -> Optional[Path]:
+        if value is None:
+            return None
+        return Path(value).expanduser().resolve(strict=False)
+
+    base_pdf_dir = _expand_path(args.out)
+    if base_pdf_dir is None:
+        parser.error("--out is required")
+
+    html_override = _expand_path(args.html_out)
+    xml_override = _expand_path(args.xml_out)
+    manifest_override = _expand_path(args.manifest)
     if args.staging:
-        run_dir = base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-        pdf_dir = run_dir / "PDF"
-        html_dir = run_dir / "HTML"
-        xml_dir = run_dir / "XML"
-        manifest_path = run_dir / "manifest.jsonl"
+        run_dir = (base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M%S")).resolve(
+            strict=False
+        )
+        pdf_dir = (run_dir / "PDF").resolve(strict=False)
+        html_dir = (run_dir / "HTML").resolve(strict=False)
+        xml_dir = (run_dir / "XML").resolve(strict=False)
+        manifest_path = (run_dir / "manifest.jsonl").resolve(strict=False)
         if args.html_out:
             LOGGER.info("Staging mode overrides --html-out; using %s", html_dir)
         if args.xml_out:
@@ -422,9 +441,13 @@ def resolve_config(
             LOGGER.info("Staging mode overrides --manifest; writing to %s", manifest_path)
     else:
         pdf_dir = base_pdf_dir
-        html_dir = args.html_out or (pdf_dir.parent / "HTML")
-        xml_dir = args.xml_out or (pdf_dir.parent / "XML")
+        html_dir = html_override or (pdf_dir.parent / "HTML")
+        xml_dir = xml_override or (pdf_dir.parent / "XML")
         manifest_path = manifest_override or (pdf_dir / "manifest.jsonl")
+
+        html_dir = Path(html_dir).expanduser().resolve(strict=False)
+        xml_dir = Path(xml_dir).expanduser().resolve(strict=False)
+        manifest_path = Path(manifest_path).expanduser().resolve(strict=False)
 
     resolver_factory = resolver_factory or default_resolvers
     resolver_instances = resolver_factory()
@@ -494,7 +517,7 @@ def resolve_config(
     previous_url_index = ManifestUrlIndex(sqlite_path, eager=args.warm_manifest_cache)
     persistent_seen_urls: Set[str] = {
         url
-        for url, meta in previous_url_index.iter_existing()
+        for url, meta in previous_url_index.iter_existing_paths()
         if str(meta.get("classification", "")).lower()
         in {Classification.PDF.value, Classification.CACHED.value, Classification.XML.value}
     }

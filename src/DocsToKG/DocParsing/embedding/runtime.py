@@ -456,6 +456,7 @@ from DocsToKG.DocParsing.io import (
     relative_path,
     resolve_attempts_path,
     resolve_manifest_path,
+    StreamingContentHasher,
 )
 from DocsToKG.DocParsing.logging import (
     get_logger,
@@ -1378,14 +1379,15 @@ class QwenEmbeddingQueue:
 
 
 class EmbeddingProcessingError(RuntimeError):
-    """Wrap exceptions raised during per-file embedding with timing metadata."""
+    """Wrap per-file embedding failures with timing and hash metadata."""
 
-    def __init__(self, original: Exception, duration: float) -> None:
-        """Record the triggering exception and elapsed duration in seconds."""
+    def __init__(self, original: Exception, duration: float, input_hash: str) -> None:
+        """Record the triggering exception, elapsed duration, and input hash."""
 
         super().__init__(str(original))
         self.original = original
         self.duration = duration
+        self.input_hash = input_hash
 
 
 def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
@@ -1498,6 +1500,36 @@ def iter_rows_in_batches(
         yield buf
 
 
+def iter_rows_in_batches_with_hash(
+    path: Path,
+    batch_size: int,
+    *,
+    content_hasher: StreamingContentHasher,
+) -> Iterator[List[dict]]:
+    """Iterate JSONL rows while incrementally updating ``content_hasher``."""
+
+    if batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
+
+    buf: List[dict] = []
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        for line_no, raw_line in enumerate(handle, start=1):
+            content_hasher.update(raw_line)
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as exc:  # pragma: no cover - malformed rows
+                raise ValueError(f"Invalid JSON in {path}:{line_no}: {exc}") from exc
+            buf.append(record)
+            if len(buf) >= batch_size:
+                yield buf
+                buf = []
+    if buf:
+        yield buf
+
+
 def _validate_chunk_file_schema(path: Path) -> None:
     """Stream chunk file rows and assert schema compatibility."""
 
@@ -1586,6 +1618,8 @@ def process_chunk_file_vectors(
     args: Optional[argparse.Namespace] = None,
     validator: Optional[SPLADEValidator] = None,
     logger=None,
+    *,
+    content_hasher: Optional[StreamingContentHasher] = None,
 ) -> Tuple[int, List[int], List[float]]:
     """Generate vectors for a single chunk file and persist them to disk.
 
@@ -1622,7 +1656,18 @@ def process_chunk_file_vectors(
     with create_vector_writer(
         resolved_out_path, str(getattr(args, "vector_format", "jsonl"))
     ) as writer:
-        for rows in iter_rows_in_batches(chunk_file, batch_size):
+        if content_hasher is None:
+            row_batches: Iterator[List[dict]] = iter_rows_in_batches(
+                chunk_file,
+                batch_size,
+            )
+        else:
+            row_batches = iter_rows_in_batches_with_hash(
+                chunk_file,
+                batch_size,
+                content_hasher=content_hasher,
+            )
+        for rows in row_batches:
             if not rows:
                 continue
 
@@ -2551,13 +2596,19 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         quarantined_files = 0
         skipped_ids: List[str] = []
         planned_ids: List[str] = []
+        resume_needs_hash = resume_controller.resume and not resume_controller.force
         for chunk_entry in chunk_entries:
             chunk_file = chunk_entry.resolved_path
             doc_id, out_path = derive_doc_id_and_vectors_path(
                 chunk_entry, chunks_dir, args.out_dir
             )
-            input_hash = compute_content_hash(chunk_file)
-            skip_file, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+            input_hash = ""
+            if resume_needs_hash:
+                input_hash = compute_content_hash(chunk_file)
+            if resume_needs_hash:
+                skip_file, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+            else:
+                skip_file = False
             if skip_file:
                 skipped_ids.append(doc_id)
                 if not plan_only:
@@ -2641,35 +2692,45 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
 
             def _process_entry(
                 entry: Tuple[Path, Path, str, str],
-            ) -> Tuple[int, List[int], List[float], float, bool]:
+            ) -> Tuple[int, List[int], List[float], float, bool, str]:
                 """Encode vectors for a chunk file and report per-file metrics."""
 
                 chunk_path, vectors_path, input_hash, doc_id = entry
                 start = time.perf_counter()
-                quarantined = False
+                hasher: StreamingContentHasher | None = None
+                if not input_hash:
+                    hasher = StreamingContentHasher()
                 try:
                     with acquire_lock(vectors_path):
                         count, nnz, norms = process_chunk_file_vectors(
-                            chunk_path, vectors_path, stats, args, validator, logger
+                            chunk_path,
+                            vectors_path,
+                            stats,
+                            args,
+                            validator,
+                            logger,
+                            content_hasher=hasher,
                         )
                 except ValueError as exc:
                     duration = time.perf_counter() - start
+                    computed_hash = input_hash or (hasher.hexdigest() if hasher else "")
                     _handle_embedding_quarantine(
                         chunk_path=chunk_path,
                         vector_path=vectors_path,
                         doc_id=doc_id,
-                        input_hash=input_hash,
+                        input_hash=computed_hash,
                         reason=str(exc),
                         logger=logger,
                         data_root=resolved_root,
                     )
-                    quarantined = True
-                    count, nnz, norms = 0, [], []
+                    return 0, [], [], duration, True, computed_hash
                 except Exception as exc:  # pragma: no cover - propagated to caller
                     duration = time.perf_counter() - start
-                    raise EmbeddingProcessingError(exc, duration) from exc
+                    computed_hash = input_hash or (hasher.hexdigest() if hasher else "")
+                    raise EmbeddingProcessingError(exc, duration, computed_hash) from exc
                 duration = time.perf_counter() - start
-                return count, nnz, norms, duration, quarantined
+                computed_hash = input_hash or (hasher.hexdigest() if hasher else "")
+                return count, nnz, norms, duration, False, computed_hash
 
             if not file_entries:
                 pass
@@ -2686,7 +2747,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                     for future in as_completed(future_map):
                         chunk_file, out_path, input_hash, doc_id = future_map[future]
                         try:
-                            count, nnz, norms, duration, quarantined = future.result()
+                            count, nnz, norms, duration, quarantined, resolved_hash = future.result()
                         except EmbeddingProcessingError as exc:
                             manifest_log_failure(
                                 stage=MANIFEST_STAGE,
@@ -2694,7 +2755,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                                 duration_s=round(exc.duration, 3),
                                 schema_version=VECTOR_SCHEMA_VERSION,
                                 input_path=chunk_file,
-                                input_hash=input_hash,
+                                input_hash=exc.input_hash,
                                 output_path=out_path,
                                 error=str(exc.original),
                             )
@@ -2726,7 +2787,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                             duration_s=round(duration, 3),
                             schema_version=VECTOR_SCHEMA_VERSION,
                             input_path=chunk_file,
-                            input_hash=input_hash,
+                            input_hash=resolved_hash,
                             output_path=out_path,
                             vector_count=count,
                         )
@@ -2751,7 +2812,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                 for entry in tqdm(file_entries, desc="Pass B: Encoding vectors", unit="file"):
                     chunk_file, out_path, input_hash, doc_id = entry
                     try:
-                        count, nnz, norms, duration, quarantined = _process_entry(entry)
+                        count, nnz, norms, duration, quarantined, resolved_hash = _process_entry(entry)
                     except EmbeddingProcessingError as exc:
                         manifest_log_failure(
                             stage=MANIFEST_STAGE,
@@ -2759,7 +2820,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                             duration_s=round(exc.duration, 3),
                             schema_version=VECTOR_SCHEMA_VERSION,
                             input_path=chunk_file,
-                            input_hash=input_hash,
+                            input_hash=exc.input_hash,
                             output_path=out_path,
                             error=str(exc.original),
                         )
@@ -2788,7 +2849,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         duration_s=round(duration, 3),
                         schema_version=VECTOR_SCHEMA_VERSION,
                         input_path=chunk_file,
-                        input_hash=input_hash,
+                        input_hash=resolved_hash,
                         output_path=out_path,
                         vector_count=count,
                     )

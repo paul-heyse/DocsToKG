@@ -2207,6 +2207,7 @@ def plan_all(
                         },
                     )
                     _cancel_pending_futures(futures, current=future)
+                    _shutdown_executor_nowait(executor)
                     if isinstance(exc, (ConfigError, ConfigurationError, PolicyError)):
                         raise
                     completed_plans = [results[i] for i in sorted(results)]
@@ -2366,6 +2367,7 @@ def fetch_all(
                         extra={"stage": "error", "ontology_id": spec.id, "error": str(exc)},
                     )
                     _cancel_pending_futures(futures, current=future)
+                    _shutdown_executor_nowait(executor)
                     completed_results = [results_map[i] for i in sorted(results_map)]
                     total_known = total_hint if total_hint is not None else submitted
                     raise BatchFetchError(

@@ -107,15 +107,8 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
     payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
     url = ontology_env.register_fixture(
         "hp-malformed-length.owl",
-def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
-    """A transient failure should consume bucket tokens for each retry."""
-
-    payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
-    url = ontology_env.register_fixture(
-        "hp-retry.owl",
         payload,
         media_type="application/rdf+xml",
-        repeats=1,
     )
     parsed_url = urlparse(url)
     ontology_env.queue_response(
@@ -154,6 +147,55 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
     assert content_length is None
     assert ontology_env.requests[-1].method == "HEAD"
     assert ontology_env.requests[-1].path.endswith("hp-malformed-length.owl")
+
+
+def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
+    """A transient failure should consume bucket tokens for each retry."""
+
+    payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
+    url = ontology_env.register_fixture(
+        "hp-retry.owl",
+        payload,
+        media_type="application/rdf+xml",
+        repeats=1,
+    )
+    parsed_url = urlparse(url)
+    ontology_env.queue_response(
+        "fixtures/hp-retry.owl",
+        ResponseSpec(
+            method="HEAD",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": "not-an-integer",
+            },
+        ),
+    )
+
+    config = ontology_env.build_download_config()
+    destination = tmp_path / "hp-retry.owl"
+    downloader = network_mod.StreamingDownloader(
+        destination=destination,
+        headers={},
+        http_config=config,
+        previous_manifest=None,
+        logger=_logger(),
+        expected_media_type="application/rdf+xml",
+        service="obo",
+        origin_host=parsed_url.hostname,
+    )
+
+    with network_mod.SESSION_POOL.lease(
+        service="obo",
+        host=parsed_url.hostname,
+        http_config=config,
+    ) as session:
+        content_type, content_length = downloader._preliminary_head_check(url, session)
+
+    assert content_type == "application/rdf+xml"
+    assert content_length is None
+    assert ontology_env.requests[-1].method == "HEAD"
+    assert ontology_env.requests[-1].path.endswith("hp-retry.owl")
 
 
 def test_download_stream_uses_cached_manifest(ontology_env, tmp_path):

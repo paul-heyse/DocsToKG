@@ -300,11 +300,7 @@ class _SearchCoalescer:
                     self._store._observability.metrics.observe(
                         "faiss_coalesced_batch_size", float(len(batch))
                     )
-                rate = (
-                    0.0
-                    if len(batch) <= 1
-                    else float(len(batch) - 1) / float(len(batch))
-                )
+                rate = 0.0 if len(batch) <= 1 else float(len(batch) - 1) / float(len(batch))
                 self._metrics.set_gauge("faiss_coalescer_hit_rate", rate)
                 batch = self._drain()
 
@@ -1439,6 +1435,7 @@ class FaissVectorStore(DenseVectorStore):
                 },
             )
         return tuple(allowed)
+
     def _create_gpu_resources(
         self, *, device: Optional[int] = None
     ) -> "faiss.StandardGpuResources":
@@ -1457,6 +1454,15 @@ class FaissVectorStore(DenseVectorStore):
                 resource.setTempMemory(temp_memory)
             except Exception:  # pragma: no cover - best effort guard
                 logger.debug("Unable to apply GPU temp memory cap", exc_info=True)
+
+        # Configure pinned memory for faster H2D/D2H transfers
+        if hasattr(self, "_config") and self._config is not None:
+            pinned_memory_bytes = getattr(self._config, "gpu_pinned_memory_bytes", None)
+            if pinned_memory_bytes is not None and hasattr(resource, "setPinnedMemory"):
+                try:
+                    resource.setPinnedMemory(pinned_memory_bytes)
+                except Exception:  # pragma: no cover - best effort guard
+                    logger.debug("Unable to apply GPU pinned memory configuration", exc_info=True)
 
         use_null_all = getattr(self, "_gpu_use_default_null_stream_all_devices", False)
         if use_null_all:
@@ -1487,9 +1493,7 @@ class FaissVectorStore(DenseVectorStore):
             except TypeError:
                 tried_device = False
             except Exception:
-                logger.debug(
-                    "Unable to bind default CUDA null stream for device", exc_info=True
-                )
+                logger.debug("Unable to bind default CUDA null stream for device", exc_info=True)
                 tried_device = True
 
         if tried_device:
@@ -1502,9 +1506,7 @@ class FaissVectorStore(DenseVectorStore):
                 try:
                     method(int(device))
                 except Exception:
-                    logger.debug(
-                        "Unable to fall back when binding CUDA null stream", exc_info=True
-                    )
+                    logger.debug("Unable to fall back when binding CUDA null stream", exc_info=True)
         except Exception:
             logger.debug(
                 "Unable to bind default CUDA null stream without explicit device",
@@ -1648,7 +1650,9 @@ class FaissVectorStore(DenseVectorStore):
         else:
             gpu_ids = list(range(gpu_count))
 
-        original_ids = tuple(self._replication_gpu_ids or ()) if explicit_targets_configured else tuple()
+        original_ids = (
+            tuple(self._replication_gpu_ids or ()) if explicit_targets_configured else tuple()
+        )
         filtered_targets = bool(original_ids) and len(gpu_ids) < len(original_ids)
 
         try:
@@ -1737,9 +1741,7 @@ class FaissVectorStore(DenseVectorStore):
 
             if explicit_targets_configured and hasattr(faiss, "index_cpu_to_gpus_list"):
                 if not gpu_ids:
-                    logger.error(
-                        "index_cpu_to_gpus_list fallback requires at least one GPU id"
-                    )
+                    logger.error("index_cpu_to_gpus_list fallback requires at least one GPU id")
                     raise AssertionError(
                         "gpu_ids must not be empty when invoking manual GPU replication"
                     )
@@ -1748,9 +1750,7 @@ class FaissVectorStore(DenseVectorStore):
                     gpus=gpu_ids,
                     co=cloner_options,
                 )
-                self._observability.metrics.increment(
-                    "faiss_gpu_manual_resource_path", amount=1.0
-                )
+                self._observability.metrics.increment("faiss_gpu_manual_resource_path", amount=1.0)
                 self._observability.logger.info(
                     "faiss-manual-resource-path-engaged",
                     extra={
@@ -1865,10 +1865,7 @@ class FaissVectorStore(DenseVectorStore):
             self._reset_nprobe_cache()
             return
         nprobe = int(self._config.nprobe)
-        if (
-            self._last_applied_nprobe == nprobe
-            and self._last_applied_nprobe_monotonic > 0.0
-        ):
+        if self._last_applied_nprobe == nprobe and self._last_applied_nprobe_monotonic > 0.0:
             return
         applied = False
         try:

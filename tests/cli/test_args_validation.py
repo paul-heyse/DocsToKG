@@ -38,8 +38,11 @@ class _StubManifestIndex:
         self.path = path
         self.eager = eager
 
-    def iter_existing(self):  # pragma: no cover - trivial
+    def iter_existing_paths(self):  # pragma: no cover - trivial
         return []
+
+    def iter_existing(self):  # pragma: no cover - trivial
+        return self.iter_existing_paths()
 
 
 @pytest.fixture(autouse=True)
@@ -73,6 +76,33 @@ def _base_args() -> list[str]:
         "2021",
         "--ignore-robots",
     ]
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--year-start", "2020", "--year-end", "2021", "--ignore-robots"],
+        ["--topic", "", "--year-start", "2020", "--year-end", "2021", "--ignore-robots"],
+        [
+            "--topic-id",
+            "   ",
+            "--year-start",
+            "2020",
+            "--year-end",
+            "2021",
+            "--ignore-robots",
+        ],
+    ],
+)
+def test_resolve_config_requires_topic_or_topic_id(parser, capfd, argv):
+    args = download_args.parse_args(parser, argv)
+
+    with pytest.raises(SystemExit) as excinfo:
+        download_args.resolve_config(args, parser)
+
+    assert excinfo.value.code == 2
+    _, err = capfd.readouterr()
+    assert "Provide --topic or --topic-id." in err
 
 
 @pytest.mark.parametrize("per_page", [0, 201])

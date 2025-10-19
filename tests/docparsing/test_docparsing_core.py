@@ -544,13 +544,37 @@ def test_atomic_write_failure(tmp_path: Path) -> None:
 
 
 def test_iter_doctags(tmp_path: Path) -> None:
-    doctags_dir = doc_env.data_doctags()
-    target = Path(doctags_dir)
-    files = [target / "a.doctags", target / "b.doctag"]
+    doctags_dir = tmp_path / "DocTagsFiles"
+    doctags_dir.mkdir()
+
+    files = [doctags_dir / "a.doctags", doctags_dir / "b.doctag"]
     for file in files:
         file.write_text("content", encoding="utf-8")
-    results = list(doc_io.iter_doctags(target))
-    assert results == sorted(file.resolve() for file in files)
+
+    alias = doctags_dir / "alias.doctags"
+    alias.symlink_to(files[0])
+
+    results = list(doc_io.iter_doctags(doctags_dir))
+    assert results == files
+    assert alias not in results
+
+
+def test_iter_doctags_symlink_outside_root(tmp_path: Path) -> None:
+    doctags_dir = tmp_path / "DocTagsFiles"
+    doctags_dir.mkdir()
+
+    external_dir = tmp_path / "external"
+    external_dir.mkdir()
+    external_file = external_dir / "external.doctags"
+    external_file.write_text("content", encoding="utf-8")
+
+    symlink_path = doctags_dir / "linked" / "external.doctags"
+    symlink_path.parent.mkdir(parents=True, exist_ok=True)
+    symlink_path.symlink_to(external_file)
+
+    results = list(doc_io.iter_doctags(doctags_dir))
+    assert results == [symlink_path]
+    assert results[0].resolve() == external_file.resolve()
 
 
 def test_iter_chunks(tmp_path: Path) -> None:
@@ -924,7 +948,7 @@ def test_make_hasher_prefers_explicit_algorithm(caplog: pytest.LogCaptureFixture
 
 def test_resolve_hash_algorithm_defaults() -> None:
     os.environ.pop("DOCSTOKG_HASH_ALG", None)
-    assert doc_io.resolve_hash_algorithm() == "sha1"
+    assert doc_io.resolve_hash_algorithm() == "sha256"
     os.environ["DOCSTOKG_HASH_ALG"] = "sha256"
     assert doc_io.resolve_hash_algorithm() == "sha256"
 
@@ -932,6 +956,15 @@ def test_resolve_hash_algorithm_defaults() -> None:
 def test_batcher() -> None:
     assert list(core.Batcher([1, 2, 3, 4, 5], 2)) == [[1, 2], [3, 4], [5]]
     assert list(core.Batcher([], 3)) == []
+
+
+def test_batcher_length_policy_handles_small_lengths() -> None:
+    items = ["one", "zero", "two", "three"]
+    lengths = [1, 0, 2, 3]
+
+    batches = list(core.Batcher(items, 2, policy="length", lengths=lengths))
+
+    assert batches == [["zero", "one"], ["two", "three"]]
 
 
 def test_manifest_append(tmp_path: Path) -> None:
