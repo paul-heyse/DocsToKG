@@ -346,6 +346,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Iterable,
     Iterator,
     List,
     Optional,
@@ -1554,6 +1555,15 @@ def iter_chunk_files(directory: Path) -> Iterator[Path]:
     yield from iter_chunks(directory)
 
 
+def _iter_chunks_or_empty(directory: Path) -> Iterable[ChunkDiscovery]:
+    """Return chunk entries for ``directory`` or an empty iterable when missing."""
+
+    chunk_iter = iter_chunks(directory)
+    if chunk_iter is None:
+        return ()
+    return chunk_iter
+
+
 class VectorWriter:
     """Abstract base class for vector writers."""
 
@@ -2013,7 +2023,7 @@ def _validate_vectors_for_chunks(
     missing: List[tuple[str, Path]] = []
     quarantined_files = 0
 
-    for chunk in iter_chunks(chunks_dir):
+    for chunk in _iter_chunks_or_empty(chunks_dir):
         doc_id, vector_path = derive_doc_id_and_vectors_path(chunk, chunks_dir, vectors_dir)
         if not vector_path.exists():
             missing.append((doc_id, vector_path))
@@ -2461,7 +2471,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
             profile=profile,
         )
 
-        chunk_entries = list(iter_chunks(chunks_dir))
+        chunk_entries = list(_iter_chunks_or_empty(chunks_dir))
         if not chunk_entries:
             log_event(
                 logger,
