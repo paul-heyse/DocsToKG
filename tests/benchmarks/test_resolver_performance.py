@@ -189,7 +189,9 @@ def test_retry_backoff_timing(patcher: PatchManager) -> None:
         sleeps.append(value)
 
     patcher.setattr(time, "sleep", fake_sleep)
-    patcher.setattr("DocsToKG.ContentDownload.networking.random.random", lambda: 0.0)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b
+    )
 
     class FakeResponse:
         def __init__(self, status_code: int):

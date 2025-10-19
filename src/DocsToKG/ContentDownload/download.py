@@ -111,6 +111,10 @@ __all__ = [
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
 
+_RUN_EXTRA_REF_KEY = "_run_extra"
+_RANGE_RESUME_WARNING_KEY = "range_resume_warning_emitted"
+
+
 def ensure_dir(path: Path) -> None:
     """Create a directory if it does not already exist.
 
@@ -134,7 +138,7 @@ class DownloadConfig:
     list_only: bool = False
     extract_html_text: bool = False
     run_id: str = ""
-    previous_lookup: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    previous_lookup: Mapping[str, Dict[str, Any]] = field(default_factory=dict)
     resume_completed: Set[str] = field(default_factory=set)
     sniff_bytes: int = DEFAULT_SNIFF_BYTES
     min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
@@ -164,8 +168,8 @@ class DownloadConfig:
         self.skip_head_precheck = bool(self.skip_head_precheck)
         self.head_precheck_passed = bool(self.head_precheck_passed)
 
-        self.previous_lookup = self._normalize_mapping(self.previous_lookup)
-        self.resume_completed = {str(item) for item in self.resume_completed}
+        self.previous_lookup = self._normalize_resume_lookup(self.previous_lookup)
+        self.resume_completed = self._normalize_resume_completed(self.resume_completed)
         self.domain_content_rules = self._normalize_mapping(self.domain_content_rules)
         self.host_accept_overrides = self._normalize_mapping(self.host_accept_overrides)
         self.global_manifest_index = self._normalize_mapping(self.global_manifest_index)
@@ -186,6 +190,24 @@ class DownloadConfig:
         if isinstance(value, Mapping):
             return dict(value)
         return {}
+
+    @staticmethod
+    def _normalize_resume_lookup(value: Any) -> Mapping[str, Dict[str, Any]]:
+        if value is None:
+            return {}
+        if isinstance(value, Mapping):
+            return value
+        return {}
+
+    @staticmethod
+    def _normalize_resume_completed(value: Any) -> Set[str]:
+        if value is None:
+            return set()
+        if isinstance(value, Set):
+            return {str(item) for item in value}
+        if isinstance(value, Iterable):
+            return {str(item) for item in value}
+        return set()
 
     @staticmethod
     def _coerce_int(value: Any, default: int) -> int:
@@ -230,6 +252,7 @@ class DownloadConfig:
             "stream_retry_attempts": self.stream_retry_attempts,
             "extra": self.extra,
         }
+        payload[_RUN_EXTRA_REF_KEY] = self.extra
         if overrides:
             for key, value in overrides.items():
                 if key in {"max_bytes", "max_download_size_gb"}:
@@ -443,9 +466,23 @@ def prepare_candidate_download(
         headers["Accept"] = str(accept_value)
 
     resume_requested = bool(getattr(ctx, "enable_range_resume", False))
+    ctx_extra = getattr(ctx, "extra", {})
+    run_extra: Optional[Dict[str, Any]] = None
+    if isinstance(ctx_extra, dict):
+        candidate = ctx_extra.get(_RUN_EXTRA_REF_KEY)
+        if isinstance(candidate, dict):
+            run_extra = candidate
+        else:
+            nested = ctx_extra.get("extra")
+            if isinstance(nested, dict):
+                run_extra = nested
+    if run_extra is None and isinstance(ctx_extra, dict):
+        run_extra = ctx_extra
+
     if resume_requested:
-        ctx.extra["resume_disabled"] = True
-        if not ctx.extra.get("resume_warning_logged"):
+        if isinstance(ctx_extra, dict):
+            ctx_extra["resume_disabled"] = True
+        if isinstance(run_extra, dict) and not run_extra.get(_RANGE_RESUME_WARNING_KEY):
             LOGGER.warning(
                 "Range resume requested for %s; feature is deprecated and will be ignored.",
                 url,
@@ -457,9 +494,10 @@ def prepare_candidate_download(
                     },
                 },
             )
-            ctx.extra["resume_warning_logged"] = True
+            run_extra[_RANGE_RESUME_WARNING_KEY] = True
     else:
-        ctx.extra.pop("resume_disabled", None)
+        if isinstance(ctx_extra, dict):
+            ctx_extra.pop("resume_disabled", None)
     ctx.enable_range_resume = False
     enable_resume = False
 
@@ -624,6 +662,12 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
 
             start_request = time.monotonic()
             try:
+                retry_after_cap = None
+                context_extra = getattr(plan.context, "extra", None)
+                if isinstance(context_extra, Mapping):
+                    raw_cap = context_extra.get("retry_after_cap")
+                    if isinstance(raw_cap, (int, float)):
+                        retry_after_cap = float(raw_cap)
                 response_cm = request_with_retries(
                     session,
                     "GET",
@@ -632,6 +676,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                     allow_redirects=True,
                     timeout=timeout,
                     headers=headers,
+                    retry_after_cap=retry_after_cap,
                     content_policy=content_policy,
                 )
             except ContentPolicyViolation as exc:

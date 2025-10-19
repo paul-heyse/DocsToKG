@@ -6,6 +6,7 @@ import io
 import hashlib
 import logging
 import tarfile
+import time
 import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
@@ -134,6 +135,7 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
 
     config = ontology_env.build_download_config()
     destination = tmp_path / "hp-malformed-length.owl"
+    expected_user_agent = config.polite_http_headers().get("User-Agent")
     downloader = network_mod.StreamingDownloader(
         destination=destination,
         headers={},
@@ -156,6 +158,97 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
     assert content_length is None
     assert ontology_env.requests[-1].method == "HEAD"
     assert ontology_env.requests[-1].path.endswith("hp-malformed-length.owl")
+    if expected_user_agent is not None:
+        assert (
+            ontology_env.requests[-1].headers.get("User-Agent") == expected_user_agent
+        )
+
+
+def test_head_request_includes_polite_and_conditional_headers(ontology_env, tmp_path):
+    """HEAD should forward polite headers plus conditional validators."""
+
+    payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
+    url = ontology_env.register_fixture(
+        "hp-conditional.owl",
+        payload,
+        media_type="application/rdf+xml",
+    )
+
+    config = ontology_env.build_download_config()
+    destination = tmp_path / "hp-conditional.owl"
+    expected_headers = config.polite_http_headers()
+    previous_manifest = {
+        "etag": 'W/"conditional-etag"',
+        "last_modified": "Wed, 21 Oct 2015 07:28:00 GMT",
+    }
+
+    network_mod.download_stream(
+        url=url,
+        destination=destination,
+        headers={},
+        previous_manifest=previous_manifest,
+        http_config=config,
+        cache_dir=ontology_env.cache_dir,
+        logger=_logger(),
+        expected_media_type="application/rdf+xml",
+        service="obo",
+    )
+
+    head_requests = [request for request in ontology_env.requests if request.method == "HEAD"]
+    assert head_requests, "Expected a HEAD request to be issued"
+    head_headers = head_requests[-1].headers
+
+    user_agent = expected_headers.get("User-Agent")
+    if user_agent is not None:
+        assert head_headers.get("User-Agent") == user_agent
+    assert head_headers.get("If-None-Match") == previous_manifest["etag"]
+    assert head_headers.get("If-Modified-Since") == previous_manifest["last_modified"]
+
+
+def test_head_retry_after_honours_delay_before_get(ontology_env, tmp_path):
+    """A Retry-After header on the HEAD response should delay the subsequent GET."""
+
+    payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
+    retry_after_sec = 0.35
+    url = ontology_env.register_fixture(
+        "hp-retry-after.owl",
+        payload,
+        media_type="application/rdf+xml",
+        repeats=1,
+    )
+    ontology_env.queue_response(
+        "fixtures/hp-retry-after.owl",
+        ResponseSpec(
+            method="HEAD",
+            status=429,
+            headers={"Retry-After": f"{retry_after_sec:.2f}"},
+        ),
+    )
+
+    config = ontology_env.build_download_config()
+    destination = tmp_path / "hp-retry-after.owl"
+
+    start = time.monotonic()
+    result = network_mod.download_stream(
+        url=url,
+        destination=destination,
+        headers={},
+        previous_manifest=None,
+        http_config=config,
+        cache_dir=ontology_env.cache_dir,
+        logger=_logger(),
+        expected_media_type="application/rdf+xml",
+        service="obo",
+    )
+    elapsed = time.monotonic() - start
+
+    assert result.status == "fresh"
+    assert destination.read_bytes() == payload
+    assert elapsed >= retry_after_sec - 0.05
+
+    methods = [request.method for request in ontology_env.requests]
+    assert methods.count("HEAD") == 1
+    assert methods.count("GET") == 1
 
 
 def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):

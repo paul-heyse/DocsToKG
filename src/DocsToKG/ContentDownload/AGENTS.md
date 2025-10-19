@@ -66,6 +66,7 @@ flowchart LR
 ## I/O, Caching & Concurrency Notes
 - Artifact layout: staging runs create `RUN_ID/{PDF,HTML,XML}`. Non-staging reuses `--out` plus sibling HTML/XML directories.
 - Resume: `telemetry.load_previous_manifest()` consumes JSONL (including rotated files) and `manifest.sqlite3`. Keep `record_type` fields intact.
+- Global URL dedupe hydration only runs when `ResolverConfig.enable_global_url_dedup` is true; `--global-url-dedup-cap` bounds the manifest scan (0 disables the cap) to keep persistent resume state lightweight.
 - Robots policies: `download.RobotsCache` respects `robots.txt` unless `--ignore-robots` is set. User agent defaults derive from `ResolverConfig.polite_headers`.
 - Concurrency: `ThreadLocalSessionFactory` maintains per-thread sessions; host-level concurrency is gated by semaphores and token buckets.
 

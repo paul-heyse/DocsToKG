@@ -193,7 +193,7 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
 
     from DocsToKG.DocParsing.core import cli
 
-    def fake_iter_manifest_entries(stages, data_root):
+    def fake_iter_manifest_entries(stages, data_root, *, limit=None):
         assert stages == [stage_name]
         assert data_root == tmp_path
 
