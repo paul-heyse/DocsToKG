@@ -727,6 +727,69 @@ def test_main_dry_run_skips_writing_files(download_modules, patcher, tmp_path):
     assert all(row["dry_run"] is True for row in manifest_rows)
 
 
+def test_main_with_max_zero_skips_artifacts(download_modules, patcher, tmp_path):
+    downloader = download_modules.downloader
+
+    out_dir = tmp_path / "max-zero"
+    manifest_path = out_dir / "manifest.jsonl"
+    out_dir.mkdir()
+
+    works = [
+        {
+            "id": f"https://openalex.org/WZero{i}",
+            "title": f"Zero Work {i}",
+            "publication_year": 2024,
+        }
+        for i in range(5)
+    ]
+
+    def fake_iterate(*_, **__):
+        return iter(works)
+
+    patcher.setattr(downloader, "iterate_openalex", fake_iterate)
+    patcher.setattr("DocsToKG.ContentDownload.runner.iterate_openalex", fake_iterate)
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", lambda value, *_: value
+    )
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.args.default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.resolvers.default_resolvers", lambda: [])
+
+    call_count = 0
+
+    def fake_process_one_work(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return {}
+
+    patcher.setattr("DocsToKG.ContentDownload.runner.process_one_work", fake_process_one_work)
+
+    argv = [
+        "download_pyalex_pdfs.py",
+        "--topic",
+        "max zero",
+        "--year-start",
+        "2024",
+        "--year-end",
+        "2024",
+        "--out",
+        str(out_dir),
+        "--manifest",
+        str(manifest_path),
+        "--max",
+        "0",
+    ]
+    patcher.setattr("sys.argv", value=argv)
+
+    result = downloader.main()
+
+    assert result.processed == 0
+    assert result.saved == 0
+    assert result.skipped == 0
+    assert call_count == 0
+
+
 def test_main_requires_topic_or_topic_id(download_modules, patcher):
     downloader = download_modules.downloader
     patcher.setattr(
