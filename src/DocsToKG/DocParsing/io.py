@@ -19,6 +19,7 @@ import unicodedata
 import uuid
 import warnings
 from datetime import datetime, timezone
+from functools import total_ordering
 from itertools import count
 from pathlib import Path
 from typing import (
@@ -752,17 +753,40 @@ def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, di
     return index
 
 
-def _manifest_timestamp_key(entry: Mapping[str, object]) -> str:
-    """Return a sortable timestamp key for manifest entries."""
+@total_ordering
+class _ManifestHeapKey:
+    """Comparable key that preserves manifest order when timestamps are missing."""
+
+    __slots__ = ("timestamp", "order")
+
+    def __init__(self, timestamp: Optional[str], order: int) -> None:
+        self.timestamp = timestamp
+        self.order = order
+
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, _ManifestHeapKey):
+            return NotImplemented
+        if self.timestamp is not None and other.timestamp is not None:
+            if self.timestamp != other.timestamp:
+                return self.timestamp < other.timestamp
+        return self.order < other.order
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, _ManifestHeapKey):
+            return NotImplemented
+        return self.timestamp == other.timestamp and self.order == other.order
+
+
+def _manifest_timestamp_key(entry: Mapping[str, object]) -> Optional[str]:
+    """Return a sortable timestamp key or ``None`` when unavailable."""
 
     raw = entry.get("timestamp")
     if isinstance(raw, str):
-        return raw
+        stripped = raw.strip()
+        return stripped or None
     if isinstance(raw, datetime):
         return raw.isoformat()
-    if raw is None:
-        return ""
-    return str(raw)
+    return None
 
 
 def _iter_manifest_tail_lines(path: Path, limit: int) -> Iterator[str]:
@@ -850,8 +874,13 @@ def iter_manifest_entries(
     """
 
     manifest_dir = data_manifests(root, ensure=False)
-    heap: List[Tuple[str, int, dict, Iterator[dict]]] = []
+    heap: List[Tuple[_ManifestHeapKey, int, dict, Iterator[dict]]] = []
     unique = count()
+
+    def _push_entry(entry: dict, stream: Iterator[dict]) -> None:
+        order = next(unique)
+        key = _ManifestHeapKey(_manifest_timestamp_key(entry), order)
+        heapq.heappush(heap, (key, order, entry, stream))
 
     for stage in stages:
         stage_path = manifest_dir / _manifest_filename(stage)
@@ -862,15 +891,7 @@ def iter_manifest_entries(
             first_entry = next(stream)
         except StopIteration:
             continue
-        heapq.heappush(
-            heap,
-            (
-                _manifest_timestamp_key(first_entry),
-                next(unique),
-                first_entry,
-                stream,
-            ),
-        )
+        _push_entry(first_entry, stream)
 
     while heap:
         _, _, entry, stream = heapq.heappop(heap)
@@ -879,15 +900,7 @@ def iter_manifest_entries(
             next_entry = next(stream)
         except StopIteration:
             continue
-        heapq.heappush(
-            heap,
-            (
-                _manifest_timestamp_key(next_entry),
-                next(unique),
-                next_entry,
-                stream,
-            ),
-        )
+        _push_entry(next_entry, stream)
 
 
 __all__ = [

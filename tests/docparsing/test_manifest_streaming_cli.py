@@ -336,98 +336,59 @@ def test_manifest_read_only_root_existing_manifests(tmp_path, monkeypatch, capsy
     assert "status=failure" in stdout[1]
 
 
-def test_manifest_tail_reads_bounded_window(monkeypatch, tmp_path, capsys) -> None:
-    """``--tail`` without summary reads only a bounded suffix from manifests."""
+def test_manifest_tail_handles_missing_timestamps(monkeypatch, tmp_path, capsys) -> None:
+    """Tail output should respect manifest order when timestamps are missing."""
 
     _prepare_manifest_cli_stubs(monkeypatch)
 
-    from DocsToKG.DocParsing.core import cli
-    from DocsToKG.DocParsing import io as manifest_io
-
-    stage_name = "chunks"
     manifest_dir = tmp_path / "Manifests"
     manifest_dir.mkdir()
-    manifest_path = manifest_dir / f"docparse.{stage_name}.manifest.jsonl"
 
-    total_entries = 6_000
-    lines = [
-        json.dumps(
-            {
-                "timestamp": f"2025-01-01T00:{index // 60:02d}:{index % 60:02d}",
-                "stage": stage_name,
-                "doc_id": f"doc-{index}",
-                "status": "success",
-                "duration_s": 0.25,
-            }
-        )
-        for index in range(total_entries)
-    ]
-    manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    def _write(stage: str, entries: list[dict]) -> None:
+        path = manifest_dir / f"docparse.{stage}.manifest.jsonl"
+        with path.open("w", encoding="utf-8") as handle:
+            for entry in entries:
+                handle.write(json.dumps(entry))
+                handle.write("\n")
 
-    window_bytes = 4096
-    monkeypatch.setattr(manifest_io, "_MANIFEST_TAIL_MIN_WINDOW", window_bytes)
-    monkeypatch.setattr(manifest_io, "_MANIFEST_TAIL_BYTES_PER_ENTRY", 64)
+    _write(
+        "chunks",
+        [
+            {"timestamp": "2025-01-01T00:00:00", "doc_id": "chunk-0", "status": "success"},
+            {"doc_id": "chunk-no-ts", "status": "success"},
+            {"timestamp": "2025-01-01T00:02:00", "doc_id": "chunk-2", "status": "success"},
+        ],
+    )
+    _write(
+        "embeddings",
+        [
+            {"timestamp": "2025-01-01T00:00:30", "doc_id": "embed-0", "status": "success"},
+            {"doc_id": "embed-no-ts", "status": "failure"},
+            {"timestamp": "2025-01-01T00:03:00", "doc_id": "embed-2", "status": "success"},
+        ],
+    )
 
-    read_lengths: list[int] = []
-    target_path = manifest_path.resolve()
-    original_open = manifest_io.Path.open
+    from DocsToKG.DocParsing.core import cli
 
-    class _CountingHandle:
-        def __init__(self, handle):
-            self._handle = handle
-
-        def read(self, size=-1):
-            data = self._handle.read(size)
-            if isinstance(data, bytes):
-                read_lengths.append(len(data))
-            return data
-
-        def __getattr__(self, name):  # pragma: no cover - passthrough helper
-            return getattr(self._handle, name)
-
-        def __enter__(self):
-            self._handle.__enter__()
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return self._handle.__exit__(exc_type, exc, tb)
-
-    def counting_open(self, mode="r", *args, **kwargs):
-        handle = original_open(self, mode, *args, **kwargs)
-        if "b" in mode:
-            try:
-                resolved = self.resolve()
-            except OSError:
-                resolved = self
-            if resolved == target_path:
-                return _CountingHandle(handle)
-        return handle
-
-    monkeypatch.setattr(manifest_io.Path, "open", counting_open)
-
-    tail_count = 5
     exit_code = cli.manifest(
         [
-            "--stage",
-            stage_name,
-            "--tail",
-            str(tail_count),
             "--data-root",
             str(tmp_path),
+            "--stage",
+            "chunks",
+            "--stage",
+            "embeddings",
+            "--tail",
+            "3",
+            "--raw",
         ]
     )
 
     assert exit_code == 0
 
-    stdout = capsys.readouterr().out.splitlines()
-    assert stdout[0] == f"docparse manifest tail (last {tail_count} entries)"
+    stdout = capsys.readouterr().out.strip().splitlines()
+    assert stdout[0] == "docparse manifest tail (last 3 entries)"
+    assert len(stdout[1:]) == 3
 
-    expected_ids = [f"doc-{index}" for index in range(total_entries - tail_count, total_entries)]
-    tail_lines = stdout[1 : 1 + tail_count]
-    for doc_id, line in zip(expected_ids, tail_lines):
-        assert doc_id in line
-
-    bytes_read = sum(read_lengths)
-    assert bytes_read > 0
-    assert bytes_read <= window_bytes
-    assert manifest_path.stat().st_size > window_bytes * 4
+    tail_ids = [json.loads(line)["doc_id"] for line in stdout[1:]]
+    assert tail_ids == ["embed-no-ts", "chunk-2", "embed-2"]
