@@ -6,6 +6,7 @@ import json
 import logging
 import threading
 import time
+from contextlib import ExitStack
 from pathlib import Path
 
 import pytest
@@ -285,3 +286,76 @@ def test_fetch_all_batch_failure_cancels_blocking_workers(ontology_env):
         for request in ontology_env.requests
     )
     assert elapsed < 1.0
+
+
+def test_plan_all_releases_tokens_after_heavy_batch(ontology_env):
+    """Heavy planning batches should release tokens when complete."""
+
+    token_group = CancellationTokenGroup()
+    config = _resolved_config(ontology_env)
+    config.defaults.http.concurrent_plans = 4
+
+    specs: list[FetchSpec] = []
+    with ExitStack() as stack:
+        for index in range(8):
+            resolver_name, resolver = _static_resolver_for(
+                ontology_env,
+                name=f"plan-heavy-{index}",
+                filename=f"plan-heavy-{index}.owl",
+            )
+            stack.enter_context(temporary_resolver(resolver_name, resolver))
+            specs.append(
+                FetchSpec(
+                    id=f"plan-heavy-{index}",
+                    resolver=resolver_name,
+                    extras={},
+                    target_formats=("owl",),
+                )
+            )
+
+        plans = plan_all(
+            specs,
+            config=config,
+            logger=_logger(),
+            cancellation_token_group=token_group,
+        )
+
+    assert len(plans) == len(specs)
+    assert len(token_group) == 0
+
+
+def test_fetch_all_releases_tokens_after_heavy_batch(ontology_env):
+    """Heavy fetch batches should release tokens when complete."""
+
+    token_group = CancellationTokenGroup()
+    config = _resolved_config(ontology_env)
+    config.defaults.http.concurrent_downloads = 4
+
+    specs: list[FetchSpec] = []
+    with ExitStack() as stack:
+        for index in range(6):
+            resolver_name, resolver = _static_resolver_for(
+                ontology_env,
+                name=f"fetch-heavy-{index}",
+                filename=f"fetch-heavy-{index}.owl",
+            )
+            stack.enter_context(temporary_resolver(resolver_name, resolver))
+            specs.append(
+                FetchSpec(
+                    id=f"fetch-heavy-{index}",
+                    resolver=resolver_name,
+                    extras={},
+                    target_formats=("owl",),
+                )
+            )
+
+        results = fetch_all(
+            specs,
+            config=config,
+            logger=_logger(),
+            force=True,
+            cancellation_token_group=token_group,
+        )
+
+    assert len(results) == len(specs)
+    assert len(token_group) == 0
