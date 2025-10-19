@@ -416,16 +416,56 @@ class DownloadRun:
         self.state.update_from_result(result)
         return result
 
+    def _record_worker_crash_manifest(
+        self,
+        artifact_context: Optional[Tuple[WorkArtifact, bool, Optional[str]]],
+        exc: Exception,
+    ) -> None:
+        """Record a manifest entry for a worker crash if telemetry is available."""
+
+        if self.attempt_logger is None or artifact_context is None:
+            return
+
+        artifact, dry_run_flag, run_id_token = artifact_context
+        normalized_run_id = run_id_token or self.resolved.run_id
+        crash_url = (
+            f"worker-crash://{normalized_run_id or 'unknown-run'}/{artifact.work_id}"
+        )
+        try:
+            outcome = DownloadOutcome(
+                classification=Classification.SKIPPED,
+                reason=ReasonCode.WORKER_EXCEPTION,
+                reason_detail="worker-crash",
+                error=str(exc),
+            )
+            self.attempt_logger.record_manifest(
+                artifact,
+                resolver=None,
+                url=crash_url,
+                outcome=outcome,
+                html_paths=(),
+                dry_run=dry_run_flag,
+                run_id=normalized_run_id,
+                reason=ReasonCode.WORKER_EXCEPTION,
+                reason_detail="worker-crash",
+            )
+        except Exception:
+            LOGGER.warning(
+                "Failed to record manifest after worker crash",
+                exc_info=True,
+            )
+
     def _handle_worker_exception(
         self,
         state: DownloadRunState,
         exc: Exception,
         *,
         work_id: Optional[str] = None,
+        artifact_context: Optional[Tuple[WorkArtifact, bool, Optional[str]]] = None,
     ) -> None:
         """Apply consistent crash handling for sequential and threaded workers."""
 
-        state.worker_failures += 1
+        state.record_worker_failure()
         extra_fields: Dict[str, Any] = {"error": str(exc)}
         if work_id:
             extra_fields["work_id"] = work_id
@@ -433,6 +473,7 @@ class DownloadRun:
             "worker_crash",
             extra={"extra_fields": extra_fields},
         )
+        self._record_worker_crash_manifest(artifact_context, exc)
         state.update_from_result({"skipped": True})
 
     def run(self) -> RunResult:
@@ -474,6 +515,11 @@ class DownloadRun:
                                 state,
                                 exc,
                                 work_id=getattr(artifact, "work_id", None),
+                                artifact_context=(
+                                    artifact,
+                                    bool(state.options.dry_run),
+                                    state.options.run_id or self.resolved.run_id,
+                                ),
                             )
                         if self.args.sleep > 0:
                             time.sleep(self.args.sleep)
@@ -506,45 +552,12 @@ class DownloadRun:
                             try:
                                 completed_future.result()
                             except Exception as exc:
-                                state.record_worker_failure()
-                                extra_fields: Dict[str, Any] = {"error": str(exc)}
-                                if work_id:
-                                    extra_fields["work_id"] = work_id
-                                LOGGER.exception(
-                                    "worker_crash",
-                                    extra={"extra_fields": extra_fields},
+                                self._handle_worker_exception(
+                                    state,
+                                    exc,
+                                    work_id=work_id,
+                                    artifact_context=artifact_context,
                                 )
-                                if self.attempt_logger is not None and artifact_context:
-                                    artifact, dry_run_flag, run_id_token = artifact_context
-                                    normalized_run_id = run_id_token or self.resolved.run_id
-                                    crash_url = (
-                                        f"worker-crash://{normalized_run_id or 'unknown-run'}/"
-                                        f"{artifact.work_id}"
-                                    )
-                                    try:
-                                        outcome = DownloadOutcome(
-                                            classification=Classification.SKIPPED,
-                                            reason=ReasonCode.WORKER_EXCEPTION,
-                                            reason_detail="worker-crash",
-                                            error=str(exc),
-                                        )
-                                        self.attempt_logger.record_manifest(
-                                            artifact,
-                                            resolver=None,
-                                            url=crash_url,
-                                            outcome=outcome,
-                                            html_paths=(),
-                                            dry_run=dry_run_flag,
-                                            run_id=normalized_run_id,
-                                            reason=ReasonCode.WORKER_EXCEPTION,
-                                            reason_detail="worker-crash",
-                                        )
-                                    except Exception:
-                                        LOGGER.warning(
-                                            "Failed to record manifest after worker crash",
-                                            exc_info=True,
-                                        )
-                                state.update_from_result({"skipped": True})
                                 return
 
                         for artifact in provider.iter_artifacts():
