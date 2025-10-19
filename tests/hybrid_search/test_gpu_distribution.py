@@ -16,7 +16,7 @@ except Exception:  # pragma: no cover - gracefully handle missing wheel
     faiss = None  # type: ignore
 
 
-temp_memory = 8 * 1024 * 1024
+temp_memory = 1 << 20
 
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
@@ -30,7 +30,10 @@ temp_memory = 8 * 1024 * 1024
     reason="faiss build does not expose GPU replication helpers",
 )
 @pytest.mark.parametrize("shard", [False, True])
-def test_distribute_to_all_gpus_configures_cloner_options(monkeypatch, shard: bool) -> None:
+@pytest.mark.parametrize("force_legacy_path", [False, True])
+def test_distribute_to_all_gpus_configures_cloner_options(
+    monkeypatch, caplog, shard: bool, force_legacy_path: bool
+) -> None:
     """Ensure the GPU distributor forwards supported arguments only."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -52,6 +55,7 @@ def test_distribute_to_all_gpus_configures_cloner_options(monkeypatch, shard: bo
     monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
 
     captured: dict[str, object] = {}
+    caplog.set_level(logging.INFO, logger="DocsToKG.HybridSearch")
 
     class RecordingResources:
         def __init__(self) -> None:
@@ -86,30 +90,62 @@ def test_distribute_to_all_gpus_configures_cloner_options(monkeypatch, shard: bo
 
     monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", DummyClonerOptions, raising=False)
 
-    def fake_index_cpu_to_gpu_multiple(
-        resources_vector, gpu_ids, index_arg, co=None
-    ):  # type: ignore[override]
-        captured["co"] = co
-        captured["gpu_ids"] = list(gpu_ids)
-        captured["resources_vector"] = resources_vector
-        return index_arg
+    if force_legacy_path:
+        monkeypatch.delattr(faiss, "index_cpu_to_gpu_multiple", raising=False)
 
-    monkeypatch.setattr(faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple)
-    monkeypatch.setattr(
-        faiss,
-        "index_cpu_to_all_gpus",
-        lambda *args, **kwargs: pytest.fail("legacy replication path invoked"),
-    )
+        def fake_index_cpu_to_gpus_list(
+            index_arg, *, gpus=None, co=None, resources=None
+        ):  # type: ignore[override]
+            captured["co"] = co
+            captured["gpus"] = list(gpus or [])
+            captured["resources_vector"] = resources
+            return index_arg
+
+        monkeypatch.setattr(
+            faiss,
+            "index_cpu_to_gpus_list",
+            fake_index_cpu_to_gpus_list,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            faiss,
+            "index_cpu_to_all_gpus",
+            lambda *args, **kwargs: pytest.fail("manual resource fallback should be used"),
+        )
+    else:
+
+        def fake_index_cpu_to_gpu_multiple(
+            resources_vector, gpu_ids, index_arg, co=None
+        ):  # type: ignore[override]
+            captured["co"] = co
+            captured["gpu_ids"] = list(gpu_ids)
+            captured["resources_vector"] = resources_vector
+            return index_arg
+
+        monkeypatch.setattr(
+            faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple
+        )
+        monkeypatch.setattr(
+            faiss,
+            "index_cpu_to_gpus_list",
+            lambda *args, **kwargs: pytest.fail("gpu_multiple path should be used"),
+            raising=False,
+        )
+        monkeypatch.setattr(
+            faiss,
+            "index_cpu_to_all_gpus",
+            lambda *args, **kwargs: pytest.fail("legacy replication path invoked"),
+        )
 
     replicated = store.distribute_to_all_gpus(cpu_index, shard=shard)
 
     assert replicated is cpu_index
     assert store._replicated is True
     assert isinstance(captured["co"], faiss.GpuMultipleClonerOptions)
-    assert captured["gpu_ids"] == [0, 1]
     vector = captured["resources_vector"]
     assert isinstance(vector, RecordingVector)
-    assert len(vector.resources) == 2
+    expected_gpu_ids = [0, 1]
+    assert len(vector.resources) == len(expected_gpu_ids)
     for resource in vector.resources:
         assert resource.temp_memory_calls == [temp_memory]
     assert store._replica_gpu_resources == [vector.resources[1]]
@@ -117,6 +153,21 @@ def test_distribute_to_all_gpus_configures_cloner_options(monkeypatch, shard: bo
     assert cloner.shard is shard
     if shard and hasattr(cloner, "common_ivf_quantizer"):
         assert cloner.common_ivf_quantizer is True
+
+    counters = {
+        (sample.name, tuple(sorted(sample.labels.items()))): sample.value
+        for sample in store._observability.metrics.export_counters()
+    }
+    if force_legacy_path:
+        assert captured["gpus"] == expected_gpu_ids
+        assert counters.get(("faiss_gpu_manual_resource_path", ())) == 1.0
+        assert any(
+            record.getMessage() == "faiss-manual-resource-path-engaged"
+            for record in caplog.records
+        )
+    else:
+        assert captured["gpu_ids"] == expected_gpu_ids
+        assert ("faiss_gpu_manual_resource_path", ()) not in counters
 
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
