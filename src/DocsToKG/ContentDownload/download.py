@@ -80,7 +80,7 @@ from DocsToKG.ContentDownload.pipeline import (
     ResolverMetrics,
     ResolverPipeline,
 )
-from DocsToKG.ContentDownload.telemetry import RunTelemetry
+from DocsToKG.ContentDownload.telemetry import RunTelemetry, normalize_manifest_path
 
 __all__ = [
     "ensure_dir",
@@ -2003,7 +2003,10 @@ def build_download_outcome(
         if reason_detail is None:
             reason_detail = "not-modified"
 
-    path_str = str(dest_path) if dest_path else None
+    path_str = normalize_manifest_path(dest_path) if dest_path else None
+    normalized_text_path = (
+        normalize_manifest_path(extracted_text_path) if extracted_text_path else None
+    )
 
     return DownloadOutcome(
         classification=classification_code,
@@ -2017,7 +2020,7 @@ def build_download_outcome(
         content_length=content_length,
         etag=etag,
         last_modified=last_modified,
-        extracted_text_path=extracted_text_path,
+        extracted_text_path=normalized_text_path,
         retry_after=retry_after,
     )
 

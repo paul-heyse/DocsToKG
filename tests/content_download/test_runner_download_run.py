@@ -2,8 +2,9 @@ import argparse
 import contextlib
 import json
 import logging
-import time
+import os
 import sqlite3
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Sequence
@@ -13,6 +14,7 @@ import requests
 
 from DocsToKG.ContentDownload.args import ResolvedConfig, bootstrap_run_environment
 from DocsToKG.ContentDownload.core import Classification, ReasonCode, WorkArtifact
+from DocsToKG.ContentDownload.download import handle_resume_logic
 from DocsToKG.ContentDownload.networking import ThreadLocalSessionFactory
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.providers import WorkProvider
@@ -696,6 +698,168 @@ def test_setup_download_state_prefers_adjacent_sqlite_for_external_csv(tmp_path)
     resume_entry = next(iter(previous_lookup.values()))
     assert resume_entry["classification"] == "pdf"
     assert resume_entry["path"].endswith("external.pdf")
+
+
+def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, monkeypatch):
+    run_root = tmp_path / "first"
+    pdf_dir = run_root / "pdfs"
+    html_dir = run_root / "html"
+    xml_dir = run_root / "xml"
+    for directory in (pdf_dir, html_dir, xml_dir):
+        directory.mkdir(parents=True, exist_ok=True)
+
+    cached_pdf = pdf_dir / "w-abs.pdf"
+    cached_pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
+
+    manifest_path = run_root / "manifest.jsonl"
+    manifest_entry = {
+        "record_type": "manifest",
+        "schema_version": MANIFEST_SCHEMA_VERSION,
+        "run_id": "resume-run",
+        "work_id": "W-ABS",
+        "url": "https://example.org/w-abs.pdf",
+        "classification": "pdf",
+        "path": "pdfs/w-abs.pdf",
+    }
+    manifest_path.write_text(json.dumps(manifest_entry) + "\n", encoding="utf-8")
+
+    other_root = tmp_path / "second"
+    other_root.mkdir()
+    monkeypatch.chdir(other_root)
+
+    resume_target = Path(os.path.relpath(manifest_path, other_root))
+    relative_pdf_dir = Path(os.path.relpath(pdf_dir, other_root))
+    relative_html_dir = Path(os.path.relpath(html_dir, other_root))
+    relative_xml_dir = Path(os.path.relpath(xml_dir, other_root))
+
+    args = _build_args()
+    args.resume_from = resume_target
+
+    resolved = ResolvedConfig(
+        args=args,
+        run_id="resume-run",
+        query=DummyWorks(),
+        pdf_dir=relative_pdf_dir,
+        html_dir=relative_html_dir,
+        xml_dir=relative_xml_dir,
+        manifest_path=resume_target,
+        csv_path=None,
+        sqlite_path=resume_target.with_suffix(".sqlite3"),
+        resolver_instances=[],
+        resolver_config=SimpleNamespace(polite_headers={}),
+        previous_url_index=ManifestUrlIndex(None),
+        persistent_seen_urls=set(),
+        robots_checker=None,
+        concurrency_product=1,
+        extract_html_text=False,
+        verify_cache_digest=False,
+    )
+
+    bootstrap_run_environment(resolved)
+
+    download_run = DownloadRun(resolved)
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        state = download_run.setup_download_state(factory)
+    finally:
+        factory.close_all()
+        download_run.close()
+
+    assert "W-ABS" in state.options.resume_completed
+    previous_lookup = state.options.previous_lookup.get("W-ABS")
+    assert previous_lookup is not None and previous_lookup
+    resume_entry = next(iter(previous_lookup.values()))
+    cached_path = resume_entry["path"]
+    assert cached_path is not None
+    assert Path(cached_path).is_absolute()
+    assert Path(cached_path).exists()
+
+    artifact = _make_artifact(resolved, "W-ABS")
+    decision = handle_resume_logic(
+        artifact,
+        previous_lookup,
+        state.options,
+    )
+    assert decision.should_skip is True
+    assert decision.reason is ReasonCode.RESUME_COMPLETE
+    assert decision.outcome is not None
+    assert decision.outcome.classification is Classification.SKIPPED
+
+
+def test_manifest_url_index_resolves_relative_paths(tmp_path, monkeypatch):
+    run_root = tmp_path / "run"
+    pdf_dir = run_root / "pdfs"
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    cached_file = pdf_dir / "cached.pdf"
+    cached_file.write_bytes(b"binary")
+
+    sqlite_path = run_root / "manifest.sqlite3"
+    conn = sqlite3.connect(sqlite_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE manifests (
+                timestamp TEXT,
+                url TEXT,
+                normalized_url TEXT,
+                path TEXT,
+                sha256 TEXT,
+                classification TEXT,
+                etag TEXT,
+                last_modified TEXT,
+                content_length INTEGER,
+                path_mtime_ns INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO manifests (
+                timestamp,
+                url,
+                normalized_url,
+                path,
+                sha256,
+                classification,
+                etag,
+                last_modified,
+                content_length,
+                path_mtime_ns
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "2025-01-01T00:00:00Z",
+                "https://example.org/cached.pdf",
+                "https://example.org/cached.pdf",
+                "pdfs/cached.pdf",
+                "deadbeef",
+                "pdf",
+                None,
+                None,
+                cached_file.stat().st_size,
+                cached_file.stat().st_mtime_ns,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    other_root = tmp_path / "elsewhere"
+    other_root.mkdir()
+    monkeypatch.chdir(other_root)
+
+    relative_sqlite = Path(os.path.relpath(sqlite_path, other_root))
+    index = ManifestUrlIndex(relative_sqlite)
+
+    record = index.get("https://example.org/cached.pdf")
+    assert record is not None
+    assert record["path"] == str(cached_file.resolve())
+    assert Path(record["path"]).exists()
+
+    existing = list(index.iter_existing())
+    assert existing
+    _, meta = existing[0]
+    assert meta["path"] == record["path"]
 
 
 def test_setup_worker_pool_creates_executor_when_parallel(tmp_path):
