@@ -107,6 +107,7 @@ def _build_args(
         "sleep": 0.0,
         "openalex_retry_attempts": 3,
         "openalex_retry_backoff": 0.0,
+        "retry_after_cap": 120.0,
     }
     if overrides:
         defaults.update(overrides)
@@ -152,6 +153,7 @@ def make_resolved_config(
         verify_cache_digest=False,
         openalex_retry_attempts=args.openalex_retry_attempts,
         openalex_retry_backoff=args.openalex_retry_backoff,
+        retry_after_cap=args.retry_after_cap,
     )
 
 
@@ -1455,6 +1457,88 @@ def test_worker_crash_records_manifest_reason(patcher, tmp_path, worker_count):
     assert failure_record["classification"] == Classification.SKIPPED.value
     assert failure_record["reason"] == ReasonCode.WORKER_EXCEPTION.value
     assert failure_record["reason_detail"] == "worker-crash"
+
+
+def test_single_worker_exception_discards_session(patcher, tmp_path):
+    resolved = make_resolved_config(tmp_path, workers=1, csv=False)
+    bootstrap_run_environment(resolved)
+
+    failure_id = "W_SEQ_FAIL"
+    recovery_id = "W_SEQ_RECOVER"
+    artifacts = [
+        _make_artifact(resolved, failure_id),
+        _make_artifact(resolved, recovery_id),
+    ]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    session_counter = itertools.count()
+    created_sessions: List["RecordingSession"] = []
+    closed_tokens: List[int] = []
+
+    class RecordingSession:
+        def __init__(self, token: int) -> None:
+            self.token = token
+
+        def close(self) -> None:
+            closed_tokens.append(self.token)
+
+    def fake_create_session(*args, **kwargs):
+        token = next(session_counter)
+        session = RecordingSession(token)
+        created_sessions.append(session)
+        return session
+
+    observed_sessions: List[RecordingSession] = []
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: RecordingSession,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        observed_sessions.append(session)
+        if work.work_id == failure_id:
+            raise RuntimeError("boom")
+        return {"saved": True, "downloaded_bytes": 1}
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.create_session", fake_create_session
+    )
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.worker_failures == 1
+    assert len(observed_sessions) == 2
+    assert observed_sessions[0] is created_sessions[0]
+    assert observed_sessions[1] is created_sessions[1]
+    assert observed_sessions[0] is not observed_sessions[1]
+    assert closed_tokens and closed_tokens[0] == created_sessions[0].token
+
+    download_run.close()
 
 
 def test_worker_tls_failure_discards_thread_session(patcher, tmp_path):
