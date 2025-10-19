@@ -38,8 +38,11 @@ class _StubManifestIndex:
         self.path = path
         self.eager = eager
 
-    def iter_existing(self):  # pragma: no cover - trivial
+    def iter_existing_paths(self):  # pragma: no cover - trivial
         return []
+
+    def iter_existing(self):  # pragma: no cover - trivial
+        return self.iter_existing_paths()
 
 
 @pytest.fixture(autouse=True)

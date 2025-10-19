@@ -229,16 +229,68 @@ class ManifestUrlIndex:
         self._ensure_loaded()
         return self._cache.items()
 
-    def iter_existing(self) -> Iterator[Tuple[str, Dict[str, Any]]]:
-        """Yield manifest entries whose artifact paths still exist on disk.
+    def iter_existing_paths(self) -> Iterator[Tuple[str, Dict[str, Any]]]:
+        """Stream manifest entries whose artifact paths still exist on disk."""
 
-        Returns:
-            Iterator with cached entries whose ``path`` resolves to an existing file.
-        """
-        for normalized, meta in self.items():
-            path_value = meta.get("path")
-            if path_value and Path(path_value).exists():
-                yield normalized, meta
+        if self._loaded_all or not self._path or not self._path.exists():
+            for normalized, meta in self._cache.items():
+                path_value = meta.get("path")
+                if path_value and Path(path_value).exists():
+                    yield normalized, meta
+            return
+
+        conn = sqlite3.connect(self._path)
+        try:
+            try:
+                cursor = conn.execute(
+                    "SELECT url, normalized_url, path, sha256, classification, etag, last_modified, content_length, path_mtime_ns "
+                    "FROM manifests ORDER BY timestamp DESC"
+                )
+            except sqlite3.OperationalError:
+                return
+
+            seen: Set[str] = set()
+            for (
+                url,
+                normalized_url,
+                stored_path,
+                sha256,
+                classification,
+                etag,
+                last_modified,
+                content_length,
+                path_mtime_ns,
+            ) in cursor:
+                if not url:
+                    continue
+                normalized = normalized_url or normalize_url(url)
+                if normalized in seen:
+                    continue
+                if not stored_path:
+                    continue
+                if not Path(stored_path).exists():
+                    continue
+
+                payload = {
+                    "url": url,
+                    "path": stored_path,
+                    "sha256": sha256,
+                    "classification": classification,
+                    "etag": etag,
+                    "last_modified": last_modified,
+                    "content_length": content_length,
+                    "mtime_ns": path_mtime_ns,
+                }
+                self._cache.setdefault(normalized, payload)
+                seen.add(normalized)
+                yield normalized, payload
+        finally:
+            conn.close()
+
+    def iter_existing(self) -> Iterator[Tuple[str, Dict[str, Any]]]:
+        """Yield manifest entries whose artifact paths still exist on disk."""
+
+        yield from self.iter_existing_paths()
 
     def as_dict(self) -> Dict[str, Dict[str, Any]]:
         """Return a defensive copy of the manifest cache.
