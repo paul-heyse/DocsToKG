@@ -3209,6 +3209,17 @@ class ManagedFaissAdapter(DenseVectorStore):
 
         self._inner.flush_snapshot(reason=reason)
 
+    def snapshot_meta(self) -> Mapping[str, object]:
+        """Return snapshot metadata exposed by the managed store."""
+
+        meta_getter = getattr(self._inner, "snapshot_meta", None)
+        if not callable(meta_getter):
+            return {}
+        meta = meta_getter()
+        if isinstance(meta, Mapping):
+            return dict(meta)
+        return {}
+
     def get_gpu_resources(self) -> Optional["faiss.StandardGpuResources"]:
         """Return GPU resources backing the managed index (if available)."""
 

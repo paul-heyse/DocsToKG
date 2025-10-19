@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 import time
 from threading import RLock
@@ -115,19 +116,38 @@ class FaissRouter:
                     totals[key] = totals.get(key, 0.0) + float(value)
         return totals
 
-    def serialize_all(self) -> Dict[str, bytes]:
-        """Serialize every managed store (namespace -> payload)."""
+    def serialize_all(self) -> Dict[str, Dict[str, object]]:
+        """Serialize every managed store including snapshot metadata."""
 
-        payloads: Dict[str, bytes] = {}
+        def build_entry(
+            payload: bytes, meta: Optional[Mapping[str, object]]
+        ) -> Dict[str, object]:
+            entry: Dict[str, object] = {"faiss": bytes(payload)}
+            entry["meta"] = dict(meta) if isinstance(meta, Mapping) else None
+            return entry
+
+        def collect(store: DenseVectorStore) -> Tuple[bytes, Optional[Mapping[str, object]]]:
+            payload = store.serialize()
+            meta_getter = getattr(store, "snapshot_meta", None)
+            meta: Optional[Mapping[str, object]] = None
+            if callable(meta_getter):
+                raw_meta = meta_getter()
+                if isinstance(raw_meta, Mapping):
+                    meta = dict(raw_meta)
+            return payload, meta
+
+        payloads: Dict[str, Dict[str, object]] = {}
         if not self._per_namespace:
-            payloads[DEFAULT_NAMESPACE] = self._default_store.serialize()
+            payload, meta = collect(self._default_store)
+            payloads[DEFAULT_NAMESPACE] = build_entry(payload, meta)
             return payloads
         with self._lock:
             for namespace, store in self._stores.items():
-                payloads[namespace] = store.serialize()
+                payload, meta = collect(store)
+                payloads[namespace] = build_entry(payload, meta)
             for namespace, snapshot in self._snapshots.items():
-                payload, _ = snapshot
-                payloads.setdefault(namespace, payload)
+                payload, meta = snapshot
+                payloads.setdefault(namespace, build_entry(payload, meta))
         return payloads
 
     def iter_stores(self) -> Sequence[Tuple[str, DenseVectorStore]]:
@@ -139,16 +159,58 @@ class FaissRouter:
             items = list(self._stores.items())
         return items
 
-    def restore_all(self, payloads: Mapping[str, bytes]) -> None:
-        """Restore stores from serialized payloads."""
+    def restore_all(self, payloads: Mapping[str, object]) -> None:
+        """Restore stores from serialized payloads and metadata."""
+
+        def coerce_entry(
+            entry: object,
+        ) -> Tuple[Optional[bytes], Optional[Mapping[str, object]]]:
+            if isinstance(entry, (bytes, bytearray, memoryview)):
+                return bytes(entry), None
+            if isinstance(entry, Mapping):
+                blob = entry.get("faiss")
+                if isinstance(blob, (bytes, bytearray, memoryview)):
+                    meta_obj = entry.get("meta")
+                    meta = meta_obj if isinstance(meta_obj, Mapping) else None
+                    return bytes(blob), meta
+            return None, None
+
+        def restore_store(
+            store: DenseVectorStore,
+            blob: bytes,
+            meta: Optional[Mapping[str, object]],
+        ) -> None:
+            restore_fn = getattr(store, "restore")
+            if meta is None:
+                restore_fn(blob)
+                return
+            try:
+                signature = inspect.signature(restore_fn)
+            except (TypeError, ValueError):
+                signature = None
+            if signature is not None:
+                for parameter in signature.parameters.values():
+                    if parameter.name == "meta" and parameter.kind in (
+                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                        inspect.Parameter.KEYWORD_ONLY,
+                    ):
+                        restore_fn(blob, meta=meta)
+                        return
+            restore_fn(blob)
 
         if not self._per_namespace:
-            blob = payloads.get(DEFAULT_NAMESPACE)
-            if blob is not None:
-                self._default_store.restore(blob)
+            entry = payloads.get(DEFAULT_NAMESPACE)
+            if entry is not None:
+                blob, meta = coerce_entry(entry)
+                if blob is not None:
+                    restore_store(self._default_store, blob, meta)
             return
+
         with self._lock:
-            for namespace, blob in payloads.items():
+            for namespace, entry in payloads.items():
+                blob, meta = coerce_entry(entry)
+                if blob is None:
+                    continue
                 store = self._stores.get(namespace)
                 if store is None:
                     if self._factory is None:
@@ -160,7 +222,7 @@ class FaissRouter:
                 elif self._resolver:
                     store.set_id_resolver(self._resolver)
                 try:
-                    store.restore(blob)
+                    restore_store(store, blob, meta)
                 finally:
                     self._last_used[namespace] = time.time()
                     self._snapshots.pop(namespace, None)
