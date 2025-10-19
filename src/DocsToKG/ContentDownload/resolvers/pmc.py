@@ -42,6 +42,12 @@ if TYPE_CHECKING:  # pragma: no cover
 LOGGER = logging.getLogger(__name__)
 
 
+def request_with_retries(*args, **kwargs):
+    """Proxy to :func:`resolvers.base.request_with_retries` for patchability."""
+
+    return resolver_base.request_with_retries(*args, **kwargs)
+
+
 class PmcResolver(RegisteredResolver):
     """Resolve PubMed Central articles via identifiers and lookups."""
 
@@ -65,7 +71,7 @@ class PmcResolver(RegisteredResolver):
         if not identifiers:
             return []
         try:
-            resp = resolver_base.request_with_retries(
+            resp = request_with_retries(
                 session,
                 "get",
                 "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/",
@@ -77,6 +83,7 @@ class PmcResolver(RegisteredResolver):
                 },
                 timeout=config.get_timeout(self.name),
                 headers=config.polite_headers,
+                retry_after_cap=config.retry_after_cap,
             )
         except _requests.Timeout as exc:
             LOGGER.debug("PMC ID lookup timed out: %s", exc)
@@ -145,12 +152,13 @@ class PmcResolver(RegisteredResolver):
             oa_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={pmcid}"
             fallback_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/pdf/"
             try:
-                resp = resolver_base.request_with_retries(
+                resp = request_with_retries(
                     session,
                     "get",
                     oa_url,
                     timeout=config.get_timeout(self.name),
                     headers=config.polite_headers,
+                    retry_after_cap=config.retry_after_cap,
                 )
             except _requests.Timeout as exc:
                 yield ResolverResult(

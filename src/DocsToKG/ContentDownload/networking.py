@@ -197,17 +197,28 @@ class ThreadLocalSessionFactory:
         self._builder = builder
         self._local = threading.local()
         self._lock = threading.Lock()
-        self._sessions: Dict[int, requests.Session] = {}
+        self._thread_sessions: Dict[int, requests.Session] = {}
 
     def get_thread_session(self) -> requests.Session:
         """Return a session scoped to the current thread."""
 
+        thread_id = threading.get_ident()
         session = getattr(self._local, "session", None)
-        if session is None:
-            session = self._builder()
-            setattr(self._local, "session", session)
+        if session is not None:
             with self._lock:
-                self._sessions[id(session)] = session
+                if self._thread_sessions.get(thread_id) is session:
+                    return session
+            setattr(self._local, "session", None)
+            session = None
+
+        if session is None:
+            with self._lock:
+                session = self._thread_sessions.get(thread_id)
+            if session is None:
+                session = self._builder()
+                with self._lock:
+                    self._thread_sessions[thread_id] = session
+            setattr(self._local, "session", session)
         return session
 
     def __call__(self) -> requests.Session:
@@ -218,12 +229,17 @@ class ThreadLocalSessionFactory:
     def close_current(self) -> None:
         """Close and remove the session bound to the current thread."""
 
-        session = getattr(self._local, "session", None)
+        thread_id = threading.get_ident()
+        setattr(self._local, "session", None)
+        self.close_for_thread(thread_id)
+
+    def close_for_thread(self, thread_id: int) -> None:
+        """Close and discard the session bound to ``thread_id`` if present."""
+
+        with self._lock:
+            session = self._thread_sessions.pop(thread_id, None)
         if session is None:
             return
-        setattr(self._local, "session", None)
-        with self._lock:
-            self._sessions.pop(id(session), None)
         with contextlib.suppress(Exception):
             session.close()
 
@@ -231,8 +247,8 @@ class ThreadLocalSessionFactory:
         """Close all cached sessions and reset thread-local state."""
 
         with self._lock:
-            sessions = list(self._sessions.values())
-            self._sessions.clear()
+            sessions = list(self._thread_sessions.values())
+            self._thread_sessions.clear()
         setattr(self._local, "session", None)
         for session in sessions:
             with contextlib.suppress(Exception):
@@ -435,6 +451,29 @@ def _enforce_content_policy(
 
 
 
+def _calculate_equal_jitter_delay(
+    attempt: int,
+    *,
+    backoff_factor: float,
+    backoff_max: float,
+) -> float:
+    """Return an exponential backoff delay using equal jitter."""
+
+    if backoff_factor <= 0:
+        return 0.0
+
+    base_delay = backoff_factor * (2**attempt)
+    if base_delay <= 0:
+        return 0.0
+
+    capped_base = min(base_delay, backoff_max)
+    if capped_base <= 0:
+        return 0.0
+
+    half = capped_base / 2.0
+    return half + random.uniform(0.0, half)
+
+
 def request_with_retries(
     session: requests.Session,
     method: str,
@@ -444,6 +483,7 @@ def request_with_retries(
     retry_statuses: Optional[Set[int]] = None,
     backoff_factor: float = 0.75,
     respect_retry_after: bool = True,
+    retry_after_cap: Optional[float] = None,
     content_policy: Optional[Mapping[str, Any]] = None,
     max_retry_duration: Optional[float] = None,
     backoff_max: float = 60.0,
@@ -461,6 +501,8 @@ def request_with_retries(
             ``{429, 500, 502, 503, 504}``.
         backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to ``0.75``.
         respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
+        retry_after_cap: Optional ceiling applied to parsed ``Retry-After`` values in seconds. When provided,
+            the helper honours the lesser of the header value and this cap while still respecting ``backoff_max``.
         content_policy: Optional mapping describing allowed MIME types for the target host.
         max_retry_duration: Maximum total time to spend on retries in seconds. If exceeded, raises
             immediately. Defaults to ``None`` (no limit).
@@ -492,6 +534,8 @@ def request_with_retries(
         raise ValueError(f"max_retry_duration must be positive, got {max_retry_duration}")
     if backoff_max <= 0:
         raise ValueError(f"backoff_max must be positive, got {backoff_max}")
+    if retry_after_cap is not None and retry_after_cap <= 0:
+        raise ValueError(f"retry_after_cap must be positive when provided, got {retry_after_cap}")
 
     # Optimize timeout handling: separate connect and read timeouts
     if "timeout" in kwargs:
@@ -586,12 +630,17 @@ def request_with_retries(
                     _enforce_content_policy(response, content_policy, method=method, url=url)
                     return response
 
-            base_delay = backoff_factor * (2**attempt)
-            jitter = random.random() * 0.1
-            delay = min(base_delay + jitter, backoff_max)  # Cap at backoff_max
+            delay = _calculate_equal_jitter_delay(
+                attempt,
+                backoff_factor=backoff_factor,
+                backoff_max=backoff_max,
+            )
 
-            if retry_after_delay is not None and retry_after_delay > delay:
-                delay = min(retry_after_delay, backoff_max)
+            if retry_after_delay is not None:
+                if retry_after_cap is not None:
+                    retry_after_delay = min(retry_after_delay, retry_after_cap)
+                if retry_after_delay > delay:
+                    delay = min(retry_after_delay, backoff_max)
 
             LOGGER.debug(
                 "Retrying %s %s after HTTP %s (attempt %s/%s, delay %.2fs)",
@@ -622,7 +671,11 @@ def request_with_retries(
                 )
                 raise
 
-            delay = backoff_factor * (2**attempt) + random.random() * 0.1
+            delay = _calculate_equal_jitter_delay(
+                attempt,
+                backoff_factor=backoff_factor,
+                backoff_max=backoff_max,
+            )
             time.sleep(delay)
 
         except requests.ConnectionError as exc:
@@ -645,7 +698,11 @@ def request_with_retries(
                 )
                 raise
 
-            delay = backoff_factor * (2**attempt) + random.random() * 0.1
+            delay = _calculate_equal_jitter_delay(
+                attempt,
+                backoff_factor=backoff_factor,
+                backoff_max=backoff_max,
+            )
             time.sleep(delay)
 
         except requests.RequestException as exc:
@@ -663,7 +720,11 @@ def request_with_retries(
                 LOGGER.warning("Exhausted %s retries for %s %s: %s", max_retries, method, url, exc)
                 raise
 
-            delay = backoff_factor * (2**attempt) + random.random() * 0.1
+            delay = _calculate_equal_jitter_delay(
+                attempt,
+                backoff_factor=backoff_factor,
+                backoff_max=backoff_max,
+            )
             time.sleep(delay)
 
     if last_exception is not None:  # pragma: no cover - defensive safety net

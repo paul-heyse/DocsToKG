@@ -6,6 +6,7 @@ import logging
 import time
 from threading import Event, RLock, Thread
 from types import MethodType, SimpleNamespace
+from typing import Sequence
 
 import numpy as np
 import pytest
@@ -38,6 +39,18 @@ class _NullContext:
 
     def __exit__(self, exc_type, exc, tb) -> bool:
         return False
+
+
+def test_resolve_cuvs_state_handles_missing_should_use(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """cuVS availability should be reported as unavailable when the probe is missing."""
+
+    monkeypatch.setattr(store_module, "_FAISS_AVAILABLE", True, raising=False)
+    stub_faiss = SimpleNamespace(knn_gpu=object())
+    monkeypatch.setattr(store_module, "faiss", stub_faiss, raising=False)
+
+    enabled, available, reported = store_module.resolve_cuvs_state(requested=None)
+
+    assert (enabled, available, reported) == (False, False, None)
 
 
 def test_faiss_vector_store_search_batch_preserves_queries(
@@ -111,6 +124,59 @@ def test_coerce_batch_allows_opt_out_of_normalization(monkeypatch: "pytest.Monke
     np.testing.assert_array_equal(bypassed, vectors)
     norms = np.linalg.norm(bypassed, axis=1)
     assert not np.allclose(norms, np.ones_like(norms)), "Vectors should remain unnormalised"
+
+
+def test_apply_cloner_reservation_scales_per_gpu(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """Reserve vectors should scale based on GPU participation in shard mode."""
+
+    class FakeIntVector(list):
+        def push_back(self, value: int) -> None:
+            self.append(int(value))
+
+    class RecordingLogger:
+        def __init__(self) -> None:
+            self.events: list[dict[str, object] | None] = []
+
+        def info(self, _message: str, *, extra: dict[str, object] | None = None) -> None:
+            self.events.append(extra)
+
+    class RecordingCloner:
+        def __init__(self) -> None:
+            self.reserveVecs: int | None = None
+            self.eachReserveVecs: list[int] | None = None
+            self.set_calls: list[list[int]] = []
+
+        def setReserveVecs(self, values: Sequence[int]) -> None:
+            self.set_calls.append(list(int(v) for v in values))
+
+    fake_faiss = SimpleNamespace(IntVector=FakeIntVector)
+    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+
+    def make_store(mode: str, expected: int) -> FaissVectorStore:
+        store = FaissVectorStore.__new__(FaissVectorStore)
+        store._multi_gpu_mode = mode  # type: ignore[attr-defined]
+        store._expected_ntotal = expected  # type: ignore[attr-defined]
+        store._observability = SimpleNamespace(logger=RecordingLogger())  # type: ignore[attr-defined]
+        return store
+
+    replicate_store = make_store("replicate", expected=120)
+    replicate_cloner = RecordingCloner()
+    replicate_store._apply_cloner_reservation(replicate_cloner, gpu_ids=[0, 1, 2])
+    assert replicate_cloner.reserveVecs == 120
+    assert replicate_cloner.eachReserveVecs == [120, 120, 120]
+    assert replicate_cloner.set_calls == []
+
+    shard_store = make_store("shard", expected=101)
+    shard_cloner = RecordingCloner()
+    shard_store._apply_cloner_reservation(shard_cloner, gpu_ids=[0, 1, 2, 3])
+    assert shard_cloner.reserveVecs == 26
+    assert shard_cloner.eachReserveVecs == [26, 26, 26, 26]
+
+    tiny_store = make_store("shard", expected=2)
+    tiny_cloner = RecordingCloner()
+    tiny_store._apply_cloner_reservation(tiny_cloner, gpu_ids=[0, 1, 2])
+    assert tiny_cloner.reserveVecs == 1
+    assert tiny_cloner.eachReserveVecs == [1, 1, 1]
 
 
 def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> None:
@@ -190,6 +256,74 @@ def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> No
     np.testing.assert_array_equal(
         stored_ids, np.array([store_module._vector_uuid_to_faiss_int(ids[0])])
     )
+
+
+@pytest.mark.parametrize("requested, expected", [(True, True), (False, False)])
+def test_maybe_distribute_applies_cuvs_flag(
+    monkeypatch: "pytest.MonkeyPatch", requested: bool, expected: bool
+) -> None:
+    """GpuParameterSpace should receive ``use_cuvs`` updates for every index variant."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._config = SimpleNamespace(use_cuvs=requested, index_type="flat", nprobe=1)  # type: ignore[attr-defined]
+    store._multi_gpu_mode = "single"  # type: ignore[attr-defined]
+    store._replication_enabled = False  # type: ignore[attr-defined]
+    store._observability = SimpleNamespace(  # type: ignore[attr-defined]
+        logger=SimpleNamespace(debug=lambda *a, **k: None, info=lambda *a, **k: None),
+        metrics=SimpleNamespace(increment=lambda *a, **k: None, set_gauge=lambda *a, **k: None),
+    )
+    store._last_applied_cuvs = None  # type: ignore[attr-defined]
+
+    class RecordingGpuParameterSpace:
+        def __init__(self) -> None:
+            self.initialize_calls: list[object] = []
+            self.set_calls: list[tuple[object, str, object]] = []
+            self._values: dict[int, object] = {}
+
+        def initialize(self, index: object) -> None:
+            self.initialize_calls.append(index)
+
+        def set_index_parameter(self, index: object, key: str, value: object) -> None:
+            self.set_calls.append((index, key, value))
+            self._values[id(index)] = value
+
+        def get_index_parameter(self, index: object, key: str) -> object:
+            return self._values.get(id(index), False)
+
+    gps_instances: list[RecordingGpuParameterSpace] = []
+
+    def gps_factory() -> RecordingGpuParameterSpace:
+        instance = RecordingGpuParameterSpace()
+        gps_instances.append(instance)
+        return instance
+
+    fake_faiss = SimpleNamespace(
+        GpuParameterSpace=gps_factory,
+        downcast_index=lambda index: index,
+        describe_index=lambda index: "mock",
+    )
+    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+
+    monkeypatch.setattr(
+        store_module,
+        "resolve_cuvs_state",
+        lambda value: (expected, True, expected),
+        raising=False,
+    )
+
+    class DummyIndex:
+        pass
+
+    gpu_index = DummyIndex()
+
+    result = store._maybe_distribute_multi_gpu(gpu_index)
+
+    assert result is gpu_index
+    assert gps_instances, "GpuParameterSpace should be constructed"
+    gps = gps_instances[0]
+    assert gpu_index in gps.initialize_calls
+    assert (gpu_index, "use_cuvs", expected) in gps.set_calls
+    assert store._last_applied_cuvs == expected
 
 
 def test_add_dedupe_rejects_scaled_duplicates(monkeypatch: "pytest.MonkeyPatch") -> None:
@@ -428,7 +562,8 @@ def test_set_nprobe_initializes_gpu_parameter_space(monkeypatch: "pytest.MonkeyP
                 for shard in collection:
                     if shard in seen:
                         continue
-                    shard.nprobe = value
+                    if name == "nprobe":
+                        shard.nprobe = value
                     seen.add(shard)
 
     fake_faiss = SimpleNamespace(
@@ -441,7 +576,11 @@ def test_set_nprobe_initializes_gpu_parameter_space(monkeypatch: "pytest.MonkeyP
 
     store._set_nprobe()
 
-    assert set_calls == [(replica_index, "nprobe", store._config.nprobe)]  # type: ignore[attr-defined]
+    expected_pairs = [
+        (replica_index, "nprobe", store._config.nprobe),  # type: ignore[attr-defined]
+        (replica_index, "use_cuvs", False),
+    ]
+    assert set_calls == expected_pairs
     assert [shard.nprobe for shard in shards] == [store._config.nprobe] * len(shards)
     assert replica_index.fallback_assignments == 0
 
@@ -479,18 +618,27 @@ def test_set_nprobe_short_circuits_when_value_unchanged(
     store._set_nprobe()  # type: ignore[attr-defined]
     first_timestamp = store._last_applied_nprobe_monotonic  # type: ignore[attr-defined]
 
-    assert set_calls == [(store._index, "nprobe", store._config.nprobe)]  # type: ignore[attr-defined]
+    initial_expected = [
+        (store._index, "nprobe", store._config.nprobe),  # type: ignore[attr-defined]
+        (store._index, "use_cuvs", False),
+    ]
+    assert set_calls == initial_expected
     assert store._last_applied_nprobe == store._config.nprobe  # type: ignore[attr-defined]
     assert first_timestamp > 0.0
 
     store._set_nprobe()  # type: ignore[attr-defined]
-    assert set_calls == [(store._index, "nprobe", store._config.nprobe)]  # type: ignore[attr-defined]
+    assert set_calls == initial_expected
     assert store._last_applied_nprobe_monotonic == first_timestamp  # type: ignore[attr-defined]
 
     store._reset_nprobe_cache()  # type: ignore[attr-defined]
     store._set_nprobe()  # type: ignore[attr-defined]
-    assert len(set_calls) == 2
-    assert set_calls[-1] == (store._index, "nprobe", store._config.nprobe)  # type: ignore[attr-defined]
+    repeat_expected = [
+        (store._index, "nprobe", store._config.nprobe),  # type: ignore[attr-defined]
+        (store._index, "use_cuvs", False),
+        (store._index, "nprobe", store._config.nprobe),
+        (store._index, "use_cuvs", False),
+    ]
+    assert set_calls == repeat_expected
     assert store._last_applied_nprobe_monotonic > first_timestamp  # type: ignore[attr-defined]
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -106,6 +107,39 @@ def test_prepare_candidate_download_skip_head_precheck(monkeypatch: pytest.Monke
     )
     assert not calls
     assert not plan.head_precheck_passed
+
+
+def test_range_resume_warning_emitted_once(
+    caplog: pytest.LogCaptureFixture, artifact: WorkArtifact
+) -> None:
+    config = DownloadConfig(run_id="run", enable_range_resume=True)
+    base_ctx = config.to_context({})
+    session = requests.Session()
+    url = "https://example.com/foo.pdf"
+
+    with caplog.at_level(logging.WARNING):
+        prepare_candidate_download(
+            session,
+            artifact,
+            url,
+            None,
+            5.0,
+            base_ctx.clone_for_download(),
+        )
+        prepare_candidate_download(
+            session,
+            artifact,
+            url,
+            None,
+            5.0,
+            base_ctx.clone_for_download(),
+        )
+
+    warning_messages = [
+        record.getMessage() for record in caplog.records if "Range resume requested" in record.getMessage()
+    ]
+    assert len(warning_messages) == 1
+    assert config.extra.get("range_resume_warning_emitted") is True
 
 
 def test_stream_candidate_payload_returns_cached(monkeypatch: pytest.MonkeyPatch, artifact: WorkArtifact, tmp_path: Path) -> None:

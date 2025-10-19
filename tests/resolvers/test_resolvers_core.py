@@ -3299,7 +3299,9 @@ def test_crossref_resolver_uses_central_retry_logic(patcher, tmp_path) -> None:
             self.calls.append(response.status_code)
             return response
 
-    patcher.setattr("DocsToKG.ContentDownload.networking.random.random", lambda: 0.0)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b
+    )
     sleep_calls: list[float] = []
     patcher.setattr(
         "DocsToKG.ContentDownload.networking.time.sleep", lambda delay: sleep_calls.append(delay)
