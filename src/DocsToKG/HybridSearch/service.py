@@ -3510,27 +3510,53 @@ class HybridSearchValidator:
 # --- Public Functions ---
 
 
-def load_dataset(path: Path) -> List[Mapping[str, object]]:
-    """Load a JSONL dataset describing documents and queries.
+class JsonlDataset(Sequence[Mapping[str, object]]):
+    """Memory-efficient JSONL dataset that streams entries on demand."""
 
-    Args:
-        path: Path to a JSONL file containing dataset entries.
+    __slots__ = ("_path", "_encoding", "_offsets")
 
-    Returns:
-        List of parsed dataset rows suitable for validation routines.
+    def __init__(self, path: Path, encoding: str = "utf-8") -> None:
+        if not path.exists():
+            raise FileNotFoundError(path)
+        self._path = path
+        self._encoding = encoding
+        offsets: List[int] = []
+        offset = 0
+        with path.open("rb") as handle:
+            for raw in handle:
+                length = len(raw)
+                if raw.strip():
+                    offsets.append(offset)
+                offset += length
+        self._offsets = offsets
 
-    Raises:
-        FileNotFoundError: If the dataset file does not exist.
-        json.JSONDecodeError: If any line contains invalid JSON.
-    """
+    def __len__(self) -> int:
+        return len(self._offsets)
 
-    lines = path.read_text(encoding="utf-8").splitlines()
-    dataset: List[Mapping[str, object]] = []
-    for line in lines:
-        if not line.strip():
-            continue
-        dataset.append(json.loads(line))
-    return dataset
+    def __getitem__(self, index: int | slice) -> Mapping[str, object]:
+        if isinstance(index, slice):
+            return [self[i] for i in range(*index.indices(len(self)))]
+        if index < 0:
+            index += len(self)
+        if index < 0 or index >= len(self):
+            raise IndexError(index)
+        offset = self._offsets[index]
+        with self._path.open("rb") as handle:
+            handle.seek(offset)
+            raw = handle.readline()
+        return json.loads(raw.decode(self._encoding))
+
+    def __iter__(self) -> Iterator[Mapping[str, object]]:
+        with self._path.open("r", encoding=self._encoding) as handle:
+            for line in handle:
+                if line.strip():
+                    yield json.loads(line)
+
+
+def load_dataset(path: Path) -> JsonlDataset:
+    """Load a JSONL dataset describing documents and queries."""
+
+    return JsonlDataset(path)
 
 
 def infer_embedding_dim(dataset: Sequence[Mapping[str, object]]) -> int:

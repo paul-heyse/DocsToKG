@@ -6,6 +6,27 @@ last_updated: 2025-02-15
 
 > _Metadata backlog_: owning_team, stability, versioning, codeowners, related_adrs, slos, data_handling, and sbom will be populated in a future revision.
 
+## Table of Contents
+- [DocsToKG • DocParsing](#docstokg--docparsing)
+  - [Prerequisites & optional dependencies](#prerequisites--optional-dependencies)
+  - [Quickstart](#quickstart)
+  - [Common commands](#common-commands)
+    - [CLI command matrix](#cli-command-matrix)
+    - [Planner previews](#planner-previews)
+  - [Core capabilities](#core-capabilities)
+  - [Folder map](#folder-map)
+  - [System overview](#system-overview)
+  - [Entry points & contracts](#entry-points--contracts)
+  - [Configuration](#configuration)
+    - [Content hashing defaults](#content-hashing-defaults)
+  - [Data contracts & schemas](#data-contracts--schemas)
+  - [Interactions with other packages](#interactions-with-other-packages)
+  - [Observability](#observability)
+  - [Security & data handling](#security--data-handling)
+  - [Development tasks](#development-tasks)
+  - [Agent guardrails](#agent-guardrails)
+  - [FAQ](#faq)
+
 # DocsToKG • DocParsing
 
 Purpose: Convert raw documents (PDF/HTML/etc.) into DocTags, topic-aware chunks, and embeddings with resumable manifests.

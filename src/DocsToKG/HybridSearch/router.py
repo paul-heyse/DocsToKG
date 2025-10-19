@@ -1,10 +1,27 @@
-"""Namespace-aware routing for dense vector stores and snapshot caching.
+"""Namespace-aware coordination of managed FAISS stores and their snapshots.
 
-`FaissRouter` mirrors the namespace strategies documented in the README. It
-keeps per-namespace FAISS instances (or a shared default), rehydrates evicted
-stores from serialized payloads, and tracks last-use timestamps for proactive
-cache trimming. The router integrates with `ManagedFaissAdapter` snapshots so
-workers can lazily restore large GPU indexes without blocking startup.
+``FaissRouter`` encapsulates the namespace strategy described in the package
+README: a deployment may run a single shared FAISS instance or dedicate a GPU
+index per tenant. The router hides the book-keeping required to make that work:
+
+- It keeps a thread-safe map of namespace → ``DenseVectorStore`` instances,
+  instantiating new stores on demand via a factory that typically produces
+  ``ManagedFaissAdapter`` objects already wired for ``StandardGpuResources`` and
+  ``ChunkRegistry`` access.
+- When a namespace is evicted to reclaim GPU memory, the router caches the
+  serialized FAISS bytes (and optional snapshot metadata) so that a subsequent
+  request can call ``restore`` without blocking process startup.
+- ``stats`` and ``serialize_all`` expose aggregated metrics and payloads for
+  observability and persistence. These methods merge live stores with any
+  cached snapshots so operators can gauge GPU memory utilisation, last-access
+  timestamps, and serialized footprint before deciding which namespaces to trim.
+- Optional ``set_id_resolver`` propagation lets downstream adapters resolve
+  FAISS integer ids back to vector ids—mirroring how ``ManagedFaissAdapter``
+  annotates search results.
+
+Agents modifying namespace behaviour should adjust this router alongside the
+service layer so eviction policy, snapshot metadata, and restoration semantics
+stay aligned.
 """
 
 from __future__ import annotations

@@ -1,4 +1,9 @@
-"""Resource budget tests for :class:`HybridSearchValidator`.
+"""HybridSearchValidator resource-budget tests against the FAISS GPU wheel.
+
+Confirms validation runs configure `StandardGpuResources` according to config
+(temp/pinned memory, null streams) and fall back cleanly when FAISS is absent.
+Prevents validation harnesses from over-subscribing CUDA memory while using the
+custom CUDA 12/OpenBLAS wheel documented in `faiss-gpu-wheel-reference.md`."""
 
 Checks GPU memory limits, pinned memory configuration, null stream handling,
 and fallback behaviour when FAISS utilities are unavailable so validation

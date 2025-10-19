@@ -7,43 +7,42 @@
 # === /NAVMAP ===
 
 """
-Hybrid Search Module for DocsToKG
+DocsToKG.HybridSearch exposes the ingestion, storage, and query primitives that
+back the DocsToKG hybrid search reference implementation. The package couples a
+custom FAISS 1.12 GPU wheel (see ``faiss-gpu-wheel-reference.md``) with lexical
+retrieval, observability, and configuration helpers so agents can stand up or
+extend the end-to-end retrieval pipeline without reverse engineering internals.
 
-This module provides comprehensive hybrid search capabilities for DocsToKG,
-combining traditional text search (BM25) with dense vector similarity search
-and advanced fusion techniques for optimal retrieval performance.
+Core modules and how they interrelate:
 
-The module includes components for:
-- Document ingestion and chunking
-- Multi-modal search (lexical + semantic)
-- Result fusion and ranking
-- Configuration management
-- API interfaces
-- Observability and monitoring
+- ``config`` defines the dataclasses that configure chunking, FAISS GPU indexes,
+  fusion heuristics, and retrieval budgets. ``DenseIndexConfig`` maps directly
+  onto FAISS constructs such as ``GpuMultipleClonerOptions``, tiling limits, and
+  ``GpuDistanceParams`` toggles (FP16, cuVS) used by ``store.ManagedFaissAdapter``.
+- ``pipeline`` ingests DocParsing artifacts, normalises lexical/dense features,
+  and emits instrumentation. It is the canonical reference for how sparse and
+  dense payloads enter the system before reaching the FAISS adapters.
+- ``store`` owns the FAISS GPU lifecycle: it trains CPU indexes, migrates them
+  to GPUs via ``index_cpu_to_gpu(_multiple)``, manages ``StandardGpuResources``
+  pools, and offers cosine / inner-product helpers built on ``knn_gpu`` and
+  ``pairwise_distance_gpu``. Snapshot/restore utilities here underpin cold-start
+  and failover flows used by both ingestion and service layers.
+- ``service`` orchestrates synchronous query handling, launching lexical and
+  FAISS GPU searches in parallel and fusing results with Reciprocal Rank Fusion
+  plus optional MMR diversification. It consumes ``HybridSearchConfig`` and the
+  adapters exposed by ``store`` and ``router``.
+- ``router`` maintains namespace-aware caches of managed FAISS stores, handing
+  back live adapters or rehydrating snapshots on demand to keep GPU memory usage
+  bounded across tenants.
+- ``types`` and ``interfaces`` provide the shared contracts that ensure the
+  ingestion pipeline, FAISS adapters, and query API speak the same language.
+- ``devtools`` contains deterministic feature generators and an in-memory
+  OpenSearch simulator that implement the ``interfaces`` protocols for testing.
 
-Key Features:
-- Hybrid retrieval combining BM25 and dense embeddings
-- GPU-accelerated vector search using FAISS
-- Configurable fusion strategies (RRF, MMR)
-- Real-time observability and metrics
-- Scalable architecture for large document collections
-
-Dependencies:
-- faiss: Vector similarity search
-- sentence-transformers: Dense embedding generation
-- elasticsearch: Optional for additional search capabilities
-- redis: Caching and session management
-
-Usage:
-    from DocsToKG.HybridSearch import HybridSearchService
-    from DocsToKG.HybridSearch.config import HybridSearchConfig
-
-    # Configure search service
-    config = HybridSearchConfig()
-    service = HybridSearchService(config)
-
-    # Perform hybrid search
-    results = service.search("machine learning algorithms")
+Agents extending the system should start by reading the relevant module
+docstrings plus the FAISS wheel reference. Together they describe the GPU
+resource model, expected tensor shapes/dtypes, and failure-handling guarantees
+that downstream code assumes.
 """
 
 from __future__ import annotations

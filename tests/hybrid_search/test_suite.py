@@ -1,4 +1,11 @@
 # === NAVMAP v1 ===
+"""End-to-end hybrid search suite validating ingestion, FAISS GPU usage, API, and snapshots.
+
+Stitches together config management, DocParsing fixtures, FAISS GPU ingestion,
+API requests, validator resource budgets, and snapshot/restore flows. Mirrors
+the README quickstart and ensures the custom `faiss-1.12.0` wheel (CUDA 12 +
+OpenBLAS) works across ingestion, query, and scale scenarios."""
+
 # {
 #   "module": "tests.hybrid_search.test_suite",
 #   "purpose": "Pytest coverage for hybrid search suite scenarios",
@@ -270,13 +277,6 @@
 #   ]
 # }
 # === /NAVMAP ===
-
-"""End-to-end hybrid search suite using real FAISS/BM25 pipelines.
-
-Bootstraps config, fixture data, ingestion pipeline, and query service to
-validate ranking quality, pagination, diagnostics, and API contracts. Mirrors
-the critical smoke suite used in CI and documentation.
-"""
 
 from __future__ import annotations
 

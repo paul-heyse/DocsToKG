@@ -1,4 +1,11 @@
-"""Developer tooling helpers for DocsToKG hybrid search."""
+"""Developer tooling helpers for DocsToKG hybrid search.
+
+The ``devtools`` package aggregates utilities that make it easy to spin up a
+fully functional hybrid-search environment without external services. It
+re-exports the deterministic feature generators plus the in-memory OpenSearch
+simulator so tests and notebooks can import from a single namespace while still
+conforming to the production interfaces.
+"""
 
 from .features import (
     FeatureGenerator,

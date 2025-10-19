@@ -1,8 +1,12 @@
-"""Extensive coverage for :class:`DocsToKG.HybridSearch.store.FaissVectorStore`.
+"""Regression suite for `FaissVectorStore` on the custom FAISS GPU wheel.
 
-Exercises concurrency guards, vector normalization, retry loops, background
-threads, observability counters, and adapter behaviours to ensure the dense
-store remains thread-safe and resilient under load.
+Grounds the guarantees documented in `faiss-gpu-wheel-reference.md` and the
+README by stress-testing concurrency guards, cuVS detection, retry logic,
+metrics wiring, and vector normalisation. Ensures dense ingestion remains
+thread-safe, resource-aware (CUDA 12 + OpenBLAS), and resilient to loader
+quirks exposed by the `faiss-1.12.0` wheel. Additional coverage exercises
+concurrency guards, vector normalisation, retry loops, background threads, and
+observability counters so the dense store remains robust under load.
 """
 
 from __future__ import annotations

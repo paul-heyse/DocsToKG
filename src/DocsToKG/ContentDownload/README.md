@@ -6,6 +6,31 @@ last_updated: 2025-10-19
 
 > _Metadata backlog_: owning_team, stability, versioning, codeowners, related_adrs, slos, data_handling, and sbom will be populated in a future revision.
 
+## Table of Contents
+- [DocsToKG • ContentDownload](#docstokg--contentdownload)
+  - [Quickstart](#quickstart)
+  - [CLI Quick Reference](#cli-quick-reference)
+  - [Run Outputs](#run-outputs)
+    - [Storage Layout & Lifecycle States](#storage-layout--lifecycle-states)
+  - [Folder Map (top N)](#folder-map-top-n)
+  - [System Overview](#system-overview)
+  - [Run Lifecycle & Contracts](#run-lifecycle--contracts)
+  - [Configuration Surfaces](#configuration-surfaces)
+  - [Telemetry & Data Contracts](#telemetry--data-contracts)
+  - [Error Handling & Diagnostics](#error-handling--diagnostics)
+  - [Networking, Rate Limiting, and Politeness](#networking-rate-limiting-and-politeness)
+  - [Interactions with Other Packages](#interactions-with-other-packages)
+    - [Responsibilities & Contracts](#responsibilities--contracts)
+    - [End-to-End Workflow](#end-to-end-workflow)
+    - [CLI Surface (`ontofetch`)](#cli-surface-ontofetch)
+    - [Module Reference Highlights](#module-reference-highlights)
+    - [Extensibility & Testing](#extensibility--testing)
+  - [OntologyDownload Deep Dive](#ontologydownload-deep-dive)
+  - [Development & Testing](#development--testing)
+  - [Operational Playbooks](#operational-playbooks)
+  - [Agent Guardrails](#agent-guardrails)
+  - [FAQ](#faq)
+
 # DocsToKG • ContentDownload
 
 Purpose: Coordinate resolver-driven acquisition of scholarly artifacts from OpenAlex metadata into local storage with manifest bookkeeping and telemetry.
