@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from threading import Event, RLock, Thread
-from types import MethodType
+from types import MethodType, SimpleNamespace
 
 import numpy as np
 
+from DocsToKG.HybridSearch.config import DenseIndexConfig
 from DocsToKG.HybridSearch import store as store_module
 from DocsToKG.HybridSearch.store import FaissVectorStore
 
@@ -54,6 +55,85 @@ def test_faiss_vector_store_search_batch_preserves_queries(monkeypatch: "pytest.
     np.testing.assert_array_equal(queries, original)
     assert "matrix" in captured
     assert not np.may_share_memory(captured["matrix"], queries)
+
+
+def test_set_nprobe_initializes_gpu_parameter_space(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """Ensure GPU parameter tuning initializes replica shards before configuration."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._config = DenseIndexConfig(index_type="ivf_flat", nprobe=11)
+
+    class RecordingShard:
+        def __init__(self, label: str) -> None:
+            self.label = label
+            self.nprobe: int | None = None
+
+    shards = [RecordingShard(label) for label in ("a", "b", "c")]
+
+    class RecordingReplicaIndex:
+        def __init__(self, shard_list: list[RecordingShard]) -> None:
+            object.__setattr__(self, "replicas", shard_list)
+            object.__setattr__(self, "shards", shard_list)
+            object.__setattr__(self, "index", None)
+            object.__setattr__(self, "_fallback_assignments", 0)
+            object.__setattr__(self, "_nprobe", "unset")
+
+        @property
+        def nprobe(self) -> object:
+            return object.__getattribute__(self, "_nprobe")
+
+        @nprobe.setter
+        def nprobe(self, value: object) -> None:
+            object.__setattr__(
+                self,
+                "_fallback_assignments",
+                object.__getattribute__(self, "_fallback_assignments") + 1,
+            )
+            object.__setattr__(self, "_nprobe", value)
+
+        @property
+        def fallback_assignments(self) -> int:
+            return object.__getattribute__(self, "_fallback_assignments")
+
+    replica_index = RecordingReplicaIndex(shards)
+    store._index = replica_index  # type: ignore[attr-defined]
+
+    set_calls: list[tuple[object, str, int]] = []
+
+    class FakeGpuParameterSpace:
+        def __init__(self) -> None:
+            self.initialized: object | None = None
+
+        def initialize(self, index: object) -> None:
+            self.initialized = index
+
+        def set_index_parameter(self, index: object, name: str, value: int) -> None:
+            assert self.initialized is index, "GpuParameterSpace.initialize must be invoked first"
+            set_calls.append((index, name, value))
+            seen: set[object] = set()
+            for attr in ("replicas", "shards"):
+                collection = getattr(index, attr, None)
+                if not collection:
+                    continue
+                for shard in collection:
+                    if shard in seen:
+                        continue
+                    shard.nprobe = value
+                    seen.add(shard)
+
+    fake_faiss = SimpleNamespace(
+        GpuParameterSpace=FakeGpuParameterSpace,
+        describe_index=lambda index: "recording-index",
+    )
+    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+
+    store._log_index_configuration = MethodType(lambda self, _: None, store)  # type: ignore[attr-defined]
+
+    store._set_nprobe()
+
+    assert set_calls == [(replica_index, "nprobe", store._config.nprobe)]  # type: ignore[attr-defined]
+    assert [shard.nprobe for shard in shards] == [store._config.nprobe] * len(shards)
+    assert replica_index.fallback_assignments == 0
 
 
 def test_remove_ids_is_atomic_across_threads() -> None:
