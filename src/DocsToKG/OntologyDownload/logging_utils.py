@@ -55,12 +55,21 @@ def _cleanup_logs(log_dir: Path, retention_days: int) -> List[str]:
     actions: List[str] = []
     now = datetime.now(timezone.utc)
     retention_delta = timedelta(days=retention_days)
+    import sys
+    print(f"DEBUG: _cleanup_logs called with log_dir={log_dir}, retention_days={retention_days}", file=sys.stderr)
+    print(f"DEBUG: Files found: {list(log_dir.glob('*.jsonl'))}", file=sys.stderr)
+    
     for file in log_dir.glob("*.jsonl"):
         mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
-        if now - mtime > retention_delta:
+        age = now - mtime
+        print(f"DEBUG: File {file.name}, mtime={mtime}, age={age}, retention_delta={retention_delta}", file=sys.stderr)
+        if age > retention_delta:
             target = file.with_suffix(file.suffix + ".gz")
             _compress_old_log(file)
             actions.append(f"Compressed {file.name} -> {target.name}")
+            print(f"DEBUG: Compressed {file.name}", file=sys.stderr)
+        else:
+            print(f"DEBUG: File {file.name} not old enough (age={age}, retention={retention_delta})", file=sys.stderr)
     for file in log_dir.glob("*.jsonl.gz"):
         mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
         if now - mtime > retention_delta:

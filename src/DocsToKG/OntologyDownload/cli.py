@@ -1100,8 +1100,6 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
     """Attempt to remediate common doctor issues and return action notes."""
 
     actions: List[str] = []
-    import sys
-    print(f"DEBUG: _apply_doctor_fixes called with report keys: {list(report.keys())}", file=sys.stderr)
 
     for info in report.get("directories", {}).values():
         path = Path(info.get("path", ""))
@@ -1114,20 +1112,13 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
     # Import LOG_DIR at runtime to respect TestingEnvironment patches
     from DocsToKG.OntologyDownload.settings import LOG_DIR as runtime_log_dir
     
-    print(f"DEBUG: runtime_log_dir: {runtime_log_dir}")
-    print(f"DEBUG: runtime_log_dir.exists(): {runtime_log_dir.exists()}")
-    
     if runtime_log_dir.exists():
         retention_days = ResolvedConfig.from_defaults().defaults.logging.retention_days
-        print(f"DEBUG: retention_days: {retention_days}")
         try:
             rotations = _cleanup_logs(runtime_log_dir, retention_days)
-            print(f"DEBUG: rotations: {rotations}")
             actions.extend(rotations)
         except OSError as exc:
             actions.append(f"Failed to rotate logs in {runtime_log_dir}: {exc}")
-    
-    print(f"DEBUG: final actions: {actions}")
     
     placeholders = {
         CONFIG_DIR / "bioportal_api_key.txt": "Add your BioPortal API key here\n",
@@ -1548,7 +1539,6 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
             fixes: List[str] = []
             if getattr(args, "fix", False):
                 fixes = _apply_doctor_fixes(report)
-                report = _doctor_report()
                 if fixes:
                     report["fixes"] = fixes
             if args.json:
