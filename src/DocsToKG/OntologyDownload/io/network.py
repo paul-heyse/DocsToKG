@@ -760,6 +760,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
         *,
         headers: Optional[Mapping[str, str]] = None,
         token_consumed: bool = False,
+        remaining_budget: Optional[Callable[[], float]] = None,
+        timeout_callback: Optional[Callable[[], None]] = None,
     ) -> tuple[Optional[str], Optional[int]]:
         """Probe the origin with HEAD to audit media type and size before downloading.
 
@@ -775,6 +777,10 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 resolver-supplied headers.
             token_consumed: Indicates whether the caller already consumed a
                 rate-limit token prior to invoking the HEAD request.
+            remaining_budget: Optional callable returning the remaining time
+                budget (in seconds) before the download timeout is reached.
+            timeout_callback: Optional callable invoked when the requested
+                backoff would exhaust the remaining timeout budget.
 
         Returns:
             Tuple ``(content_type, content_length)`` extracted from response
@@ -782,6 +788,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
         Raises:
             PolicyError: Propagates download policy errors encountered during the HEAD request.
+            DownloadFailure: Raised when the timeout budget is exhausted prior to completing the HEAD request.
         """
 
         # Check for cancellation before HEAD request
@@ -813,6 +820,11 @@ class StreamingDownloader(pooch.HTTPDownloader):
         else:
             request_headers = dict(headers)
 
+        if remaining_budget is not None and timeout_callback is not None:
+            remaining = remaining_budget()
+            if remaining <= 0:
+                timeout_callback()
+
         try:
             with self._request_with_redirect_audit(
                 session=session,
@@ -843,14 +855,13 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             host=self.origin_host,
                             delay=retry_after_delay,
                         )
-                        if (
-                            retry_after_delay > 0
-                            and self.bucket is not None
-                            and token_consumed
-                        ):
-                            self._reuse_head_token = True
-                            time.sleep(retry_after_delay)
-                        elif retry_after_delay > 0:
+                        if retry_after_delay > 0:
+                            if remaining_budget is not None and timeout_callback is not None:
+                                remaining = remaining_budget()
+                                if retry_after_delay >= max(remaining, 0.0):
+                                    timeout_callback()
+                            if self.bucket is not None and token_consumed:
+                                self._reuse_head_token = True
                             time.sleep(retry_after_delay)
                     self.logger.debug(
                         "HEAD request failed, proceeding with GET",
@@ -1014,6 +1025,9 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self.response_content_type = None
         self.response_content_length = None
 
+        overall_start = time.monotonic()
+        timeout_limit = float(self.http_config.download_timeout_sec)
+
         with SESSION_POOL.lease(
             service=self.service,
             host=self.origin_host,
@@ -1023,22 +1037,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
             if self.bucket is not None:
                 self.bucket.consume()
                 head_token_consumed = True
-
-            head_content_type, head_content_length = self._preliminary_head_check(
-                url,
-                session,
-                headers=base_headers,
-                token_consumed=head_token_consumed,
-            )
-            self.head_content_type = head_content_type
-            self.head_content_length = head_content_length
-            if head_content_type:
-                self._validate_media_type(head_content_type, self.expected_media_type, url)
-
-            resume_position = part_path.stat().st_size if part_path.exists() else 0
-
-            overall_start = time.monotonic()
-            timeout_limit = float(self.http_config.download_timeout_sec)
 
             def _clear_partial_files() -> None:
                 for candidate in (part_path, destination_part_path):
@@ -1068,6 +1066,27 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     ),
                     retryable=False,
                 )
+
+            def _remaining_budget() -> float:
+                return timeout_limit - (time.monotonic() - overall_start)
+
+            def _fail_for_timeout() -> None:
+                _raise_timeout(time.monotonic() - overall_start)
+
+            head_content_type, head_content_length = self._preliminary_head_check(
+                url,
+                session,
+                headers=base_headers,
+                token_consumed=head_token_consumed,
+                remaining_budget=_remaining_budget,
+                timeout_callback=_fail_for_timeout,
+            )
+            self.head_content_type = head_content_type
+            self.head_content_length = head_content_length
+            if head_content_type:
+                self._validate_media_type(head_content_type, self.expected_media_type, url)
+
+            resume_position = part_path.stat().st_size if part_path.exists() else 0
 
             def _enforce_timeout() -> None:
                 elapsed = time.monotonic() - overall_start

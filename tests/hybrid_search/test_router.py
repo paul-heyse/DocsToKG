@@ -104,6 +104,7 @@ class RecordingFaissStore:
         self._vectors: list[str] = []
         self._resolver: Optional[Callable[[int], Optional[str]]] = None
         self.last_restore_meta: Optional[Mapping[str, object]] = None
+        self.last_snapshot_meta: Optional[Mapping[str, object]] = None
 
     @property
     def dim(self) -> int:
