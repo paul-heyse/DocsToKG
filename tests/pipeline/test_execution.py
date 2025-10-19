@@ -859,8 +859,16 @@ def test_pipeline_deduplicates_urls(tmp_path):
     )
     session = requests.Session()
     pipeline.run(session, artifact)
-    duplicates = [record.reason for record in logger.records if record.reason == "duplicate-url"]
-    assert duplicates == ["duplicate-url"]
+
+    from DocsToKG.ContentDownload.core import ReasonCode
+
+    # Global deduplication is enabled by default, so we expect global duplicate detection
+    global_duplicates = [
+        record.reason
+        for record in logger.records
+        if record.reason == ReasonCode.DUPLICATE_URL_GLOBAL
+    ]
+    assert global_duplicates == [ReasonCode.DUPLICATE_URL_GLOBAL]
 
 
 # --- test_pipeline_behaviour.py ---
@@ -1150,6 +1158,8 @@ def test_pipeline_executes_resolvers_in_expected_order(
         "pmc",
         "europe_pmc",
         "core",
+        "semantic_scholar",
+        "doaj",
         "zenodo",
     ]
 
@@ -1299,4 +1309,4 @@ def test_download_candidate_marks_corrupt_without_eof(tmp_path):
     outcome = downloader.download_candidate(session, artifact, pdf_url, referer=None, timeout=5.0)
     assert outcome.classification is Classification.MISS
     assert outcome.path is None
-    assert outcome.error == "pdf-eof-missing"
+    assert outcome.reason_detail == "pdf-eof-missing"
