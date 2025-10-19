@@ -1,10 +1,13 @@
 """Tests covering configuration resolution purity helpers."""
 
+import logging
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
+import requests
 
+from DocsToKG.ContentDownload import args as args_module
 from DocsToKG.ContentDownload.args import (
     ResolvedConfig,
     bootstrap_run_environment,
@@ -66,3 +69,111 @@ def test_bootstrap_run_environment_creates_directories(tmp_path: Path) -> None:
 
     # Idempotent behaviour should not raise when repeated.
     bootstrap_run_environment(resolved)
+
+
+def test_lookup_topic_id_requests_minimal_payload(monkeypatch, caplog) -> None:
+    args_module._lookup_topic_id.cache_clear()
+
+    class FakeTopics:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def search(self, text: str):
+            self.calls.append(("search", text))
+            return self
+
+        def select(self, fields):
+            self.calls.append(("select", tuple(fields)))
+            return self
+
+        def per_page(self, value: int):
+            self.calls.append(("per_page", value))
+            return self
+
+        def get(self):
+            self.calls.append(("get",))
+            return [{"id": "https://openalex.org/T999"}]
+
+    fake = FakeTopics()
+    monkeypatch.setattr(args_module, "Topics", lambda: fake)
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+
+    resolved = args_module._lookup_topic_id("quantum photonics")
+
+    assert resolved == "https://openalex.org/T999"
+    assert fake.calls == [
+        ("search", "quantum photonics"),
+        ("select", ("id",)),
+        ("per_page", 1),
+        ("get",),
+    ]
+    assert (
+        "DocsToKG.ContentDownload",
+        logging.INFO,
+        "Resolved topic 'quantum photonics' -> https://openalex.org/T999",
+    ) in caplog.record_tuples
+
+
+def test_lookup_topic_id_handles_empty_results(monkeypatch, caplog) -> None:
+    args_module._lookup_topic_id.cache_clear()
+
+    class EmptyTopics:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def search(self, text: str):
+            self.calls.append(("search", text))
+            return self
+
+        def select(self, fields):
+            self.calls.append(("select", tuple(fields)))
+            return self
+
+        def per_page(self, value: int):
+            self.calls.append(("per_page", value))
+            return self
+
+        def get(self):
+            self.calls.append(("get",))
+            return []
+
+    fake = EmptyTopics()
+    monkeypatch.setattr(args_module, "Topics", lambda: fake)
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+
+    resolved = args_module._lookup_topic_id("obscure field")
+
+    assert resolved is None
+    assert fake.calls == [
+        ("search", "obscure field"),
+        ("select", ("id",)),
+        ("per_page", 1),
+        ("get",),
+    ]
+    assert not any(
+        record[0] == "DocsToKG.ContentDownload" and record[1] == logging.INFO
+        for record in caplog.record_tuples
+    )
+
+
+def test_lookup_topic_id_handles_request_exception(monkeypatch, caplog) -> None:
+    args_module._lookup_topic_id.cache_clear()
+
+    class ErrorTopics:
+        def search(self, text: str):
+            raise requests.RequestException("boom")
+
+    monkeypatch.setattr(args_module, "Topics", lambda: ErrorTopics())
+    caplog.set_level(logging.WARNING)
+    caplog.clear()
+
+    resolved = args_module._lookup_topic_id("failing topic")
+
+    assert resolved is None
+    assert any(
+        record[0] == "DocsToKG.ContentDownload" and record[1] == logging.WARNING
+        for record in caplog.record_tuples
+    )
+    assert any("Topic lookup failed" in record[2] for record in caplog.record_tuples)
