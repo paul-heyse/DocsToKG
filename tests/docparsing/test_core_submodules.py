@@ -133,9 +133,11 @@ def test_normalize_http_timeout_scalar_and_iterables() -> None:
     """HTTP timeout coercion handles scalars, strings, and iterables."""
 
     assert normalize_http_timeout(None) == (5.0, 30.0)
-    assert normalize_http_timeout(12) == (5.0, 12.0)
+    assert normalize_http_timeout(12) == (12.0, 12.0)
+    assert normalize_http_timeout(30) == (30.0, 30.0)
     assert normalize_http_timeout("1.5, 2.5") == (1.5, 2.5)
     assert normalize_http_timeout([2, 3]) == (2.0, 3.0)
+    assert normalize_http_timeout((4, 5)) == (4.0, 5.0)
 
 
 def test_get_http_session_reuses_singleton_without_base_headers() -> None:
@@ -149,7 +151,7 @@ def test_get_http_session_reuses_singleton_without_base_headers() -> None:
         session_b, timeout_b = get_http_session()
 
         assert session_a is session_b
-        assert timeout_a == (5.0, 10.0)
+        assert timeout_a == (10.0, 10.0)
         assert timeout_b == (5.0, 30.0)
 
 

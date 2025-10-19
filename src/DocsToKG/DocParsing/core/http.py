@@ -37,11 +37,13 @@ def normalize_http_timeout(timeout: Optional[object]) -> Tuple[float, float]:
         if not extracted:
             return DEFAULT_HTTP_TIMEOUT
         if len(extracted) == 1:
-            return float(DEFAULT_HTTP_TIMEOUT[0]), float(extracted[0])
+            coerced = float(extracted[0])
+            return coerced, coerced
         return float(extracted[0]), float(extracted[1])
 
     if isinstance(timeout, (int, float)):
-        return float(DEFAULT_HTTP_TIMEOUT[0]), float(timeout)
+        coerced = float(timeout)
+        return coerced, coerced
 
     if isinstance(timeout, str):
         parts = [part for part in re.split(r"[;,\s]+", timeout) if part]
