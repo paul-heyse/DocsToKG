@@ -1331,6 +1331,21 @@ def _main_inner(
             """
             duration = round(result.duration_s, 3)
             if result.status != "success":
+                error_message = result.error or "unknown error"
+                failure_metadata = {
+                    "status": "failure",
+                    "duration_s": duration,
+                    "schema_version": CHUNK_SCHEMA_VERSION,
+                    "input_path": str(result.input_path),
+                    "input_hash": result.input_hash,
+                    "hash_alg": resolve_hash_algorithm(),
+                    "output_path": str(result.output_path),
+                    "parse_engine": result.parse_engine,
+                    "chunk_count": result.chunk_count,
+                    "anchors_injected": result.anchors_injected,
+                    "sanitizer_profile": result.sanitizer_profile,
+                    "error": error_message,
+                }
                 log_event(
                     logger,
                     "error",
@@ -1342,22 +1357,18 @@ def _main_inner(
                     output_relpath=relative_path(result.output_path, resolved_data_root),
                     elapsed_ms=int(result.duration_s * 1000),
                     error_class="RuntimeError",
-                    error=result.error or "unknown error",
+                    error=error_message,
                 )
                 stage_telemetry.log_failure(
                     doc_id=result.doc_id,
                     input_path=result.input_path,
                     duration_s=duration,
-                    reason=result.error or "unknown error",
-                    metadata={
-                        "input_path": str(result.input_path),
-                        "input_hash": result.input_hash,
-                        "output_path": str(result.output_path),
-                        "parse_engine": result.parse_engine,
-                    },
+                    reason=error_message,
+                    metadata=failure_metadata.copy(),
+                    manifest_metadata=failure_metadata,
                 )
                 raise RuntimeError(
-                    f"Chunking failed for {result.doc_id}: {result.error or 'unknown error'}"
+                    f"Chunking failed for {result.doc_id}: {error_message}"
                 )
 
             log_event(

@@ -70,3 +70,60 @@ def test_chunk_runtime_avoids_eager_hash(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
     expected_hash = original_hash(doctags_path)
     assert entry.get("input_hash") == expected_hash
+
+
+def test_chunk_runtime_records_manifest_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Chunk failures should emit a manifest row marked with ``status=\"failure\"``."""
+
+    dependency_stubs()
+    module = importlib.import_module("DocsToKG.DocParsing.chunking.runtime")
+    module = importlib.reload(module)
+
+    data_root = tmp_path / "Data"
+    in_dir = data_root / "DocTagsFiles"
+    out_dir = data_root / "ChunkedDocTagFiles"
+    in_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    doc_stem = "broken"
+    manifest_doc_id = f"{doc_stem}.doctags"
+    doctags_path = in_dir / manifest_doc_id
+    doctags_path.write_text("Paragraph one", encoding="utf-8")
+
+    def _failing_read(path: Path) -> str:
+        raise RuntimeError("forced chunk failure")
+
+    monkeypatch.setattr(module, "read_utf8", _failing_read)
+
+    with pytest.raises(RuntimeError, match="forced chunk failure"):
+        module._main_inner(
+            [
+                "--data-root",
+                str(data_root),
+                "--in-dir",
+                str(in_dir),
+                "--out-dir",
+                str(out_dir),
+                "--workers",
+                "1",
+            ]
+        )
+
+    manifest_path = module.resolve_manifest_path("chunks", data_root)
+    assert manifest_path.exists(), "chunk manifest should capture failure rows"
+
+    with manifest_path.open("r", encoding="utf-8") as handle:
+        entries = [json.loads(line) for line in handle if line.strip()]
+
+    failure_entries = [entry for entry in entries if entry.get("status") == "failure"]
+    assert len(failure_entries) == 1, "exactly one failure entry should be recorded"
+
+    failure_entry = failure_entries[0]
+    assert failure_entry.get("doc_id") == manifest_doc_id
+    assert failure_entry.get("schema_version") == module.CHUNK_SCHEMA_VERSION
+    assert failure_entry.get("parse_engine") == "docling-html"
+    assert failure_entry.get("input_path", "").endswith(manifest_doc_id)
+    assert failure_entry.get("output_path", "").endswith(".chunks.jsonl")
+    assert failure_entry.get("hash_alg") == module.resolve_hash_algorithm()
