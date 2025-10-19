@@ -9,8 +9,8 @@ from pathlib import Path
 from DocsToKG.DocParsing.io import compute_content_hash
 
 
-def _legacy_compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
-    """Replicate the historical content hashing strategy for regression tests."""
+def _replicated_compute_content_hash(path: Path, algorithm: str = "sha256") -> str:
+    """Replicate :func:`compute_content_hash` for deterministic expectations."""
 
     hasher = hashlib.new(algorithm)
     try:
@@ -28,8 +28,8 @@ def _legacy_compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
     return hasher.hexdigest()
 
 
-def test_compute_content_hash_text_preserves_legacy_digest(tmp_path: Path) -> None:
-    """UTF-8 inputs should match the historical digest, including combining marks."""
+def test_compute_content_hash_text_matches_reference_digest(tmp_path: Path) -> None:
+    """UTF-8 inputs should match the reference digest, including combining marks."""
 
     content = (
         "Heading — naïve façade"  # simple ASCII + Latin-1 supplement
@@ -43,20 +43,20 @@ def test_compute_content_hash_text_preserves_legacy_digest(tmp_path: Path) -> No
     target = tmp_path / "text.txt"
     target.write_text(content, encoding="utf-8")
 
-    legacy = _legacy_compute_content_hash(target)
+    expected = _replicated_compute_content_hash(target)
     updated = compute_content_hash(target)
 
-    assert updated == legacy
+    assert updated == expected
 
 
-def test_compute_content_hash_binary_preserves_legacy_digest(tmp_path: Path) -> None:
+def test_compute_content_hash_binary_matches_reference_digest(tmp_path: Path) -> None:
     """Binary inputs should fall back to byte-wise hashing unchanged."""
 
     payload = (b"\xff\x00\xfe\x00" * 16384) + b"\x00\xff\xfe\xfd"
     target = tmp_path / "binary.bin"
     target.write_bytes(payload)
 
-    legacy = _legacy_compute_content_hash(target)
+    expected = _replicated_compute_content_hash(target)
     updated = compute_content_hash(target)
 
-    assert updated == legacy
+    assert updated == expected

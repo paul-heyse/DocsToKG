@@ -125,6 +125,13 @@ sequenceDiagram
   - Embedding: `DOCSTOKG_EMBED_*` flags plus `DOCSTOKG_QWEN_DIR`, `DOCSTOKG_SPLADE_DIR` for model caches.
 - Validate configuration: run `python -m DocsToKG.DocParsing.core.cli chunk --validate-only` or `... embed --validate-only` before production runs.
 
+### Content hashing defaults
+- **New default (2025-10-20):** `compute_content_hash`, `compute_chunk_uuid`, and `resolve_hash_algorithm()` now use SHA-256 by
+  default. SHA-1 remains available via `DOCSTOKG_HASH_ALG=sha1` or explicit function arguments.
+- **Operational impact:** SHA-256 digests change manifest `input_hash` values and chunk UUIDs, so resumed runs may schedule
+  reprocessing for artifacts produced with the previous default. Set `DOCSTOKG_HASH_ALG=sha1` during migration if you must resume
+  older manifests before switching fleets to the stronger digest.
+
 ## Data contracts & schemas
 - Schemas: `formats.CHUNK_ROW_SCHEMA`, `formats.VECTOR_ROW_SCHEMA`, DocTags manifest rows emitted via `telemetry.ManifestEntry`.
 - Manifests stored under `Data/Manifests/docparse.*.manifest.jsonl` (DocTags, chunking, embeddings).

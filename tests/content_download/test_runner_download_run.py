@@ -12,7 +12,7 @@ import pytest
 import requests
 
 from DocsToKG.ContentDownload.args import ResolvedConfig, bootstrap_run_environment
-from DocsToKG.ContentDownload.core import WorkArtifact
+from DocsToKG.ContentDownload.core import Classification, ReasonCode, WorkArtifact
 from DocsToKG.ContentDownload.networking import ThreadLocalSessionFactory
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.providers import WorkProvider
@@ -25,6 +25,7 @@ from DocsToKG.ContentDownload.telemetry import (
     MultiSink,
     RunTelemetry,
     SummarySink,
+    load_previous_manifest,
 )
 
 
@@ -260,6 +261,40 @@ def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
     message = str(excinfo.value)
     assert str(missing_manifest) in message
     assert "--resume-from" in message
+
+
+def test_setup_download_state_expands_user_resume_path(
+    tmp_path, patcher, monkeypatch
+):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    monkeypatch.setenv("HOME", str(home_dir))
+
+    expected_resume = home_dir / "manifests" / "resume.jsonl"
+    expected_resume.parent.mkdir(parents=True, exist_ok=True)
+
+    captured: Dict[str, object] = {}
+
+    def _capture_resume_path(_self, resume_path):
+        captured["path"] = resume_path
+        return {}, set()
+
+    patcher.setattr(DownloadRun, "_load_resume_state", _capture_resume_path)
+
+    resolved.args.resume_from = "~/manifests/resume.jsonl"
+    download_run = DownloadRun(resolved)
+
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        download_run.setup_download_state(factory)
+    finally:
+        factory.close_all()
+        download_run.close()
+
+    assert captured.get("path") == expected_resume
 
 
 def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_path):
@@ -946,3 +981,65 @@ def test_run_respects_explicit_resume_from_override(patcher, tmp_path):
     assert result.saved == 1
     # Explicit override should prefer override.jsonl, leaving W_BASE unskipped.
     assert resolved.args.resume_from == override_path
+
+
+def test_worker_crash_records_manifest_reason(patcher, tmp_path):
+    resolved = make_resolved_config(tmp_path, workers=2, csv=False)
+    bootstrap_run_environment(resolved)
+
+    failure_id = "W_FAIL"
+    artifacts = [
+        _make_artifact(resolved, failure_id),
+        _make_artifact(resolved, "W_OK"),
+    ]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: requests.Session,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        if work.work_id == failure_id:
+            raise RuntimeError("boom")
+        return {"saved": True, "downloaded_bytes": 5}
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.worker_failures == 1
+    per_work, completed = load_previous_manifest(resolved.manifest_path)
+    assert failure_id not in completed
+
+    crash_entries = per_work.get(failure_id)
+    assert crash_entries is not None and crash_entries
+    failure_record = next(iter(crash_entries.values()))
+
+    assert failure_record["classification"] == Classification.SKIPPED.value
+    assert failure_record["reason"] == ReasonCode.WORKER_EXCEPTION.value
+    assert failure_record["reason_detail"] == "worker-crash"
+

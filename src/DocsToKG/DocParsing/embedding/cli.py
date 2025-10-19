@@ -76,8 +76,11 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
         {
             "type": str,
             "default": "jsonl",
-            "choices": ["jsonl", "parquet"],
-            "help": "Vector output format (default: %(default)s).",
+            "choices": ["jsonl"],
+            "help": (
+                "Vector output format (default: %(default)s). "
+                "Parquet support is not yet available."
+            ),
         },
     ),
     CLIOption(("--bm25-k1",), {"type": float, "default": 1.5}),
