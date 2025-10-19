@@ -662,6 +662,12 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
 
             start_request = time.monotonic()
             try:
+                retry_after_cap = None
+                context_extra = getattr(plan.context, "extra", None)
+                if isinstance(context_extra, Mapping):
+                    raw_cap = context_extra.get("retry_after_cap")
+                    if isinstance(raw_cap, (int, float)):
+                        retry_after_cap = float(raw_cap)
                 response_cm = request_with_retries(
                     session,
                     "GET",
@@ -670,6 +676,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                     allow_redirects=True,
                     timeout=timeout,
                     headers=headers,
+                    retry_after_cap=retry_after_cap,
                     content_policy=content_policy,
                 )
             except ContentPolicyViolation as exc:

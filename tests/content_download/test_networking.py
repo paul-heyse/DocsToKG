@@ -1790,7 +1790,7 @@ def _download(
         handler.statuses = [429, 429, 200]
         url = f"http://127.0.0.1:{server.server_address[1]}/rate-limited.pdf"
 
-        patcher.setattr("DocsToKG.ContentDownload.networking.random.random", lambda: 0.0)
+        patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: a)
 
         sleep_durations: list[float] = []
 
@@ -1806,7 +1806,7 @@ def _download(
             assert handler.head_calls == 0
             # Ensure exactly max_retries + 1 attempts were issued (default helper budget)
             assert len(handler.request_times) == 3
-            assert sleep_durations == [0.75, 1.5]
+            assert sleep_durations == [0.375, 0.75]
         finally:
             session.close()
 
@@ -1846,7 +1846,7 @@ def _download(
 
     # --- test_http_retry.py ---
 
-    @patch("DocsToKG.ContentDownload.networking.random.random", return_value=0.0)
+    @patch("DocsToKG.ContentDownload.networking.random.uniform", side_effect=lambda a, b: a)
     @patch("DocsToKG.ContentDownload.networking.time.sleep")
     def test_transient_503_with_exponential_backoff(mock_sleep: Mock, _: Mock) -> None:
         """Verify exponential backoff timing for transient 503 errors."""
@@ -1866,7 +1866,30 @@ def _download(
 
         assert result is response_200
         assert session.request.call_count == 3
-        assert mock_sleep.call_args_list == [call(0.5), call(1.0)]
+        assert mock_sleep.call_args_list == [call(0.25), call(0.5)]
+
+    def test_equal_jitter_delay_bounds(patcher) -> None:
+        """Ensure equal jitter stays within the expected range for each attempt."""
+
+        from DocsToKG.ContentDownload.networking import _calculate_equal_jitter_delay
+
+        patcher.setattr(
+            "DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: a
+        )
+        lower = _calculate_equal_jitter_delay(2, backoff_factor=0.8, backoff_max=10.0)
+        assert lower == pytest.approx(0.8 * (2**2) / 2)
+
+        patcher.setattr(
+            "DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b
+        )
+        upper = _calculate_equal_jitter_delay(2, backoff_factor=0.8, backoff_max=10.0)
+        assert upper == pytest.approx(0.8 * (2**2))
+
+        patcher.setattr(
+            "DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b
+        )
+        capped = _calculate_equal_jitter_delay(4, backoff_factor=1.0, backoff_max=3.0)
+        assert capped == pytest.approx(3.0)
 
     # --- test_http_retry.py ---
 
@@ -1913,7 +1936,7 @@ def _download(
 
     # --- test_http_retry.py ---
 
-    @patch("DocsToKG.ContentDownload.networking.random.random", return_value=0.0)
+    @patch("DocsToKG.ContentDownload.networking.random.uniform", side_effect=lambda a, b: a)
     @patch("DocsToKG.ContentDownload.networking.time.sleep")
     def test_retry_after_header_overrides_backoff(mock_sleep: Mock, _: Mock) -> None:
         session = Mock(spec=requests.Session)
@@ -1932,6 +1955,26 @@ def _download(
 
         assert result is response_success
         assert mock_sleep.call_args_list == [call(10.0)]
+
+    @patch("DocsToKG.ContentDownload.networking.random.uniform", side_effect=lambda a, b: a)
+    @patch("DocsToKG.ContentDownload.networking.time.sleep")
+    def test_retry_after_cap_limits_sleep(mock_sleep: Mock, _: Mock) -> None:
+        session = Mock(spec=requests.Session)
+        response_retry = _mock_response(429, headers={"Retry-After": "120"})
+        response_success = _mock_response(200)
+        session.request.side_effect = [response_retry, response_success]
+
+        result = request_with_retries(
+            session,
+            "GET",
+            "https://example.org/test",
+            backoff_factor=0.5,
+            max_retries=2,
+            retry_after_cap=30.0,
+        )
+
+        assert result is response_success
+        assert mock_sleep.call_args_list == [call(30.0)]
 
     # --- test_http_retry.py ---
 
