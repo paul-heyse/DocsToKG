@@ -90,10 +90,15 @@ pytest.importorskip("transformers")
 
 pytestmark = pytest.mark.filterwarnings("ignore:.*SwigPy.*__module__ attribute:DeprecationWarning")
 
+import DocsToKG.DocParsing.chunking.runtime as chunk_runtime  # noqa: E402
 import DocsToKG.DocParsing.env as doc_env  # noqa: E402
 from DocsToKG.DocParsing.chunking.runtime import (  # noqa: E402
     Rec,
     coalesce_small_runs,
+)
+from DocsToKG.DocParsing.io import (  # noqa: E402
+    resolve_attempts_path,
+    resolve_manifest_path,
 )
 from tests.docparsing.stubs import dependency_stubs  # noqa: E402
 
@@ -219,6 +224,92 @@ def test_chunk_and_embed_cli_with_dependency_stubs(tmp_path: Path) -> None:
             ]
         )
     assert embed_exit.value.code == 0
+
+
+def test_chunk_resume_skips_unchanged_docs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Chunk resume mode should skip unchanged inputs and retain order."""
+
+    dependency_stubs()
+
+    data_root = tmp_path / "data"
+    doc_dir = data_root / "DocTagsFiles"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    doc_dir.mkdir(parents=True, exist_ok=True)
+    chunks_dir.mkdir(parents=True, exist_ok=True)
+
+    for name in ("splade", "qwen", "models"):
+        (tmp_path / name).mkdir(exist_ok=True)
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+    monkeypatch.setenv("DOCSTOKG_SPLADE_DIR", str(tmp_path / "splade"))
+    monkeypatch.setenv("DOCSTOKG_QWEN_DIR", str(tmp_path / "qwen"))
+    monkeypatch.setenv("DOCSTOKG_MODEL_ROOT", str(tmp_path / "models"))
+
+    docs = {
+        "alpha": {"uuid": "alpha-1", "text": "Alpha content", "doc_id": "alpha"},
+        "beta": {"uuid": "beta-1", "text": "Beta content", "doc_id": "beta"},
+    }
+    for name, payload in docs.items():
+        (doc_dir / f"{name}.doctags").write_text(
+            json.dumps(payload) + "\n",
+            encoding="utf-8",
+        )
+
+    chunk_args = [
+        "--in-dir",
+        str(doc_dir),
+        "--out-dir",
+        str(chunks_dir),
+        "--resume",
+        "--workers",
+        "2",
+    ]
+
+    first_exit = chunk_runtime.main(chunk_args)
+    assert first_exit == 0
+
+    manifest_path = resolve_manifest_path("chunks", data_root)
+    attempts_path = resolve_attempts_path("chunks", data_root)
+    manifest_entries = list(_load_jsonl(manifest_path))
+    attempts_entries = list(_load_jsonl(attempts_path))
+
+    manifest_docs = [row["doc_id"] for row in manifest_entries if row["doc_id"] != "__config__"]
+    assert manifest_docs == ["alpha.doctags", "beta.doctags"]
+
+    beta_path = doc_dir / "beta.doctags"
+    beta_path.write_text(
+        json.dumps({"uuid": "beta-2", "text": "Beta content updated", "doc_id": "beta"})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    manifest_count = len(manifest_entries)
+    attempts_count = len(attempts_entries)
+
+    second_exit = chunk_runtime.main(chunk_args)
+    assert second_exit == 0
+
+    manifest_entries_after = list(_load_jsonl(manifest_path))
+    attempts_entries_after = list(_load_jsonl(attempts_path))
+
+    manifest_delta = [
+        row
+        for row in manifest_entries_after[manifest_count:]
+        if row.get("doc_id") != "__config__"
+    ]
+    assert [row["doc_id"] for row in manifest_delta] == [
+        "alpha.doctags",
+        "beta.doctags",
+    ]
+
+    attempt_delta = attempts_entries_after[attempts_count:]
+    assert [entry["status"] for entry in attempt_delta] == ["skip", "success"]
+    assert [entry["file_id"] for entry in attempt_delta] == [
+        "alpha.doctags",
+        "beta.doctags",
+    ]
 
 
 # --- CLI path smoke tests ---

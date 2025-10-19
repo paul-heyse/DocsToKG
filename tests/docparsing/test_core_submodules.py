@@ -177,6 +177,33 @@ def test_get_http_session_transient_headers_do_not_leak() -> None:
         assert "Authorization" not in shared_session.headers
 
 
+def test_get_http_session_transient_cookies_do_not_pollute_singleton() -> None:
+    """Mutations to cloned sessions' cookies do not alter the cached shared session."""
+
+    with (
+        mock.patch.object(core_http, "_HTTP_SESSION", None),
+        mock.patch.object(core_http, "_HTTP_SESSION_TIMEOUT", core_http.DEFAULT_HTTP_TIMEOUT),
+    ):
+        shared_session, _ = get_http_session()
+        shared_session.cookies.set("shared", "base")
+
+        cloned_session, _ = get_http_session(base_headers={"Authorization": "Token"})
+
+        assert cloned_session is not shared_session
+        assert cloned_session.cookies is not shared_session.cookies
+        assert cloned_session.cookies.get("shared") == "base"
+
+        cloned_session.cookies.set("transient", "clone")
+
+        assert shared_session.cookies.get("transient") is None
+        # Fetch the cached session again to ensure singleton state remains unchanged.
+        cached_again, _ = get_http_session()
+
+        assert cached_again is shared_session
+        assert cached_again.cookies.get("transient") is None
+        assert cached_again.cookies.get("shared") == "base"
+
+
 def test_manifest_resume_controller(tmp_path: Path) -> None:
     """ResumeController mirrors should_skip_output behaviour."""
 

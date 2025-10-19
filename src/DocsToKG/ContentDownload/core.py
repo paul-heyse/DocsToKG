@@ -458,6 +458,7 @@ class ReasonCode(Enum):
     DOMAIN_BREAKER_OPEN = "domain_breaker_open"
     DOMAIN_DISALLOWED_MIME = "domain_disallowed_mime"
     SKIP_LARGE_DOWNLOAD = "skip_large_download"
+    WORKER_EXCEPTION = "worker_exception"
 
     @classmethod
     def from_wire(cls, value: Union[str, "ReasonCode", None]) -> "ReasonCode":

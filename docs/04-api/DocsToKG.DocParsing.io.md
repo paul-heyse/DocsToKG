@@ -50,7 +50,10 @@ Return newline-aligned byte ranges that partition ``path``.
 
 ### `iter_doctags(directory)`
 
-Yield DocTags files within ``directory`` and subdirectories.
+Yield DocTags files within ``directory`` and subdirectories while preserving
+their logical locations beneath the provided root. Entries that resolve to the
+same filesystem target are emitted once, preferring real files over symbolic
+links and returning results sorted by their logical path.
 
 ### `_iter_jsonl_records(path)`
 

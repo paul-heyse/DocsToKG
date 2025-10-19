@@ -115,6 +115,7 @@ class DenseIndexConfig:
         multi_gpu_mode: Replica strategy for multi-GPU hosts ("single" default)
         replication_gpu_ids: Explicit GPU ids to target when multi-GPU replication is enabled
         gpu_temp_memory_bytes: Optional temporary memory pool size for FAISS GPU ops
+        gpu_pinned_memory_bytes: Optional pinned memory pool size for faster H2D/D2H transfers
         gpu_indices_32_bit: When True, store FAISS indices in 32-bit format to save VRAM
         expected_ntotal: Hint for anticipated index size; used to pre-reserve GPU memory
         rebuild_delete_threshold: Pending delete count before forcing full rebuild
@@ -156,6 +157,7 @@ class DenseIndexConfig:
     multi_gpu_mode: Literal["single", "replicate", "shard"] = "single"
     replication_gpu_ids: Optional[Tuple[int, ...]] = None
     gpu_temp_memory_bytes: Optional[int] = None
+    gpu_pinned_memory_bytes: Optional[int] = None
     gpu_indices_32_bit: bool = True
     expected_ntotal: int = 0
     rebuild_delete_threshold: int = 10000

@@ -254,16 +254,41 @@ def build_jsonl_split_map(
 
 
 def iter_doctags(directory: Path) -> Iterator[Path]:
-    """Yield DocTags files within ``directory`` and subdirectories."""
+    """Yield DocTags files within ``directory`` and subdirectories.
+
+    The returned paths retain their logical location beneath ``directory`` even
+    when they are symbolic links. Files that resolve to the same on-disk target
+    are emitted once, preferring concrete files over symlinks and ordering the
+    results lexicographically by their logical (relative) path.
+    """
 
     extensions = ("*.doctags", "*.doctag")
-    seen = set()
+    resolved_to_logical: Dict[Path, Tuple[Path, str, Tuple[bool, str]]] = {}
     for pattern in extensions:
         for candidate in directory.rglob(pattern):
-            if candidate.is_file() and not candidate.name.startswith("."):
-                seen.add(candidate.resolve())
-    for path in sorted(seen):
-        yield path
+            if not candidate.is_file() or candidate.name.startswith("."):
+                continue
+
+            try:
+                logical = candidate.relative_to(directory)
+            except ValueError:
+                logical = candidate
+            logical_key = logical.as_posix()
+
+            try:
+                resolved = candidate.resolve()
+            except (OSError, RuntimeError):
+                resolved = candidate
+
+            priority = (candidate.is_symlink(), logical_key)
+            existing = resolved_to_logical.get(resolved)
+            if existing is None or priority < existing[2]:
+                resolved_to_logical[resolved] = (candidate, logical_key, priority)
+
+    for candidate, _logical_key, _priority in sorted(
+        resolved_to_logical.values(), key=lambda item: item[1]
+    ):
+        yield candidate
 
 
 def _iter_jsonl_records(
@@ -461,7 +486,7 @@ def _select_hash_algorithm(requested: Optional[str], default: Optional[str]) -> 
     return fallback
 
 
-def resolve_hash_algorithm(default: str = "sha1") -> str:
+def resolve_hash_algorithm(default: str = _SAFE_HASH_ALGORITHM) -> str:
     """Return the active content hash algorithm, guarding invalid overrides."""
 
     return _select_hash_algorithm(requested=None, default=default)
@@ -479,7 +504,7 @@ def compute_chunk_uuid(
     start_offset: int,
     text: str,
     *,
-    algorithm: str = "sha1",
+    algorithm: str = _SAFE_HASH_ALGORITHM,
 ) -> str:
     """Compute a deterministic UUID for a chunk of text."""
 
