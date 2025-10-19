@@ -863,6 +863,26 @@ def _handle_prune(args, logger) -> Dict[str, object]:
     }
 
 
+def _bioportal_api_key_status(path: Path) -> Dict[str, object]:
+    """Return configuration status for the BioPortal API key file."""
+
+    status: Dict[str, object] = {"path": str(path), "configured": False}
+
+    if not path.exists():
+        return status
+
+    try:
+        contents = path.read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        status["error"] = f"{exc.__class__.__name__}: {exc}"
+        return status
+
+    if contents.strip():
+        status["configured"] = True
+
+    return status
+
+
 def _doctor_report() -> Dict[str, object]:
     """Collect diagnostic information for the ``doctor`` command.
 
@@ -959,10 +979,7 @@ def _doctor_report() -> Dict[str, object]:
             robot_info["error"] = str(exc)
 
     api_key_path = CONFIG_DIR / "bioportal_api_key.txt"
-    bioportal = {
-        "path": str(api_key_path),
-        "configured": api_key_path.exists() and api_key_path.read_text().strip() != "",
-    }
+    bioportal = _bioportal_api_key_status(api_key_path)
 
     network_targets = {
         "ols": "https://www.ebi.ac.uk/ols4/api/health",
