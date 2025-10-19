@@ -39,8 +39,11 @@ from typing import (
 try:  # pragma: no cover - dependency check
     import yaml  # type: ignore
 except ModuleNotFoundError as exc:  # pragma: no cover - explicit guidance for users
+    # Guardrail: align messaging with OntologyDownload/AGENTS.md environment policy.
     raise ImportError(
-        "PyYAML is required for configuration parsing. Install it with: pip install pyyaml"
+        "PyYAML is required for configuration parsing. "
+        "Ensure the project-managed .venv is set up (rerun the approved bootstrap script) "
+        "instead of installing packages directly."
     ) from exc
 
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
@@ -195,6 +198,13 @@ class DownloadConfiguration(BaseModel):
         }
     )
     allowed_hosts: Optional[List[str]] = Field(default=None)
+    allow_private_networks_for_host_allowlist: bool = Field(
+        default=False,
+        description=(
+            "When true, allowlisted hosts may resolve to private or loopback addresses."
+            " Defaults to False to prevent accidental SSRF via misconfigured DNS."
+        ),
+    )
     allowed_ports: Optional[List[int]] = Field(default=None)
     polite_headers: Dict[str, str] = Field(
         default_factory=lambda: {
@@ -284,8 +294,10 @@ class DownloadConfiguration(BaseModel):
             ports.update(self.allowed_ports)
         return ports
 
-    def normalized_allowed_hosts(self) -> Optional[Tuple[Set[str], Set[str], Dict[str, Set[int]]]]:
-        """Split allowed host list into exact domains, wildcard suffixes, and per-host port allowances."""
+    def normalized_allowed_hosts(
+        self,
+    ) -> Optional[Tuple[Set[str], Set[str], Dict[str, Set[int]], Set[str]]]:
+        """Split allowed host list into exact domains, wildcard suffixes, per-host ports, and IP literals."""
 
         if not self.allowed_hosts:
             return None
@@ -293,6 +305,7 @@ class DownloadConfiguration(BaseModel):
         exact: Set[str] = set()
         suffixes: Set[str] = set()
         host_ports: Dict[str, Set[int]] = {}
+        ip_literals: Set[str] = set()
 
         for entry in self.allowed_hosts:
             candidate = entry.strip()
@@ -343,6 +356,7 @@ class DownloadConfiguration(BaseModel):
                     raise ValueError(f"Invalid hostname in allowlist: {entry}") from exc
             else:
                 normalized = working.lower()
+                ip_literals.add(normalized)
 
             if wildcard and port is not None:
                 raise ValueError("Wildcard allowlist entries cannot specify ports")
@@ -357,7 +371,7 @@ class DownloadConfiguration(BaseModel):
         if not exact and not suffixes and not host_ports:
             return None
 
-        return exact, suffixes, host_ports
+        return exact, suffixes, host_ports, ip_literals
 
     def polite_http_headers(
         self,

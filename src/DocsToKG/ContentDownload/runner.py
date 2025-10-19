@@ -799,18 +799,6 @@ def iterate_openalex(
     base_backoff = retry_backoff
     max_delay = max(0.0, float(retry_max_delay)) if retry_max_delay is not None else 0.0
 
-    def _jittered_delay(attempt_number: int) -> float:
-        if attempt_number <= 0 or retry_backoff <= 0 or max_delay <= 0:
-            return 0.0
-        base_delay = retry_backoff * (2 ** max(attempt_number - 1, 0))
-        if base_delay <= 0:
-            return 0.0
-        capped = min(base_delay, max_delay)
-        if capped <= 0:
-            return 0.0
-        half = capped / 2.0
-        return half + random.uniform(0.0, half)
-
     pager = query.paginate(
         per_page=per_page, n_max=max_results if max_results is not None else None
     )
@@ -834,7 +822,16 @@ def iterate_openalex(
                     raise
                 attempt += 1
                 retry_after = _retry_after_seconds(exc)
-                delay = _jittered_delay(attempt)
+                jitter_delay = 0.0
+                if retry_backoff > 0:
+                    base_attempt = max(attempt - 1, 0)
+                    backoff_cap = max_delay if max_delay > 0 else retry_backoff * (2**base_attempt)
+                    jitter_delay = _calculate_equal_jitter_delay(
+                        base_attempt,
+                        backoff_factor=retry_backoff,
+                        backoff_max=backoff_cap,
+                    )
+
                 bounded_retry_after: Optional[float] = None
                 if retry_after is not None:
                     bounded_retry_after = retry_after
@@ -842,30 +839,23 @@ def iterate_openalex(
                         bounded_retry_after = min(bounded_retry_after, retry_after_cap)
                     if max_delay > 0:
                         bounded_retry_after = min(bounded_retry_after, max_delay)
+
+                delay = max(jitter_delay, bounded_retry_after or 0.0)
+
                 if bounded_retry_after is not None:
-                    delay = max(delay, bounded_retry_after)
-                base_delay = base_backoff * (2 ** (attempt - 1)) if base_backoff else 0.0
-                jitter_delay = (
-                    _calculate_equal_jitter_delay(
-                        attempt - 1,
-                        backoff_factor=base_backoff,
-                        backoff_max=max_delay if max_delay > 0 else base_delay,
-                    )
-                    if base_delay > 0
-                    else 0.0
-                )
-                if max_delay <= 0:
-                    jitter_delay = 0.0
-                retry_after_effective = 0.0
-                if retry_after is not None:
-                    retry_after_effective = retry_after
+                    effective_limit: Optional[float] = None
+                    if retry_after_cap is not None and retry_after_cap > 0:
+                        effective_limit = retry_after_cap
                     if max_delay > 0:
-                        retry_after_effective = min(retry_after_effective, max_delay)
-                    else:
-                        retry_after_effective = 0.0
-                delay = max(jitter_delay, retry_after_effective)
-                if max_delay > 0:
+                        if effective_limit is None:
+                            effective_limit = max_delay
+                        else:
+                            effective_limit = min(effective_limit, max_delay)
+                    if effective_limit is not None:
+                        delay = min(delay, effective_limit)
+                elif max_delay > 0:
                     delay = min(delay, max_delay)
+                delay = max(0.0, delay)
                 LOGGER.warning(
                     "OpenAlex pagination error (%s/%s retries): %s. Retrying in %.2fs.",
                     attempt,

@@ -64,6 +64,14 @@ def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
     sensitive_keys = {"authorization", "api_key", "apikey", "token", "secret", "password"}
     token_pattern = re.compile(r"^[A-Za-z0-9+/=_-]{32,}$")
 
+    def _mask_header_pair(item: object) -> Optional[object]:
+        """Mask values for header-like key/value tuples."""
+
+        if isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], str):
+            key_lower = item[0].lower()
+            return (item[0], _mask_value(item[1], key_lower))
+        return None
+
     def _mask_value(value: object, key_hint: Optional[str] = None) -> object:
         if isinstance(value, dict):
             return {
@@ -71,21 +79,38 @@ def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
                 for sub_key, sub_value in value.items()
             }
         if isinstance(value, list):
-            return [_mask_value(item, key_hint) for item in value]
+            masked_list = []
+            for item in value:
+                masked_pair = _mask_header_pair(item)
+                if masked_pair is not None:
+                    masked_list.append(masked_pair)
+                else:
+                    masked_list.append(_mask_value(item, key_hint))
+            return masked_list
         if isinstance(value, tuple):
-            return tuple(_mask_value(item, key_hint) for item in value)
+            masked_pair = _mask_header_pair(value)
+            if masked_pair is not None:
+                return masked_pair
+            return tuple(
+                _mask_header_pair(item) or _mask_value(item, key_hint) for item in value
+            )
         if isinstance(value, set):
-            return {_mask_value(item, key_hint) for item in value}
+            masked_set = set()
+            for item in value:
+                masked_pair = _mask_header_pair(item)
+                if masked_pair is not None:
+                    masked_set.add(masked_pair)
+                else:
+                    masked_set.add(_mask_value(item, key_hint))
+            return masked_set
         if isinstance(value, str):
             lowered = value.lower()
+            if key_hint == "authorization":
+                return "***masked***"
             if key_hint in sensitive_keys:
                 return "***masked***"
             if "apikey" in lowered:
                 return "***masked***"
-            if key_hint == "authorization":
-                token = value.strip()
-                if "bearer " in lowered or token_pattern.match(token):
-                    return "***masked***"
             if "bearer " in lowered:
                 return "***masked***"
         return value

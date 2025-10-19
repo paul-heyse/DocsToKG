@@ -344,6 +344,24 @@ def _normalise_domain_content_rules(data: Mapping[str, Any]) -> Dict[str, Dict[s
     return normalized
 
 
+def _validate_max_concurrent_resolvers(value: Any) -> int:
+    """Validate ``max_concurrent_resolvers`` sourced from configuration files."""
+
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("max_concurrent_resolvers must be an integer >= 1")
+    if value < 1:
+        raise ValueError("max_concurrent_resolvers must be >= 1")
+    return value
+
+
+def _validate_enable_global_url_dedup(value: Any) -> bool:
+    """Validate ``enable_global_url_dedup`` sourced from configuration files."""
+
+    if not isinstance(value, bool):
+        raise ValueError("enable_global_url_dedup must be a boolean value")
+    return value
+
+
 @dataclass
 class ResolverConfig:
     """Runtime configuration options applied across resolvers.
@@ -641,6 +659,11 @@ def apply_config_overrides(
 ) -> None:
     """Apply overrides from configuration data onto a ResolverConfig."""
 
+    validators: Dict[str, Callable[[Any], Any]] = {
+        "max_concurrent_resolvers": _validate_max_concurrent_resolvers,
+        "enable_global_url_dedup": _validate_enable_global_url_dedup,
+    }
+
     for field_name in (
         "resolver_order",
         "resolver_toggles",
@@ -661,14 +684,18 @@ def apply_config_overrides(
         "host_accept_overrides",
         "domain_token_buckets",
         "resolver_circuit_breakers",
+        "max_concurrent_resolvers",
         "max_concurrent_per_host",
+        "enable_global_url_dedup",
         "domain_content_rules",
     ):
         if field_name in data and data[field_name] is not None:
+            value = data[field_name]
             if field_name == "domain_content_rules":
-                setattr(config, field_name, _normalise_domain_content_rules(data[field_name]))
-            else:
-                setattr(config, field_name, data[field_name])
+                value = _normalise_domain_content_rules(value)
+            elif field_name in validators:
+                value = validators[field_name](value)
+            setattr(config, field_name, value)
 
     if "resolver_rate_limits" in data:
         raise ValueError(
@@ -692,7 +719,8 @@ def load_resolver_config(
         config_paths.append(DEFAULT_RESOLVER_CREDENTIALS_PATH)
 
     if args.resolver_config:
-        config_paths.append(Path(args.resolver_config))
+        cli_config_path = Path(args.resolver_config).expanduser().resolve(strict=False)
+        config_paths.append(cli_config_path)
 
     for config_path in config_paths:
         config_data = read_resolver_config(config_path)

@@ -135,6 +135,8 @@ sequenceDiagram
 
 Configuration is layered: baked-in defaults → YAML file (`--spec /path/to/sources.yaml`) → environment variables → CLI overrides. The `settings.py` models (`DefaultsConfig`, `DownloadConfiguration`, `ValidationConfig`, `ResolvedConfig`) combine those sources before any network call occurs.
 
+CLI flags that accept configuration files (`--spec`, `--config`, `config validate/show` positional args) expand `~` to the caller's home directory before reading, so invocations like `ontofetch pull hp --spec ~/configs/sources.yaml` work reliably across shells.
+
 Example YAML (`configs/sources.yaml`):
 
 ```yaml
@@ -236,6 +238,7 @@ Example manifest excerpt:
 
 ## Security & data handling
 - Controls align with OWASP ASVS L1: TLS-only URLs, checksum verification, DNS validation, and strict allowlists defend against tampering and spoofing.
+- Host allowlists differentiate between domain names and IP literals. Domains continue to require public DNS results unless `allow_private_networks_for_host_allowlist` is explicitly enabled; IP literals may be allowlisted when the operator intends to reach private infrastructure.
 - Threats considered (STRIDE):
   - Spoofing: enforce resolver allowlists and DNS validation via `_cached_getaddrinfo`.
   - Tampering: checksums and fingerprint comparison guard against artifact corruption.
