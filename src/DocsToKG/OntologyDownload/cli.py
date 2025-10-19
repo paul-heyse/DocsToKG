@@ -1304,12 +1304,11 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
         )
         if getattr(args, "json", False):
             for handler in logger.handlers:
-                if isinstance(handler, logging.StreamHandler):
+                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
                     handler.setStream(sys.stderr)
-                    logger.debug("redirected handler to stderr")
         if args.command == "pull":
             if getattr(args, "dry_run", False):
-                plans = _handle_pull(args, base_config, dry_run=True)
+                plans = _handle_pull(args, base_config, dry_run=True, logger=logger)
                 if args.json:
                     json.dump([plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
                     sys.stdout.write("\n")
@@ -1320,7 +1319,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                     else:
                         print("No ontologies to process")
             else:
-                results = _handle_pull(args, base_config, dry_run=False)
+                results = _handle_pull(args, base_config, dry_run=False, logger=logger)
                 if args.json:
                     json.dump([results_to_dict(result) for result in results], sys.stdout, indent=2)
                     sys.stdout.write("\n")
@@ -1339,7 +1338,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                         },
                     )
         elif args.command == "plan":
-            plans = _handle_plan(args, base_config)
+            plans = _handle_plan(args, base_config, logger=logger)
             if args.json:
                 json.dump([plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
                 sys.stdout.write("\n")

@@ -85,6 +85,15 @@ from .planning import (
     MANIFEST_SCHEMA_VERSION,
     FetchResult,
 )
+from .planning import (
+    FetchSpec as _FetchSpec,
+)
+from .planning import (
+    fetch_all as _fetch_all,
+)
+from .planning import (
+    fetch_one as _fetch_one,
+)
 from .settings import (
     CACHE_DIR,
     LOCAL_ONTOLOGY_DIR,
@@ -150,7 +159,14 @@ __all__ += [
     "VALIDATION_TABLE_HEADERS",
     "_results_to_dict",
     "mask_sensitive_data",
+    "FetchSpec",
+    "fetch_one",
+    "fetch_all",
 ]
+
+FetchSpec = _FetchSpec
+fetch_one = _fetch_one
+fetch_all = _fetch_all
 
 
 def list_plugins(kind: str) -> Dict[str, str]:

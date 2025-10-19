@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import socket
+import sys
 import threading
 import time
 from collections import defaultdict, deque
@@ -333,14 +334,16 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         """Enqueue ``response`` for the specified ``path``."""
 
         key = (response.method.upper(), "/" + path.lstrip("/"))
-        self._responses[key].append(response)
+        self._responses[key].appendleft(response)
 
     def _dequeue_response(self, *, method: str, path: str) -> Optional[ResponseSpec]:
         key = (method.upper(), path)
         responses = self._responses.get(key)
         if not responses:
             return None
-        return responses.popleft()
+        response = responses.popleft()
+        print(f"serve {method} {path} -> {response.status}", file=sys.stderr)
+        return response
 
     # --- Fixture helpers ----------------------------------------------------------
 

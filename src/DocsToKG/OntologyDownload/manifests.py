@@ -110,6 +110,32 @@ def plan_to_dict(plan: PlannedFetch) -> dict:
     expected_checksum = metadata.get("expected_checksum")
     if isinstance(expected_checksum, dict):
         payload["expected_checksum"] = expected_checksum
+
+    payload["spec"] = {
+        "id": plan.spec.id,
+        "resolver": plan.spec.resolver,
+        "extras": dict(plan.spec.extras),
+        "target_formats": list(plan.spec.target_formats),
+    }
+    payload["plan"] = {
+        "resolver": plan.resolver,
+        "url": plan.plan.url,
+        "version": plan.plan.version,
+        "license": plan.plan.license,
+        "media_type": plan.plan.media_type,
+        "service": plan.plan.service,
+        "headers": plan.plan.headers,
+        "candidates": candidates,
+    }
+    if last_modified:
+        payload["plan"]["last_modified"] = last_modified
+    if size_hint is not None:
+        payload["plan"]["content_length"] = int(size_hint)
+    if metadata.get("etag"):
+        payload["plan"]["etag"] = metadata["etag"]
+    if isinstance(expected_checksum, dict):
+        payload["plan"]["expected_checksum"] = expected_checksum
+
     return payload
 
 
