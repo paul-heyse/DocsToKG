@@ -120,11 +120,11 @@ def _clone_http_session(session: requests.Session) -> requests.Session:
 
     clone = requests.Session()
 
-    # Preserve base configuration while isolating header mutations.
+    # Preserve base configuration while isolating header mutations and mutable containers.
     clone.headers.clear()
     clone.headers.update(session.headers)
     clone.auth = session.auth
-    clone.cookies = session.cookies
+    clone.cookies = session.cookies.copy()
     clone.params = session.params.copy()
     clone.proxies = session.proxies.copy()
     clone.verify = session.verify
