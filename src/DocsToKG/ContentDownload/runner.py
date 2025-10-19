@@ -250,7 +250,7 @@ class DownloadRun:
         resume_path_raw = self.args.resume_from
         sqlite_path = self.resolved.sqlite_path
         if resume_path_raw is not None:
-            resume_path = Path(resume_path_raw)
+            resume_path = Path(resume_path_raw).expanduser()
             resume_lookup, resume_completed = self._load_resume_state(resume_path)
         else:
             manifest_path = self.resolved.manifest_path

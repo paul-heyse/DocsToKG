@@ -261,6 +261,40 @@ def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
     assert "--resume-from" in message
 
 
+def test_setup_download_state_expands_user_resume_path(
+    tmp_path, patcher, monkeypatch
+):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    monkeypatch.setenv("HOME", str(home_dir))
+
+    expected_resume = home_dir / "manifests" / "resume.jsonl"
+    expected_resume.parent.mkdir(parents=True, exist_ok=True)
+
+    captured: Dict[str, object] = {}
+
+    def _capture_resume_path(_self, resume_path):
+        captured["path"] = resume_path
+        return {}, set()
+
+    patcher.setattr(DownloadRun, "_load_resume_state", _capture_resume_path)
+
+    resolved.args.resume_from = "~/manifests/resume.jsonl"
+    download_run = DownloadRun(resolved)
+
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        download_run.setup_download_state(factory)
+    finally:
+        factory.close_all()
+        download_run.close()
+
+    assert captured.get("path") == expected_resume
+
+
 def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_path):
     resolved = make_resolved_config(tmp_path, csv=False)
     bootstrap_run_environment(resolved)
