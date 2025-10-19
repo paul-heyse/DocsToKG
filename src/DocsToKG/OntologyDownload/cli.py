@@ -63,6 +63,7 @@ from .planning import (
     plan_all,
     validate_manifest_dict,
 )
+from .resolvers import RESOLVERS
 from .settings import (
     CACHE_DIR,
     CONFIG_DIR,
@@ -546,6 +547,28 @@ def _resolve_specs_from_args(
     target_formats = _parse_target_formats(getattr(args, "target_formats", None))
     config_path: Optional[Path] = getattr(args, "spec", None)
     ids: List[str] = list(getattr(args, "ids", []))
+    resolver_override_arg = getattr(args, "resolver", None)
+    if resolver_override_arg is None:
+        resolver_override: Optional[str] = None
+    else:
+        candidate = str(resolver_override_arg).strip()
+        resolver_override = candidate or None
+    if resolver_override and resolver_override not in RESOLVERS:
+        raise ConfigError("Unknown resolver(s) specified: " + resolver_override)
+
+    def apply_resolver_override(specs: Sequence[FetchSpec]) -> List[FetchSpec]:
+        if not resolver_override:
+            return list(specs)
+        return [
+            FetchSpec(
+                id=spec.id,
+                resolver=resolver_override,
+                extras=dict(spec.extras),
+                target_formats=tuple(spec.target_formats),
+            )
+            for spec in specs
+        ]
+
     if config_path is None and not ids:
         default_config = CONFIG_DIR / "sources.yaml"
         if default_config.exists():
@@ -571,6 +594,7 @@ def _resolve_specs_from_args(
             raise ConfigError(f"No matching entries found in lock file {lock_path}")
         config.defaults.resolver_fallback_enabled = False
         config.defaults.prefer_source = ["direct"]
+        specs = apply_resolver_override(specs)
         config.specs = specs
         logging.getLogger("DocsToKG.OntologyDownload").info(
             "using lockfile",
@@ -583,7 +607,6 @@ def _resolve_specs_from_args(
         return config, specs
 
     if ids:
-        resolver_override = getattr(args, "resolver", None)
         default_resolver = None
         if config.defaults.prefer_source:
             default_resolver = config.defaults.prefer_source[0]
@@ -616,10 +639,13 @@ def _resolve_specs_from_args(
                         target_formats=fallback_formats,
                     )
                 )
-        return config, resolved_specs
+        return config, apply_resolver_override(resolved_specs)
 
     if config.specs:
-        return config, config.specs
+        specs = apply_resolver_override(config.specs)
+        if resolver_override:
+            config.specs = specs
+        return config, specs
 
     if allow_empty:
         return config, []
