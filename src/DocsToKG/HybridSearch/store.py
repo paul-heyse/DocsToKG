@@ -3199,6 +3199,11 @@ class ManagedFaissAdapter(DenseVectorStore):
 
         return self._inner.stats()
 
+    def snapshot_meta(self) -> Mapping[str, object]:
+        """Return snapshot metadata provided by the managed store."""
+
+        return self._inner.snapshot_meta()
+
     def flush_snapshot(self, *, reason: str = "flush") -> None:
         """Forward snapshot flush requests to the managed store."""
 
