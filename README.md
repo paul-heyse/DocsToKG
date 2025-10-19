@@ -75,6 +75,30 @@ for result in response.results:
     print(result.doc_id, round(result.score, 3), result.highlights)
 ```
 
+#### CPU snapshot refresh throttling
+
+Dense FAISS indexes now throttle CPU snapshot refreshes to reduce excessive
+`serialize()` calls on busy ingest nodes. Tune the behaviour via
+`DenseIndexConfig`:
+
+```python
+DenseIndexConfig(
+    snapshot_refresh_interval_seconds=30.0,  # minimum time between refreshes
+    snapshot_refresh_writes=5000,            # or minimum writes before refresh
+)
+```
+
+Set either value to `0` to disable that threshold; when both are `0` the store
+refreshes after every write (legacy behaviour). Operators can still force a
+refresh—use `FaissVectorStore.flush_snapshot()` before shutdown or after
+maintenance windows.
+
+Observability now reports when snapshots occur: counters
+`faiss_snapshot_refresh_total` and `faiss_snapshot_refresh_skipped` track actual
+and throttled attempts (labelled by reason and whether the refresh was forced),
+while the gauge `faiss_snapshot_age_seconds` surfaces the age of the cached CPU
+replica for dashboards and alerts.
+
 ### Ontology Download CLI
 
 ```bash
