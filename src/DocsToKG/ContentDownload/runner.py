@@ -305,6 +305,11 @@ class DownloadRun:
             xml_dir=self.resolved.xml_dir,
             per_page=self.args.per_page,
             max_results=self.args.max,
+            retry_attempts=self.resolved.openalex_retry_attempts,
+            retry_backoff=self.resolved.openalex_retry_backoff,
+            retry_max_delay=self.resolved.openalex_retry_max_delay,
+            retry_after_cap=self.resolved.retry_after_cap,
+            iterate_openalex_func=self.iterate_openalex_func,
         )
         self.provider = provider
         return provider
@@ -791,6 +796,7 @@ def iterate_openalex(
 
     max_retries = max(0, int(retry_attempts))
     retry_backoff = max(0.0, float(retry_backoff))
+    base_backoff = retry_backoff
     max_delay = max(0.0, float(retry_max_delay)) if retry_max_delay is not None else 0.0
 
     pager = query.paginate(
