@@ -451,7 +451,6 @@ def _enforce_content_policy(
             )
 
 
-
 def _calculate_equal_jitter_delay(
     attempt: int,
     *,

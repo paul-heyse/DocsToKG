@@ -1,4 +1,9 @@
-"""Snapshot serialization/restore regression tests.
+"""FAISS snapshot serialization/restore regression tests.
+
+Validates that `serialize_state`/`restore_state` payloads (binary blobs +
+metadata) round-trip across versions, honour encryption hooks, and integrate
+with the CUDA/OpenBLAS-backed FAISS wheel. Guards disaster-recovery workflows
+outlined in the README."""
 
 Exercises ``serialize_state`` output, encrypted payload handling, metadata
 round-tripping, and error paths during ``restore_state`` to guarantee hybrid

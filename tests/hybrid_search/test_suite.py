@@ -1,4 +1,11 @@
 # === NAVMAP v1 ===
+"""End-to-end hybrid search suite validating ingestion, FAISS GPU usage, API, and snapshots.
+
+Stitches together config management, DocParsing fixtures, FAISS GPU ingestion,
+API requests, validator resource budgets, and snapshot/restore flows. Mirrors
+the README quickstart and ensures the custom `faiss-1.12.0` wheel (CUDA 12 +
+OpenBLAS) works across ingestion, query, and scale scenarios."""
+
 # {
 #   "module": "tests.hybrid_search.test_suite",
 #   "purpose": "Pytest coverage for hybrid search suite scenarios",
@@ -271,19 +278,14 @@
 # }
 # === /NAVMAP ===
 
-"""End-to-end hybrid search suite using real FAISS/BM25 pipelines.
-
-Bootstraps config, fixture data, ingestion pipeline, and query service to
-validate ranking quality, pagination, diagnostics, and API contracts. Mirrors
-the critical smoke suite used in CI and documentation.
-"""
-
 from __future__ import annotations
 
+import gc
 import importlib
 import json
 import logging
 import os
+import random
 import sys
 import uuid
 from dataclasses import replace
@@ -375,6 +377,19 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
 @pytest.fixture
 def dataset() -> Sequence[Mapping[str, object]]:
     return load_dataset(Path("tests/data/hybrid_dataset.jsonl"))
+
+
+def test_infer_embedding_dim_returns_after_first_valid_vector(tmp_path: Path) -> None:
+    vector_path = tmp_path / "mock_vectors.jsonl"
+    with vector_path.open("w", encoding="utf-8") as handle:
+        handle.write(json.dumps({"Qwen3-4B": {"vector": [0.0, 1.0, 2.0]}}) + "\n")
+        # Subsequent lines are intentionally invalid JSON to prove we exit early.
+        for _ in range(1000):
+            handle.write("not-json\n")
+
+    dataset = [{"document": {"vector_file": str(vector_path)}}]
+
+    assert infer_embedding_dim(dataset) == 3
 
 
 # --- test_hybrid_search.py ---
@@ -1231,9 +1246,9 @@ def test_real_fixture_ingest_and_search(
 ) -> None:
     ingestion, service, registry, validator, _, _ = stack()
     documents = _to_documents(real_dataset)
-    ingested = ingestion.upsert_documents(documents)
-    assert ingested, "Expected chunks to ingest from real vector fixture"
-    assert registry.count() == len(ingested)
+    summary = ingestion.upsert_documents(documents)
+    assert summary.chunk_count > 0, "Expected chunks to ingest from real vector fixture"
+    assert registry.count() == summary.chunk_count
 
     for entry in real_dataset:
         for query in entry.get("queries", []):
@@ -1623,6 +1638,22 @@ def test_hybrid_scale_suite(
     assert metrics_file.exists()
     metrics_payload = json.loads(metrics_file.read_text(encoding="utf-8"))
     assert "scale_dense_metrics" in metrics_payload
+
+    psutil = pytest.importorskip("psutil")
+    process = psutil.Process()
+    gc.collect()
+    before_rss = process.memory_info().rss
+    dense_report = validator._scale_dense_metrics(  # pylint: disable=protected-access
+        service_module.DEFAULT_SCALE_THRESHOLDS,
+        random.Random(9876),
+    )
+    gc.collect()
+    after_rss = process.memory_info().rss
+    delta_gib = max(0.0, (after_rss - before_rss) / (1024 ** 3))
+    assert (
+        delta_gib < 0.5
+    ), f"scale_dense_metrics should not increase RSS by >=0.5 GiB (observed {delta_gib:.2f} GiB)"
+    assert dense_report.details.get("sampled_chunks", 0) > 0
 
 
 # --- test_hybridsearch_gpu_only.py ---

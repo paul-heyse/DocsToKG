@@ -1,6 +1,12 @@
-"""GPU fan-out and replication tests for FAISS adapter helpers.
+"""GPU replication/sharding tests aligned with the custom FAISS wheel.
 
-Validates memory sizing, stream usage, multi-GPU index sharding, and fallback
+Validates StandardGpuResources setup (temp/pinned memory, null streams),
+multi-GPU cloning options, and graceful CPU fallbacks when CUDA prerequisites
+from `faiss-gpu-wheel-reference.md` are missing. Confirms HybridSearch can
+distribute indexes across accelerators without violating the wheel’s runtime
+constraints.
+
+Also covers memory sizing, stream usage, multi-GPU index sharding, and fallback
 behaviour when the FAISS GPU APIs are unavailable. Ensures hybrid search scales
 vector stores across accelerators correctly.
 """

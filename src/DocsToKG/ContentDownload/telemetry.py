@@ -1772,7 +1772,9 @@ def iter_previous_manifest_entries(
 
     for file_path in ordered_files:
         line_number: Optional[int] = None
-        buffered: Optional[List[Tuple[str, str, Dict[str, Any], bool]]] = [] if buffer_entries else None
+        buffered: Optional[List[Tuple[str, str, Dict[str, Any], bool]]] = (
+            [] if buffer_entries else None
+        )
         try:
             with file_path.open("r", encoding="utf-8") as handle:
                 for line_number, raw in enumerate(handle, start=1):
@@ -2062,9 +2064,7 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
             if self._closed:
                 return len(self._cache)
             try:
-                row = self._conn.execute(
-                    "SELECT COUNT(DISTINCT work_id) FROM entries"
-                ).fetchone()
+                row = self._conn.execute("SELECT COUNT(DISTINCT work_id) FROM entries").fetchone()
             except sqlite3.OperationalError:
                 return len(self._cache)
         total = int(row[0]) if row and row[0] is not None else 0

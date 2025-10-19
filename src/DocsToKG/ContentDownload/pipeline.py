@@ -218,7 +218,7 @@ DEFAULT_RESOLVER_CREDENTIALS_PATH = PROJECT_ROOT / "config" / "resolver_credenti
 
 
 def _coerce_download_context(
-    context: Optional[Union["DownloadConfig", DownloadContext, Mapping[str, Any]]]
+    context: Optional[Union["DownloadConfig", DownloadContext, Mapping[str, Any]]],
 ) -> DownloadContext:
     """Normalise context-like inputs into a :class:`DownloadContext` instance."""
 

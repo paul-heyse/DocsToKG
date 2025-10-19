@@ -433,9 +433,7 @@ def resolve_config(
     extract_html_text = args.extract_text == "html"
 
     topic = args.topic.strip() if isinstance(args.topic, str) else args.topic
-    topic_id_input = (
-        args.topic_id.strip() if isinstance(args.topic_id, str) else args.topic_id
-    )
+    topic_id_input = args.topic_id.strip() if isinstance(args.topic_id, str) else args.topic_id
 
     if args.workers < 1:
         parser.error("--workers must be >= 1")
@@ -498,9 +496,7 @@ def resolve_config(
     manifest_override = _expand_path(args.manifest)
     csv_override = _expand_path(args.log_csv)
     if args.staging:
-        run_dir = (base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M%S")).resolve(
-            strict=False
-        )
+        run_dir = (base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M%S")).resolve(strict=False)
         pdf_dir = (run_dir / "PDF").resolve(strict=False)
         html_dir = (run_dir / "HTML").resolve(strict=False)
         xml_dir = (run_dir / "XML").resolve(strict=False)

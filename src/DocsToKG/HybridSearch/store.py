@@ -121,32 +121,44 @@
 # }
 # === /NAVMAP ===
 
-"""Vector-store orchestration built atop the custom FAISS GPU wheel.
+"""Vector-store orchestration built atop the custom FAISS 1.12 GPU wheel.
 
-This module contains the dense retrieval backbone referenced throughout the
-HybridSearch README and the `faiss-gpu-wheel-reference.md`:
+The code here is the authoritative reference for how DocsToKG drives FAISS on
+GPU, and it assumes the wheel documented in ``faiss-gpu-wheel-reference.md`` is
+installed. Key responsibilities include:
 
-- `ManagedFaissAdapter` wraps FAISS GPU indexes (Flat, IVF, PQ) using the custom
-  `faiss-1.12.0` wheel. It configures `StandardGpuResources`, multi-GPU cloning,
-  sharding/replication, and index snapshot/restore consistent with the wheel’s
-  runtime prerequisites (CUDA 12, OpenBLAS, jemalloc).
-- GPU similarity helpers (`cosine_against_corpus_gpu`, `pairwise_inner_products`,
-  `cosine_topk_blockwise`) use FAISS “no-index” routines (`knn_gpu`,
-  `pairwise_distance_gpu`) and honour the optional cuVS acceleration flags noted
-  in the wheel reference (`use_cuvs`, memory limits).
-- Snapshot utilities (`serialize_state`, `restore_state`) capture FAISS binary
-  payloads alongside adapter metadata so ingestion and service processes can
-  share deterministic state, aligning with the README’s “Failure recovery &
-  snapshot management” guidance.
-- `AdapterStats` exposes GPU memory usage, index sizes, and search counters for
-  observability pipelines.
-- Fallback utilities (OpenSearch simulator, cosine batches) allow agents to test
-  retrieval logic without a GPU while keeping interface parity with the FAISS
-  implementation.
+- ``FaissVectorStore`` manages the lifecycle of GPU indexes (Flat, IVF-Flat,
+  IVF-PQ, IVF-ScalarQuantizer). It trains CPU indexes, migrates them using
+  ``faiss.index_cpu_to_gpu`` / ``index_cpu_to_gpu_multiple`` with the appropriate
+  ``GpuMultipleClonerOptions``, sizes ``StandardGpuResources`` based on
+  ``DenseIndexConfig``, and keeps replication/sharding in sync with the config.
+- ``ManagedFaissAdapter`` wraps a ``FaissVectorStore`` to add snapshotting,
+  rebuild heuristics, adapter statistics, and namespace routing hooks. It is the
+  concrete ``DenseVectorStore`` consumed by the ingestion pipeline, router, and
+  query service.
+- GPU similarity helpers (``normalize_rows``, ``cosine_against_corpus_gpu``,
+  ``pairwise_inner_products``, ``cosine_topk_blockwise``) provide “no-index”
+  computations for validation and re-ranking. They normalise inputs, configure
+  ``GpuDistanceParams`` for FP32/FP16 execution, and call FAISS primitives such
+  as ``knn_gpu`` and ``pairwise_distance_gpu`` with tiling limits derived from
+  ``StandardGpuResources.getMemoryInfo``. Cosine similarity is realised via
+  inner products on unit-length vectors, matching the mathematics assumed by the
+  service layer’s fusion logic.
+- ``resolve_cuvs_state`` and the cuVS-aware branches integrate FAISS’s optional
+  CUDA Vector Search kernels. The helpers respect ``DenseIndexConfig.use_cuvs``
+  overrides and propagate the result into every GPU callsite that supports it.
+- ``ChunkRegistry`` and the snapshot utilities (`serialize_state`, `restore_state`)
+  bind FAISS integer ids back to human-readable vector ids and persist extra
+  metadata (e.g., index type, nprobe, memory pools) alongside the raw FAISS
+  bytes, ensuring cold-starts and failover restores behave predictably.
+- ``AdapterStats`` surfaces GPU memory consumption, ntotal, detailed
+  configuration, and kernel counters for observability pipelines, mirroring the
+  expectations laid out in the README.
 
-When modifying this module, cross-check the FAISS loader requirements (GLIBC,
-CUDA libraries, `FAISS_OPT_LEVEL`) and multi-GPU behavioural notes from the
-reference document to remain compatible with the deployed wheel.
+Any modification to GPU execution, memory sizing, or snapshot format should be
+cross-checked against the FAISS wheel reference so that runtime prerequisites
+(CUDA 12 libraries, OpenBLAS, jemalloc) and environment knobs (``FAISS_OPT_LEVEL``,
+``use_cuvs``) remain accurate.
 """
 
 from __future__ import annotations

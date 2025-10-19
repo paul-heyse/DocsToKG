@@ -1791,7 +1791,6 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     )
     stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=MANIFEST_STAGE)
     with telemetry_scope(stage_telemetry):
-
         manifest_log_success(
             stage=MANIFEST_STAGE,
             doc_id="__config__",
@@ -2503,7 +2502,6 @@ def html_main(args: argparse.Namespace | None = None) -> int:
     )
     stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=HTML_MANIFEST_STAGE)
     with telemetry_scope(stage_telemetry):
-
         manifest_log_success(
             stage=HTML_MANIFEST_STAGE,
             doc_id="__config__",

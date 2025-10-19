@@ -1,12 +1,31 @@
-"""Protocols describing hybrid-search integration points.
+"""Formal contracts for plugging alternative sparse and dense backends into the
+DocsToKG hybrid search pipeline.
 
-Implementations of these protocols plug into the ingestion (`pipeline`) and
-query (`service`) paths outlined in the README. `LexicalIndex` covers sparse
-search backends (BM25/SPLADE/OpenSearch), while `DenseVectorStore` describes
-the FAISS-based dense index used by `ManagedFaissAdapter`. Keeping the
-interfaces explicit allows agents to swap implementations—e.g., replacing the
-OpenSearch simulator or introducing a different FAISS GPU configuration—without
-rewriting ingestion or fusion logic.
+The ingestion and query flows interact with dependencies exclusively through
+``LexicalIndex`` and ``DenseVectorStore``. This module documents what those
+dependencies *must* guarantee so agents can swap implementations while keeping
+fusion, observability, and pagination semantics intact:
+
+- ``LexicalIndex`` represents BM25/SPLADE-capable sparse stores (the production
+  integration is OpenSearch; the dev harness uses
+  ``devtools.OpenSearchSimulator``). Implementations are responsible for bulk
+  upserts/deletes, cursor-based pagination, and deterministic scoring so that
+  ``service.HybridSearchService`` can safely blend results across channels.
+  Optional ``search_bm25_true`` support exposes exact Okapi BM25 (matching the
+  formula in ``devtools.opensearch_simulator``) when dense recall tuning calls
+  for DF-aware scoring.
+- ``DenseVectorStore`` models the FAISS GPU adapter surface. ``ManagedFaissAdapter``
+  is the canonical implementation; it uses ``faiss.StandardGpuResources``,
+  ``index_cpu_to_gpu(_multiple)``, and ``knn_gpu`` / ``pairwise_distance_gpu`` to
+  serve cosine or inner-product queries. Method signatures here assume callers
+  pass contiguous ``float32`` arrays (optionally batched) and expect per-query
+  Top-K ``FaissSearchResult`` objects that include scores, vector identifiers,
+  and metadata from the ``ChunkRegistry``.
+
+Read these protocols before introducing alternative backends: every method,
+return type, and docstring maps directly onto behaviour that ``pipeline``,
+``router``, and ``service`` rely on for concurrency control, snapshotting, and
+fusion math.
 """
 
 from __future__ import annotations

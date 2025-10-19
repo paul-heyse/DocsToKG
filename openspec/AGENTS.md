@@ -1,3 +1,268 @@
+
+## Table of Contents
+
+- [0) Guard rails (set once per session)](#0-guard-rails-set-once-per-session)
+- [1) Verify the environment exists (no install)](#1-verify-the-environment-exists-no-install)
+- [2) Run commands strictly from the project `.venv`](#2-run-commands-strictly-from-the-project-venv)
+- [3) Quick health checks (no network)](#3-quick-health-checks-no-network)
+- [4) Typical tasks (all no-install)](#4-typical-tasks-all-no-install)
+- [5) Troubleshooting (stay no-install)](#5-troubleshooting-stay-no-install)
+- [6) “Absolutely no installs” policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
+- [7) Fallback (only with **explicit approval** to install)](#7-fallback-only-with-explicit-approval-to-install)
+- [8) One-page quick reference (copy/paste safe)](#8-one-page-quick-reference-copy-paste-safe)
+- [TL;DR Quick Checklist](#tl-dr-quick-checklist)
+- [Environment Activation](#environment-activation)
+- [CI notes](#ci-notes)
+- [Troubleshooting (short)](#troubleshooting-short)
+- [Three-Stage Workflow](#three-stage-workflow)
+- [Before Any Task](#before-any-task)
+- [Quick Start](#quick-start)
+- [Directory Structure](#directory-structure)
+- [Creating Change Proposals](#creating-change-proposals)
+- [Why](#why)
+- [What Changes](#what-changes)
+- [Impact](#impact)
+- [ADDED Requirements](#added-requirements)
+- [MODIFIED Requirements](#modified-requirements)
+- [REMOVED Requirements](#removed-requirements)
+- [1. Implementation](#1-implementation)
+- [Context](#context)
+- [Goals / Non-Goals](#goals-non-goals)
+- [Decisions](#decisions)
+- [Risks / Trade-offs](#risks-trade-offs)
+- [Migration Plan](#migration-plan)
+- [Open Questions](#open-questions)
+- [Spec File Format](#spec-file-format)
+- [RENAMED Requirements](#renamed-requirements)
+- [Troubleshooting](#troubleshooting)
+- [Happy Path Script](#happy-path-script)
+- [ADDED Requirements](#added-requirements)
+- [Multi-Capability Example](#multi-capability-example)
+- [ADDED Requirements](#added-requirements)
+- [ADDED Requirements](#added-requirements)
+- [Best Practices](#best-practices)
+- [Tool Selection Guide](#tool-selection-guide)
+- [Error Recovery](#error-recovery)
+- [Quick Reference](#quick-reference)
+- [Coding Standards & Module Organization](#coding-standards-module-organization)
+
+Here’s a **drop-in `AGENTS.md` section** rewritten to **prefer running with what’s already in the project `.venv`**—**no fetching or installing** unless explicitly authorized. It’s explicit, step-by-step, and tuned for environments with many custom/GPU wheels.
+
+---
+
+# Project Environment — **No-Install** Runbook (for AI agents)
+
+> **Prime directive:** **Use the packages already installed in `./.venv`.**
+> Do **not** fetch or install anything unless you are explicitly told to. The project `.venv` includes custom wheels and GPU-specific builds that must not be disturbed.
+
+---
+
+## 0) Guard rails (set once per session)
+
+To make accidental installs impossible:
+
+```bash
+# Always run inside the project venv (enforced)
+export PIP_REQUIRE_VIRTUALENV=1
+
+# Never hit the network/package index unless explicitly allowed
+export PIP_NO_INDEX=1
+
+# Don’t read user site-packages (avoid leakage)
+export PYTHONNOUSERSITE=1
+```
+
+> If you later receive explicit approval to install, temporarily unset `PIP_NO_INDEX` (and only follow the “Fallback (with approval)” section at the end).
+
+---
+
+## 1) Verify the environment exists (no install)
+
+```bash
+# from repo root
+test -x .venv/bin/python || { echo "ERROR: .venv is missing — STOP (no installs)."; exit 1; }
+```
+
+If missing or broken: **stop and report**. Do **not** create or modify the environment without authorization.
+
+---
+
+## 2) Run commands strictly from the project `.venv`
+
+Pick **one** method below. All of them resolve **imports and console scripts from `./.venv`** and avoid installs.
+
+### A) Most explicit (activation-free; recommended for agents)
+
+```bash
+# Call tools by absolute path inside the venv
+./.venv/bin/python -m pip --version      # proves you're on ./.venv/bin/python
+./.venv/bin/python -m DocsToKG.ContentDownload.cli --help
+./.venv/bin/pytest -q
+./.venv/bin/ruff check .
+./.venv/bin/mypy src
+```
+
+### B) `direnv` (auto-env; if available)
+
+```bash
+direnv allow                             # trust once per machine
+direnv exec . python -m pip --version
+direnv exec . python -m DocsToKG.ContentDownload.cli --help
+direnv exec . pytest -q
+```
+
+### C) `./scripts/dev.sh` (portable wrapper; no direnv needed)
+
+```bash
+./scripts/dev.sh doctor                  # prints interpreter/env and importability
+./scripts/dev.sh python -m DocsToKG.ContentDownload.cli --help
+./scripts/dev.sh exec pytest -q
+./scripts/dev.sh pip list                # safe: listing does not install
+```
+
+### D) Classic activation (if explicitly requested)
+
+```bash
+# Linux/macOS
+source .venv/bin/activate
+export PYTHONPATH="\$PWD/src:${PYTHONPATH:-}"    # mirrors project behavior
+python -m pip --version
+python -m DocsToKG.ContentDownload.cli --help
+pytest -q
+```
+
+> Prefer **A–C** for automation. **D** is acceptable in interactive shells but easier to get wrong.
+
+---
+
+## 3) Quick health checks (no network)
+
+Run these **before** heavy work:
+
+```bash
+# 1) Interpreter identity (must be the project venv)
+./.venv/bin/python - <<'PY'
+import sys
+assert sys.executable.endswith("/.venv/bin/python"), sys.executable
+print("OK: using", sys.executable)
+PY
+
+# 2) Package presence WITHOUT installing (examples)
+./.venv/bin/python -c "import DocsToKG, pkgutil; print('DocsToKG OK');"
+./.venv/bin/python -c "import faiss; print('FAISS OK')"
+./.venv/bin/python -c "import cupy; import numpy; print('CuPy OK', cupy.__version__)"
+```
+
+If any import fails: **do not install**. Go to Troubleshooting.
+
+---
+
+## 4) Typical tasks (all no-install)
+
+```bash
+# CLIs (module form)
+./.venv/bin/python -m DocsToKG.ContentDownload.cli --help
+
+# Tests
+./.venv/bin/pytest -q
+
+# Lint/format
+./.venv/bin/ruff check .
+./.venv/bin/black --check .
+
+# Type check
+./.venv/bin/mypy src
+```
+
+> Always prefer `python -m <module>` and `.venv/bin/<tool>` — these guarantee resolution from the project environment.
+
+---
+
+## 5) Troubleshooting (stay no-install)
+
+**Symptom → Action (no installs):**
+
+- **`ModuleNotFoundError`**
+  You’re not using the project interpreter. Re-run via one of §2 methods, then re-check `sys.executable`.
+
+- **GPU/FAISS/CuPy errors** (e.g., missing `.so`/DLL)
+  Do **not** build or fetch wheels. Report the exact error. These packages are customized; replacing them may break GPU paths.
+
+- **`pip` tries to fetch**
+  You forgot the guard rails. Ensure `PIP_REQUIRE_VIRTUALENV=1` and `PIP_NO_INDEX=1` are set. Never pass `-U/--upgrade`.
+
+---
+
+## 6) “Absolutely no installs” policy (what you may do)
+
+- You **may**:
+
+  - Inspect environment: `./.venv/bin/pip list`, `./.venv/bin/pip show <pkg>`.
+  - Run any console script from `./.venv/bin/…`.
+  - Read code and run module CLIs with `python -m …`.
+
+- You **must not**:
+
+  - Run `pip install`, `pip wheel`, `pip cache purge`, or `pip uninstall`.
+  - Upgrade/downgrade packages (including `pip` itself).
+  - Recreate or modify `./.venv` without explicit approval.
+
+---
+
+## 7) Fallback (only with **explicit approval** to install)
+
+If (and only if) you have written approval to modify the environment, apply the **smallest necessary** action **inside** the venv:
+
+```bash
+# ensure you are in the project venv first:
+source .venv/bin/activate  # or use ./.venv/bin/python -m pip ...
+unset PIP_NO_INDEX         # allow index access if instructed
+
+# project code (editable) and pinned deps ONLY:
+pip install -e .
+pip install -r requirements.txt
+
+# If a local wheelhouse exists (to avoid network):
+# pip install --no-index --find-links ./ci/wheels -r requirements.txt
+```
+
+> Never “try versions” or compile GPU libs. If a wheel is missing, escalate.
+
+---
+
+## 8) One-page quick reference (copy/paste safe)
+
+```bash
+# Guard rails (no accidental installs)
+export PIP_REQUIRE_VIRTUALENV=1 PIP_NO_INDEX=1 PYTHONNOUSERSITE=1
+
+# Verify venv exists (stop if missing)
+test -x .venv/bin/python || { echo "Missing .venv — STOP (no installs)."; exit 1; }
+
+# Preferred run patterns (choose ONE)
+./.venv/bin/python -m DocsToKG.ContentDownload.cli --help
+./.venv/bin/pytest -q
+# or
+direnv exec . python -m DocsToKG.ContentDownload.cli --help
+direnv exec . pytest -q
+# or
+./scripts/dev.sh doctor
+./scripts/dev.sh python -m DocsToKG.ContentDownload.cli --help
+./scripts/dev.sh exec pytest -q
+
+# Health checks (no network)
+./.venv/bin/python - <<'PY'
+import sys; assert sys.executable.endswith("/.venv/bin/python"); print("OK:", sys.executable)
+PY
+./.venv/bin/python -c "import DocsToKG, faiss, cupy; print('Core imports OK')"
+```
+
+---
+
+### Final note for agents
+
+This repository’s environment includes **custom wheels and GPU-optimized packages**. Treat the `.venv` as **immutable** unless you are explicitly told to modify it. Your default posture is **execute only**: run what’s already installed, verify, and report issues rather than “fixing” them by installing.
+
 # OpenSpec Instructions
 
 Instructions for AI coding assistants using OpenSpec for spec-driven development.
@@ -663,3 +928,8 @@ openspec archive [change]  # Mark complete
 ```
 
 Remember: Specs are truth. Changes are proposals. Keep them in sync.
+
+## Coding Standards & Module Organization
+
+- Follow the documentation in [CODE_ANNOTATION_STANDARDS.md](../docs/CODE_ANNOTATION_STANDARDS.md) when annotating code or updating NAVMAP headers.
+- Structure modules according to [MODULE_ORGANIZATION_GUIDE.md.txt](../docs/html/_sources/MODULE_ORGANIZATION_GUIDE.md.txt) so imports, dataclasses, and public APIs remain predictable for downstream agents.

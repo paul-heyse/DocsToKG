@@ -6,6 +6,27 @@ last_updated: 2025-02-15
 
 > _Metadata backlog_: owning_team, stability, versioning, codeowners, related_adrs, slos, data_handling, and sbom will be populated in a future revision.
 
+## Table of Contents
+- [DocsToKG • OntologyDownload](#docstokg--ontologydownload)
+  - [Quickstart](#quickstart)
+  - [Common commands](#common-commands)
+  - [Core capabilities](#core-capabilities)
+  - [Folder map (top files)](#folder-map-top-files)
+  - [System overview](#system-overview)
+    - [Pipeline walkthrough](#pipeline-walkthrough)
+  - [Entry points & contracts](#entry-points--contracts)
+  - [Configuration](#configuration)
+  - [Data contracts & schemas](#data-contracts--schemas)
+  - [Outputs & artifacts](#outputs--artifacts)
+  - [Interactions with other packages](#interactions-with-other-packages)
+  - [Extensibility](#extensibility)
+  - [Observability](#observability)
+  - [Security & data handling](#security--data-handling)
+  - [Testing & quality gates](#testing--quality-gates)
+  - [Development tasks](#development-tasks)
+  - [Agent guardrails](#agent-guardrails)
+  - [FAQ](#faq)
+
 # DocsToKG • OntologyDownload
 
 Purpose: Plan, download, and validate third-party ontologies for DocsToKG ingestion.

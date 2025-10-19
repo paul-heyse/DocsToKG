@@ -43,13 +43,34 @@
 # }
 # === /NAVMAP ===
 
-"""Configuration models and manager for hybrid search.
+"""Configuration surface area for DocsToKG hybrid search.
 
-These Pydantic dataclasses correspond to the YAML/JSON snippets in the README
-(“Configuration quick reference”). They coordinate ingestion locations, FAISS
-GPU settings (replication, memory pools, cuVS toggles), fusion budgets, and
-retrieval weights. `HybridSearchConfigManager` adds thread-safe load/save and
-snapshot helpers so agents can persist configs alongside FAISS snapshots.
+The dataclasses defined here mirror the YAML/JSON snippets in the repository
+README and describe every user-tunable aspect of the system:
+
+- ``ChunkingConfig`` governs deterministic sliding-window chunking performed by
+  :mod:`DocsToKG.HybridSearch.pipeline`. Adjusting ``max_tokens`` or ``overlap``
+  directly alters the lexical payloads consumed by the FAISS adapters.
+- ``DenseIndexConfig`` maps one-to-one to FAISS GPU primitives documented in
+  ``faiss-gpu-wheel-reference.md``. Fields such as ``index_type``, ``nlist``,
+  ``nprobe``, ``pq_m``/``pq_bits`` select between ``GpuIndexFlat*`` and
+  ``GpuIndexIVF(PQ|ScalarQuantizer)`` families, while ``multi_gpu_mode``,
+  ``replication_gpu_ids``, and the memory toggles feed into
+  ``faiss.GpuMultipleClonerOptions`` and ``StandardGpuResources`` sizing. Flags
+  like ``use_cuvs`` and ``flat_use_fp16`` control whether GPU distance kernels
+  spin up ``GpuDistanceParams`` instances with FP16 or cuVS acceleration.
+- ``FusionConfig`` and ``RetrievalConfig`` encode scoring budgets for the hybrid
+  service layer (RRF/MMR weights, per-channel top-k cut-offs, cosine dedupe
+  thresholds). ``HybridSearchService`` reads these values verbatim to plan
+  concurrent lexical + dense queries and to guard pagination state.
+- ``HybridSearchConfig`` groups the four components into a single snapshot,
+  making it the hand-off shape for ingestion and query orchestration.
+
+``HybridSearchConfigManager`` is a thread-safe facade for loading and persisting
+configuration files. It supports JSON *and* YAML, normalises legacy field names
+(``gpu_default_null_stream*``), and caches the current config while providing
+atomic reloads so background workers can hot-swap FAISS settings without racing
+ingestion or query threads.
 """
 
 from __future__ import annotations
