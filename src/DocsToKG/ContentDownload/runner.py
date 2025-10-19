@@ -6,6 +6,7 @@ import contextlib
 import inspect
 import json
 import logging
+import random
 import sqlite3
 import threading
 import time
@@ -247,6 +248,7 @@ class DownloadRun:
             "max_results": self.args.max,
             "retry_attempts": self.resolved.openalex_retry_attempts,
             "retry_backoff": self.resolved.openalex_retry_backoff,
+            "retry_max_delay": self.resolved.openalex_retry_max_delay,
         }
         try:
             signature = inspect.signature(self.iterate_openalex_func)
@@ -555,9 +557,12 @@ class DownloadRun:
                 if self.args.workers == 1:
                     session = state.session_factory()
                     for artifact in provider.iter_artifacts():
+                        if session is None:
+                            session = state.session_factory()
                         try:
                             self.process_work_item(artifact, state.options, session=session)
                         except Exception as exc:
+                            state.session_factory.close_current()
                             self._handle_worker_exception(
                                 state,
                                 exc,
@@ -568,6 +573,7 @@ class DownloadRun:
                                     state.options.run_id or self.resolved.run_id,
                                 ),
                             )
+                            session = None
                         if self.args.sleep > 0:
                             time.sleep(self.args.sleep)
                 else:
@@ -692,6 +698,29 @@ class DownloadRun:
         )
 
 
+def _calculate_equal_jitter_delay(
+    attempt: int,
+    *,
+    backoff_factor: float,
+    backoff_max: float,
+) -> float:
+    """Return an exponential backoff delay using equal jitter."""
+
+    if backoff_factor <= 0 or attempt < 0:
+        return 0.0
+
+    base_delay = backoff_factor * (2**attempt)
+    if base_delay <= 0:
+        return 0.0
+
+    capped_base = min(base_delay, backoff_max)
+    if capped_base <= 0:
+        return 0.0
+
+    half = capped_base / 2.0
+    return half + random.uniform(0.0, half)
+
+
 def iterate_openalex(
     query: Works,
     per_page: int,
@@ -699,8 +728,13 @@ def iterate_openalex(
     *,
     retry_attempts: int = 3,
     retry_backoff: float = 1.0,
+    retry_max_delay: float = 60.0,
 ) -> Iterable[Dict[str, Any]]:
-    """Iterate over OpenAlex works respecting pagination, limits, and retry policy."""
+    """Iterate over OpenAlex works respecting pagination, limits, and retry policy.
+
+    Retries honour ``Retry-After`` headers while applying an equal-jitter
+    exponential backoff capped by ``retry_max_delay`` to avoid unbounded sleeps.
+    """
 
     def _retry_after_seconds(exc: Exception) -> Optional[float]:
         response = getattr(exc, "response", None)
@@ -732,6 +766,7 @@ def iterate_openalex(
 
     max_retries = max(0, int(retry_attempts))
     base_backoff = max(0.0, float(retry_backoff))
+    max_delay = max(0.0, float(retry_max_delay))
 
     pager = query.paginate(
         per_page=per_page, n_max=max_results if max_results is not None else None
@@ -756,8 +791,28 @@ def iterate_openalex(
                     raise
                 attempt += 1
                 retry_after = _retry_after_seconds(exc)
-                exponential = base_backoff * (2 ** (attempt - 1)) if base_backoff else 0.0
-                delay = max(retry_after or 0.0, exponential)
+                base_delay = base_backoff * (2 ** (attempt - 1)) if base_backoff else 0.0
+                jitter_delay = (
+                    _calculate_equal_jitter_delay(
+                        attempt - 1,
+                        backoff_factor=base_backoff,
+                        backoff_max=max_delay if max_delay > 0 else base_delay,
+                    )
+                    if base_delay > 0
+                    else 0.0
+                )
+                if max_delay <= 0:
+                    jitter_delay = 0.0
+                retry_after_effective = 0.0
+                if retry_after is not None:
+                    retry_after_effective = retry_after
+                    if max_delay > 0:
+                        retry_after_effective = min(retry_after_effective, max_delay)
+                    else:
+                        retry_after_effective = 0.0
+                delay = max(jitter_delay, retry_after_effective)
+                if max_delay > 0:
+                    delay = min(delay, max_delay)
                 LOGGER.warning(
                     "OpenAlex pagination error (%s/%s retries): %s. Retrying in %.2fs.",
                     attempt,

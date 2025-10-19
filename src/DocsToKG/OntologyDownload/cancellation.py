@@ -81,6 +81,22 @@ class CancellationTokenGroup:
         self.add_token(token)
         return token
 
+    def remove_token(self, token: CancellationToken) -> None:
+        """Remove ``token`` from this group if it is present.
+
+        This allows callers to release tokens once work associated with them
+        has completed, keeping the group size accurate for monitoring and
+        follow-up operations.
+        """
+
+        with self._lock:
+            try:
+                self._tokens.remove(token)
+            except ValueError:
+                # Token may have already been removed or was never part of the
+                # group; treat as a no-op for convenience.
+                pass
+
     def cancel_all(self) -> None:
         """Cancel all tokens in this group."""
         with self._lock:

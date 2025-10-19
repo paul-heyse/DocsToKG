@@ -6,10 +6,12 @@ import logging
 import os
 import sqlite3
 import time
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pytest
 import requests
@@ -51,20 +53,32 @@ class DummyWorks:
 class FlakyWorks:
     """Works stub that raises once before yielding pages."""
 
-    def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+    def __init__(
+        self,
+        pages: Sequence[Iterable[Dict[str, object]]],
+        *,
+        retry_after: Optional[str] = "1",
+    ) -> None:
         self._pages = [list(page) for page in pages]
+        self._retry_after = retry_after
 
     def paginate(
         self, per_page: int, n_max: Optional[int] = None
     ) -> Iterable[Iterable[Dict[str, object]]]:
-        return _FlakyPager(self._pages)
+        return _FlakyPager(self._pages, retry_after=self._retry_after)
 
 
 class _FlakyPager:
-    def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+    def __init__(
+        self,
+        pages: Sequence[Iterable[Dict[str, object]]],
+        *,
+        retry_after: Optional[str],
+    ) -> None:
         self._pages = [list(page) for page in pages]
         self._index = 0
         self._raised = False
+        self._retry_after = retry_after
 
     def __iter__(self) -> "_FlakyPager":
         return self
@@ -74,7 +88,8 @@ class _FlakyPager:
             self._raised = True
             response = requests.Response()
             response.status_code = 429
-            response.headers["Retry-After"] = "1"
+            if self._retry_after is not None:
+                response.headers["Retry-After"] = str(self._retry_after)
             error = requests.HTTPError("rate limited")
             error.response = response
             raise error
@@ -154,6 +169,7 @@ def make_resolved_config(
         openalex_retry_attempts=args.openalex_retry_attempts,
         openalex_retry_backoff=args.openalex_retry_backoff,
         retry_after_cap=args.retry_after_cap,
+        openalex_retry_max_delay=args.openalex_retry_max_delay,
     )
 
 
@@ -178,6 +194,62 @@ def test_iterate_openalex_retries_then_succeeds(monkeypatch):
 
     assert [item["id"] for item in results] == ["W1", "W2"]
     assert slept and slept[0] >= 1.0
+
+
+def test_iterate_openalex_uses_equal_jitter(monkeypatch):
+    works = FlakyWorks([[{"id": "W1"}]], retry_after=None)
+    slept: List[float] = []
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.time.sleep",
+        lambda seconds: slept.append(seconds),
+    )
+
+    uniform_calls: List[Tuple[float, float]] = []
+
+    def _uniform(low: float, high: float) -> float:
+        uniform_calls.append((low, high))
+        return high
+
+    monkeypatch.setattr("DocsToKG.ContentDownload.runner.random.uniform", _uniform)
+
+    results = list(
+        iterate_openalex(
+            works,
+            per_page=1,
+            max_results=None,
+            retry_attempts=2,
+            retry_backoff=2.0,
+        )
+    )
+
+    assert [item["id"] for item in results] == ["W1"]
+    assert uniform_calls == [(0.0, 1.0)]
+    assert slept and slept[0] == pytest.approx(2.0)
+
+
+def test_iterate_openalex_caps_retry_after(monkeypatch):
+    future = datetime.now(timezone.utc) + timedelta(minutes=30)
+    header = format_datetime(future)
+    works = FlakyWorks([[{"id": "W1"}]], retry_after=header)
+    slept: List[float] = []
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.time.sleep",
+        lambda seconds: slept.append(seconds),
+    )
+
+    results = list(
+        iterate_openalex(
+            works,
+            per_page=1,
+            max_results=None,
+            retry_attempts=2,
+            retry_backoff=0.5,
+            retry_max_delay=5.0,
+        )
+    )
+
+    assert [item["id"] for item in results] == ["W1"]
+    assert slept and slept[0] == pytest.approx(5.0)
 
 
 def _manifest_entry(work_id: str, *, run_id: str = "resume-run") -> str:
@@ -1092,6 +1164,7 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, m
         openalex_retry_attempts=args.openalex_retry_attempts,
         openalex_retry_backoff=args.openalex_retry_backoff,
         retry_after_cap=args.retry_after_cap,
+        openalex_retry_max_delay=args.openalex_retry_max_delay,
     )
 
     bootstrap_run_environment(resolved)
@@ -1566,6 +1639,88 @@ def test_worker_crash_records_manifest_reason(patcher, tmp_path, worker_count):
     assert failure_record["classification"] == Classification.SKIPPED.value
     assert failure_record["reason"] == ReasonCode.WORKER_EXCEPTION.value
     assert failure_record["reason_detail"] == "worker-crash"
+
+
+def test_single_worker_exception_discards_session(patcher, tmp_path):
+    resolved = make_resolved_config(tmp_path, workers=1, csv=False)
+    bootstrap_run_environment(resolved)
+
+    failure_id = "W_SEQ_FAIL"
+    recovery_id = "W_SEQ_RECOVER"
+    artifacts = [
+        _make_artifact(resolved, failure_id),
+        _make_artifact(resolved, recovery_id),
+    ]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    session_counter = itertools.count()
+    created_sessions: List["RecordingSession"] = []
+    closed_tokens: List[int] = []
+
+    class RecordingSession:
+        def __init__(self, token: int) -> None:
+            self.token = token
+
+        def close(self) -> None:
+            closed_tokens.append(self.token)
+
+    def fake_create_session(*args, **kwargs):
+        token = next(session_counter)
+        session = RecordingSession(token)
+        created_sessions.append(session)
+        return session
+
+    observed_sessions: List[RecordingSession] = []
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: RecordingSession,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        observed_sessions.append(session)
+        if work.work_id == failure_id:
+            raise RuntimeError("boom")
+        return {"saved": True, "downloaded_bytes": 1}
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.create_session", fake_create_session
+    )
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.worker_failures == 1
+    assert len(observed_sessions) == 2
+    assert observed_sessions[0] is created_sessions[0]
+    assert observed_sessions[1] is created_sessions[1]
+    assert observed_sessions[0] is not observed_sessions[1]
+    assert closed_tokens and closed_tokens[0] == created_sessions[0].token
+
+    download_run.close()
 
 
 def test_worker_tls_failure_discards_thread_session(patcher, tmp_path):

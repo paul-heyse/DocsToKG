@@ -75,6 +75,7 @@ class ResolvedConfig:
     verify_cache_digest: bool
     openalex_retry_attempts: int
     openalex_retry_backoff: float
+    openalex_retry_max_delay: float
     retry_after_cap: float
 
 
@@ -175,6 +176,15 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=1.0,
         help="Base backoff (seconds) used between OpenAlex pagination retries.",
+    )
+    openalex_group.add_argument(
+        "--openalex-retry-max-delay",
+        type=float,
+        default=60.0,
+        help=(
+            "Ceiling applied to OpenAlex pagination retry sleeps (seconds)."
+            " Retry-After headers and exponential backoff are honoured up to this limit."
+        ),
     )
 
     classifier_group = parser.add_argument_group("Classifier settings")
@@ -432,6 +442,8 @@ def resolve_config(
         parser.error("--openalex-retry-attempts must be >= 0")
     if args.openalex_retry_backoff < 0:
         parser.error("--openalex-retry-backoff must be >= 0")
+    if args.openalex_retry_max_delay <= 0:
+        parser.error("--openalex-retry-max-delay must be > 0")
     if args.retry_after_cap <= 0:
         parser.error("--retry-after-cap must be > 0")
     for field_name in ("sniff_bytes", "min_pdf_bytes", "tail_check_bytes"):
@@ -595,6 +607,7 @@ def resolve_config(
         verify_cache_digest=args.verify_cache_digest,
         openalex_retry_attempts=args.openalex_retry_attempts,
         openalex_retry_backoff=args.openalex_retry_backoff,
+        openalex_retry_max_delay=args.openalex_retry_max_delay,
         retry_after_cap=args.retry_after_cap,
     )
 
