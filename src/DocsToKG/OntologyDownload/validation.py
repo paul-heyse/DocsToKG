@@ -8,6 +8,7 @@ import hashlib
 import heapq
 import json
 import logging
+import multiprocessing
 import os
 import platform
 import re
@@ -59,6 +60,36 @@ def _current_memory_mb() -> float:
     """Return the current resident memory usage in megabytes."""
 
     return _PROCESS.memory_info().rss / (1024**2)
+
+
+class _ValidatorBudget:
+    """Cross-process concurrency budget backed by a multiprocessing semaphore."""
+
+    __slots__ = ("_limit", "_semaphore")
+
+    def __init__(self, limit: int):
+        ctx = multiprocessing.get_context()
+        self._limit = limit
+        self._semaphore = ctx.BoundedSemaphore(limit)
+
+    @property
+    def limit(self) -> int:
+        """Return the maximum number of concurrent validators allowed."""
+
+        return self._limit
+
+    def acquire(self, timeout: Optional[float]) -> bool:
+        """Acquire a budget slot, respecting an optional timeout."""
+
+        if timeout is None:
+            self._semaphore.acquire()
+            return True
+        return self._semaphore.acquire(timeout=timeout)
+
+    def release(self) -> None:
+        """Release a previously acquired budget slot."""
+
+        self._semaphore.release()
 
 
 def _acquire_validator_slot(config: ResolvedConfig) -> BoundedSemaphore:
@@ -1083,6 +1114,7 @@ def _run_validator_task(
     request: ValidationRequest,
     logger: logging.Logger,
     *,
+    budget: Optional[_ValidatorBudget] = None,
     use_semaphore: bool = True,
 ) -> ValidationResult:
     """Execute a single validator with exception guards."""
@@ -1090,10 +1122,24 @@ def _run_validator_task(
     start_time = time.perf_counter()
     before_mb = _current_memory_mb()
     log_memory_usage(logger, stage="validate", event="before", validator=request.name)
-    semaphore = _acquire_validator_slot(request.config) if use_semaphore else None
+    concurrency_guard: Optional[Any] = None
     acquired = False
-    if semaphore is not None:
-        acquired = semaphore.acquire(timeout=request.config.defaults.validation.parser_timeout_sec)
+    timeout = getattr(
+        request.config.defaults.validation,
+        "parser_timeout_sec",
+        60,
+    )
+    if budget is not None:
+        concurrency_guard = budget
+        acquired = budget.acquire(timeout=timeout)
+        if not acquired:
+            raise ValidationTimeout(
+                "validator concurrency limit prevented start"
+            )  # pragma: no cover
+    elif use_semaphore:
+        semaphore = _acquire_validator_slot(request.config)
+        concurrency_guard = semaphore
+        acquired = semaphore.acquire(timeout=timeout)
         if not acquired:
             raise ValidationTimeout(
                 "validator concurrency limit prevented start"
@@ -1136,11 +1182,15 @@ def _run_validator_task(
         result.details.setdefault("metrics", {}).update(metrics)
         return result
     finally:
-        if acquired and semaphore is not None:
-            semaphore.release()
+        if acquired and concurrency_guard is not None:
+            concurrency_guard.release()
 
 
-def _run_validator_in_process(name: str, request: ValidationRequest) -> ValidationResult:
+def _run_validator_in_process(
+    name: str,
+    request: ValidationRequest,
+    budget: Optional[_ValidatorBudget] = None,
+) -> ValidationResult:
     """Execute a validator inside a worker process."""
 
     validator = VALIDATORS.get(name)
@@ -1155,7 +1205,13 @@ def _run_validator_in_process(name: str, request: ValidationRequest) -> Validati
         process_logger.setLevel(logging.INFO)
         process_logger.propagate = True
 
-    return _run_validator_task(validator, request, process_logger, use_semaphore=False)
+    return _run_validator_task(
+        validator,
+        request,
+        process_logger,
+        budget=budget,
+        use_semaphore=False,
+    )
 
 
 def run_validators(
@@ -1187,6 +1243,7 @@ def run_validators(
 
     max_workers = _determine_max_workers()
     results: Dict[str, ValidationResult] = {}
+    budget = _ValidatorBudget(max_workers)
 
     process_enabled = False
     process_validator_names: set[str] = set()
@@ -1229,6 +1286,7 @@ def run_validators(
                     validator,
                     request,
                     logger,
+                    budget=budget,
                     use_semaphore=True,
                 )
                 futures[future] = request
@@ -1239,7 +1297,12 @@ def run_validators(
             process_executor = ProcessPoolExecutor(max_workers=process_workers)
             executors.append(process_executor)
             for request in process_requests:
-                future = process_executor.submit(_run_validator_in_process, request.name, request)
+                future = process_executor.submit(
+                    _run_validator_in_process,
+                    request.name,
+                    request,
+                    budget,
+                )
                 futures[future] = request
 
         for future in as_completed(futures):

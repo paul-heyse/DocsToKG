@@ -153,9 +153,11 @@ Usage:
     pytest tests/ontology_download/test_validators.py
 """
 
+import functools
 import hashlib
 import json
 import logging
+import multiprocessing
 import os
 import platform
 import shutil
@@ -221,8 +223,46 @@ def _reset_validator_state() -> None:
     validation_mod._VALIDATOR_REGISTRY_CACHE = None
 
 
+def _concurrency_tracking_validator(
+    request: ValidationRequest,
+    logger: logging.Logger,
+    *,
+    state: "multiprocessing.managers.DictProxy",  # type: ignore[name-defined]
+    lock: "multiprocessing.synchronize.Lock",  # type: ignore[name-defined]
+    start: Optional["multiprocessing.synchronize.Event"] = None,  # type: ignore[name-defined]
+    expected: int = 1,
+    sleep: float = 0.05,
+) -> ValidationResult:
+    """Helper validator that records active worker counts across processes."""
+
+    path = request.validation_dir / f"{request.name}_parse.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if start is not None:
+        with lock:
+            ready = state.get("ready", 0) + 1
+            state["ready"] = ready
+            if ready >= expected:
+                start.set()
+        start.wait()
+    with lock:
+        active = state.get("active", 0) + 1
+        state["active"] = active
+        state["max_active"] = max(state.get("max_active", 0), active)
+    try:
+        time.sleep(sleep)
+    finally:
+        with lock:
+            state["active"] = state.get("active", 0) - 1
+    payload = {"ok": True, "validator": request.name}
+    path.write_text(json.dumps(payload))
+    return ValidationResult(ok=True, details=payload, output_files=[str(path)])
+
+
 @pytest.fixture()
 def config():
+    from DocsToKG.OntologyDownload.planning import FetchSpec  # noqa: F401
+
+    ResolvedConfig.model_rebuild()
     return ResolvedConfig(defaults=DefaultsConfig(), specs=[])
 
 
@@ -418,6 +458,91 @@ def test_run_validators_respects_concurrency(tmp_path, config):
         artifact = tmp_path / f"val-{name}" / f"{name}_parse.json"
         assert artifact.exists()
 
+
+def test_run_validators_mixed_pools_respects_budget(tmp_path, config):
+    if multiprocessing.get_start_method(allow_none=True) == "spawn":
+        pytest.skip("spawn start method breaks validator monkeypatching for this test")
+
+    config = config.model_copy(deep=True)
+    config.defaults.validation.max_concurrent_validators = 3
+    config.defaults.validation.use_process_pool = True
+    config.defaults.validation.process_pool_validators = ["proc_one", "proc_two"]
+
+    with multiprocessing.Manager() as manager:
+        state = manager.dict(active=0, max_active=0)
+        lock = manager.Lock()
+        start = manager.Event()
+        start.clear()
+
+        limit = config.defaults.validation.max_concurrent_validators
+        state["ready"] = 0
+
+        validators = {
+            "proc_one": functools.partial(
+                _concurrency_tracking_validator,
+                state=state,
+                lock=lock,
+                start=start,
+                expected=limit,
+                sleep=0.1,
+            ),
+            "proc_two": functools.partial(
+                _concurrency_tracking_validator,
+                state=state,
+                lock=lock,
+                start=start,
+                expected=limit,
+                sleep=0.1,
+            ),
+            "thread_one": functools.partial(
+                _concurrency_tracking_validator,
+                state=state,
+                lock=lock,
+                start=start,
+                expected=limit,
+                sleep=0.1,
+            ),
+            "thread_two": functools.partial(
+                _concurrency_tracking_validator,
+                state=state,
+                lock=lock,
+                start=start,
+                expected=limit,
+                sleep=0.1,
+            ),
+        }
+
+        with patch.object(validation_mod, "VALIDATORS", validators):
+            requests = []
+            for name in validators:
+                file_path = tmp_path / f"{name}.ttl"
+                file_path.write_text("@prefix ex: <http://example.org/> .")
+                requests.append(
+                    ValidationRequest(
+                        name,
+                        file_path,
+                        tmp_path / f"norm-{name}",
+                        tmp_path / f"val-{name}",
+                        config,
+                    )
+                )
+
+            releaser = threading.Thread(
+                target=lambda: (time.sleep(1.0), start.set()),
+                daemon=True,
+            )
+            releaser.start()
+            results = run_validators(requests, _noop_logger())
+            releaser.join(timeout=1)
+            assert start.is_set()
+
+            assert set(results) == set(validators)
+            assert state["max_active"] <= config.defaults.validation.max_concurrent_validators
+            assert state["max_active"] >= 2
+            assert state["active"] == 0
+            for name in validators:
+                artifact = tmp_path / f"val-{name}" / f"{name}_parse.json"
+                assert artifact.exists()
 
 def test_run_validators_matches_sequential(tmp_path, config):
     config_seq = config.model_copy(deep=True)
