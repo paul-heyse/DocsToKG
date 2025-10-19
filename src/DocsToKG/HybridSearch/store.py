@@ -2911,14 +2911,14 @@ def restore_state(
     faiss_index: FaissVectorStore,
     payload: dict[str, object],
     *,
-    allow_legacy: bool = False,
+    allow_legacy: bool = True,
 ) -> None:
     """Restore the vector store from a payload produced by :func:`serialize_state`.
 
     Args:
         faiss_index: Vector store receiving the restored state.
         payload: Mapping with ``faiss`` (base64) and registry vector ids.
-        allow_legacy: Permit payloads missing ``meta`` (emits a warning).
+        allow_legacy: Permit payloads missing ``meta`` (emits a warning). Defaults to ``True``.
 
     Returns:
         None
@@ -2929,14 +2929,18 @@ def restore_state(
     encoded = payload.get("faiss")
     if not isinstance(encoded, str):
         raise ValueError("Missing FAISS payload")
-    meta = payload.get("meta")
-    if not isinstance(meta, Mapping):
-        if not allow_legacy:
-            raise ValueError("FAISS snapshot payload missing 'meta'")
-        logger.warning("restore_state: legacy payload without 'meta'; defaults will be applied")
-        faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=None)
+    if "meta" in payload:
+        meta = payload["meta"]
+        if not isinstance(meta, Mapping):
+            raise ValueError("FAISS snapshot payload has invalid 'meta' type")
+        faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=dict(meta))
         return
-    faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=dict(meta))
+
+    if not allow_legacy:
+        raise ValueError("FAISS snapshot payload missing 'meta'")
+
+    logger.warning("restore_state: legacy payload without 'meta'; defaults will be applied")
+    faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=None)
 
 
 class ChunkRegistry:
@@ -3098,6 +3102,17 @@ class ManagedFaissAdapter(DenseVectorStore):
 
         return self._inner.serialize()
 
+    def snapshot_meta(self) -> Mapping[str, object]:
+        """Return snapshot metadata describing the managed index configuration."""
+
+        getter = getattr(self._inner, "snapshot_meta", None)
+        if not callable(getter):
+            return {}
+        meta = getter()
+        if isinstance(meta, Mapping):
+            return dict(meta)
+        return {}
+
     def restore(
         self,
         payload: bytes,
@@ -3199,10 +3214,26 @@ class ManagedFaissAdapter(DenseVectorStore):
 
         return self._inner.stats()
 
+    def snapshot_meta(self) -> Mapping[str, object]:
+        """Return snapshot metadata provided by the managed store."""
+
+        return self._inner.snapshot_meta()
+
     def flush_snapshot(self, *, reason: str = "flush") -> None:
         """Forward snapshot flush requests to the managed store."""
 
         self._inner.flush_snapshot(reason=reason)
+
+    def snapshot_meta(self) -> Mapping[str, object]:
+        """Return snapshot metadata exposed by the managed store."""
+
+        meta_getter = getattr(self._inner, "snapshot_meta", None)
+        if not callable(meta_getter):
+            return {}
+        meta = meta_getter()
+        if isinstance(meta, Mapping):
+            return dict(meta)
+        return {}
 
     def get_gpu_resources(self) -> Optional["faiss.StandardGpuResources"]:
         """Return GPU resources backing the managed index (if available)."""

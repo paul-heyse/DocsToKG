@@ -559,9 +559,12 @@ class DownloadRun:
                 if self.args.workers == 1:
                     session = state.session_factory()
                     for artifact in provider.iter_artifacts():
+                        if session is None:
+                            session = state.session_factory()
                         try:
                             self.process_work_item(artifact, state.options, session=session)
                         except Exception as exc:
+                            state.session_factory.close_current()
                             self._handle_worker_exception(
                                 state,
                                 exc,
@@ -572,6 +575,7 @@ class DownloadRun:
                                     state.options.run_id or self.resolved.run_id,
                                 ),
                             )
+                            session = None
                         if self.args.sleep > 0:
                             time.sleep(self.args.sleep)
                 else:
