@@ -25,9 +25,14 @@ def should_skip_output(
         return False
     if not output_path.exists():
         return False
-    if not manifest_entry:
+    if not manifest_entry or not isinstance(manifest_entry, Mapping):
         return False
-    stored_hash = manifest_entry.get("input_hash") if isinstance(manifest_entry, Mapping) else None
+
+    status = manifest_entry.get("status")
+    if status not in {"success", "skip"}:
+        return False
+
+    stored_hash = manifest_entry.get("input_hash")
     return stored_hash == input_hash
 
 

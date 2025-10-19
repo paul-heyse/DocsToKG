@@ -176,16 +176,32 @@ def test_manifest_resume_controller(tmp_path: Path) -> None:
     """ResumeController mirrors should_skip_output behaviour."""
 
     output = tmp_path / "out.jsonl"
-    manifest_entry = {"input_hash": "abc123"}
+    manifest_success = {"input_hash": "abc123", "status": "success"}
+    manifest_skip = {"input_hash": "abc123", "status": "skip"}
+    manifest_failure = {"input_hash": "abc123", "status": "failure"}
+    manifest_unknown = {"input_hash": "abc123", "status": "other"}
+    manifest_missing_status = {"input_hash": "abc123"}
 
-    assert not should_skip_output(output, manifest_entry, "abc123", resume=True, force=True)
+    assert not should_skip_output(output, manifest_success, "abc123", resume=True, force=True)
 
     output.write_text("data", encoding="utf-8")
-    assert should_skip_output(output, manifest_entry, "abc123", resume=True, force=False)
+    assert should_skip_output(output, manifest_success, "abc123", resume=True, force=False)
+    assert should_skip_output(output, manifest_skip, "abc123", resume=True, force=False)
+    assert not should_skip_output(output, manifest_failure, "abc123", resume=True, force=False)
+    assert not should_skip_output(output, manifest_unknown, "abc123", resume=True, force=False)
+    assert not should_skip_output(output, manifest_missing_status, "abc123", resume=True, force=False)
 
-    controller = ResumeController(resume=True, force=False, manifest_index={"doc1": manifest_entry})
+    controller = ResumeController(
+        resume=True,
+        force=False,
+        manifest_index={"doc1": manifest_success, "doc2": manifest_failure},
+    )
+
     skip, entry = controller.should_skip("doc1", output, "abc123")
-    assert skip is True and entry is manifest_entry
+    assert skip is True and entry is manifest_success
+
+    skip_failure, entry_failure = controller.should_skip("doc2", output, "abc123")
+    assert skip_failure is False and entry_failure is manifest_failure
 
     process, _ = controller.should_process("doc1", output, "zzzz")
     assert process is True
