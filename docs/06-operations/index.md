@@ -35,9 +35,10 @@ direnv exec . python -m DocsToKG.ContentDownload.cli \
   direnv exec . python tools/manifest_to_csv.py runs/20250101_1200/manifest.jsonl \
     runs/20250101_1200/manifest.last.csv
   ```
-- `--log-format csv` keeps JSONL manifests while adding a consolidated attempts
-  CSV; invoke `tools/manifest_to_csv.py` to generate `manifest.last.csv` after
-  the downloader finishes.
+- `--log-format csv` swaps JSONL manifests for a consolidated attempts CSV; the
+  downloader still writes SQLite, summary, and last-attempt artifacts for
+  resumes on the same host. Invoke `tools/manifest_to_csv.py` to generate
+  `manifest.last.csv` after the downloader finishes when running older logs.
 - Review `docs/content-download-migration.md` when upgrading existing
   automation to the new resolver stack and logging surfaces.
 
