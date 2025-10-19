@@ -50,6 +50,7 @@ from DocsToKG.ContentDownload.telemetry import (
     SqliteSink,
     SummarySink,
     load_previous_manifest,
+    looks_like_csv_resume_target,
 )
 
 __all__ = ["DownloadRun", "iterate_openalex", "run"]

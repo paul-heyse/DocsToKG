@@ -329,7 +329,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--resume-from",
         type=Path,
         default=None,
-        help="Resume from manifest JSONL log, skipping completed works.",
+        help=(
+            "Resume from a manifest log, skipping completed works. Provide JSONL files "
+            "for direct parsing; CSV attempt logs rely on the SQLite cache."
+        ),
     )
     parser.add_argument(
         "--extract-text",

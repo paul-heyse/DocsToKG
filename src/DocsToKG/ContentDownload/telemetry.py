@@ -57,6 +57,7 @@ from DocsToKG.ContentDownload.core import (
 
 MANIFEST_SCHEMA_VERSION = 3
 SQLITE_SCHEMA_VERSION = 4
+CSV_HEADER_TOKENS = {"run_id", "work_id"}
 
 
 @dataclass(frozen=True)
@@ -1469,6 +1470,38 @@ def _load_resume_from_sqlite(sqlite_path: Path) -> Tuple[Dict[str, Dict[str, Any
     return lookup, completed
 
 
+def looks_like_csv_resume_target(path: Path) -> bool:
+    """Return True when ``path`` likely references a CSV attempts log."""
+
+    lower_name = path.name.lower()
+    if lower_name.endswith(".csv") or ".csv." in lower_name:
+        return True
+
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for _ in range(5):
+                sample = handle.readline()
+                if not sample:
+                    break
+                stripped = sample.strip()
+                if not stripped:
+                    continue
+                if stripped.startswith("{") or stripped.startswith("["):
+                    return False
+                if "," in stripped:
+                    header = {
+                        column.strip().strip('"').lower()
+                        for column in stripped.split(",")
+                    }
+                    if CSV_HEADER_TOKENS.issubset(header):
+                        return True
+                break
+    except OSError:
+        return lower_name.endswith(".csv") or ".csv." in lower_name
+
+    return False
+
+
 def load_previous_manifest(
     path: Optional[Path],
     *,
@@ -1483,6 +1516,15 @@ def load_previous_manifest(
         if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
             return _load_resume_from_sqlite(sqlite_path)
         return per_work, completed
+
+    if looks_like_csv_resume_target(path):
+        if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
+            return _load_resume_from_sqlite(sqlite_path)
+        raise ValueError(
+            "Resume manifest '{path}' appears to be a CSV attempts log but no SQLite cache was found. "
+            "Provide the matching manifest.sqlite file or resume from a JSONL manifest."
+            .format(path=path)
+        )
 
     prefix = f"{path.name}."
     rotated: List[Tuple[int, Path]] = []
@@ -1732,6 +1774,7 @@ __all__ = [
     "SummarySink",
     "SqliteSink",
     "build_manifest_entry",
+    "looks_like_csv_resume_target",
     "load_previous_manifest",
     "load_manifest_url_index",
 ]

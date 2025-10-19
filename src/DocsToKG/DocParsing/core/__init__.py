@@ -74,6 +74,7 @@ from .concurrency import acquire_lock, find_free_port, set_spawn_or_warn
 from .discovery import (
     DEFAULT_CAPTION_MARKERS,
     DEFAULT_HEADING_MARKERS,
+    ChunkDiscovery,
     compute_relative_doc_id,
     compute_stable_shard,
     derive_doc_id_and_chunks_path,
@@ -110,6 +111,7 @@ __all__ = [
     "resolve_model_root",
     "find_free_port",
     "atomic_write",
+    "ChunkDiscovery",
     "iter_doctags",
     "iter_chunks",
     "jsonl_load",

@@ -291,19 +291,9 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     if args.validate_only:
         validate_bucket = _new_bucket()
         missing_bucket = _new_bucket()
-        if missing_notes:
-            return {
-                "stage": "embed",
-                "action": "validate",
-                "chunks_dir": str(chunks_dir),
-                "vectors_dir": str(vectors_dir),
-                "validate": validate_bucket,
-                "missing": missing_bucket,
-                "notes": missing_notes,
-            }
-        for chunk_path in iter_chunks(chunks_dir):
+        for chunk in iter_chunks(chunks_dir):
             doc_id, vector_path = derive_doc_id_and_vectors_path(
-                chunk_path, chunks_dir, vectors_dir
+                chunk, chunks_dir, vectors_dir
             )
             if vector_path.exists():
                 _record_bucket(validate_bucket, doc_id)
@@ -338,9 +328,9 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         }
 
     files = iter_chunks(chunks_dir)
-    for chunk_path in files:
+    for chunk in files:
         doc_id, vector_path = derive_doc_id_and_vectors_path(
-            chunk_path, chunks_dir, vectors_dir
+            chunk, chunks_dir, vectors_dir
         )
         manifest_entry = resume_controller.entry(doc_id)
         should_hash = bool(args.resume and not args.force and manifest_entry)
@@ -349,7 +339,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
             if not vector_path.exists():
                 _record_bucket(planned, doc_id)
                 continue
-            input_hash = compute_content_hash(chunk_path)
+            input_hash = compute_content_hash(chunk.resolved_path)
             skip = should_skip_output(
                 vector_path,
                 manifest_entry,

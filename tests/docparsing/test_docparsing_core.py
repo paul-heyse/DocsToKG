@@ -563,7 +563,10 @@ def test_iter_chunks(tmp_path: Path) -> None:
     nested.write_text("{}\n", encoding="utf-8")
     other.write_text("{}\n", encoding="utf-8")
     results = list(core.iter_chunks(chunks_dir))
-    assert results == sorted({good.resolve(), nested.resolve()})
+    logical_paths = sorted(item.logical_path for item in results)
+    resolved_paths = sorted(item.resolved_path for item in results)
+    assert logical_paths == [Path("doc.chunks.jsonl"), Path("teamA/doc.chunks.jsonl")]
+    assert resolved_paths == sorted({good.resolve(), nested.resolve()})
 
 
 def test_jsonl_load_and_save(tmp_path: Path) -> None:

@@ -22,15 +22,21 @@ if "yaml" not in sys.modules:
     sys.modules["yaml"] = yaml_stub
 
 if "pydantic_core" not in sys.modules:
-    pydantic_core_stub = types.ModuleType("pydantic_core")
+    try:  # pragma: no cover - exercised in environments without pydantic-core
+        import pydantic_core as _pydantic_core  # type: ignore
+    except ImportError:
+        pydantic_core_stub = types.ModuleType("pydantic_core")
 
-    class _StubValidationError(Exception):
-        """Lightweight placeholder mirroring pydantic-core's ValidationError."""
+        class _StubValidationError(Exception):
+            """Lightweight placeholder mirroring pydantic-core's ValidationError."""
 
-        pass
+            pass
 
-    pydantic_core_stub.ValidationError = _StubValidationError
-    sys.modules["pydantic_core"] = pydantic_core_stub
+        pydantic_core_stub.ValidationError = _StubValidationError
+        pydantic_core_stub.__version__ = "2.41.4"
+        sys.modules["pydantic_core"] = pydantic_core_stub
+    else:  # pragma: no cover - when real pydantic-core is installed
+        sys.modules["pydantic_core"] = _pydantic_core
 
 if "pydantic_settings" not in sys.modules:
     pydantic_settings_stub = types.ModuleType("pydantic_settings")
@@ -167,7 +173,7 @@ from tests.docparsing.stubs import dependency_stubs
 dependency_stubs()
 
 # Import after dependency stubs so core modules use fake optional deps.
-from DocsToKG.DocParsing.core import planning  # noqa: E402
+from DocsToKG.DocParsing.core import ChunkDiscovery, planning  # noqa: E402
 
 
 class _StreamingStub:
@@ -218,7 +224,10 @@ def test_plan_chunk_streams_doctags(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     monkeypatch.setattr(
         chunking_module, "MANIFEST_STAGE", "docparse.chunks.manifest", raising=False
     )
-    manifest = {f"doc-{idx}": {"input_hash": f"hash-{idx}"} for idx in range(total)}
+    manifest = {
+        f"doc-{idx}": {"input_hash": f"hash-{idx}", "status": "success"}
+        for idx in range(total)
+    }
 
     monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
     monkeypatch.setattr(planning, "iter_doctags", fake_iter_doctags)
@@ -248,28 +257,45 @@ def test_plan_embed_streams_chunks(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     chunks_dir.mkdir(parents=True)
     vectors_dir.mkdir()
 
+    index_lookup: Dict[Path, int] = {}
+
     def fake_iter_chunks(_directory: Path):
         for idx in range(total):
-            yield _StreamingStub(idx, tracker)
+            tracker["active"] += 1
+            tracker["max_active"] = max(tracker["max_active"], tracker["active"])
+            logical = Path(f"doc-{idx}.chunks.jsonl")
+            resolved = tmp_path / f"stream-{idx}.chunks.jsonl"
+            index_lookup[resolved] = idx
+            try:
+                yield ChunkDiscovery(logical, resolved)
+            finally:
+                tracker["active"] -= 1
 
-    def fake_derive(doc: _StreamingStub, _chunks_dir: Path, vectors_dir: Path) -> tuple[str, Path]:
-        doc_id = f"doc-{doc.identifier}"
+    def fake_derive(
+        chunk_entry: ChunkDiscovery, _chunks_dir: Path, vectors_dir: Path
+    ) -> tuple[str, Path]:
+        idx = index_lookup[chunk_entry.resolved_path]
+        doc_id = f"doc-{idx}"
         vector_path = vectors_dir / f"{doc_id}.vectors.jsonl"
-        if doc.identifier in skips:
+        if idx in skips:
             vector_path.write_text("{}", encoding="utf-8")
         elif vector_path.exists():
             vector_path.unlink()
         return doc_id, vector_path
 
-    def fake_hash(doc: _StreamingStub) -> str:
-        return f"hash-{doc.identifier}"
+    def fake_hash(path: Path) -> str:
+        idx = index_lookup[path]
+        return f"hash-{idx}"
 
     import DocsToKG.DocParsing.embedding as embedding_module
 
     monkeypatch.setattr(
         embedding_module, "MANIFEST_STAGE", "docparse.embeddings.manifest", raising=False
     )
-    manifest = {f"doc-{idx}": {"input_hash": f"hash-{idx}"} for idx in range(total)}
+    manifest = {
+        f"doc-{idx}": {"input_hash": f"hash-{idx}", "status": "success"}
+        for idx in range(total)
+    }
 
     monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
     monkeypatch.setattr(planning, "iter_chunks", fake_iter_chunks)
@@ -346,6 +372,7 @@ def test_plan_embed_missing_output_skips_hash(
 
     chunk_path = chunks_dir / "doc-1.chunks.jsonl"
     chunk_path.write_text("{}", encoding="utf-8")
+    chunk_entry = ChunkDiscovery(chunk_path.relative_to(chunks_dir), chunk_path)
 
     doc_id = "doc-1"
     vector_path = vectors_dir / f"{doc_id}.vectors.jsonl"
@@ -357,7 +384,7 @@ def test_plan_embed_missing_output_skips_hash(
     )
 
     monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
-    monkeypatch.setattr(planning, "iter_chunks", lambda _directory: [chunk_path])
+    monkeypatch.setattr(planning, "iter_chunks", lambda _directory: [chunk_entry])
     monkeypatch.setattr(
         planning,
         "derive_doc_id_and_vectors_path",
@@ -380,3 +407,27 @@ def test_plan_embed_missing_output_skips_hash(
     assert result["process"]["count"] == 1
     assert result["skip"]["count"] == 0
     assert calls["count"] == 0
+
+
+def test_plan_embed_handles_symlinked_chunks(tmp_path: Path) -> None:
+    data_root = tmp_path / "Data"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    vectors_dir = data_root / "Embeddings"
+    chunks_dir.mkdir(parents=True)
+    vectors_dir.mkdir(parents=True)
+
+    external_dir = tmp_path / "external"
+    external_dir.mkdir()
+    external_chunk = external_dir / "report.chunks.jsonl"
+    external_chunk.write_text("{}\n", encoding="utf-8")
+
+    symlink_dir = chunks_dir / "linked"
+    symlink_dir.mkdir()
+    symlink_path = symlink_dir / "report.chunks.jsonl"
+    symlink_path.symlink_to(external_chunk)
+
+    result = planning.plan_embed(["--data-root", str(data_root)])
+
+    assert result["process"]["count"] == 1
+    assert result["skip"]["count"] == 0
+    assert result["process"]["preview"] == ["linked/report.doctags"]

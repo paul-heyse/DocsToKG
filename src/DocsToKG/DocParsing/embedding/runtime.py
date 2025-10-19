@@ -408,6 +408,7 @@ from DocsToKG.DocParsing.core import (
     UUID_NAMESPACE,
     Batcher,
     BM25Stats,
+    ChunkDiscovery,
     QwenCfg,
     ResumeController,
     SpladeCfg,
@@ -1932,8 +1933,8 @@ def _validate_vectors_for_chunks(
     missing: List[tuple[str, Path]] = []
     quarantined_files = 0
 
-    for chunk_path in iter_chunks(chunks_dir):
-        doc_id, vector_path = derive_doc_id_and_vectors_path(chunk_path, chunks_dir, vectors_dir)
+    for chunk in iter_chunks(chunks_dir):
+        doc_id, vector_path = derive_doc_id_and_vectors_path(chunk, chunks_dir, vectors_dir)
         if not vector_path.exists():
             missing.append((doc_id, vector_path))
             continue
@@ -2373,8 +2374,8 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
             profile=profile,
         )
 
-        files = list(iter_chunks(chunks_dir))
-        if not files:
+        chunk_entries = list(iter_chunks(chunks_dir))
+        if not chunk_entries:
             log_event(
                 logger,
                 "warning",
@@ -2388,11 +2389,11 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
             return 0
 
         if args.shard_count > 1:
-            total_candidates = len(files)
-            selected_files = [
-                path
-                for path in files
-                if compute_stable_shard(path.relative_to(chunks_dir).as_posix(), args.shard_count)
+            total_candidates = len(chunk_entries)
+            selected_entries = [
+                entry
+                for entry in chunk_entries
+                if compute_stable_shard(entry.logical_path.as_posix(), args.shard_count)
                 == args.shard_index
             ]
             logger.info(
@@ -2401,13 +2402,13 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                     "extra_fields": {
                         "shard_index": args.shard_index,
                         "shard_count": args.shard_count,
-                        "selected_files": len(selected_files),
+                        "selected_files": len(selected_entries),
                         "total_files": total_candidates,
                     }
                 },
             )
-            files = selected_files
-            if not files:
+            chunk_entries = selected_entries
+            if not chunk_entries:
                 log_event(
                     logger,
                     "warning",
@@ -2422,8 +2423,9 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                 return 0
 
         incompatible_chunks: List[Path] = []
-        validated_files: List[Path] = []
-        for chunk_file in files:
+        validated_files: List[ChunkDiscovery] = []
+        for chunk_entry in chunk_entries:
+            chunk_file = chunk_entry.resolved_path
             try:
                 _validate_chunk_file_schema(chunk_file)
             except ValueError as exc:
@@ -2432,7 +2434,9 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                     chunk_hash = compute_content_hash(chunk_file)
                 except Exception:
                     chunk_hash = ""
-                doc_id = compute_relative_doc_id(chunk_file, chunks_dir)
+                doc_id = compute_relative_doc_id(
+                    chunks_dir / chunk_entry.logical_path, chunks_dir
+                )
                 log_event(
                     logger,
                     "error",
@@ -2454,9 +2458,9 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                     logger=logger,
                 )
                 continue
-            validated_files.append(chunk_file)
+            validated_files.append(chunk_entry)
         if incompatible_chunks:
-            files = validated_files
+            chunk_entries = validated_files
 
         if cfg.force:
             logger.info("Force mode: reprocessing all chunk files")
@@ -2485,7 +2489,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         if plan_only:
             stats = BM25Stats(N=0, avgdl=0.0, df={})
         else:
-            stats = process_pass_a(files, logger)
+            stats = process_pass_a([entry.resolved_path for entry in chunk_entries], logger)
             if not stats.N:
                 log_event(
                     logger,
@@ -2515,8 +2519,11 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         quarantined_files = 0
         skipped_ids: List[str] = []
         planned_ids: List[str] = []
-        for chunk_file in files:
-            doc_id, out_path = derive_doc_id_and_vectors_path(chunk_file, chunks_dir, args.out_dir)
+        for chunk_entry in chunk_entries:
+            chunk_file = chunk_entry.resolved_path
+            doc_id, out_path = derive_doc_id_and_vectors_path(
+                chunk_entry, chunks_dir, args.out_dir
+            )
             input_hash = compute_content_hash(chunk_file)
             skip_file, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
             if skip_file:
