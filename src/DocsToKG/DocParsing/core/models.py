@@ -101,6 +101,7 @@ class ChunkResult:
     output_path: Path
     input_hash: str
     chunk_count: int
+    total_tokens: int
     parse_engine: str
     sanitizer_profile: Optional[str] = None
     anchors_injected: bool = False

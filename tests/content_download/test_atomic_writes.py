@@ -441,12 +441,14 @@ def configure_chunker_stubs(
                 output_path=task.output_path,
                 input_hash=task.input_hash,
                 chunk_count=0,
+                total_tokens=0,
                 parse_engine="docling-html",
                 sanitizer_profile=None,
                 anchors_injected=False,
                 error=str(exc),
             )
 
+        total_tokens = sum(len(text.split()) for text in texts)
         return chunk_result_cls(
             doc_id=doc_id,
             doc_stem=doc_name,
@@ -456,6 +458,7 @@ def configure_chunker_stubs(
             output_path=task.output_path,
             input_hash=task.input_hash,
             chunk_count=len(texts),
+            total_tokens=total_tokens,
             parse_engine="docling-html",
             sanitizer_profile=None,
             anchors_injected=False,
