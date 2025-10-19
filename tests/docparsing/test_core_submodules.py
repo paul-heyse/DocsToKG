@@ -473,7 +473,11 @@ def test_run_all_forwards_zero_token_bounds(
 
     def _stage(name: str) -> Callable[[Sequence[str]], int]:
         def _capture(argv: Sequence[str]) -> int:
-            recorded[name] = list(argv)
+            argv_list = list(argv)
+            if name == "doctags":
+                parser = core_cli.build_doctags_parser()
+                parser.parse_args(argv_list)
+            recorded[name] = argv_list
             return 0
 
         return _capture
@@ -505,6 +509,8 @@ def test_run_all_forwards_zero_token_bounds(
             "3",
             "--log-level",
             "DEBUG",
+            "--vllm-wait-timeout",
+            "90",
         ]
     )
 
@@ -515,6 +521,7 @@ def test_run_all_forwards_zero_token_bounds(
     assert "--out-dir" in doctags_args
     assert doctags_args[doctags_args.index("--out-dir") + 1] == str(doctags_out_dir)
     assert "--min-tokens" not in doctags_args
+    assert "--vllm-wait-timeout" in doctags_args
 
     chunk_args = recorded["chunk"]
     assert chunk_args[chunk_args.index("--in-dir") + 1] == str(doctags_out_dir)
