@@ -8,7 +8,6 @@ import json
 import logging
 import os
 import socket
-import sys
 import threading
 import time
 from collections import defaultdict, deque
@@ -334,16 +333,16 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         """Enqueue ``response`` for the specified ``path``."""
 
         key = (response.method.upper(), "/" + path.lstrip("/"))
-        self._responses[key].appendleft(response)
+        responses = self._responses[key]
+        responses.clear()
+        responses.append(response)
 
     def _dequeue_response(self, *, method: str, path: str) -> Optional[ResponseSpec]:
         key = (method.upper(), path)
         responses = self._responses.get(key)
         if not responses:
             return None
-        response = responses.popleft()
-        print(f"serve {method} {path} -> {response.status}", file=sys.stderr)
-        return response
+        return responses.popleft()
 
     # --- Fixture helpers ----------------------------------------------------------
 
@@ -377,9 +376,11 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         rel_path = f"fixtures/{name}"
         head_spec = ResponseSpec(status=200, body=b"", headers=headers, method="HEAD")
         get_spec = ResponseSpec(status=200, body=content, headers=headers, method="GET")
+        key_head = ("HEAD", "/" + rel_path)
+        key_get = ("GET", "/" + rel_path)
         for _ in range(max(1, repeats)):
-            self.queue_response(rel_path, head_spec)
-            self.queue_response(rel_path, get_spec)
+            self._responses[key_head].append(head_spec)
+            self._responses[key_get].append(get_spec)
         return self.http_url(rel_path)
 
     # --- Configuration helpers ----------------------------------------------------

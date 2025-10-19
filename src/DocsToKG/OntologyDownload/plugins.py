@@ -53,7 +53,11 @@ _VALIDATOR_REGISTRY: MutableMapping[str, ValidatorPlugin] = {}
 
 def _describe_plugin(obj: object) -> str:
     module = getattr(obj, "__module__", obj.__class__.__module__)
-    name = getattr(obj, "__qualname__", obj.__class__.__name__)
+    if callable(obj) and hasattr(obj, "__name__"):
+        name = getattr(obj, "__name__")
+    else:
+        qualname = getattr(obj, "__qualname__", obj.__class__.__name__)
+        name = ".".join(part for part in qualname.split(".") if part != "<locals>")
     return f"{module}.{name}"
 
 
