@@ -334,3 +334,61 @@ def test_manifest_read_only_root_existing_manifests(tmp_path, monkeypatch, capsy
     assert stdout[0] == "docparse manifest tail (last 1 entries)"
     assert "doc-2" in stdout[1]
     assert "status=failure" in stdout[1]
+
+
+def test_manifest_tail_handles_missing_timestamps(monkeypatch, tmp_path, capsys) -> None:
+    """Tail output should respect manifest order when timestamps are missing."""
+
+    _prepare_manifest_cli_stubs(monkeypatch)
+
+    manifest_dir = tmp_path / "Manifests"
+    manifest_dir.mkdir()
+
+    def _write(stage: str, entries: list[dict]) -> None:
+        path = manifest_dir / f"docparse.{stage}.manifest.jsonl"
+        with path.open("w", encoding="utf-8") as handle:
+            for entry in entries:
+                handle.write(json.dumps(entry))
+                handle.write("\n")
+
+    _write(
+        "chunks",
+        [
+            {"timestamp": "2025-01-01T00:00:00", "doc_id": "chunk-0", "status": "success"},
+            {"doc_id": "chunk-no-ts", "status": "success"},
+            {"timestamp": "2025-01-01T00:02:00", "doc_id": "chunk-2", "status": "success"},
+        ],
+    )
+    _write(
+        "embeddings",
+        [
+            {"timestamp": "2025-01-01T00:00:30", "doc_id": "embed-0", "status": "success"},
+            {"doc_id": "embed-no-ts", "status": "failure"},
+            {"timestamp": "2025-01-01T00:03:00", "doc_id": "embed-2", "status": "success"},
+        ],
+    )
+
+    from DocsToKG.DocParsing.core import cli
+
+    exit_code = cli.manifest(
+        [
+            "--data-root",
+            str(tmp_path),
+            "--stage",
+            "chunks",
+            "--stage",
+            "embeddings",
+            "--tail",
+            "3",
+            "--raw",
+        ]
+    )
+
+    assert exit_code == 0
+
+    stdout = capsys.readouterr().out.strip().splitlines()
+    assert stdout[0] == "docparse manifest tail (last 3 entries)"
+    assert len(stdout[1:]) == 3
+
+    tail_ids = [json.loads(line)["doc_id"] for line in stdout[1:]]
+    assert tail_ids == ["embed-no-ts", "chunk-2", "embed-2"]
