@@ -3098,6 +3098,17 @@ class ManagedFaissAdapter(DenseVectorStore):
 
         return self._inner.serialize()
 
+    def snapshot_meta(self) -> Mapping[str, object]:
+        """Return snapshot metadata describing the managed index configuration."""
+
+        getter = getattr(self._inner, "snapshot_meta", None)
+        if not callable(getter):
+            return {}
+        meta = getter()
+        if isinstance(meta, Mapping):
+            return dict(meta)
+        return {}
+
     def restore(
         self,
         payload: bytes,
