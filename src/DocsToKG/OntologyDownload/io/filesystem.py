@@ -381,9 +381,17 @@ def _materialize_cached_file(source: Path, destination: Path) -> tuple[Path, Pat
         os.replace(temp_path, destination)
         return destination, source
     except OSError:
-        shutil.move(str(source), str(temp_path))
+        shutil.copy2(source, temp_path)
+        try:
+            with temp_path.open("rb") as temp_file:
+                try:
+                    os.fsync(temp_file.fileno())
+                except OSError:
+                    pass
+        except OSError:
+            pass
         os.replace(temp_path, destination)
-        return destination, destination
+        return destination, source
     finally:
         temp_path.unlink(missing_ok=True)
 
