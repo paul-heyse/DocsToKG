@@ -48,6 +48,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict
 import sqlite3
 from pathlib import Path
@@ -319,6 +320,29 @@ def test_load_previous_manifest_truncated_jsonl_uses_sqlite_fallback(
         allow_sqlite_fallback=True,
     )
 
+    assert "W-SQLITE" in completed
+    resume_entry = per_work.get("W-SQLITE")
+    assert resume_entry is not None and resume_entry
+    first_entry = next(iter(resume_entry.values()))
+    assert first_entry["classification"] == "pdf"
+    assert first_entry["path"] == "/data/stored.pdf"
+
+
+def test_load_previous_manifest_sqlite_path_has_no_warning(
+    tmp_path: Path, caplog
+) -> None:
+    sqlite_path = tmp_path / "resume.sqlite3"
+    _seed_sqlite_resume(sqlite_path)
+
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="DocsToKG.ContentDownload.telemetry"):
+        per_work, completed = downloader.load_previous_manifest(
+            sqlite_path,
+            sqlite_path=sqlite_path,
+            allow_sqlite_fallback=True,
+        )
+
+    assert not caplog.records
     assert "W-SQLITE" in completed
     resume_entry = per_work.get("W-SQLITE")
     assert resume_entry is not None and resume_entry

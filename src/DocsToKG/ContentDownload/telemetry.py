@@ -1543,6 +1543,22 @@ def looks_like_csv_resume_target(path: Path) -> bool:
     return False
 
 
+def looks_like_sqlite_resume_target(path: Path) -> bool:
+    """Return True when ``path`` likely references a SQLite manifest cache."""
+
+    lower_name = path.name.lower()
+    if lower_name.endswith(".sqlite") or lower_name.endswith(".sqlite3"):
+        return True
+
+    try:
+        with path.open("rb") as handle:
+            header = handle.read(16)
+    except OSError:
+        return False
+
+    return header.startswith(b"SQLite format 3\x00")
+
+
 def load_previous_manifest(
     path: Optional[Path],
     *,
@@ -1565,12 +1581,22 @@ def load_previous_manifest(
             return _sqlite_resume(clear_completed=False)
         return per_work, completed
 
+    if looks_like_sqlite_resume_target(path):
+        if not path.exists() or not path.is_file():
+            raise ValueError(
+                "Resume SQLite cache '{path}' does not exist or is not a file. Provide the matching "
+                "manifest.sqlite or manifest.sqlite3 file, or omit --resume-from to start a new run.".format(
+                    path=path
+                )
+            )
+        return _load_resume_from_sqlite(path)
+
     if looks_like_csv_resume_target(path):
         if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
             return _sqlite_resume(clear_completed=False)
         raise ValueError(
             "Resume manifest '{path}' appears to be a CSV attempts log but no SQLite cache was found. "
-            "Provide the matching manifest.sqlite file or resume from a JSONL manifest."
+            "Provide the matching manifest.sqlite or manifest.sqlite3 file, or resume from a JSONL manifest."
             .format(path=path)
         )
 
