@@ -1179,9 +1179,9 @@ def test_real_fixture_ingest_and_search(
 ) -> None:
     ingestion, service, registry, validator, _, _ = stack()
     documents = _to_documents(real_dataset)
-    ingested = ingestion.upsert_documents(documents)
-    assert ingested, "Expected chunks to ingest from real vector fixture"
-    assert registry.count() == len(ingested)
+    summary = ingestion.upsert_documents(documents)
+    assert summary.chunk_count > 0, "Expected chunks to ingest from real vector fixture"
+    assert registry.count() == summary.chunk_count
 
     for entry in real_dataset:
         for query in entry.get("queries", []):
