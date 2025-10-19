@@ -1106,6 +1106,67 @@ def test_snapshot_refresh_throttled(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(calls) == 2, "flush_snapshot should bypass the throttle policy"
 
 
+def test_service_close_flushes_dense_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_payload = {
+        "dense": {"index_type": "flat", "oversample": 2},
+        "fusion": {"k0": 10.0},
+        "retrieval": {"bm25_top_k": 5, "splade_top_k": 5, "dense_top_k": 5},
+    }
+    config_path = tmp_path / "shutdown_config.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+    manager = HybridSearchConfigManager(config_path)
+    config = manager.get()
+    config.dense.snapshot_refresh_interval_seconds = 3600.0
+    config.dense.snapshot_refresh_writes = 100
+    feature_generator = FeatureGenerator(embedding_dim=16)
+    faiss_index = FaissVectorStore(dim=feature_generator.embedding_dim, config=config.dense)
+    opensearch = OpenSearchSimulator()
+    registry = ChunkRegistry()
+    observability = Observability()
+
+    ingestion = ChunkIngestionPipeline(
+        faiss_index=faiss_index,
+        opensearch=opensearch,
+        registry=registry,
+        observability=observability,
+    )
+    service = HybridSearchService(
+        config_manager=manager,
+        feature_generator=feature_generator,
+        faiss_index=ManagedFaissAdapter(faiss_index),
+        opensearch=opensearch,
+        registry=registry,
+        observability=observability,
+    )
+
+    calls: list[int] = []
+
+    real_serialize = FaissVectorStore.serialize
+
+    def spy_serialize(self: FaissVectorStore) -> bytes:  # pragma: no cover - exercised in test
+        calls.append(1)
+        return real_serialize(self)
+
+    monkeypatch.setattr(FaissVectorStore, "serialize", spy_serialize)
+
+    document = _write_document_artifacts(
+        tmp_path,
+        doc_id="shutdown-doc",
+        namespace="ops",
+        text="graceful shutdown triggers snapshot",
+        metadata={},
+        feature_generator=feature_generator,
+    )
+    ingestion.upsert_documents([document])
+    baseline = len(calls)
+
+    service.close()
+
+    assert len(calls) >= baseline + 1, "service.close() should flush a final snapshot"
+
+
 # --- test_hybrid_search_scale.py ---
 
 DATASET_PATH = Path("Data/HybridScaleFixture/dataset.jsonl")

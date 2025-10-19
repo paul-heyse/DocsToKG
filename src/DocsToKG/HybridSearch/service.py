@@ -119,7 +119,7 @@ from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
 from threading import RLock
-from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -843,6 +843,10 @@ class HybridSearchService:
             return
         self._closed = True
         try:
+            self._flush_dense_snapshots()
+        except Exception:
+            self._observability.logger.exception("dense-snapshot-flush-failed")
+        try:
             self._dense_strategy.persist()
         except Exception:
             self._observability.logger.exception("dense-strategy-persist-failed")
@@ -1114,6 +1118,33 @@ class HybridSearchService:
             raise TypeError("HybridSearchService requires a managed dense vector store")
         if not hasattr(store, "get_gpu_resources"):
             raise TypeError("Dense vector store must expose get_gpu_resources()")
+
+    def _flush_dense_snapshots(self) -> None:
+        router = getattr(self, "_faiss_router", None)
+        if router is None:
+            return
+        iter_fn = getattr(router, "iter_stores", None)
+        if callable(iter_fn):
+            stores: Iterable[Tuple[str, DenseVectorStore]] = iter_fn()
+        else:
+            default_store = getattr(router, "default_store", None)
+            if default_store is None:
+                return
+            stores = [("__default__", default_store)]
+        for namespace, store in stores:
+            flush_fn = getattr(store, "flush_snapshot", None)
+            try:
+                if callable(flush_fn):
+                    flush_fn(reason="shutdown")
+                else:
+                    serializer = getattr(store, "serialize", None)
+                    if callable(serializer):
+                        serializer()
+            except Exception:
+                self._observability.logger.exception(
+                    "dense-snapshot-flush-error",
+                    extra={"event": {"namespace": namespace}},
+                )
 
     def _dense_store(self, namespace: Optional[str]) -> DenseVectorStore:
         store = self._faiss_router.get(namespace)

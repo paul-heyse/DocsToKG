@@ -279,33 +279,34 @@ class _SearchCoalescer:
         return batch
 
     def _execute(self, batch: List[_PendingSearch]) -> None:
-        if not batch:
-            return
-        vectors = [self._store._ensure_dim(item.vector) for item in batch]
-        k_max = max(item.top_k for item in batch)
-        matrix = np.stack(vectors, dtype=np.float32)
-        try:
-            results = self._store._search_batch_impl(matrix, k_max)
-        except Exception as exc:
-            for pending in batch:
-                pending.set_exception(exc)
-            trailing = self._drain()
-            for pending in trailing:
-                pending.set_exception(exc)
-            raise
-        else:
-            for pending, row in zip(batch, results):
-                pending.set_result(row[: pending.top_k])
-            if self._store._observability is not None:
-                self._store._observability.metrics.observe(
-                    "faiss_coalesced_batch_size", float(len(batch))
+        while batch:
+            vectors = [self._store._ensure_dim(item.vector) for item in batch]
+            k_max = max(item.top_k for item in batch)
+            matrix = np.stack(vectors, dtype=np.float32)
+            try:
+                results = self._store._search_batch_impl(matrix, k_max)
+            except Exception as exc:
+                while True:
+                    for pending in batch:
+                        pending.set_exception(exc)
+                    batch = self._drain()
+                    if not batch:
+                        break
+                raise
+            else:
+                for pending, row in zip(batch, results):
+                    pending.set_result(row[: pending.top_k])
+                if self._store._observability is not None:
+                    self._store._observability.metrics.observe(
+                        "faiss_coalesced_batch_size", float(len(batch))
+                    )
+                rate = (
+                    0.0
+                    if len(batch) <= 1
+                    else float(len(batch) - 1) / float(len(batch))
                 )
-            rate = 0.0 if len(batch) <= 1 else float(len(batch) - 1) / float(len(batch))
-            self._metrics.set_gauge("faiss_coalescer_hit_rate", rate)
-            # If additional requests arrived while executing, process them next.
-            trailing = self._drain()
-            if trailing:
-                self._execute(trailing)
+                self._metrics.set_gauge("faiss_coalescer_hit_rate", rate)
+                batch = self._drain()
 
 
 class FaissVectorStore(DenseVectorStore):
@@ -381,6 +382,14 @@ class FaissVectorStore(DenseVectorStore):
         self._multi_gpu_mode = getattr(config, "multi_gpu_mode", "single")
         self._indices_32_bit = bool(getattr(config, "gpu_indices_32_bit", True))
         self._temp_memory_bytes = getattr(config, "gpu_temp_memory_bytes", None)
+        self._gpu_use_default_null_stream_all_devices = bool(
+            getattr(config, "gpu_use_default_null_stream_all_devices", False)
+            or getattr(config, "gpu_default_null_stream_all_devices", False)
+        )
+        self._gpu_use_default_null_stream = bool(
+            getattr(config, "gpu_use_default_null_stream", False)
+            or getattr(config, "gpu_default_null_stream", False)
+        )
         self._expected_ntotal = int(getattr(config, "expected_ntotal", 0))
         self._rebuild_delete_threshold = int(getattr(config, "rebuild_delete_threshold", 10000))
         self._force_64bit_ids = bool(getattr(config, "force_64bit_ids", False))
@@ -405,11 +414,13 @@ class FaissVectorStore(DenseVectorStore):
         self._reserve_memory_enabled = bool(getattr(config, "enable_reserve_memory", True))
         self._replicated = False
         self._gpu_resources: Optional["faiss.StandardGpuResources"] = None
+        self._replica_gpu_resources: list["faiss.StandardGpuResources"] = []
         self._pinned_buffers: list[object] = []
         self._observability = observability or Observability()
         self.init_gpu()
         self._lock = RLock()
         self._index = self._create_index()
+        self._index = self._maybe_distribute_multi_gpu(self._index)
         if self._dim != dim:
             raise RuntimeError(
                 f"HybridSearch initialised with dim={dim} but created index expects {self._dim}"
@@ -745,13 +756,13 @@ class FaissVectorStore(DenseVectorStore):
             ids64 = np.asarray(ids, dtype=np.int64)
             if ids64.size == 0:
                 return 0
-        self._remove_ids(ids64)
-        self._flush_pending_deletes(force=force_flush)
-        self._update_gpu_metrics()
-        count = int(ids64.size)
-        if count:
-            self._maybe_refresh_snapshot(writes_delta=count, reason=reason)
-        return count
+            self._remove_ids(ids64)
+            self._flush_pending_deletes(force=force_flush)
+            self._update_gpu_metrics()
+            count = int(ids64.size)
+            if count:
+                self._maybe_refresh_snapshot(writes_delta=count, reason=reason)
+            return count
 
     def _current_index_ids(self) -> np.ndarray:
         # Robustly extract id_map across wrappers / GPU clones.
@@ -1379,9 +1390,7 @@ class FaissVectorStore(DenseVectorStore):
                 "Update DenseIndexConfig.device or adjust CUDA visibility."
             )
         try:
-            resources = faiss.StandardGpuResources()
-            if self._temp_memory_bytes is not None and hasattr(resources, "setTempMemory"):
-                resources.setTempMemory(self._temp_memory_bytes)
+            resources = self._create_gpu_resources(device=device)
             self._gpu_resources = resources
         except Exception as exc:  # pragma: no cover - GPU-specific failure
             raise RuntimeError(
@@ -1417,6 +1426,76 @@ class FaissVectorStore(DenseVectorStore):
                 },
             )
         return tuple(allowed)
+    def _create_gpu_resources(
+        self, *, device: Optional[int] = None
+    ) -> "faiss.StandardGpuResources":
+        """Instantiate and configure ``StandardGpuResources`` for ``device``."""
+
+        resources = faiss.StandardGpuResources()
+        self._configure_gpu_resource(resources, device=device)
+        return resources
+
+    def _configure_gpu_resource(
+        self, resource: "faiss.StandardGpuResources", *, device: Optional[int] = None
+    ) -> None:
+        """Apply configured knobs to a FAISS GPU resource manager."""
+
+        if self._temp_memory_bytes is not None and hasattr(resource, "setTempMemory"):
+            try:
+                resource.setTempMemory(self._temp_memory_bytes)
+            except Exception:  # pragma: no cover - best effort guard
+                logger.debug("Unable to apply GPU temp memory cap", exc_info=True)
+
+        if self._gpu_use_default_null_stream_all_devices:
+            method = getattr(resource, "setDefaultNullStreamAllDevices", None)
+            if callable(method):
+                try:  # pragma: no cover - hardware/driver dependent
+                    method()
+                except Exception:
+                    logger.debug(
+                        "Unable to enable default CUDA null stream across devices",
+                        exc_info=True,
+                    )
+            return
+
+        if not self._gpu_use_default_null_stream:
+            return
+
+        method = getattr(resource, "setDefaultNullStream", None)
+        if not callable(method):
+            return
+
+        tried_device = False
+        if device is not None:
+            try:  # pragma: no cover - GPU binding specific
+                method(int(device))
+                tried_device = True
+            except TypeError:
+                tried_device = False
+            except Exception:
+                logger.debug(
+                    "Unable to bind default CUDA null stream for device", exc_info=True
+                )
+                tried_device = True
+
+        if tried_device:
+            return
+
+        try:  # pragma: no cover - GPU binding specific
+            method()
+        except TypeError:
+            if device is not None:
+                try:
+                    method(int(device))
+                except Exception:
+                    logger.debug(
+                        "Unable to fall back when binding CUDA null stream", exc_info=True
+                    )
+        except Exception:
+            logger.debug(
+                "Unable to bind default CUDA null stream without explicit device",
+                exc_info=True,
+            )
 
     def distribute_to_all_gpus(self, index: "faiss.Index", *, shard: bool = False) -> "faiss.Index":
         """Clone ``index`` across available GPUs when the build supports it.
@@ -1501,6 +1580,43 @@ class FaissVectorStore(DenseVectorStore):
                     co=cloner_options,
                     ngpu=available_gpus,
                 )
+
+            resources_vector: "faiss.GpuResourcesVector | None" = None
+            gpu_ids = list(range(gpu_count))
+            if hasattr(faiss, "GpuResourcesVector"):
+                try:
+                    resources_vector = faiss.GpuResourcesVector()
+                except Exception:  # pragma: no cover - fall back to legacy path
+                    resources_vector = None
+
+            self._replica_gpu_resources = []
+            multi: "faiss.Index"
+            if resources_vector is not None and (
+                hasattr(faiss, "index_cpu_to_gpu_multiple")
+                or hasattr(faiss, "index_cpu_to_gpus_list")
+            ):
+                for gpu_id in gpu_ids:
+                    resource: "faiss.StandardGpuResources"
+                    if (
+                        self._gpu_resources is not None
+                        and int(self.device) == gpu_id
+                    ):
+                        resource = self._gpu_resources
+                        self._configure_gpu_resource(resource, device=gpu_id)
+                    else:
+                        resource = self._create_gpu_resources(device=gpu_id)
+                        self._replica_gpu_resources.append(resource)
+                    resources_vector.push_back(resource)
+                if hasattr(faiss, "index_cpu_to_gpu_multiple"):
+                    multi = faiss.index_cpu_to_gpu_multiple(
+                        resources_vector, gpu_ids, base_index, cloner_options
+                    )
+                else:
+                    multi = faiss.index_cpu_to_gpus_list(
+                        resources_vector, gpu_ids, base_index, cloner_options
+                    )
+            else:
+                multi = faiss.index_cpu_to_all_gpus(base_index, co=cloner_options, ngpu=gpu_count)
             self._replicated = True
             return multi
         except RuntimeError:
@@ -1508,6 +1624,18 @@ class FaissVectorStore(DenseVectorStore):
         except Exception:  # pragma: no cover - GPU-specific failure
             logger.warning("Unable to replicate FAISS index across GPUs", exc_info=True)
             return index
+
+    def _maybe_distribute_multi_gpu(self, index: "faiss.Index") -> "faiss.Index":
+        """Conditionally replicate or shard ``index`` based on configuration."""
+
+        if self._multi_gpu_mode not in ("replicate", "shard"):
+            self._replicated = False
+            return index
+        if not self._replication_enabled:
+            self._replicated = False
+            return index
+        shard = self._multi_gpu_mode == "shard"
+        return self.distribute_to_all_gpus(index, shard=shard)
 
     def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
         self.init_gpu()
@@ -1529,17 +1657,9 @@ class FaissVectorStore(DenseVectorStore):
                 ):
                     co.indicesOptions = faiss.INDICES_32_BIT
                 promoted = faiss.index_cpu_to_gpu(self._gpu_resources, device, index, co)
-                return (
-                    self.distribute_to_all_gpus(promoted, shard=self._multi_gpu_mode == "shard")
-                    if self._multi_gpu_mode in ("replicate", "shard")
-                    else promoted
-                )
+                return self._maybe_distribute_multi_gpu(promoted)
             cloned = faiss.index_cpu_to_gpu(self._gpu_resources, device, index)
-            return (
-                self.distribute_to_all_gpus(cloned, shard=self._multi_gpu_mode == "shard")
-                if self._multi_gpu_mode in ("replicate", "shard")
-                else cloned
-            )
+            return self._maybe_distribute_multi_gpu(cloned)
         except Exception as exc:  # pragma: no cover - hardware specific failure
             raise RuntimeError(
                 "Failed to promote FAISS index to GPU "
@@ -1759,6 +1879,7 @@ class FaissVectorStore(DenseVectorStore):
         current_ids = self._current_index_ids()
         if current_ids.size == 0:
             self._index = self._create_index()
+            self._index = self._maybe_distribute_multi_gpu(self._index)
             self._set_nprobe()
             return
         if self._tombstones:
@@ -1778,6 +1899,7 @@ class FaissVectorStore(DenseVectorStore):
         )
         vectors = np.ascontiguousarray(vectors, dtype=np.float32)
         self._index = self._create_index()
+        self._index = self._maybe_distribute_multi_gpu(self._index)
         self._set_nprobe()
         if vectors.size:
             base_new = self._index.index if hasattr(self._index, "index") else self._index
@@ -2363,6 +2485,11 @@ class ManagedFaissAdapter(DenseVectorStore):
         """Expose diagnostic statistics from the managed store."""
 
         return self._inner.stats()
+
+    def flush_snapshot(self, *, reason: str = "flush") -> None:
+        """Forward snapshot flush requests to the managed store."""
+
+        self._inner.flush_snapshot(reason=reason)
 
     def get_gpu_resources(self) -> Optional["faiss.StandardGpuResources"]:
         """Return GPU resources backing the managed index (if available)."""

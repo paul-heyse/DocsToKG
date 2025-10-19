@@ -26,6 +26,18 @@
 #       "name": "test_load_resolver_config_rejects_legacy_rate_limits",
 #       "anchor": "function-test-load-resolver-config-rejects-legacy-rate-limits",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "test-load-previous-manifest-uses-sqlite-fallback",
+#       "name": "test_load_previous_manifest_uses_sqlite_fallback",
+#       "anchor": "function-test-load-previous-manifest-uses-sqlite-fallback",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test-load-previous-manifest-truncated-jsonl-uses-sqlite-fallback",
+#       "name": "test_load_previous_manifest_truncated_jsonl_uses_sqlite_fallback",
+#       "anchor": "function-test-load-previous-manifest-truncated-jsonl-uses-sqlite-fallback",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -50,6 +62,79 @@ from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
     build_manifest_entry,
 )
+
+
+def _seed_sqlite_resume(sqlite_path: Path) -> None:
+    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(sqlite_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE manifests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                run_id TEXT,
+                schema_version INTEGER,
+                work_id TEXT,
+                title TEXT,
+                publication_year INTEGER,
+                resolver TEXT,
+                url TEXT,
+                normalized_url TEXT,
+                path TEXT,
+                path_mtime_ns INTEGER,
+                classification TEXT,
+                content_type TEXT,
+                reason TEXT,
+                reason_detail TEXT,
+                html_paths TEXT,
+                sha256 TEXT,
+                content_length INTEGER,
+                etag TEXT,
+                last_modified TEXT,
+                extracted_text_path TEXT,
+                dry_run INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO manifests (
+                timestamp, run_id, schema_version, work_id, title, publication_year,
+                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                content_type, reason, reason_detail, html_paths, sha256,
+                content_length, etag, last_modified, extracted_text_path, dry_run
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "2025-01-02T00:00:00Z",
+                "resume-run",
+                MANIFEST_SCHEMA_VERSION,
+                "W-SQLITE",
+                "SQLite Resume",
+                2024,
+                "openalex",
+                "https://example.org/W-SQLITE.pdf",
+                "https://example.org/w-sqlite.pdf",
+                "/data/stored.pdf",
+                None,
+                "pdf",
+                "application/pdf",
+                None,
+                None,
+                None,
+                "deadbeef",
+                2048,
+                None,
+                None,
+                None,
+                0,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 # --- Test Cases ---
 
@@ -201,76 +286,32 @@ def test_load_previous_manifest_missing_file(tmp_path: Path) -> None:
 def test_load_previous_manifest_uses_sqlite_fallback(tmp_path: Path) -> None:
     manifest_path = tmp_path / "resume.jsonl"
     sqlite_path = tmp_path / "resume.sqlite3"
-    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+    _seed_sqlite_resume(sqlite_path)
 
-    conn = sqlite3.connect(sqlite_path)
-    try:
-        conn.execute(
-            """
-            CREATE TABLE manifests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                run_id TEXT,
-                schema_version INTEGER,
-                work_id TEXT,
-                title TEXT,
-                publication_year INTEGER,
-                resolver TEXT,
-                url TEXT,
-                normalized_url TEXT,
-                path TEXT,
-                path_mtime_ns INTEGER,
-                classification TEXT,
-                content_type TEXT,
-                reason TEXT,
-                reason_detail TEXT,
-                html_paths TEXT,
-                sha256 TEXT,
-                content_length INTEGER,
-                etag TEXT,
-                last_modified TEXT,
-                extracted_text_path TEXT,
-                dry_run INTEGER
-            )
-            """
-        )
-        conn.execute(
-            """
-            INSERT INTO manifests (
-                timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, normalized_url, path, path_mtime_ns, classification,
-                content_type, reason, reason_detail, html_paths, sha256,
-                content_length, etag, last_modified, extracted_text_path, dry_run
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                "2025-01-02T00:00:00Z",
-                "resume-run",
-                MANIFEST_SCHEMA_VERSION,
-                "W-SQLITE",
-                "SQLite Resume",
-                2024,
-                "openalex",
-                "https://example.org/W-SQLITE.pdf",
-                "https://example.org/w-sqlite.pdf",
-                "/data/stored.pdf",
-                None,
-                "pdf",
-                "application/pdf",
-                None,
-                None,
-                None,
-                "deadbeef",
-                2048,
-                None,
-                None,
-                None,
-                0,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    per_work, completed = downloader.load_previous_manifest(
+        manifest_path,
+        sqlite_path=sqlite_path,
+        allow_sqlite_fallback=True,
+    )
+
+    assert "W-SQLITE" in completed
+    resume_entry = per_work.get("W-SQLITE")
+    assert resume_entry is not None and resume_entry
+    first_entry = next(iter(resume_entry.values()))
+    assert first_entry["classification"] == "pdf"
+    assert first_entry["path"] == "/data/stored.pdf"
+
+
+def test_load_previous_manifest_truncated_jsonl_uses_sqlite_fallback(
+    tmp_path: Path,
+) -> None:
+    manifest_path = tmp_path / "resume.jsonl"
+    sqlite_path = tmp_path / "resume.sqlite3"
+    manifest_path.write_text(
+        '{"record_type": "manifest", "schema_version": 3, "work_id": "W-BAD"',
+        encoding="utf-8",
+    )
+    _seed_sqlite_resume(sqlite_path)
 
     per_work, completed = downloader.load_previous_manifest(
         manifest_path,

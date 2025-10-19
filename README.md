@@ -91,7 +91,8 @@ DenseIndexConfig(
 Set either value to `0` to disable that threshold; when both are `0` the store
 refreshes after every write (legacy behaviour). Operators can still force a
 refresh—use `FaissVectorStore.flush_snapshot()` before shutdown or after
-maintenance windows.
+maintenance windows, though `HybridSearchService.close()` now flushes a final
+snapshot automatically during graceful shutdown.
 
 Observability now reports when snapshots occur: counters
 `faiss_snapshot_refresh_total` and `faiss_snapshot_refresh_skipped` track actual
@@ -178,7 +179,9 @@ back to the original ``GET`` attempt to avoid false negatives.
 ### 5.4 Additional CLI Flags
 
 - ``--dry-run``: compute resolver coverage without writing files.
-- ``--resume-from <manifest.jsonl>``: skip works already recorded as successful. If the
+- ``--resume-from <manifest.jsonl>``: skip works already recorded as successful. CSV
+  attempts logs are also supported when the matching ``manifest.sqlite3`` cache is
+  available. If the
   manifest path is wrong or missing, the downloader now fails fast with a clear
   error so you can fix the flag before rerunning.
 - ``--extract-text=html``: save plaintext alongside HTML fallbacks (requires ``trafilatura``).

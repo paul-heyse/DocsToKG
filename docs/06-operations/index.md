@@ -145,6 +145,9 @@ def hybrid_search(payload: dict):
     return body
 ```
 
+- During shutdown hooks call `service.close()` to persist throttled FAISS
+  snapshots—this now forces a final refresh even when interval/write thresholds
+  would normally defer serialization.
 - Reload configuration dynamically using `HybridSearchConfigManager.reload`.
 - Warm caches by issuing representative queries after startup.
 
