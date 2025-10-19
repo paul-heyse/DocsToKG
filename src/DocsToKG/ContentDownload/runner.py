@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import inspect
 import json
 import logging
 import sqlite3
@@ -241,12 +242,31 @@ class DownloadRun:
     def setup_work_provider(self) -> WorkProvider:
         """Construct the OpenAlex work provider used to yield artefacts."""
 
+        iterate_kwargs = {
+            "per_page": self.args.per_page,
+            "max_results": self.args.max,
+            "retry_attempts": self.resolved.openalex_retry_attempts,
+            "retry_backoff": self.resolved.openalex_retry_backoff,
+        }
+        try:
+            signature = inspect.signature(self.iterate_openalex_func)
+        except (TypeError, ValueError):
+            supported_kwargs = iterate_kwargs
+        else:
+            if any(
+                param.kind is inspect.Parameter.VAR_KEYWORD
+                for param in signature.parameters.values()
+            ):
+                supported_kwargs = iterate_kwargs
+            else:
+                supported_kwargs = {
+                    key: value
+                    for key, value in iterate_kwargs.items()
+                    if key in signature.parameters
+                }
         work_iterable = self.iterate_openalex_func(
             self.resolved.query,
-            per_page=self.args.per_page,
-            max_results=self.args.max,
-            retry_attempts=self.resolved.openalex_retry_attempts,
-            retry_backoff=self.resolved.openalex_retry_backoff,
+            **supported_kwargs,
         )
         provider = OpenAlexWorkProvider(
             query=self.resolved.query,
@@ -305,6 +325,9 @@ class DownloadRun:
             content_addressed=self.args.content_addressed,
             verify_cache_digest=self.args.verify_cache_digest,
         )
+        retry_after_cap = getattr(self.resolved.resolver_config, "retry_after_cap", None)
+        if retry_after_cap is not None:
+            options.extra["retry_after_cap"] = retry_after_cap
         options.previous_lookup = resume_lookup
         state = DownloadRunState(
             session_factory=session_factory,
