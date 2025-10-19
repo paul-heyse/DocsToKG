@@ -276,6 +276,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Disable global URL deduplication.",
     )
     resolver_group.add_argument(
+        "--global-url-dedup-cap",
+        type=int,
+        default=100000,
+        metavar="N",
+        help=(
+            "Maximum number of URLs hydrated from prior manifests into the persistent dedupe "
+            "set (default: 100000). Set to 0 to disable the cap."
+        ),
+    )
+    resolver_group.add_argument(
         "--domain-min-interval",
         dest="domain_min_interval",
         type=_parse_domain_interval,
@@ -400,6 +410,8 @@ def resolve_config(
         parser.error("--max-concurrent-per-host must be >= 0")
     if not 1 <= args.per_page <= 200:
         parser.error("--per-page must be between 1 and 200")
+    if args.sleep < 0:
+        parser.error("--sleep must be greater than or equal to 0")
     if args.max is not None and args.max < 0:
         parser.error("--max must be greater than or equal to 0")
     if args.year_start > args.year_end:
@@ -410,6 +422,8 @@ def resolve_config(
         parser.error("--openalex-retry-attempts must be >= 0")
     if args.openalex_retry_backoff < 0:
         parser.error("--openalex-retry-backoff must be >= 0")
+    if getattr(args, "global_url_dedup_cap", 0) < 0:
+        parser.error("--global-url-dedup-cap must be >= 0")
     for field_name in ("sniff_bytes", "min_pdf_bytes", "tail_check_bytes"):
         value = getattr(args, field_name, None)
         if value is not None and value < 0:
@@ -708,13 +722,27 @@ def build_query(args: argparse.Namespace) -> Works:
 def _lookup_topic_id(topic_text: str) -> Optional[str]:
     """Cached helper to resolve an OpenAlex topic identifier."""
     try:
-        hits = Topics().search(topic_text).get()
+        query = Topics().search(topic_text).select(["id"]).per_page(1)
+        hits = query.get()
     except requests.RequestException as exc:  # pragma: no cover - network guard
         LOGGER.warning("Topic lookup failed for %s: %s", topic_text, exc)
         return None
     if not hits:
         return None
-    resolved = hits[0].get("id")
+    candidate: Optional[Dict[str, Any]]
+    if isinstance(hits, list):
+        if not hits:
+            return None
+        candidate = hits[0] if isinstance(hits[0], dict) else None
+    elif isinstance(hits, dict):
+        candidate = hits
+    else:
+        candidate = None
+
+    if not candidate:
+        return None
+
+    resolved = candidate.get("id")
     if resolved:
         LOGGER.info("Resolved topic '%s' -> %s", topic_text, resolved)
     return resolved
