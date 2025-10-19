@@ -10,6 +10,7 @@
 - [6) “Absolutely no installs” policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
 - [7) Fallback (only with **explicit approval** to install)](#7-fallback-only-with-explicit-approval-to-install)
 - [8) One-page quick reference (copy/paste safe)](#8-one-page-quick-reference-copy-paste-safe)
+- [🚨 Mandatory Pre-Read: FAISS GPU Wheel & Library Walkthrough](#-mandatory-pre-read-faiss-gpu-wheel--library-walkthrough)
 - [Mission and Scope](#mission-and-scope)
 - [Runtime prerequisites](#runtime-prerequisites)
 - [Module architecture](#module-architecture)
@@ -22,6 +23,21 @@
 - [Reference commands](#reference-commands)
 - [Ownership & change management](#ownership-change-management)
 - [Coding Standards & Module Organization](#coding-standards-module-organization)
+
+# 🚨 Mandatory Pre-Read: FAISS GPU Wheel & Library Walkthrough
+
+Before executing or modifying any HybridSearch code, you **must**:
+
+1. Read the entire [`faiss-gpu-wheel-reference.md`](./faiss-gpu-wheel-reference.md).
+2. Inspect the installed FAISS package under `.venv/lib/python3.13/site-packages/faiss`.
+
+This prerequisite matters because HybridSearch depends on a **custom** `faiss-1.12.0` CUDA 12 wheel with cuVS integration, bespoke loader behaviour, and GPU resource heuristics. The reference explains:
+
+- Runtime prerequisites, environment knobs (`FAISS_OPT_LEVEL`, cuVS toggles), memory pooling, and supported GPU index types beyond upstream FAISS docs.
+- Mathematical underpinnings of FAISS GPU kernels (L2/IP distance functions, IVF/PQ quantisation, tiling and batching strategies) needed when tuning performance or debugging recall.
+- CUDA-specific APIs (e.g., `knn_gpu`, `pairwise_distance_gpu`, `GpuMultipleClonerOptions`, `StandardGpuResources`) that must be respected to avoid memory corruption or kernel sync issues.
+
+The `.venv/.../faiss` package contains SWIG bindings (`swigfaiss.py`), GPU helpers (`gpu_wrappers.py`), class wrappers, array conversions, and contrib utilities (Torch integration). Reviewing these modules clarifies dtype/layout expectations, cuVS pathways, and error handling used throughout `store.py`, ensuring agents understand the exact surface area exposed by the customised wheel before touching ingestion, routing, or search code.
 
 # Project Environment — **No-Install** Runbook (for AI agents)
 

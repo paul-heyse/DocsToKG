@@ -8,6 +8,7 @@ last_updated: 2025-02-15
 
 ## Table of Contents
 - [DocsToKG • HybridSearch](#docstokg--hybridsearch)
+  - [⚠️ Required Prereading: FAISS GPU Wheel & Library](#️-required-prereading-faiss-gpu-wheel--library)
   - [Prerequisites & dependencies](#prerequisites--dependencies)
   - [Data inputs & expected layout](#data-inputs--expected-layout)
   - [Quickstart](#quickstart)
@@ -31,6 +32,17 @@ last_updated: 2025-02-15
   - [Development tasks](#development-tasks)
   - [Agent guardrails](#agent-guardrails)
   - [FAQ](#faq)
+
+### ⚠️ Required Prereading: FAISS GPU Wheel & Library
+
+Before modifying or operating HybridSearch, read the entire [`faiss-gpu-wheel-reference.md`](./faiss-gpu-wheel-reference.md) and inspect the installed FAISS package at `.venv/lib/python3.13/site-packages/faiss`:
+
+- **Customized wheel** – The repository ships a bespoke `faiss-1.12.0` CUDA 12 wheel with cuVS integration, altered loader behaviour, and environment knobs (`FAISS_OPT_LEVEL`, cuVS toggles). The reference file documents runtime prerequisites, memory pooling, index variants, and known pitfalls not covered by upstream FAISS docs.
+- **Mathematically intensive kernels** – FAISS GPU search relies on optimized L2/IP distance kernels, IVF/PQ quantization, and cuVS acceleration; understanding tiling, batching, and resource heuristics (e.g., `GpuDistanceParams`, `StandardGpuResources`) is essential when tuning performance or diagnosing accuracy/regression issues.
+- **CUDA-specific workflows** – The wheel exposes GPU helper functions (`knn_gpu`, `pairwise_distance_gpu`, `GpuMultipleClonerOptions`) and stream management APIs. Reviewing the actual Python bindings/array wrappers in `.venv/.../faiss` clarifies dtype/layout expectations, memory limits, and error handling paths used by `store.py`.
+- **Operational safety** – Misconfiguring memory pools, replica strategies, or snapshot flows can corrupt indexes or exhaust GPU VRAM. The reference plus source code review equips agents with the guardrails needed to modify HybridSearch responsibly.
+
+The `.venv/.../faiss` package contains SWIG bindings (`swigfaiss.py`), GPU helpers (`gpu_wrappers.py`), class wrappers, contrib modules (Torch utilities, array conversions), and loader logic. Read these modules after the reference to internalize the exposed API surface, dtype requirements, and optional cuVS pathways leveraged by HybridSearch.
 
 # DocsToKG • HybridSearch
 
