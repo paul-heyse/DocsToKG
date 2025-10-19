@@ -2408,6 +2408,11 @@ class ManagedFaissAdapter(DenseVectorStore):
 
         return self._inner.stats()
 
+    def flush_snapshot(self, *, reason: str = "flush") -> None:
+        """Forward snapshot flush requests to the managed store."""
+
+        self._inner.flush_snapshot(reason=reason)
+
     def get_gpu_resources(self) -> Optional["faiss.StandardGpuResources"]:
         """Return GPU resources backing the managed index (if available)."""
 

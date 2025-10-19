@@ -130,6 +130,15 @@ class FaissRouter:
                 payloads.setdefault(namespace, payload)
         return payloads
 
+    def iter_stores(self) -> Sequence[Tuple[str, DenseVectorStore]]:
+        """Return a snapshot of managed stores keyed by namespace."""
+
+        if not self._per_namespace:
+            return [(DEFAULT_NAMESPACE, self._default_store)]
+        with self._lock:
+            items = list(self._stores.items())
+        return items
+
     def restore_all(self, payloads: Mapping[str, bytes]) -> None:
         """Restore stores from serialized payloads."""
 

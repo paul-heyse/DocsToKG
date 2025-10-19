@@ -91,7 +91,8 @@ DenseIndexConfig(
 Set either value to `0` to disable that threshold; when both are `0` the store
 refreshes after every write (legacy behaviour). Operators can still force a
 refresh—use `FaissVectorStore.flush_snapshot()` before shutdown or after
-maintenance windows.
+maintenance windows, though `HybridSearchService.close()` now flushes a final
+snapshot automatically during graceful shutdown.
 
 Observability now reports when snapshots occur: counters
 `faiss_snapshot_refresh_total` and `faiss_snapshot_refresh_skipped` track actual

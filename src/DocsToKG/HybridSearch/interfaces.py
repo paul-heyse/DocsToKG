@@ -195,6 +195,9 @@ class DenseVectorStore(Protocol):
     def restore(self, payload: bytes) -> None:
         """Restore index state from ``payload``."""
 
+    def flush_snapshot(self, *, reason: str = "flush") -> None:
+        """Force a snapshot refresh bypassing throttle safeguards."""
+
     def stats(self) -> Mapping[str, float | str]:
         """Return implementation-defined statistics."""
 
