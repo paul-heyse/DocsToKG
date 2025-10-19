@@ -1389,20 +1389,31 @@ def ensure_vllm(
 
 def _iter_sorted_paths(root: Path, predicate: Callable[[Path], bool]) -> Iterator[Path]:
     """Yield ``Path`` objects that satisfy ``predicate`` in lexicographic order."""
+
+    yield from _iter_directory_files(
+        root,
+        None,
+        exclude=lambda candidate: not predicate(candidate),
+    )
+
+
 def _iter_directory_files(
     root: Path,
-    suffixes: Iterable[str],
+    suffixes: Iterable[str] | None,
     *,
     exclude: Callable[[Path], bool] | None = None,
 ) -> Iterator[Path]:
     """Yield files beneath ``root`` whose suffix is in ``suffixes``.
+
+    When ``suffixes`` is ``None`` all files are considered before applying the
+    optional ``exclude`` predicate.
 
     The traversal is performed in a deterministic, lexicographically sorted
     order while avoiding materialising the full file list in memory. Hidden
     directories are not skipped to maintain parity with ``Path.rglob``.
     """
 
-    normalized_suffixes = {suffix.lower() for suffix in suffixes}
+    normalized_suffixes = None if suffixes is None else {suffix.lower() for suffix in suffixes}
     root = Path(root)
 
     if not root.exists():
@@ -1411,7 +1422,7 @@ def _iter_directory_files(
     if root.is_file():
         candidate = root
         if (
-            candidate.suffix.lower() in normalized_suffixes
+            (normalized_suffixes is None or candidate.suffix.lower() in normalized_suffixes)
             and (exclude is None or not exclude(candidate))
         ):
             yield candidate
@@ -1444,7 +1455,7 @@ def _iter_directory_files(
                 continue
             _enqueue_directory(candidate)
             continue
-        if candidate.suffix.lower() not in normalized_suffixes:
+        if normalized_suffixes is not None and candidate.suffix.lower() not in normalized_suffixes:
             continue
         if exclude is not None and exclude(candidate):
             continue
@@ -1456,26 +1467,6 @@ def iter_pdfs(root: Path) -> Iterator[Path]:
     """Iterate over PDF files beneath ``root`` lazily."""
 
     yield from _iter_directory_files(root, {".pdf"})
-
-
-def list_pdfs(root: Path) -> List[Path]:
-    """Collect PDF files under a directory recursively.
-
-    if root.is_file():
-        if predicate(root):
-            yield root
-        return
-
-    try:
-        entries = sorted(root.iterdir(), key=lambda entry: entry.name)
-    except (FileNotFoundError, NotADirectoryError):
-        return
-
-    for entry in entries:
-        if entry.is_dir():
-            yield from _iter_sorted_paths(entry, predicate)
-        elif predicate(entry):
-            yield entry
 
 
 def _peek_iterable(iterable: Iterable[_T]) -> tuple[Iterator[_T], Optional[_T]]:
@@ -1492,7 +1483,9 @@ def _peek_iterable(iterable: Iterable[_T]) -> tuple[Iterator[_T], Optional[_T]]:
 def list_pdfs(root: Path) -> Iterator[Path]:
     """Iterate over PDF files under *root* in deterministic lexical order."""
 
-    yield from _iter_sorted_paths(root, lambda path: path.is_file() and path.name.endswith(".pdf"))
+    yield from _iter_sorted_paths(
+        root, lambda path: path.is_file() and path.suffix.lower() == ".pdf"
+    )
 
 
 # PDF worker helpers

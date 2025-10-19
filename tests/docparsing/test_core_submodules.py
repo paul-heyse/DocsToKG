@@ -915,6 +915,103 @@ def test_plan_doctags_resume_manifest_missing_hash_skips_hash(
     assert plan["process"]["preview"] == ["doc.html"]
 
 
+def test_plan_doctags_resume_overwrite_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """HTML planner bypasses hashing immediately when overwrite is requested."""
+
+    html_dir = tmp_path / "html"
+    out_dir = tmp_path / "doctags"
+    html_dir.mkdir()
+    out_dir.mkdir()
+
+    html_path = html_dir / "doc.html"
+    html_path.write_text("<html></html>", encoding="utf-8")
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+
+    manifest_index = {"doc.html": {"input_hash": "cached", "status": "success"}}
+
+    def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
+        raise AssertionError("compute_content_hash should not run when overwrite is set")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index",
+        lambda *_args, **_kwargs: manifest_index,
+    )
+
+    plan = plan_doctags(
+        [
+            "--mode",
+            "html",
+            "--in-dir",
+            str(html_dir),
+            "--out-dir",
+            str(out_dir),
+            "--resume",
+            "--overwrite",
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
+
+
+def test_plan_doctags_missing_output_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """DocTags planner avoids hashing when expected outputs are absent."""
+
+    html_dir = tmp_path / "html"
+    out_dir = tmp_path / "doctags"
+    html_dir.mkdir()
+    out_dir.mkdir()
+
+    html_path = html_dir / "doc.html"
+    html_path.write_text("<html></html>", encoding="utf-8")
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+
+    manifest_index = {"doc.html": {"input_hash": "previous", "status": "success"}}
+
+    calls = {"count": 0}
+
+    def _fake_hash(_path: Path, _algorithm: str = "sha256") -> str:
+        calls["count"] += 1
+        return "new"
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash", _fake_hash
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index",
+        lambda *_args, **_kwargs: manifest_index,
+    )
+
+    plan = plan_doctags(
+        [
+            "--mode",
+            "html",
+            "--in-dir",
+            str(html_dir),
+            "--out-dir",
+            str(out_dir),
+            "--resume",
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
+    assert calls["count"] == 0
+
+
 def test_plan_doctags_preview_bounded_for_large_inputs(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

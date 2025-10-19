@@ -192,7 +192,9 @@ class DenseVectorStore(Protocol):
     def serialize(self) -> bytes:
         """Return a serialised representation of the index."""
 
-    def restore(self, payload: bytes) -> None:
+    def restore(
+        self, payload: bytes, *, meta: Optional[Mapping[str, object]] = None
+    ) -> None:
         """Restore index state from ``payload``."""
 
     def flush_snapshot(self, *, reason: str = "flush") -> None:
