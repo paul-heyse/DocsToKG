@@ -302,7 +302,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--log-format",
         choices=["jsonl", "csv"],
         default="jsonl",
-        help="Log format for attempts (default: jsonl).",
+        help=(
+            "Log format for attempts (default: jsonl). Use 'csv' to emit only CSV logs "
+            "alongside SQLite/summary outputs."
+        ),
     )
     parser.add_argument(
         "--log-csv",
