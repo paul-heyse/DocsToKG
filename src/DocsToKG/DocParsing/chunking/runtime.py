@@ -1263,12 +1263,16 @@ def _main_inner(
 
         def iter_chunk_tasks() -> Iterator[ChunkTask]:
             """Generate chunk tasks for processing, respecting resume/force settings."""
-            resume_needs_hash = args.resume and not args.force
+            resume_enabled = bool(args.resume)
+            force_enabled = bool(args.force)
+            resume_needs_hash = resume_enabled and not force_enabled
             for path in files:
                 doc_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
                 name = path.stem
                 input_hash = ""
-                if resume_needs_hash:
+                manifest_entry = resume_controller.entry(doc_id) if resume_enabled else None
+                output_exists = out_path.exists() if resume_enabled else False
+                if resume_needs_hash and manifest_entry and output_exists:
                     input_hash = compute_content_hash(path)
                 parse_engine = parse_engine_lookup.get(doc_id, "docling-html")
                 if doc_id not in parse_engine_lookup:
@@ -1277,7 +1281,7 @@ def _main_inner(
                         extra={"extra_fields": {"doc_id": doc_id}},
                     )
 
-                if resume_needs_hash:
+                if resume_needs_hash and manifest_entry and output_exists:
                     skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
                 else:
                     skip_doc = False
