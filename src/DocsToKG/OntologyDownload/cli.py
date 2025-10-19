@@ -604,7 +604,11 @@ def _resolve_specs_from_args(
                         id=existing.id,
                         resolver=existing.resolver,
                         extras=dict(existing.extras),
-                        target_formats=tuple(existing.target_formats),
+                        target_formats=(
+                            tuple(target_formats)
+                            if target_formats
+                            else tuple(existing.target_formats)
+                        ),
                     )
                 )
             else:

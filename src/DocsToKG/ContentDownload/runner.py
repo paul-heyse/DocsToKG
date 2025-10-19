@@ -11,7 +11,7 @@ import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 import requests
 from pyalex import Works
@@ -73,6 +73,7 @@ class DownloadRunState:
     options: DownloadConfig
     resume_lookup: Mapping[str, Dict[str, Any]]
     resume_completed: Set[str]
+    resume_cleanup: Optional[Callable[[], None]] = field(default=None, repr=False)
     processed: int = 0
     saved: int = 0
     html_only: int = 0
@@ -151,6 +152,9 @@ class DownloadRun:
         if self.state is not None:
             with contextlib.suppress(Exception):
                 self.state.session_factory.close_all()
+            if self.state.resume_cleanup is not None:
+                with contextlib.suppress(Exception):
+                    self.state.resume_cleanup()
 
     def setup_sinks(self, stack: Optional[contextlib.ExitStack] = None) -> MultiSink:
         """Initialise telemetry sinks responsible for manifest and summary data."""
@@ -266,7 +270,7 @@ class DownloadRun:
         sqlite_path = self.resolved.sqlite_path
         if resume_path_raw is not None:
             resume_path = Path(resume_path_raw).expanduser()
-            resume_lookup, resume_completed = self._load_resume_state(resume_path)
+            resume_lookup, resume_completed, resume_cleanup = self._load_resume_state(resume_path)
         else:
             manifest_path = self.resolved.manifest_path
             prefix = f"{manifest_path.name}."
@@ -276,9 +280,9 @@ class DownloadRun:
             )
             sqlite_available = sqlite_path and sqlite_path.exists()
             if manifest_path.exists() or has_rotated or sqlite_available:
-                resume_lookup, resume_completed = self._load_resume_state(manifest_path)
+                resume_lookup, resume_completed, resume_cleanup = self._load_resume_state(manifest_path)
             else:
-                resume_lookup, resume_completed = {}, set()
+                resume_lookup, resume_completed, resume_cleanup = {}, set(), None
         options = DownloadConfig(
             dry_run=self.args.dry_run,
             list_only=self.args.list_only,
@@ -301,11 +305,14 @@ class DownloadRun:
             options=options,
             resume_lookup=resume_lookup,
             resume_completed=resume_completed,
+            resume_cleanup=resume_cleanup,
         )
         self.state = state
         return state
 
-    def _load_resume_state(self, resume_path: Path) -> Tuple[Mapping[str, Dict[str, Any]], Set[str]]:
+    def _load_resume_state(
+        self, resume_path: Path
+    ) -> Tuple[Mapping[str, Dict[str, Any]], Set[str], Optional[Callable[[], None]]]:
         """Load resume metadata from JSON manifests with SQLite fallback."""
 
         resolved_sqlite_path = self.resolved.sqlite_path
@@ -338,20 +345,32 @@ class DownloadRun:
 
         used_sqlite = False
         resume_lookup: Mapping[str, Dict[str, Any]]
+        resume_completed: Set[str]
+        cleanup_callback: Optional[Callable[[], None]] = None
         if sqlite_path and sqlite_path.exists():
             sqlite_lookup = SqliteResumeLookup(sqlite_path)
-            resume_completed = load_resume_completed_from_sqlite(sqlite_path)
-            row_count = len(sqlite_lookup)
-            if row_count == 0 and (resume_path_exists or has_rotated):
-                sqlite_lookup.close()
-                resume_lookup, resume_completed = load_previous_manifest(
-                    resume_path,
-                    sqlite_path=sqlite_path,
-                    allow_sqlite_fallback=True,
-                )
-            else:
-                resume_lookup = sqlite_lookup
-                used_sqlite = True
+            cleanup_callback = getattr(sqlite_lookup, "close", None)
+            try:
+                resume_completed = load_resume_completed_from_sqlite(sqlite_path)
+                row_count = len(sqlite_lookup)
+                if row_count == 0 and (resume_path_exists or has_rotated):
+                    if cleanup_callback is not None:
+                        with contextlib.suppress(Exception):
+                            cleanup_callback()
+                    cleanup_callback = None
+                    resume_lookup, resume_completed = load_previous_manifest(
+                        resume_path,
+                        sqlite_path=sqlite_path,
+                        allow_sqlite_fallback=True,
+                    )
+                else:
+                    resume_lookup = sqlite_lookup
+                    used_sqlite = True
+            except Exception:
+                if cleanup_callback is not None:
+                    with contextlib.suppress(Exception):
+                        cleanup_callback()
+                raise
         else:
             resume_lookup, resume_completed = load_previous_manifest(
                 resume_path,
@@ -379,7 +398,7 @@ class DownloadRun:
                 sqlite_path,
             )
 
-        return resume_lookup, resume_completed
+        return resume_lookup, resume_completed, cleanup_callback
 
     def setup_worker_pool(self) -> ThreadPoolExecutor:
         """Create a thread pool when concurrency is enabled."""

@@ -1565,6 +1565,42 @@ def test_gpu_cosine_against_corpus() -> None:
 # --- test_hybridsearch_gpu_only.py ---
 
 
+@GPU_MARK
+def test_gpu_cosine_helpers_preserve_input_buffers() -> None:
+    xb, _ = _toy_data(n=256)
+    shared_query = xb[0]
+    shared_corpus = xb[:32]
+    query_before = shared_query.copy()
+    corpus_before = shared_corpus.copy()
+    xb_before = xb.copy()
+
+    resources = faiss.StandardGpuResources()
+
+    cosine_against_corpus_gpu(
+        shared_query,
+        shared_corpus,
+        device=_target_device(),
+        resources=resources,
+    )
+
+    assert np.allclose(shared_query, query_before)
+    assert np.allclose(shared_corpus, corpus_before)
+    assert np.allclose(xb, xb_before)
+
+    pairwise_inner_products(
+        shared_corpus,
+        device=_target_device(),
+        resources=resources,
+    )
+
+    assert np.allclose(shared_query, query_before)
+    assert np.allclose(shared_corpus, corpus_before)
+    assert np.allclose(xb, xb_before)
+
+
+# --- test_hybridsearch_gpu_only.py ---
+
+
 def test_gpu_clone_strict_coarse_quantizer() -> None:
     cfg = DenseIndexConfig(
         index_type="flat",
