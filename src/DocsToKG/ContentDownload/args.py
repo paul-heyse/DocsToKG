@@ -549,30 +549,16 @@ def resolve_config(
     sqlite_path = manifest_path.with_suffix(".sqlite3")
 
     previous_url_index = ManifestUrlIndex(sqlite_path, eager=args.warm_manifest_cache)
-    persistent_seen_urls: Set[str] = set()
-    if getattr(config, "enable_global_url_dedup", True):
-        allowed_classifications = {
-            Classification.PDF.value,
-            Classification.CACHED.value,
-            Classification.XML.value,
+    persistent_seen_urls: Set[str]
+    if config.enable_global_url_dedup:
+        persistent_seen_urls = {
+            url
+            for url, meta in previous_url_index.iter_existing_paths()
+            if str(meta.get("classification", "")).lower()
+            in {Classification.PDF.value, Classification.CACHED.value, Classification.XML.value}
         }
-        cap = getattr(args, "global_url_dedup_cap", 0) or 0
-        truncated = False
-        for url, meta in previous_url_index.iter_existing_paths():
-            classification = str(meta.get("classification", "")).strip().lower()
-            if classification in allowed_classifications:
-                before = len(persistent_seen_urls)
-                persistent_seen_urls.add(url)
-                if cap and len(persistent_seen_urls) >= cap and len(persistent_seen_urls) != before:
-                    truncated = True
-                    break
-        if truncated:
-            LOGGER.info(
-                "Hydrated %s persistent URLs for dedupe (cap=%s). Remaining manifest entries "
-                "were skipped; increase --global-url-dedup-cap to hydrate more.",
-                len(persistent_seen_urls),
-                cap,
-            )
+    else:
+        persistent_seen_urls = set()
 
     robots_checker: Optional[RobotsCache] = None
     if not args.ignore_robots:
