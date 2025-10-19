@@ -38,12 +38,16 @@ Usage:
 """
 
 import json
+import os
+from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
+from DocsToKG.OntologyDownload import logging_utils as logging_utils_mod
 from DocsToKG.OntologyDownload.io import mask_sensitive_data
 from DocsToKG.OntologyDownload.logging_utils import setup_logging
 from DocsToKG.OntologyDownload.settings import LoggingConfiguration
@@ -115,3 +119,81 @@ def test_setup_logging_emits_structured_json(tmp_path):
         for handler in list(logger.handlers):
             handler.close()
             logger.removeHandler(handler)
+
+
+def _get_file_handler(logger):
+    for handler in logger.handlers:
+        if hasattr(handler, "baseFilename"):
+            return handler
+    raise AssertionError("expected a file handler")
+
+
+def _cleanup_logger(logger):
+    for handler in list(logger.handlers):
+        handler.close()
+        logger.removeHandler(handler)
+
+
+@contextmanager
+def temporary_env(**overrides):
+    previous = {}
+    try:
+        for key, value in overrides.items():
+            previous[key] = os.environ.get(key)
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        yield
+    finally:
+        for key, old in previous.items():
+            if old is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old
+
+
+@contextmanager
+def temporary_attr(module, name, value):
+    sentinel = object()
+    previous = getattr(module, name, sentinel)
+    setattr(module, name, value)
+    try:
+        yield
+    finally:
+        if previous is sentinel:
+            delattr(module, name)
+        else:
+            setattr(module, name, previous)
+
+
+def test_setup_logging_uses_env_dir_when_provided(ontology_env):
+    custom_dir = ontology_env.root / "custom"
+    with temporary_env(ONTOFETCH_LOG_DIR=f"  {custom_dir}  "):
+        logger = setup_logging(level="INFO", retention_days=1, max_log_size_mb=1)
+    try:
+        file_handler = _get_file_handler(logger)
+        assert Path(file_handler.baseFilename).parent == custom_dir
+    finally:
+        _cleanup_logger(logger)
+
+
+def test_setup_logging_falls_back_when_env_blank(ontology_env):
+    with temporary_env(ONTOFETCH_LOG_DIR="   "):
+        logger = setup_logging(level="INFO", retention_days=1, max_log_size_mb=1)
+    try:
+        file_handler = _get_file_handler(logger)
+        assert Path(file_handler.baseFilename).parent == ontology_env.log_dir
+    finally:
+        _cleanup_logger(logger)
+
+
+def test_setup_logging_falls_back_when_env_missing(ontology_env):
+    with temporary_env(ONTOFETCH_LOG_DIR=None):
+        with temporary_attr(logging_utils_mod, "LOG_DIR", ontology_env.log_dir):
+            logger = setup_logging(level="INFO", retention_days=1, max_log_size_mb=1)
+    try:
+        file_handler = _get_file_handler(logger)
+        assert Path(file_handler.baseFilename).parent == ontology_env.log_dir
+    finally:
+        _cleanup_logger(logger)
