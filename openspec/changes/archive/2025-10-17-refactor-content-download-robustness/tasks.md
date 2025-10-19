@@ -204,7 +204,7 @@
 ### 6.1 Add Staging Directory Mode
 
 - [x] 6.1.1 Add `--staging` boolean CLI flag with help text explaining timestamped run directories
-- [x] 6.1.2 When enabled, compute run directory as `args.out / datetime.now(UTC).strftime("%Y%m%d_%H%M")`
+- [x] 6.1.2 When enabled, compute run directory as `args.out / datetime.now(UTC).strftime("%Y%m%d_%H%M%S")`
 - [x] 6.1.3 Set `pdf_dir = run_dir / "PDF"` and `html_dir = run_dir / "HTML"`
 - [x] 6.1.4 Set `manifest_path = run_dir / "manifest.jsonl"`
 - [x] 6.1.5 Ensure `ensure_dir()` creates run directory structure before downloads begin

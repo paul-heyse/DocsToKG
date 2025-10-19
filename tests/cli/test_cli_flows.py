@@ -538,7 +538,7 @@ def test_main_with_staging_creates_timestamped_directories(download_modules, pat
     patcher.setattr("DocsToKG.ContentDownload.resolvers.default_resolvers", lambda: [])
     patcher.setattr("DocsToKG.ContentDownload.args.default_resolvers", lambda: [])
 
-    run_dir = base_out / fixed_timestamp.strftime("%Y%m%d_%H%M")
+    run_dir = base_out / fixed_timestamp.strftime("%Y%m%d_%H%M%S")
     pdf_path = run_dir / "PDF" / "out.pdf"
 
     outcome = resolvers.DownloadOutcome(
