@@ -17,6 +17,7 @@ Raises:
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import io
 import json
@@ -24,6 +25,7 @@ import logging
 import os
 import shutil
 import sqlite3
+import tempfile
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -34,6 +36,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
+    FrozenSet,
     Iterable,
     Iterator,
     List,
@@ -1686,6 +1689,7 @@ def iter_previous_manifest_entries(
     *,
     sqlite_path: Optional[Path] = None,
     allow_sqlite_fallback: bool = False,
+    buffer_entries: bool = True,
 ) -> Iterator[Tuple[str, str, Dict[str, Any], bool]]:
     """Yield resume manifest entries lazily, preferring SQLite when available."""
 
@@ -1751,7 +1755,7 @@ def iter_previous_manifest_entries(
 
     for file_path in ordered_files:
         line_number: Optional[int] = None
-        buffered: List[Tuple[str, str, Dict[str, Any], bool]] = []
+        buffered: Optional[List[Tuple[str, str, Dict[str, Any], bool]]] = [] if buffer_entries else None
         try:
             with file_path.open("r", encoding="utf-8") as handle:
                 for line_number, raw in enumerate(handle, start=1):
@@ -1841,7 +1845,12 @@ def iter_previous_manifest_entries(
                             data["reason_detail"] = None
 
                     normalized = data["normalized_url"]
-                    buffered.append((str(work_id), normalized, data, completed))
+                    record = (str(work_id), normalized, data, completed)
+                    if buffered is not None:
+                        buffered.append(record)
+                    else:
+                        yielded_any = True
+                        yield record
         except Exception as exc:
             location = f"{file_path}:{line_number}" if line_number is not None else str(file_path)
             if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
@@ -1855,9 +1864,10 @@ def iter_previous_manifest_entries(
                 return
             raise ValueError(f"Failed to parse resume manifest at {location}: {exc}") from exc
 
-        for item in buffered:
-            yielded_any = True
-            yield item
+        if buffered is not None:
+            for item in buffered:
+                yielded_any = True
+                yield item
 
     if not yielded_any and allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
         logger.warning(
@@ -1889,6 +1899,226 @@ def load_previous_manifest(
             completed.add(work_id)
 
     return per_work, completed
+
+
+class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
+    """Lazy resume mapping backed by a temporary SQLite index built from JSONL."""
+
+    def __init__(self, path: Path) -> None:
+        if not path:
+            raise ValueError("Resume manifest path is required for JsonlResumeLookup")
+        self._path = path
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._missing: Set[str] = set()
+        self._lock = threading.Lock()
+        self._closed = False
+        self._tempdir = Path(tempfile.mkdtemp(prefix="docs_resume_jsonl_"))
+        self._db_path = self._tempdir / "resume.sqlite3"
+        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        self._initialise_schema()
+        self._completed_ids: FrozenSet[str] = frozenset()
+        self._preload_on_close = False
+        try:
+            self._populate_from_jsonl()
+        except Exception:
+            with contextlib.suppress(Exception):
+                self.close()
+            raise
+
+    def _initialise_schema(self) -> None:
+        with self._conn:
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS entries (
+                    work_id TEXT NOT NULL,
+                    normalized_url TEXT NOT NULL,
+                    entry_json TEXT NOT NULL,
+                    PRIMARY KEY (work_id, normalized_url)
+                )
+                """
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS entries_work_id_idx ON entries (work_id)"
+            )
+
+    def _populate_from_jsonl(self) -> None:
+        completed: Set[str] = set()
+        cursor = self._conn.cursor()
+        for work_id, normalized, entry, is_pdf_like in iter_previous_manifest_entries(
+            self._path,
+            allow_sqlite_fallback=False,
+            buffer_entries=False,
+        ):
+            payload = json.dumps(entry, ensure_ascii=False, separators=(",", ":"))
+            cursor.execute(
+                "INSERT OR REPLACE INTO entries (work_id, normalized_url, entry_json) VALUES (?, ?, ?)",
+                (work_id, normalized, payload),
+            )
+            if is_pdf_like:
+                completed.add(work_id)
+        self._conn.commit()
+        self._completed_ids = frozenset(completed)
+
+    @property
+    def completed_work_ids(self) -> FrozenSet[str]:
+        """Return work identifiers that completed successfully in the manifest."""
+
+        return self._completed_ids
+
+    def close(self) -> None:
+        """Close the temporary SQLite database and clean up resources."""
+
+        with self._lock:
+            if self._closed:
+                return
+            if self._preload_on_close:
+                self._preload_all_entries_unlocked()
+                self._preload_on_close = False
+            self._closed = True
+            with contextlib.suppress(Exception):
+                self._conn.close()
+        with contextlib.suppress(Exception):
+            shutil.rmtree(self._tempdir)
+
+    def __getitem__(self, key: str) -> Dict[str, Any]:
+        lookup_key = str(key)
+        if lookup_key in self._cache:
+            return self._cache[lookup_key]
+        if lookup_key in self._missing:
+            raise KeyError(lookup_key)
+        rows: Tuple[Tuple[Any, Any], ...]
+        with self._lock:
+            if self._closed:
+                rows = tuple()
+            else:
+                try:
+                    cursor = self._conn.execute(
+                        "SELECT normalized_url, entry_json FROM entries WHERE work_id = ?",
+                        (lookup_key,),
+                    )
+                except sqlite3.OperationalError:
+                    rows = tuple()
+                else:
+                    rows = tuple(cursor)
+        if not rows:
+            self._missing.add(lookup_key)
+            raise KeyError(lookup_key)
+        entries: Dict[str, Dict[str, Any]] = {}
+        for normalized_url, entry_json in rows:
+            if not normalized_url:
+                continue
+            try:
+                entry = json.loads(entry_json)
+            except json.JSONDecodeError:
+                continue
+            entries[str(normalized_url)] = entry
+        if not entries:
+            self._missing.add(lookup_key)
+            raise KeyError(lookup_key)
+        self._cache[lookup_key] = entries
+        return entries
+
+    def __iter__(self) -> Iterator[str]:
+        seen: Set[str] = set(self._cache.keys())
+        for key in seen:
+            yield key
+        rows: Tuple[str, ...]
+        with self._lock:
+            if self._closed:
+                rows = tuple()
+            else:
+                try:
+                    cursor = self._conn.execute(
+                        "SELECT DISTINCT work_id FROM entries ORDER BY work_id"
+                    )
+                except sqlite3.OperationalError:
+                    rows = tuple()
+                else:
+                    rows = tuple(str(row[0]) for row in cursor if row and row[0])
+        for key in rows:
+            if key not in seen:
+                seen.add(key)
+                yield key
+
+    def __len__(self) -> int:
+        with self._lock:
+            if self._closed:
+                return len(self._cache)
+            try:
+                row = self._conn.execute(
+                    "SELECT COUNT(DISTINCT work_id) FROM entries"
+                ).fetchone()
+            except sqlite3.OperationalError:
+                return len(self._cache)
+        total = int(row[0]) if row and row[0] is not None else 0
+        return max(total, len(self._cache))
+
+    def __contains__(self, key: object) -> bool:  # type: ignore[override]
+        lookup_key = str(key)
+        if lookup_key in self._cache:
+            return True
+        if lookup_key in self._missing:
+            return False
+        rows: Tuple[Tuple[Any, Any], ...]
+        with self._lock:
+            if self._closed:
+                rows = tuple()
+            else:
+                try:
+                    cursor = self._conn.execute(
+                        "SELECT 1 FROM entries WHERE work_id = ? LIMIT 1",
+                        (lookup_key,),
+                    )
+                except sqlite3.OperationalError:
+                    rows = tuple()
+                else:
+                    rows = tuple(cursor)
+        if not rows:
+            self._missing.add(lookup_key)
+            return False
+        return True
+
+    def get(self, key: str, default: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def enable_preload_on_close(self) -> None:
+        """Load all entries into memory when :meth:`close` is invoked."""
+
+        self._preload_on_close = True
+
+    def preload_all_entries(self) -> None:
+        """Populate the in-memory cache with every manifest entry."""
+
+        with self._lock:
+            self._preload_all_entries_unlocked()
+
+    def _preload_all_entries_unlocked(self) -> None:
+        if self._closed:
+            return
+        try:
+            cursor = self._conn.execute(
+                "SELECT work_id, normalized_url, entry_json FROM entries ORDER BY work_id"
+            )
+        except sqlite3.OperationalError:
+            return
+        for work_id, normalized_url, entry_json in cursor:
+            if not work_id or not normalized_url:
+                continue
+            try:
+                entry = json.loads(entry_json)
+            except json.JSONDecodeError:
+                continue
+            work_key = str(work_id)
+            url_key = str(normalized_url)
+            per_work = self._cache.setdefault(work_key, {})
+            per_work[url_key] = entry
+
+    def __del__(self) -> None:  # pragma: no cover - defensive cleanup
+        with contextlib.suppress(Exception):
+            self.close()
 
 
 class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
@@ -2265,5 +2495,6 @@ __all__ = [
     "load_resume_completed_from_sqlite",
     "load_previous_manifest",
     "load_manifest_url_index",
+    "JsonlResumeLookup",
     "SqliteResumeLookup",
 ]

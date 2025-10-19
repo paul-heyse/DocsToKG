@@ -6,7 +6,7 @@ import logging
 import sys
 import types
 from pathlib import Path
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, Optional
 
 import pytest
 
@@ -140,7 +140,12 @@ def test_manifest_stage_normalization(monkeypatch: pytest.MonkeyPatch, tmp_path:
 
     observed: dict[str, Any] = {}
 
-    def fake_iter_manifest_entries(stages: list[str], data_root: Path):
+    def fake_iter_manifest_entries(
+        stages: list[str],
+        data_root: Path,
+        *,
+        limit: Optional[int] = None,
+    ):
         observed["stages"] = stages
         observed["data_root"] = data_root
         return _iter_stub(stages)
@@ -251,7 +256,12 @@ def test_manifest_default_includes_discovered_stage(
 
     observed: dict[str, Any] = {}
 
-    def fake_iter_manifest_entries(stages: list[str], data_root: Path):
+    def fake_iter_manifest_entries(
+        stages: list[str],
+        data_root: Path,
+        *,
+        limit: Optional[int] = None,
+    ):
         observed["stages"] = stages
         observed["data_root"] = data_root
         return _iter_stub(stages)
@@ -294,7 +304,12 @@ def test_manifest_accepts_discovered_stage_filter(
 
     observed: dict[str, Any] = {}
 
-    def fake_iter_manifest_entries(stages: list[str], data_root: Path):
+    def fake_iter_manifest_entries(
+        stages: list[str],
+        data_root: Path,
+        *,
+        limit: Optional[int] = None,
+    ):
         observed["stages"] = stages
         observed["data_root"] = data_root
         return _iter_stub(stages)
