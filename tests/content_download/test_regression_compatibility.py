@@ -183,6 +183,17 @@ def test_load_previous_manifest_rejects_mismatched_schema_version(tmp_path: Path
         downloader.load_previous_manifest(manifest_path)
 
 
+def test_load_previous_manifest_missing_file(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "resume.jsonl"
+
+    with pytest.raises(ValueError) as excinfo:
+        downloader.load_previous_manifest(manifest_path)
+
+    message = str(excinfo.value)
+    assert str(manifest_path) in message
+    assert "--resume-from" in message
+
+
 def test_load_resolver_config_rejects_legacy_rate_limits(tmp_path: Path):
     config_payload: Dict[str, object] = {
         "resolver_rate_limits": {"example.org": 0.75},

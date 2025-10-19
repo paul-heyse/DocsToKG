@@ -1381,7 +1381,14 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
         ordered_files.append(path)
 
     if not ordered_files:
-        return per_work, completed
+        file_error = FileNotFoundError(
+            f"No manifest files found for resume path {path!s}"
+        )
+        raise ValueError(
+            "Resume manifest '{path}' does not exist and no rotated segments were found. "
+            "Double-check the --resume-from path or omit it to start a fresh run."
+            .format(path=path)
+        ) from file_error
 
     for file_path in ordered_files:
         with file_path.open("r", encoding="utf-8") as handle:

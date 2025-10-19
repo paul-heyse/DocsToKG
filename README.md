@@ -154,7 +154,9 @@ back to the original ``GET`` attempt to avoid false negatives.
 ### 5.4 Additional CLI Flags
 
 - ``--dry-run``: compute resolver coverage without writing files.
-- ``--resume-from <manifest.jsonl>``: skip works already recorded as successful.
+- ``--resume-from <manifest.jsonl>``: skip works already recorded as successful. If the
+  manifest path is wrong or missing, the downloader now fails fast with a clear
+  error so you can fix the flag before rerunning.
 - ``--extract-text=html``: save plaintext alongside HTML fallbacks (requires ``trafilatura``).
 - ``--enable-resolver openaire`` (and ``hal``/``osf``): opt into additional EU/preprint resolvers.
 - ``--resolver-config config.yaml``: load advanced options such as
