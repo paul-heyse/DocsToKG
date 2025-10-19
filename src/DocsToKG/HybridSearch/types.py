@@ -10,6 +10,12 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "embeddingproxy",
+#       "name": "EmbeddingProxy",
+#       "anchor": "class-embeddingproxy",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "chunkfeatures",
 #       "name": "ChunkFeatures",
 #       "anchor": "class-chunkfeatures",
@@ -89,7 +95,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import Any, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -101,6 +107,7 @@ from numpy.typing import NDArray
 # add UUID→int helpers here; see DocsToKG.HybridSearch.store for details.
 __all__ = (
     "ChunkFeatures",
+    "EmbeddingProxy",
     "ChunkPayload",
     "DocumentInput",
     "FusionCandidate",
@@ -152,6 +159,27 @@ class DocumentInput:
 
 
 @dataclass(slots=True)
+class EmbeddingProxy:
+    """Lightweight placeholder signalling that an embedding lives in FAISS."""
+
+    vector_id: str
+
+    def __array__(self, dtype: Optional[np.dtype] = None) -> np.ndarray:  # pragma: no cover - defensive
+        raise TypeError(
+            "EmbeddingProxy does not expose array semantics; request reconstructions "
+            "via ChunkRegistry.resolve_embedding"
+        )
+
+    def astype(self, *_: object, **__: object) -> np.ndarray:  # pragma: no cover - defensive
+        raise TypeError(
+            "EmbeddingProxy cannot be cast directly; resolve the embedding from the registry"
+        )
+
+
+EmbeddingLike = Union[NDArray[np.float32], EmbeddingProxy]
+
+
+@dataclass(slots=True)
 class ChunkFeatures:
     """Sparse and dense features computed for a document chunk.
 
@@ -174,7 +202,7 @@ class ChunkFeatures:
 
     bm25_terms: Mapping[str, float]
     splade_weights: Mapping[str, float]
-    embedding: NDArray[np.float32]
+    embedding: EmbeddingLike
 
     def copy(self) -> "ChunkFeatures":
         """Create a deep copy of the chunk features.
@@ -193,10 +221,15 @@ class ChunkFeatures:
             >>> copy = original.copy()
             >>> # Modifications to copy won't affect original
         """
+        embedding = self.embedding
+        if isinstance(embedding, np.ndarray):
+            embedding_copy: EmbeddingLike = embedding.copy()
+        else:
+            embedding_copy = embedding
         return ChunkFeatures(
             dict(self.bm25_terms),
             dict(self.splade_weights),
-            self.embedding.copy(),
+            embedding_copy,
         )
 
 

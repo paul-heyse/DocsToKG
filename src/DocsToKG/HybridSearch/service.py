@@ -472,6 +472,7 @@ class ResultShaper:
         channel_weights: Optional[Mapping[str, float]] = None,
         fp16_enabled: bool = False,
         cuvs_requested: Optional[bool] = None,
+        registry: Optional[ChunkRegistry] = None,
     ) -> None:
         self._opensearch = opensearch
         self._fusion_config = fusion_config
@@ -480,6 +481,7 @@ class ResultShaper:
         self._channel_weights = dict(channel_weights or {})
         self._fp16_enabled = bool(fp16_enabled)
         self._use_cuvs = cuvs_requested
+        self._registry = registry
 
     def shape(
         self,
@@ -508,14 +510,13 @@ class ResultShaper:
         if precomputed_embeddings is not None:
             embeddings = np.ascontiguousarray(precomputed_embeddings, dtype=np.float32)
         else:
-            embeddings = np.ascontiguousarray(
-                np.stack(
-                    [
-                        chunk.features.embedding.astype(np.float32, copy=False)
-                        for chunk in ordered_chunks
-                    ]
-                ),
-                dtype=np.float32,
+            if self._registry is None:
+                raise RuntimeError(
+                    "ResultShaper requires a registry to reconstruct embeddings when "
+                    "precomputed embeddings are not supplied"
+                )
+            embeddings = self._registry.resolve_embeddings(
+                [chunk.vector_id for chunk in ordered_chunks]
             )
 
         doc_buckets: Dict[str, int] = defaultdict(int)
@@ -624,6 +625,7 @@ def apply_mmr_diversification(
     use_fp16: bool = False,
     block_rows: int = 4096,
     use_cuvs: Optional[bool] = None,
+    registry: Optional[ChunkRegistry] = None,
 ) -> List[FusionCandidate]:
     """Diversify fused candidates using Maximum Marginal Relevance.
 
@@ -649,11 +651,12 @@ def apply_mmr_diversification(
         return []
 
     if embeddings is None:
-        embeddings = np.stack(
-            [
-                candidate.chunk.features.embedding.astype(np.float32, copy=False)
-                for candidate in fused_candidates
-            ]
+        if registry is None:
+            raise ValueError(
+                "apply_mmr_diversification requires either precomputed embeddings or a registry"
+            )
+        embeddings = registry.resolve_embeddings(
+            [candidate.chunk.vector_id for candidate in fused_candidates]
         )
     else:
         embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
@@ -976,8 +979,9 @@ class HybridSearchService:
                 cached = embedding_cache.get(vector_id)
                 if cached is not None:
                     return cached
-                embedding = candidate.chunk.features.embedding.astype(np.float32, copy=False)
-                embedding_cache[vector_id] = embedding
+                embedding = self._registry.resolve_embedding(
+                    vector_id, cache=embedding_cache
+                )
                 return embedding
 
             raw_weights = getattr(config.fusion, "channel_weights", None)
@@ -1044,6 +1048,7 @@ class HybridSearchService:
                     resources=resources,
                     use_fp16=fp16_enabled,
                     use_cuvs=cuvs_requested,
+                    registry=self._registry,
                 )
                 selected_ids = {candidate.chunk.vector_id for candidate in selected}
                 pool_remaining = [
@@ -1101,6 +1106,7 @@ class HybridSearchService:
                 channel_weights=adaptive_weights,
                 fp16_enabled=fp16_hint,
                 cuvs_requested=cuvs_requested,
+                registry=self._registry,
             )
             shaped = shaper.shape(
                 ordered_chunks,
@@ -1507,6 +1513,7 @@ class HybridSearchService:
             candidates: List[FusionCandidate] = []
             scores: Dict[str, float] = {}
             embedding_rows: List[np.ndarray] = []
+            embedding_cache_local: Dict[str, np.ndarray] = {}
             for idx, hit in enumerate(filtered):
                 chunk = payloads.get(hit.vector_id)
                 if chunk is None:
@@ -1515,7 +1522,11 @@ class HybridSearchService:
                     FusionCandidate(source="dense", score=hit.score, chunk=chunk, rank=idx + 1)
                 )
                 scores[hit.vector_id] = hit.score
-                embedding_rows.append(chunk.features.embedding.astype(np.float32, copy=False))
+                embedding_rows.append(
+                    self._registry.resolve_embedding(
+                        chunk.vector_id, cache=embedding_cache_local
+                    )
+                )
             if embedding_rows:
                 embedding_matrix = np.ascontiguousarray(np.stack(embedding_rows), dtype=np.float32)
             else:
@@ -1615,6 +1626,7 @@ class HybridSearchService:
         candidates: List[FusionCandidate] = []
         scores: Dict[str, float] = {}
         embedding_rows: List[np.ndarray] = []
+        embedding_cache_local: Dict[str, np.ndarray] = {}
         for idx, hit in enumerate(filtered):
             chunk = payloads.get(hit.vector_id)
             if chunk is None:
@@ -1623,7 +1635,11 @@ class HybridSearchService:
                 FusionCandidate(source="dense", score=hit.score, chunk=chunk, rank=idx + 1)
             )
             scores[hit.vector_id] = hit.score
-            embedding_rows.append(chunk.features.embedding.astype(np.float32, copy=False))
+            embedding_rows.append(
+                self._registry.resolve_embedding(
+                    chunk.vector_id, cache=embedding_cache_local
+                )
+            )
         embedding_matrix: Optional[np.ndarray]
         if embedding_rows:
             embedding_matrix = np.ascontiguousarray(np.stack(embedding_rows), dtype=np.float32)
@@ -2157,8 +2173,18 @@ class HybridSearchValidator:
             ValidationReport describing integrity checks for ingested chunks.
         """
         all_chunks = self._registry.all()
-        ok = all(len(chunk.features.embedding.shape) == 1 for chunk in all_chunks)
-        details = {"total_chunks": len(all_chunks)}
+        vector_ids = [chunk.vector_id for chunk in all_chunks]
+        ok = True
+        dim = 0
+        if vector_ids:
+            try:
+                reconstructed = self._registry.resolve_embeddings(vector_ids)
+            except Exception:
+                ok = False
+            else:
+                ok = reconstructed.ndim == 2 and reconstructed.shape[0] == len(vector_ids)
+                dim = int(reconstructed.shape[1]) if reconstructed.ndim == 2 else 0
+        details = {"total_chunks": len(all_chunks), "embedding_dim": dim}
         return ValidationReport(name="ingest_integrity", passed=ok, details=details)
 
     def _check_dense_self_hit(self) -> ValidationReport:
@@ -2172,9 +2198,13 @@ class HybridSearchValidator:
         """
         total = 0
         hits_met = 0
+        embedding_cache: Dict[str, np.ndarray] = {}
         for chunk in self._registry.all():
             total += 1
-            hits = self._ingestion.faiss_index.search(chunk.features.embedding, 1)
+            query_vector = self._registry.resolve_embedding(
+                chunk.vector_id, cache=embedding_cache
+            )
+            hits = self._ingestion.faiss_index.search(query_vector, 1)
             if hits and hits[0].vector_id == chunk.vector_id:
                 hits_met += 1
         rate = hits_met / total if total else 0.0
@@ -2456,8 +2486,11 @@ class HybridSearchValidator:
         namespaces = sorted({doc.namespace for doc in documents})
         dims: set[int] = set()
         invalid_vectors = 0
+        embedding_cache: Dict[str, np.ndarray] = {}
         for chunk in self._registry.all():
-            vector = chunk.features.embedding
+            vector = self._registry.resolve_embedding(
+                chunk.vector_id, cache=embedding_cache
+            )
             dims.add(vector.shape[0])
             if not np.isfinite(vector).all():
                 invalid_vectors += 1
@@ -2591,10 +2624,12 @@ class HybridSearchValidator:
         recalls: List[float] = []
 
         # Precompute matrix for brute-force recall estimates.
-        vector_matrix = np.ascontiguousarray(
-            np.stack([chunk.features.embedding for chunk in all_chunks], dtype=np.float32)
-        )
         vector_ids = [chunk.vector_id for chunk in all_chunks]
+        vector_matrix = self._registry.resolve_embeddings(vector_ids)
+        vector_lookup = {
+            vector_id: vector_matrix[idx]
+            for idx, vector_id in enumerate(vector_ids)
+        }
         try:
             adapter_stats = self._ingestion.faiss_index.adapter_stats  # type: ignore[attr-defined]
         except AttributeError:
@@ -2616,7 +2651,7 @@ class HybridSearchValidator:
         noise_rng = np.random.default_rng(2024)
 
         for chunk in sampled_chunks:
-            query_vec = chunk.features.embedding
+            query_vec = vector_lookup[chunk.vector_id]
             hits = self._ingestion.faiss_index.search(query_vec, top_k)
             retrieved_ids = [hit.vector_id for hit in hits]
             if retrieved_ids and retrieved_ids[0] == chunk.vector_id:
@@ -2712,8 +2747,13 @@ class HybridSearchValidator:
         rrf_ranks: List[int] = []
 
         doc_to_embedding: Dict[str, np.ndarray] = {}
-        for chunk in self._registry.all():
-            doc_to_embedding.setdefault(chunk.doc_id, chunk.features.embedding)
+        registry_chunks = self._registry.all()
+        if registry_chunks:
+            vectors = self._registry.resolve_embeddings(
+                [chunk.vector_id for chunk in registry_chunks]
+            )
+            for chunk, vector in zip(registry_chunks, vectors):
+                doc_to_embedding.setdefault(chunk.doc_id, vector)
 
         for document_payload, query_payload in sampled_pairs:
             expected_doc_id = str(
@@ -2956,6 +2996,7 @@ class HybridSearchValidator:
         doc_limit_violations = 0
         dedupe_violations = 0
         highlight_missing = 0
+        embedding_cache: Dict[str, np.ndarray] = {}
 
         for _, query_payload in sampled_pairs:
             request = self._request_for_query(query_payload, page_size=20)
@@ -2967,7 +3008,11 @@ class HybridSearchValidator:
                 doc_counts[result.doc_id] = doc_counts.get(result.doc_id, 0) + 1
                 chunk = chunk_lookup.get((result.doc_id, result.chunk_id))
                 if chunk is not None:
-                    embeddings.append(chunk.features.embedding)
+                    embeddings.append(
+                        self._registry.resolve_embedding(
+                            chunk.vector_id, cache=embedding_cache
+                        )
+                    )
                 if not result.highlights:
                     highlight_missing += 1
 
@@ -3202,9 +3247,13 @@ class HybridSearchValidator:
         total_chunks = max(1, self._registry.count())
         for oversample in oversamples:
             hits = 0
+            embedding_cache: Dict[str, np.ndarray] = {}
             for chunk in self._registry.all():
                 top_k = max(1, oversample * 3)
-                search_hits = self._ingestion.faiss_index.search(chunk.features.embedding, top_k)
+                query_vector = self._registry.resolve_embedding(
+                    chunk.vector_id, cache=embedding_cache
+                )
+                search_hits = self._ingestion.faiss_index.search(query_vector, top_k)
                 if search_hits and search_hits[0].vector_id == chunk.vector_id:
                     hits += 1
             accuracy = hits / total_chunks
@@ -3231,11 +3280,14 @@ class HybridSearchValidator:
             List of embedding vectors associated with the results.
         """
         embeddings: List[np.ndarray] = []
+        cache: Dict[str, np.ndarray] = {}
         for result in results[:limit]:
             chunk = chunk_lookup.get((result.doc_id, result.chunk_id))
             if chunk is None:
                 continue
-            embeddings.append(chunk.features.embedding)
+            embeddings.append(
+                self._registry.resolve_embedding(chunk.vector_id, cache=cache)
+            )
         return embeddings
 
     def _average_pairwise_cos(self, embeddings: Sequence[np.ndarray]) -> float:

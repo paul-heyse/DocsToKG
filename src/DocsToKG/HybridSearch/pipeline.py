@@ -440,6 +440,9 @@ class ChunkIngestionPipeline:
         self._metrics = IngestMetrics()
         self._observability = observability or Observability()
         self._faiss.set_id_resolver(self._registry.resolve_faiss_id)
+        attach = getattr(self._registry, "attach_dense_store", None)
+        if callable(attach):
+            attach(self._faiss)
 
     @property
     def metrics(self) -> IngestMetrics:
@@ -584,7 +587,17 @@ class ChunkIngestionPipeline:
             i += 1
         if not reservoir:
             return [chunk.features.embedding for chunk in new_chunks]
-        return [chunk.features.embedding for chunk in reservoir]
+
+        cache: Dict[str, np.ndarray] = {}
+        for chunk in reservoir:
+            embedding = chunk.features.embedding
+            if isinstance(embedding, np.ndarray):
+                cache[chunk.vector_id] = np.asarray(embedding, dtype=np.float32)
+
+        matrix = self._registry.resolve_embeddings(
+            [chunk.vector_id for chunk in reservoir], cache=cache
+        )
+        return [row for row in matrix]
 
     def _load_precomputed_chunks(self, document: DocumentInput) -> List[ChunkPayload]:
         """Load chunk and vector artifacts from disk for a document.
