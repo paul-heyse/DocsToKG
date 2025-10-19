@@ -21,12 +21,12 @@ from typing import TYPE_CHECKING, Iterable
 
 import requests as _requests
 
+from . import base as resolver_base
 from .base import (
     RegisteredResolver,
     ResolverEvent,
     ResolverEventReason,
     ResolverResult,
-    request_with_retries,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -80,7 +80,7 @@ class WaybackResolver(RegisteredResolver):
 
         for original in artifact.failed_pdf_urls:
             try:
-                resp = request_with_retries(
+                resp = resolver_base.request_with_retries(
                     session,
                     "get",
                     "https://archive.org/wayback/available",

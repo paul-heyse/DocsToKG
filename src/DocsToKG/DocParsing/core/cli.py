@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import builtins
 import json
 import sys
+import textwrap
 from collections import Counter, defaultdict, deque
 from pathlib import Path
 from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
@@ -34,6 +36,28 @@ from .cli_utils import (
 from .planning import display_plan, plan_chunk, plan_doctags, plan_embed
 
 CommandHandler = Callable[[Sequence[str]], int]
+
+
+class _ManifestHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
+    """Help formatter that avoids hyphenated aliases being split across lines."""
+
+    def __init__(self, prog: str) -> None:
+        """Initialise the formatter with a wider wrap to keep alias names intact."""
+
+        super().__init__(prog, width=120)
+
+    def _split_lines(self, text: str, width: int) -> list[str]:
+        """Wrap help text without breaking on intra-stage hyphens."""
+
+        lines: list[str] = []
+        for paragraph in text.splitlines():
+            normalized = self._whitespace_matcher.sub(" ", paragraph).strip()
+            if not normalized:
+                lines.append("")
+                continue
+            wrapper = textwrap.TextWrapper(width=width, break_on_hyphens=False)
+            lines.extend(wrapper.wrap(normalized))
+        return lines
 
 # NOTE: ``known_stages`` MUST remain in sync with the manifest filenames under
 # ``Data/Manifests``. The values are derived from the canonical filenames to
@@ -118,16 +142,9 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
         type=lambda value: str(value).upper(),
         default="INFO",
         choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
-        help="Logging verbosity for console output (default: %(default)s).",
+        help="Logging verbosity applied to the DocTags stage (default: %(default)s).",
     )
     doctags_module.add_data_root_option(parser)
-    parser.add_argument(
-        "--log-level",
-        type=lambda value: str(value).upper(),
-        default="INFO",
-        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
-        help="Logging verbosity applied to the DocTags stage",
-    )
     parser.add_argument(
         "--in-dir",
         "--input",
@@ -178,12 +195,6 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
         type=float,
         default=None,
         help="Fraction of GPU memory allocated to the vLLM server",
-    )
-    parser.add_argument(
-        "--vllm-wait-timeout",
-        type=int,
-        default=None,
-        help="Seconds to wait for vLLM readiness during PDF conversion",
     )
     doctags_module.add_resume_force_options(
         parser,
@@ -329,9 +340,24 @@ def chunk(argv: Sequence[str] | None = None) -> int:
         sys.modules.pop("DocsToKG.DocParsing.chunking", None)
         docparsing_pkg.__dict__.pop("chunking", None)
 
-        from DocsToKG.DocParsing import chunking as chunk_module
+        chunk_module = builtins.__import__("DocsToKG.DocParsing.chunking", fromlist=("chunking",))
+        docparsing_pkg._MODULE_CACHE["chunking"] = chunk_module
+        docparsing_pkg.__dict__["chunking"] = chunk_module
     except ImportError as exc:
-        print(str(exc), file=sys.stderr)
+        missing = getattr(exc, "name", None)
+        if not missing:
+            message_text = str(exc)
+            if message_text.startswith("No module named"):
+                parts = message_text.split("'")
+                missing = parts[1] if len(parts) >= 2 else message_text
+            else:
+                missing = message_text
+        friendly_message = (
+            "DocsToKG.DocParsing.chunking could not be imported because the optional "
+            f"dependency '{missing}' is not installed. Install the appropriate extras, "
+            'for example `pip install "DocsToKG[docling,gpu]"` to enable this module.'
+        )
+        print(friendly_message, file=sys.stderr)
         print(
             "Optional DocTags/chunking dependencies are required for `docparse chunk`. "
             "Install them with `pip install DocsToKG[gpu12x]` or `pip install transformers`.",
@@ -370,6 +396,11 @@ def token_profiles(argv: Sequence[str] | None = None) -> int:
     try:
         from DocsToKG.DocParsing import token_profiles as token_profiles_module
     except ImportError as exc:  # pragma: no cover - exercised via CLI test
+        root_cause = exc.__cause__
+        if root_cause is not None:
+            cause_message = str(root_cause)
+            if cause_message:
+                print(cause_message, file=sys.stderr)
         print(str(exc), file=sys.stderr)
         print(
             "Optional dependency 'transformers' is required for `docparse token-profiles`. "
@@ -405,7 +436,7 @@ def _manifest_main(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="docparse manifest",
         description="Inspect DocParsing manifest artifacts",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        formatter_class=_ManifestHelpFormatter,
     )
     parser.add_argument(
         "--stage",
@@ -413,11 +444,11 @@ def _manifest_main(argv: Sequence[str]) -> int:
         action="append",
         default=None,
         help=(
-            "Manifest stage to inspect (repeatable). Supported stages: doctags-html,"
-            " doctags-pdf, chunks, embeddings. Aliases: 'doctags' selects"
-            " doctags-html and doctags-pdf; 'chunk' selects chunks; 'embed' selects"
-            " embeddings. Defaults to stages discovered from manifest files; falls"
-            " back to embeddings when no manifests are present."
+            "Manifest stage to inspect (repeatable). Supported stages: doctags-html, "
+            "doctags-pdf, chunks, embeddings.\n"
+            "Aliases: 'doctags' selects doctags-html and doctags-pdf; 'chunk' selects chunks;\n"
+            "'embed' selects embeddings. Defaults to stages discovered from manifest "
+            "files; falls back to embeddings when no manifests are present."
         ),
     )
     parser.add_argument(
@@ -484,7 +515,7 @@ def _manifest_main(argv: Sequence[str]) -> int:
             normalized = trimmed.lower()
             alias_targets = STAGE_ALIASES.get(normalized)
             if alias_targets is None:
-                resolved: List[str] = [normalized]
+                resolved = [normalized] if normalized in allowed_stage_set else []
             else:
                 resolved = [stage for stage in alias_targets if stage in allowed_stage_set]
                 if not resolved and normalized in allowed_stage_set:

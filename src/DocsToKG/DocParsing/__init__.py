@@ -50,6 +50,21 @@ def _load_module(name: str) -> ModuleType:
                 name=name, missing=missing
             )
         ) from exc
+    except ImportError as exc:  # pragma: no cover - exercised in tests
+        missing = getattr(exc, "name", None)
+        message = str(exc)
+        if missing or message.startswith("No module named"):
+            if not missing:
+                parts = message.split("'")
+                missing = parts[1] if len(parts) >= 2 else message
+            raise ImportError(
+                "DocsToKG.DocParsing.{name} could not be imported because the optional "
+                "dependency '{missing}' is not installed. Install the appropriate extras, "
+                'for example `pip install "DocsToKG[docling,gpu]"` to enable this module.'.format(
+                    name=name, missing=missing
+                )
+            ) from exc
+        raise
 
     globals()[name] = module
     _MODULE_CACHE[name] = module

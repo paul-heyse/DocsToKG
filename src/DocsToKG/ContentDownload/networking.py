@@ -544,7 +544,16 @@ def request_with_retries(
     for attempt in range(max_retries + 1):
         try:
             response = request_func(method=method, url=url, **kwargs)
-            status_code = response.status_code
+            status_code = getattr(response, "status_code", None)
+            if status_code is None:
+                LOGGER.debug(
+                    "Response object of type %s lacks status_code; treating as success for %s %s.",
+                    type(response).__name__,
+                    method,
+                    url,
+                )
+                _enforce_content_policy(response, content_policy, method=method, url=url)
+                return response
             retry_after_delay: Optional[float] = None
             if respect_retry_after and status_code in {429, 503}:
                 retry_after_delay = parse_retry_after_header(response)

@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import requests
 from pyalex import Topics, Works
@@ -360,7 +360,11 @@ def parse_args(
     return parser.parse_args(argv)
 
 
-def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) -> ResolvedConfig:
+def resolve_config(
+    args: argparse.Namespace,
+    parser: argparse.ArgumentParser,
+    resolver_factory: Optional[Callable[[], List[Any]]] = None,
+) -> ResolvedConfig:
     """Validate arguments, resolve configuration, and prepare run state."""
     extract_html_text = args.extract_text == "html"
 
@@ -419,7 +423,8 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         xml_dir = args.xml_out or (pdf_dir.parent / "XML")
         manifest_path = manifest_override or (pdf_dir / "manifest.jsonl")
 
-    resolver_instances = default_resolvers()
+    resolver_factory = resolver_factory or default_resolvers
+    resolver_instances = resolver_factory()
     resolver_names = [resolver.name for resolver in resolver_instances]
     resolver_order_override: Optional[List[str]] = None
 

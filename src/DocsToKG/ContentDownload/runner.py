@@ -117,6 +117,8 @@ class DownloadRun:
         self.multi_sink_factory = MultiSink
         self.run_telemetry_factory = RunTelemetry
         self.process_one_work_func = process_one_work
+        self.iterate_openalex_func = iterate_openalex
+        self.download_candidate_func = download_candidate
 
     def __enter__(self) -> "DownloadRun":
         return self
@@ -204,7 +206,7 @@ class DownloadRun:
         pipeline = ResolverPipeline(
             resolvers=self.resolved.resolver_instances,
             config=self.resolved.resolver_config,
-            download_func=download_candidate,
+            download_func=self.download_candidate_func,
             logger=self.attempt_logger,
             metrics=metrics,
             initial_seen_urls=self.resolved.persistent_seen_urls or None,
@@ -218,7 +220,7 @@ class DownloadRun:
     def setup_work_provider(self) -> WorkProvider:
         """Construct the OpenAlex work provider used to yield artefacts."""
 
-        work_iterable = iterate_openalex(
+        work_iterable = self.iterate_openalex_func(
             self.resolved.query,
             per_page=self.args.per_page,
             max_results=self.args.max,

@@ -25,13 +25,13 @@ import requests as _requests
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi, normalize_pmcid
 
+from . import base as resolver_base
 from .base import (
     RegisteredResolver,
     ResolverEvent,
     ResolverEventReason,
     ResolverResult,
     _absolute_url,
-    request_with_retries,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -65,7 +65,7 @@ class PmcResolver(RegisteredResolver):
         if not identifiers:
             return []
         try:
-            resp = request_with_retries(
+            resp = resolver_base.request_with_retries(
                 session,
                 "get",
                 "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/",
@@ -145,7 +145,7 @@ class PmcResolver(RegisteredResolver):
             oa_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={pmcid}"
             fallback_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/pdf/"
             try:
-                resp = request_with_retries(
+                resp = resolver_base.request_with_retries(
                     session,
                     "get",
                     oa_url,

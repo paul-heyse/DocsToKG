@@ -118,9 +118,11 @@ def main(argv: Optional[Sequence[str]] = None) -> RunResult:
     logging.basicConfig(level=logging.INFO)
     parser = build_parser()
     args = parse_args(parser, argv)
-    resolved = resolve_config(args, parser)
+    resolved = resolve_config(args, parser, resolver_factory=default_resolvers)
     bootstrap_run_environment(resolved)
     download_run = DownloadRun(resolved)
+    download_run.iterate_openalex_func = iterate_openalex
+    download_run.download_candidate_func = download_candidate
     download_run.process_one_work_func = process_one_work
     # Allow tests and callers to monkeypatch sink implementations via cli module.
     download_run.jsonl_sink_factory = JsonlSink
