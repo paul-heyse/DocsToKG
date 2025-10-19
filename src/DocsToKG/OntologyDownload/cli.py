@@ -906,20 +906,27 @@ def _doctor_report() -> Dict[str, object]:
         else:
             probe_path = Path("/")
 
-    disk_usage = shutil.disk_usage(LOCAL_ONTOLOGY_DIR)
-    default_floor_bytes = 10 * 1_000_000_000
-    threshold_bytes = min(
-        disk_usage.total,
-        max(default_floor_bytes, int(disk_usage.total * 0.1)),
-    )
-    disk_report = {
-        "total_bytes": disk_usage.total,
-        "free_bytes": disk_usage.free,
-        "total_gb": round(disk_usage.total / 1_000_000_000, 2),
-        "free_gb": round(disk_usage.free / 1_000_000_000, 2),
-        "threshold_bytes": threshold_bytes,
-        "warning": disk_usage.free < threshold_bytes,
-    }
+    disk_report: Dict[str, object] = {"path": str(probe_path)}
+    try:
+        disk_usage = shutil.disk_usage(probe_path)
+    except OSError as exc:
+        disk_report["error"] = str(exc)
+    else:
+        default_floor_bytes = 10 * 1_000_000_000
+        threshold_bytes = min(
+            disk_usage.total,
+            max(default_floor_bytes, int(disk_usage.total * 0.1)),
+        )
+        disk_report.update(
+            {
+                "total_bytes": disk_usage.total,
+                "free_bytes": disk_usage.free,
+                "total_gb": round(disk_usage.total / 1_000_000_000, 2),
+                "free_gb": round(disk_usage.free / 1_000_000_000, 2),
+                "threshold_bytes": threshold_bytes,
+                "warning": disk_usage.free < threshold_bytes,
+            }
+        )
 
     dependencies = {
         "rdflib": importlib.util.find_spec("rdflib") is not None,
