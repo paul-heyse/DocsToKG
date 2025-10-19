@@ -565,3 +565,29 @@ def test_plan_embed_generate_counts(
 
     assert plan["process"]["count"] == 1
     assert plan["skip"]["count"] == 0
+
+
+def test_plan_embed_missing_chunks_directory_reports_note(
+    tmp_path: Path,
+) -> None:
+    """Embedding planner returns a missing-directory note when chunks are absent."""
+
+    data_root = tmp_path / "data"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    vectors_dir = data_root / "Embeddings"
+    vectors_dir.mkdir(parents=True)
+
+    plan = plan_embed(
+        [
+            "--data-root",
+            str(data_root),
+            "--chunks-dir",
+            str(chunks_dir),
+            "--out-dir",
+            str(vectors_dir),
+        ]
+    )
+
+    assert plan["process"]["count"] == 0
+    assert plan["skip"]["count"] == 0
+    assert plan["notes"] == ["Chunks directory missing"]
