@@ -181,6 +181,8 @@
 # }
 # === /NAVMAP ===
 
+from __future__ import annotations
+
 """Configuration model regression tests.
 
 Exercises the layered configuration system: YAML parsing, defaults merging,
@@ -190,8 +192,6 @@ compatibility helpers. Ensures the CLI and API receive well-formed
 """
 
 """Tests for ontology downloader configuration models and helpers."""
-
-from __future__ import annotations
 
 import io
 import logging
@@ -399,11 +399,12 @@ def test_download_config_normalizes_allowed_hosts() -> None:
 
     normalized = config.normalized_allowed_hosts()
     assert normalized is not None
-    exact, suffixes, ports = normalized
+    exact, suffixes, ports, ip_literals = normalized
     assert "example.org" in exact
     assert "example.com" in suffixes
     assert "xn--mnchen-3ya.example.org" in exact
     assert ports == {}
+    assert ip_literals == set()
 
 
 def test_download_config_polite_headers_defaults() -> None:
@@ -425,10 +426,23 @@ def test_download_config_parses_allowed_host_ports() -> None:
 
     normalized = config.normalized_allowed_hosts()
     assert normalized is not None
-    exact, suffixes, ports = normalized
+    exact, suffixes, ports, ip_literals = normalized
     assert "example.org" in exact
     assert not suffixes
     assert ports["example.org"] == {8443}
+    assert ip_literals == set()
+
+
+def test_download_config_identifies_ip_literal_allowlist_entries() -> None:
+    config = DownloadConfiguration(allowed_hosts=["10.0.0.5", "[2001:db8::1]"])
+
+    normalized = config.normalized_allowed_hosts()
+    assert normalized is not None
+    exact, suffixes, ports, ip_literals = normalized
+    assert {"10.0.0.5", "2001:db8::1"}.issubset(exact)
+    assert ip_literals == {"10.0.0.5", "2001:db8::1"}
+    assert ports == {}
+    assert not suffixes
 
 
 def test_download_config_rejects_wildcard_port_usage() -> None:

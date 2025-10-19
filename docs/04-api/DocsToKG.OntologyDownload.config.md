@@ -70,7 +70,7 @@ Return service-specific rate limits expressed as requests per second.
 
 ### `normalized_allowed_hosts(self)`
 
-Split allowed host list into exact domains and wildcard suffixes.
+Split allowed host list into exact domains, wildcard suffixes, and associated per-host metadata (ports, IP literals).
 
 ### `polite_http_headers(self)`
 
