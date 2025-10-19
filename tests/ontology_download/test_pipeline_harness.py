@@ -4,11 +4,21 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+import time
 from pathlib import Path
 
+import pytest
 from DocsToKG.OntologyDownload import api as core
-from DocsToKG.OntologyDownload.planning import FetchSpec, plan_all
-from DocsToKG.OntologyDownload.testing import temporary_resolver
+from DocsToKG.OntologyDownload.planning import (
+    BatchFetchError,
+    BatchPlanningError,
+    FetchSpec,
+    fetch_all,
+    plan_all,
+)
+from DocsToKG.OntologyDownload.resolvers import BaseResolver, FetchPlan
+from DocsToKG.OntologyDownload.testing import ResponseSpec, temporary_resolver
 
 
 def _logger() -> logging.Logger:
@@ -102,3 +112,150 @@ def test_plan_all_uses_temporary_resolver(ontology_env):
     assert planned.spec.id == "plan"
     assert planned.plan.url.startswith("http://127.0.0.1")
     assert planned.plan.filename_hint == "plan.owl"
+
+
+def test_plan_all_batch_failure_cancels_blocking_workers(ontology_env):
+    """Batch planning errors should surface without waiting for hung workers."""
+
+    blocking_started = threading.Event()
+    release_blocking = threading.Event()
+
+    class _BlockingPlanResolver(BaseResolver):
+        NAME = "blocking-plan"
+
+        def plan(self, spec, config, logger):  # noqa: D401 - simple blocking stub
+            blocking_started.set()
+            release_blocking.wait(timeout=5)
+            raise RuntimeError("blocking resolver should have been cancelled")
+
+    class _FailingPlanResolver(BaseResolver):
+        NAME = "failing-plan"
+
+        def plan(self, spec, config, logger):  # noqa: D401 - simple failure stub
+            time.sleep(0.1)
+            raise RuntimeError("planner boom")
+
+    blocking_spec = FetchSpec(
+        id="blocking",
+        resolver=_BlockingPlanResolver.NAME,
+        extras={},
+        target_formats=("owl",),
+    )
+    failing_spec = FetchSpec(
+        id="failing",
+        resolver=_FailingPlanResolver.NAME,
+        extras={},
+        target_formats=("owl",),
+    )
+    config = _resolved_config(ontology_env)
+    config.defaults.http.concurrent_plans = 2
+    config.defaults.resolver_fallback_enabled = False
+    config.defaults.prefer_source = []
+    timer = threading.Timer(2.0, release_blocking.set)
+    try:
+        with temporary_resolver(_BlockingPlanResolver.NAME, _BlockingPlanResolver()), temporary_resolver(
+            _FailingPlanResolver.NAME, _FailingPlanResolver()
+        ):
+            timer.start()
+            start = time.monotonic()
+            with pytest.raises(BatchPlanningError):
+                plan_all([blocking_spec, failing_spec], config=config, logger=_logger())
+            elapsed = time.monotonic() - start
+    finally:
+        release_blocking.set()
+        timer.cancel()
+
+    assert blocking_started.is_set()
+    assert elapsed < 1.0
+
+
+def test_fetch_all_batch_failure_cancels_blocking_workers(ontology_env):
+    """Batch fetch errors should not wait for in-flight downloads to finish."""
+
+    blocking_path = "blocking.owl"
+    failing_path = "failing.owl"
+    headers = {
+        "Content-Type": "application/rdf+xml",
+        "ETag": "test-etag",
+        "Last-Modified": "Wed, 01 Jan 2025 00:00:00 GMT",
+    }
+
+    ontology_env.queue_response(
+        blocking_path,
+        ResponseSpec(method="HEAD", status=200, headers=headers),
+    )
+    ontology_env.queue_response(
+        blocking_path,
+        ResponseSpec(method="GET", status=200, headers=headers, body=b"blocking", delay_sec=2.0),
+    )
+    ontology_env.queue_response(
+        failing_path,
+        ResponseSpec(method="HEAD", status=200, headers=headers),
+    )
+    ontology_env.queue_response(
+        failing_path,
+        ResponseSpec(method="GET", status=500, headers=headers, body=b"boom"),
+    )
+
+    blocking_url = ontology_env.http_url(blocking_path)
+    failing_url = ontology_env.http_url(failing_path)
+    class _BlockingFetchResolver(BaseResolver):
+        NAME = "blocking-fetch"
+
+        def plan(self, spec, config, logger):  # noqa: D401 - simple blocking plan
+            return FetchPlan(
+                url=blocking_url,
+                headers={"Accept": "application/rdf+xml"},
+                filename_hint="blocking.owl",
+                version="test-version",
+                license="CC0-1.0",
+                media_type="application/rdf+xml",
+                service="test",
+            )
+
+    class _FailingFetchResolver(BaseResolver):
+        NAME = "failing-fetch"
+
+        def plan(self, spec, config, logger):  # noqa: D401 - simple failure plan
+            time.sleep(0.1)
+            return FetchPlan(
+                url=failing_url,
+                headers={"Accept": "application/rdf+xml"},
+                filename_hint="failing.owl",
+                version="test-version",
+                license="CC0-1.0",
+                media_type="application/rdf+xml",
+                service="test",
+            )
+
+    blocking_spec = FetchSpec(
+        id="blocking",
+        resolver=_BlockingFetchResolver.NAME,
+        extras={},
+        target_formats=("owl",),
+    )
+    failing_spec = FetchSpec(
+        id="failing",
+        resolver=_FailingFetchResolver.NAME,
+        extras={},
+        target_formats=("owl",),
+    )
+
+    config = _resolved_config(ontology_env)
+    config.defaults.http.concurrent_downloads = 2
+    config.defaults.resolver_fallback_enabled = False
+    config.defaults.prefer_source = []
+
+    with temporary_resolver(_BlockingFetchResolver.NAME, _BlockingFetchResolver()), temporary_resolver(
+        _FailingFetchResolver.NAME, _FailingFetchResolver()
+    ):
+        start = time.monotonic()
+        with pytest.raises(BatchFetchError):
+            fetch_all([blocking_spec, failing_spec], config=config, logger=_logger(), force=True)
+        elapsed = time.monotonic() - start
+
+    assert any(
+        request.method == "GET" and request.path == f"/{blocking_path}"
+        for request in ontology_env.requests
+    )
+    assert elapsed < 1.0

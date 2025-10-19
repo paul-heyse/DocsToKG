@@ -157,13 +157,17 @@ import hashlib
 import json
 import logging
 import os
+import platform
 import shutil
+import signal
 import sys
 import threading
 import time
 import zipfile
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Optional
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -595,6 +599,59 @@ def test_validate_owlready2_memory_error(owl_file, tmp_path, config):
     assert not result.ok
     payload = json.loads((request.validation_dir / "owlready2_parse.json").read_text())
     assert "memory exceeded" in payload["error"].lower()
+
+
+def test_run_with_timeout_cancels_long_running_callable():
+    stop_event = threading.Event()
+    started = threading.Event()
+    finished = threading.Event()
+    call_count = {"value": 0}
+    shutdown_calls: list[tuple[bool, bool]] = []
+
+    def long_running_callable() -> None:
+        started.set()
+        while not stop_event.is_set():
+            call_count["value"] += 1
+            time.sleep(0.01)
+        finished.set()
+
+    class DummyFuture:
+        def __init__(self, worker: threading.Thread) -> None:
+            self._worker = worker
+
+        def result(self, timeout: float):  # pragma: no cover - deterministic behavior
+            assert started.wait(1), "callable did not start"
+            raise FuturesTimeoutError()
+
+        def cancel(self) -> bool:  # pragma: no cover - deterministic behavior
+            stop_event.set()
+            self._worker.join(timeout=1)
+            return not self._worker.is_alive()
+
+    class DummyExecutor:
+        def __init__(self, max_workers: int = 1) -> None:
+            assert max_workers == 1
+            self._worker: Optional[threading.Thread] = None
+
+        def submit(self, func):  # pragma: no cover - deterministic behavior
+            self._worker = threading.Thread(target=func, daemon=True)
+            self._worker.start()
+            return DummyFuture(self._worker)
+
+        def shutdown(self, wait: bool = True, cancel_futures: bool = False):
+            shutdown_calls.append((wait, cancel_futures))
+            if wait and self._worker is not None:
+                self._worker.join(timeout=1)
+
+    with patch.object(validation_mod.platform, "system", return_value="Windows"):
+        with patch.object(validation_mod, "ThreadPoolExecutor", DummyExecutor):
+            with pytest.raises(validation_mod.ValidationTimeout):
+                validation_mod._run_with_timeout(long_running_callable, timeout_sec=1)
+
+    assert stop_event.is_set()
+    assert finished.wait(1), "callable did not terminate after cancellation"
+    assert call_count["value"] > 0
+    assert any(call == (False, True) for call in shutdown_calls)
 
 
 # --- Helper Functions ---

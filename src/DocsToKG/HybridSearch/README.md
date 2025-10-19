@@ -101,7 +101,7 @@ sequenceDiagram
 ## Configuration
 - Env/config knobs (Pydantic models in `config.py`):
   - `HybridSearchConfig` – top-level settings (namespace mode, chunking, retrieval budgets).
-  - `DenseIndexConfig` (TODO confirm env vars, e.g., `HYBRIDSEARCH_EXPECTED_NTOTAL`).
+  - `DenseIndexConfig` – FAISS knobs including GPU replication, memory pooling, and null-stream toggles (`gpu_use_default_null_stream`, `gpu_use_default_null_stream_all_devices`).
   - `FusionConfig` – RRF/MMR parameters (`k0`, `mmr_lambda`, `token_budget`, `byte_budget`).
   - `RetrievalConfig` – channel weights, top-k, filter policy.
 - Configuration manager (`HybridSearchConfigManager`) loads JSON/YAML (TODO document sample path).
