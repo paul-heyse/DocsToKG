@@ -544,13 +544,37 @@ def test_atomic_write_failure(tmp_path: Path) -> None:
 
 
 def test_iter_doctags(tmp_path: Path) -> None:
-    doctags_dir = doc_env.data_doctags()
-    target = Path(doctags_dir)
-    files = [target / "a.doctags", target / "b.doctag"]
+    doctags_dir = tmp_path / "DocTagsFiles"
+    doctags_dir.mkdir()
+
+    files = [doctags_dir / "a.doctags", doctags_dir / "b.doctag"]
     for file in files:
         file.write_text("content", encoding="utf-8")
-    results = list(doc_io.iter_doctags(target))
-    assert results == sorted(file.resolve() for file in files)
+
+    alias = doctags_dir / "alias.doctags"
+    alias.symlink_to(files[0])
+
+    results = list(doc_io.iter_doctags(doctags_dir))
+    assert results == files
+    assert alias not in results
+
+
+def test_iter_doctags_symlink_outside_root(tmp_path: Path) -> None:
+    doctags_dir = tmp_path / "DocTagsFiles"
+    doctags_dir.mkdir()
+
+    external_dir = tmp_path / "external"
+    external_dir.mkdir()
+    external_file = external_dir / "external.doctags"
+    external_file.write_text("content", encoding="utf-8")
+
+    symlink_path = doctags_dir / "linked" / "external.doctags"
+    symlink_path.parent.mkdir(parents=True, exist_ok=True)
+    symlink_path.symlink_to(external_file)
+
+    results = list(doc_io.iter_doctags(doctags_dir))
+    assert results == [symlink_path]
+    assert results[0].resolve() == external_file.resolve()
 
 
 def test_iter_chunks(tmp_path: Path) -> None:

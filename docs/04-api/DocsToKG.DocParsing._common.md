@@ -348,11 +348,12 @@ Args:
 directory: Root directory to scan for DocTags artifacts.
 
 Returns:
-Iterator over absolute ``Path`` objects.
+Iterator over ``Path`` objects rooted beneath ``directory``.
 
 Yields:
-Absolute paths to discovered ``.doctags`` or ``.doctag`` files sorted
-lexicographically.
+Logical paths to discovered ``.doctags`` or ``.doctag`` files sorted
+lexicographically. Symbolic links are preserved, but entries resolving to the
+same on-disk file are de-duplicated, preferring concrete files over symlinks.
 
 Examples:
 >>> next(iter_doctags(Path(".")), None) is None
