@@ -34,7 +34,11 @@ from DocsToKG.ContentDownload.download import (
     process_one_work,
 )
 from DocsToKG.ContentDownload.networking import ThreadLocalSessionFactory, create_session
-from DocsToKG.ContentDownload.pipeline import ResolverMetrics, ResolverPipeline
+from DocsToKG.ContentDownload.pipeline import (
+    DownloadOutcome,
+    ResolverMetrics,
+    ResolverPipeline,
+)
 from DocsToKG.ContentDownload.providers import OpenAlexWorkProvider, WorkProvider
 from DocsToKG.ContentDownload.summary import RunResult, build_summary_record
 from DocsToKG.ContentDownload.telemetry import (
@@ -439,22 +443,63 @@ class DownloadRun:
                         in_flight: List[Future[Dict[str, Any]]] = []
                         max_in_flight = max(self.args.workers * 2, 1)
                         future_work_ids: Dict[Future[Dict[str, Any]], Optional[str]] = {}
+                        future_context: Dict[
+                            Future[Dict[str, Any]],
+                            Tuple[WorkArtifact, bool, Optional[str]],
+                        ] = {}
 
                         def _submit(work_item: WorkArtifact) -> Future[Dict[str, Any]]:
                             future = executor.submit(
                                 self.process_work_item, work_item, state.options
                             )
                             future_work_ids[future] = getattr(work_item, "work_id", None)
+                            future_context[future] = (
+                                work_item,
+                                bool(state.options.dry_run),
+                                state.options.run_id or self.resolved.run_id,
+                            )
                             return future
 
                         def _handle_future(completed_future: Future[Dict[str, Any]]) -> None:
                             work_id = future_work_ids.pop(completed_future, None)
+                            artifact_context = future_context.pop(completed_future, None)
                             try:
                                 completed_future.result()
                             except Exception as exc:
                                 self._handle_worker_exception(
                                     state, exc, work_id=work_id
                                 )
+                                if self.attempt_logger is not None and artifact_context:
+                                    artifact, dry_run_flag, run_id_token = artifact_context
+                                    normalized_run_id = run_id_token or self.resolved.run_id
+                                    crash_url = (
+                                        f"worker-crash://{normalized_run_id or 'unknown-run'}/"
+                                        f"{artifact.work_id}"
+                                    )
+                                    try:
+                                        outcome = DownloadOutcome(
+                                            classification=Classification.SKIPPED,
+                                            reason=ReasonCode.WORKER_EXCEPTION,
+                                            reason_detail="worker-crash",
+                                            error=str(exc),
+                                        )
+                                        self.attempt_logger.record_manifest(
+                                            artifact,
+                                            resolver=None,
+                                            url=crash_url,
+                                            outcome=outcome,
+                                            html_paths=(),
+                                            dry_run=dry_run_flag,
+                                            run_id=normalized_run_id,
+                                            reason=ReasonCode.WORKER_EXCEPTION,
+                                            reason_detail="worker-crash",
+                                        )
+                                    except Exception:
+                                        LOGGER.warning(
+                                            "Failed to record manifest after worker crash",
+                                            exc_info=True,
+                                        )
+                                state.update_from_result({"skipped": True})
                                 return
 
                         for artifact in provider.iter_artifacts():
