@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from .io import mask_sensitive_data, sanitize_filename
 from .settings import LOG_DIR
@@ -49,19 +49,24 @@ def _compress_old_log(path: Path) -> None:
     path.unlink(missing_ok=True)
 
 
-def _cleanup_logs(log_dir: Path, retention_days: int) -> None:
+def _cleanup_logs(log_dir: Path, retention_days: int) -> List[str]:
     """Rotate or purge log files in ``log_dir`` based on retention policy."""
 
+    actions: List[str] = []
     now = datetime.now(timezone.utc)
     retention_delta = timedelta(days=retention_days)
     for file in log_dir.glob("*.jsonl"):
         mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
         if now - mtime > retention_delta:
+            target = file.with_suffix(file.suffix + ".gz")
             _compress_old_log(file)
+            actions.append(f"Compressed {file.name} -> {target.name}")
     for file in log_dir.glob("*.jsonl.gz"):
         mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
         if now - mtime > retention_delta:
             file.unlink(missing_ok=True)
+            actions.append(f"Deleted expired archive {file.name}")
+    return actions
 
 
 def setup_logging(
