@@ -75,6 +75,7 @@ class ResolvedConfig:
     verify_cache_digest: bool
     openalex_retry_attempts: int
     openalex_retry_backoff: float
+    retry_after_cap: float
 
 
 def bootstrap_run_environment(resolved: ResolvedConfig) -> None:
@@ -252,6 +253,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Default timeout (seconds) for resolver HTTP requests.",
     )
     resolver_group.add_argument(
+        "--retry-after-cap",
+        type=float,
+        default=120.0,
+        help=(
+            "Maximum seconds honoured from Retry-After headers during resolver HTTP retries. "
+            "Retries use exponential backoff with equal jitter; this cap prevents multi-minute sleeps."
+        ),
+    )
+    resolver_group.add_argument(
         "--concurrent-resolvers",
         type=int,
         default=None,
@@ -422,8 +432,8 @@ def resolve_config(
         parser.error("--openalex-retry-attempts must be >= 0")
     if args.openalex_retry_backoff < 0:
         parser.error("--openalex-retry-backoff must be >= 0")
-    if getattr(args, "global_url_dedup_cap", 0) < 0:
-        parser.error("--global-url-dedup-cap must be >= 0")
+    if args.retry_after_cap <= 0:
+        parser.error("--retry-after-cap must be > 0")
     for field_name in ("sniff_bytes", "min_pdf_bytes", "tail_check_bytes"):
         value = getattr(args, field_name, None)
         if value is not None and value < 0:
@@ -584,6 +594,7 @@ def resolve_config(
         verify_cache_digest=args.verify_cache_digest,
         openalex_retry_attempts=args.openalex_retry_attempts,
         openalex_retry_backoff=args.openalex_retry_backoff,
+        retry_after_cap=args.retry_after_cap,
     )
 
 

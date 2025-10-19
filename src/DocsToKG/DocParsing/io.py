@@ -19,6 +19,7 @@ import unicodedata
 import uuid
 import warnings
 from datetime import datetime, timezone
+from functools import total_ordering
 from itertools import count
 from pathlib import Path
 from typing import (
@@ -39,6 +40,8 @@ from .env import data_manifests
 _SAFE_HASH_ALGORITHM = "sha256"
 _HASH_ALG_ENV_VAR = "DOCSTOKG_HASH_ALG"
 _TEXT_HASH_READ_SIZE = 65536
+_MANIFEST_TAIL_MIN_WINDOW = 64 * 1024
+_MANIFEST_TAIL_BYTES_PER_ENTRY = 4096
 
 
 _HASH_ALGORITHMS_AVAILABLE: Optional[frozenset[str]] = None
@@ -750,25 +753,103 @@ def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, di
     return index
 
 
-def _manifest_timestamp_key(entry: Mapping[str, object]) -> str:
-    """Return a sortable timestamp key for manifest entries."""
+@total_ordering
+class _ManifestHeapKey:
+    """Comparable key that preserves manifest order when timestamps are missing."""
+
+    __slots__ = ("timestamp", "order")
+
+    def __init__(self, timestamp: Optional[str], order: int) -> None:
+        self.timestamp = timestamp
+        self.order = order
+
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, _ManifestHeapKey):
+            return NotImplemented
+        if self.timestamp is not None and other.timestamp is not None:
+            if self.timestamp != other.timestamp:
+                return self.timestamp < other.timestamp
+        return self.order < other.order
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, _ManifestHeapKey):
+            return NotImplemented
+        return self.timestamp == other.timestamp and self.order == other.order
+
+
+def _manifest_timestamp_key(entry: Mapping[str, object]) -> Optional[str]:
+    """Return a sortable timestamp key or ``None`` when unavailable."""
 
     raw = entry.get("timestamp")
     if isinstance(raw, str):
-        return raw
+        stripped = raw.strip()
+        return stripped or None
     if isinstance(raw, datetime):
         return raw.isoformat()
-    if raw is None:
-        return ""
-    return str(raw)
+    return None
 
 
-def _iter_manifest_file(path: Path, stage: str) -> Iterator[dict]:
+def _iter_manifest_tail_lines(path: Path, limit: int) -> Iterator[str]:
+    """Yield the newest ``limit`` JSONL lines from ``path`` in chronological order."""
+
+    if limit <= 0:
+        return
+
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return
+
+    if size == 0:
+        return
+
+    window_bytes = max(_MANIFEST_TAIL_MIN_WINDOW, limit * _MANIFEST_TAIL_BYTES_PER_ENTRY)
+    offsets = build_jsonl_split_map(
+        path,
+        chunk_bytes=window_bytes,
+        min_chunk_bytes=window_bytes,
+    )
+    collected: List[str] = []
+    with path.open("rb") as handle:
+        for start, end in reversed(offsets):
+            handle.seek(start)
+            raw = handle.read(end - start)
+            if not raw:
+                continue
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                text = raw.decode("utf-8", errors="replace")
+            chunk_lines = text.splitlines()
+            for line in reversed(chunk_lines):
+                if not line.strip():
+                    continue
+                collected.append(line)
+                if len(collected) >= limit:
+                    break
+            if len(collected) >= limit:
+                break
+
+    for line in reversed(collected):
+        yield line
+
+
+def _iter_manifest_file(path: Path, stage: str, *, limit: Optional[int] = None) -> Iterator[dict]:
     """Yield manifest entries for a single stage file."""
 
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
+    if limit is not None and limit > 0:
+        line_iter: Iterable[str] = _iter_manifest_tail_lines(path, limit)
+    else:
+        line_iter = path.open("r", encoding="utf-8")
+
+    with contextlib.ExitStack() as stack:
+        if hasattr(line_iter, "__enter__"):
+            handle = stack.enter_context(line_iter)  # type: ignore[arg-type]
+        else:
+            handle = line_iter
+
+        for raw_line in handle:
+            line = raw_line.strip()
             if not line:
                 continue
             try:
@@ -779,31 +860,38 @@ def _iter_manifest_file(path: Path, stage: str) -> Iterator[dict]:
             yield entry
 
 
-def iter_manifest_entries(stages: Sequence[str], root: Optional[Path] = None) -> Iterator[dict]:
-    """Yield manifest entries for the requested ``stages`` sorted by timestamp."""
+def iter_manifest_entries(
+    stages: Sequence[str],
+    root: Optional[Path] = None,
+    *,
+    limit: Optional[int] = None,
+) -> Iterator[dict]:
+    """Yield manifest entries for ``stages`` sorted by timestamp.
+
+    When ``limit`` is provided, only the newest ``limit`` rows per manifest file are
+    read using bounded tail windows, reducing the amount of history that needs to
+    be scanned.
+    """
 
     manifest_dir = data_manifests(root, ensure=False)
-    heap: List[Tuple[str, int, dict, Iterator[dict]]] = []
+    heap: List[Tuple[_ManifestHeapKey, int, dict, Iterator[dict]]] = []
     unique = count()
+
+    def _push_entry(entry: dict, stream: Iterator[dict]) -> None:
+        order = next(unique)
+        key = _ManifestHeapKey(_manifest_timestamp_key(entry), order)
+        heapq.heappush(heap, (key, order, entry, stream))
 
     for stage in stages:
         stage_path = manifest_dir / _manifest_filename(stage)
         if not stage_path.exists():
             continue
-        stream = _iter_manifest_file(stage_path, stage)
+        stream = _iter_manifest_file(stage_path, stage, limit=limit)
         try:
             first_entry = next(stream)
         except StopIteration:
             continue
-        heapq.heappush(
-            heap,
-            (
-                _manifest_timestamp_key(first_entry),
-                next(unique),
-                first_entry,
-                stream,
-            ),
-        )
+        _push_entry(first_entry, stream)
 
     while heap:
         _, _, entry, stream = heapq.heappop(heap)
@@ -812,15 +900,7 @@ def iter_manifest_entries(stages: Sequence[str], root: Optional[Path] = None) ->
             next_entry = next(stream)
         except StopIteration:
             continue
-        heapq.heappush(
-            heap,
-            (
-                _manifest_timestamp_key(next_entry),
-                next(unique),
-                next_entry,
-                stream,
-            ),
-        )
+        _push_entry(next_entry, stream)
 
 
 __all__ = [

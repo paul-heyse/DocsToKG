@@ -37,6 +37,12 @@ if TYPE_CHECKING:  # pragma: no cover
 LOGGER = logging.getLogger(__name__)
 
 
+def request_with_retries(*args, **kwargs):
+    """Proxy to :func:`resolvers.base.request_with_retries` for patchability."""
+
+    return resolver_base.request_with_retries(*args, **kwargs)
+
+
 class WaybackResolver(RegisteredResolver):
     """Fallback resolver that queries the Internet Archive Wayback Machine."""
 
@@ -80,13 +86,14 @@ class WaybackResolver(RegisteredResolver):
 
         for original in artifact.failed_pdf_urls:
             try:
-                resp = resolver_base.request_with_retries(
+                resp = request_with_retries(
                     session,
                     "get",
                     "https://archive.org/wayback/available",
                     params={"url": original},
                     timeout=config.get_timeout(self.name),
                     headers=config.polite_headers,
+                    retry_after_cap=config.retry_after_cap,
                 )
             except _requests.Timeout as exc:
                 yield ResolverResult(

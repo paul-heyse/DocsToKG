@@ -112,6 +112,7 @@ import logging
 import time
 import uuid
 from dataclasses import asdict, dataclass, replace
+import inspect
 from pathlib import Path
 from threading import Event, RLock
 from typing import Callable, ClassVar, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
@@ -207,7 +208,7 @@ def resolve_cuvs_state(requested: Optional[bool]) -> tuple[bool, bool, Optional[
 
     enabled = bool(knn_runner) and enabled
     available = bool(knn_runner) and (
-        bool(reported_available) if reported_available is not None else True
+        bool(reported_available) if reported_available is not None else False
     )
     return enabled, available, reported_available
 
@@ -248,6 +249,7 @@ class AdapterStats:
     cuvs_available: bool
     cuvs_reported: Optional[bool]
     cuvs_requested: Optional[bool]
+    cuvs_applied: Optional[bool]
 
 
 class _PendingSearch:
@@ -456,6 +458,7 @@ class FaissVectorStore(DenseVectorStore):
         self._replica_gpu_resources: list["faiss.StandardGpuResources"] = []
         self._pinned_buffers: list[object] = []
         self._observability = observability or Observability()
+        self._last_applied_cuvs: Optional[bool] = None
         self.init_gpu()
         self._lock = RLock()
         self._index = self._create_index()
@@ -626,6 +629,7 @@ class FaissVectorStore(DenseVectorStore):
             cuvs_available=cuvs_available,
             cuvs_reported=cuvs_reported,
             cuvs_requested=requested_cuvs,
+            cuvs_applied=self._last_applied_cuvs,
         )
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
@@ -1140,6 +1144,7 @@ class FaissVectorStore(DenseVectorStore):
             "cuvs_available": stats.cuvs_available,
             "cuvs_requested": stats.cuvs_requested,
             "cuvs_reported": stats.cuvs_reported,
+            "cuvs_applied": stats.cuvs_applied,
         }
         log_fn = (
             self._observability.logger.info if level == "info" else self._observability.logger.debug
@@ -1365,6 +1370,7 @@ class FaissVectorStore(DenseVectorStore):
             bool(cuvs_reported) if cuvs_reported is not None else False
         )
         stats["cuvs_requested"] = getattr(self._config, "use_cuvs", None)
+        stats["cuvs_applied"] = self._last_applied_cuvs
         if self._temp_memory_bytes is not None:
             stats["gpu_temp_memory_bytes"] = float(self._temp_memory_bytes)
         try:
@@ -1900,12 +1906,16 @@ class FaissVectorStore(DenseVectorStore):
 
         if self._multi_gpu_mode not in ("replicate", "shard"):
             self._replicated = False
+            self._apply_use_cuvs_parameter(index)
             return index
         if not self._replication_enabled:
             self._replicated = False
+            self._apply_use_cuvs_parameter(index)
             return index
         shard = self._multi_gpu_mode == "shard"
-        return self.distribute_to_all_gpus(index, shard=shard)
+        distributed = self.distribute_to_all_gpus(index, shard=shard)
+        self._apply_use_cuvs_parameter(distributed)
+        return distributed
 
     def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
         self.init_gpu()
@@ -1968,6 +1978,10 @@ class FaissVectorStore(DenseVectorStore):
         if expected <= 0:
             return
         reserve = int(expected)
+        participant_count = len(gpu_ids) if gpu_ids else 0
+        if self._multi_gpu_mode == "shard":
+            participants = max(participant_count, 1)
+            reserve = max(1, (reserve + participants - 1) // participants)
 
         applied = False
         try:
@@ -2073,7 +2087,102 @@ class FaissVectorStore(DenseVectorStore):
             self._last_applied_nprobe_monotonic = time.monotonic()
         else:
             self._reset_nprobe_cache()
+        self._apply_use_cuvs_parameter(index)
         self._log_index_configuration(index)
+
+    def _apply_use_cuvs_parameter(self, index: Optional["faiss.Index"]) -> None:
+        """Propagate the cuVS toggle to ``index`` and any GPU replicas."""
+
+        if index is None or faiss is None:
+            self._last_applied_cuvs = None
+            return
+        requested = getattr(self._config, "use_cuvs", None)
+        cuvs_enabled, cuvs_available, _ = resolve_cuvs_state(requested)
+        if not cuvs_available and requested is False:
+            # Respect explicit opt-out even when FAISS reports no availability.
+            cuvs_enabled = False
+        if not hasattr(faiss, "GpuParameterSpace"):
+            self._last_applied_cuvs = cuvs_enabled if requested is not None else None
+            return
+        try:
+            gps = faiss.GpuParameterSpace()
+        except Exception:  # pragma: no cover - defensive guard
+            logger.debug("Unable to construct FAISS GpuParameterSpace", exc_info=True)
+            self._last_applied_cuvs = None
+            return
+
+        targets = list(self._iter_gpu_index_variants(index))
+        applied = False
+        for target in targets:
+            try:
+                if hasattr(gps, "initialize"):
+                    gps.initialize(target)
+            except Exception:  # pragma: no cover - defensive guard
+                logger.debug("Failed to initialise GpuParameterSpace for index", exc_info=True)
+            try:
+                gps.set_index_parameter(target, "use_cuvs", bool(cuvs_enabled))
+                applied = True
+            except Exception:  # pragma: no cover - defensive guard
+                logger.debug("Unable to set use_cuvs on FAISS index", exc_info=True)
+
+        if applied and hasattr(gps, "get_index_parameter") and targets:
+            try:  # pragma: no cover - best effort confirmation
+                applied_value = bool(gps.get_index_parameter(targets[0], "use_cuvs"))
+            except Exception:
+                applied_value = bool(cuvs_enabled)
+        elif applied:
+            applied_value = bool(cuvs_enabled)
+        else:
+            applied_value = None
+
+        self._last_applied_cuvs = applied_value
+
+    def _iter_gpu_index_variants(self, root: "faiss.Index") -> list["faiss.Index"]:
+        """Return FAISS index variants associated with ``root``.
+
+        This walks nested wrappers (e.g. IndexIDMap2, replicas, shards) so
+        parameter updates (``use_cuvs``) propagate to each GPU replica.
+        """
+
+        stack: list["faiss.Index"] = [root]
+        seen: set[int] = set()
+        collected: list["faiss.Index"] = []
+        while stack:
+            current = stack.pop()
+            if current is None:
+                continue
+            ident = id(current)
+            if ident in seen:
+                continue
+            seen.add(ident)
+            collected.append(current)
+
+            nested = getattr(current, "index", None)
+            if nested is not None and nested is not current:
+                stack.append(nested)
+
+            if hasattr(faiss, "downcast_index"):
+                try:
+                    downcast = faiss.downcast_index(current)
+                except Exception:  # pragma: no cover - defensive guard
+                    downcast = None
+                if downcast is not None and downcast is not current:
+                    stack.append(downcast)
+
+            for accessor_name in ("at", "index_at"):
+                accessor = getattr(current, accessor_name, None)
+                if accessor is None:
+                    continue
+                for offset in range(0, 64):
+                    try:
+                        candidate = accessor(offset)
+                    except Exception:
+                        break
+                    if candidate is None:
+                        break
+                    stack.append(candidate)
+
+        return collected
 
     def _log_index_configuration(self, index: "faiss.Index") -> None:
         try:
@@ -2082,7 +2191,13 @@ class FaissVectorStore(DenseVectorStore):
             desc = type(index).__name__
         logger.debug(
             "faiss-index-config",
-            extra={"event": {"nprobe": getattr(self._config, "nprobe", 0), "index": desc}},
+            extra={
+                "event": {
+                    "nprobe": getattr(self._config, "nprobe", 0),
+                    "index": desc,
+                    "use_cuvs": self._last_applied_cuvs,
+                }
+            },
         )
 
     def _create_index(self) -> "faiss.Index":
@@ -2535,6 +2650,44 @@ def _auto_block_rows(
     )
     effective = min(permitted, _COSINE_TOPK_DEFAULT_BLOCK_ROWS)
     return effective, {"free_bytes": int(free_bytes), "total_bytes": int(total_bytes)}
+def _build_distance_params(
+    *,
+    use_fp16: bool,
+    cuvs_enabled: bool,
+) -> Optional[object]:
+    """Construct a ``GpuDistanceParams`` instance when half precision is requested."""
+
+    if not use_fp16:
+        return None
+
+    params_factory = getattr(faiss, "GpuDistanceParams", None)
+    if params_factory is None:
+        return None
+
+    try:
+        params = params_factory()
+    except Exception:
+        return None
+
+    try:
+        dtype_constant = getattr(faiss, "DistanceDataType_F16", None)
+    except Exception:  # pragma: no cover - defensive guard for unexpected faiss builds
+        dtype_constant = None
+
+    if dtype_constant is not None:
+        try:
+            params.xType = dtype_constant
+            params.yType = dtype_constant
+        except Exception:
+            pass
+
+    if hasattr(params, "use_cuvs"):
+        try:
+            params.use_cuvs = bool(cuvs_enabled)
+        except Exception:
+            pass
+
+    return params
 
 
 def cosine_topk_blockwise(
@@ -2618,41 +2771,70 @@ def cosine_topk_blockwise(
     faiss.normalize_L2(q)
     q_view = q.astype(np.float16, copy=False) if use_fp16 else q
 
-    if not use_fp16:
-        knn_runner = getattr(faiss, "knn_gpu", None)
-        if knn_runner is not None:
-            try:
-                corpus_copy = np.array(C, dtype=np.float32, copy=True, order="C")
-                faiss.normalize_L2(corpus_copy)
-                row_bytes = np.dtype(np.float32).itemsize * C.shape[1]
-                vector_limit = int(block_rows) * row_bytes
-                query_rows = max(int(block_rows), q.shape[0])
-                query_limit = query_rows * np.dtype(np.float32).itemsize * q.shape[1]
-                cuvs_enabled, _, _ = resolve_cuvs_state(use_cuvs)
-                extra_kwargs: dict[str, object] = {}
-                if cuvs_enabled or use_cuvs is not None:
-                    extra_kwargs["use_cuvs"] = cuvs_enabled
-                distances, indices = knn_runner(
-                    resources,
-                    q_view,
-                    corpus_copy,
-                    k,
-                    metric=faiss.METRIC_INNER_PRODUCT,
-                    device=int(device),
-                    vectorsMemoryLimit=vector_limit,
-                    queriesMemoryLimit=query_limit,
-                    **extra_kwargs,
-                )
-            except TypeError:
-                distances = indices = None
-            except Exception:
-                distances = indices = None
-            else:
-                if distances is not None and indices is not None:
-                    return (
-                        np.asarray(distances, dtype=np.float32),
-                        np.asarray(indices, dtype=np.int64),
+    cuvs_enabled, _, _ = resolve_cuvs_state(use_cuvs)
+    distance_params = _build_distance_params(
+        use_fp16=use_fp16,
+        cuvs_enabled=cuvs_enabled,
+    )
+
+    knn_runner = getattr(faiss, "knn_gpu", None)
+    if knn_runner is not None:
+        try:
+            corpus_copy = np.array(C, dtype=np.float32, copy=True, order="C")
+            faiss.normalize_L2(corpus_copy)
+            corpus_view = (
+                corpus_copy.astype(np.float16, copy=False)
+                if use_fp16
+                else corpus_copy
+            )
+            row_bytes = np.dtype(np.float32).itemsize * C.shape[1]
+            vector_limit = int(block_rows) * row_bytes
+            query_rows = max(int(block_rows), q.shape[0])
+            query_limit = (
+                query_rows * np.dtype(np.float32).itemsize * q.shape[1]
+            )
+            extra_kwargs: dict[str, object] = {}
+            if distance_params is not None:
+                extra_kwargs["params"] = distance_params
+            elif cuvs_enabled or use_cuvs is not None:
+                extra_kwargs["use_cuvs"] = cuvs_enabled
+            distances, indices = knn_runner(
+                resources,
+                q_view,
+                corpus_view,
+                k,
+                metric=faiss.METRIC_INNER_PRODUCT,
+                device=int(device),
+                vectorsMemoryLimit=vector_limit,
+                queriesMemoryLimit=query_limit,
+                **extra_kwargs,
+            )
+        except TypeError:
+            if extra_kwargs.pop("params", None) is not None:
+                try:
+                    distances, indices = knn_runner(
+                        resources,
+                        q_view,
+                        corpus_view,
+                        k,
+                        metric=faiss.METRIC_INNER_PRODUCT,
+                        device=int(device),
+                        vectorsMemoryLimit=vector_limit,
+                        queriesMemoryLimit=query_limit,
+                        **extra_kwargs,
                     )
+                except Exception:
+                    distances = indices = None
+            else:
+                distances = indices = None
+        except Exception:
+            distances = indices = None
+        else:
+            if distances is not None and indices is not None:
+                return (
+                    np.asarray(distances, dtype=np.float32),
+                    np.asarray(indices, dtype=np.int64),
+                )
 
     N, M = q.shape[0], C.shape[0]
     best_scores = np.full((N, k), -np.inf, dtype=np.float32)
@@ -2664,13 +2846,31 @@ def cosine_topk_blockwise(
         block = np.array(C[start:end], dtype=np.float32, copy=True)
         faiss.normalize_L2(block)
         block_view = block.astype(np.float16, copy=False) if use_fp16 else block
-        sims = faiss.pairwise_distance_gpu(
-            resources,
-            q_view,
-            block_view,
-            metric=faiss.METRIC_INNER_PRODUCT,
-            device=int(device),
-        )
+        pairwise_kwargs: dict[str, object] = {
+            "metric": faiss.METRIC_INNER_PRODUCT,
+            "device": int(device),
+        }
+        if distance_params is not None:
+            pairwise_kwargs["params"] = distance_params
+
+        try:
+            sims = faiss.pairwise_distance_gpu(
+                resources,
+                q_view,
+                block_view,
+                **pairwise_kwargs,
+            )
+        except TypeError:
+            if pairwise_kwargs.pop("params", None) is not None:
+                sims = faiss.pairwise_distance_gpu(
+                    resources,
+                    q_view,
+                    block_view,
+                    metric=faiss.METRIC_INNER_PRODUCT,
+                    device=int(device),
+                )
+            else:
+                raise
 
         block_idx = np.arange(start, end, dtype=np.int64)
         cand_scores = np.concatenate([best_scores, sims], axis=1)
@@ -2893,6 +3093,62 @@ class ManagedFaissAdapter(DenseVectorStore):
 
         return list(self._inner.range_search(query, min_score, limit=limit))
 
+    def serialize(self) -> bytes:
+        """Serialize the managed FAISS index to bytes."""
+
+        return self._inner.serialize()
+
+    def restore(
+        self,
+        payload: bytes,
+        *,
+        meta: Optional[Mapping[str, object]] = None,
+    ) -> None:
+        """Restore the managed FAISS index from ``payload``."""
+
+        restore_fn = getattr(self._inner, "restore")
+        if meta is None:
+            restore_fn(payload)
+            return
+
+        try:
+            signature = inspect.signature(restore_fn)
+        except (TypeError, ValueError):
+            signature = None
+
+        if signature is not None:
+            for parameter in signature.parameters.values():
+                if parameter.name == "meta" and parameter.kind in (
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    inspect.Parameter.KEYWORD_ONLY,
+                ):
+                    restore_fn(payload, meta=meta)
+                    return
+
+        # Fallback for stores that do not accept snapshot metadata.
+        restore_fn(payload)
+
+    def save(self, path: str) -> None:
+        """Persist the managed FAISS index to ``path``."""
+
+        self._inner.save(path)
+
+    @classmethod
+    def load(
+        cls,
+        path: str,
+        config: DenseIndexConfig,
+        dim: int,
+        *,
+        observability: Optional[Observability] = None,
+    ) -> "ManagedFaissAdapter":
+        """Load a managed FAISS adapter from ``path``."""
+
+        inner = FaissVectorStore.load(
+            path, config=config, dim=dim, observability=observability
+        )
+        return cls(inner)
+
     def needs_training(self) -> bool:
         """Return ``True`` when the underlying index requires training."""
 
@@ -2902,6 +3158,18 @@ class ManagedFaissAdapter(DenseVectorStore):
         """Train the managed index using ``vectors``."""
 
         self._inner.train(vectors)
+
+    @property
+    def config(self) -> DenseIndexConfig:
+        """Return the dense index configuration for the managed store."""
+
+        return self._inner.config
+
+    @property
+    def dim(self) -> int:
+        """Return the embedding dimensionality exposed by the inner store."""
+
+        return self._inner.dim
 
     @property
     def device(self) -> int:

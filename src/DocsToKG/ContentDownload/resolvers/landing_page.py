@@ -91,6 +91,7 @@ class LandingPageResolver(RegisteredResolver):
                     landing,
                     headers=config.polite_headers,
                     timeout=config.get_timeout(self.name),
+                    retry_after_cap=config.retry_after_cap,
                 )
             except _requests.Timeout as exc:
                 yield ResolverResult(

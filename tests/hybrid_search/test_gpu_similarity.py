@@ -52,7 +52,9 @@ def test_cosine_batch_normalizes_copies_and_reuses_contiguous_buffers(shape):
     np.testing.assert_allclose(captured["corpus"], normalized_C)
 
 
-def _make_faiss_stub(*, enable_knn: bool) -> tuple[SimpleNamespace, dict[str, object]]:
+def _make_faiss_stub(
+    *, enable_knn: bool, with_params: bool = False, require_params: bool = False
+) -> tuple[SimpleNamespace, dict[str, object]]:
     state: dict[str, object] = {"pairwise_calls": 0}
 
     def normalize_L2(arr: np.ndarray) -> None:
@@ -66,12 +68,30 @@ def _make_faiss_stub(*, enable_knn: bool) -> tuple[SimpleNamespace, dict[str, ob
         norms[norms == 0] = 1.0
         view /= norms
 
-    def pairwise_distance_gpu(resources, queries, corpus, *, metric, device):
+    def pairwise_distance_gpu(
+        resources,
+        queries,
+        corpus,
+        *,
+        metric,
+        device,
+        params=None,
+    ):
         state["pairwise_calls"] = state.get("pairwise_calls", 0) + 1
+        state["pairwise_params"] = params
+        state["pairwise_queries_dtype"] = getattr(queries, "dtype", None)
+        state["pairwise_corpus_dtype"] = getattr(corpus, "dtype", None)
+        if require_params and with_params and params is None:
+            raise TypeError("params argument is required for this stub")
         return queries.astype(np.float32) @ corpus.astype(np.float32).T
 
     def knn_gpu(resources, queries, corpus, k, **kwargs):
         state["kwargs"] = kwargs
+        state["knn_params"] = kwargs.get("params")
+        state["knn_queries_dtype"] = getattr(queries, "dtype", None)
+        state["knn_corpus_dtype"] = getattr(corpus, "dtype", None)
+        if require_params and with_params and kwargs.get("params") is None:
+            raise TypeError("params argument is required for this stub")
         sims = queries.astype(np.float32) @ corpus.astype(np.float32).T
         order = np.argsort(sims, axis=1)[:, ::-1][:, :k]
         scores = np.take_along_axis(sims, order, axis=1)
@@ -86,14 +106,25 @@ def _make_faiss_stub(*, enable_knn: bool) -> tuple[SimpleNamespace, dict[str, ob
     else:
         pairwise_distance = pairwise_distance_gpu
 
-    stub = SimpleNamespace(
+    namespace_kwargs = dict(
         METRIC_INNER_PRODUCT=1,
         normalize_L2=normalize_L2,
         pairwise_distance_gpu=pairwise_distance,
     )
+    if with_params:
+        namespace_kwargs.update(
+            {
+                "DistanceDataType_F16": "f16",
+                "GpuDistanceParams": lambda: SimpleNamespace(
+                    xType=None,
+                    yType=None,
+                    use_cuvs=None,
+                ),
+            }
+        )
+    stub = SimpleNamespace(**namespace_kwargs)
     if enable_knn:
         stub.knn_gpu = knn_gpu  # type: ignore[attr-defined]
-    state["stub"] = stub
     return stub, state
 
 
@@ -237,6 +268,24 @@ def test_cosine_topk_blockwise_auto_block_rows_uses_memory_budget(monkeypatch):
     C = np.random.default_rng(7).random((128, 4), dtype=np.float32)
 
     cosine_topk_blockwise(
+def test_cosine_topk_blockwise_fp16_knn_uses_distance_params(monkeypatch):
+    stub, state = _make_faiss_stub(
+        enable_knn=True,
+        with_params=True,
+        require_params=True,
+    )
+    monkeypatch.setattr(store_module, "faiss", stub, raising=False)
+    monkeypatch.setattr(
+        store_module,
+        "resolve_cuvs_state",
+        lambda requested: (True, True, True),
+        raising=False,
+    )
+
+    q = np.random.default_rng(6).random((2, 4), dtype=np.float32)
+    C = np.random.default_rng(7).random((16, 4), dtype=np.float32)
+
+    scores, indices = cosine_topk_blockwise(
         q,
         C,
         k=3,
@@ -258,3 +307,77 @@ def test_cosine_topk_blockwise_auto_block_rows_uses_memory_budget(monkeypatch):
     assert kwargs["queriesMemoryLimit"] == expected_query_rows * q.shape[1] * np.dtype(np.float32).itemsize
     assert expected_rows < getattr(store_module, "_COSINE_TOPK_DEFAULT_BLOCK_ROWS", 65_536)
     assert resources.calls >= 1
+        resources=object(),
+        use_fp16=True,
+        use_cuvs=True,
+    )
+
+    q_norm = q.astype(np.float32, copy=True)
+    C_norm = C.astype(np.float32, copy=True)
+    stub.normalize_L2(q_norm)
+    stub.normalize_L2(C_norm)
+    expected = q_norm @ C_norm.T
+    expected_idx = np.argsort(expected, axis=1)[:, ::-1][:, :3]
+    expected_scores = np.take_along_axis(expected, expected_idx, axis=1)
+    np.testing.assert_allclose(scores, expected_scores, rtol=1e-3, atol=1e-4)
+    np.testing.assert_array_equal(indices, expected_idx)
+    assert state.get("pairwise_calls", 0) == 0
+    params = state.get("knn_params")
+    assert params is not None
+    assert params.xType == stub.DistanceDataType_F16
+    assert params.yType == stub.DistanceDataType_F16
+    assert getattr(params, "use_cuvs", None) is True
+    assert state.get("knn_queries_dtype") == np.float16
+    assert state.get("knn_corpus_dtype") == np.float16
+    assert scores.dtype == np.float32
+    assert indices.dtype == np.int64
+
+
+def test_cosine_topk_blockwise_fp16_pairwise_uses_distance_params(monkeypatch):
+    stub, state = _make_faiss_stub(
+        enable_knn=False,
+        with_params=True,
+        require_params=True,
+    )
+    monkeypatch.setattr(store_module, "faiss", stub, raising=False)
+    monkeypatch.setattr(
+        store_module,
+        "resolve_cuvs_state",
+        lambda requested: (True, True, True),
+        raising=False,
+    )
+
+    q = np.random.default_rng(8).random((3, 5), dtype=np.float32)
+    C = np.random.default_rng(9).random((21, 5), dtype=np.float32)
+
+    scores, indices = cosine_topk_blockwise(
+        q,
+        C,
+        k=4,
+        device=0,
+        resources=object(),
+        block_rows=10,
+        use_fp16=True,
+        use_cuvs=True,
+    )
+
+    q_norm = q.astype(np.float32, copy=True)
+    C_norm = C.astype(np.float32, copy=True)
+    stub.normalize_L2(q_norm)
+    stub.normalize_L2(C_norm)
+    expected = q_norm @ C_norm.T
+    expected_idx = np.argsort(expected, axis=1)[:, ::-1][:, :4]
+    expected_scores = np.take_along_axis(expected, expected_idx, axis=1)
+    np.testing.assert_allclose(scores, expected_scores, rtol=1e-3, atol=1e-4)
+    np.testing.assert_array_equal(indices, expected_idx)
+
+    assert state.get("pairwise_calls", 0) > 0
+    params = state.get("pairwise_params")
+    assert params is not None
+    assert params.xType == stub.DistanceDataType_F16
+    assert params.yType == stub.DistanceDataType_F16
+    assert getattr(params, "use_cuvs", None) is True
+    assert state.get("pairwise_queries_dtype") == np.float16
+    assert state.get("pairwise_corpus_dtype") == np.float16
+    assert scores.dtype == np.float32
+    assert indices.dtype == np.int64
