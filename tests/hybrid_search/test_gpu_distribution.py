@@ -276,6 +276,62 @@ def test_distribute_to_all_gpus_uses_non_contiguous_ids(monkeypatch) -> None:
 
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
+def test_distribute_to_all_gpus_manual_path_without_resources(monkeypatch) -> None:
+    """Manual replication without explicit resources must honour requested GPUs."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._replication_enabled = True
+    store._replicated = False
+    store._config = DenseIndexConfig(replication_gpu_ids=(1, 3))
+    store._has_explicit_replication_ids = True
+    store._replication_gpu_ids = (1, 3)
+    store._multi_gpu_mode = "replicate"
+    store._observability = Observability()
+    store._replica_gpu_resources = []
+    store._gpu_resources = None
+    store._temp_memory_bytes = None
+    store._gpu_use_default_null_stream = False
+    store._gpu_use_default_null_stream_all_devices = False
+
+    cpu_index = object()
+
+    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 4, raising=False)
+    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+
+    if hasattr(faiss, "GpuResourcesVector"):
+        monkeypatch.delattr(faiss, "GpuResourcesVector", raising=False)
+
+    captured_gpus: list[int] = []
+    sentinel_index = object()
+
+    def fake_index_cpu_to_gpus_list(index_arg, *, gpus=None, co=None):  # type: ignore[override]
+        captured_gpus.extend(list(gpus or []))
+        return sentinel_index
+
+    monkeypatch.setattr(
+        faiss, "index_cpu_to_gpus_list", fake_index_cpu_to_gpus_list, raising=False
+    )
+    monkeypatch.setattr(
+        faiss,
+        "index_cpu_to_all_gpus",
+        lambda *args, **kwargs: pytest.fail("index_cpu_to_all_gpus should not run"),
+        raising=False,
+    )
+
+    replicated = store.distribute_to_all_gpus(cpu_index, shard=False)
+
+    assert replicated is sentinel_index
+    assert store._replicated is True
+    assert captured_gpus == [1, 3]
+    counters = {
+        (sample.name, tuple(sorted(sample.labels.items()))): sample.value
+        for sample in store._observability.metrics.export_counters()
+    }
+    assert counters.get(("faiss_gpu_manual_resource_path", ())) == 1.0
+    assert store._replica_gpu_resources == []
+
+
+@pytest.mark.skipif(faiss is None, reason="faiss not installed")
 @pytest.mark.parametrize("shard", [False, True])
 def test_distribute_to_all_gpus_respects_explicit_gpu_list(monkeypatch, shard: bool) -> None:
     """Explicit replication ids should use ``index_cpu_to_gpus_list`` with filtering."""

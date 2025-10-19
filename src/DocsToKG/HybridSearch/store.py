@@ -1678,14 +1678,6 @@ class FaissVectorStore(DenseVectorStore):
                         }
                     },
                 )
-                if (not resources_supported) and hasattr(faiss, "index_cpu_to_all_gpus"):
-                    fallback = faiss.index_cpu_to_all_gpus(
-                        base_index,
-                        co=cloner_options,
-                        ngpu=len(gpu_ids),
-                    )
-                    self._replicated = True
-                    return fallback
                 self._replicated = True
                 return multi
 
