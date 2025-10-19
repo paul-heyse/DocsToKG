@@ -1973,6 +1973,10 @@ class FaissVectorStore(DenseVectorStore):
         if expected <= 0:
             return
         reserve = int(expected)
+        participant_count = len(gpu_ids) if gpu_ids else 0
+        if self._multi_gpu_mode == "shard":
+            participants = max(participant_count, 1)
+            reserve = max(1, (reserve + participants - 1) // participants)
 
         applied = False
         try:
