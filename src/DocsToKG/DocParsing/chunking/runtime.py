@@ -1282,18 +1282,6 @@ def _main_inner(
                 else:
                     skip_doc = False
                 if skip_doc:
-                    stage_telemetry.log_skip(
-                        doc_id=doc_id,
-                        input_path=path,
-                        reason="unchanged-input",
-                        metadata={
-                            "input_path": str(path),
-                            "input_hash": input_hash,
-                            "output_path": str(out_path),
-                            "schema_version": CHUNK_SCHEMA_VERSION,
-                            "parse_engine": parse_engine,
-                        },
-                    )
                     log_event(
                         logger,
                         "info",
@@ -1311,6 +1299,8 @@ def _main_inner(
                         input_hash=input_hash,
                         output_path=out_path,
                         schema_version=CHUNK_SCHEMA_VERSION,
+                        reason="unchanged-input",
+                        parse_engine=parse_engine,
                     )
                     continue
 
