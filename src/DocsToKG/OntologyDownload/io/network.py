@@ -676,7 +676,11 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 response.close()
 
     def _preliminary_head_check(
-        self, url: str, session: requests.Session
+        self,
+        url: str,
+        session: requests.Session,
+        *,
+        token_consumed: bool = False,
     ) -> tuple[Optional[str], Optional[int]]:
         """Probe the origin with HEAD to audit media type and size before downloading.
 
@@ -687,6 +691,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
         Args:
             url: Fully qualified download URL resolved by the planner.
             session: Prepared requests session used for outbound calls.
+            token_consumed: Indicates whether the caller already consumed a
+                rate-limit token prior to invoking the HEAD request.
 
         Returns:
             Tuple ``(content_type, content_length)`` extracted from response
@@ -695,6 +701,9 @@ class StreamingDownloader(pooch.HTTPDownloader):
         Raises:
             PolicyError: Propagates download policy errors encountered during the HEAD request.
         """
+
+        if self.bucket is not None and not token_consumed:
+            self.bucket.consume()
 
         try:
             with self._request_with_redirect_audit(
@@ -865,7 +874,16 @@ class StreamingDownloader(pooch.HTTPDownloader):
             host=self.origin_host,
             http_config=self.http_config,
         ) as session:
-            head_content_type, head_content_length = self._preliminary_head_check(url, session)
+            head_token_consumed = False
+            if self.bucket is not None:
+                self.bucket.consume()
+                head_token_consumed = True
+
+            head_content_type, head_content_length = self._preliminary_head_check(
+                url,
+                session,
+                token_consumed=head_token_consumed,
+            )
             self.head_content_type = head_content_type
             self.head_content_length = head_content_length
             if head_content_type:
