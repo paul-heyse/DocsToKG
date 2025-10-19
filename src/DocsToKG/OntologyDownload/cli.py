@@ -49,6 +49,7 @@ from .manifests import (
     plan_to_dict,
     results_to_dict,
     specs_from_lock_payload,
+    write_json_atomic,
     write_lockfile,
 )
 from .planning import (
@@ -1400,7 +1401,7 @@ def _handle_validate(args, config: ResolvedConfig) -> dict:
     )
     results = run_validators(requests, logger)
     manifest["validation"] = {name: result.to_dict() for name, result in results.items()}
-    manifest_path.write_text(json.dumps(manifest, indent=2))
+    write_json_atomic(manifest_path, manifest)
     return manifest["validation"]
 
 
