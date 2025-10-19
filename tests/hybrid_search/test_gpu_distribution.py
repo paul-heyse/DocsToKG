@@ -362,20 +362,38 @@ def test_distribute_to_all_gpus_skips_invalid_targets(monkeypatch, caplog) -> No
     monkeypatch.setattr(faiss, "index_cpu_to_all_gpus", fail_index_cpu_to_all_gpus, raising=False)
 
     caplog.set_level(logging.DEBUG)
+    caplog.set_level(logging.INFO, logger="DocsToKG.HybridSearch")
 
     replicated = store.distribute_to_all_gpus(cpu_index, shard=False)
 
     assert replicated is cpu_index
     assert store._replicated is False
+
+    counters = {
+        (sample.name, tuple(sorted(sample.labels.items()))): sample.value
+        for sample in store._observability.metrics.export_counters()
+    }
+    assert counters.get(
+        (
+            "faiss_gpu_explicit_target_unavailable",
+            (("reason", "insufficient_filtered_targets"),),
+        )
+    ) == 1.0
+
+    assert any(
+        record.getMessage() == "faiss-explicit-gpu-targets-partially-unavailable"
+        for record in caplog.records
+        if record.name == "DocsToKG.HybridSearch"
+    )
     assert any("Insufficient GPU targets" in record.getMessage() for record in caplog.records)
 
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
 @pytest.mark.parametrize(
-    "replication_ids, available, expected_count, expected_selected",
+    "replication_ids, available, expected_count, expect_fallback, expected_selected",
     [
-        (None, 3, 3, None),
-        ((0, 2, 7), 4, 2, [0, 2]),
+        (None, 3, 3, True, []),
+        ((0, 2, 7), 4, 2, False, [0, 2]),
     ],
 )
 def test_distribute_to_all_gpus_fallback_uses_gpu_count(
@@ -383,7 +401,8 @@ def test_distribute_to_all_gpus_fallback_uses_gpu_count(
     replication_ids: tuple[int, ...] | None,
     available: int,
     expected_count: int,
-    expected_selected: list[int] | None,
+    expect_fallback: bool,
+    expected_selected: list[int],
 ) -> None:
     """Fallback replication should respect the resolved GPU ids/count."""
 
@@ -441,10 +460,165 @@ def test_distribute_to_all_gpus_fallback_uses_gpu_count(
 
     assert replicated is cpu_index
     assert store._replicated is True
-    assert fallback_calls, "Expected fallback replication to invoke index_cpu_to_all_gpus"
-    assert fallback_calls[-1]["ngpu"] == expected_count
 
-    if expected_selected is not None:
-        assert captured_gpus == expected_selected
-    else:
+    if expect_fallback:
+        assert fallback_calls, "Expected fallback replication to invoke index_cpu_to_all_gpus"
+        assert fallback_calls[-1]["ngpu"] == expected_count
         assert captured_gpus == []
+    else:
+        assert fallback_calls == []
+        assert captured_gpus == expected_selected
+
+
+@pytest.mark.skipif(faiss is None, reason="faiss not installed")
+def test_distribute_to_all_gpus_reports_missing_manual_helper(monkeypatch, caplog) -> None:
+    """Explicit GPU targets should emit telemetry when helpers are unavailable."""
+
+    if not hasattr(faiss, "index_cpu_to_gpus_list"):
+        pytest.skip("faiss build already missing index_cpu_to_gpus_list")
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._replication_enabled = True
+    store._replicated = False
+    store._config = DenseIndexConfig(replication_gpu_ids=(0, 1))
+    store._has_explicit_replication_ids = True
+    store._replication_gpu_ids = (0, 1)
+    store._multi_gpu_mode = "replicate"
+    store._observability = Observability()
+
+    cpu_index = object()
+
+    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 2, raising=False)
+    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+
+    caplog.set_level(logging.WARNING)
+    caplog.set_level(logging.WARNING, logger="DocsToKG.HybridSearch")
+
+    monkeypatch.delattr(faiss, "index_cpu_to_gpus_list", raising=False)
+
+    replicated = store.distribute_to_all_gpus(cpu_index, shard=False)
+
+    assert replicated is cpu_index
+    assert store._replicated is False
+
+    counters = {
+        (sample.name, tuple(sorted(sample.labels.items()))): sample.value
+        for sample in store._observability.metrics.export_counters()
+    }
+    assert counters.get(
+        (
+            "faiss_gpu_explicit_target_unavailable",
+            (("reason", "missing_index_cpu_to_gpus_list"),),
+        )
+    ) == 1.0
+
+    assert any(
+        record.getMessage() == "faiss-explicit-gpu-targets-unavailable"
+        for record in caplog.records
+        if record.name == "DocsToKG.HybridSearch"
+    )
+
+
+@pytest.mark.skipif(faiss is None, reason="faiss not installed")
+def test_distribute_to_all_gpus_manual_path_without_resources_vector(monkeypatch, caplog) -> None:
+    """Manual GPU replication should respect ids even without GpuResourcesVector."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._replication_enabled = True
+    store._replicated = False
+    store._config = DenseIndexConfig(replication_gpu_ids=(1, 3))
+    store._has_explicit_replication_ids = True
+    store._replication_gpu_ids = (1, 3)
+    store._multi_gpu_mode = "replicate"
+    store._observability = Observability()
+    store._temp_memory_bytes = temp_memory
+    store._gpu_use_default_null_stream = False
+    store._gpu_use_default_null_stream_all_devices = False
+    store._replica_gpu_resources = []
+    store._gpu_resources = None
+
+    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 4, raising=False)
+    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+
+    if hasattr(faiss, "GpuResourcesVector"):
+        monkeypatch.delattr(faiss, "GpuResourcesVector", raising=False)
+
+    caplog.set_level(logging.INFO, logger="DocsToKG.HybridSearch")
+
+    captured_gpus: list[int] = []
+    sentinel = object()
+
+    def fake_index_cpu_to_gpus_list(index_arg, *, gpus=None, co=None):  # type: ignore[override]
+        captured_gpus.extend(list(gpus or []))
+        return sentinel
+
+    monkeypatch.setattr(
+        faiss,
+        "index_cpu_to_gpus_list",
+        fake_index_cpu_to_gpus_list,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        faiss,
+        "index_cpu_to_all_gpus",
+        lambda *args, **kwargs: pytest.fail("index_cpu_to_all_gpus should not run"),
+        raising=False,
+    )
+
+    configured_devices: list[int | None] = []
+    created_resources: list[object] = []
+
+    class StubResource:
+        def __init__(self) -> None:
+            self.temp_memory_calls: list[int] = []
+
+        def setTempMemory(self, value: int) -> None:
+            self.temp_memory_calls.append(value)
+
+        def setDefaultNullStreamAllDevices(self) -> None:  # pragma: no cover - stubbed
+            return None
+
+        def setDefaultNullStream(self, device: int | None = None) -> None:  # pragma: no cover
+            return None
+
+    def fake_create(self, *, device=None):
+        resource = StubResource()
+        created_resources.append(resource)
+        return resource
+
+    def fake_configure(self, resource, *, device=None):
+        configured_devices.append(device)
+        if hasattr(resource, "setTempMemory"):
+            resource.setTempMemory(temp_memory)
+
+    monkeypatch.setattr(
+        FaissVectorStore,
+        "_create_gpu_resources",
+        fake_create,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        FaissVectorStore,
+        "_configure_gpu_resource",
+        fake_configure,
+        raising=False,
+    )
+
+    replicated = store.distribute_to_all_gpus(object(), shard=False)
+
+    assert replicated is sentinel
+    assert store._replicated is True
+    assert captured_gpus == [1, 3]
+    assert configured_devices == [1, 3]
+    assert store._replica_gpu_resources == created_resources
+
+    counters = {
+        (sample.name, tuple(sorted(sample.labels.items()))): sample.value
+        for sample in store._observability.metrics.export_counters()
+    }
+    assert counters.get(("faiss_gpu_manual_resource_path", ())) == 1.0
+    assert any(
+        record.getMessage() == "faiss-manual-resource-path-engaged"
+        for record in caplog.records
+        if record.name == "DocsToKG.HybridSearch"
+    )

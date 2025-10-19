@@ -1525,6 +1525,21 @@ class FaissVectorStore(DenseVectorStore):
             logger.warning(
                 "FAISS build missing index_cpu_to_gpus_list; cannot honour explicit replication gpu ids"
             )
+            self._observability.metrics.increment(
+                "faiss_gpu_explicit_target_unavailable",
+                reason="missing_index_cpu_to_gpus_list",
+            )
+            self._observability.logger.warning(
+                "faiss-explicit-gpu-targets-unavailable",
+                extra={
+                    "event": {
+                        "component": "faiss",
+                        "action": "explicit_gpu_targets_unavailable",
+                        "reason": "missing_index_cpu_to_gpus_list",
+                        "requested_gpu_ids": tuple(self._replication_gpu_ids or ()),
+                    }
+                },
+            )
             return index
         if not explicit_targets_configured and not hasattr(faiss, "index_cpu_to_all_gpus"):
             if shard:
@@ -1558,6 +1573,21 @@ class FaissVectorStore(DenseVectorStore):
                             }
                         },
                     )
+                self._observability.metrics.increment(
+                    "faiss_gpu_explicit_target_unavailable",
+                    reason="insufficient_filtered_targets",
+                )
+                self._observability.logger.info(
+                    "faiss-explicit-gpu-targets-partially-unavailable",
+                    extra={
+                        "event": {
+                            "component": "faiss",
+                            "action": "explicit_gpu_targets_filtered",
+                            "requested_gpu_ids": tuple(self._replication_gpu_ids or ()),
+                            "filtered_gpu_ids": target_gpus,
+                        }
+                    },
+                )
                 return index
 
         gpu_count = len(target_gpus) if explicit_targets_configured else available_gpus
@@ -1678,14 +1708,6 @@ class FaissVectorStore(DenseVectorStore):
                         }
                     },
                 )
-                if (not resources_supported) and hasattr(faiss, "index_cpu_to_all_gpus"):
-                    fallback = faiss.index_cpu_to_all_gpus(
-                        base_index,
-                        co=cloner_options,
-                        ngpu=len(gpu_ids),
-                    )
-                    self._replicated = True
-                    return fallback
                 self._replicated = True
                 return multi
 
