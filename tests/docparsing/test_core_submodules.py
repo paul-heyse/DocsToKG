@@ -355,6 +355,114 @@ def test_embed_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> Non
     assert "cannot be combined" in captured.err
 
 
+@pytest.mark.filterwarnings(
+    "ignore:Using `@model_validator`:pydantic.warnings.PydanticDeprecatedSince212"
+)
+def test_embed_plan_only_stops_after_summary(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Plan-only embed mode exits before Pass B and stops tracemalloc."""
+
+    import DocsToKG.DocParsing.embedding.runtime as embedding_runtime
+
+    chunks_dir = tmp_path / "chunks"
+    chunks_dir.mkdir()
+    chunk_file = chunks_dir / "doc.chunks.jsonl"
+    chunk_file.write_text('{"schema_version": "1.0"}\n', encoding="utf-8")
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+
+    monkeypatch.setattr(embedding_runtime, "ensure_model_environment", lambda: (tmp_path, tmp_path))
+
+    def _expand_path(path: object) -> Path:
+        if path is None:
+            return tmp_path
+        return Path(path).expanduser().resolve()
+
+    monkeypatch.setattr(embedding_runtime, "expand_path", _expand_path)
+    monkeypatch.setattr(embedding_runtime, "_resolve_qwen_dir", lambda root: root / "qwen")
+    monkeypatch.setattr(embedding_runtime, "_resolve_splade_dir", lambda root: root / "splade")
+    monkeypatch.setattr(
+        embedding_runtime,
+        "ensure_splade_environment",
+        lambda **_: {"device": "cpu"},
+    )
+    monkeypatch.setattr(
+        embedding_runtime,
+        "ensure_qwen_environment",
+        lambda **_: {"device": "cpu", "dtype": "fp16"},
+    )
+    monkeypatch.setattr(embedding_runtime, "_ensure_splade_dependencies", lambda: None)
+    monkeypatch.setattr(embedding_runtime, "_ensure_qwen_dependencies", lambda: None)
+    monkeypatch.setattr(embedding_runtime, "prepare_data_root", lambda override, detected: tmp_path)
+    monkeypatch.setattr(embedding_runtime, "detect_data_root", lambda: tmp_path)
+    monkeypatch.setattr(embedding_runtime, "data_chunks", lambda _root, ensure=False: chunks_dir)
+    monkeypatch.setattr(embedding_runtime, "data_vectors", lambda _root, ensure=False: vectors_dir)
+    monkeypatch.setattr(
+        embedding_runtime,
+        "resolve_pipeline_path",
+        lambda cli_value, default_path, resolved_data_root, data_root_overridden, resolver: (
+            cli_value or default_path
+        ),
+    )
+    monkeypatch.setattr(embedding_runtime, "load_manifest_index", lambda *_, **__: {})
+    monkeypatch.setattr(embedding_runtime, "manifest_log_success", lambda **_: None)
+    monkeypatch.setattr(embedding_runtime, "manifest_log_skip", lambda **_: None)
+    monkeypatch.setattr(embedding_runtime, "manifest_log_failure", lambda **_: None)
+    monkeypatch.setattr(embedding_runtime, "_validate_chunk_file_schema", lambda _path: None)
+    monkeypatch.setattr(embedding_runtime, "_handle_embedding_quarantine", lambda **_: None)
+
+    def _fail_process(*_args, **_kwargs):
+        raise AssertionError("plan-only should not encode")
+
+    monkeypatch.setattr(embedding_runtime, "process_chunk_file_vectors", _fail_process)
+
+    trace_state = {"tracing": False, "stop_calls": 0}
+
+    def _start() -> None:
+        trace_state["tracing"] = True
+
+    def _stop() -> None:
+        trace_state["tracing"] = False
+        trace_state["stop_calls"] += 1
+
+    def _is_tracing() -> bool:
+        return trace_state["tracing"]
+
+    def _get_traced_memory():  # type: ignore[override]
+        raise AssertionError("plan-only should exit before collecting tracemalloc stats")
+
+    monkeypatch.setattr(
+        embedding_runtime,
+        "tracemalloc",
+        types.SimpleNamespace(
+            start=_start,
+            stop=_stop,
+            is_tracing=_is_tracing,
+            get_traced_memory=_get_traced_memory,
+        ),
+    )
+
+    exit_code = core_cli.embed(
+        [
+            "--plan-only",
+            "--chunks-dir",
+            str(chunks_dir),
+            "--out-dir",
+            str(vectors_dir),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "docparse embed plan" in captured.out
+    assert "process 1" in captured.out
+    assert trace_state["stop_calls"] == 1
+    assert not trace_state["tracing"]
+
+
 def test_token_profiles_missing_transformers(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
