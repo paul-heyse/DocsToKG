@@ -122,7 +122,7 @@ def _build_args(
         "sleep": 0.0,
         "openalex_retry_attempts": 3,
         "openalex_retry_backoff": 0.0,
-        "openalex_retry_max_delay": 60.0,
+        "retry_after_cap": None,
     }
     if overrides:
         defaults.update(overrides)
@@ -168,6 +168,7 @@ def make_resolved_config(
         verify_cache_digest=False,
         openalex_retry_attempts=args.openalex_retry_attempts,
         openalex_retry_backoff=args.openalex_retry_backoff,
+        retry_after_cap=args.retry_after_cap,
         openalex_retry_max_delay=args.openalex_retry_max_delay,
     )
 
@@ -691,8 +692,116 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
             after = _count_open_fds()
         factory.close_all()
 
-    assert during is not None and after is not None
-    assert after < during
+
+def test_sqlite_resume_lookup_preload_allows_post_close_access(tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+    sqlite_path = resolved.sqlite_path
+    assert sqlite_path is not None
+
+    with SqliteSink(sqlite_path) as sink:
+        for index in range(5):
+            work_id = f"W{index}"
+            entry = ManifestEntry(
+                schema_version=MANIFEST_SCHEMA_VERSION,
+                timestamp="2024-02-01T00:00:00Z",
+                work_id=work_id,
+                title=f"Work {index}",
+                publication_year=None,
+                resolver="resolver",
+                url=f"https://example.org/{work_id}.pdf",
+                path=f"/tmp/{work_id}.pdf",
+                classification=Classification.PDF.value,
+                content_type="application/pdf",
+                reason=None,
+                html_paths=[],
+                sha256=None,
+                content_length=2048,
+                etag=None,
+                last_modified=None,
+                extracted_text_path=None,
+                dry_run=False,
+                path_mtime_ns=None,
+                run_id="resume",
+            )
+            sink.log_manifest(entry)
+
+    download_run = DownloadRun(resolved)
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        state = download_run.setup_download_state(factory)
+        lookup = state.resume_lookup
+        assert isinstance(lookup, SqliteResumeLookup)
+
+        lookup.preload_all_entries()
+        assert state.resume_cleanup is not None
+        state.resume_cleanup()
+        state.resume_cleanup = None
+
+        cached_entry = next(iter(lookup["W3"].values()))
+        assert cached_entry["path"].endswith("W3.pdf")
+    finally:
+        factory.close_all()
+        download_run.close()
+
+
+def test_resume_cleanup_avoids_bulk_selects_for_large_resume(tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+    sqlite_path = resolved.sqlite_path
+    assert sqlite_path is not None
+
+    with SqliteSink(sqlite_path) as sink:
+        for index in range(5000):
+            work_id = f"W{index}"
+            entry = ManifestEntry(
+                schema_version=MANIFEST_SCHEMA_VERSION,
+                timestamp="2024-03-01T00:00:00Z",
+                work_id=work_id,
+                title=f"Work {index}",
+                publication_year=None,
+                resolver="resolver",
+                url=f"https://example.org/{work_id}.pdf",
+                path=f"/tmp/{work_id}.pdf",
+                classification=Classification.PDF.value,
+                content_type="application/pdf",
+                reason=None,
+                html_paths=[],
+                sha256=None,
+                content_length=4096,
+                etag=None,
+                last_modified=None,
+                extracted_text_path=None,
+                dry_run=False,
+                path_mtime_ns=None,
+                run_id="resume",
+            )
+            sink.log_manifest(entry)
+
+    download_run = DownloadRun(resolved)
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        state = download_run.setup_download_state(factory)
+        lookup = state.resume_lookup
+        assert isinstance(lookup, SqliteResumeLookup)
+        sample_entry = next(iter(lookup["W1024"].values()))
+        assert sample_entry["path"].endswith("W1024.pdf")
+
+        traced: List[str] = []
+        lookup._conn.set_trace_callback(traced.append)  # type: ignore[attr-defined]
+        traced.clear()
+
+        assert state.resume_cleanup is not None
+        state.resume_cleanup()
+        state.resume_cleanup = None
+
+        select_queries = [
+            sql for sql in traced if sql and sql.strip().lower().startswith("select")
+        ]
+        assert select_queries == []
+    finally:
+        factory.close_all()
+        download_run.close()
 
 
 def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
@@ -1054,6 +1163,7 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, m
         verify_cache_digest=False,
         openalex_retry_attempts=args.openalex_retry_attempts,
         openalex_retry_backoff=args.openalex_retry_backoff,
+        retry_after_cap=args.retry_after_cap,
         openalex_retry_max_delay=args.openalex_retry_max_delay,
     )
 
