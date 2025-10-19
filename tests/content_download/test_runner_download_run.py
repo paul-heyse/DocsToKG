@@ -761,6 +761,17 @@ def test_download_run_run_processes_artifacts(patcher, tmp_path):
     assert result.saved == 2
     assert result.bytes_downloaded == 84
 
+    summary_path = resolved.manifest_path.with_suffix(".summary.json")
+    metrics_path = resolved.manifest_path.with_suffix(".metrics.json")
+
+    assert summary_path.exists()
+    summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert summary_payload == result.summary_record
+
+    assert metrics_path.exists()
+    metrics_payload = json.loads(metrics_path.read_text(encoding="utf-8"))
+    assert metrics_payload == result.summary_record
+
     download_run.close()
 
 
