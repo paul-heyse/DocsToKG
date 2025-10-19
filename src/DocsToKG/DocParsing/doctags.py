@@ -288,6 +288,7 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    Mapping,
     Optional,
     Tuple,
 )
@@ -304,6 +305,7 @@ from DocsToKG.DocParsing.core import (
     DEFAULT_HTTP_TIMEOUT,
     CLIOption,
     ResumeController,
+    should_skip_output,
     acquire_lock,
     build_subcommand,
     derive_doc_id_and_doctags_path,
@@ -2495,8 +2497,22 @@ def html_main(args: argparse.Namespace | None = None) -> int:
             rel_path = path.relative_to(input_dir)
             doc_id = rel_path.as_posix()
             out_path = (output_dir / rel_path).with_suffix(".doctags")
-            input_hash = compute_content_hash(path)
-            skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+            manifest_entry = resume_controller.entry(doc_id)
+            should_hash_for_resume = bool(
+                cfg.resume and not cfg.force and manifest_entry and not cfg.overwrite
+            )
+            input_hash: Optional[str] = None
+            skip_doc = False
+            if should_hash_for_resume:
+                input_hash = compute_content_hash(path)
+                skip_doc = should_skip_output(
+                    out_path,
+                    manifest_entry,
+                    input_hash,
+                    resume_controller.resume,
+                    resume_controller.force,
+                )
+
             if skip_doc and not cfg.overwrite:
                 log_event(
                     logger,
@@ -2519,6 +2535,16 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 )
                 skip += 1
                 continue
+
+            if input_hash is None and not cfg.overwrite:
+                input_hash = compute_content_hash(path)
+            if input_hash is None:
+                if manifest_entry and isinstance(manifest_entry, Mapping):
+                    stored_hash = manifest_entry.get("input_hash")
+                    input_hash = stored_hash if isinstance(stored_hash, str) else ""
+                else:
+                    input_hash = ""
+
             tasks.append(
                 HtmlTask(
                     html_path=path,

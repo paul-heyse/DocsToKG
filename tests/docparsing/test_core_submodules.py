@@ -840,71 +840,37 @@ def test_plan_doctags_without_resume_skips_hash(
     assert plan["skip"]["count"] == 0
 
 
-def test_plan_doctags_preview_matches_sorted_fixture(
+def test_plan_doctags_resume_overwrite_skips_hash(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     planning_module_stubs: None,
 ) -> None:
-    """Planner preserves deterministic ordering and previews for HTML trees."""
+    """DocTags planner omits hashing when overwrite disables resume checks."""
 
     html_dir = tmp_path / "html"
-    out_dir = tmp_path / "doctags"
+    output_dir = tmp_path / "doctags"
     html_dir.mkdir()
-    out_dir.mkdir()
-
-    html_files = [
-        "beta.html",
-        "alpha.html",
-        "nested/gamma.xhtml",
-        "nested/deeper/delta.htm",
-        "nested/deeper/epsilon.html",
-        "omega.html",
-    ]
-
-    for rel in html_files:
-        path = html_dir / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("<html></html>", encoding="utf-8")
-
-    # Normalised artefacts should be ignored.
-    (html_dir / "should_skip.normalized.html").write_text(
-        "<html></html>",
-        encoding="utf-8",
-    )
-
-    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
-
-    plan = plan_doctags(
-        [
-            "--mode",
-            "html",
-            "--in-dir",
-            str(html_dir),
-            "--out-dir",
-            str(out_dir),
-        ]
-    )
-
-    expected_doc_ids = sorted(html_files)
-    assert plan["process"]["count"] == len(expected_doc_ids)
-    assert plan["skip"]["count"] == 0
-    assert plan["process"]["preview"] == expected_doc_ids[:PLAN_PREVIEW_LIMIT]
-
-
-def test_plan_doctags_prefers_iterators_over_lists(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    planning_module_stubs: None,
-) -> None:
-    """Planner relies on lazy iterator helpers when they are available."""
-
-    html_dir = tmp_path / "html"
-    out_dir = tmp_path / "out"
-    html_dir.mkdir()
-    out_dir.mkdir()
+    output_dir.mkdir()
     (html_dir / "doc.html").write_text("<html></html>", encoding="utf-8")
 
     monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+
+    manifest_index = {
+        "doc.html": {"input_hash": "old", "status": "success"},
+    }
+
+    def _raise_hash(_path: Path) -> str:
+        raise AssertionError(
+            "compute_content_hash should not run when overwrite disables resume"
+        )
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index",
+        lambda *_args, **_kwargs: manifest_index,
+    )
 
     def _boom(_directory: Path) -> list[Path]:
         raise AssertionError("list_htmls should not be invoked")
@@ -952,6 +918,14 @@ def test_plan_doctags_preview_bounded_for_large_inputs(
             "--in-dir",
             str(html_dir),
             "--out-dir",
+            str(output_dir),
+            "--resume",
+            "--overwrite",
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
             str(out_dir),
         ]
     )

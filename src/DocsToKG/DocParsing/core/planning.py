@@ -158,7 +158,9 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
     for path in files:
         doc_id, out_path = derive_doc_id_and_doctags_path(path, input_dir, output_dir)
         manifest_entry = resume_controller.entry(doc_id)
-        should_hash = bool(args.resume and not args.force and manifest_entry)
+        should_hash = bool(
+            args.resume and not args.force and manifest_entry and not overwrite
+        )
         skip = False
         if should_hash:
             input_hash = compute_content_hash(path)
