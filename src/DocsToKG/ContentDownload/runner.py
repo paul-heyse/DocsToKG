@@ -399,8 +399,6 @@ class DownloadRun:
                 else:
                     resume_lookup = sqlite_lookup
                     used_sqlite = True
-                    # Enable preloading for offline access after close (when using SQLite fallback)
-                    sqlite_lookup.enable_preload_on_close()
             except Exception:
                 if cleanup_callback is not None:
                     with contextlib.suppress(Exception):
