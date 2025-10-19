@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 import typing
 from types import TracebackType as _TypesTracebackType
 from typing import Dict, Iterable, List, Optional
+
+import pytest
+import requests
 
 if not hasattr(typing, "TracebackType"):
     typing.TracebackType = _TypesTracebackType  # type: ignore[attr-defined]
@@ -99,3 +104,92 @@ def test_provider_with_query_only_iterates_all_results(tmp_path) -> None:
     assert artifacts == ["W1", "W2", "W3", "W4", "W5"]
     assert works.paginate_calls == [{"per_page": 200, "n_max": None}]
     assert works.pages_iterated == 3
+
+
+@pytest.mark.parametrize("retry_after_format", ["numeric", "http-date"])
+def test_iterate_openalex_retries_with_retry_after_headers(
+    monkeypatch: pytest.MonkeyPatch, retry_after_format: str
+) -> None:
+    class _RetryAfterPager:
+        def __init__(self, pages: Iterable[Iterable[Dict[str, object]]], header: str) -> None:
+            self._pages = [list(page) for page in pages]
+            self._header = header
+            self._index = 0
+            self.calls = 0
+            self.failures = 0
+
+        def __iter__(self) -> "_RetryAfterPager":
+            return self
+
+        def __next__(self) -> Iterable[Dict[str, object]]:
+            self.calls += 1
+            if self.failures == 0:
+                self.failures += 1
+                response = requests.Response()
+                response.status_code = 429
+                response.headers["Retry-After"] = self._header
+                error = requests.HTTPError("rate limited")
+                error.response = response
+                raise error
+            if self._index >= len(self._pages):
+                raise StopIteration
+            page = self._pages[self._index]
+            self._index += 1
+            return list(page)
+
+    class _RetryAfterWorks:
+        def __init__(self, header: str) -> None:
+            self._header = header
+            self.paginate_calls: List[Dict[str, Optional[int]]] = []
+            self.pages_iterated = 0
+            self.pager: Optional[_RetryAfterPager] = None
+
+        def paginate(
+            self, per_page: int, n_max: Optional[int] = None
+        ) -> Iterable[Iterable[Dict[str, object]]]:
+            self.paginate_calls.append({"per_page": per_page, "n_max": n_max})
+            pager = _RetryAfterPager([[{"id": "W1"}]], self._header)
+            self.pager = pager
+            return pager
+
+    if retry_after_format == "numeric":
+        header_value = "120"
+    else:
+        future = datetime.now(timezone.utc) + timedelta(minutes=5)
+        header_value = format_datetime(future)
+
+    works = _RetryAfterWorks(header_value)
+    sleeps: List[float] = []
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.time.sleep",
+        lambda seconds: sleeps.append(seconds),
+    )
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.random.uniform",
+        lambda _low, _high: 0.0,
+    )
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.base_backoff",
+        2.0,
+        raising=False,
+    )
+
+    results = list(
+        iterate_openalex(
+            works,
+            per_page=1,
+            max_results=None,
+            retry_attempts=3,
+            retry_backoff=2.0,
+            retry_max_delay=3.0,
+            retry_after_cap=3.0,
+        )
+    )
+
+    assert [item["id"] for item in results] == ["W1"]
+    assert works.paginate_calls == [{"per_page": 1, "n_max": None}]
+    assert works.pager is not None
+    assert works.pager.failures == 1
+    assert len(sleeps) == works.pager.failures == 1
+    assert sleeps == [pytest.approx(3.0)]
