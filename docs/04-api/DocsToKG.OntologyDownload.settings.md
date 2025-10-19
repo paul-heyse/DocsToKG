@@ -179,7 +179,7 @@ Return the union of default ports and user-configured allowances.
 
 ### `normalized_allowed_hosts(self)`
 
-Split allowed host list into exact domains, wildcard suffixes, and per-host port allowances.
+Split allowed host list into exact domains, wildcard suffixes, per-host port allowances, and tracked IP literals.
 
 ### `polite_http_headers(self)`
 

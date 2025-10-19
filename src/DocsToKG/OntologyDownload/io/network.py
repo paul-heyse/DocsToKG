@@ -244,20 +244,26 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
     allowed_exact: Set[str] = set()
     allowed_suffixes: Set[str] = set()
     allowed_host_ports: Dict[str, Set[int]] = {}
+    allowed_ip_literals: Set[str] = set()
     allowed_port_set = http_config.allowed_port_set() if http_config else {80, 443}
     if http_config:
         normalized = http_config.normalized_allowed_hosts()
         if normalized:
-            allowed_exact, allowed_suffixes, allowed_host_ports = normalized
+            allowed_exact, allowed_suffixes, allowed_host_ports, allowed_ip_literals = normalized
 
     allow_private = False
     if allowed_exact or allowed_suffixes:
-        if ascii_host in allowed_exact or any(
+        matched_exact = ascii_host in allowed_exact
+        matched_suffix = any(
             ascii_host == suffix or ascii_host.endswith(f".{suffix}") for suffix in allowed_suffixes
-        ):
-            allow_private = True
-        else:
+        )
+        if not (matched_exact or matched_suffix):
             raise PolicyError(f"Host {host} not in allowlist")
+
+        if matched_exact and ascii_host in allowed_ip_literals:
+            allow_private = True
+        elif http_config and http_config.allow_private_networks_for_host_allowlist:
+            allow_private = True
 
     if scheme == "http":
         if allow_private:
