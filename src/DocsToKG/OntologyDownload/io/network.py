@@ -87,7 +87,7 @@ for canonical, aliases in _RDF_ALIAS_GROUPS.items():
         RDF_MIME_FORMAT_LABELS[alias] = label
 
 SESSION_POOL_CACHE_DEFAULT = 2
-_RETRYABLE_HTTP_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
+_RETRYABLE_HTTP_STATUSES = {408, 409, 416, 425, 429, 500, 502, 503, 504}
 
 T = TypeVar("T")
 
@@ -244,20 +244,26 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
     allowed_exact: Set[str] = set()
     allowed_suffixes: Set[str] = set()
     allowed_host_ports: Dict[str, Set[int]] = {}
+    allowed_ip_literals: Set[str] = set()
     allowed_port_set = http_config.allowed_port_set() if http_config else {80, 443}
     if http_config:
         normalized = http_config.normalized_allowed_hosts()
         if normalized:
-            allowed_exact, allowed_suffixes, allowed_host_ports = normalized
+            allowed_exact, allowed_suffixes, allowed_host_ports, allowed_ip_literals = normalized
 
     allow_private = False
     if allowed_exact or allowed_suffixes:
-        if ascii_host in allowed_exact or any(
+        matched_exact = ascii_host in allowed_exact
+        matched_suffix = any(
             ascii_host == suffix or ascii_host.endswith(f".{suffix}") for suffix in allowed_suffixes
-        ):
-            allow_private = True
-        else:
+        )
+        if not (matched_exact or matched_suffix):
             raise PolicyError(f"Host {host} not in allowlist")
+
+        if matched_exact and ascii_host in allowed_ip_literals:
+            allow_private = True
+        elif http_config and http_config.allow_private_networks_for_host_allowlist:
+            allow_private = True
 
     if scheme == "http":
         if allow_private:
@@ -774,6 +780,52 @@ class StreamingDownloader(pooch.HTTPDownloader):
         ) as response:
             yield response
 
+    def _sleep_with_cancellation(
+        self,
+        delay: float,
+        *,
+        remaining_budget: Optional[Callable[[], float]] = None,
+        timeout_callback: Optional[Callable[[], None]] = None,
+    ) -> None:
+        """Sleep in short increments while monitoring cancellation state."""
+
+        if delay <= 0:
+            return
+
+        callback_invoked = False
+        deadline = time.monotonic() + delay
+        poll_interval = 0.5
+
+        while True:
+            if self.cancellation_token and self.cancellation_token.is_cancelled():
+                self.logger.info(
+                    "download cancelled during HEAD retry backoff",
+                    extra={
+                        "stage": "download",
+                        "status": "cancelled",
+                    },
+                )
+                raise DownloadFailure(
+                    "Download was cancelled during HEAD retry backoff",
+                    retryable=False,
+                )
+
+            if remaining_budget is not None:
+                budget_remaining = remaining_budget()
+                if (
+                    timeout_callback is not None
+                    and budget_remaining <= 0
+                    and not callback_invoked
+                ):
+                    timeout_callback()
+                    callback_invoked = True
+
+            remaining_sleep = deadline - time.monotonic()
+            if remaining_sleep <= 0:
+                break
+
+            time.sleep(min(poll_interval, remaining_sleep))
+
     def _preliminary_head_check(
         self,
         url: str,
@@ -883,7 +935,11 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                     timeout_callback()
                             if self.bucket is not None and token_consumed:
                                 self._reuse_head_token = True
-                            time.sleep(retry_after_delay)
+                            self._sleep_with_cancellation(
+                                retry_after_delay,
+                                remaining_budget=remaining_budget,
+                                timeout_callback=timeout_callback,
+                            )
                     self.logger.debug(
                         "HEAD request failed, proceeding with GET",
                         extra={
@@ -1225,6 +1281,24 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         setattr(http_error, "_retry_after_delay", retry_after_delay)
                         response.close()
                         raise http_error
+
+                    if response.status_code == 416:
+                        self.logger.warning(
+                            "range request rejected; retrying without resume",
+                            extra={
+                                "stage": "download",
+                                "status_code": response.status_code,
+                                "resume_position": original_resume_position,
+                                "service": self.service,
+                                "host": self.origin_host,
+                            },
+                        )
+                        _clear_partial_files()
+                        resume_position = 0
+                        want_range = False
+                        raise requests.HTTPError(
+                            f"HTTP error {response.status_code}", response=response
+                        )
 
                     range_honored = response.status_code == 206
                     if want_range and range_honored:

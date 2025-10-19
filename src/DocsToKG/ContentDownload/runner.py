@@ -849,6 +849,7 @@ def iterate_openalex(
                         delay = min(delay, effective_limit)
                 elif max_delay > 0:
                     delay = min(delay, max_delay)
+                delay = max(0.0, delay)
                 LOGGER.warning(
                     "OpenAlex pagination error (%s/%s retries): %s. Retrying in %.2fs.",
                     attempt,

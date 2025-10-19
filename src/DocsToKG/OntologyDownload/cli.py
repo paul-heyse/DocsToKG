@@ -468,17 +468,62 @@ def _parse_allowed_hosts(value: Optional[str]) -> List[str]:
     return entries
 
 
+_DEFAULT_SUBCOMMAND = "pull"
+_KNOWN_SUBCOMMANDS = {
+    "pull",
+    "plan",
+    "plan-diff",
+    "show",
+    "validate",
+    "init",
+    "config",
+    "doctor",
+    "prune",
+    "plugins",
+}
+_GLOBAL_OPTIONS_WITH_VALUES = {"--log-level"}
+
+
 def _normalize_plan_args(args: Sequence[str]) -> List[str]:
-    """Ensure ``plan`` command defaults to the ``run`` subcommand when omitted.
+    """Inject the default subcommand when callers omit it.
 
     Args:
-        args: Original CLI argument vector.
+        args: Original CLI argument vector supplied to :func:`cli_main`.
 
     Returns:
-        Updated argument list with explicit subcommands injected as needed.
+        Updated argument list with the default subcommand inserted before the
+        first positional argument when no explicit subcommand is present.
     """
 
-    return list(args)
+    normalized = list(args)
+    if not normalized:
+        return normalized
+
+    index = 0
+    while index < len(normalized):
+        token = normalized[index]
+        if token == "--":
+            index += 1
+            break
+        if token.startswith("-"):
+            option_name = token.split("=", 1)[0]
+            if option_name in _GLOBAL_OPTIONS_WITH_VALUES:
+                if "=" in token:
+                    index += 1
+                else:
+                    index += 2
+            else:
+                index += 1
+            continue
+        break
+
+    if index >= len(normalized):
+        return normalized
+
+    if normalized[index] not in _KNOWN_SUBCOMMANDS:
+        normalized.insert(index, _DEFAULT_SUBCOMMAND)
+
+    return normalized
 
 
 def _parse_since_arg(value: str) -> datetime:

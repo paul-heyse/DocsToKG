@@ -164,8 +164,11 @@ cross-checked against the FAISS wheel reference so that runtime prerequisites
 from __future__ import annotations
 
 import base64
+import ctypes
+import importlib.util
 import inspect
 import logging
+import os
 import time
 import uuid
 from dataclasses import asdict, dataclass, replace
@@ -221,6 +224,69 @@ _COSINE_TOPK_AUTO_BLOCK_ROWS_SENTINEL = -1
 _COSINE_TOPK_AUTO_MEM_FRACTION = 0.5
 
 
+_CUVS_LIBRARIES_LOADED = False
+
+
+def _ensure_cuvs_loader_path() -> None:
+    """Preload cuVS shared objects so extension modules resolve correctly."""
+
+    global _CUVS_LIBRARIES_LOADED
+    if _CUVS_LIBRARIES_LOADED:
+        return
+
+    log = logging.getLogger(__name__)
+
+    def package_root(name: str) -> Optional[Path]:
+        spec = importlib.util.find_spec(name)
+        if spec and spec.submodule_search_locations:
+            return Path(spec.submodule_search_locations[0])
+        return None
+
+    candidates: list[Path] = []
+
+    libcuvs_root = package_root("libcuvs")
+    if libcuvs_root is not None:
+        candidates.extend(
+            [
+                libcuvs_root / "lib64" / "libcuvs.so",
+                libcuvs_root / "lib64" / "libcuvs_c.so",
+            ]
+        )
+
+    librmm_root = package_root("librmm")
+    if librmm_root is not None:
+        candidates.append(librmm_root / "lib64" / "librmm.so")
+
+    rapids_logger_root = package_root("rapids_logger")
+    if rapids_logger_root is not None:
+        candidates.append(rapids_logger_root / "lib64" / "librapids_logger.so")
+
+    loaded_any = False
+    search_dirs: set[str] = set()
+
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            ctypes.CDLL(str(path))
+            loaded_any = True
+            search_dirs.add(str(path.parent))
+        except OSError:
+            log.debug(
+                "Unable to preload cuVS dependency",
+                extra={"event": {"path": str(path)}},
+                exc_info=True,
+            )
+
+    if search_dirs:
+        existing = os.environ.get("LD_LIBRARY_PATH")
+        dirs = set(filter(None, (existing or "").split(":")))
+        dirs.update(search_dirs)
+        os.environ["LD_LIBRARY_PATH"] = ":".join(sorted(dirs))
+
+    _CUVS_LIBRARIES_LOADED = True
+
+
 def _vector_uuid_to_faiss_int(vector_id: str) -> int:
     """Translate a vector UUID into a FAISS-compatible 63-bit integer."""
 
@@ -228,6 +294,7 @@ def _vector_uuid_to_faiss_int(vector_id: str) -> int:
 
 
 try:  # pragma: no cover - exercised via integration tests
+    _ensure_cuvs_loader_path()
     import faiss  # type: ignore
 
     _FAISS_AVAILABLE = all(

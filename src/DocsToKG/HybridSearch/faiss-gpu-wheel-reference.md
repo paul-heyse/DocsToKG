@@ -3,7 +3,7 @@
 **FAISS version label**: `1.12.0`  
 **Generated**: 2025-10-19 01:46 UTC
 
-This document summarizes the *actual* GPU-enabled surface area exposed by your custom FAISS wheel, plus practical guidance for using it safely and efficiently from autonomous or tool-using AI systems.
+This document summarizes the *actual* GPU-enabled surface area exposed by your custom FAISS wheel, plus practical guidance for using it safely and efficiently from autonomous or tool-using AI systems. HybridSearch bundles FAISS alongside the NVIDIA cuVS Python bindings (`cuvs`, version 25.10.00) and their loader (`libcuvs`). Even though the shipped FAISS binary cannot enable cuVS kernels (`use_cuvs=True` raises “cuVS has not been compiled into the current version”), the interfaces are present and HybridSearch code interacts with them. The cuVS sections below explain how discovery, configuration, and fallbacks work so you can reason about current behaviour and future upgrades.
 
 > ⚠️ **Important**: The wheel is tagged as `py3-none-any` (pure Python), but it **does contain native code** (`_swigfaiss.so`). Treat it as platform-specific. See **Runtime prerequisites** for required shared libraries.
 
@@ -92,6 +92,8 @@ These classes are present in the wheel (from `swigfaiss.py`):
 - Flat (brute force): `GpuIndexFlatL2`, `GpuIndexFlatIP` (+ `GpuIndexFlat` & `GpuIndexFlatConfig`)
 - IVF family: `GpuIndexIVFFlat`, `GpuIndexIVFPQ`, `GpuIndexIVFScalarQuantizer` (+ their `*Config` classes)
 - Binary: `GpuIndexBinaryFlat` (+ `GpuIndexBinaryFlatConfig`)
+- Progressive dimension builder: `GpuProgressiveDimIndexFactory` (incrementally expand dimensionality on GPU; useful for ANN warm starts).
+- Progressive dimension builder: `GpuProgressiveDimIndexFactory` (incrementally expand dimensionality on GPU; useful for warm-starting ANN structures).
 
 **Common patterns**
 
@@ -125,6 +127,8 @@ D2, I2 = ivfpq.search(xq, 10)
 - `storeTransposed` — data layout tweak for `GpuIndexFlat*`.
 - `indicesOptions` — choose ID storage (`INDICES_32_BIT`, `INDICES_64_BIT`, `INDICES_CPU`, `INDICES_IVF`).
 - `reserveVecs` — pre-reserve inverted list capacity to reduce reallocs.
+- `flatHashed` / `directMapType` — enable hashed flat indexes or direct-map variants when mixing CPU+GPU fleets.
+- `flatHashed` / `directMapType` — enable hashed flat indexes or direct-map variants when mixing CPU/GPU fleets.
 
 Supported metrics include METRIC_GOWER, METRIC_INNER_PRODUCT, METRIC_L1, METRIC_L2.
 
@@ -166,13 +170,17 @@ These functions run directly on a GPU **without constructing an index** (from `g
 
 - `knn_gpu(res, xq, xb, k, D=None, I=None, metric=faiss.METRIC_L2, device=-1, use_cuvs=False, vectorsMemoryLimit=0, queriesMemoryLimit=0)`
 - `pairwise_distance_gpu(res, xq, xb, D=None, metric=faiss.METRIC_L2, device=-1)`
+- `pairwise_index_gpu_multiple(...)` — dispatch brute-force searches across multiple GPU indexes (see `gpu_wrappers.py`).
+- `pairwise_index_gpu_multiple(...)` — orchestrate multi-index brute-force queries (see `gpu_wrappers.py` for signature).
 
 **Notes for agents**
 
 - Inputs must be contiguous `float32` or `float16` arrays (NumPy), shapes `(nq, d)` and `(nb, d)`.
 - Set `device` to a specific GPU id, or `-1` to use the current CUDA device.
-- `use_cuvs=True` (if enabled at build/runtime) dispatches to NVIDIA cuVS kernels; `faiss.should_use_cuvs(...)` can tell if it’s applicable in your environment.
+- `use_cuvs=True` currently raises `RuntimeError: cuVS has not been compiled into the current version so it cannot be used`. HybridSearch guards the flag through `resolve_cuvs_state` and will record `cuvs_enabled=False`/`cuvs_available=False` in `AdapterStats`.
 - Use `vectorsMemoryLimit` / `queriesMemoryLimit` or `bfKnn_tiling(...)` to cap workspace footprint on large problems.
+- If/when a cuVS-enabled build is shipped, diagnostics/logging live under `.venv/lib/python3.13/site-packages/cuvs/common`.
+- When cuVS kernels execute, diagnostics and additional helpers live in `.venv/lib/python3.13/site-packages/cuvs/common`; enable logging if you need kernel-level visibility.
 
 **Example**
 
@@ -231,10 +239,38 @@ Binary indexes use `read_index_binary` / `write_index_binary`.
 - **Multi-GPU strategy**: *Replicate* small/medium datasets; *Shard* very large datasets. Consider `common_ivf_quantizer=True` for IVF sharding.
 - **Interoperability**: Align CUDA streams with other frameworks; consider `setDefaultNullStreamAllDevices()`.
 - **IDs**: Choose `INDICES_32_BIT` unless you expect more than 2^31-1 vectors; otherwise use 64-bit.
+- **cuVS flag**: HybridSearch exposes the `use_cuvs` knob through `DenseIndexConfig` and tracks outcomes via `AdapterStats`. With the shipped wheel, `use_cuvs=True` triggers a runtime guard (`resolve_cuvs_state` forces it off and records `cuvs_enabled=False`) because the binary was compiled without cuVS kernels.
 
 ---
 
-## 11) What’s actually present in this wheel (symbol inventory)
+## 11) cuVS bindings & current limitations
+
+The repository includes NVIDIA cuVS Python packages even though the bundled FAISS binary cannot execute cuVS kernels:
+
+- `.venv/lib/python3.13/site-packages/cuvs` (version **25.10.00**) exposes Python wrappers for ANN algorithms (CAGRA, IVF-Flat/PQ, Vamana, NN-Descent), clustering, distance utilities, and preprocessing modules. Only the pure-Python pieces are present—the expected compiled extensions (`*.so`) for subpackages such as `cuvs.neighbors.vamana` are missing, so importing them raises `ModuleNotFoundError`.
+- `.venv/lib/python3.13/site-packages/libcuvs` provides the loader shim (`load.py`) and metadata (`VERSION`, `GIT_COMMIT`) but no `lib64/libcuvs.so` suitable for dispatch. Consequently, FAISS’s `should_use_cuvs(...)` returns `False` when given a `GpuIndexConfig`, and calling `knn_gpu(..., use_cuvs=True)` raises:
+
+```
+RuntimeError: cuVS has not been compiled into the current version so it cannot be used.
+```
+
+Example guard (mirrors HybridSearch behaviour):
+
+```python
+cfg = faiss.GpuIndexFlatConfig()
+if not faiss.should_use_cuvs(cfg):
+    # safe: cuVS kernels unavailable, stay on FAISS implementation
+    D, I = faiss.knn_gpu(res, xq, xb, k, use_cuvs=False)
+else:
+    D, I = faiss.knn_gpu(res, xq, xb, k, use_cuvs=True)
+```
+
+- HybridSearch’s `resolve_cuvs_state()` (see `store.py`) checks for `faiss.knn_gpu`, calls `faiss.should_use_cuvs(...)`, records telemetry (`AdapterStats.cuvs_*`), and disables cuVS when unavailable. `ManagedFaissAdapter._apply_use_cuvs_parameter()` echoes the applied value back into stats/logs so operators know whether requests took effect.
+- Future wheel updates could ship the missing shared objects (`libcuvs.so` plus per-operator extensions). When that happens, re-run smoke tests with `use_cuvs=True`, monitor `AdapterStats`/logs, and update this reference to document behaviour changes.
+
+---
+
+## 12) What’s actually present in this wheel (symbol inventory)
 
 **GPU index classes**
 - `GpuIndex`
@@ -288,7 +324,7 @@ Binary indexes use `read_index_binary` / `write_index_binary`.
 
 ---
 
-## 12) Quick smoke test (from your build script)
+## 13) Quick smoke test (from your build script)
 
 This is the same check your script performs after building the wheel:
 
@@ -305,7 +341,7 @@ print("OK. top-1:", float(D[0,0]))
 
 ---
 
-## 13) Notes from the provided build script
+## 14) Notes from the provided build script
 
 ```
 #!/usr/bin/env bash
@@ -400,7 +436,7 @@ echo "✅ Done. Wheel archived in: ${WHEELS_DIR}"
 
 ---
 
-## 14) Common pitfalls & remedies
+## 15) Common pitfalls & remedies
 
 - **`ImportError: libopenblas.so.0 / libcudart.so.12 / libcublas.so.12`** → Install matching OpenBLAS and CUDA 12 runtimes; ensure they are on `LD_LIBRARY_PATH` / default linker path.
 - **NumPy import during `faiss` import** → set `FAISS_OPT_LEVEL=avx2` to bypass CPU feature probing.
@@ -410,7 +446,7 @@ echo "✅ Done. Wheel archived in: ${WHEELS_DIR}"
 
 ---
 
-## 15) Minimal recipes (copy‑paste)
+## 16) Minimal recipes (copy‑paste)
 
 **A. Build an IVFPQ index entirely on GPU and query it**
 ```python

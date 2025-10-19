@@ -57,7 +57,7 @@ def test_validate_url_security_blocks_private_cidr() -> None:
     with pytest.raises(ConfigError):
         api_mod.validate_url_security(url, DownloadConfiguration())
 
-    # Hostnames resolving to private space are also rejected unless allowlisted.
+    # Hostnames resolving to private space are also rejected unless explicitly opted in.
     def _private_getaddrinfo(host: str) -> List[Tuple]:
         return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("10.1.2.3", 0))]
 
@@ -65,9 +65,59 @@ def test_validate_url_security_blocks_private_cidr() -> None:
     with pytest.raises(ConfigError):
         api_mod.validate_url_security("https://internal.example.org/data", DownloadConfiguration())
 
-    allowed_config = DownloadConfiguration(allowed_hosts=["internal.example.org"])
-    validated = api_mod.validate_url_security("https://internal.example.org/data", allowed_config)
-    assert validated.startswith("https://internal.example.org")
+
+def test_allowlisted_domain_resolving_to_public_ip_is_allowed() -> None:
+    """Allowlisted domains remain subject to DNS checks and pass for public IPs."""
+
+    def _public_getaddrinfo(host: str) -> List[Tuple]:
+        return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("93.184.216.34", 0))]
+
+    network_mod.register_dns_stub("allowed.example.org", _public_getaddrinfo)
+    config = DownloadConfiguration(allowed_hosts=["allowed.example.org"])
+
+    validated = api_mod.validate_url_security("https://allowed.example.org/data", config)
+    assert validated.startswith("https://allowed.example.org")
+
+
+def test_allowlisted_domain_resolving_to_private_ip_is_rejected() -> None:
+    """Allowlisted domains resolving to private space should still be blocked."""
+
+    def _private_getaddrinfo(host: str) -> List[Tuple]:
+        return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("127.0.0.1", 0))]
+
+    network_mod.register_dns_stub("loopback.example.org", _private_getaddrinfo)
+    config = DownloadConfiguration(allowed_hosts=["loopback.example.org"])
+
+    with pytest.raises(ConfigError):
+        api_mod.validate_url_security("https://loopback.example.org/data", config)
+
+
+def test_allowlisted_private_ip_literal_allowed_with_opt_in() -> None:
+    """Explicit IP literals can opt into private networks when configured."""
+
+    url = "https://10.1.2.3/secret"
+    config = DownloadConfiguration(
+        allowed_hosts=["10.1.2.3"], allow_private_networks_for_host_allowlist=True
+    )
+
+    validated = api_mod.validate_url_security(url, config)
+    assert validated.startswith("https://10.1.2.3")
+
+
+def test_allowlisted_domain_private_resolution_allowed_when_opted_in() -> None:
+    """The opt-in flag restores legacy behaviour for DNS hostnames."""
+
+    def _private_getaddrinfo(host: str) -> List[Tuple]:
+        return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("10.9.8.7", 0))]
+
+    network_mod.register_dns_stub("legacy.example.org", _private_getaddrinfo)
+    config = DownloadConfiguration(
+        allowed_hosts=["legacy.example.org"],
+        allow_private_networks_for_host_allowlist=True,
+    )
+
+    validated = api_mod.validate_url_security("https://legacy.example.org/data", config)
+    assert validated.startswith("https://legacy.example.org")
 
 
 def test_validate_url_security_dns_failure_strict_mode() -> None:
