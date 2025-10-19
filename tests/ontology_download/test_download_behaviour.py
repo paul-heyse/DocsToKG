@@ -61,6 +61,12 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
     payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
     url = ontology_env.register_fixture(
         "hp-malformed-length.owl",
+def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
+    """A transient failure should consume bucket tokens for each retry."""
+
+    payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
+    url = ontology_env.register_fixture(
+        "hp-retry.owl",
         payload,
         media_type="application/rdf+xml",
         repeats=1,

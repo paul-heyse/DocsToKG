@@ -1541,6 +1541,76 @@ def test_gpu_near_duplicate_detection_filters_duplicates() -> None:
     assert len(results) == 1, "GPU near-duplicate detection should filter duplicates"
 
 
+def test_result_shaper_doc_cap_ignores_filtered_duplicates() -> None:
+    embedding = np.ones(8, dtype=np.float32)
+    duplicate = embedding.copy()
+    distinct = np.concatenate((np.ones(4), np.zeros(4))).astype(np.float32)
+
+    chunk_primary = ChunkPayload(
+        doc_id="doc-1",
+        chunk_id="chunk-1",
+        vector_id="vec-1",
+        namespace="default",
+        text="Primary chunk for the document",
+        metadata={},
+        features=ChunkFeatures({}, {}, embedding),
+        token_count=4,
+        source_chunk_idxs=[0],
+        doc_items_refs=[],
+    )
+    chunk_duplicate = ChunkPayload(
+        doc_id="doc-1",
+        chunk_id="chunk-2",
+        vector_id="vec-2",
+        namespace="default",
+        text="Primary chunk for the document",
+        metadata={},
+        features=ChunkFeatures({}, {}, duplicate),
+        token_count=4,
+        source_chunk_idxs=[1],
+        doc_items_refs=[],
+    )
+    chunk_distinct = ChunkPayload(
+        doc_id="doc-1",
+        chunk_id="chunk-3",
+        vector_id="vec-3",
+        namespace="default",
+        text="A distinct chunk that should still be emitted",
+        metadata={},
+        features=ChunkFeatures({}, {}, distinct),
+        token_count=4,
+        source_chunk_idxs=[2],
+        doc_items_refs=[],
+    )
+
+    opensearch = OpenSearchSimulator()
+    opensearch.bulk_upsert([chunk_primary, chunk_duplicate, chunk_distinct])
+
+    shaper = ResultShaper(
+        opensearch,
+        FusionConfig(max_chunks_per_doc=2, cosine_dedupe_threshold=0.9),
+    )
+    request = HybridSearchRequest(
+        query="primary chunk",
+        namespace=None,
+        filters={},
+        page_size=5,
+    )
+
+    ordered = [chunk_primary, chunk_duplicate, chunk_distinct]
+    fused_scores = {
+        chunk_primary.vector_id: 1.0,
+        chunk_duplicate.vector_id: 0.95,
+        chunk_distinct.vector_id: 0.9,
+    }
+    channel_scores = {"dense": fused_scores}
+
+    results = shaper.shape(ordered, fused_scores, request, channel_scores)
+
+    assert [result.chunk_id for result in results] == ["chunk-1", "chunk-3"]
+    assert all(result.doc_id == "doc-1" for result in results)
+
+
 # --- test_hybridsearch_gpu_only.py ---
 
 
