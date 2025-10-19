@@ -1640,9 +1640,9 @@ class FaissVectorStore(DenseVectorStore):
             array = array.reshape(1, -1)
         if array.ndim != 2 or array.shape[1] != self._dim:
             raise ValueError(f"bad batch shape {array.shape}, expected (*,{self._dim})")
-        array = np.ascontiguousarray(array, dtype=np.float32)
-        normalize_rows(array)
-        return array
+        matrix = np.array(array, dtype=np.float32, order="C", copy=True)
+        normalize_rows(matrix)
+        return matrix
 
     def _coerce_query(self, x: np.ndarray) -> np.ndarray:
         matrix = self._coerce_batch(x)
