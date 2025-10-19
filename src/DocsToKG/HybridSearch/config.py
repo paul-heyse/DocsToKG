@@ -124,6 +124,10 @@ class DenseIndexConfig:
         enable_replication: Allow replication to additional GPUs when configured
         enable_reserve_memory: Enable GPU memory reservation based on expected_ntotal
         use_pinned_memory: Use pinned host buffers for large add/search batches
+        gpu_use_default_null_stream: Use FAISS APIs to bind CUDA's default null stream
+            for the configured device when available (False default)
+        gpu_use_default_null_stream_all_devices: Use FAISS APIs to bind the default
+            CUDA null stream across every visible GPU (False default)
         ingest_dedupe_threshold: Skip ingest when cosine similarity exceeds this value (0 disables)
         persist_mode: Persistence policy ("cpu_bytes" default, disable for GPU-only runtime)
         snapshot_refresh_interval_seconds: Minimum seconds between CPU snapshot refreshes (0 disables interval throttle)
@@ -161,6 +165,8 @@ class DenseIndexConfig:
     enable_replication: bool = True
     enable_reserve_memory: bool = True
     use_pinned_memory: bool = True
+    gpu_use_default_null_stream: bool = False
+    gpu_use_default_null_stream_all_devices: bool = False
     ingest_dedupe_threshold: float = 0.0
     force_remove_ids_fallback: bool = False
     # Persistence: "cpu_bytes" (default, serialize via CPU), or "disabled"
@@ -291,7 +297,21 @@ class HybridSearchConfig:
             Fully populated `HybridSearchConfig` instance.
         """
         chunking = ChunkingConfig(**payload.get("chunking", {}))
-        dense = DenseIndexConfig(**payload.get("dense", {}))
+        dense_payload = dict(payload.get("dense", {}))
+        alias_pairs = (
+            ("gpu_default_null_stream", "gpu_use_default_null_stream"),
+            (
+                "gpu_default_null_stream_all_devices",
+                "gpu_use_default_null_stream_all_devices",
+            ),
+        )
+        for legacy_key, canonical_key in alias_pairs:
+            if canonical_key in dense_payload:
+                dense_payload.pop(legacy_key, None)
+                continue
+            if legacy_key in dense_payload:
+                dense_payload[canonical_key] = dense_payload.pop(legacy_key)
+        dense = DenseIndexConfig(**dense_payload)
         fusion = FusionConfig(**payload.get("fusion", {}))
         retrieval = RetrievalConfig(**payload.get("retrieval", {}))
         return HybridSearchConfig(
