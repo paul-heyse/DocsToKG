@@ -113,6 +113,13 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
     )
     doctags_module.add_data_root_option(parser)
     parser.add_argument(
+        "--log-level",
+        type=lambda value: str(value).upper(),
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Logging verbosity applied to the DocTags stage",
+    )
+    parser.add_argument(
         "--in-dir",
         "--input",
         dest="in_dir",
@@ -153,6 +160,12 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
         type=float,
         default=None,
         help="Fraction of GPU memory allocated to the vLLM server",
+    )
+    parser.add_argument(
+        "--vllm-wait-timeout",
+        type=int,
+        default=None,
+        help="Seconds to wait for vLLM readiness in PDF mode",
     )
     doctags_module.add_resume_force_options(
         parser,
@@ -266,6 +279,7 @@ def doctags(argv: Sequence[str] | None = None) -> int:
         "workers": parsed.workers,
         "resume": parsed.resume,
         "force": parsed.force,
+        "log_level": parsed.log_level,
     }
 
     if mode == "html":
@@ -278,6 +292,7 @@ def doctags(argv: Sequence[str] | None = None) -> int:
         "model": parsed.model,
         "served_model_names": parsed.served_model_names,
         "gpu_memory_utilization": parsed.gpu_memory_utilization,
+        "vllm_wait_timeout": parsed.vllm_wait_timeout,
     }
     pdf_args = merge_args(doctags_module.pdf_build_parser(), overrides)
     return doctags_module.pdf_main(pdf_args)
