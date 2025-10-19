@@ -41,6 +41,12 @@ _HASH_ALG_ENV_VAR = "DOCSTOKG_HASH_ALG"
 _TEXT_HASH_READ_SIZE = 65536
 
 
+_HASH_ALGORITHMS_AVAILABLE: Optional[frozenset[str]] = None
+_HASH_ALGORITHM_SELECTION_CACHE: Dict[
+    Tuple[Optional[str], Optional[str]], Tuple[Optional[str], str]
+] = {}
+
+
 def _partition_normalisation_buffer(buffer: str) -> tuple[str, str]:
     """Split ``buffer`` into a flushable prefix and a retained suffix.
 
@@ -440,16 +446,45 @@ def _normalise_hash_name(candidate: Optional[str]) -> Optional[str]:
     return text or None
 
 
-def _select_hash_algorithm(requested: Optional[str], default: Optional[str]) -> str:
+def _hash_algorithms_available() -> frozenset[str]:
+    """Return the cached set of available hashlib algorithms."""
+
+    global _HASH_ALGORITHMS_AVAILABLE
+    if _HASH_ALGORITHMS_AVAILABLE is None:
+        available = {name.lower() for name in hashlib.algorithms_available}
+        if not available:
+            raise RuntimeError("No hash algorithms are available via hashlib.")
+        _HASH_ALGORITHMS_AVAILABLE = frozenset(available)
+    return _HASH_ALGORITHMS_AVAILABLE
+
+
+def _select_hash_algorithm(
+    requested: Optional[str], default: Optional[str]
+) -> str:
     """Return a supported hash algorithm honouring env overrides and defaults."""
 
-    available = {name.lower() for name in hashlib.algorithms_available}
-    if not available:
-        raise RuntimeError("No hash algorithms are available via hashlib.")
+    env_override = os.getenv(_HASH_ALG_ENV_VAR)
+    cache_key = (requested, default)
+    cached = _HASH_ALGORITHM_SELECTION_CACHE.get(cache_key)
+    if cached is not None and cached[0] == env_override:
+        return cached[1]
 
+    algorithm = _select_hash_algorithm_uncached(requested, default, env_override)
+    _HASH_ALGORITHM_SELECTION_CACHE[cache_key] = (env_override, algorithm)
+    return algorithm
+
+
+def _select_hash_algorithm_uncached(
+    requested: Optional[str],
+    default: Optional[str],
+    env_override: Optional[str],
+) -> str:
+    """Resolve a hash algorithm without consulting the selection cache."""
+
+    available = _hash_algorithms_available()
     logger = logging.getLogger(__name__)
     candidates = [
-        (_HASH_ALG_ENV_VAR, os.getenv(_HASH_ALG_ENV_VAR)),
+        (_HASH_ALG_ENV_VAR, env_override),
         ("algorithm parameter", requested),
         ("default algorithm", default),
     ]
@@ -484,6 +519,12 @@ def _select_hash_algorithm(requested: Optional[str], default: Optional[str]) -> 
         fallback,
     )
     return fallback
+
+
+def _clear_hash_algorithm_cache() -> None:
+    """Reset memoized hash algorithm selections (intended for testing)."""
+
+    _HASH_ALGORITHM_SELECTION_CACHE.clear()
 
 
 def resolve_hash_algorithm(default: str = _SAFE_HASH_ALGORITHM) -> str:
