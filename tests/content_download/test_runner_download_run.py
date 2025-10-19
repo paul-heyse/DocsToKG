@@ -559,6 +559,109 @@ def test_setup_download_state_accepts_explicit_csv_resume(tmp_path):
     assert resume_entry["path"].endswith("stored.pdf")
 
 
+def test_setup_download_state_prefers_adjacent_sqlite_for_external_csv(tmp_path):
+    resolved = make_resolved_config(tmp_path)
+    bootstrap_run_environment(resolved)
+
+    external_dir = tmp_path / "external_resume"
+    external_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = external_dir / "external_attempts.csv"
+    sqlite_path = csv_path.with_suffix(".sqlite3")
+
+    conn = sqlite3.connect(sqlite_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE manifests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                run_id TEXT,
+                schema_version INTEGER,
+                work_id TEXT,
+                title TEXT,
+                publication_year INTEGER,
+                resolver TEXT,
+                url TEXT,
+                normalized_url TEXT,
+                path TEXT,
+                path_mtime_ns INTEGER,
+                classification TEXT,
+                content_type TEXT,
+                reason TEXT,
+                reason_detail TEXT,
+                html_paths TEXT,
+                sha256 TEXT,
+                content_length INTEGER,
+                etag TEXT,
+                last_modified TEXT,
+                extracted_text_path TEXT,
+                dry_run INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO manifests (
+                timestamp, run_id, schema_version, work_id, title, publication_year,
+                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                content_type, reason, reason_detail, html_paths, sha256,
+                content_length, etag, last_modified, extracted_text_path, dry_run
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "2025-02-01T00:00:00Z",
+                "resume-run",
+                MANIFEST_SCHEMA_VERSION,
+                "W-EXTERNAL",
+                "External CSV Resume",
+                2024,
+                "openalex",
+                "https://example.org/W-EXTERNAL.pdf",
+                "https://example.org/w-external.pdf",
+                str(resolved.pdf_dir / "external.pdf"),
+                None,
+                "pdf",
+                "application/pdf",
+                None,
+                None,
+                None,
+                "feedface",
+                4096,
+                None,
+                None,
+                None,
+                0,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    csv_path.write_text("run_id,work_id\nresume-run,W-EXTERNAL\n", encoding="utf-8")
+
+    manifest_sqlite = resolved.sqlite_path
+    if manifest_sqlite is not None and manifest_sqlite.exists():
+        manifest_sqlite.unlink()
+
+    resolved.args.resume_from = csv_path
+
+    download_run = DownloadRun(resolved)
+
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        state = download_run.setup_download_state(factory)
+    finally:
+        factory.close_all()
+        download_run.close()
+
+    assert "W-EXTERNAL" in state.options.resume_completed
+    previous_lookup = state.options.previous_lookup.get("W-EXTERNAL")
+    assert previous_lookup is not None and previous_lookup
+    resume_entry = next(iter(previous_lookup.values()))
+    assert resume_entry["classification"] == "pdf"
+    assert resume_entry["path"].endswith("external.pdf")
+
+
 def test_setup_worker_pool_creates_executor_when_parallel(tmp_path):
     resolved = make_resolved_config(tmp_path, workers=3)
     download_run = DownloadRun(resolved)

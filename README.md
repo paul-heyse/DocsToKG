@@ -180,8 +180,8 @@ back to the original ``GET`` attempt to avoid false negatives.
 
 - ``--dry-run``: compute resolver coverage without writing files.
 - ``--resume-from <manifest.jsonl>``: skip works already recorded as successful. CSV
-  attempts logs are also supported when the matching ``manifest.sqlite3`` cache is
-  available. If the
+  attempts logs are also supported when a paired ``*.sqlite3``/``*.sqlite`` cache lives
+  alongside the CSV—even outside the active manifest directory. If the
   manifest path is wrong or missing, the downloader now fails fast with a clear
   error so you can fix the flag before rerunning.
 - ``--extract-text=html``: save plaintext alongside HTML fallbacks (requires ``trafilatura``).
