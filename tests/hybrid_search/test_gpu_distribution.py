@@ -64,6 +64,8 @@ def test_configure_gpu_resource_respects_default_null_stream_flags() -> None:
 def test_distribute_to_all_gpus_configures_cloner_options(
     monkeypatch, caplog, shard: bool, force_legacy_path: bool
 ) -> None:
+
+
     """Ensure the GPU distributor forwards supported arguments only."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -117,6 +119,10 @@ def test_distribute_to_all_gpus_configures_cloner_options(
         def __init__(self) -> None:
             self.shard = False
             self.common_ivf_quantizer = False
+            self.indicesOptions = None
+            self.useFloat16: bool | None = None
+            self.useFloat16CoarseQuantizer: bool | None = None
+            self.useFloat16LookupTables: bool | None = None
 
     monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", DummyClonerOptions, raising=False)
 
@@ -181,6 +187,13 @@ def test_distribute_to_all_gpus_configures_cloner_options(
     assert store._replica_gpu_resources == [vector.resources[1]]
     cloner = captured["co"]
     assert cloner.shard is shard
+    expected_indices = getattr(faiss, "INDICES_32_BIT", 0)
+    assert getattr(cloner, "indicesOptions", None) == expected_indices
+    assert getattr(cloner, "useFloat16", None) is False
+    if hasattr(cloner, "useFloat16CoarseQuantizer"):
+        assert getattr(cloner, "useFloat16CoarseQuantizer") is False
+    if hasattr(cloner, "useFloat16LookupTables"):
+        assert getattr(cloner, "useFloat16LookupTables") is False
     if shard and hasattr(cloner, "common_ivf_quantizer"):
         assert cloner.common_ivf_quantizer is True
 
@@ -198,6 +211,130 @@ def test_distribute_to_all_gpus_configures_cloner_options(
     else:
         assert captured["gpu_ids"] == expected_gpu_ids
         assert ("faiss_gpu_manual_resource_path", ()) not in counters
+
+
+@pytest.mark.skipif(faiss is None, reason="faiss not installed")
+@pytest.mark.skipif(
+    faiss is not None
+    and (
+        not hasattr(faiss, "GpuMultipleClonerOptions")
+        or not hasattr(faiss, "index_cpu_to_gpu_multiple")
+        or not hasattr(faiss, "GpuResourcesVector")
+    ),
+    reason="faiss build missing multi-GPU replication helpers",
+)
+def test_distribute_to_all_gpus_propagates_gpu_flags(monkeypatch) -> None:
+    """Replicated shards should reflect configured ID width and FP16 toggles."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._replication_enabled = True
+    store._replicated = False
+    store._config = DenseIndexConfig(flat_use_fp16=True, gpu_indices_32_bit=True)
+    store._has_explicit_replication_ids = False
+    store._replication_gpu_ids = None
+    store._multi_gpu_mode = "replicate"
+    store._observability = Observability()
+    store._temp_memory_bytes = None
+    store._gpu_use_default_null_stream = False
+    store._gpu_use_default_null_stream_all_devices = False
+    store._replica_gpu_resources = []
+    store._gpu_resources = None
+    store._device = 0
+
+    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 2, raising=False)
+    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+
+    class RecordingResources:
+        def __init__(self) -> None:
+            self.temp_memory_calls: list[int] = []
+
+        def setTempMemory(self, value: int) -> None:
+            self.temp_memory_calls.append(value)
+
+        def setDefaultNullStreamAllDevices(self) -> None:  # pragma: no cover - stubbed
+            return None
+
+        def setDefaultNullStream(self, device: int | None = None) -> None:  # pragma: no cover
+            return None
+
+    class RecordingVector:
+        def __init__(self) -> None:
+            self.resources: list[RecordingResources] = []
+
+        def push_back(self, resource: RecordingResources) -> None:
+            self.resources.append(resource)
+
+    monkeypatch.setattr(faiss, "StandardGpuResources", RecordingResources)
+    monkeypatch.setattr(faiss, "GpuResourcesVector", RecordingVector)
+
+    store._gpu_resources = faiss.StandardGpuResources()
+
+    class RecordingClonerOptions:
+        def __init__(self) -> None:
+            self.shard = False
+            self.common_ivf_quantizer = False
+            self.indicesOptions = None
+            self.useFloat16: bool | None = None
+            self.useFloat16CoarseQuantizer: bool | None = None
+            self.useFloat16LookupTables: bool | None = None
+
+    monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", RecordingClonerOptions, raising=False)
+
+    class FakeShard:
+        def __init__(self, indices_option: int | None, use_fp16: bool | None) -> None:
+            self.indicesOptions = indices_option
+            self.useFloat16 = use_fp16
+
+    class FakeDistributedIndex:
+        def __init__(self, shards: list[FakeShard]) -> None:
+            self.shards = shards
+
+    captured: dict[str, object] = {}
+
+    def fake_index_cpu_to_gpu_multiple(resources_vector, gpu_ids, index_arg, co=None):
+        captured["co"] = co
+        shards = [FakeShard(getattr(co, "indicesOptions", None), getattr(co, "useFloat16", None)) for _ in gpu_ids]
+        return FakeDistributedIndex(shards)
+
+    monkeypatch.setattr(faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple)
+    monkeypatch.setattr(
+        faiss,
+        "index_cpu_to_gpus_list",
+        lambda *args, **kwargs: pytest.fail("gpu_multiple path should be used"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        faiss,
+        "index_cpu_to_all_gpus",
+        lambda *args, **kwargs: pytest.fail("index_cpu_to_all_gpus should not run"),
+        raising=False,
+    )
+
+    cpu_index = faiss.IndexFlatIP(4)
+    distributed = store.distribute_to_all_gpus(cpu_index, shard=False)
+
+    assert isinstance(distributed, FakeDistributedIndex)
+    cloner = captured["co"]
+    expected_indices = getattr(faiss, "INDICES_32_BIT", 0)
+    assert getattr(cloner, "indicesOptions", None) == expected_indices
+    assert getattr(cloner, "useFloat16", None) is True
+    for shard in distributed.shards:
+        assert shard.indicesOptions == expected_indices
+        assert shard.useFloat16 is True
+
+    assert store._replicated is True
+
+
+@pytest.mark.skipif(faiss is None, reason="faiss not installed")
+@pytest.mark.skipif(
+    faiss is not None
+    and (
+        not hasattr(faiss, "GpuMultipleClonerOptions")
+        or not hasattr(faiss, "index_cpu_to_gpu_multiple")
+        or not hasattr(faiss, "GpuResourcesVector")
+    ),
+    reason="faiss build missing multi-GPU replication helpers",
+)
 
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
@@ -270,6 +407,10 @@ def test_distribute_to_all_gpus_uses_non_contiguous_ids(monkeypatch) -> None:
         def __init__(self) -> None:
             self.shard = False
             self.common_ivf_quantizer = False
+            self.indicesOptions = None
+            self.useFloat16: bool | None = None
+            self.useFloat16CoarseQuantizer: bool | None = None
+            self.useFloat16LookupTables: bool | None = None
 
     monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", DummyClonerOptions, raising=False)
 
@@ -303,6 +444,13 @@ def test_distribute_to_all_gpus_uses_non_contiguous_ids(monkeypatch) -> None:
     cloner = captured["co"]
     assert isinstance(cloner, DummyClonerOptions)
     assert cloner.shard is False
+    expected_indices = getattr(faiss, "INDICES_32_BIT", 0)
+    assert getattr(cloner, "indicesOptions", None) == expected_indices
+    assert getattr(cloner, "useFloat16", None) is False
+    if hasattr(cloner, "useFloat16CoarseQuantizer"):
+        assert getattr(cloner, "useFloat16CoarseQuantizer") is False
+    if hasattr(cloner, "useFloat16LookupTables"):
+        assert getattr(cloner, "useFloat16LookupTables") is False
 
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
@@ -332,10 +480,13 @@ def test_distribute_to_all_gpus_manual_path_without_resources(monkeypatch) -> No
         monkeypatch.delattr(faiss, "GpuResourcesVector", raising=False)
 
     captured_gpus: list[int] = []
+    captured_options: list[object] = []
     sentinel_index = object()
 
     def fake_index_cpu_to_gpus_list(index_arg, *, gpus=None, co=None):  # type: ignore[override]
         captured_gpus.extend(list(gpus or []))
+        if co is not None:
+            captured_options.append(co)
         return sentinel_index
 
     monkeypatch.setattr(
@@ -359,6 +510,15 @@ def test_distribute_to_all_gpus_manual_path_without_resources(monkeypatch) -> No
     }
     assert counters.get(("faiss_gpu_manual_resource_path", ())) == 1.0
     assert store._replica_gpu_resources == []
+    assert captured_options, 'cloner options should be captured'
+    manual_co = captured_options[-1]
+    expected_indices = getattr(faiss, "INDICES_32_BIT", 0)
+    assert getattr(manual_co, "indicesOptions", None) == expected_indices
+    assert getattr(manual_co, "useFloat16", None) is False
+    if hasattr(manual_co, "useFloat16CoarseQuantizer"):
+        assert getattr(manual_co, "useFloat16CoarseQuantizer") is False
+    if hasattr(manual_co, "useFloat16LookupTables"):
+        assert getattr(manual_co, "useFloat16LookupTables") is False
 
 
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
@@ -398,6 +558,10 @@ def test_distribute_to_all_gpus_respects_explicit_gpu_list(monkeypatch, shard: b
         def __init__(self) -> None:
             self.shard = False
             self.common_ivf_quantizer = False
+            self.indicesOptions = None
+            self.useFloat16: bool | None = None
+            self.useFloat16CoarseQuantizer: bool | None = None
+            self.useFloat16LookupTables: bool | None = None
 
     monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", DummyCloner, raising=False)
     monkeypatch.setattr(
@@ -416,6 +580,13 @@ def test_distribute_to_all_gpus_respects_explicit_gpu_list(monkeypatch, shard: b
     cloner = captured["co"]
     assert isinstance(cloner, DummyCloner)
     assert cloner.shard is shard
+    expected_indices = getattr(faiss, "INDICES_32_BIT", 0)
+    assert getattr(cloner, "indicesOptions", None) == expected_indices
+    assert getattr(cloner, "useFloat16", None) is False
+    if hasattr(cloner, "useFloat16CoarseQuantizer"):
+        assert getattr(cloner, "useFloat16CoarseQuantizer") is False
+    if hasattr(cloner, "useFloat16LookupTables"):
+        assert getattr(cloner, "useFloat16LookupTables") is False
     if shard and hasattr(cloner, "common_ivf_quantizer"):
         assert cloner.common_ivf_quantizer is True
 
@@ -549,7 +720,17 @@ def test_distribute_to_all_gpus_fallback_uses_gpu_count(
 
     if expect_fallback:
         assert fallback_calls, "Expected fallback replication to invoke index_cpu_to_all_gpus"
-        assert fallback_calls[-1]["ngpu"] == expected_count
+        last_call = fallback_calls[-1]
+        assert last_call["ngpu"] == expected_count
+        fallback_co = last_call.get("co")
+        if fallback_co is not None:
+            expected_indices = getattr(faiss, "INDICES_32_BIT", 0)
+            assert getattr(fallback_co, "indicesOptions", None) == expected_indices
+            assert getattr(fallback_co, "useFloat16", None) is False
+            if hasattr(fallback_co, "useFloat16CoarseQuantizer"):
+                assert getattr(fallback_co, "useFloat16CoarseQuantizer") is False
+            if hasattr(fallback_co, "useFloat16LookupTables"):
+                assert getattr(fallback_co, "useFloat16LookupTables") is False
         assert captured_gpus == []
     else:
         assert fallback_calls == []

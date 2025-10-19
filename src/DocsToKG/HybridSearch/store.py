@@ -1556,6 +1556,56 @@ class FaissVectorStore(DenseVectorStore):
             or getattr(self, "_gpu_use_default_null_stream_all_devices", False)
         )
 
+    def _configure_gpu_cloner_options(self, options: Optional[object]) -> None:
+        """Apply DenseIndexConfig-aware flags to FAISS GPU cloner options."""
+
+        if options is None:
+            return
+
+        config_obj = getattr(self, "_config", None)
+        fp16_enabled = bool(getattr(config_obj, "flat_use_fp16", False))
+        force_64bit_ids = bool(
+            getattr(self, "_force_64bit_ids", getattr(config_obj, "force_64bit_ids", False))
+        )
+        indices_32_enabled = bool(
+            getattr(self, "_indices_32_bit", getattr(config_obj, "gpu_indices_32_bit", False))
+        )
+        indices_flag = 0
+        if (
+            not force_64bit_ids
+            and indices_32_enabled
+            and hasattr(faiss, "INDICES_32_BIT")
+        ):
+            indices_flag = getattr(faiss, "INDICES_32_BIT")
+
+        if hasattr(options, "indicesOptions"):
+            try:
+                setattr(options, "indicesOptions", indices_flag)
+            except Exception:  # pragma: no cover - defensive best effort
+                logger.debug("Unable to configure indicesOptions on cloner", exc_info=True)
+
+        if hasattr(options, "useFloat16"):
+            try:
+                setattr(options, "useFloat16", fp16_enabled)
+            except Exception:  # pragma: no cover - defensive best effort
+                logger.debug("Unable to configure useFloat16 on cloner", exc_info=True)
+
+        if hasattr(options, "useFloat16CoarseQuantizer"):
+            try:  # pragma: no cover - rarely exposed attribute
+                setattr(options, "useFloat16CoarseQuantizer", fp16_enabled)
+            except Exception:
+                logger.debug(
+                    "Unable to configure useFloat16CoarseQuantizer on cloner", exc_info=True
+                )
+
+        if hasattr(options, "useFloat16LookupTables"):
+            try:  # pragma: no cover - rarely exposed attribute
+                setattr(options, "useFloat16LookupTables", fp16_enabled)
+            except Exception:
+                logger.debug(
+                    "Unable to configure useFloat16LookupTables on cloner", exc_info=True
+                )
+
     def distribute_to_all_gpus(self, index: "faiss.Index", *, shard: bool = False) -> "faiss.Index":
         """Clone ``index`` across available GPUs when the build supports it.
 
@@ -1669,6 +1719,8 @@ class FaissVectorStore(DenseVectorStore):
                 cloner_options.shard = bool(shard)
                 if shard and hasattr(cloner_options, "common_ivf_quantizer"):
                     cloner_options.common_ivf_quantizer = True
+
+                self._configure_gpu_cloner_options(cloner_options)
 
             gpu_ids: List[int]
             if explicit_targets_configured:
@@ -1803,12 +1855,7 @@ class FaissVectorStore(DenseVectorStore):
                 co.device = device
                 co.verbose = True
                 co.allowCpuCoarseQuantizer = False
-                if (
-                    not self._force_64bit_ids
-                    and self._indices_32_bit
-                    and hasattr(faiss, "INDICES_32_BIT")
-                ):
-                    co.indicesOptions = faiss.INDICES_32_BIT
+                self._configure_gpu_cloner_options(co)
                 promoted = faiss.index_cpu_to_gpu(self._gpu_resources, device, index, co)
                 return self._maybe_distribute_multi_gpu(promoted)
             cloned = faiss.index_cpu_to_gpu(self._gpu_resources, device, index)
