@@ -57,7 +57,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import RLock
-from typing import Any, Dict, Literal, Mapping, Optional
+from typing import Any, Dict, Literal, Mapping, Optional, Tuple
 
 # --- Globals ---
 
@@ -113,6 +113,7 @@ class DenseIndexConfig:
         ivfpq_use_precomputed: Use precomputed IVFPQ lookup tables (True default)
         ivfpq_float16_lut: Use float16 IVFPQ lookup tables when available (True default)
         multi_gpu_mode: Replica strategy for multi-GPU hosts ("single" default)
+        replication_gpu_ids: Explicit GPU ids to target when multi-GPU replication is enabled
         gpu_temp_memory_bytes: Optional temporary memory pool size for FAISS GPU ops
         gpu_indices_32_bit: When True, store FAISS indices in 32-bit format to save VRAM
         expected_ntotal: Hint for anticipated index size; used to pre-reserve GPU memory
@@ -149,6 +150,7 @@ class DenseIndexConfig:
     ivfpq_use_precomputed: bool = True
     ivfpq_float16_lut: bool = True
     multi_gpu_mode: Literal["single", "replicate", "shard"] = "single"
+    replication_gpu_ids: Optional[Tuple[int, ...]] = None
     gpu_temp_memory_bytes: Optional[int] = None
     gpu_indices_32_bit: bool = True
     expected_ntotal: int = 0
