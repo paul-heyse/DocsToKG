@@ -1261,6 +1261,35 @@ def test_legacy_resolver_rate_limits_rejected(tmp_path: Path) -> None:
         load_resolver_config(args, ["unpaywall"], None)
 
 
+def test_load_resolver_config_expands_user_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = tmp_path / "resolver-config.json"
+    config_path.write_text('{"resolver_order": ["beta", "alpha"]}')
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    args = Namespace(
+        resolver_config="~/resolver-config.json",
+        unpaywall_email=None,
+        core_api_key=None,
+        semantic_scholar_api_key=None,
+        doaj_api_key=None,
+        mailto=None,
+        max_resolver_attempts=None,
+        resolver_timeout=None,
+        disable_resolver=[],
+        enable_resolver=[],
+        resolver_order=None,
+        log_format="jsonl",
+        resume_from=None,
+    )
+
+    config = load_resolver_config(args, ["alpha", "beta"], None)
+
+    assert config.resolver_order == ["beta", "alpha"]
+
+
 # --- test_resolver_config.py ---
 
 

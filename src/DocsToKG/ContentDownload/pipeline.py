@@ -719,7 +719,8 @@ def load_resolver_config(
         config_paths.append(DEFAULT_RESOLVER_CREDENTIALS_PATH)
 
     if args.resolver_config:
-        config_paths.append(Path(args.resolver_config))
+        cli_config_path = Path(args.resolver_config).expanduser().resolve(strict=False)
+        config_paths.append(cli_config_path)
 
     for config_path in config_paths:
         config_data = read_resolver_config(config_path)
