@@ -13,6 +13,7 @@ if not hasattr(typing, "TracebackType"):  # pragma: no cover - python<3.13 shim
     typing.TracebackType = types.TracebackType
 
 from DocsToKG.ContentDownload import args as download_args
+from DocsToKG.ContentDownload.core import Classification
 
 
 class _StubWorks:
@@ -54,7 +55,11 @@ def _patch_dependencies(monkeypatch):
     monkeypatch.setattr(
         download_args,
         "load_resolver_config",
-        lambda *_: SimpleNamespace(max_concurrent_resolvers=1, polite_headers={"User-Agent": "stub"}),
+        lambda *_: SimpleNamespace(
+            max_concurrent_resolvers=1,
+            polite_headers={"User-Agent": "stub"},
+            enable_global_url_dedup=True,
+        ),
     )
     monkeypatch.setattr(download_args, "ManifestUrlIndex", _StubManifestIndex)
 
@@ -193,6 +198,7 @@ def test_resolve_config_sets_pyalex_email_from_config(parser, monkeypatch):
             max_concurrent_resolvers=1,
             polite_headers={"User-Agent": "stub"},
             mailto="config@example.org",
+            enable_global_url_dedup=True,
         ),
     )
     monkeypatch.setattr(oa_config, "email", "initial@example.org", raising=False)
@@ -201,3 +207,83 @@ def test_resolve_config_sets_pyalex_email_from_config(parser, monkeypatch):
     download_args.resolve_config(args, parser)
 
     assert oa_config.email == "config@example.org"
+
+
+def test_resolve_config_skips_manifest_scan_when_dedupe_disabled(parser, monkeypatch):
+    entries = [
+        ("https://example.org/pdf", {"classification": Classification.PDF.value}),
+    ]
+
+    class _TrackingManifestIndex:
+        instances: list["_TrackingManifestIndex"] = []
+
+        def __init__(self, path: object, eager: object) -> None:
+            self.path = path
+            self.eager = eager
+            self.entries = list(entries)
+            self.iter_calls = 0
+            _TrackingManifestIndex.instances.append(self)
+
+        def iter_existing_paths(self):
+            self.iter_calls += 1
+            return list(self.entries)
+
+        def iter_existing(self):
+            return self.iter_existing_paths()
+
+    monkeypatch.setattr(download_args, "ManifestUrlIndex", _TrackingManifestIndex)
+    monkeypatch.setattr(
+        download_args,
+        "load_resolver_config",
+        lambda *_: SimpleNamespace(
+            max_concurrent_resolvers=1,
+            polite_headers={"User-Agent": "stub"},
+            enable_global_url_dedup=False,
+        ),
+    )
+
+    args = download_args.parse_args(parser, _base_args())
+    resolved = download_args.resolve_config(args, parser)
+
+    assert not resolved.persistent_seen_urls
+    assert _TrackingManifestIndex.instances and _TrackingManifestIndex.instances[0].iter_calls == 0
+
+
+def test_resolve_config_hydrates_persistent_seen_urls_with_cap(parser, monkeypatch):
+    entries = [
+        ("https://example.org/a.pdf", {"classification": Classification.PDF.value}),
+        ("https://example.org/b.pdf", {"classification": Classification.CACHED.value}),
+        ("https://example.org/c.xml", {"classification": Classification.XML.value}),
+    ]
+
+    class _TrackingManifestIndex:
+        instances: list["_TrackingManifestIndex"] = []
+
+        def __init__(self, path: object, eager: object) -> None:
+            self.path = path
+            self.eager = eager
+            self.entries = list(entries)
+            self.iter_calls = 0
+            _TrackingManifestIndex.instances.append(self)
+
+        def iter_existing_paths(self):
+            self.iter_calls += 1
+            return list(self.entries)
+
+        def iter_existing(self):
+            return self.iter_existing_paths()
+
+    monkeypatch.setattr(download_args, "ManifestUrlIndex", _TrackingManifestIndex)
+
+    args = download_args.parse_args(
+        parser,
+        _base_args()
+        + [
+            "--global-url-dedup-cap",
+            "2",
+        ],
+    )
+    resolved = download_args.resolve_config(args, parser)
+
+    assert resolved.persistent_seen_urls == {entries[0][0], entries[1][0]}
+    assert _TrackingManifestIndex.instances and _TrackingManifestIndex.instances[0].iter_calls == 1

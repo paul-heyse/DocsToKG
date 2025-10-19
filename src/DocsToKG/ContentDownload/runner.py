@@ -47,6 +47,7 @@ from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
     AttemptSink,
     CsvSink,
+    JsonlResumeLookup,
     JsonlSink,
     LastAttemptCsvSink,
     ManifestIndexSink,
@@ -55,7 +56,6 @@ from DocsToKG.ContentDownload.telemetry import (
     RunTelemetry,
     SqliteSink,
     SummarySink,
-    load_previous_manifest,
     load_resume_completed_from_sqlite,
     looks_like_csv_resume_target,
     looks_like_sqlite_resume_target,
@@ -294,7 +294,7 @@ class DownloadRun:
             list_only=self.args.list_only,
             extract_html_text=self.resolved.extract_html_text,
             run_id=self.resolved.run_id,
-            previous_lookup={},
+            previous_lookup=resume_lookup,
             resume_completed=resume_completed,
             sniff_bytes=self.args.sniff_bytes,
             min_pdf_bytes=self.args.min_pdf_bytes,
@@ -305,7 +305,6 @@ class DownloadRun:
             content_addressed=self.args.content_addressed,
             verify_cache_digest=self.args.verify_cache_digest,
         )
-        options.previous_lookup = resume_lookup
         state = DownloadRunState(
             session_factory=session_factory,
             options=options,
@@ -355,6 +354,12 @@ class DownloadRun:
         resume_lookup: Mapping[str, Dict[str, Any]]
         resume_completed: Set[str]
         cleanup_callback: Optional[Callable[[], None]] = None
+
+        def _build_json_lookup() -> Tuple[Mapping[str, Dict[str, Any]], Set[str], Optional[Callable[[], None]]]:
+            json_lookup = JsonlResumeLookup(resume_path)
+            completed_ids = set(json_lookup.completed_work_ids)
+            return json_lookup, completed_ids, getattr(json_lookup, "close", None)
+
         if sqlite_path and sqlite_path.exists():
             sqlite_lookup = SqliteResumeLookup(sqlite_path)
             cleanup_callback = getattr(sqlite_lookup, "close", None)
@@ -366,11 +371,7 @@ class DownloadRun:
                         with contextlib.suppress(Exception):
                             cleanup_callback()
                     cleanup_callback = None
-                    resume_lookup, resume_completed = load_previous_manifest(
-                        resume_path,
-                        sqlite_path=sqlite_path,
-                        allow_sqlite_fallback=True,
-                    )
+                    resume_lookup, resume_completed, cleanup_callback = _build_json_lookup()
                 else:
                     resume_lookup = sqlite_lookup
                     used_sqlite = True
@@ -382,11 +383,7 @@ class DownloadRun:
                         cleanup_callback()
                 raise
         else:
-            resume_lookup, resume_completed = load_previous_manifest(
-                resume_path,
-                sqlite_path=sqlite_path,
-                allow_sqlite_fallback=True,
-            )
+            resume_lookup, resume_completed, cleanup_callback = _build_json_lookup()
 
         if (
             not resume_path_exists
@@ -561,22 +558,43 @@ class DownloadRun:
                             Future[Dict[str, Any]],
                             Tuple[WorkArtifact, bool, Optional[str]],
                         ] = {}
+                        future_thread_ids: Dict[
+                            Future[Dict[str, Any]],
+                            Dict[str, int],
+                        ] = {}
 
                         def _submit(work_item: WorkArtifact) -> Future[Dict[str, Any]]:
-                            future = executor.submit(
-                                self.process_work_item, work_item, state.options
-                            )
+                            thread_info: Dict[str, int] = {}
+
+                            def _runner() -> Dict[str, Any]:
+                                thread_info["thread_id"] = threading.get_ident()
+                                try:
+                                    return self.process_work_item(
+                                        work_item, state.options
+                                    )
+                                except Exception:
+                                    state.session_factory.close_current()
+                                    raise
+
+                            future = executor.submit(_runner)
                             future_work_ids[future] = getattr(work_item, "work_id", None)
                             future_context[future] = (
                                 work_item,
                                 bool(state.options.dry_run),
                                 state.options.run_id or self.resolved.run_id,
                             )
+                            future_thread_ids[future] = thread_info
                             return future
 
                         def _handle_future(completed_future: Future[Dict[str, Any]]) -> None:
                             work_id = future_work_ids.pop(completed_future, None)
                             artifact_context = future_context.pop(completed_future, None)
+                            thread_info = future_thread_ids.pop(completed_future, None)
+                            thread_id = (
+                                thread_info.get("thread_id")
+                                if thread_info is not None
+                                else None
+                            )
                             try:
                                 completed_future.result()
                             except Exception as exc:
@@ -586,6 +604,8 @@ class DownloadRun:
                                     work_id=work_id,
                                     artifact_context=artifact_context,
                                 )
+                                if thread_id is not None:
+                                    state.session_factory.close_for_thread(thread_id)
                                 return
 
                         for artifact in provider.iter_artifacts():

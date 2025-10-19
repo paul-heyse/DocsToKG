@@ -147,11 +147,21 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
         }
 
     if mode == "html":
-        files = doctags_module.list_htmls(input_dir)
+        iter_htmls = getattr(doctags_module, "iter_htmls", None)
+        files = (
+            iter_htmls(input_dir)
+            if callable(iter_htmls)
+            else iter(doctags_module.list_htmls(input_dir))
+        )
         manifest_stage = getattr(doctags_module, "HTML_MANIFEST_STAGE", "doctags-html")
         overwrite = bool(getattr(args, "overwrite", False))
     else:
-        files = doctags_module.list_pdfs(input_dir)
+        iter_pdfs = getattr(doctags_module, "iter_pdfs", None)
+        files = (
+            iter_pdfs(input_dir)
+            if callable(iter_pdfs)
+            else iter(doctags_module.list_pdfs(input_dir))
+        )
         manifest_stage = doctags_module.MANIFEST_STAGE
         overwrite = False
 
