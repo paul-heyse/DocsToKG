@@ -92,6 +92,8 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
     parser = build_doctags_parser()
 
     args, _unknown = parser.parse_known_args(argv)
+    raw_log_level = getattr(args, "log_level", None)
+    log_level = str(raw_log_level).upper() if raw_log_level is not None else None
 
     try:
         mode, input_dir, output_dir, resolved_root_str = _resolve_doctags_paths(args)
@@ -105,6 +107,7 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
             "process": [],
             "skip": [],
             "notes": [f"{exc.message}{hint_suffix}"],
+            "log_level": log_level,
             "error": {
                 "option": exc.option,
                 "message": exc.message,
@@ -123,6 +126,7 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
             "process": _new_bucket(),
             "skip": _new_bucket(),
             "notes": ["Input directory missing"],
+            "log_level": log_level,
         }
 
     if mode == "html":
@@ -170,6 +174,7 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
         "process": planned,
         "skip": skipped,
         "notes": [],
+        "log_level": log_level,
     }
 
 
@@ -392,6 +397,9 @@ def display_plan(plans: Sequence[Dict[str, Any]], stream: Optional[TextIO] = Non
             lines.append(f"- {desc}: process {process_count}, skip {skip_count}")
             lines.append(f"  input:  {entry.get('input_dir')}")
             lines.append(f"  output: {entry.get('output_dir')}")
+            log_level_value = entry.get("log_level")
+            if log_level_value:
+                lines.append(f"  log_level: {log_level_value}")
             if process_count:
                 lines.append(
                     "  process preview: "
