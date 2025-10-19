@@ -1575,18 +1575,13 @@ class FaissVectorStore(DenseVectorStore):
                 cloner_options.shard = bool(shard)
                 if shard and hasattr(cloner_options, "common_ivf_quantizer"):
                     cloner_options.common_ivf_quantizer = True
+
+            gpu_ids: List[int]
             if explicit_targets_configured:
-                multi = faiss.index_cpu_to_gpus_list(
-                    base_index,
-                    gpus=gpu_ids,
-                    co=cloner_options,
-                )
+                gpu_ids = list(target_gpus)
             else:
-                multi = faiss.index_cpu_to_all_gpus(
-                    base_index,
-                    co=cloner_options,
-                    ngpu=gpu_count,
-                )
+                gpu_ids = list(range(available_gpus))
+            gpu_count = len(gpu_ids)
 
             resources_vector: "faiss.GpuResourcesVector | None" = None
             if hasattr(faiss, "GpuResourcesVector"):
@@ -1622,7 +1617,18 @@ class FaissVectorStore(DenseVectorStore):
                         resources_vector, gpu_ids, base_index, cloner_options
                     )
             else:
-                multi = faiss.index_cpu_to_all_gpus(base_index, co=cloner_options, ngpu=gpu_count)
+                if explicit_targets_configured:
+                    multi = faiss.index_cpu_to_gpus_list(
+                        base_index,
+                        gpus=gpu_ids,
+                        co=cloner_options,
+                    )
+                else:
+                    multi = faiss.index_cpu_to_all_gpus(
+                        base_index,
+                        co=cloner_options,
+                        ngpu=gpu_count,
+                    )
             self._replicated = True
             return multi
         except RuntimeError:
