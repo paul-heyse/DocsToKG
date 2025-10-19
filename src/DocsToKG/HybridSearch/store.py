@@ -1567,6 +1567,9 @@ class FaissVectorStore(DenseVectorStore):
         else:
             gpu_ids = list(range(gpu_count))
 
+        original_ids = tuple(self._replication_gpu_ids or ()) if explicit_targets_configured else tuple()
+        filtered_targets = bool(original_ids) and len(gpu_ids) < len(original_ids)
+
         try:
             base_index = index
             if hasattr(faiss, "index_gpu_to_cpu"):
@@ -1589,25 +1592,20 @@ class FaissVectorStore(DenseVectorStore):
                 gpu_ids = list(range(available_gpus))
             gpu_count = len(gpu_ids)
 
+            resources_supported = hasattr(faiss, "GpuResourcesVector")
             resources_vector: "faiss.GpuResourcesVector | None" = None
-            if explicit_targets_configured:
-                gpu_ids = list(target_gpus)
-            else:
-                gpu_ids = list(range(available_gpus))
-            gpu_count = len(gpu_ids)
-            if hasattr(faiss, "GpuResourcesVector"):
+            if resources_supported and not filtered_targets:
                 try:
                     resources_vector = faiss.GpuResourcesVector()
                 except Exception:  # pragma: no cover - fall back to legacy path
+                    resources_supported = False
                     resources_vector = None
 
             self._replica_gpu_resources = []
             primary_resource = getattr(self, "_gpu_resources", None)
             multi: "faiss.Index"
-            if resources_vector is not None and (
-                hasattr(faiss, "index_cpu_to_gpu_multiple")
-                or hasattr(faiss, "index_cpu_to_gpus_list")
-            ):
+
+            if resources_vector is not None:
                 for gpu_id in gpu_ids:
                     resource: "faiss.StandardGpuResources"
                     if (
@@ -1620,52 +1618,72 @@ class FaissVectorStore(DenseVectorStore):
                         resource = self._create_gpu_resources(device=gpu_id)
                         self._replica_gpu_resources.append(resource)
                     resources_vector.push_back(resource)
-                if hasattr(faiss, "index_cpu_to_gpu_multiple"):
-                    multi = faiss.index_cpu_to_gpu_multiple(
-                        resources_vector, gpu_ids, base_index, cloner_options
-                    )
-                else:
-                    if not gpu_ids:
-                        logger.error(
-                            "index_cpu_to_gpus_list fallback requires at least one GPU id"
+
+                if hasattr(faiss, "index_cpu_to_gpu_multiple") and not filtered_targets:
+                    try:
+                        multi = faiss.index_cpu_to_gpu_multiple(
+                            resources_vector, gpu_ids, base_index, cloner_options
                         )
-                        raise AssertionError(
-                            "gpu_ids must not be empty when invoking manual GPU replication"
-                        )
-                    self._observability.metrics.increment(
-                        "faiss_gpu_manual_resource_path", amount=1.0
-                    )
-                    self._observability.logger.info(
-                        "faiss-manual-resource-path-engaged",
-                        extra={
-                            "event": {
-                                "component": "faiss",
-                                "action": "manual_resource_replication",
-                                "gpu_ids": tuple(gpu_ids),
-                            }
-                        },
-                    )
+                        self._replicated = True
+                        return multi
+                    except TypeError:
+                        pass
+
+                if hasattr(faiss, "index_cpu_to_gpus_list"):
                     multi = faiss.index_cpu_to_gpus_list(
                         base_index,
                         gpus=gpu_ids,
                         co=cloner_options,
                         resources=resources_vector,
                     )
-            else:
-                if explicit_targets_configured:
-                    multi = faiss.index_cpu_to_gpus_list(
-                        base_index,
-                        gpus=gpu_ids,
-                        co=cloner_options,
+                    self._replicated = True
+                    return multi
+
+            if explicit_targets_configured and hasattr(faiss, "index_cpu_to_gpus_list"):
+                if not gpu_ids:
+                    logger.error(
+                        "index_cpu_to_gpus_list fallback requires at least one GPU id"
                     )
-                else:
-                    multi = faiss.index_cpu_to_all_gpus(
+                    raise AssertionError(
+                        "gpu_ids must not be empty when invoking manual GPU replication"
+                    )
+                multi = faiss.index_cpu_to_gpus_list(
+                    base_index,
+                    gpus=gpu_ids,
+                    co=cloner_options,
+                )
+                self._observability.metrics.increment(
+                    "faiss_gpu_manual_resource_path", amount=1.0
+                )
+                self._observability.logger.info(
+                    "faiss-manual-resource-path-engaged",
+                    extra={
+                        "event": {
+                            "component": "faiss",
+                            "action": "manual_resource_replication",
+                            "gpu_ids": tuple(gpu_ids),
+                        }
+                    },
+                )
+                if (not resources_supported) and hasattr(faiss, "index_cpu_to_all_gpus"):
+                    fallback = faiss.index_cpu_to_all_gpus(
                         base_index,
                         co=cloner_options,
-                        ngpu=gpu_count,
+                        ngpu=len(gpu_ids),
                     )
-            self._replicated = True
-            return multi
+                    self._replicated = True
+                    return fallback
+                self._replicated = True
+                return multi
+
+            if hasattr(faiss, "index_cpu_to_all_gpus"):
+                multi = faiss.index_cpu_to_all_gpus(
+                    base_index,
+                    co=cloner_options,
+                    ngpu=gpu_count,
+                )
+                self._replicated = True
+                return multi
         except RuntimeError:
             raise
         except Exception:  # pragma: no cover - GPU-specific failure
