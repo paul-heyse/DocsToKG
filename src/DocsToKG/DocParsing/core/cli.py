@@ -122,6 +122,13 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
     )
     doctags_module.add_data_root_option(parser)
     parser.add_argument(
+        "--log-level",
+        type=lambda value: str(value).upper(),
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Logging verbosity applied to the DocTags stage",
+    )
+    parser.add_argument(
         "--in-dir",
         "--input",
         dest="in_dir",
@@ -171,6 +178,12 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
         type=float,
         default=None,
         help="Fraction of GPU memory allocated to the vLLM server",
+    )
+    parser.add_argument(
+        "--vllm-wait-timeout",
+        type=int,
+        default=None,
+        help="Seconds to wait for vLLM readiness in PDF mode",
     )
     doctags_module.add_resume_force_options(
         parser,

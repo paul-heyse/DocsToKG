@@ -538,6 +538,65 @@ def test_run_all_forwards_zero_token_bounds(
     assert embed_args[embed_args.index("--shard-index") + 1] == "3"
 
 
+def test_run_all_plan_reports_log_level(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    planning_module_stubs: None,
+) -> None:
+    """`docparse all --plan` surfaces the forwarded log level in the plan output."""
+
+    html_dir = tmp_path / "html"
+    doctags_out_dir = tmp_path / "DocTagsFiles"
+    html_dir.mkdir()
+    doctags_out_dir.mkdir()
+    (html_dir / "doc.html").write_text("<html></html>", encoding="utf-8")
+
+    def _fake_plan_chunk(_argv: Sequence[str]) -> dict[str, object]:
+        return {
+            "stage": "chunk",
+            "input_dir": str(doctags_out_dir),
+            "output_dir": str(tmp_path / "ChunkedDocTagFiles"),
+            "process": {"count": 0, "preview": []},
+            "skip": {"count": 0, "preview": []},
+            "notes": [],
+        }
+
+    def _fake_plan_embed(_argv: Sequence[str]) -> dict[str, object]:
+        return {
+            "stage": "embed",
+            "action": "generate",
+            "chunks_dir": str(tmp_path / "ChunkedDocTagFiles"),
+            "vectors_dir": str(tmp_path / "Embeddings"),
+            "process": {"count": 0, "preview": []},
+            "skip": {"count": 0, "preview": []},
+            "notes": [],
+        }
+
+    monkeypatch.setattr(core_cli, "plan_chunk", _fake_plan_chunk)
+    monkeypatch.setattr(core_cli, "plan_embed", _fake_plan_embed)
+
+    exit_code = core_cli.run_all(
+        [
+            "--mode",
+            "html",
+            "--log-level",
+            "DEBUG",
+            "--doctags-in-dir",
+            str(html_dir),
+            "--doctags-out-dir",
+            str(doctags_out_dir),
+            "--plan",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "docparse all plan" in captured.out
+    assert "log_level: DEBUG" in captured.out
+
+
 def test_token_profiles_missing_transformers(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
