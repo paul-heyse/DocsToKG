@@ -146,6 +146,13 @@ def _make_artifact(resolved: ResolvedConfig, work_id: str) -> WorkArtifact:
     )
 
 
+def _count_open_fds() -> int:
+    fd_root = Path("/proc/self/fd")
+    if not fd_root.exists():
+        raise FileNotFoundError("/proc/self/fd is not available")
+    return len(list(fd_root.iterdir()))
+
+
 def test_setup_sinks_returns_multisink(tmp_path):
     resolved = make_resolved_config(tmp_path)
     bootstrap_run_environment(resolved)
@@ -332,7 +339,7 @@ def test_setup_download_state_expands_user_resume_path(tmp_path, patcher, monkey
 
     def _capture_resume_path(_self, resume_path):
         captured["path"] = resume_path
-        return {}, set()
+        return {}, set(), None
 
     patcher.setattr(DownloadRun, "_load_resume_state", _capture_resume_path)
 
@@ -441,6 +448,105 @@ def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_pat
     sqlite_entry = next(iter(previous_lookup.values()))
     assert sqlite_entry["classification"] == "pdf"
     assert sqlite_entry["path"].endswith("stored.pdf")
+
+
+def test_download_run_closes_sqlite_resume_handles(tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+    sqlite_path = resolved.sqlite_path
+    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(sqlite_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE manifests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                run_id TEXT,
+                schema_version INTEGER,
+                work_id TEXT,
+                title TEXT,
+                publication_year INTEGER,
+                resolver TEXT,
+                url TEXT,
+                normalized_url TEXT,
+                path TEXT,
+                path_mtime_ns INTEGER,
+                classification TEXT,
+                content_type TEXT,
+                reason TEXT,
+                reason_detail TEXT,
+                html_paths TEXT,
+                sha256 TEXT,
+                content_length INTEGER,
+                etag TEXT,
+                last_modified TEXT,
+                extracted_text_path TEXT,
+                dry_run INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO manifests (
+                timestamp, run_id, schema_version, work_id, title, publication_year,
+                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                content_type, reason, reason_detail, html_paths, sha256,
+                content_length, etag, last_modified, extracted_text_path, dry_run
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "2025-01-01T00:00:00Z",
+                "resume-run",
+                MANIFEST_SCHEMA_VERSION,
+                "W-HANDLES",
+                "SQLite Resume",
+                2024,
+                "openalex",
+                "https://example.org/W-HANDLES.pdf",
+                "https://example.org/w-handles.pdf",
+                str(resolved.pdf_dir / "stored.pdf"),
+                None,
+                "pdf",
+                "application/pdf",
+                None,
+                None,
+                None,
+                "deadbeef",
+                1024,
+                None,
+                None,
+                None,
+                0,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    download_run = DownloadRun(resolved)
+    factory = ThreadLocalSessionFactory(requests.Session)
+
+    during = None
+    after = None
+    try:
+        try:
+            before = _count_open_fds()
+        except FileNotFoundError:
+            pytest.skip("/proc/self/fd is required for handle tracking")
+        state = download_run.setup_download_state(factory)
+        during = _count_open_fds()
+        assert isinstance(state.resume_lookup, SqliteResumeLookup)
+        assert during > before
+    finally:
+        download_run.close()
+        if during is not None:
+            after = _count_open_fds()
+        factory.close_all()
+
+    assert during is not None and after is not None
+    assert after < during
 
 
 def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):

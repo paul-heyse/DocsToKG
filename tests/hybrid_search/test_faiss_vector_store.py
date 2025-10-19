@@ -650,6 +650,57 @@ def test_init_gpu_configures_resource_knobs(monkeypatch, caplog, use_all_devices
     assert payload.get("default_null_stream_all_devices") is use_all_devices
 
 
+def test_maybe_to_gpu_applies_expected_reserve_vecs(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """``_maybe_to_gpu`` should propagate expected reservations to cloner options."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._observability = Observability()  # type: ignore[attr-defined]
+    store._expected_ntotal = 256  # type: ignore[attr-defined]
+    store._force_64bit_ids = False  # type: ignore[attr-defined]
+    store._indices_32_bit = True  # type: ignore[attr-defined]
+    store._gpu_resources = object()  # type: ignore[attr-defined]
+    store._multi_gpu_mode = "single"  # type: ignore[attr-defined]
+    store._replication_enabled = False  # type: ignore[attr-defined]
+    store._maybe_distribute_multi_gpu = MethodType(lambda self, idx: idx, store)  # type: ignore[attr-defined]
+    store.init_gpu = MethodType(lambda self: None, store)  # type: ignore[attr-defined]
+    store._config = SimpleNamespace(device=1, flat_use_fp16=False)  # type: ignore[attr-defined]
+
+    captured: dict[str, object] = {}
+
+    class RecordingCloner:
+        def __init__(self) -> None:
+            self.device = None
+            self.verbose = False
+            self.allowCpuCoarseQuantizer = True
+            self.indicesOptions = None
+            self.reserveVecs = None
+
+    def fake_index_cpu_to_gpu(resources, device, index, co):  # type: ignore[override]
+        captured["co"] = co
+        captured["device"] = device
+        captured["resources"] = resources
+        captured["index"] = index
+        return f"gpu-{device}"
+
+    fake_faiss = SimpleNamespace(
+        GpuClonerOptions=RecordingCloner,
+        index_cpu_to_gpu=fake_index_cpu_to_gpu,
+        INDICES_32_BIT=13,
+    )
+
+    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+
+    result = store._maybe_to_gpu(object())
+
+    assert result == "gpu-1"
+    assert captured["resources"] is store._gpu_resources
+    assert captured["device"] == 1
+    cloner = captured["co"]
+    assert isinstance(cloner, RecordingCloner)
+    assert cloner.device == 1
+    assert cloner.reserveVecs == store._expected_ntotal
+
+
 def test_search_coalescer_iterative_execution_handles_many_micro_batches() -> None:
     """Ensure the coalescer drains large queues without recursive overflow."""
 
