@@ -72,6 +72,68 @@ def test_download_stream_fetches_fixture(ontology_env, tmp_path):
         )
 
 
+def test_download_stream_recovers_from_range_not_satisfiable(ontology_env, tmp_path):
+    """A 416 response should trigger a clean retry without a Range header."""
+
+    payload = b"range retry payload\n"
+    fixture_name = "range-retry.owl"
+    url = ontology_env.register_fixture(
+        fixture_name,
+        payload,
+        media_type="application/rdf+xml",
+        repeats=2,
+    )
+
+    get_key = ("GET", f"/fixtures/{fixture_name}")
+    get_queue = ontology_env._responses[get_key]
+    assert len(get_queue) >= 2, "Expected at least two GET responses for retry simulation"
+    get_queue[0] = ResponseSpec(
+        method="GET",
+        status=416,
+        headers={
+            "Content-Type": "application/rdf+xml",
+            "Content-Range": f"bytes */{len(payload)}",
+        },
+        body=b"",
+    )
+
+    destination = tmp_path / fixture_name
+    destination_part = Path(f"{destination}.part")
+    partial_seed = b"partial-bytes"
+    destination_part.write_bytes(partial_seed)
+    partial_size = len(partial_seed)
+
+    config = ontology_env.build_download_config()
+    config.max_retries = 3
+
+    result = network_mod.download_stream(
+        url=url,
+        destination=destination,
+        headers={},
+        previous_manifest=None,
+        http_config=config,
+        cache_dir=ontology_env.cache_dir,
+        logger=_logger(),
+        expected_media_type="application/rdf+xml",
+        service="obo",
+    )
+
+    assert destination.read_bytes() == payload
+    assert result.status in {"fresh", "updated"}
+    assert result.sha256 == hashlib.sha256(payload).hexdigest()
+    assert not destination_part.exists(), "Expected stale partial files to be removed"
+
+    methods = [record.method for record in ontology_env.requests]
+    assert methods.count("HEAD") == 1
+    assert methods.count("GET") == 2
+
+    get_records = [record for record in ontology_env.requests if record.method == "GET"]
+    assert get_records[0].headers.get("Range") == f"bytes={partial_size}-"
+    assert "Range" not in get_records[1].headers
+
+    assert result.content_type == "application/rdf+xml"
+
+
 def test_head_get_connections_remain_bounded(ontology_env, tmp_path):
     """Back-to-back HEAD/GET cycles should not leak pooled sessions."""
 
