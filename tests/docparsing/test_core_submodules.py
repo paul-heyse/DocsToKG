@@ -12,6 +12,7 @@ from unittest import mock
 
 import pytest
 
+from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
 import DocsToKG.DocParsing.core.http as core_http
 from DocsToKG.DocParsing.config import ConfigLoadError, load_toml_markers, load_yaml_markers
 from DocsToKG.DocParsing.core import (
@@ -310,8 +311,31 @@ def test_load_toml_markers_failure() -> None:
     assert "TOML" in str(excinfo.value)
 
 
-def test_chunk_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> None:
+def test_chunk_cli_validation_failure(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Chunk CLI surfaces validation errors without tracebacks."""
+
+    import DocsToKG.DocParsing as docparsing_pkg
+
+    stub_chunking = types.ModuleType("DocsToKG.DocParsing.chunking")
+
+    def _build_parser() -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument("--min-tokens", type=int, default=0)
+        return parser
+
+    def _main(_args: argparse.Namespace) -> int:
+        raise ChunkingCLIValidationError(
+            "--min-tokens", "Value must be non-negative", hint="Provide a value >= 0"
+        )
+
+    stub_chunking.build_parser = _build_parser
+    stub_chunking.main = _main
+
+    monkeypatch.setitem(sys.modules, "DocsToKG.DocParsing.chunking", stub_chunking)
+    monkeypatch.setitem(docparsing_pkg._MODULE_CACHE, "chunking", stub_chunking)
+    monkeypatch.setattr(docparsing_pkg, "chunking", stub_chunking, raising=False)
 
     exit_code = core_cli.chunk(["--min-tokens", "-1"])
     captured = capsys.readouterr()
@@ -567,27 +591,35 @@ def test_plan_embed_generate_counts(
     assert plan["skip"]["count"] == 0
 
 
-def test_plan_embed_missing_chunks_directory_reports_note(
+def test_plan_embed_accepts_file_chunks_dir(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    planning_module_stubs: None,
 ) -> None:
-    """Embedding planner returns a missing-directory note when chunks are absent."""
+    """Embedding planner handles file-valued ``--chunks-dir`` arguments."""
 
     data_root = tmp_path / "data"
-    chunks_dir = data_root / "ChunkedDocTagFiles"
-    vectors_dir = data_root / "Embeddings"
-    vectors_dir.mkdir(parents=True)
+    data_root.mkdir()
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+    chunk_file = tmp_path / "doc.chunks.jsonl"
+    chunk_file.write_text("{}\n", encoding="utf-8")
 
-    plan = plan_embed(
-        [
-            "--data-root",
-            str(data_root),
-            "--chunks-dir",
-            str(chunks_dir),
-            "--out-dir",
-            str(vectors_dir),
-        ]
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.detect_data_root", lambda *_args, **_kwargs: data_root
     )
 
-    assert plan["process"]["count"] == 0
+    def _mock_data_vectors(_root: Path, *, ensure: bool = False) -> Path:
+        return vectors_dir.resolve()
+
+    monkeypatch.setattr("DocsToKG.DocParsing.core.planning.data_vectors", _mock_data_vectors)
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index", lambda *_args, **_kwargs: {}
+    )
+
+    plan = plan_embed(["--chunks-dir", str(chunk_file), "--plan-only"])
+
+    assert plan["process"]["count"] == 1
+    assert plan["process"]["preview"] == ["doc.doctags"]
     assert plan["skip"]["count"] == 0
-    assert plan["notes"] == ["Chunks directory missing"]
+    assert plan["vectors_dir"] == str(vectors_dir.resolve())
