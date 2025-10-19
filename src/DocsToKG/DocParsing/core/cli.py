@@ -309,7 +309,9 @@ def chunk(argv: Sequence[str] | None = None) -> int:
     """Execute the Docling chunker subcommand."""
 
     try:
-        from DocsToKG.DocParsing import chunking as chunk_module
+        import DocsToKG.DocParsing as docparsing_pkg
+
+        chunk_module = docparsing_pkg._load_module("chunking")
     except ImportError as exc:
         print(str(exc), file=sys.stderr)
         print(
@@ -452,11 +454,8 @@ def _manifest_main(argv: Sequence[str]) -> int:
             if stage not in discovered:
                 discovered.append(stage)
 
-    canonical_list = ", ".join(known_stages)
-    discovered_list = ", ".join(discovered) if discovered else "none"
     allowed_stage_set = set(known_stage_set).union(discovered)
-    canonical_list = ", ".join(sorted(known_stage_set))
-    discovered_list = ", ".join(sorted(discovered)) or "none"
+    canonical_display = ", ".join(sorted(known_stage_set))
 
     if args.stages:
         seen: List[str] = []
@@ -465,17 +464,21 @@ def _manifest_main(argv: Sequence[str]) -> int:
             if not trimmed:
                 continue
             normalized = trimmed.lower()
-            resolved = STAGE_ALIASES.get(normalized, (normalized,))
-            invalid = [stage for stage in resolved if stage not in allowed_stage_set]
-            if invalid:
-                canonical_list = ", ".join(sorted(known_stage_set))
-                discovered_list = ", ".join(discovered) if discovered else "<none>"
+            alias_targets = STAGE_ALIASES.get(normalized)
+            if alias_targets is None:
+                resolved: List[str] = [normalized]
+            else:
+                resolved = [stage for stage in alias_targets if stage in allowed_stage_set]
+                if not resolved and normalized in allowed_stage_set:
+                    resolved = [normalized]
+            if not resolved:
+                discovered_message = ", ".join(discovered) if discovered else "<none>"
                 raise CLIValidationError(
                     option="--stage",
                     message=(
                         "Unsupported stage "
-                        f"'{trimmed}'. Canonical stages: {canonical_list}. "
-                        f"Discovered stages: {discovered_list}"
+                        f"'{trimmed}'. Canonical stages: {canonical_display}. "
+                        f"Discovered stages: {discovered_message}"
                     ),
                     hint="Choose a supported manifest stage.",
                 )
