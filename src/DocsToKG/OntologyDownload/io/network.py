@@ -774,6 +774,52 @@ class StreamingDownloader(pooch.HTTPDownloader):
         ) as response:
             yield response
 
+    def _sleep_with_cancellation(
+        self,
+        delay: float,
+        *,
+        remaining_budget: Optional[Callable[[], float]] = None,
+        timeout_callback: Optional[Callable[[], None]] = None,
+    ) -> None:
+        """Sleep in short increments while monitoring cancellation state."""
+
+        if delay <= 0:
+            return
+
+        callback_invoked = False
+        deadline = time.monotonic() + delay
+        poll_interval = 0.5
+
+        while True:
+            if self.cancellation_token and self.cancellation_token.is_cancelled():
+                self.logger.info(
+                    "download cancelled during HEAD retry backoff",
+                    extra={
+                        "stage": "download",
+                        "status": "cancelled",
+                    },
+                )
+                raise DownloadFailure(
+                    "Download was cancelled during HEAD retry backoff",
+                    retryable=False,
+                )
+
+            if remaining_budget is not None:
+                budget_remaining = remaining_budget()
+                if (
+                    timeout_callback is not None
+                    and budget_remaining <= 0
+                    and not callback_invoked
+                ):
+                    timeout_callback()
+                    callback_invoked = True
+
+            remaining_sleep = deadline - time.monotonic()
+            if remaining_sleep <= 0:
+                break
+
+            time.sleep(min(poll_interval, remaining_sleep))
+
     def _preliminary_head_check(
         self,
         url: str,
@@ -883,7 +929,11 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                     timeout_callback()
                             if self.bucket is not None and token_consumed:
                                 self._reuse_head_token = True
-                            time.sleep(retry_after_delay)
+                            self._sleep_with_cancellation(
+                                retry_after_delay,
+                                remaining_budget=remaining_budget,
+                                timeout_callback=timeout_callback,
+                            )
                     self.logger.debug(
                         "HEAD request failed, proceeding with GET",
                         extra={
