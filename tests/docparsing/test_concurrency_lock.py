@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import multiprocessing
 import os
 import time
 from pathlib import Path
 from typing import Any, Iterable, List, Tuple
+
+import pytest
 
 from DocsToKG.DocParsing.core.concurrency import acquire_lock
 
@@ -97,3 +100,42 @@ def test_acquire_lock_creates_nested_directory(tmp_path: Path) -> None:
         assert lock_path.exists()
 
     assert not lock_path.exists()
+
+
+@pytest.mark.parametrize("raw_pid", ["", "not-a-pid"])
+def test_acquire_lock_recovers_from_invalid_pid(
+    tmp_path: Path, raw_pid: str
+) -> None:
+    """Invalid lock contents should be treated as stale and recovered quickly."""
+
+    target_path = tmp_path / f"resource-{raw_pid or 'empty'}"
+    lock_path = target_path.with_suffix(target_path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text(raw_pid, encoding="utf-8")
+
+    records: List[logging.LogRecord] = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - simple hook
+            records.append(record)
+
+    capture_handler = _Capture()
+    capture_handler.setLevel(logging.WARNING)
+    logger = logging.getLogger("DocsToKG.DocParsing.core.concurrency")
+    logger.addHandler(capture_handler)
+
+    timeout = 0.5
+    start = time.time()
+    try:
+        with acquire_lock(target_path, timeout=timeout):
+            assert lock_path.exists()
+        elapsed = time.time() - start
+    finally:
+        logger.removeHandler(capture_handler)
+
+    assert elapsed < timeout - 0.1
+    assert not lock_path.exists()
+    assert any(
+        getattr(record, "extra_fields", {}).get("error_code") == "LOCK_INVALID_PID"
+        for record in records
+    )

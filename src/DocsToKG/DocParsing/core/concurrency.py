@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import random
 import socket
 import time
 from pathlib import Path
@@ -18,6 +19,10 @@ __all__ = [
     "find_free_port",
     "set_spawn_or_warn",
 ]
+
+
+LOGGER = get_logger(__name__, base_fields={"stage": "core"})
+_STALE_LOCK_JITTER_RANGE = (0.01, 0.05)
 
 
 @contextlib.contextmanager
@@ -40,13 +45,22 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
                     0o644,
                 )
             except FileExistsError:
-                existing_pid = _read_lock_owner(lock_path)
+                existing_pid, raw_pid = _read_lock_owner(lock_path)
 
-                if existing_pid and not _pid_is_running(existing_pid):
-                    try:
-                        lock_path.unlink()
-                    except FileNotFoundError:
-                        pass
+                if raw_pid is not None and existing_pid is None:
+                    _evict_stale_lock(
+                        lock_path,
+                        reason="invalid-pid",
+                        raw_pid=raw_pid,
+                    )
+                    continue
+
+                if existing_pid is not None and not _pid_is_running(existing_pid):
+                    _evict_stale_lock(
+                        lock_path,
+                        reason="stale-pid",
+                        raw_pid=raw_pid,
+                    )
                     continue
 
                 if time.time() - start > timeout:
@@ -90,21 +104,49 @@ def _pid_is_running(pid: int) -> bool:
     return True
 
 
-def _read_lock_owner(lock_path: Path) -> Optional[int]:
-    """Read the PID stored in ``lock_path`` if available."""
+def _read_lock_owner(lock_path: Path) -> tuple[Optional[int], Optional[str]]:
+    """Read the PID stored in ``lock_path`` and return both the parsed and raw forms."""
 
     try:
         pid_text = lock_path.read_text(encoding="utf-8").strip()
     except OSError:
-        return None
+        return None, None
 
     if not pid_text:
-        return None
+        return None, ""
 
     try:
-        return int(pid_text)
+        return int(pid_text), pid_text
     except ValueError:
-        return None
+        return None, pid_text
+
+
+def _evict_stale_lock(
+    lock_path: Path,
+    *,
+    reason: str,
+    raw_pid: Optional[str],
+) -> None:
+    """Remove a stale lock file after a brief jitter to avoid thundering herds."""
+
+    if reason == "invalid-pid":
+        log_event(
+            LOGGER,
+            "warning",
+            "Lock file contained invalid PID; treating as stale.",
+            doc_id="__system__",
+            input_hash=None,
+            error_code="LOCK_INVALID_PID",
+            lock_path=str(lock_path),
+            raw_pid=raw_pid or "",
+        )
+
+    jitter = random.uniform(*_STALE_LOCK_JITTER_RANGE)
+    time.sleep(jitter)
+    try:
+        lock_path.unlink()
+    except FileNotFoundError:
+        return
 
 
 def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
