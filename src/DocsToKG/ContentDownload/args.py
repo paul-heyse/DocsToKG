@@ -368,7 +368,7 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
     if args.max is not None and args.max <= 0:
         parser.error("--max must be a positive integer")
     if args.year_start > args.year_end:
-        parser.error("--year-start cannot be greater than --year-end")
+        parser.error("--year-start must be less than or equal to --year-end")
     if not args.topic and not args.topic_id:
         parser.error("Provide --topic or --topic-id.")
     for field_name in ("sniff_bytes", "min_pdf_bytes", "tail_check_bytes"):
