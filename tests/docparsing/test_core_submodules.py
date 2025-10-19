@@ -58,6 +58,7 @@ def planning_module_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
     ) -> None:
         parser.add_argument("--resume", action="store_true")
         parser.add_argument("--force", action="store_true")
+        parser.add_argument("--verify-hash", action="store_true")
 
     def list_htmls(directory: Path):
         return (path for path in sorted(Path(directory).rglob("*.html")))
@@ -298,6 +299,9 @@ def test_manifest_resume_controller(tmp_path: Path) -> None:
         force=False,
         manifest_index={"doc1": manifest_success, "doc2": manifest_failure},
     )
+
+    fast_skip, fast_entry = controller.can_skip_without_hash("doc1", output)
+    assert fast_skip is True and fast_entry is manifest_success
 
     skip, entry = controller.should_skip("doc1", output, "abc123")
     assert skip is True and entry is manifest_success
@@ -946,6 +950,62 @@ def test_plan_doctags_preview_bounded_for_large_inputs(
     assert plan["skip"]["count"] == 0
 
 
+def test_plan_doctags_resume_fast_path_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """DocTags planner avoids hashing when manifest success + outputs exist."""
+
+    html_dir = tmp_path / "html"
+    output_dir = tmp_path / "doctags"
+    html_dir.mkdir()
+    output_dir.mkdir()
+    html_path = html_dir / "doc.html"
+    html_path.write_text("<html></html>", encoding="utf-8")
+    (output_dir / "doc.doctags").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.detect_data_root",
+        lambda *_args, **_kwargs: tmp_path,
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index",
+        lambda *_args, **_kwargs: {
+            "doc.html": {
+                "doc_id": "doc.html",
+                "status": "success",
+                "input_hash": "abc123",
+                "hash_alg": "sha256",
+            }
+        },
+    )
+
+    def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
+        raise AssertionError("compute_content_hash should not run for fast resume")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash",
+        _raise_hash,
+    )
+
+    plan = plan_doctags(
+        [
+            "--mode",
+            "html",
+            "--in-dir",
+            str(html_dir),
+            "--out-dir",
+            str(output_dir),
+            "--resume",
+        ]
+    )
+
+    assert plan["process"]["count"] == 0
+    assert plan["skip"]["count"] == 1
+    assert plan["skip"]["preview"] == ["doc.html"]
+
+
 def test_plan_chunk_resume_missing_manifest_skips_hash(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1030,6 +1090,64 @@ def test_plan_chunk_resume_manifest_missing_hash_skips_hash(
     assert plan["skip"]["count"] == 0
 
 
+def test_plan_chunk_resume_fast_path_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Chunk planner honours fast path when outputs already exist."""
+
+    data_root = tmp_path / "data"
+    in_dir = data_root / "DocTagsFiles"
+    out_dir = data_root / "ChunkedDocTagFiles"
+    in_dir.mkdir(parents=True)
+    out_dir.mkdir(parents=True)
+
+    doctags_path = in_dir / "doc1.doctags"
+    doctags_path.write_text("{}", encoding="utf-8")
+    (out_dir / "doc1.chunks.jsonl").write_text("{}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.detect_data_root",
+        lambda *_args, **_kwargs: data_root,
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index",
+        lambda *_args, **_kwargs: {
+            "doc1.doctags": {
+                "doc_id": "doc1.doctags",
+                "status": "success",
+                "input_hash": "chunkhash",
+                "hash_alg": "sha256",
+            }
+        },
+    )
+
+    def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
+        raise AssertionError("compute_content_hash should not run for fast chunk resume")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash",
+        _raise_hash,
+    )
+
+    plan = plan_chunk(
+        [
+            "--data-root",
+            str(data_root),
+            "--in-dir",
+            str(in_dir),
+            "--out-dir",
+            str(out_dir),
+            "--resume",
+        ]
+    )
+
+    assert plan["process"]["count"] == 0
+    assert plan["skip"]["count"] == 1
+    assert plan["skip"]["preview"] == ["doc1.doctags"]
+
+
 def test_plan_embed_resume_missing_manifest_skips_hash(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1068,6 +1186,64 @@ def test_plan_embed_resume_missing_manifest_skips_hash(
 
     assert plan["process"]["count"] == 1
     assert plan["skip"]["count"] == 0
+
+
+def test_plan_embed_resume_fast_path_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Embedding planner uses manifest status + outputs for skipping."""
+
+    data_root = tmp_path / "data"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    vectors_dir = data_root / "Embeddings"
+    chunks_dir.mkdir(parents=True)
+    vectors_dir.mkdir(parents=True)
+
+    chunk_file = chunks_dir / "doc1.chunks.jsonl"
+    chunk_file.write_text("{}\n", encoding="utf-8")
+    (vectors_dir / "doc1.vectors.jsonl").write_text("{}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.detect_data_root",
+        lambda *_args, **_kwargs: data_root,
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index",
+        lambda *_args, **_kwargs: {
+            "doc1.doctags": {
+                "doc_id": "doc1.doctags",
+                "status": "success",
+                "input_hash": "embedhash",
+                "hash_alg": "sha256",
+            }
+        },
+    )
+
+    def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
+        raise AssertionError("compute_content_hash should not run for fast embed resume")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash",
+        _raise_hash,
+    )
+
+    plan = plan_embed(
+        [
+            "--data-root",
+            str(data_root),
+            "--chunks-dir",
+            str(chunks_dir),
+            "--out-dir",
+            str(vectors_dir),
+            "--resume",
+        ]
+    )
+
+    assert plan["process"]["count"] == 0
+    assert plan["skip"]["count"] == 1
+    assert plan["skip"]["preview"] == ["doc1.doctags"]
 
 
 def test_plan_embed_resume_manifest_missing_hash_skips_hash(
