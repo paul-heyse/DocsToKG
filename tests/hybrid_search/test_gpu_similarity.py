@@ -143,6 +143,7 @@ def test_cosine_topk_blockwise_prefers_knn_gpu(monkeypatch):
     query_limit = max(block_rows, q.shape[0]) * q.shape[1] * np.dtype(np.float32).itemsize
     assert kwargs["vectorsMemoryLimit"] == vector_limit
     assert kwargs["queriesMemoryLimit"] == query_limit
+    assert "use_cuvs" not in kwargs
 
 
 def test_cosine_topk_blockwise_falls_back_without_knn(monkeypatch):
@@ -176,3 +177,53 @@ def test_cosine_topk_blockwise_falls_back_without_knn(monkeypatch):
     assert scores.dtype == np.float32
     assert indices.dtype == np.int64
     assert state["pairwise_calls"]
+
+
+def test_cosine_topk_blockwise_honors_cuvs_request(monkeypatch):
+    faiss = pytest.importorskip(
+        "faiss", reason="cuVS integration test requires faiss GPU runtime"
+    )
+    if not hasattr(faiss, "knn_gpu") or not hasattr(faiss, "StandardGpuResources"):
+        pytest.skip("faiss GPU helpers unavailable")
+    get_num_gpus = getattr(faiss, "get_num_gpus", None)
+    if callable(get_num_gpus) and int(get_num_gpus()) <= 0:
+        pytest.skip("no GPUs available for cuVS test")
+    should_use = getattr(faiss, "should_use_cuvs", None)
+    if not callable(should_use):
+        pytest.skip("faiss.should_use_cuvs unavailable")
+    try:
+        if not bool(should_use()):
+            pytest.skip("cuVS runtime not available")
+    except Exception as exc:
+        pytest.skip(f"faiss.should_use_cuvs failed: {exc}")
+    try:
+        resources = faiss.StandardGpuResources()
+    except Exception as exc:
+        pytest.skip(f"unable to allocate GPU resources: {exc}")
+
+    q = np.random.default_rng(4).random((2, 8), dtype=np.float32)
+    C = np.random.default_rng(5).random((32, 8), dtype=np.float32)
+
+    original_knn = faiss.knn_gpu
+    captured: dict[str, object] = {}
+
+    def wrapped_knn(*args, **kwargs):
+        captured["kwargs"] = kwargs
+        return original_knn(*args, **kwargs)
+
+    monkeypatch.setattr(store_module.faiss, "knn_gpu", wrapped_knn, raising=False)
+    try:
+        cosine_topk_blockwise(
+            q,
+            C,
+            k=3,
+            device=0,
+            resources=resources,
+            use_cuvs=True,
+        )
+    finally:
+        monkeypatch.setattr(store_module.faiss, "knn_gpu", original_knn, raising=False)
+
+    kwargs = captured.get("kwargs")
+    assert isinstance(kwargs, dict)
+    assert kwargs.get("use_cuvs") is True

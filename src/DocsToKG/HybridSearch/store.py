@@ -138,6 +138,7 @@ __all__ = (
     "cosine_against_corpus_gpu",
     "cosine_batch",
     "cosine_topk_blockwise",
+    "resolve_cuvs_state",
     "max_inner_product",
     "normalize_rows",
     "pairwise_inner_products",
@@ -173,6 +174,40 @@ except Exception:  # pragma: no cover - dependency not present in test rig
     _FAISS_AVAILABLE = False
 
 
+# --- Helpers ---
+
+
+def resolve_cuvs_state(requested: Optional[bool]) -> tuple[bool, bool, Optional[bool]]:
+    """Determine whether cuVS kernels should be enabled for FAISS helpers."""
+
+    if not _FAISS_AVAILABLE:
+        return False, False, None
+    knn_runner = getattr(faiss, "knn_gpu", None)
+    if knn_runner is None:
+        return False, False, None
+
+    reported_available: Optional[bool]
+    should_use = getattr(faiss, "should_use_cuvs", None)
+    if callable(should_use):
+        try:
+            reported_available = bool(should_use())
+        except Exception:  # pragma: no cover - defensive best effort
+            reported_available = None
+    else:
+        reported_available = None
+
+    if requested is None:
+        enabled = bool(reported_available)
+    else:
+        enabled = bool(requested)
+
+    enabled = bool(knn_runner) and enabled
+    available = bool(knn_runner) and (
+        bool(reported_available) if reported_available is not None else True
+    )
+    return enabled, available, reported_available
+
+
 # --- Public Classes ---
 
 
@@ -205,6 +240,10 @@ class AdapterStats:
     replicated: bool
     fp16_enabled: bool
     resources: Optional["faiss.StandardGpuResources"]
+    cuvs_enabled: bool
+    cuvs_available: bool
+    cuvs_reported: Optional[bool]
+    cuvs_requested: Optional[bool]
 
 
 class _PendingSearch:
@@ -568,6 +607,8 @@ class FaissVectorStore(DenseVectorStore):
         """Return a read-only snapshot of adapter state."""
 
         index_desc = self._describe_index(getattr(self, "_index", None))
+        requested_cuvs = getattr(self._config, "use_cuvs", None)
+        cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(requested_cuvs)
         return AdapterStats(
             device=self.device,
             ntotal=self.ntotal,
@@ -577,6 +618,10 @@ class FaissVectorStore(DenseVectorStore):
             replicated=bool(self._replicated),
             fp16_enabled=bool(getattr(self._config, "flat_use_fp16", False)),
             resources=self._gpu_resources,
+            cuvs_enabled=cuvs_enabled,
+            cuvs_available=cuvs_available,
+            cuvs_reported=cuvs_reported,
+            cuvs_requested=requested_cuvs,
         )
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
@@ -1056,6 +1101,12 @@ class FaissVectorStore(DenseVectorStore):
         stats = self.adapter_stats
         self._observability.metrics.set_gauge("faiss_ntotal", float(stats.ntotal))
         self._observability.metrics.set_gauge("faiss_nprobe_effective", float(stats.nprobe))
+        self._observability.metrics.set_gauge(
+            "faiss_cuvs_enabled", 1.0 if stats.cuvs_enabled else 0.0
+        )
+        self._observability.metrics.set_gauge(
+            "faiss_cuvs_available", 1.0 if stats.cuvs_available else 0.0
+        )
         resources = stats.resources
         if resources is None or not hasattr(resources, "getMemoryInfo"):
             return
@@ -1081,6 +1132,10 @@ class FaissVectorStore(DenseVectorStore):
             "indices_32_bit": bool(self._indices_32_bit and not self._force_64bit_ids),
             "nprobe": stats.nprobe,
             "ntotal": stats.ntotal,
+            "cuvs_enabled": stats.cuvs_enabled,
+            "cuvs_available": stats.cuvs_available,
+            "cuvs_requested": stats.cuvs_requested,
+            "cuvs_reported": stats.cuvs_reported,
         }
         log_fn = (
             self._observability.logger.info if level == "info" else self._observability.logger.debug
@@ -1297,6 +1352,15 @@ class FaissVectorStore(DenseVectorStore):
             "snapshot_writes_since_refresh": float(self._writes_since_snapshot),
             "snapshot_last_refresh_epoch": float(self._last_snapshot_refresh),
         }
+        cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(
+            getattr(self._config, "use_cuvs", None)
+        )
+        stats["cuvs_enabled"] = cuvs_enabled
+        stats["cuvs_available"] = cuvs_available
+        stats["cuvs_reported_available"] = (
+            bool(cuvs_reported) if cuvs_reported is not None else False
+        )
+        stats["cuvs_requested"] = getattr(self._config, "use_cuvs", None)
         if self._temp_memory_bytes is not None:
             stats["gpu_temp_memory_bytes"] = float(self._temp_memory_bytes)
         try:
@@ -1330,6 +1394,7 @@ class FaissVectorStore(DenseVectorStore):
             "flat_use_fp16": bool(getattr(self._config, "flat_use_fp16", False)),
             "multi_gpu_mode": str(self._multi_gpu_mode),
             "device": int(getattr(self._config, "device", 0)),
+            "use_cuvs": getattr(self._config, "use_cuvs", None),
         }
 
     def rebuild_needed(self) -> bool:
@@ -2450,6 +2515,7 @@ def cosine_topk_blockwise(
     resources: "faiss.StandardGpuResources",
     block_rows: int = 65_536,
     use_fp16: bool = False,
+    use_cuvs: Optional[bool] = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return Top-K cosine similarities between ``q`` and ``C`` using GPU tiling.
 
@@ -2465,6 +2531,10 @@ def cosine_topk_blockwise(
         device: CUDA device ordinal used for FAISS kernels.
         resources: FAISS GPU resources backing ``pairwise_distance_gpu``.
         block_rows: Number of corpus rows processed per iteration.
+        use_fp16: Enable float16 compute for pairwise distance kernels.
+        use_cuvs: Optional override forcing cuVS acceleration when supported
+            (``True``) or disabling it (``False``). ``None`` defers to
+            :func:`faiss.should_use_cuvs` when available.
 
     Returns:
         Tuple ``(scores, indices)`` where each has shape ``(N x K)``. Scores are
@@ -2506,6 +2576,10 @@ def cosine_topk_blockwise(
                 vector_limit = int(block_rows) * row_bytes
                 query_rows = max(int(block_rows), q.shape[0])
                 query_limit = query_rows * np.dtype(np.float32).itemsize * q.shape[1]
+                cuvs_enabled, _, _ = resolve_cuvs_state(use_cuvs)
+                extra_kwargs: dict[str, object] = {}
+                if cuvs_enabled or use_cuvs is not None:
+                    extra_kwargs["use_cuvs"] = cuvs_enabled
                 distances, indices = knn_runner(
                     resources,
                     q_view,
@@ -2515,6 +2589,7 @@ def cosine_topk_blockwise(
                     device=int(device),
                     vectorsMemoryLimit=vector_limit,
                     queriesMemoryLimit=query_limit,
+                    **extra_kwargs,
                 )
             except TypeError:
                 distances = indices = None
