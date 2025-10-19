@@ -1318,8 +1318,9 @@ def test_run_respects_explicit_resume_from_override(patcher, tmp_path):
     assert resolved.args.resume_from == override_path
 
 
-def test_worker_crash_records_manifest_reason(patcher, tmp_path):
-    resolved = make_resolved_config(tmp_path, workers=2, csv=False)
+@pytest.mark.parametrize("worker_count", [1, 2])
+def test_worker_crash_records_manifest_reason(patcher, tmp_path, worker_count):
+    resolved = make_resolved_config(tmp_path, workers=worker_count, csv=False)
     bootstrap_run_environment(resolved)
 
     failure_id = "W_FAIL"
