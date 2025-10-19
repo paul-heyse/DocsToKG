@@ -55,6 +55,11 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --resume
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only
 ```
 
+> ℹ️ If `docparse embed` cannot find any chunk files (for example when
+> `--chunks-dir` points to a missing directory) it logs a "No chunk files
+> found" warning and exits with status 0 without writing new vectors, so the
+> run can be retried after preparing the inputs.
+
 ### Planner previews
 - `--plan-only` mode reports total document counts per bucket and shows up to
   five representative IDs for each category (`process`, `skip`, `validate`,
