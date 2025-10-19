@@ -9,7 +9,7 @@ from typing import Dict, Tuple
 import pytest
 
 from DocsToKG.DocParsing.core import BM25Stats
-from DocsToKG.DocParsing.io import compute_content_hash as canonical_hash
+from DocsToKG.DocParsing.io import compute_content_hash
 from DocsToKG.DocParsing.io import resolve_manifest_path
 
 _DOC_ID = "doc-1.doctags"
@@ -150,20 +150,22 @@ def test_embed_without_resume_streams_hash(monkeypatch: pytest.MonkeyPatch, tmp_
         monkeypatch, tmp_path
     )
 
-    exit_code = runtime.main([
-        "--data-root",
-        str(data_root),
-        "--chunks-dir",
-        str(chunks_dir),
-        "--out-dir",
-        str(vectors_dir),
-        "--qwen-dim",
-        "2",
-        "--batch-size-qwen",
-        "1",
-        "--batch-size-splade",
-        "1",
-    ])
+    exit_code = runtime.main(
+        [
+            "--data-root",
+            str(data_root),
+            "--chunks-dir",
+            str(chunks_dir),
+            "--out-dir",
+            str(vectors_dir),
+            "--qwen-dim",
+            "2",
+            "--batch-size-qwen",
+            "1",
+            "--batch-size-splade",
+            "1",
+        ]
+    )
 
     assert exit_code == 0
     assert counters["process"] == 1
@@ -171,11 +173,13 @@ def test_embed_without_resume_streams_hash(monkeypatch: pytest.MonkeyPatch, tmp_
 
     entries = _read_manifest_entries(runtime.MANIFEST_STAGE, data_root)
     success_entries = [
-        entry for entry in entries if entry.get("doc_id") == _DOC_ID and entry.get("status") == "success"
+        entry
+        for entry in entries
+        if entry.get("doc_id") == _DOC_ID and entry.get("status") == "success"
     ]
     assert success_entries, "Expected a success manifest entry for doc-1"
     recorded_hash = success_entries[-1]["input_hash"]
-    expected_hash = canonical_hash(chunk_file)
+    expected_hash = compute_content_hash(chunk_file)
     assert recorded_hash == expected_hash
 
 
@@ -209,9 +213,10 @@ def test_embed_resume_skips_unchanged(monkeypatch: pytest.MonkeyPatch, tmp_path:
 
     entries = _read_manifest_entries(runtime.MANIFEST_STAGE, data_root)
     skip_entries = [
-        entry for entry in entries if entry.get("doc_id") == _DOC_ID and entry.get("status") == "skip"
+        entry
+        for entry in entries
+        if entry.get("doc_id") == _DOC_ID and entry.get("status") == "skip"
     ]
     assert skip_entries, "Expected a skip manifest entry after resume"
-    expected_hash = canonical_hash(chunk_file)
+    expected_hash = compute_content_hash(chunk_file)
     assert skip_entries[-1]["input_hash"] == expected_hash
-

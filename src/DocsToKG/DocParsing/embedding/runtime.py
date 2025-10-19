@@ -884,7 +884,7 @@ def _legacy_chunk_uuid(doc_id: str, source_chunk_idxs: Any, text_value: str) -> 
     else:
         src_iterable = [src_raw] if src_raw is not None else []
     src = ",".join(str(idx) for idx in src_iterable)
-    digest = hashlib.sha1(text_value.encode("utf-8")).hexdigest()[:16]
+    digest = hashlib.sha256(text_value.encode("utf-8")).hexdigest()[:16]
     name = f"{doc_id}|{src}|{digest}"
     try:
         return str(uuid.uuid5(UUID_NAMESPACE, name))
@@ -1924,7 +1924,9 @@ def write_vectors(
                 doc_id=doc_id,
                 duration_s=0.0,
                 schema_version=VECTOR_SCHEMA_VERSION,
-                input_path=row.get("source_path", "unknown") if isinstance(row, dict) else "unknown",
+                input_path=row.get("source_path", "unknown")
+                if isinstance(row, dict)
+                else "unknown",
                 input_hash=row.get("input_hash", "") if isinstance(row, dict) else "",
                 output_path=output_ref,
                 error=str(exc),
@@ -2511,9 +2513,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                     chunk_hash = compute_content_hash(chunk_file)
                 except Exception:
                     chunk_hash = ""
-                doc_id = compute_relative_doc_id(
-                    chunks_dir / chunk_entry.logical_path, chunks_dir
-                )
+                doc_id = compute_relative_doc_id(chunks_dir / chunk_entry.logical_path, chunks_dir)
                 log_event(
                     logger,
                     "error",
@@ -2599,9 +2599,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         resume_needs_hash = resume_controller.resume and not resume_controller.force
         for chunk_entry in chunk_entries:
             chunk_file = chunk_entry.resolved_path
-            doc_id, out_path = derive_doc_id_and_vectors_path(
-                chunk_entry, chunks_dir, args.out_dir
-            )
+            doc_id, out_path = derive_doc_id_and_vectors_path(chunk_entry, chunks_dir, args.out_dir)
             input_hash = ""
             if resume_needs_hash:
                 input_hash = compute_content_hash(chunk_file)
@@ -2747,7 +2745,9 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                     for future in as_completed(future_map):
                         chunk_file, out_path, input_hash, doc_id = future_map[future]
                         try:
-                            count, nnz, norms, duration, quarantined, resolved_hash = future.result()
+                            count, nnz, norms, duration, quarantined, resolved_hash = (
+                                future.result()
+                            )
                         except EmbeddingProcessingError as exc:
                             manifest_log_failure(
                                 stage=MANIFEST_STAGE,
@@ -2812,7 +2812,9 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                 for entry in tqdm(file_entries, desc="Pass B: Encoding vectors", unit="file"):
                     chunk_file, out_path, input_hash, doc_id = entry
                     try:
-                        count, nnz, norms, duration, quarantined, resolved_hash = _process_entry(entry)
+                        count, nnz, norms, duration, quarantined, resolved_hash = _process_entry(
+                            entry
+                        )
                     except EmbeddingProcessingError as exc:
                         manifest_log_failure(
                             stage=MANIFEST_STAGE,

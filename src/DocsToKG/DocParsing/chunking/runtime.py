@@ -238,7 +238,7 @@ from DocsToKG.DocParsing.io import (
     resolve_hash_algorithm,
     resolve_manifest_path,
 )
-from DocsToKG.DocParsing.logging import get_logger, log_event, telemetry_scope
+from DocsToKG.DocParsing.logging import get_logger, log_event, manifest_log_skip, telemetry_scope
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
 from .cli import build_parser, parse_args
@@ -691,18 +691,14 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
         )
 
 
-def _process_indexed_chunk_task(
-    payload: Tuple[int, ChunkTask]
-) -> Tuple[int, ChunkResult]:
+def _process_indexed_chunk_task(payload: Tuple[int, ChunkTask]) -> Tuple[int, ChunkResult]:
     """Execute ``_process_chunk_task`` and preserve submission ordering."""
 
     index, task = payload
     return index, _process_chunk_task(task)
 
 
-def _ordered_results(
-    results: Iterable[Tuple[int, ChunkResult]]
-) -> Iterator[ChunkResult]:
+def _ordered_results(results: Iterable[Tuple[int, ChunkResult]]) -> Iterator[ChunkResult]:
     """Yield chunk results in their original submission order."""
 
     pending: Dict[int, ChunkResult] = {}
@@ -1266,10 +1262,14 @@ def _main_inner(
         resume_controller = ResumeController(args.resume, args.force, chunk_manifest_index)
 
         def iter_chunk_tasks() -> Iterator[ChunkTask]:
+            """Generate chunk tasks for processing, respecting resume/force settings."""
+            resume_needs_hash = args.resume and not args.force
             for path in files:
                 doc_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
                 name = path.stem
-                input_hash = compute_content_hash(path)
+                input_hash = ""
+                if resume_needs_hash:
+                    input_hash = compute_content_hash(path)
                 parse_engine = parse_engine_lookup.get(doc_id, "docling-html")
                 if doc_id not in parse_engine_lookup:
                     logger.debug(
@@ -1277,7 +1277,10 @@ def _main_inner(
                         extra={"extra_fields": {"doc_id": doc_id}},
                     )
 
-                skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+                if resume_needs_hash:
+                    skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+                else:
+                    skip_doc = False
                 if skip_doc:
                     stage_telemetry.log_skip(
                         doc_id=doc_id,
@@ -1300,6 +1303,14 @@ def _main_inner(
                         doc_id=doc_id,
                         input_relpath=relative_path(path, resolved_data_root),
                         output_relpath=relative_path(out_path, resolved_data_root),
+                    )
+                    manifest_log_skip(
+                        stage=MANIFEST_STAGE,
+                        doc_id=doc_id,
+                        input_path=path,
+                        input_hash=input_hash,
+                        output_path=out_path,
+                        schema_version=CHUNK_SCHEMA_VERSION,
                     )
                     continue
 

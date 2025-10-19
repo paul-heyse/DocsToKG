@@ -606,7 +606,7 @@ def quarantine_artifact(
 class StreamingContentHasher:
     """Incrementally compute a content hash that mirrors :func:`compute_content_hash`."""
 
-    def __init__(self, algorithm: str = "sha1") -> None:
+    def __init__(self, algorithm: str = _SAFE_HASH_ALGORITHM) -> None:
         """Initialise the streaming hasher with the desired digest algorithm."""
 
         self.algorithm = algorithm
@@ -636,7 +636,7 @@ class StreamingContentHasher:
         return self._hasher.hexdigest()
 
 
-def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
+def compute_content_hash(path: Path, algorithm: str = _SAFE_HASH_ALGORITHM) -> str:
     """Compute a content hash for ``path`` using the requested algorithm."""
 
     hasher = make_hasher(name=algorithm)
@@ -708,9 +708,7 @@ def _iter_manifest_file(path: Path, stage: str) -> Iterator[dict]:
             yield entry
 
 
-def iter_manifest_entries(
-    stages: Sequence[str], root: Optional[Path] = None
-) -> Iterator[dict]:
+def iter_manifest_entries(stages: Sequence[str], root: Optional[Path] = None) -> Iterator[dict]:
     """Yield manifest entries for the requested ``stages`` sorted by timestamp."""
 
     manifest_dir = data_manifests(root, ensure=False)

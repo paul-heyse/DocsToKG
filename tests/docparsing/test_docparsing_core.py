@@ -940,8 +940,8 @@ def test_make_hasher_invalid_env_fallback(caplog: pytest.LogCaptureFixture) -> N
 def test_make_hasher_prefers_explicit_algorithm(caplog: pytest.LogCaptureFixture) -> None:
     os.environ["DOCSTOKG_HASH_ALG"] = "sha-1"
     with caplog.at_level("WARNING"):
-        hasher = doc_io.make_hasher(name="sha1")
-    assert hasher.name == "sha1"
+        hasher = doc_io.make_hasher(name="sha256")
+    assert hasher.name == "sha256"
     # Warning emitted for env override but no fallback message because explicit value is valid
     assert "Unknown hash algorithm 'sha-1'" in caplog.text
 
@@ -1325,7 +1325,6 @@ def test_qwen_embed_caches_llm(tmp_path: Path) -> None:
         ),
         mock.patch.object(embedding, "ensure_qwen_dependencies", lambda: None),
     ):
-
         cfg = embedding.QwenCfg(model_dir=tmp_path, batch_size=2)
         first = embedding.qwen_embed(cfg, ["a", "b"])
         second = embedding.qwen_embed(cfg, ["c"])
