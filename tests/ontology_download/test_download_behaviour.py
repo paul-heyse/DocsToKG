@@ -6,6 +6,7 @@ import io
 import logging
 import tarfile
 import zipfile
+from urllib.parse import urlparse
 
 import pytest
 
@@ -52,6 +53,58 @@ def test_download_stream_fetches_fixture(ontology_env, tmp_path):
     methods = [request.method for request in ontology_env.requests]
     assert methods.count("HEAD") == 1
     assert methods.count("GET") == 1
+
+
+def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
+    """A transient failure should consume bucket tokens for each retry."""
+
+    payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
+    url = ontology_env.register_fixture(
+        "hp-retry.owl",
+        payload,
+        media_type="application/rdf+xml",
+        repeats=1,
+    )
+
+    parsed = urlparse(url)
+    get_key = ("GET", parsed.path)
+    failure = ResponseSpec(status=503, headers={"Retry-After": "0"}, method="GET")
+    # The testing harness exposes the queued responses; prepend a transient failure
+    # so the first GET yields a retryable error before the cached success entries.
+    ontology_env._responses[get_key].appendleft(failure)
+
+    config = ontology_env.build_download_config()
+
+    class RecordingBucket:
+        def __init__(self) -> None:
+            self.calls: list[float] = []
+
+        def consume(self, tokens: float = 1.0) -> None:
+            self.calls.append(tokens)
+
+    bucket = RecordingBucket()
+    config.set_bucket_provider(lambda service, cfg, host: bucket)
+
+    destination = tmp_path / "hp-retry.owl"
+
+    result = network_mod.download_stream(
+        url=url,
+        destination=destination,
+        headers={},
+        previous_manifest=None,
+        http_config=config,
+        cache_dir=ontology_env.cache_dir,
+        logger=_logger(),
+        expected_media_type="application/rdf+xml",
+        service="obo",
+    )
+
+    assert destination.read_bytes() == payload
+    assert result.status == "fresh"
+    assert len(bucket.calls) == 2
+    methods = [request.method for request in ontology_env.requests]
+    assert methods.count("HEAD") == 1
+    assert methods.count("GET") == 2
 
 
 def test_download_stream_uses_cached_manifest(ontology_env, tmp_path):

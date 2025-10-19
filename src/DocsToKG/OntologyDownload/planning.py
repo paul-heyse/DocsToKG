@@ -441,6 +441,20 @@ def _cancel_pending_futures(
             cancel_fn()
 
 
+def _executor_is_shutting_down(executor: ThreadPoolExecutor) -> bool:
+    """Return ``True`` when *executor* has begun shutdown processing."""
+
+    return bool(getattr(executor, "_shutdown", False))
+
+
+def _shutdown_executor_nowait(executor: ThreadPoolExecutor) -> None:
+    """Request non-blocking shutdown with cancellation for *executor*."""
+
+    if _executor_is_shutting_down(executor):
+        return
+    executor.shutdown(wait=False, cancel_futures=True)
+
+
 @dataclass(slots=True, frozen=True)
 class Manifest:
     """Provenance information for a downloaded ontology artifact.
