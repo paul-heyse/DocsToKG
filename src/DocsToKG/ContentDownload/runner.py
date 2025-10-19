@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import random
 import inspect
 import json
 import logging
@@ -248,7 +249,8 @@ class DownloadRun:
             "max_results": self.args.max,
             "retry_attempts": self.resolved.openalex_retry_attempts,
             "retry_backoff": self.resolved.openalex_retry_backoff,
-            "retry_max_delay": self.resolved.openalex_retry_max_delay,
+            "retry_max_delay": self.resolved.openalex_max_retry_delay,
+            "retry_after_cap": self.resolved.retry_after_cap,
         }
         try:
             signature = inspect.signature(self.iterate_openalex_func)
@@ -728,7 +730,8 @@ def iterate_openalex(
     *,
     retry_attempts: int = 3,
     retry_backoff: float = 1.0,
-    retry_max_delay: float = 60.0,
+    retry_max_delay: float = 75.0,
+    retry_after_cap: Optional[float] = None,
 ) -> Iterable[Dict[str, Any]]:
     """Iterate over OpenAlex works respecting pagination, limits, and retry policy.
 
@@ -765,8 +768,20 @@ def iterate_openalex(
         return max(0.0, float(seconds))
 
     max_retries = max(0, int(retry_attempts))
-    base_backoff = max(0.0, float(retry_backoff))
-    max_delay = max(0.0, float(retry_max_delay))
+    retry_backoff = max(0.0, float(retry_backoff))
+    max_delay = max(0.0, float(retry_max_delay)) if retry_max_delay is not None else 0.0
+
+    def _jittered_delay(attempt_number: int) -> float:
+        if attempt_number <= 0 or retry_backoff <= 0 or max_delay <= 0:
+            return 0.0
+        base_delay = retry_backoff * (2 ** max(attempt_number - 1, 0))
+        if base_delay <= 0:
+            return 0.0
+        capped = min(base_delay, max_delay)
+        if capped <= 0:
+            return 0.0
+        half = capped / 2.0
+        return half + random.uniform(0.0, half)
 
     pager = query.paginate(
         per_page=per_page, n_max=max_results if max_results is not None else None
@@ -791,6 +806,16 @@ def iterate_openalex(
                     raise
                 attempt += 1
                 retry_after = _retry_after_seconds(exc)
+                delay = _jittered_delay(attempt)
+                bounded_retry_after: Optional[float] = None
+                if retry_after is not None:
+                    bounded_retry_after = retry_after
+                    if retry_after_cap is not None and retry_after_cap > 0:
+                        bounded_retry_after = min(bounded_retry_after, retry_after_cap)
+                    if max_delay > 0:
+                        bounded_retry_after = min(bounded_retry_after, max_delay)
+                if bounded_retry_after is not None:
+                    delay = max(delay, bounded_retry_after)
                 base_delay = base_backoff * (2 ** (attempt - 1)) if base_backoff else 0.0
                 jitter_delay = (
                     _calculate_equal_jitter_delay(

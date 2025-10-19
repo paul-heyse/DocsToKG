@@ -122,6 +122,7 @@ def _build_args(
         "sleep": 0.0,
         "openalex_retry_attempts": 3,
         "openalex_retry_backoff": 0.0,
+        "openalex_max_retry_delay": 75.0,
         "retry_after_cap": None,
     }
     if overrides:
@@ -197,6 +198,46 @@ def test_iterate_openalex_retries_then_succeeds(monkeypatch):
 
 
 def test_iterate_openalex_uses_equal_jitter(monkeypatch):
+    class _JitterPager:
+        def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+            self._pages = [list(page) for page in pages]
+            self._raised = False
+            self._index = 0
+
+        def __iter__(self) -> "_JitterPager":
+            return self
+
+        def __next__(self) -> Iterable[Dict[str, object]]:
+            if not self._raised:
+                self._raised = True
+                raise requests.HTTPError("temporary failure")
+            if self._index >= len(self._pages):
+                raise StopIteration
+            page = self._pages[self._index]
+            self._index += 1
+            return list(page)
+
+    class _JitterWorks:
+        def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+            self._pages = [list(page) for page in pages]
+
+        def paginate(
+            self, per_page: int, n_max: Optional[int] = None
+        ) -> Iterable[Iterable[Dict[str, object]]]:
+            return _JitterPager(self._pages)
+
+    works = _JitterWorks([[{"id": "W1"}]])
+    sleeps: List[float] = []
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.random.uniform",
+        lambda _a, half: 0.0,
+    )
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.time.sleep",
+        lambda value: sleeps.append(value),
+    )
+
     works = FlakyWorks([[{"id": "W1"}]], retry_after=None)
     slept: List[float] = []
     monkeypatch.setattr(
@@ -219,10 +260,61 @@ def test_iterate_openalex_uses_equal_jitter(monkeypatch):
             max_results=None,
             retry_attempts=2,
             retry_backoff=2.0,
+            retry_max_delay=10.0,
         )
     )
 
     assert [item["id"] for item in results] == ["W1"]
+    assert sleeps and sleeps[0] == pytest.approx(1.0)
+
+
+def test_iterate_openalex_caps_retry_after(monkeypatch):
+    future = datetime.now(timezone.utc) + timedelta(hours=4)
+    retry_after_header = format_datetime(future)
+
+    class _CappedPager:
+        def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+            self._pages = [list(page) for page in pages]
+            self._raised = False
+            self._index = 0
+
+        def __iter__(self) -> "_CappedPager":
+            return self
+
+        def __next__(self) -> Iterable[Dict[str, object]]:
+            if not self._raised:
+                self._raised = True
+                response = requests.Response()
+                response.status_code = 429
+                response.headers["Retry-After"] = retry_after_header
+                error = requests.HTTPError("rate limited")
+                error.response = response
+                raise error
+            if self._index >= len(self._pages):
+                raise StopIteration
+            page = self._pages[self._index]
+            self._index += 1
+            return list(page)
+
+    class _CappedWorks:
+        def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+            self._pages = [list(page) for page in pages]
+
+        def paginate(
+            self, per_page: int, n_max: Optional[int] = None
+        ) -> Iterable[Iterable[Dict[str, object]]]:
+            return _CappedPager(self._pages)
+
+    works = _CappedWorks([[{"id": "W1"}]])
+    sleeps: List[float] = []
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.random.uniform",
+        lambda _a, half: 0.0,
+    )
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.time.sleep",
+        lambda value: sleeps.append(value),
     assert uniform_calls == [(0.0, 1.0)]
     assert slept and slept[0] == pytest.approx(2.0)
 
@@ -243,13 +335,14 @@ def test_iterate_openalex_caps_retry_after(monkeypatch):
             per_page=1,
             max_results=None,
             retry_attempts=2,
-            retry_backoff=0.5,
+            retry_backoff=1.0,
             retry_max_delay=5.0,
+            retry_after_cap=90.0,
         )
     )
 
     assert [item["id"] for item in results] == ["W1"]
-    assert slept and slept[0] == pytest.approx(5.0)
+    assert sleeps and sleeps[0] == pytest.approx(5.0)
 
 
 def _manifest_entry(work_id: str, *, run_id: str = "resume-run") -> str:
