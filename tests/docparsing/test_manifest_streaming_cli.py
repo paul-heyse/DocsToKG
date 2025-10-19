@@ -248,6 +248,66 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
     assert status_line == "  statuses: failure=6, success=10044"
 
 
+def test_manifest_summary_respects_stage_order(monkeypatch, tmp_path, capsys) -> None:
+    """Requested stage order should be preserved in the manifest summary output."""
+
+    _prepare_manifest_cli_stubs(monkeypatch)
+
+    manifests_dir = tmp_path / "Manifests"
+    manifests_dir.mkdir()
+
+    from DocsToKG.DocParsing.core import cli
+
+    stage_order = ["embeddings", "chunks"]
+
+    def fake_iter_manifest_entries(stages, data_root):
+        assert stages == stage_order
+        assert data_root == tmp_path
+
+        yield {
+            "timestamp": "2025-01-01T00:00:00+00:00",
+            "stage": "chunks",
+            "doc_id": "doc-1",
+            "status": "success",
+            "duration_s": 1.234,
+        }
+        yield {
+            "timestamp": "2025-01-01T00:01:00+00:00",
+            "stage": "embeddings",
+            "doc_id": "doc-2",
+            "status": "success",
+            "duration_s": 2.345,
+        }
+
+    monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
+
+    exit_code = cli.manifest(
+        [
+            "--stage",
+            "embed",
+            "--stage",
+            "chunk",
+            "--summarize",
+            "--data-root",
+            str(tmp_path),
+        ]
+    )
+
+    assert exit_code == 0
+
+    stdout_lines = capsys.readouterr().out.splitlines()
+    manifest_header_index = stdout_lines.index("Manifest summary")
+    summary_lines = [
+        line
+        for line in stdout_lines[manifest_header_index + 1 : manifest_header_index + 5]
+        if line.startswith("- ")
+    ]
+    assert summary_lines == [
+        "- embeddings: total=1 duration_s=2.345",
+        "- chunks: total=1 duration_s=1.234",
+    ]
+
+
 def test_manifest_missing_directory_read_only(tmp_path, monkeypatch, capsys) -> None:
     """CLI should warn when the manifest directory is absent without creating it."""
 
