@@ -291,6 +291,16 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     if args.validate_only:
         validate_bucket = _new_bucket()
         missing_bucket = _new_bucket()
+        if missing_notes:
+            return {
+                "stage": "embed",
+                "action": "validate",
+                "chunks_dir": str(chunks_dir),
+                "vectors_dir": str(vectors_dir),
+                "validate": validate_bucket,
+                "missing": missing_bucket,
+                "notes": missing_notes,
+            }
         for chunk in iter_chunks(chunks_dir):
             doc_id, vector_path = derive_doc_id_and_vectors_path(
                 chunk, chunks_dir, vectors_dir
