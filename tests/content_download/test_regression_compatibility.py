@@ -388,3 +388,70 @@ def test_load_resolver_config_rejects_legacy_rate_limits(tmp_path: Path):
     resolver_names: List[str] = ["alpha", "beta", "gamma"]
     with pytest.raises(ValueError, match="resolver_rate_limits.*no longer supported"):
         downloader.load_resolver_config(args, resolver_names)
+
+
+def test_load_resolver_config_applies_concurrency_and_dedup_overrides(tmp_path: Path):
+    config_payload: Dict[str, object] = {
+        "max_concurrent_resolvers": 5,
+        "enable_global_url_dedup": False,
+    }
+    config_path = tmp_path / "resolvers.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+
+    args = SimpleNamespace(
+        resolver_config=str(config_path),
+        unpaywall_email=None,
+        core_api_key=None,
+        semantic_scholar_api_key=None,
+        doaj_api_key=None,
+        max_resolver_attempts=None,
+        resolver_timeout=None,
+        retry_after_cap=None,
+        concurrent_resolvers=None,
+        max_concurrent_per_host=None,
+        disable_resolver=[],
+        enable_resolver=[],
+        resolver_order=None,
+        head_precheck=None,
+        accept=None,
+        mailto=None,
+        global_url_dedup=None,
+        domain_min_interval=[],
+        domain_token_bucket=[],
+    )
+
+    config = downloader.load_resolver_config(args, ["alpha", "beta"])
+
+    assert config.max_concurrent_resolvers == 5
+    assert config.enable_global_url_dedup is False
+
+
+def test_load_resolver_config_rejects_invalid_concurrency_override(tmp_path: Path):
+    config_payload: Dict[str, object] = {"max_concurrent_resolvers": 0}
+    config_path = tmp_path / "resolvers.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+
+    args = SimpleNamespace(
+        resolver_config=str(config_path),
+        unpaywall_email=None,
+        core_api_key=None,
+        semantic_scholar_api_key=None,
+        doaj_api_key=None,
+        max_resolver_attempts=None,
+        resolver_timeout=None,
+        retry_after_cap=None,
+        concurrent_resolvers=None,
+        max_concurrent_per_host=None,
+        disable_resolver=[],
+        enable_resolver=[],
+        resolver_order=None,
+        head_precheck=None,
+        accept=None,
+        mailto=None,
+        global_url_dedup=None,
+        domain_min_interval=[],
+        domain_token_bucket=[],
+    )
+
+    with pytest.raises(ValueError, match="max_concurrent_resolvers"):
+        downloader.load_resolver_config(args, ["alpha", "beta"])
