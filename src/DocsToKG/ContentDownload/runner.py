@@ -47,6 +47,7 @@ from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
     AttemptSink,
     CsvSink,
+    JsonlResumeLookup,
     JsonlSink,
     LastAttemptCsvSink,
     ManifestIndexSink,
@@ -55,7 +56,6 @@ from DocsToKG.ContentDownload.telemetry import (
     RunTelemetry,
     SqliteSink,
     SummarySink,
-    load_previous_manifest,
     load_resume_completed_from_sqlite,
     looks_like_csv_resume_target,
     looks_like_sqlite_resume_target,
@@ -294,7 +294,7 @@ class DownloadRun:
             list_only=self.args.list_only,
             extract_html_text=self.resolved.extract_html_text,
             run_id=self.resolved.run_id,
-            previous_lookup={},
+            previous_lookup=resume_lookup,
             resume_completed=resume_completed,
             sniff_bytes=self.args.sniff_bytes,
             min_pdf_bytes=self.args.min_pdf_bytes,
@@ -305,7 +305,6 @@ class DownloadRun:
             content_addressed=self.args.content_addressed,
             verify_cache_digest=self.args.verify_cache_digest,
         )
-        options.previous_lookup = resume_lookup
         state = DownloadRunState(
             session_factory=session_factory,
             options=options,
@@ -355,6 +354,12 @@ class DownloadRun:
         resume_lookup: Mapping[str, Dict[str, Any]]
         resume_completed: Set[str]
         cleanup_callback: Optional[Callable[[], None]] = None
+
+        def _build_json_lookup() -> Tuple[Mapping[str, Dict[str, Any]], Set[str], Optional[Callable[[], None]]]:
+            json_lookup = JsonlResumeLookup(resume_path)
+            completed_ids = set(json_lookup.completed_work_ids)
+            return json_lookup, completed_ids, getattr(json_lookup, "close", None)
+
         if sqlite_path and sqlite_path.exists():
             sqlite_lookup = SqliteResumeLookup(sqlite_path)
             cleanup_callback = getattr(sqlite_lookup, "close", None)
@@ -366,11 +371,7 @@ class DownloadRun:
                         with contextlib.suppress(Exception):
                             cleanup_callback()
                     cleanup_callback = None
-                    resume_lookup, resume_completed = load_previous_manifest(
-                        resume_path,
-                        sqlite_path=sqlite_path,
-                        allow_sqlite_fallback=True,
-                    )
+                    resume_lookup, resume_completed, cleanup_callback = _build_json_lookup()
                 else:
                     resume_lookup = sqlite_lookup
                     used_sqlite = True
@@ -382,11 +383,7 @@ class DownloadRun:
                         cleanup_callback()
                 raise
         else:
-            resume_lookup, resume_completed = load_previous_manifest(
-                resume_path,
-                sqlite_path=sqlite_path,
-                allow_sqlite_fallback=True,
-            )
+            resume_lookup, resume_completed, cleanup_callback = _build_json_lookup()
 
         if (
             not resume_path_exists
