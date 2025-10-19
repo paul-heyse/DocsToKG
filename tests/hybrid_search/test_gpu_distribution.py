@@ -80,6 +80,7 @@ def test_distribute_to_all_gpus_configures_cloner_options(
     store._gpu_use_default_null_stream = False
     store._gpu_use_default_null_stream_all_devices = False
     store._replica_gpu_resources = []
+    store._expected_ntotal = 1234  # type: ignore[attr-defined]
 
     cpu_index = faiss.IndexFlatIP(4)
 
@@ -112,6 +113,12 @@ def test_distribute_to_all_gpus_configures_cloner_options(
 
     monkeypatch.setattr(faiss, "StandardGpuResources", RecordingResources)
     monkeypatch.setattr(faiss, "GpuResourcesVector", RecordingVector)
+
+    class RecordingIntVector(list):
+        def push_back(self, value: int) -> None:
+            self.append(int(value))
+
+    monkeypatch.setattr(faiss, "IntVector", RecordingIntVector, raising=False)
 
     store._gpu_resources = faiss.StandardGpuResources()
 
@@ -196,6 +203,9 @@ def test_distribute_to_all_gpus_configures_cloner_options(
         assert getattr(cloner, "useFloat16LookupTables") is False
     if shard and hasattr(cloner, "common_ivf_quantizer"):
         assert cloner.common_ivf_quantizer is True
+    assert getattr(cloner, "reserveVecs") == store._expected_ntotal
+    if getattr(cloner, "eachReserveVecs", None) is not None:
+        assert list(cloner.eachReserveVecs) == [store._expected_ntotal] * len(expected_gpu_ids)
 
     counters = {
         (sample.name, tuple(sorted(sample.labels.items()))): sample.value

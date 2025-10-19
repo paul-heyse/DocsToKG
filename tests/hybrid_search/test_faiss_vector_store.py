@@ -192,6 +192,97 @@ def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> No
     )
 
 
+def test_add_dedupe_probe_uses_normalised_vectors(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """The dedupe probe must operate on unit-normalised vectors."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._dim = 3  # type: ignore[attr-defined]
+    store._config = SimpleNamespace(  # type: ignore[attr-defined]
+        ingest_dedupe_threshold=0.99,
+        nlist=1,
+        ivf_train_factor=1,
+    )
+    store._lock = RLock()  # type: ignore[attr-defined]
+    store._observability = SimpleNamespace(  # type: ignore[attr-defined]
+        trace=lambda *a, **k: _NullContext(),
+        metrics=SimpleNamespace(
+            increment=lambda *a, **k: None,
+            observe=lambda *a, **k: None,
+            set_gauge=lambda *a, **k: None,
+        ),
+    )
+    store._as_pinned = MethodType(lambda self, matrix: matrix, store)  # type: ignore[attr-defined]
+    store._release_pinned_buffers = MethodType(lambda self: None, store)  # type: ignore[attr-defined]
+    store._flush_pending_deletes = MethodType(lambda self, *, force: None, store)  # type: ignore[attr-defined]
+    store._probe_remove_support = MethodType(lambda self: False, store)  # type: ignore[attr-defined]
+    store._lookup_existing_ids = MethodType(
+        lambda self, ids: np.empty(0, dtype=np.int64), store
+    )  # type: ignore[attr-defined]
+    store._update_gpu_metrics = MethodType(lambda self: None, store)  # type: ignore[attr-defined]
+    store._maybe_refresh_snapshot = MethodType(
+        lambda self, *, writes_delta, reason: None, store
+    )  # type: ignore[attr-defined]
+    store._dirty_deletes = 0  # type: ignore[attr-defined]
+    store._needs_rebuild = False  # type: ignore[attr-defined]
+    store._supports_remove_ids = False  # type: ignore[attr-defined]
+    store._search_coalescer = None  # type: ignore[attr-defined]
+
+    class _Index:
+        def __init__(self) -> None:
+            self.index = self
+            self.ntotal = 1
+            self.is_trained = True
+            self.add_calls: list[tuple[np.ndarray, np.ndarray]] = []
+
+        def add_with_ids(self, matrix: np.ndarray, ids: np.ndarray) -> None:
+            self.add_calls.append((matrix.copy(), ids.copy()))
+
+    fake_index = _Index()
+    store._index = fake_index  # type: ignore[attr-defined]
+
+    if store_module.faiss is None:
+        monkeypatch.setattr(store_module, "faiss", SimpleNamespace(), raising=False)
+
+    def fake_normalize(matrix: np.ndarray) -> None:
+        norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+        norms[norms == 0.0] = 1.0
+        matrix[:] = matrix / norms
+
+    monkeypatch.setattr(store_module.faiss, "normalize_L2", fake_normalize, raising=False)
+    monkeypatch.setattr(store_module.faiss, "downcast_index", lambda index: index, raising=False)
+
+    existing_unit = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    recorded: dict[str, np.ndarray] = {}
+
+    def fake_search_matrix(self: FaissVectorStore, matrix: np.ndarray, top_k: int):
+        recorded["matrix"] = matrix.copy()
+        np.testing.assert_allclose(
+            np.linalg.norm(matrix, axis=1), np.ones(matrix.shape[0]), rtol=1e-6
+        )
+        scores = (matrix @ existing_unit.reshape(-1, 1)).astype(np.float32)
+        recorded["scores"] = scores.copy()
+        indices = np.full((matrix.shape[0], top_k), 123, dtype=np.int64)
+        return scores, indices
+
+    store._search_matrix = MethodType(fake_search_matrix, store)  # type: ignore[attr-defined]
+
+    base = np.array([0.5, np.sqrt(3.0) / 2.0, 0.0], dtype=np.float32)
+    vector = base * 7.0
+    vectors = [vector]
+    ids = ["00000000-0000-0000-0000-000000000099"]
+
+    store.add(vectors, ids)
+
+    assert "matrix" in recorded, "dedupe probe should execute"
+    np.testing.assert_allclose(recorded["scores"], np.array([[0.5]], dtype=np.float32), atol=1e-6)
+    assert fake_index.add_calls, "vector should be ingested when cosine score is below threshold"
+    stored_matrix, stored_ids = fake_index.add_calls[0]
+    np.testing.assert_allclose(np.linalg.norm(stored_matrix, axis=1), 1.0, rtol=1e-6)
+    np.testing.assert_array_equal(
+        stored_ids, np.array([store_module._vector_uuid_to_faiss_int(ids[0])])
+    )
+
+
 def test_search_batch_impl_normalizes_once(monkeypatch: "pytest.MonkeyPatch") -> None:
     """``_search_batch_impl`` should bypass redundant normalisation steps."""
 
@@ -579,6 +670,57 @@ def test_init_gpu_configures_resource_knobs(monkeypatch, caplog, use_all_devices
     payload = getattr(records[-1], "event", {})
     assert payload.get("temp_memory_bytes") == temp_memory
     assert payload.get("default_null_stream_all_devices") is use_all_devices
+
+
+def test_maybe_to_gpu_applies_expected_reserve_vecs(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """``_maybe_to_gpu`` should propagate expected reservations to cloner options."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._observability = Observability()  # type: ignore[attr-defined]
+    store._expected_ntotal = 256  # type: ignore[attr-defined]
+    store._force_64bit_ids = False  # type: ignore[attr-defined]
+    store._indices_32_bit = True  # type: ignore[attr-defined]
+    store._gpu_resources = object()  # type: ignore[attr-defined]
+    store._multi_gpu_mode = "single"  # type: ignore[attr-defined]
+    store._replication_enabled = False  # type: ignore[attr-defined]
+    store._maybe_distribute_multi_gpu = MethodType(lambda self, idx: idx, store)  # type: ignore[attr-defined]
+    store.init_gpu = MethodType(lambda self: None, store)  # type: ignore[attr-defined]
+    store._config = SimpleNamespace(device=1, flat_use_fp16=False)  # type: ignore[attr-defined]
+
+    captured: dict[str, object] = {}
+
+    class RecordingCloner:
+        def __init__(self) -> None:
+            self.device = None
+            self.verbose = False
+            self.allowCpuCoarseQuantizer = True
+            self.indicesOptions = None
+            self.reserveVecs = None
+
+    def fake_index_cpu_to_gpu(resources, device, index, co):  # type: ignore[override]
+        captured["co"] = co
+        captured["device"] = device
+        captured["resources"] = resources
+        captured["index"] = index
+        return f"gpu-{device}"
+
+    fake_faiss = SimpleNamespace(
+        GpuClonerOptions=RecordingCloner,
+        index_cpu_to_gpu=fake_index_cpu_to_gpu,
+        INDICES_32_BIT=13,
+    )
+
+    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+
+    result = store._maybe_to_gpu(object())
+
+    assert result == "gpu-1"
+    assert captured["resources"] is store._gpu_resources
+    assert captured["device"] == 1
+    cloner = captured["co"]
+    assert isinstance(cloner, RecordingCloner)
+    assert cloner.device == 1
+    assert cloner.reserveVecs == store._expected_ntotal
 
 
 def test_search_coalescer_iterative_execution_handles_many_micro_batches() -> None:

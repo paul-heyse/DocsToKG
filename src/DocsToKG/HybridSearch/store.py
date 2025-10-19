@@ -664,8 +664,10 @@ class FaissVectorStore(DenseVectorStore):
             dedupe_threshold = float(getattr(self._config, "ingest_dedupe_threshold", 0.0))
             dropped = 0
             if dedupe_threshold > 0.0 and self.ntotal > 0:
+                probe_matrix = np.ascontiguousarray(matrix.copy(), dtype=np.float32)
+                faiss.normalize_L2(probe_matrix)
                 try:
-                    distances, indices = self._search_matrix(matrix, 1)
+                    distances, indices = self._search_matrix(probe_matrix, 1)
                 except Exception:
                     logger.debug(
                         "ingest dedupe check failed; proceeding without filter", exc_info=True
@@ -1693,12 +1695,11 @@ class FaissVectorStore(DenseVectorStore):
                 )
                 return index
 
-        gpu_count = len(target_gpus) if explicit_targets_configured else available_gpus
-        gpu_ids: List[int]
         if explicit_targets_configured:
-            gpu_ids = list(target_gpus)
+            gpu_ids: List[int] = list(target_gpus)
         else:
-            gpu_ids = list(range(gpu_count))
+            gpu_ids = list(range(available_gpus))
+        gpu_count = len(gpu_ids)
 
         original_ids = (
             tuple(self._replication_gpu_ids or ()) if explicit_targets_configured else tuple()
@@ -1887,6 +1888,69 @@ class FaissVectorStore(DenseVectorStore):
                     extra={"event": {"expected_ntotal": expected}},
                     exc_info=True,
                 )
+
+    def _apply_cloner_reservation(
+        self,
+        cloner_options: object | None,
+        *,
+        gpu_ids: Optional[Sequence[int]] = None,
+    ) -> None:
+        """Populate FAISS cloner reservation knobs when ``expected_ntotal`` is set."""
+
+        if cloner_options is None:
+            return
+        expected = getattr(self, "_expected_ntotal", 0)
+        if expected <= 0:
+            return
+        reserve = int(expected)
+
+        applied = False
+        try:
+            if hasattr(cloner_options, "reserveVecs"):
+                setattr(cloner_options, "reserveVecs", reserve)
+                applied = True
+        except Exception:  # pragma: no cover - defensive guard
+            logger.debug("Unable to set reserveVecs on FAISS cloner options", exc_info=True)
+
+        per_device_applied = False
+        if gpu_ids:
+            try:
+                if hasattr(cloner_options, "eachReserveVecs"):
+                    vector_factory = getattr(faiss, "IntVector", None) if faiss is not None else None
+                    if vector_factory is not None:
+                        reserve_vector = vector_factory()
+                        for _gpu in gpu_ids:
+                            reserve_vector.push_back(reserve)
+                    else:
+                        reserve_vector = [reserve for _ in gpu_ids]
+                    setattr(cloner_options, "eachReserveVecs", reserve_vector)
+                    per_device_applied = True
+            except Exception:  # pragma: no cover - defensive guard
+                logger.debug(
+                    "Unable to configure per-device reserve vector on FAISS cloner options",
+                    exc_info=True,
+                )
+
+            if not per_device_applied and hasattr(cloner_options, "setReserveVecs"):
+                try:  # pragma: no cover - defensive guard
+                    cloner_options.setReserveVecs([reserve for _ in gpu_ids])
+                    per_device_applied = True
+                except Exception:
+                    logger.debug(
+                        "Unable to invoke setReserveVecs on FAISS cloner options", exc_info=True
+                    )
+
+        if applied or per_device_applied:
+            observer = getattr(self, "_observability", None)
+            structured_logger = getattr(observer, "logger", logger) if observer is not None else logger
+            event: Dict[str, object] = {
+                "component": "faiss",
+                "action": "gpu_cloner_reserve",
+                "reserve_vecs": reserve,
+            }
+            if gpu_ids is not None:
+                event["gpu_ids"] = tuple(int(gpu) for gpu in gpu_ids)
+            structured_logger.info("faiss-gpu-cloner-reserve", extra={"event": event})
 
     def _to_cpu(self, index: "faiss.Index") -> "faiss.Index":
         if not hasattr(faiss, "index_gpu_to_cpu"):
@@ -2360,15 +2424,11 @@ def cosine_batch(
     Returns:
         numpy.ndarray: Pairwise cosine similarities with shape ``(N, M)``.
     """
-    q = np.asarray(q, dtype=np.float32)
+    q = np.array(q, dtype=np.float32, copy=True, order="C")
     if q.ndim == 1:
         q = q.reshape(1, -1)
-    if not q.flags.c_contiguous:
-        q = np.ascontiguousarray(q)
 
-    C = np.asarray(C, dtype=np.float32)
-    if not C.flags.c_contiguous:
-        C = np.ascontiguousarray(C)
+    C = np.array(C, dtype=np.float32, copy=True, order="C")
     faiss.normalize_L2(q)
     faiss.normalize_L2(C)
     kernel = pairwise_fn or faiss.pairwise_distance_gpu
