@@ -134,7 +134,7 @@ class DownloadConfig:
     list_only: bool = False
     extract_html_text: bool = False
     run_id: str = ""
-    previous_lookup: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    previous_lookup: Mapping[str, Dict[str, Any]] = field(default_factory=dict)
     resume_completed: Set[str] = field(default_factory=set)
     sniff_bytes: int = DEFAULT_SNIFF_BYTES
     min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
@@ -164,8 +164,8 @@ class DownloadConfig:
         self.skip_head_precheck = bool(self.skip_head_precheck)
         self.head_precheck_passed = bool(self.head_precheck_passed)
 
-        self.previous_lookup = self._normalize_mapping(self.previous_lookup)
-        self.resume_completed = {str(item) for item in self.resume_completed}
+        self.previous_lookup = self._normalize_resume_lookup(self.previous_lookup)
+        self.resume_completed = self._normalize_resume_completed(self.resume_completed)
         self.domain_content_rules = self._normalize_mapping(self.domain_content_rules)
         self.host_accept_overrides = self._normalize_mapping(self.host_accept_overrides)
         self.global_manifest_index = self._normalize_mapping(self.global_manifest_index)
@@ -186,6 +186,24 @@ class DownloadConfig:
         if isinstance(value, Mapping):
             return dict(value)
         return {}
+
+    @staticmethod
+    def _normalize_resume_lookup(value: Any) -> Mapping[str, Dict[str, Any]]:
+        if value is None:
+            return {}
+        if isinstance(value, Mapping):
+            return value
+        return {}
+
+    @staticmethod
+    def _normalize_resume_completed(value: Any) -> Set[str]:
+        if value is None:
+            return set()
+        if isinstance(value, Set):
+            return {str(item) for item in value}
+        if isinstance(value, Iterable):
+            return {str(item) for item in value}
+        return set()
 
     @staticmethod
     def _coerce_int(value: Any, default: int) -> int:

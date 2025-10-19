@@ -280,15 +280,27 @@ def test_setup_download_state_records_manifest_data(patcher, tmp_path):
 
     dummy_lookup = {"W1": {"path": "foo"}}
     dummy_completed = {"W2"}
+
+    class _DummyJsonLookup(dict):
+        def __init__(self) -> None:
+            super().__init__(dummy_lookup)
+            self.completed_work_ids = frozenset(dummy_completed)
+
+        def close(self) -> None:
+            pass
+
+    lookup_instance = _DummyJsonLookup()
+
     patcher.setattr(
-        "DocsToKG.ContentDownload.runner.load_previous_manifest",
-        lambda *args, **kwargs: (dummy_lookup, dummy_completed),
+        "DocsToKG.ContentDownload.runner.JsonlResumeLookup",
+        lambda *args, **kwargs: lookup_instance,
     )
 
     factory = ThreadLocalSessionFactory(requests.Session)
     state = download_run.setup_download_state(factory, robots_cache="robots")
 
-    assert state.options.previous_lookup == dummy_lookup
+    assert state.resume_lookup is lookup_instance
+    assert state.options.previous_lookup is lookup_instance
     assert state.options.resume_completed == dummy_completed
     assert state.options.robots_checker == "robots"
 
@@ -974,17 +986,20 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, m
 
     download_run = DownloadRun(resolved)
     factory = ThreadLocalSessionFactory(requests.Session)
+    previous_lookup: Optional[Dict[str, Dict[str, Any]]] = None
+    cached_path: Optional[str] = None
     try:
         state = download_run.setup_download_state(factory)
+        assert "W-ABS" in state.options.resume_completed
+        previous_lookup = state.options.previous_lookup.get("W-ABS")
+        assert previous_lookup is not None and previous_lookup
+        resume_entry = next(iter(previous_lookup.values()))
+        cached_path = resume_entry["path"]
     finally:
         factory.close_all()
         download_run.close()
 
-    assert "W-ABS" in state.options.resume_completed
-    previous_lookup = state.options.previous_lookup.get("W-ABS")
     assert previous_lookup is not None and previous_lookup
-    resume_entry = next(iter(previous_lookup.values()))
-    cached_path = resume_entry["path"]
     assert cached_path is not None
     # Paths in manifests are stored as relative paths
     assert not Path(cached_path).is_absolute()
@@ -1142,8 +1157,9 @@ def test_download_run_run_processes_artifacts(patcher, tmp_path):
             yield from self._batch
 
     patcher.setattr(
-        "DocsToKG.ContentDownload.runner.load_previous_manifest",
-        lambda *args, **kwargs: ({}, set()),
+        DownloadRun,
+        "_load_resume_state",
+        lambda self, resume_path: ({}, set(), None),
     )
 
     def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
@@ -1213,8 +1229,9 @@ def test_run_parallel_workers_aggregates_state(patcher, tmp_path):
             yield from self._batch
 
     patcher.setattr(
-        "DocsToKG.ContentDownload.runner.load_previous_manifest",
-        lambda *args, **kwargs: ({}, set()),
+        DownloadRun,
+        "_load_resume_state",
+        lambda self, resume_path: ({}, set(), None),
     )
 
     def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
