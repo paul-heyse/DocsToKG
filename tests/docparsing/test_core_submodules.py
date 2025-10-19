@@ -488,3 +488,36 @@ def test_plan_embed_resume_missing_manifest_skips_hash(
 
     assert plan["process"]["count"] == 1
     assert plan["skip"]["count"] == 0
+
+
+def test_plan_embed_generate_counts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Embedding planner reports generate counts for discovered chunks."""
+
+    data_root = tmp_path / "data"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    vectors_dir = data_root / "Embeddings"
+    chunks_dir.mkdir(parents=True)
+    vectors_dir.mkdir(parents=True)
+    (chunks_dir / "doc1.chunks.jsonl").write_text("{}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.detect_data_root", lambda *_args, **_kwargs: data_root
+    )
+
+    plan = plan_embed(
+        [
+            "--data-root",
+            str(data_root),
+            "--chunks-dir",
+            str(chunks_dir),
+            "--out-dir",
+            str(vectors_dir),
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0

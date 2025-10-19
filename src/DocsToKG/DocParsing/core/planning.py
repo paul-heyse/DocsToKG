@@ -308,6 +308,8 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     planned = _new_bucket()
     skipped = _new_bucket()
 
+    files = iter_chunks(chunks_dir)
+
     for chunk_path in files:
         doc_id, vector_path = derive_doc_id_and_vectors_path(
             chunk_path, chunks_dir, vectors_dir
