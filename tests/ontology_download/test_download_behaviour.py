@@ -8,6 +8,8 @@ import tarfile
 import zipfile
 from urllib.parse import urlparse
 
+from urllib.parse import urlparse
+
 import pytest
 
 from DocsToKG.OntologyDownload.errors import ConfigError
@@ -55,6 +57,50 @@ def test_download_stream_fetches_fixture(ontology_env, tmp_path):
     assert methods.count("GET") == 1
 
 
+def test_head_get_connections_remain_bounded(ontology_env, tmp_path):
+    """Back-to-back HEAD/GET cycles should not leak pooled sessions."""
+
+    payload = b"@prefix : <http://example.org/> .\n:onto a :Ontology .\n"
+    url = ontology_env.register_fixture(
+        "bounded.owl",
+        payload,
+        media_type="application/rdf+xml",
+        repeats=8,
+    )
+    config = ontology_env.build_download_config()
+
+    for attempt in range(4):
+        destination = tmp_path / f"bounded-{attempt}.owl"
+        result = network_mod.download_stream(
+            url=url,
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=ontology_env.cache_dir,
+            logger=_logger(),
+            expected_media_type="application/rdf+xml",
+            service="obo",
+        )
+        assert destination.read_bytes() == payload
+        assert result.status == "fresh"
+
+    methods = [request.method for request in ontology_env.requests]
+    assert methods.count("HEAD") == 4
+    assert methods.count("GET") == 4
+
+    parsed = urlparse(url)
+    pool = getattr(network_mod.SESSION_POOL, "_pool")
+    lock = getattr(network_mod.SESSION_POOL, "_lock")
+    max_per_key = getattr(network_mod.SESSION_POOL, "_max_per_key")
+    normalize = getattr(network_mod.SESSION_POOL, "_normalize")
+
+    with lock:
+        pool_snapshot = {key: list(stack) for key, stack in pool.items()}
+
+    assert all(len(stack) <= max_per_key for stack in pool_snapshot.values())
+    normalized_key = normalize("obo", parsed.hostname)
+    assert len(pool_snapshot.get(normalized_key, [])) <= max_per_key
 def test_preliminary_head_check_handles_malformed_content_length(ontology_env, tmp_path):
     """Malformed Content-Length headers should be ignored by the downloader."""
 

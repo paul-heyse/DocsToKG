@@ -712,7 +712,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
             )
             return None, None
 
-        with request_context as response:
+        try:
             if response.status_code >= 400:
                 self.logger.debug(
                     "HEAD request failed, proceeding with GET",
@@ -725,24 +725,13 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 )
                 return None, None
 
-        content_type = response.headers.get("Content-Type")
-        content_length_header = response.headers.get("Content-Length")
-        content_length: Optional[int] = None
-        if content_length_header:
-            try:
-                content_length = int(content_length_header)
-            except ValueError:
-                self.logger.debug(
-                    "malformed content length header ignored",
-                    extra={
-                        "stage": "download",
-                        "method": "HEAD",
-                        "url": url,
-                        "content_length": content_length_header,
-                    },
-                )
+            content_type = response.headers.get("Content-Type")
+            content_length_header = response.headers.get("Content-Length")
+            content_length = int(content_length_header) if content_length_header else None
 
-        return content_type, content_length
+            return content_type, content_length
+        finally:
+            response.close()
 
     def _validate_media_type(
         self,
