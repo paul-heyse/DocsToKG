@@ -2060,8 +2060,12 @@ def _validate_vectors_for_chunks(
         files_checked += 1
 
     if missing:
-        preview = ", ".join(doc for doc, _ in missing[:5])
-        if len(missing) > 5:
+        sample_size = min(5, len(missing))
+        doc_id_sample = [doc for doc, _ in missing[:sample_size]]
+        path_sample = [str(path) for _, path in missing[:sample_size]]
+        preview = ", ".join(doc_id_sample)
+        truncated = len(missing) > sample_size
+        if truncated:
             preview += ", ..."
         log_event(
             logger,
@@ -2072,8 +2076,11 @@ def _validate_vectors_for_chunks(
             doc_id="__aggregate__",
             input_hash=None,
             error_code="MISSING_VECTORS",
-            missing=[str(path) for _, path in missing],
             missing_count=len(missing),
+            missing_doc_ids_sample=doc_id_sample,
+            missing_paths_sample=path_sample,
+            missing_sample_truncated=truncated,
+            missing_sample_size=sample_size,
             chunks_dir=str(chunks_dir),
             vectors_dir=str(vectors_dir),
         )
