@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from itertools import islice
 from typing import Iterable, Iterator, List, Optional, Sequence, TypeVar
 
 T = TypeVar("T")
@@ -10,7 +11,15 @@ __all__ = ["Batcher"]
 
 
 class Batcher(Iterable[List[T]]):
-    """Yield fixed-size batches from an iterable with optional policies."""
+    """Yield fixed-size batches from an iterable with optional policies.
+
+    ``Batcher`` operates in two distinct modes depending on ``policy``. When no
+    policy is supplied the iterable is consumed lazily: items are fetched on
+    demand from the underlying iterator via :mod:`itertools` without storing the
+    entire sequence in memory. Policy-aware batching (for example ``"length"``)
+    requires random access to items and therefore materialises the iterable to a
+    list so that indices can be reordered deterministically.
+    """
 
     def __init__(
         self,
@@ -20,23 +29,29 @@ class Batcher(Iterable[List[T]]):
         policy: Optional[str] = None,
         lengths: Optional[Sequence[int]] = None,
     ) -> None:
-        """Materialise items and batching metadata for subsequent iteration."""
+        """Initialise batching metadata for streaming or materialised modes."""
 
         if batch_size < 1:
             raise ValueError("batch_size must be >= 1")
-        self._items: List[T] = list(iterable)
         self._batch_size = batch_size
         self._policy = (policy or "").lower() or None
-        if self._policy:
-            if self._policy not in {"length"}:
-                raise ValueError(f"Unsupported batching policy: {policy}")
-            if lengths is None:
-                raise ValueError("lengths must be provided when using a policy")
-            if len(lengths) != len(self._items):
-                raise ValueError("lengths must align with iterable length")
-            self._lengths = [int(max(0, length)) for length in lengths]
-        else:
-            self._lengths = None
+        self._iterable: Optional[Iterable[T]] = None
+        self._items: Optional[List[T]] = None
+        self._lengths: Optional[List[int]] = None
+
+        if not self._policy:
+            self._iterable = iterable
+            return
+
+        if self._policy not in {"length"}:
+            raise ValueError(f"Unsupported batching policy: {policy}")
+        if lengths is None:
+            raise ValueError("lengths must be provided when using a policy")
+
+        self._items = list(iterable)
+        if len(lengths) != len(self._items):
+            raise ValueError("lengths must align with iterable length")
+        self._lengths = [int(max(0, length)) for length in lengths]
 
     @staticmethod
     def _length_bucket(length: int) -> int:
@@ -49,9 +64,13 @@ class Batcher(Iterable[List[T]]):
     def _ordered_indices(self) -> List[int]:
         """Return indices ordered by bucketed length and original position."""
 
+        assert self._items is not None
         if not self._lengths:
             return list(range(len(self._items)))
-        pairs = [(idx, self._length_bucket(self._lengths[idx])) for idx in range(len(self._items))]
+        pairs = [
+            (idx, self._length_bucket(self._lengths[idx]))
+            for idx in range(len(self._items))
+        ]
         pairs.sort(key=lambda pair: (pair[1], pair[0]))
         return [idx for idx, _ in pairs]
 
@@ -59,10 +78,16 @@ class Batcher(Iterable[List[T]]):
         """Yield successive batches respecting any active policy."""
 
         if not self._policy:
-            for i in range(0, len(self._items), self._batch_size):
-                yield self._items[i : i + self._batch_size]
+            assert self._iterable is not None
+            iterator = iter(self._iterable)
+            while True:
+                batch = list(islice(iterator, self._batch_size))
+                if not batch:
+                    break
+                yield batch
             return
 
+        assert self._items is not None
         ordered_indices = self._ordered_indices()
         for i in range(0, len(ordered_indices), self._batch_size):
             batch_indices = ordered_indices[i : i + self._batch_size]
