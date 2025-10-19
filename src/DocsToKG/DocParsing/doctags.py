@@ -2044,7 +2044,6 @@ class HtmlTask:
     input_hash: str
     overwrite: bool
     sanitizer_profile: str = "balanced"
-    sanitizer_profile: str
 
 
 @dataclass
@@ -2072,7 +2071,6 @@ class HtmlConversionResult:
     input_hash: str
     output_path: str
     error: str | None = None
-    sanitizer_profile: Optional[str] = None
     sanitizer_profile: Optional[str] = None
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import builtins
 import io
 import sys
 import types
@@ -352,6 +353,31 @@ def test_embed_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> Non
     assert exit_code == 2
     assert "embed" in captured.err
     assert "cannot be combined" in captured.err
+
+
+def test_token_profiles_missing_transformers(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Token profile CLI reports missing transformers dependency gracefully."""
+
+    monkeypatch.delitem(sys.modules, "DocsToKG.DocParsing.token_profiles", raising=False)
+    monkeypatch.delitem(sys.modules, "transformers", raising=False)
+
+    original_import = builtins.__import__
+
+    def fake_import(name: str, *args, **kwargs):
+        if name == "transformers" or name.startswith("transformers."):
+            raise ImportError("No module named 'transformers'")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+
+    exit_code = core_cli.token_profiles([])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "No module named 'transformers'" in captured.err
+    assert "pip install transformers" in captured.err
 
 
 def test_display_plan_stream_output() -> None:

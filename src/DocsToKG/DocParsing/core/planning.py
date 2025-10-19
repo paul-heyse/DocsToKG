@@ -282,9 +282,25 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         resolver=lambda root: data_vectors(root, ensure=False),
     ).resolve()
 
+    missing_notes: List[str] = []
+    if not chunks_dir.exists():
+        missing_notes.append("Chunks directory missing")
+    if not vectors_dir.exists():
+        missing_notes.append("Vectors directory missing")
+
     if args.validate_only:
         validate_bucket = _new_bucket()
         missing_bucket = _new_bucket()
+        if missing_notes:
+            return {
+                "stage": "embed",
+                "action": "validate",
+                "chunks_dir": str(chunks_dir),
+                "vectors_dir": str(vectors_dir),
+                "validate": validate_bucket,
+                "missing": missing_bucket,
+                "notes": missing_notes,
+            }
         for chunk_path in iter_chunks(chunks_dir):
             doc_id, vector_path = derive_doc_id_and_vectors_path(
                 chunk_path, chunks_dir, vectors_dir
@@ -309,6 +325,17 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     resume_controller = ResumeController(args.resume, args.force, manifest_index)
     planned = _new_bucket()
     skipped = _new_bucket()
+
+    if missing_notes:
+        return {
+            "stage": "embed",
+            "action": "generate",
+            "chunks_dir": str(chunks_dir),
+            "vectors_dir": str(vectors_dir),
+            "process": _new_bucket(),
+            "skip": _new_bucket(),
+            "notes": missing_notes,
+        }
 
     files = iter_chunks(chunks_dir)
     for chunk_path in files:

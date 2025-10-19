@@ -882,7 +882,45 @@ def _create_pystow_stub(root: Path) -> ModuleType:
 
         return root.joinpath(*segments)
 
-    module = _create_stub_module("pystow", {"join": join})
+    def module(*segments: str, ensure_exists: bool = True) -> Path:
+        """Return a child directory while optionally creating it."""
+
+        target = root.joinpath(*segments)
+        if ensure_exists:
+            target.mkdir(parents=True, exist_ok=True)
+        return target
+
+    def joinpath(*segments: str) -> Path:
+        """Compatibility alias for :func:`join`."""
+
+        return join(*segments)
+
+    def ensure(*segments: str, directory: bool = True) -> Path:
+        """Ensure a file or directory exists beneath the stub root."""
+
+        target = root.joinpath(*segments)
+        if directory:
+            target.mkdir(parents=True, exist_ok=True)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.touch(exist_ok=True)
+        return target
+
+    def get_config(_module: str, _key: str, *, default=None, **_kwargs):
+        """Return default configuration values."""
+
+        return default
+
+    module = _create_stub_module(
+        "pystow",
+        {
+            "join": join,
+            "joinpath": joinpath,
+            "module": module,
+            "ensure": ensure,
+            "get_config": get_config,
+        },
+    )
     module._root = root  # type: ignore[attr-defined]
     return module
 
