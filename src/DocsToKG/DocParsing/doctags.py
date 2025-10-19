@@ -1347,17 +1347,21 @@ def ensure_vllm(
         return preferred, None, False
 
     # 3) Otherwise, pick a new free port
-    alt = find_free_port(preferred + 1, PORT_SCAN_SPAN)
-    _LOGGER.info(
-        "Launching vLLM on alternate port",
-        extra={
-            "extra_fields": {
-                "preferred_port": preferred,
-                "alternate_port": alt,
-            }
-        },
-    )
-    proc = start_vllm(alt, model_path, served_model_names, gpu_memory_utilization)
+    with find_free_port(preferred + 1, PORT_SCAN_SPAN) as reservation:
+        alt = reservation.port
+        _LOGGER.info(
+            "Launching vLLM on alternate port",
+            extra={
+                "extra_fields": {
+                    "preferred_port": preferred,
+                    "alternate_port": alt,
+                }
+            },
+        )
+        # Release the reservation immediately before launching to minimise the
+        # window where another worker could claim the port.
+        reservation.close()
+        proc = start_vllm(alt, model_path, served_model_names, gpu_memory_utilization)
     names = wait_for_vllm(alt, proc, timeout_s=wait_timeout_s, http_timeout=http_timeout)
     validate_served_models(names, served_model_names)
     return alt, proc, True

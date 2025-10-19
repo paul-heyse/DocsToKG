@@ -70,7 +70,7 @@ from .cli import (
     token_profiles,
 )
 from .cli_utils import CLIOption, build_subcommand, detect_mode
-from .concurrency import acquire_lock, find_free_port, set_spawn_or_warn
+from .concurrency import ReservedPort, acquire_lock, find_free_port, set_spawn_or_warn
 from .discovery import (
     DEFAULT_CAPTION_MARKERS,
     DEFAULT_HEADING_MARKERS,
@@ -109,6 +109,7 @@ __all__ = [
     "expand_path",
     "resolve_hf_home",
     "resolve_model_root",
+    "ReservedPort",
     "find_free_port",
     "atomic_write",
     "ChunkDiscovery",

@@ -295,12 +295,14 @@ import json
 import logging
 import os
 import socket
+import threading
 import sys
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from typing import Any, ClassVar, Dict
+from typing import Any, ClassVar, Dict, Tuple
 from unittest import mock
 
 import pytest
@@ -510,8 +512,8 @@ def test_get_logger_idempotent() -> None:
 
 
 def test_find_free_port_basic() -> None:
-    port = core.find_free_port(start=9000, span=4)
-    assert isinstance(port, int)
+    with core.find_free_port(start=9000, span=4) as reservation:
+        assert isinstance(reservation.port, int)
 
 
 def test_find_free_port_fallback() -> None:
@@ -520,10 +522,42 @@ def test_find_free_port_fallback() -> None:
     sock.listen()
     busy_port = sock.getsockname()[1]
     try:
-        result = core.find_free_port(start=busy_port, span=1)
-        assert result != busy_port
+        with core.find_free_port(start=busy_port, span=1) as reservation:
+            assert reservation.port != busy_port
     finally:
         sock.close()
+
+
+def test_find_free_port_reservation_blocks() -> None:
+    start_port = 47000
+    holder_ready = threading.Event()
+    results: Dict[str, Tuple[int, float]] = {}
+
+    def holder() -> None:
+        with core.find_free_port(start=start_port, span=1) as reservation:
+            results["first"] = (reservation.port, 0.0)
+            holder_ready.set()
+            time.sleep(0.5)
+
+    def contender() -> None:
+        assert holder_ready.wait(timeout=2), "holder thread did not acquire port"
+        begin = time.monotonic()
+        with core.find_free_port(start=start_port, span=1) as reservation:
+            elapsed = time.monotonic() - begin
+            results["second"] = (reservation.port, elapsed)
+
+    t1 = threading.Thread(target=holder)
+    t2 = threading.Thread(target=contender)
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join(timeout=5)
+
+    assert "second" in results, "second reservation did not complete"
+    first_port, _ = results["first"]
+    second_port, elapsed = results["second"]
+    assert second_port == first_port
+    assert elapsed >= 0.4
 
 
 def test_atomic_write_success(tmp_path: Path) -> None:
