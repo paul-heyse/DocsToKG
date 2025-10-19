@@ -11,7 +11,7 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_c
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 import requests
 from pyalex import Works
@@ -50,7 +50,10 @@ from DocsToKG.ContentDownload.telemetry import (
     SqliteSink,
     SummarySink,
     load_previous_manifest,
+    load_resume_completed_from_sqlite,
     looks_like_csv_resume_target,
+    looks_like_sqlite_resume_target,
+    SqliteResumeLookup,
 )
 
 __all__ = ["DownloadRun", "iterate_openalex", "run"]
@@ -64,7 +67,7 @@ class DownloadRunState:
 
     session_factory: ThreadLocalSessionFactory
     options: DownloadConfig
-    resume_lookup: Dict[str, Dict[str, Any]]
+    resume_lookup: Mapping[str, Dict[str, Any]]
     resume_completed: Set[str]
     processed: int = 0
     saved: int = 0
@@ -245,7 +248,7 @@ class DownloadRun:
     ) -> DownloadRunState:
         """Initialise download options and counters for the run."""
 
-        resume_lookup: Dict[str, Dict[str, Any]]
+        resume_lookup: Mapping[str, Dict[str, Any]]
         resume_completed: Set[str]
         resume_path_raw = self.args.resume_from
         sqlite_path = self.resolved.sqlite_path
@@ -269,7 +272,7 @@ class DownloadRun:
             list_only=self.args.list_only,
             extract_html_text=self.resolved.extract_html_text,
             run_id=self.resolved.run_id,
-            previous_lookup=resume_lookup,
+            previous_lookup={},
             resume_completed=resume_completed,
             sniff_bytes=self.args.sniff_bytes,
             min_pdf_bytes=self.args.min_pdf_bytes,
@@ -280,6 +283,7 @@ class DownloadRun:
             content_addressed=self.args.content_addressed,
             verify_cache_digest=self.args.verify_cache_digest,
         )
+        options.previous_lookup = resume_lookup
         state = DownloadRunState(
             session_factory=session_factory,
             options=options,
@@ -289,15 +293,19 @@ class DownloadRun:
         self.state = state
         return state
 
-    def _load_resume_state(self, resume_path: Path) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+    def _load_resume_state(self, resume_path: Path) -> Tuple[Mapping[str, Dict[str, Any]], Set[str]]:
         """Load resume metadata from JSON manifests with SQLite fallback."""
 
         resolved_sqlite_path = self.resolved.sqlite_path
         sqlite_candidates: List[Path] = []
+        if looks_like_csv_resume_target(resume_path) and not resolved_sqlite_path:
+            LOGGER.debug("Resume target %s appears to be CSV without SQLite cache.", resume_path)
         for suffix in (".sqlite3", ".sqlite"):
             candidate = resume_path.with_suffix(suffix)
             if candidate not in sqlite_candidates:
                 sqlite_candidates.append(candidate)
+        if looks_like_sqlite_resume_target(resume_path):
+            sqlite_candidates.insert(0, resume_path)
         sqlite_path = next((candidate for candidate in sqlite_candidates if candidate.is_file()), None)
         if sqlite_path is None:
             sqlite_path = resolved_sqlite_path
@@ -316,21 +324,45 @@ class DownloadRun:
                 for candidate in resume_path.parent.glob(f"{resume_path.name}.*")
             )
 
-        resume_lookup, resume_completed = load_previous_manifest(
-            resume_path,
-            sqlite_path=sqlite_path,
-            allow_sqlite_fallback=True,
-        )
+        used_sqlite = False
+        resume_lookup: Mapping[str, Dict[str, Any]]
+        if sqlite_path and sqlite_path.exists():
+            sqlite_lookup = SqliteResumeLookup(sqlite_path)
+            resume_completed = load_resume_completed_from_sqlite(sqlite_path)
+            row_count = len(sqlite_lookup)
+            if row_count == 0 and (resume_path_exists or has_rotated):
+                sqlite_lookup.close()
+                resume_lookup, resume_completed = load_previous_manifest(
+                    resume_path,
+                    sqlite_path=sqlite_path,
+                    allow_sqlite_fallback=True,
+                )
+            else:
+                resume_lookup = sqlite_lookup
+                used_sqlite = True
+        else:
+            resume_lookup, resume_completed = load_previous_manifest(
+                resume_path,
+                sqlite_path=sqlite_path,
+                allow_sqlite_fallback=True,
+            )
 
         if (
             not resume_path_exists
             and not has_rotated
             and sqlite_path
             and sqlite_path.exists()
-            and (resume_lookup or resume_completed)
+            and (len(resume_completed) > 0 or (hasattr(resume_lookup, "__len__") and len(resume_lookup) > 0))
         ):
             LOGGER.warning(
                 "Resume manifest %s is missing; loading resume metadata from SQLite %s.",
+                resume_path,
+                sqlite_path,
+            )
+
+        if used_sqlite and looks_like_csv_resume_target(resume_path) and resume_path_exists:
+            LOGGER.debug(
+                "Resume target %s is CSV; using SQLite cache %s for resume lookup.",
                 resume_path,
                 sqlite_path,
             )

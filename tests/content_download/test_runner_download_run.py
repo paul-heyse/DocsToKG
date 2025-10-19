@@ -11,7 +11,7 @@ import pytest
 import requests
 
 from DocsToKG.ContentDownload.args import ResolvedConfig, bootstrap_run_environment
-from DocsToKG.ContentDownload.core import WorkArtifact
+from DocsToKG.ContentDownload.core import Classification, WorkArtifact
 from DocsToKG.ContentDownload.networking import ThreadLocalSessionFactory
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.providers import WorkProvider
@@ -20,9 +20,12 @@ from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
     CsvSink,
     JsonlSink,
+    ManifestEntry,
     ManifestUrlIndex,
     MultiSink,
     RunTelemetry,
+    SqliteResumeLookup,
+    SqliteSink,
     SummarySink,
 )
 
@@ -215,6 +218,54 @@ def test_setup_download_state_records_manifest_data(patcher, tmp_path):
 
     factory.close_all()
     download_run.close()
+
+
+def test_setup_download_state_uses_lazy_sqlite_lookup(tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+    sqlite_path = resolved.sqlite_path
+    assert sqlite_path is not None
+
+    with SqliteSink(sqlite_path) as sink:
+        for index in range(2000):
+            work_id = f"W{index}"
+            entry = ManifestEntry(
+                schema_version=MANIFEST_SCHEMA_VERSION,
+                timestamp="2024-01-01T00:00:00Z",
+                work_id=work_id,
+                title=f"Work {index}",
+                publication_year=None,
+                resolver="resolver",
+                url=f"https://example.org/{work_id}.pdf",
+                path=f"/tmp/{work_id}.pdf",
+                classification=Classification.PDF.value,
+                content_type="application/pdf",
+                reason=None,
+                html_paths=[],
+                sha256=None,
+                content_length=1024,
+                etag=None,
+                last_modified=None,
+                extracted_text_path=None,
+                dry_run=False,
+                path_mtime_ns=None,
+                run_id="resume",
+            )
+            sink.log_manifest(entry)
+
+    download_run = DownloadRun(resolved)
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        state = download_run.setup_download_state(factory)
+        lookup = state.options.previous_lookup
+        assert isinstance(lookup, SqliteResumeLookup)
+        assert getattr(lookup, "_cache") == {}
+        sample = lookup.get("W100")
+        assert sample is not None and sample
+        assert len(getattr(lookup, "_cache")) == 1
+    finally:
+        factory.close_all()
+        download_run.close()
 
 
 def test_setup_download_state_fresh_csv_run_has_no_resume_warning(caplog, tmp_path):
