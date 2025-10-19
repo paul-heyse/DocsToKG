@@ -282,20 +282,18 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         resolver=lambda root: data_vectors(root, ensure=False),
     ).resolve()
 
-    missing_notes: List[str] = []
     chunks_missing = not chunks_dir.exists()
     vectors_missing = not vectors_dir.exists()
-    if chunks_missing and vectors_missing:
-        missing_notes.append("Chunks/Vectors directories missing: chunks, vectors")
-    elif chunks_missing:
-        missing_notes.append("Chunks directory missing")
-    elif vectors_missing:
-        missing_notes.append("Vectors directory missing")
 
     if args.validate_only:
         validate_bucket = _new_bucket()
         missing_bucket = _new_bucket()
-        if missing_notes:
+        notes: List[str] = []
+        if chunks_missing:
+            notes.append("Chunks directory missing")
+        if vectors_missing:
+            notes.append("Vectors directory missing")
+        if notes:
             return {
                 "stage": "embed",
                 "action": "validate",
@@ -303,7 +301,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
                 "vectors_dir": str(vectors_dir),
                 "validate": validate_bucket,
                 "missing": missing_bucket,
-                "notes": missing_notes,
+                "notes": notes,
             }
         for chunk in iter_chunks(chunks_dir):
             doc_id, vector_path = derive_doc_id_and_vectors_path(
@@ -330,7 +328,8 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     planned = _new_bucket()
     skipped = _new_bucket()
 
-    if missing_notes:
+    notes: List[str] = []
+    if chunks_missing:
         return {
             "stage": "embed",
             "action": "generate",
@@ -338,8 +337,10 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
             "vectors_dir": str(vectors_dir),
             "process": _new_bucket(),
             "skip": _new_bucket(),
-            "notes": missing_notes,
+            "notes": ["Chunks directory missing"],
         }
+    if vectors_missing:
+        notes.append("Vectors directory not found; outputs will be created during generation")
 
     files = iter_chunks(chunks_dir)
     for chunk in files:
@@ -373,7 +374,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         "vectors_dir": str(vectors_dir),
         "process": planned,
         "skip": skipped,
-        "notes": [],
+        "notes": notes,
     }
 
 
