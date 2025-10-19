@@ -286,7 +286,16 @@ def doctags(argv: Sequence[str] | None = None) -> int:
 def chunk(argv: Sequence[str] | None = None) -> int:
     """Execute the Docling chunker subcommand."""
 
-    from DocsToKG.DocParsing import chunking as chunk_module
+    try:
+        from DocsToKG.DocParsing import chunking as chunk_module
+    except ImportError as exc:
+        print(str(exc), file=sys.stderr)
+        print(
+            "Optional DocTags/chunking dependencies are required for `docparse chunk`. "
+            "Install them with `pip install DocsToKG[gpu12x]` or `pip install transformers`.",
+            file=sys.stderr,
+        )
+        return 1
 
     parser = chunk_module.build_parser()
     parser.prog = "docparse chunk"
