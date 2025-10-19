@@ -7,6 +7,7 @@ import random
 import inspect
 import json
 import logging
+import random
 import sqlite3
 import threading
 import time
@@ -402,8 +403,6 @@ class DownloadRun:
                 else:
                     resume_lookup = sqlite_lookup
                     used_sqlite = True
-                    # Enable preloading for offline access after close (when using SQLite fallback)
-                    sqlite_lookup.enable_preload_on_close()
             except Exception:
                 if cleanup_callback is not None:
                     with contextlib.suppress(Exception):
@@ -560,9 +559,12 @@ class DownloadRun:
                 if self.args.workers == 1:
                     session = state.session_factory()
                     for artifact in provider.iter_artifacts():
+                        if session is None:
+                            session = state.session_factory()
                         try:
                             self.process_work_item(artifact, state.options, session=session)
                         except Exception as exc:
+                            state.session_factory.close_current()
                             self._handle_worker_exception(
                                 state,
                                 exc,
@@ -573,6 +575,7 @@ class DownloadRun:
                                     state.options.run_id or self.resolved.run_id,
                                 ),
                             )
+                            session = None
                         if self.args.sleep > 0:
                             time.sleep(self.args.sleep)
                 else:
@@ -697,6 +700,29 @@ class DownloadRun:
         )
 
 
+def _calculate_equal_jitter_delay(
+    attempt: int,
+    *,
+    backoff_factor: float,
+    backoff_max: float,
+) -> float:
+    """Return an exponential backoff delay using equal jitter."""
+
+    if backoff_factor <= 0 or attempt < 0:
+        return 0.0
+
+    base_delay = backoff_factor * (2**attempt)
+    if base_delay <= 0:
+        return 0.0
+
+    capped_base = min(base_delay, backoff_max)
+    if capped_base <= 0:
+        return 0.0
+
+    half = capped_base / 2.0
+    return half + random.uniform(0.0, half)
+
+
 def iterate_openalex(
     query: Works,
     per_page: int,
@@ -707,7 +733,11 @@ def iterate_openalex(
     retry_max_delay: float = 75.0,
     retry_after_cap: Optional[float] = None,
 ) -> Iterable[Dict[str, Any]]:
-    """Iterate over OpenAlex works respecting pagination, limits, and retry policy."""
+    """Iterate over OpenAlex works respecting pagination, limits, and retry policy.
+
+    Retries honour ``Retry-After`` headers while applying an equal-jitter
+    exponential backoff capped by ``retry_max_delay`` to avoid unbounded sleeps.
+    """
 
     def _retry_after_seconds(exc: Exception) -> Optional[float]:
         response = getattr(exc, "response", None)
@@ -786,6 +816,26 @@ def iterate_openalex(
                         bounded_retry_after = min(bounded_retry_after, max_delay)
                 if bounded_retry_after is not None:
                     delay = max(delay, bounded_retry_after)
+                base_delay = base_backoff * (2 ** (attempt - 1)) if base_backoff else 0.0
+                jitter_delay = (
+                    _calculate_equal_jitter_delay(
+                        attempt - 1,
+                        backoff_factor=base_backoff,
+                        backoff_max=max_delay if max_delay > 0 else base_delay,
+                    )
+                    if base_delay > 0
+                    else 0.0
+                )
+                if max_delay <= 0:
+                    jitter_delay = 0.0
+                retry_after_effective = 0.0
+                if retry_after is not None:
+                    retry_after_effective = retry_after
+                    if max_delay > 0:
+                        retry_after_effective = min(retry_after_effective, max_delay)
+                    else:
+                        retry_after_effective = 0.0
+                delay = max(jitter_delay, retry_after_effective)
                 if max_delay > 0:
                     delay = min(delay, max_delay)
                 LOGGER.warning(

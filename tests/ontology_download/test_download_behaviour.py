@@ -11,6 +11,8 @@ import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
 
+from unittest import mock
+
 import pytest
 
 from DocsToKG.OntologyDownload.errors import ConfigError
@@ -416,6 +418,43 @@ def test_download_stream_resumes_and_streams_hash(ontology_env, tmp_path):
     assert result.sha256 == hashlib.sha256(payload).hexdigest()
     get_requests = [request for request in ontology_env.requests if request.method == "GET"]
     assert get_requests[-1].headers.get("Range") == f"bytes={resume_offset}-"
+
+
+def test_download_stream_respects_validated_url_hint(ontology_env, tmp_path):
+    """Passing the validated flag should suppress redundant URL validations."""
+
+    payload = b"@prefix : <http://example.org/> .\n:validated a :Ontology .\n"
+    original_url = ontology_env.register_fixture(
+        "validated.owl",
+        payload,
+        media_type="application/rdf+xml",
+    )
+    config = ontology_env.build_download_config()
+    destination = tmp_path / "validated.owl"
+
+    original_validate = network_mod.validate_url_security
+    secure_url = original_validate(original_url, config)
+
+    with mock.patch.object(
+        network_mod,
+        "validate_url_security",
+        wraps=original_validate,
+    ) as validate_spy:
+        network_mod.download_stream(
+            url=secure_url,
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=ontology_env.cache_dir,
+            logger=_logger(),
+            expected_media_type="application/rdf+xml",
+            service="obo",
+            url_already_validated=True,
+        )
+
+    assert validate_spy.call_count == 0
+    assert destination.read_bytes() == payload
 
 
 def test_extract_zip_rejects_traversal(tmp_path):

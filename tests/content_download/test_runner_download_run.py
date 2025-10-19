@@ -11,7 +11,7 @@ from email.utils import format_datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pytest
 import requests
@@ -53,20 +53,32 @@ class DummyWorks:
 class FlakyWorks:
     """Works stub that raises once before yielding pages."""
 
-    def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+    def __init__(
+        self,
+        pages: Sequence[Iterable[Dict[str, object]]],
+        *,
+        retry_after: Optional[str] = "1",
+    ) -> None:
         self._pages = [list(page) for page in pages]
+        self._retry_after = retry_after
 
     def paginate(
         self, per_page: int, n_max: Optional[int] = None
     ) -> Iterable[Iterable[Dict[str, object]]]:
-        return _FlakyPager(self._pages)
+        return _FlakyPager(self._pages, retry_after=self._retry_after)
 
 
 class _FlakyPager:
-    def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+    def __init__(
+        self,
+        pages: Sequence[Iterable[Dict[str, object]]],
+        *,
+        retry_after: Optional[str],
+    ) -> None:
         self._pages = [list(page) for page in pages]
         self._index = 0
         self._raised = False
+        self._retry_after = retry_after
 
     def __iter__(self) -> "_FlakyPager":
         return self
@@ -76,7 +88,8 @@ class _FlakyPager:
             self._raised = True
             response = requests.Response()
             response.status_code = 429
-            response.headers["Retry-After"] = "1"
+            if self._retry_after is not None:
+                response.headers["Retry-After"] = str(self._retry_after)
             error = requests.HTTPError("rate limited")
             error.response = response
             raise error
@@ -110,6 +123,7 @@ def _build_args(
         "openalex_retry_attempts": 3,
         "openalex_retry_backoff": 0.0,
         "openalex_max_retry_delay": 75.0,
+        "retry_after_cap": None,
     }
     if overrides:
         defaults.update(overrides)
@@ -155,7 +169,8 @@ def make_resolved_config(
         verify_cache_digest=False,
         openalex_retry_attempts=args.openalex_retry_attempts,
         openalex_retry_backoff=args.openalex_retry_backoff,
-        openalex_max_retry_delay=args.openalex_max_retry_delay,
+        retry_after_cap=args.retry_after_cap,
+        openalex_retry_max_delay=args.openalex_retry_max_delay,
     )
 
 
@@ -223,6 +238,21 @@ def test_iterate_openalex_uses_equal_jitter(monkeypatch):
         lambda value: sleeps.append(value),
     )
 
+    works = FlakyWorks([[{"id": "W1"}]], retry_after=None)
+    slept: List[float] = []
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.time.sleep",
+        lambda seconds: slept.append(seconds),
+    )
+
+    uniform_calls: List[Tuple[float, float]] = []
+
+    def _uniform(low: float, high: float) -> float:
+        uniform_calls.append((low, high))
+        return high
+
+    monkeypatch.setattr("DocsToKG.ContentDownload.runner.random.uniform", _uniform)
+
     results = list(
         iterate_openalex(
             works,
@@ -285,6 +315,18 @@ def test_iterate_openalex_caps_retry_after(monkeypatch):
     monkeypatch.setattr(
         "DocsToKG.ContentDownload.runner.time.sleep",
         lambda value: sleeps.append(value),
+    assert uniform_calls == [(0.0, 1.0)]
+    assert slept and slept[0] == pytest.approx(2.0)
+
+
+def test_iterate_openalex_caps_retry_after(monkeypatch):
+    future = datetime.now(timezone.utc) + timedelta(minutes=30)
+    header = format_datetime(future)
+    works = FlakyWorks([[{"id": "W1"}]], retry_after=header)
+    slept: List[float] = []
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.time.sleep",
+        lambda seconds: slept.append(seconds),
     )
 
     results = list(
@@ -743,8 +785,116 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
             after = _count_open_fds()
         factory.close_all()
 
-    assert during is not None and after is not None
-    assert after < during
+
+def test_sqlite_resume_lookup_preload_allows_post_close_access(tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+    sqlite_path = resolved.sqlite_path
+    assert sqlite_path is not None
+
+    with SqliteSink(sqlite_path) as sink:
+        for index in range(5):
+            work_id = f"W{index}"
+            entry = ManifestEntry(
+                schema_version=MANIFEST_SCHEMA_VERSION,
+                timestamp="2024-02-01T00:00:00Z",
+                work_id=work_id,
+                title=f"Work {index}",
+                publication_year=None,
+                resolver="resolver",
+                url=f"https://example.org/{work_id}.pdf",
+                path=f"/tmp/{work_id}.pdf",
+                classification=Classification.PDF.value,
+                content_type="application/pdf",
+                reason=None,
+                html_paths=[],
+                sha256=None,
+                content_length=2048,
+                etag=None,
+                last_modified=None,
+                extracted_text_path=None,
+                dry_run=False,
+                path_mtime_ns=None,
+                run_id="resume",
+            )
+            sink.log_manifest(entry)
+
+    download_run = DownloadRun(resolved)
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        state = download_run.setup_download_state(factory)
+        lookup = state.resume_lookup
+        assert isinstance(lookup, SqliteResumeLookup)
+
+        lookup.preload_all_entries()
+        assert state.resume_cleanup is not None
+        state.resume_cleanup()
+        state.resume_cleanup = None
+
+        cached_entry = next(iter(lookup["W3"].values()))
+        assert cached_entry["path"].endswith("W3.pdf")
+    finally:
+        factory.close_all()
+        download_run.close()
+
+
+def test_resume_cleanup_avoids_bulk_selects_for_large_resume(tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+    sqlite_path = resolved.sqlite_path
+    assert sqlite_path is not None
+
+    with SqliteSink(sqlite_path) as sink:
+        for index in range(5000):
+            work_id = f"W{index}"
+            entry = ManifestEntry(
+                schema_version=MANIFEST_SCHEMA_VERSION,
+                timestamp="2024-03-01T00:00:00Z",
+                work_id=work_id,
+                title=f"Work {index}",
+                publication_year=None,
+                resolver="resolver",
+                url=f"https://example.org/{work_id}.pdf",
+                path=f"/tmp/{work_id}.pdf",
+                classification=Classification.PDF.value,
+                content_type="application/pdf",
+                reason=None,
+                html_paths=[],
+                sha256=None,
+                content_length=4096,
+                etag=None,
+                last_modified=None,
+                extracted_text_path=None,
+                dry_run=False,
+                path_mtime_ns=None,
+                run_id="resume",
+            )
+            sink.log_manifest(entry)
+
+    download_run = DownloadRun(resolved)
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        state = download_run.setup_download_state(factory)
+        lookup = state.resume_lookup
+        assert isinstance(lookup, SqliteResumeLookup)
+        sample_entry = next(iter(lookup["W1024"].values()))
+        assert sample_entry["path"].endswith("W1024.pdf")
+
+        traced: List[str] = []
+        lookup._conn.set_trace_callback(traced.append)  # type: ignore[attr-defined]
+        traced.clear()
+
+        assert state.resume_cleanup is not None
+        state.resume_cleanup()
+        state.resume_cleanup = None
+
+        select_queries = [
+            sql for sql in traced if sql and sql.strip().lower().startswith("select")
+        ]
+        assert select_queries == []
+    finally:
+        factory.close_all()
+        download_run.close()
 
 
 def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
@@ -1106,6 +1256,8 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, m
         verify_cache_digest=False,
         openalex_retry_attempts=args.openalex_retry_attempts,
         openalex_retry_backoff=args.openalex_retry_backoff,
+        retry_after_cap=args.retry_after_cap,
+        openalex_retry_max_delay=args.openalex_retry_max_delay,
     )
 
     bootstrap_run_environment(resolved)
@@ -1580,6 +1732,88 @@ def test_worker_crash_records_manifest_reason(patcher, tmp_path, worker_count):
     assert failure_record["classification"] == Classification.SKIPPED.value
     assert failure_record["reason"] == ReasonCode.WORKER_EXCEPTION.value
     assert failure_record["reason_detail"] == "worker-crash"
+
+
+def test_single_worker_exception_discards_session(patcher, tmp_path):
+    resolved = make_resolved_config(tmp_path, workers=1, csv=False)
+    bootstrap_run_environment(resolved)
+
+    failure_id = "W_SEQ_FAIL"
+    recovery_id = "W_SEQ_RECOVER"
+    artifacts = [
+        _make_artifact(resolved, failure_id),
+        _make_artifact(resolved, recovery_id),
+    ]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    session_counter = itertools.count()
+    created_sessions: List["RecordingSession"] = []
+    closed_tokens: List[int] = []
+
+    class RecordingSession:
+        def __init__(self, token: int) -> None:
+            self.token = token
+
+        def close(self) -> None:
+            closed_tokens.append(self.token)
+
+    def fake_create_session(*args, **kwargs):
+        token = next(session_counter)
+        session = RecordingSession(token)
+        created_sessions.append(session)
+        return session
+
+    observed_sessions: List[RecordingSession] = []
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: RecordingSession,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        observed_sessions.append(session)
+        if work.work_id == failure_id:
+            raise RuntimeError("boom")
+        return {"saved": True, "downloaded_bytes": 1}
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.create_session", fake_create_session
+    )
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.worker_failures == 1
+    assert len(observed_sessions) == 2
+    assert observed_sessions[0] is created_sessions[0]
+    assert observed_sessions[1] is created_sessions[1]
+    assert observed_sessions[0] is not observed_sessions[1]
+    assert closed_tokens and closed_tokens[0] == created_sessions[0].token
+
+    download_run.close()
 
 
 def test_worker_tls_failure_discards_thread_session(patcher, tmp_path):

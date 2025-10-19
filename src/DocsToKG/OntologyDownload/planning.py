@@ -938,6 +938,7 @@ def planner_http_probe(
                     timeout=timeout,
                     stream=current_method != "HEAD",
                     http_config=http_config,
+                    assume_url_validated=True,
                 ) as response:
                     status_code = response.status_code
                     if status_code in {429, 503}:
@@ -956,7 +957,7 @@ def planner_http_probe(
                         setattr(http_error, delay_attr, retry_delay)
                         raise http_error
 
-                    final_url = validate_url_security(response.url, http_config)
+                    final_url = getattr(response, "validated_url", response.url)
                     headers_map = CaseInsensitiveDict(response.headers)
                     return status_code, response.ok, headers_map, final_url
 
@@ -1820,6 +1821,7 @@ def fetch_one(
                     service=candidate.plan.service,
                     expected_hash=expected_hash_value,
                     cancellation_token=cancellation_token,
+                    url_already_validated=True,
                 )
 
                 if expected_checksum:
@@ -2189,6 +2191,7 @@ def plan_all(
 
     results: Dict[int, PlannedFetch] = {}
     futures: Dict[Future[PlannedFetch], tuple[int, FetchSpec]] = {}
+    future_tokens: Dict[Future[PlannedFetch], CancellationToken] = {}
 
     exhausted = False
 
@@ -2209,6 +2212,8 @@ def plan_all(
             cancellation_token=token,
         )
         futures[future] = (index, spec)
+        if token is not None:
+            future_tokens[future] = token
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         _submit(first_item, index_counter)
@@ -2230,6 +2235,7 @@ def plan_all(
             done, _ = wait(list(futures.keys()), return_when=FIRST_COMPLETED)
             for future in done:
                 index, spec = futures.pop(future)
+                token = future_tokens.pop(future, None)
                 try:
                     planned = future.result()
                 except Exception as exc:  # pylint: disable=broad-except
@@ -2244,6 +2250,11 @@ def plan_all(
                     # Cancel all pending tasks using cancellation tokens
                     cancellation_token_group.cancel_all()
                     _shutdown_executor_nowait(executor)
+                    if token is not None:
+                        cancellation_token_group.remove_token(token)
+                    for remaining_token in list(future_tokens.values()):
+                        cancellation_token_group.remove_token(remaining_token)
+                    future_tokens.clear()
                     if isinstance(exc, (ConfigError, ConfigurationError, PolicyError)):
                         raise
                     completed_plans = [results[i] for i in sorted(results)]
@@ -2256,6 +2267,8 @@ def plan_all(
                     ) from exc
                 else:
                     results[index] = planned
+                    if token is not None:
+                        cancellation_token_group.remove_token(token)
 
     ordered_indices = sorted(results)
     ordered_plans = [results[i] for i in ordered_indices]
@@ -2360,6 +2373,7 @@ def fetch_all(
 
     results_map: Dict[int, FetchResult] = {}
     futures: Dict[Future[FetchResult], tuple[int, FetchSpec]] = {}
+    future_tokens: Dict[Future[FetchResult], CancellationToken] = {}
     exhausted = False
     submitted = 0
 
@@ -2389,6 +2403,8 @@ def fetch_all(
             cancellation_token=token,
         )
         futures[future] = (index, spec)
+        if token is not None:
+            future_tokens[future] = token
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         submitted += 1
@@ -2410,6 +2426,7 @@ def fetch_all(
             done, _ = wait(list(futures.keys()), return_when=FIRST_COMPLETED)
             for future in done:
                 index, spec = futures.pop(future)
+                token = future_tokens.pop(future, None)
                 try:
                     result = future.result()
                 except Exception as exc:  # pylint: disable=broad-except
@@ -2420,6 +2437,11 @@ def fetch_all(
                     # Cancel all pending tasks using cancellation tokens
                     cancellation_token_group.cancel_all()
                     _shutdown_executor_nowait(executor)
+                    if token is not None:
+                        cancellation_token_group.remove_token(token)
+                    for remaining_token in list(future_tokens.values()):
+                        cancellation_token_group.remove_token(remaining_token)
+                    future_tokens.clear()
                     completed_results = [results_map[i] for i in sorted(results_map)]
                     total_known = total_hint if total_hint is not None else submitted
                     raise BatchFetchError(
@@ -2437,6 +2459,8 @@ def fetch_all(
                         "progress update",
                         extra={"stage": "progress", "ontology_id": spec.id, "progress": progress},
                     )
+                    if token is not None:
+                        cancellation_token_group.remove_token(token)
 
     ordered_results = [results_map[i] for i in sorted(results_map)]
     return ordered_results
