@@ -863,6 +863,26 @@ def _handle_prune(args, logger) -> Dict[str, object]:
     }
 
 
+def _bioportal_api_key_status(path: Path) -> Dict[str, object]:
+    """Return configuration status for the BioPortal API key file."""
+
+    status: Dict[str, object] = {"path": str(path), "configured": False}
+
+    if not path.exists():
+        return status
+
+    try:
+        contents = path.read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        status["error"] = f"{exc.__class__.__name__}: {exc}"
+        return status
+
+    if contents.strip():
+        status["configured"] = True
+
+    return status
+
+
 def _doctor_report() -> Dict[str, object]:
     """Collect diagnostic information for the ``doctor`` command.
 
@@ -956,10 +976,7 @@ def _doctor_report() -> Dict[str, object]:
             robot_info["error"] = str(exc)
 
     api_key_path = CONFIG_DIR / "bioportal_api_key.txt"
-    bioportal = {
-        "path": str(api_key_path),
-        "configured": api_key_path.exists() and api_key_path.read_text().strip() != "",
-    }
+    bioportal = _bioportal_api_key_status(api_key_path)
 
     network_targets = {
         "ols": "https://www.ebi.ac.uk/ols4/api/health",
@@ -1132,17 +1149,32 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
         print(f"  - {name}: {', '.join(status)} ({info['path']})")
 
     disk = report["disk"]
-    print(
-        "Disk space: {free:.2f} GB free / {total:.2f} GB total".format(
-            free=disk["free_gb"], total=disk["total_gb"]
-        )
-    )
-    if disk.get("warning"):
-        threshold_gb = disk["threshold_bytes"] / 1_000_000_000
+    disk_path = disk.get("path")
+    label = f"Disk space ({disk_path})" if disk_path else "Disk space"
+    if "free_gb" in disk and "total_gb" in disk:
         print(
-            "  Warning: free space below threshold "
-            f"({threshold_gb:.2f} GB; min(total capacity, max(10 GB, 10% of capacity)))."
+            f"{label}: {disk['free_gb']:.2f} GB free / {disk['total_gb']:.2f} GB total"
         )
+        if disk.get("warning"):
+            threshold_gb = disk["threshold_bytes"] / 1_000_000_000
+            print(
+                "  Warning: free space below threshold "
+                f"({threshold_gb:.2f} GB; min(total capacity, max(10 GB, 10% of capacity)))."
+            )
+    else:
+        print(f"{label}: unavailable")
+        error_info = disk.get("error")
+        if error_info:
+            if isinstance(error_info, dict):
+                error_type = error_info.get("type")
+                message = error_info.get("message")
+                if error_type and message:
+                    detail = f"{error_type}: {message}"
+                else:
+                    detail = message or error_type or "Unknown error"
+            else:
+                detail = str(error_info)
+            print(f"  Error: {detail}")
 
     print("Optional dependencies:")
     for name, available in report["dependencies"].items():

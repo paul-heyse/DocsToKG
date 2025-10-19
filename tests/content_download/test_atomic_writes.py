@@ -225,10 +225,12 @@ if DOWNLOAD_DEPS_AVAILABLE:
         )
 
     def _download_with_session(
-        session: _DummySession, tmp_path: Path
+        session: _DummySession, tmp_path: Path, enable_resume: bool = False
     ) -> tuple[WorkArtifact, Path, Dict[str, Dict[str, Any]], DownloadOutcome]:
         artifact = _make_artifact(tmp_path)
         context: Dict[str, Dict[str, Any]] = {"previous": {}}
+        if enable_resume:
+            context["enable_range_resume"] = True
         outcome = download_candidate(
             session,
             artifact,
@@ -240,14 +242,14 @@ if DOWNLOAD_DEPS_AVAILABLE:
         return artifact, artifact.pdf_dir / "atomic.pdf", context, outcome
 
     @pytest.mark.skipif(not DOWNLOAD_DEPS_AVAILABLE, reason=DOWNLOAD_TESTS_SKIP_REASON)
-    def test_partial_download_leaves_part_file(tmp_path: Path) -> None:
+    def test_partial_download_cleans_part_file(tmp_path: Path) -> None:
         session = _DummySession(_FailingResponse())
         artifact, final_path, _, outcome = _download_with_session(session, tmp_path)
 
         part_path = final_path.with_suffix(".pdf.part")
         assert outcome.classification is Classification.HTTP_ERROR
         assert not final_path.exists()
-        assert part_path.exists()
+        assert not part_path.exists()  # Partial files should be cleaned up when resume is disabled
 
     @pytest.mark.skipif(not DOWNLOAD_DEPS_AVAILABLE, reason=DOWNLOAD_TESTS_SKIP_REASON)
     def test_successful_download_records_digest(tmp_path: Path) -> None:

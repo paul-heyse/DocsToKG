@@ -32,6 +32,7 @@ def test_cli_doctor_handles_missing_ontology_dir(capsys):
 
         disk = output["disk"]
         assert Path(disk["path"]) == missing_dir
+        assert disk["ok"] is True
         assert disk["total_bytes"] is not None
         assert disk["free_bytes"] is not None
         assert "error" not in disk

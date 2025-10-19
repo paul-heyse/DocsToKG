@@ -71,6 +71,7 @@ class _DummyResponse(requests.Response):
         self.status_code = status_code
         self.headers = headers
         self.closed = False
+        self.raw = Mock()  # Mock the raw attribute to prevent AttributeError
 
     def close(self) -> None:  # noqa: D401
         self.closed = True
