@@ -578,6 +578,39 @@ def quarantine_artifact(
     return candidate
 
 
+class StreamingContentHasher:
+    """Incrementally compute a content hash that mirrors :func:`compute_content_hash`."""
+
+    def __init__(self, algorithm: str = "sha1") -> None:
+        """Initialise the streaming hasher with the desired digest algorithm."""
+
+        self.algorithm = algorithm
+        self._hasher = make_hasher(name=algorithm)
+        self._buffer = ""
+
+    def update(self, text: str) -> None:
+        """Ingest ``text`` into the hash while preserving Unicode normalisation semantics."""
+
+        if not text:
+            return
+        self._buffer += text
+        prefix, self._buffer = _partition_normalisation_buffer(self._buffer)
+        if prefix:
+            normalised = unicodedata.normalize("NFKC", prefix)
+            if normalised:
+                self._hasher.update(normalised.encode("utf-8"))
+
+    def hexdigest(self) -> str:
+        """Finalize the digest and return the hexadecimal representation."""
+
+        if self._buffer:
+            tail = unicodedata.normalize("NFKC", self._buffer)
+            if tail:
+                self._hasher.update(tail.encode("utf-8"))
+            self._buffer = ""
+        return self._hasher.hexdigest()
+
+
 def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
     """Compute a content hash for ``path`` using the requested algorithm."""
 
@@ -715,6 +748,7 @@ __all__ = [
     "load_manifest_index",
     "manifest_append",
     "quarantine_artifact",
+    "StreamingContentHasher",
     "relative_path",
     "resolve_hash_algorithm",
 ]
