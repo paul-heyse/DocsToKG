@@ -244,6 +244,7 @@ class AdapterStats:
     cuvs_available: bool
     cuvs_reported: Optional[bool]
     cuvs_requested: Optional[bool]
+    cuvs_applied: Optional[bool]
 
 
 class _PendingSearch:
@@ -452,6 +453,7 @@ class FaissVectorStore(DenseVectorStore):
         self._replica_gpu_resources: list["faiss.StandardGpuResources"] = []
         self._pinned_buffers: list[object] = []
         self._observability = observability or Observability()
+        self._last_applied_cuvs: Optional[bool] = None
         self.init_gpu()
         self._lock = RLock()
         self._index = self._create_index()
@@ -622,6 +624,7 @@ class FaissVectorStore(DenseVectorStore):
             cuvs_available=cuvs_available,
             cuvs_reported=cuvs_reported,
             cuvs_requested=requested_cuvs,
+            cuvs_applied=self._last_applied_cuvs,
         )
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
@@ -1136,6 +1139,7 @@ class FaissVectorStore(DenseVectorStore):
             "cuvs_available": stats.cuvs_available,
             "cuvs_requested": stats.cuvs_requested,
             "cuvs_reported": stats.cuvs_reported,
+            "cuvs_applied": stats.cuvs_applied,
         }
         log_fn = (
             self._observability.logger.info if level == "info" else self._observability.logger.debug
@@ -1361,6 +1365,7 @@ class FaissVectorStore(DenseVectorStore):
             bool(cuvs_reported) if cuvs_reported is not None else False
         )
         stats["cuvs_requested"] = getattr(self._config, "use_cuvs", None)
+        stats["cuvs_applied"] = self._last_applied_cuvs
         if self._temp_memory_bytes is not None:
             stats["gpu_temp_memory_bytes"] = float(self._temp_memory_bytes)
         try:
@@ -1896,12 +1901,16 @@ class FaissVectorStore(DenseVectorStore):
 
         if self._multi_gpu_mode not in ("replicate", "shard"):
             self._replicated = False
+            self._apply_use_cuvs_parameter(index)
             return index
         if not self._replication_enabled:
             self._replicated = False
+            self._apply_use_cuvs_parameter(index)
             return index
         shard = self._multi_gpu_mode == "shard"
-        return self.distribute_to_all_gpus(index, shard=shard)
+        distributed = self.distribute_to_all_gpus(index, shard=shard)
+        self._apply_use_cuvs_parameter(distributed)
+        return distributed
 
     def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
         self.init_gpu()
@@ -2069,7 +2078,102 @@ class FaissVectorStore(DenseVectorStore):
             self._last_applied_nprobe_monotonic = time.monotonic()
         else:
             self._reset_nprobe_cache()
+        self._apply_use_cuvs_parameter(index)
         self._log_index_configuration(index)
+
+    def _apply_use_cuvs_parameter(self, index: Optional["faiss.Index"]) -> None:
+        """Propagate the cuVS toggle to ``index`` and any GPU replicas."""
+
+        if index is None or faiss is None:
+            self._last_applied_cuvs = None
+            return
+        requested = getattr(self._config, "use_cuvs", None)
+        cuvs_enabled, cuvs_available, _ = resolve_cuvs_state(requested)
+        if not cuvs_available and requested is False:
+            # Respect explicit opt-out even when FAISS reports no availability.
+            cuvs_enabled = False
+        if not hasattr(faiss, "GpuParameterSpace"):
+            self._last_applied_cuvs = cuvs_enabled if requested is not None else None
+            return
+        try:
+            gps = faiss.GpuParameterSpace()
+        except Exception:  # pragma: no cover - defensive guard
+            logger.debug("Unable to construct FAISS GpuParameterSpace", exc_info=True)
+            self._last_applied_cuvs = None
+            return
+
+        targets = list(self._iter_gpu_index_variants(index))
+        applied = False
+        for target in targets:
+            try:
+                if hasattr(gps, "initialize"):
+                    gps.initialize(target)
+            except Exception:  # pragma: no cover - defensive guard
+                logger.debug("Failed to initialise GpuParameterSpace for index", exc_info=True)
+            try:
+                gps.set_index_parameter(target, "use_cuvs", bool(cuvs_enabled))
+                applied = True
+            except Exception:  # pragma: no cover - defensive guard
+                logger.debug("Unable to set use_cuvs on FAISS index", exc_info=True)
+
+        if applied and hasattr(gps, "get_index_parameter") and targets:
+            try:  # pragma: no cover - best effort confirmation
+                applied_value = bool(gps.get_index_parameter(targets[0], "use_cuvs"))
+            except Exception:
+                applied_value = bool(cuvs_enabled)
+        elif applied:
+            applied_value = bool(cuvs_enabled)
+        else:
+            applied_value = None
+
+        self._last_applied_cuvs = applied_value
+
+    def _iter_gpu_index_variants(self, root: "faiss.Index") -> list["faiss.Index"]:
+        """Return FAISS index variants associated with ``root``.
+
+        This walks nested wrappers (e.g. IndexIDMap2, replicas, shards) so
+        parameter updates (``use_cuvs``) propagate to each GPU replica.
+        """
+
+        stack: list["faiss.Index"] = [root]
+        seen: set[int] = set()
+        collected: list["faiss.Index"] = []
+        while stack:
+            current = stack.pop()
+            if current is None:
+                continue
+            ident = id(current)
+            if ident in seen:
+                continue
+            seen.add(ident)
+            collected.append(current)
+
+            nested = getattr(current, "index", None)
+            if nested is not None and nested is not current:
+                stack.append(nested)
+
+            if hasattr(faiss, "downcast_index"):
+                try:
+                    downcast = faiss.downcast_index(current)
+                except Exception:  # pragma: no cover - defensive guard
+                    downcast = None
+                if downcast is not None and downcast is not current:
+                    stack.append(downcast)
+
+            for accessor_name in ("at", "index_at"):
+                accessor = getattr(current, accessor_name, None)
+                if accessor is None:
+                    continue
+                for offset in range(0, 64):
+                    try:
+                        candidate = accessor(offset)
+                    except Exception:
+                        break
+                    if candidate is None:
+                        break
+                    stack.append(candidate)
+
+        return collected
 
     def _log_index_configuration(self, index: "faiss.Index") -> None:
         try:
@@ -2078,7 +2182,13 @@ class FaissVectorStore(DenseVectorStore):
             desc = type(index).__name__
         logger.debug(
             "faiss-index-config",
-            extra={"event": {"nprobe": getattr(self._config, "nprobe", 0), "index": desc}},
+            extra={
+                "event": {
+                    "nprobe": getattr(self._config, "nprobe", 0),
+                    "index": desc,
+                    "use_cuvs": self._last_applied_cuvs,
+                }
+            },
         )
 
     def _create_index(self) -> "faiss.Index":
