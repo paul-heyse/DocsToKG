@@ -35,12 +35,15 @@ Scope boundary: Handles resolver planning, secure HTTP streaming, and manifest/v
 ---
 
 ## Quickstart
-> Provision the virtual environment, validate configuration, then run a dry-run pull to exercise the full pipeline without writing artifacts.
+> Verify the managed environment is ready, then run a dry-run pull to exercise the full pipeline without writing artifacts. See the guardrails in [AGENTS.md](./AGENTS.md) for the preferred workflow.
 ```bash
-./scripts/bootstrap_env.sh
+test -x .venv/bin/python || { echo "ERROR: .venv is missing — STOP"; exit 1; }
 direnv allow                     # or source .venv/bin/activate
 direnv exec . python -m DocsToKG.OntologyDownload.cli config validate configs/sources.yaml
 direnv exec . python -m DocsToKG.OntologyDownload.cli pull hp --config configs/sources.yaml --dry-run --json
+
+# If the managed environment is missing or broken, rebuild it as a last resort:
+./scripts/bootstrap_env.sh
 ```
 
 ## Common commands
