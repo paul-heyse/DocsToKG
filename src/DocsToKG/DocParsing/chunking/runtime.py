@@ -791,6 +791,7 @@ def _validate_chunk_files(
                 input_hash = compute_content_hash(path)
             except Exception:
                 input_hash = ""
+            hash_alg = resolve_hash_algorithm()
             doc_id = path.stem
             quarantine_path = quarantine_artifact(path, reason=reason, logger=logger)
             if telemetry is not None:
@@ -803,6 +804,8 @@ def _validate_chunk_files(
                         "input_path": str(path),
                         "input_hash": input_hash,
                         "quarantine": True,
+                        "status": "failure",
+                        "hash_alg": hash_alg,
                     },
                     manifest_metadata={
                         "output_path": str(quarantine_path),
@@ -811,6 +814,8 @@ def _validate_chunk_files(
                         "input_hash": input_hash,
                         "error": reason,
                         "quarantine": True,
+                        "status": "failure",
+                        "hash_alg": hash_alg,
                     },
                 )
             log_event(
