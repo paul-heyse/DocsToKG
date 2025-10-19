@@ -173,9 +173,13 @@ Key environment variables:
 Validate the effective configuration at any time:
 
 ```bash
-direnv exec . python -m DocsToKG.OntologyDownload.cli config show --config configs/sources.yaml
+direnv exec . python -m DocsToKG.OntologyDownload.cli config validate --json configs/sources.yaml
 direnv exec . python -m DocsToKG.OntologyDownload.cli config validate configs/sources.yaml
 ```
+
+> **Note:** A dedicated `config show` subcommand is not yet available. To review the
+> active settings, inspect `configs/sources.yaml` (or your override file) directly,
+> or rely on the JSON emitted by `config validate --json` for a resolved snapshot.
 
 ## Data contracts & schemas
 - Ontology manifest schema and helpers: `src/DocsToKG/OntologyDownload/manifests.py` (schema version 1.0).
@@ -280,7 +284,7 @@ direnv exec . pytest tests/ontology_download -q
 ```json x-agent-map
 {
   "entry_points": [
-    {"type": "cli", "module": "DocsToKG.OntologyDownload.cli", "commands": ["pull", "plan", "plan-diff", "plugins", "show", "validate", "config", "doctor", "prune", "init"]},
+    {"type": "cli", "module": "DocsToKG.OntologyDownload.cli", "commands": ["pull", "plan", "plan-diff", "plugins", "validate", "config", "doctor", "prune", "init"]},
     {"type": "python", "module": "DocsToKG.OntologyDownload.api", "symbols": ["plan_all", "fetch_all", "run_validators", "validate_manifest_dict"]}
   ],
   "env": [
