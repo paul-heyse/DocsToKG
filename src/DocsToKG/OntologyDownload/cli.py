@@ -909,11 +909,10 @@ def _doctor_report() -> Dict[str, object]:
     disk_report: Dict[str, object] = {"path": str(probe_path)}
     try:
         disk_usage = shutil.disk_usage(probe_path)
-    except OSError as exc:
-        disk_report["error"] = {
-            "type": exc.__class__.__name__,
-            "message": str(exc),
-        }
+    except PermissionError as exc:
+        disk_report.update({"ok": False, "error": str(exc)})
+    except OSError as exc:  # pragma: no cover - defensive fallback
+        disk_report.update({"ok": False, "error": str(exc)})
     else:
         default_floor_bytes = 10 * 1_000_000_000
         threshold_bytes = min(
@@ -922,6 +921,7 @@ def _doctor_report() -> Dict[str, object]:
         )
         disk_report.update(
             {
+                "ok": True,
                 "total_bytes": disk_usage.total,
                 "free_bytes": disk_usage.free,
                 "total_gb": round(disk_usage.total / 1_000_000_000, 2),
