@@ -2610,7 +2610,15 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                 if len(skipped_ids) > 5:
                     preview += f", ... (+{len(skipped_ids) - 5} more)"
                 print("  skip preview:", preview)
-                return 0
+            should_stop_tracing = True
+            if hasattr(tracemalloc, "is_tracing"):
+                should_stop_tracing = tracemalloc.is_tracing()
+            if should_stop_tracing:
+                try:
+                    tracemalloc.stop()
+                except RuntimeError:
+                    pass
+            return 0
 
         files_parallel = min(requested_parallel, max(1, len(file_entries)))
         args.files_parallel = files_parallel
