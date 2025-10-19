@@ -102,6 +102,7 @@ class RecordingFaissStore:
         self._vectors: list[str] = []
         self._resolver: Optional[Callable[[int], Optional[str]]] = None
         self.last_restore_meta: Optional[Mapping[str, object]] = None
+        self.last_snapshot_meta: Optional[Mapping[str, object]] = None
 
     @property
     def dim(self) -> int:
@@ -147,6 +148,15 @@ class RecordingFaissStore:
         ids = data.get("ids", [])
         self._vectors = [str(vector_id) for vector_id in ids]
         self.last_restore_meta = meta
+
+    def snapshot_meta(self) -> Mapping[str, object]:
+        payload = {
+            "namespace": self.namespace,
+            "marker": "recording-meta",
+            "vector_count": len(self._vectors),
+        }
+        self.last_snapshot_meta = dict(payload)
+        return payload
 
     def stats(self) -> Mapping[str, float | str]:
         return {"ntotal": float(self.ntotal)}
@@ -211,3 +221,43 @@ def test_managed_adapter_restores_with_snapshot_metadata() -> None:
     assert isinstance(inner_store, RecordingFaissStore)
     assert inner_store.last_restore_meta == snapshot_meta
     assert inner_store._vectors == ["alpha-vector"]
+
+
+def test_managed_adapter_evict_idle_preserves_snapshot_metadata() -> None:
+    """Managed adapters should retain snapshot metadata across eviction cycles."""
+
+    router = FaissRouter(
+        per_namespace=True,
+        default_store=ManagedFaissAdapter(RecordingFaissStore("__default__")),
+        factory=lambda namespace: ManagedFaissAdapter(RecordingFaissStore(namespace)),
+    )
+
+    managed_store = router.get("alpha")
+    managed_store.add([np.zeros(3, dtype=np.float32)], ["alpha-vector"])
+
+    inner_store = managed_store._inner  # type: ignore[attr-defined]
+    assert isinstance(inner_store, RecordingFaissStore)
+
+    expected_meta = {
+        "namespace": "alpha",
+        "marker": "recording-meta",
+        "vector_count": 1,
+    }
+
+    router._last_used["alpha"] = 0.0
+
+    evicted = router.evict_idle(max_idle_seconds=1)
+
+    assert evicted == 1
+    assert "alpha" not in router._stores
+    assert inner_store.last_snapshot_meta == expected_meta
+
+    payload, meta = router._snapshots["alpha"]
+    assert isinstance(payload, bytes)
+    assert meta == expected_meta
+
+    restored_store = router.get("alpha")
+    restored_inner = restored_store._inner  # type: ignore[attr-defined]
+    assert isinstance(restored_inner, RecordingFaissStore)
+    assert restored_inner.last_restore_meta == expected_meta
+    assert restored_inner._vectors == ["alpha-vector"]
