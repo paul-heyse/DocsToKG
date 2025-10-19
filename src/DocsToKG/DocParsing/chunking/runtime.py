@@ -153,16 +153,17 @@ if __name__ == "__main__" and __package__ is None:
 
 import argparse
 import importlib
+import itertools
 import json
 import logging
 import statistics
 import unicodedata
 import time
 import uuid
-from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, fields
+from multiprocessing import get_context
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
@@ -688,6 +689,29 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             anchors_injected=cfg.inject_anchors,
             error=str(exc),
         )
+
+
+def _process_indexed_chunk_task(
+    payload: Tuple[int, ChunkTask]
+) -> Tuple[int, ChunkResult]:
+    """Execute ``_process_chunk_task`` and preserve submission ordering."""
+
+    index, task = payload
+    return index, _process_chunk_task(task)
+
+
+def _ordered_results(
+    results: Iterable[Tuple[int, ChunkResult]]
+) -> Iterator[ChunkResult]:
+    """Yield chunk results in their original submission order."""
+
+    pending: Dict[int, ChunkResult] = {}
+    next_index = 0
+    for index, result in results:
+        pending[index] = result
+        while next_index in pending:
+            yield pending.pop(next_index)
+            next_index += 1
 
 
 def _resolve_serializer_provider(spec: str) -> type[ChunkingSerializerProvider]:
@@ -1241,59 +1265,45 @@ def _main_inner(
 
         resume_controller = ResumeController(args.resume, args.force, chunk_manifest_index)
 
-        tasks: List[ChunkTask] = []
-        for path in files:
-            doc_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
-            name = path.stem
-            parse_engine = parse_engine_lookup.get(doc_id, "docling-html")
-            if doc_id not in parse_engine_lookup:
-                logger.debug(
-                    "Parse engine defaulted to docling-html",
-                    extra={"extra_fields": {"doc_id": doc_id}},
-                )
-
-            manifest_entry = resume_controller.entry(doc_id)
-            should_consider_resume = (
-                resume_controller.resume
-                and not resume_controller.force
-                and manifest_entry is not None
-                and out_path.exists()
-            )
-            input_hash = ""
-            if should_consider_resume:
+        def iter_chunk_tasks() -> Iterator[ChunkTask]:
+            for path in files:
+                doc_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
+                name = path.stem
                 input_hash = compute_content_hash(path)
-                skip_doc, manifest_entry = resume_controller.should_skip(doc_id, out_path, input_hash)
-            else:
-                skip_doc = False
+                parse_engine = parse_engine_lookup.get(doc_id, "docling-html")
+                if doc_id not in parse_engine_lookup:
+                    logger.debug(
+                        "Parse engine defaulted to docling-html",
+                        extra={"extra_fields": {"doc_id": doc_id}},
+                    )
 
-            if skip_doc:
-                stage_telemetry.log_skip(
-                    doc_id=doc_id,
-                    input_path=path,
-                    reason="unchanged-input",
-                    metadata={
-                        "status": "skip",
-                        "input_path": str(path),
-                        "input_hash": input_hash,
-                        "output_path": str(out_path),
-                        "schema_version": CHUNK_SCHEMA_VERSION,
-                        "parse_engine": parse_engine,
-                    },
-                )
-                log_event(
-                    logger,
-                    "info",
-                    "Skipping chunk file: output exists and input unchanged",
-                    status="skip",
-                    stage=CHUNK_STAGE,
-                    doc_id=doc_id,
-                    input_relpath=relative_path(path, resolved_data_root),
-                    output_relpath=relative_path(out_path, resolved_data_root),
-                )
-                continue
+                skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+                if skip_doc:
+                    stage_telemetry.log_skip(
+                        doc_id=doc_id,
+                        input_path=path,
+                        reason="unchanged-input",
+                        metadata={
+                            "input_path": str(path),
+                            "input_hash": input_hash,
+                            "output_path": str(out_path),
+                            "schema_version": CHUNK_SCHEMA_VERSION,
+                            "parse_engine": parse_engine,
+                        },
+                    )
+                    log_event(
+                        logger,
+                        "info",
+                        "Skipping chunk file: output exists and input unchanged",
+                        status="skip",
+                        stage=CHUNK_STAGE,
+                        doc_id=doc_id,
+                        input_relpath=relative_path(path, resolved_data_root),
+                        output_relpath=relative_path(out_path, resolved_data_root),
+                    )
+                    continue
 
-            tasks.append(
-                ChunkTask(
+                yield ChunkTask(
                     doc_path=path,
                     output_path=out_path,
                     doc_id=doc_id,
@@ -1301,9 +1311,11 @@ def _main_inner(
                     input_hash=input_hash,
                     parse_engine=parse_engine,
                 )
-            )
 
-        if not tasks:
+        task_iterator = iter_chunk_tasks()
+        try:
+            first_task = next(task_iterator)
+        except StopIteration:
             return 0
 
         def handle_result(result: ChunkResult) -> None:
@@ -1377,19 +1389,25 @@ def _main_inner(
 
         if worker_count == 1:
             _chunk_worker_initializer(chunk_config)
-            for task in tasks:
+            for task in itertools.chain((first_task,), task_iterator):
                 handle_result(_process_chunk_task(task))
         else:
             logger.info(
                 "Parallel chunking enabled",
                 extra={"extra_fields": {"workers": worker_count}},
             )
-            with ProcessPoolExecutor(
-                max_workers=worker_count,
+            ctx = get_context("spawn")
+            with ctx.Pool(
+                processes=worker_count,
                 initializer=_chunk_worker_initializer,
                 initargs=(chunk_config,),
             ) as pool:
-                for result in pool.map(_process_chunk_task, tasks):
+                indexed_results = pool.imap_unordered(
+                    _process_indexed_chunk_task,
+                    enumerate(itertools.chain((first_task,), task_iterator)),
+                    chunksize=1,
+                )
+                for result in _ordered_results(indexed_results):
                     handle_result(result)
 
         return 0
