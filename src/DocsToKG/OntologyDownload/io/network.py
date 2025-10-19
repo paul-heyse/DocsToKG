@@ -1208,6 +1208,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     try:
                         with part_path.open(mode) as fh:
                             for chunk in response.iter_content(chunk_size=1 << 20):
+                                _enforce_timeout()
                                 if not chunk:
                                     continue
 

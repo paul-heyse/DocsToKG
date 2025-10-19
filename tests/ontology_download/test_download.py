@@ -1,4 +1,5 @@
 import logging
+import time
 
 import pytest
 
@@ -224,3 +225,63 @@ def test_download_timeout_aborts_retries(ontology_env, tmp_path, caplog):
         and record.getMessage() == "download timeout"
     ]
     assert timeout_records
+
+
+def test_stream_timeout_removes_partial_files(ontology_env, tmp_path):
+    """Slow streaming responses exceeding the timeout must clean up partial files."""
+
+    slow_path = "fixtures/slow-stream-timeout.owl"
+    ontology_env.queue_response(
+        slow_path,
+        ResponseSpec(
+            method="HEAD",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": "2",
+            },
+        ),
+    )
+
+    def slow_stream():
+        time.sleep(1.2)
+        yield b"a"
+        yield b"b"
+
+    ontology_env.queue_response(
+        slow_path,
+        ResponseSpec(
+            method="GET",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": "2",
+            },
+            stream=slow_stream(),
+        ),
+    )
+
+    url = ontology_env.http_url(slow_path)
+    destination = tmp_path / "slow-stream-timeout.owl"
+    config = ontology_env.build_download_config()
+    config.download_timeout_sec = 1
+
+    with pytest.raises(DownloadFailure) as exc_info:
+        network_mod.download_stream(
+            url=url,
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=ontology_env.cache_dir,
+            logger=_logger(),
+            expected_media_type="application/rdf+xml",
+            service="test",
+        )
+
+    assert "timeout" in str(exc_info.value).lower()
+    assert not exc_info.value.retryable
+    assert not destination.exists()
+    destination_part = destination.parent / (destination.name + ".part")
+    assert not destination_part.exists()
+    assert not list(ontology_env.cache_dir.rglob("*.part"))
