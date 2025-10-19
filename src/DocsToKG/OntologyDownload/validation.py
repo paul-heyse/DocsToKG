@@ -609,19 +609,25 @@ def _run_with_timeout(func, timeout_sec: int) -> None:
             """
             raise ValidationTimeout()  # pragma: no cover - bridges to outer scope
 
+        previous_handler = signal.getsignal(signal.SIGALRM)
         signal.signal(signal.SIGALRM, _handler)
         signal.alarm(timeout_sec)
         try:
             func()
         finally:
             signal.alarm(0)
+            signal.signal(signal.SIGALRM, previous_handler)
     else:  # Windows
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(func)
-            try:
-                future.result(timeout=timeout_sec)
-            except FuturesTimeoutError as exc:  # pragma: no cover - platform specific
-                raise ValidationTimeout() from exc
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(func)
+        try:
+            future.result(timeout=timeout_sec)
+        except FuturesTimeoutError as exc:  # pragma: no cover - platform specific
+            future.cancel()
+            executor.shutdown(wait=False, cancel_futures=True)
+            raise ValidationTimeout() from exc
+        finally:
+            executor.shutdown(wait=True, cancel_futures=False)
 
 
 def _prepare_xbrl_package(
