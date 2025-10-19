@@ -24,7 +24,9 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
     """Acquire an advisory lock using ``.lock`` sentinel files."""
 
     lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_dir = lock_path.parent
     start = time.time()
+    lock_dir.mkdir(parents=True, exist_ok=True)
     while lock_path.exists():
         try:
             pid_text = lock_path.read_text(encoding="utf-8").strip()
@@ -39,8 +41,10 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
         if time.time() - start > timeout:
             raise TimeoutError(f"Could not acquire lock on {path} after {timeout}s")
         time.sleep(0.1)
+        lock_dir.mkdir(parents=True, exist_ok=True)
 
     try:
+        lock_dir.mkdir(parents=True, exist_ok=True)
         lock_path.write_text(str(os.getpid()), encoding="utf-8")
         yield True
     finally:
