@@ -19,7 +19,7 @@ from DocsToKG.ContentDownload.download import handle_resume_logic
 from DocsToKG.ContentDownload.networking import ThreadLocalSessionFactory
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.providers import WorkProvider
-from DocsToKG.ContentDownload.runner import DownloadRun
+from DocsToKG.ContentDownload.runner import DownloadRun, iterate_openalex
 from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
     CsvSink,
@@ -47,6 +47,43 @@ class DummyWorks:
         return iter(self._pages)
 
 
+class FlakyWorks:
+    """Works stub that raises once before yielding pages."""
+
+    def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+        self._pages = [list(page) for page in pages]
+
+    def paginate(
+        self, per_page: int, n_max: Optional[int] = None
+    ) -> Iterable[Iterable[Dict[str, object]]]:
+        return _FlakyPager(self._pages)
+
+
+class _FlakyPager:
+    def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+        self._pages = [list(page) for page in pages]
+        self._index = 0
+        self._raised = False
+
+    def __iter__(self) -> "_FlakyPager":
+        return self
+
+    def __next__(self) -> Iterable[Dict[str, object]]:
+        if not self._raised:
+            self._raised = True
+            response = requests.Response()
+            response.status_code = 429
+            response.headers["Retry-After"] = "1"
+            error = requests.HTTPError("rate limited")
+            error.response = response
+            raise error
+        if self._index >= len(self._pages):
+            raise StopIteration
+        page = self._pages[self._index]
+        self._index += 1
+        return list(page)
+
+
 def _build_args(
     overrides: Optional[Dict[str, object]] = None, **extra: object
 ) -> argparse.Namespace:
@@ -67,6 +104,8 @@ def _build_args(
         "max": None,
         "workers": 1,
         "sleep": 0.0,
+        "openalex_retry_attempts": 3,
+        "openalex_retry_backoff": 0.0,
     }
     if overrides:
         defaults.update(overrides)
@@ -110,7 +149,32 @@ def make_resolved_config(
         concurrency_product=max(workers, 1),
         extract_html_text=False,
         verify_cache_digest=False,
+        openalex_retry_attempts=args.openalex_retry_attempts,
+        openalex_retry_backoff=args.openalex_retry_backoff,
     )
+
+
+def test_iterate_openalex_retries_then_succeeds(monkeypatch):
+    works = FlakyWorks([[{"id": "W1"}, {"id": "W2"}]])
+    slept: List[float] = []
+
+    def _record_sleep(delay: float) -> None:
+        slept.append(delay)
+
+    monkeypatch.setattr("DocsToKG.ContentDownload.runner.time.sleep", _record_sleep)
+
+    results = list(
+        iterate_openalex(
+            works,
+            per_page=2,
+            max_results=None,
+            retry_attempts=2,
+            retry_backoff=0.2,
+        )
+    )
+
+    assert [item["id"] for item in results] == ["W1", "W2"]
+    assert slept and slept[0] >= 1.0
 
 
 def _manifest_entry(work_id: str, *, run_id: str = "resume-run") -> str:
@@ -296,12 +360,11 @@ def test_setup_download_state_fresh_csv_run_has_no_resume_warning(caplog, tmp_pa
     try:
         with caplog.at_level(logging.WARNING):
             download_run.setup_download_state(factory)
+        messages = [record.getMessage() for record in caplog.records]
+        assert not any("Resume manifest" in message for message in messages)
     finally:
         factory.close_all()
         download_run.close()
-
-    messages = [record.getMessage() for record in caplog.records]
-    assert not any("Resume manifest" in message for message in messages)
 
 
 def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
@@ -315,13 +378,12 @@ def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
     try:
         with pytest.raises(ValueError) as excinfo:
             download_run.setup_download_state(factory)
+        message = str(excinfo.value)
+        assert str(missing_manifest) in message
+        assert "--resume-from" in message
     finally:
         factory.close_all()
         download_run.close()
-
-    message = str(excinfo.value)
-    assert str(missing_manifest) in message
-    assert "--resume-from" in message
 
 
 def test_setup_download_state_expands_user_resume_path(tmp_path, patcher, monkeypatch):
@@ -349,11 +411,10 @@ def test_setup_download_state_expands_user_resume_path(tmp_path, patcher, monkey
     factory = ThreadLocalSessionFactory(requests.Session)
     try:
         download_run.setup_download_state(factory)
+        assert captured.get("path") == expected_resume
     finally:
         factory.close_all()
         download_run.close()
-
-    assert captured.get("path") == expected_resume
 
 
 def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_path):
@@ -438,16 +499,15 @@ def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_pat
     factory = ThreadLocalSessionFactory(requests.Session)
     try:
         state = download_run.setup_download_state(factory)
+        assert "W-SQLITE" in state.options.resume_completed
+        previous_lookup = state.options.previous_lookup.get("W-SQLITE")
+        assert previous_lookup is not None and previous_lookup
+        sqlite_entry = next(iter(previous_lookup.values()))
+        assert sqlite_entry["classification"] == "pdf"
+        assert sqlite_entry["path"].endswith("stored.pdf")
     finally:
         factory.close_all()
         download_run.close()
-
-    assert "W-SQLITE" in state.options.resume_completed
-    previous_lookup = state.options.previous_lookup.get("W-SQLITE")
-    assert previous_lookup is not None and previous_lookup
-    sqlite_entry = next(iter(previous_lookup.values()))
-    assert sqlite_entry["classification"] == "pdf"
-    assert sqlite_entry["path"].endswith("stored.pdf")
 
 
 def test_download_run_closes_sqlite_resume_handles(tmp_path):
@@ -638,16 +698,15 @@ def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
     factory = ThreadLocalSessionFactory(requests.Session)
     try:
         state = download_run.setup_download_state(factory)
+        assert "W-CSV" in state.options.resume_completed
+        csv_lookup = state.options.previous_lookup.get("W-CSV")
+        assert csv_lookup is not None and csv_lookup
+        resume_entry = next(iter(csv_lookup.values()))
+        assert resume_entry["classification"] == "pdf"
+        assert resume_entry["path"].endswith("stored.pdf")
     finally:
         factory.close_all()
         download_run.close()
-
-    assert "W-CSV" in state.options.resume_completed
-    csv_lookup = state.options.previous_lookup.get("W-CSV")
-    assert csv_lookup is not None and csv_lookup
-    resume_entry = next(iter(csv_lookup.values()))
-    assert resume_entry["classification"] == "pdf"
-    assert resume_entry["path"].endswith("stored.pdf")
 
 
 def test_setup_download_state_accepts_explicit_csv_resume(tmp_path):
@@ -741,16 +800,15 @@ def test_setup_download_state_accepts_explicit_csv_resume(tmp_path):
     factory = ThreadLocalSessionFactory(requests.Session)
     try:
         state = download_run.setup_download_state(factory)
+        assert "W-CSV" in state.options.resume_completed
+        previous_lookup = state.options.previous_lookup.get("W-CSV")
+        assert previous_lookup is not None and previous_lookup
+        resume_entry = next(iter(previous_lookup.values()))
+        assert resume_entry["classification"] == "pdf"
+        assert resume_entry["path"].endswith("stored.pdf")
     finally:
         factory.close_all()
         download_run.close()
-
-    assert "W-CSV" in state.options.resume_completed
-    previous_lookup = state.options.previous_lookup.get("W-CSV")
-    assert previous_lookup is not None and previous_lookup
-    resume_entry = next(iter(previous_lookup.values()))
-    assert resume_entry["classification"] == "pdf"
-    assert resume_entry["path"].endswith("stored.pdf")
 
 
 def test_setup_download_state_prefers_adjacent_sqlite_for_external_csv(tmp_path):
@@ -844,16 +902,15 @@ def test_setup_download_state_prefers_adjacent_sqlite_for_external_csv(tmp_path)
     factory = ThreadLocalSessionFactory(requests.Session)
     try:
         state = download_run.setup_download_state(factory)
+        assert "W-EXTERNAL" in state.options.resume_completed
+        previous_lookup = state.options.previous_lookup.get("W-EXTERNAL")
+        assert previous_lookup is not None and previous_lookup
+        resume_entry = next(iter(previous_lookup.values()))
+        assert resume_entry["classification"] == "pdf"
+        assert resume_entry["path"].endswith("external.pdf")
     finally:
         factory.close_all()
         download_run.close()
-
-    assert "W-EXTERNAL" in state.options.resume_completed
-    previous_lookup = state.options.previous_lookup.get("W-EXTERNAL")
-    assert previous_lookup is not None and previous_lookup
-    resume_entry = next(iter(previous_lookup.values()))
-    assert resume_entry["classification"] == "pdf"
-    assert resume_entry["path"].endswith("external.pdf")
 
 
 def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, monkeypatch):
@@ -909,6 +966,8 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, m
         concurrency_product=1,
         extract_html_text=False,
         verify_cache_digest=False,
+        openalex_retry_attempts=args.openalex_retry_attempts,
+        openalex_retry_backoff=args.openalex_retry_backoff,
     )
 
     bootstrap_run_environment(resolved)

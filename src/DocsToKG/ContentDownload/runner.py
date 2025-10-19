@@ -8,6 +8,8 @@ import logging
 import sqlite3
 import threading
 import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -243,6 +245,8 @@ class DownloadRun:
             self.resolved.query,
             per_page=self.args.per_page,
             max_results=self.args.max,
+            retry_attempts=self.resolved.openalex_retry_attempts,
+            retry_backoff=self.resolved.openalex_retry_backoff,
         )
         provider = OpenAlexWorkProvider(
             query=self.resolved.query,
@@ -642,15 +646,84 @@ class DownloadRun:
 
 
 def iterate_openalex(
-    query: Works, per_page: int, max_results: Optional[int]
+    query: Works,
+    per_page: int,
+    max_results: Optional[int],
+    *,
+    retry_attempts: int = 3,
+    retry_backoff: float = 1.0,
 ) -> Iterable[Dict[str, Any]]:
-    """Iterate over OpenAlex works respecting pagination and limits."""
+    """Iterate over OpenAlex works respecting pagination, limits, and retry policy."""
+
+    def _retry_after_seconds(exc: Exception) -> Optional[float]:
+        response = getattr(exc, "response", None)
+        if response is None:
+            return None
+        try:
+            header_value = response.headers.get("Retry-After")
+        except Exception:
+            return None
+        if not header_value:
+            return None
+        text = str(header_value).strip()
+        if not text:
+            return None
+        try:
+            seconds = float(text)
+        except (TypeError, ValueError):
+            try:
+                retry_dt = parsedate_to_datetime(text)
+            except (TypeError, ValueError, OverflowError):
+                return None
+            if retry_dt is None:
+                return None
+            if retry_dt.tzinfo is None:
+                retry_dt = retry_dt.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            seconds = (retry_dt - now).total_seconds()
+        return max(0.0, float(seconds))
+
+    max_retries = max(0, int(retry_attempts))
+    base_backoff = max(0.0, float(retry_backoff))
 
     pager = query.paginate(
         per_page=per_page, n_max=max_results if max_results is not None else None
     )
+    pager_iter = iter(pager)
     retrieved = 0
-    for page in pager:
+
+    while True:
+        attempt = 0
+        while True:
+            try:
+                page = next(pager_iter)
+            except StopIteration:
+                return
+            except (requests.HTTPError, requests.RequestException) as exc:
+                if attempt >= max_retries:
+                    LOGGER.error(
+                        "OpenAlex pagination failed with no retries remaining (allowed=%s).",
+                        max_retries,
+                        exc_info=True,
+                    )
+                    raise
+                attempt += 1
+                retry_after = _retry_after_seconds(exc)
+                exponential = base_backoff * (2 ** (attempt - 1)) if base_backoff else 0.0
+                delay = max(retry_after or 0.0, exponential)
+                LOGGER.warning(
+                    "OpenAlex pagination error (%s/%s retries): %s. Retrying in %.2fs.",
+                    attempt,
+                    max_retries,
+                    exc,
+                    delay,
+                )
+                if delay > 0:
+                    time.sleep(delay)
+                continue
+            else:
+                break
+
         for work in page:
             yield work
             retrieved += 1
