@@ -20,27 +20,41 @@ Scope boundary: Ingests chunked documents, maintains FAISS/OpenSearch-style inde
 ---
 
 ## Quickstart
-> Bootstrap environment, then ingest a toy dataset and issue a hybrid search.
+> Bootstrap a virtualenv, ensure a CUDA-enabled `faiss-gpu` build is available, then run the bundled demo harness to ingest a toy dataset and execute a hybrid search.
+>
+> Requirements:
+> - NVIDIA GPU with drivers exposed to the runtime and CUDA-enabled `faiss-gpu` installed into the virtualenv.
+> - The repo’s sample dataset at `tests/data/hybrid_dataset.jsonl` (installed by default).
+
 ```bash
 ./scripts/bootstrap_env.sh
-direnv allow                     # or source .venv/bin/activate
-direnv exec . python examples/hybrid_search/ingest.py  # TODO: confirm script path
-direnv exec . python examples/hybrid_search/query.py "hybrid search"
+source .venv/bin/activate        # or run `direnv allow` if you use direnv
+
+# Ingest + search: writes tmp/hybrid_quickstart.config.json on first run
+python examples/hybrid_search_quickstart.py
 ```
+
+Expected output includes an ingestion summary similar to:
+
+```
+[hybrid-quickstart] wrote default config -> tmp/hybrid_quickstart.config.json
+[hybrid-quickstart] Ingested 3 chunks from 3 documents across namespaces: ['research', 'support']
+[hybrid-quickstart] Top result doc_id=doc-1 (fused score=...)
+  01. doc_id=doc-1 ...
+```
+
+The harness accepts `--query`, `--namespace`, `--page-size`, and `--no-diversify` flags for ad-hoc searches against the in-memory stack.
 
 ## Common commands
 ```bash
-# Discover just tasks (if present)
-just --list
+# Re-run the quickstart search with a different query/namespace
+python examples/hybrid_search_quickstart.py --query "snapshot restore runbook" --namespace support
 
-# Typical workflows (TODO replace placeholders)
-just hybrid.ingest
-just hybrid.search
-just hybrid.tests
+# Inspect more candidates without diversification
+python examples/hybrid_search_quickstart.py --page-size 5 --no-diversify
 
-# Fallback Python entry points
-direnv exec . python -m DocsToKG.HybridSearch.devtools.ingest --config configs/hybrid-search.yaml
-direnv exec . python -m DocsToKG.HybridSearch.service --serve   # TODO: confirm service CLI
+# Hybrid search regression (requires CUDA faiss + GPU)
+pytest tests/hybrid_search/test_suite.py::test_hybrid_retrieval_end_to_end -q
 ```
 
 ## Folder map
