@@ -697,41 +697,43 @@ class StreamingDownloader(pooch.HTTPDownloader):
         """
 
         try:
-            request_context = self._request_with_redirect_audit(
+            with self._request_with_redirect_audit(
                 session=session,
                 method="HEAD",
                 url=url,
                 headers=self.custom_headers,
                 timeout=self.http_config.timeout_sec,
                 stream=False,
-            )
+            ) as response:
+                if response.status_code >= 400:
+                    self.logger.debug(
+                        "HEAD request failed, proceeding with GET",
+                        extra={
+                            "stage": "download",
+                            "method": "HEAD",
+                            "status_code": response.status_code,
+                            "url": url,
+                        },
+                    )
+                    return None, None
+
+                content_type = response.headers.get("Content-Type")
+                content_length_header = response.headers.get("Content-Length")
+                content_length = None
+                if content_length_header:
+                    try:
+                        content_length = int(content_length_header)
+                    except (TypeError, ValueError):
+                        # Invalid Content-Length header, ignore it
+                        content_length = None
+
+                return content_type, content_length
         except requests.RequestException as exc:
             self.logger.debug(
                 "HEAD request exception, proceeding with GET",
                 extra={"stage": "download", "error": str(exc), "url": url},
             )
             return None, None
-
-        try:
-            if response.status_code >= 400:
-                self.logger.debug(
-                    "HEAD request failed, proceeding with GET",
-                    extra={
-                        "stage": "download",
-                        "method": "HEAD",
-                        "status_code": response.status_code,
-                        "url": url,
-                    },
-                )
-                return None, None
-
-            content_type = response.headers.get("Content-Type")
-            content_length_header = response.headers.get("Content-Length")
-            content_length = int(content_length_header) if content_length_header else None
-
-            return content_type, content_length
-        finally:
-            response.close()
 
     def _validate_media_type(
         self,
@@ -891,8 +893,12 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 if self.bucket is not None:
                     self.bucket.consume()
 
-                with session.get(
-                    url,
+                request_timeout = self.http_config.timeout_sec
+
+                with self._request_with_redirect_audit(
+                    session=session,
+                    method="GET",
+                    url=url,
                     headers=request_headers,
                     timeout=request_timeout,
                     stream=True,
