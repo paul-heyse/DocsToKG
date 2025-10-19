@@ -417,6 +417,7 @@ from DocsToKG.DocParsing.core import (
     compute_stable_shard,
     derive_doc_id_and_vectors_path,
     iter_chunks,
+    should_skip_output,
 )
 from DocsToKG.DocParsing.env import (
     data_chunks,
@@ -2600,11 +2601,19 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         for chunk_entry in chunk_entries:
             chunk_file = chunk_entry.resolved_path
             doc_id, out_path = derive_doc_id_and_vectors_path(chunk_entry, chunks_dir, args.out_dir)
-            input_hash = ""
-            if resume_needs_hash:
-                input_hash = compute_content_hash(chunk_file)
-            if resume_needs_hash:
-                skip_file, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+            manifest_entry = resume_controller.entry(doc_id) if resume_controller.resume else None
+            vectors_exist = out_path.exists()
+            has_manifest_entry = manifest_entry is not None
+            should_hash = resume_needs_hash and has_manifest_entry and vectors_exist
+            input_hash = compute_content_hash(chunk_file) if should_hash else ""
+            if resume_controller.resume:
+                skip_file = should_skip_output(
+                    out_path,
+                    manifest_entry,
+                    input_hash,
+                    resume_controller.resume,
+                    resume_controller.force,
+                )
             else:
                 skip_file = False
             if skip_file:
