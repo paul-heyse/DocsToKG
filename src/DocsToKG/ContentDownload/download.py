@@ -1103,6 +1103,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                         classification_hint,
                         ctx,
                         resume_supported=bool(resume_bytes_offset),
+                        preserve_partial=True,
                     )
                     seen_attempts = ctx.stream_retry_attempts
                     if seen_attempts < 1:
@@ -1793,6 +1794,7 @@ def cleanup_sidecar_files(
     options: Union[DownloadConfig, DownloadOptions, DownloadContext],
     *,
     resume_supported: bool = False,
+    preserve_partial: bool = False,
 ) -> None:
     """Remove temporary sidecar files for the given artifact classification.
 
@@ -1818,7 +1820,10 @@ def cleanup_sidecar_files(
     if isinstance(extra, Mapping):
         resume_disabled = bool(extra.get("resume_disabled"))
 
-    if resume_supported and resume_requested and not resume_disabled:
+    preserve_part = preserve_partial or (
+        resume_supported and resume_requested and not resume_disabled
+    )
+    if preserve_part:
         # Preserve partial files so a follow-up Range request can continue.
         return
 

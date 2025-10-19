@@ -210,7 +210,11 @@ if [[ -f "$REQ_FILE" ]] && grep -Eq '^-e[[:space:]]+\.' "$REQ_FILE"; then
   echo "[bootstrap] Editable install done via $(basename "$REQ_FILE"); skipping duplicate"
 else
   echo "[bootstrap] Installing DocsToKG in editable mode"
-  "$VENV_PATH/bin/pip" install "${PIP_ARGS[@]}" -e .
+  CMD=( "$VENV_PATH/bin/pip" install -e . )
+  if [[ ${#PIP_ARGS[@]} -gt 0 ]]; then
+    CMD+=( "${PIP_ARGS[@]}" )
+  fi
+  "${CMD[@]}"
 fi
 
 ###############################################

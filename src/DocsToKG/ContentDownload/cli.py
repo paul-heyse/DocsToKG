@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Optional, Sequence
 
+import requests
+
 from DocsToKG.ContentDownload import pipeline as resolvers
 from DocsToKG.ContentDownload.args import (
     bootstrap_run_environment,
@@ -101,8 +103,8 @@ __all__ = (
     "resolve_topic_id_if_needed",
     "slugify",
     "DownloadConfig",
-"DownloadOptions",
-"oa_config",
+    "DownloadOptions",
+    "oa_config",
 )
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
