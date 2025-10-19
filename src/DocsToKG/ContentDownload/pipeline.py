@@ -350,6 +350,7 @@ class ResolverConfig:
         resolver_toggles: Mapping toggling individual resolvers on/off.
         max_attempts_per_work: Maximum number of resolver attempts per work item.
         timeout: Default HTTP timeout applied to resolvers.
+        retry_after_cap: Ceiling (seconds) applied to ``Retry-After`` hints when retrying HTTP calls.
         sleep_jitter: Random jitter added between retries.
         polite_headers: HTTP headers to apply for polite crawling.
         unpaywall_email: Contact email registered with Unpaywall.
@@ -390,6 +391,7 @@ class ResolverConfig:
     )
     max_attempts_per_work: int = 25
     timeout: float = 30.0
+    retry_after_cap: float = 120.0
     sleep_jitter: float = 0.35
     polite_headers: Dict[str, str] = field(default_factory=dict)
     unpaywall_email: Optional[str] = None
@@ -641,6 +643,7 @@ def apply_config_overrides(
         "resolver_toggles",
         "max_attempts_per_work",
         "timeout",
+        "retry_after_cap",
         "sleep_jitter",
         "polite_headers",
         "unpaywall_email",
@@ -715,6 +718,8 @@ def load_resolver_config(
         config.max_attempts_per_work = args.max_resolver_attempts
     if getattr(args, "resolver_timeout", None):
         config.timeout = args.resolver_timeout
+    if getattr(args, "retry_after_cap", None):
+        config.retry_after_cap = float(args.retry_after_cap)
     if hasattr(args, "concurrent_resolvers") and args.concurrent_resolvers is not None:
         config.max_concurrent_resolvers = args.concurrent_resolvers
     if hasattr(args, "max_concurrent_per_host") and args.max_concurrent_per_host is not None:
@@ -751,6 +756,9 @@ def load_resolver_config(
         for domain, spec in args.domain_token_bucket:
             bucket_map[domain] = dict(spec)
         config.domain_token_buckets = bucket_map
+
+    if config.retry_after_cap <= 0:
+        raise ValueError("retry_after_cap must be positive")
 
     headers = dict(config.polite_headers)
     existing_mailto = headers.get("mailto")

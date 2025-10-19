@@ -119,6 +119,10 @@ Compute a content hash for ``path`` using the requested algorithm.
 
 Load the latest manifest entries for a specific pipeline stage.
 
-### `iter_manifest_entries(stages, root)`
+### `iter_manifest_entries(stages, root, *, limit=None)`
 
 Yield manifest entries for the requested ``stages`` sorted by timestamp.
+
+When ``limit`` is provided the reader only loads the newest ``limit`` rows from
+each manifest file using bounded tail windows, which avoids scanning the full
+history for tail-only inspections.

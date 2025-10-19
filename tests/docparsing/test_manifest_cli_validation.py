@@ -93,7 +93,12 @@ def test_manifest_accepts_known_stage(monkeypatch, tmp_path) -> None:
     captured: dict[str, object] = {}
     call_count = {"value": 0}
 
-    def fake_iter_manifest_entries(stages, data_root: Path):
+    def fake_iter_manifest_entries(
+        stages,
+        data_root: Path,
+        *,
+        limit=None,
+    ):
         call_count["value"] += 1
         captured["stages"] = list(stages)
         captured["data_root"] = data_root
@@ -129,7 +134,12 @@ def test_manifest_aliases_chunk_and_embed(monkeypatch, tmp_path) -> None:
 
     observed: list[tuple[list[str], Path]] = []
 
-    def fake_iter_manifest_entries(stages, data_root: Path):
+    def fake_iter_manifest_entries(
+        stages,
+        data_root: Path,
+        *,
+        limit=None,
+    ):
         observed.append((list(stages), data_root))
         return iter(())
 
@@ -162,7 +172,12 @@ def test_manifest_accepts_discovered_stage(monkeypatch, tmp_path) -> None:
 
     captured: dict[str, object] = {}
 
-    def fake_iter_manifest_entries(stages, data_root: Path):
+    def fake_iter_manifest_entries(
+        stages,
+        data_root: Path,
+        *,
+        limit=None,
+    ):
         captured["stages"] = list(stages)
         captured["data_root"] = data_root
         return iter(())

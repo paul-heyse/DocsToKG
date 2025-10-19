@@ -83,7 +83,10 @@ def test_request_with_retries_backoff_sequence(status_codes: List[int]) -> None:
     session.request.side_effect = responses
 
     with (
-        patch("DocsToKG.ContentDownload.networking.random.random", return_value=0.0),
+        patch(
+            "DocsToKG.ContentDownload.networking.random.uniform",
+            side_effect=lambda a, b: a,
+        ),
         patch("DocsToKG.ContentDownload.networking.time.sleep") as mock_sleep,
     ):
         result = request_with_retries(
@@ -96,7 +99,7 @@ def test_request_with_retries_backoff_sequence(status_codes: List[int]) -> None:
         )
 
     assert result.status_code == 200
-    expected_delays = [0.2 * (2**idx) for idx in range(len(status_codes))]
+    expected_delays = [0.2 * (2**idx) / 2 for idx in range(len(status_codes))]
     observed_delays = [entry.args[0] for entry in mock_sleep.call_args_list]
     assert observed_delays == expected_delays
 

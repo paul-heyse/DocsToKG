@@ -332,6 +332,7 @@ class ApiResolverBase(RegisteredResolver, register=False):
                 json=json,
                 headers=request_headers,
                 timeout=timeout_value,
+                retry_after_cap=config.retry_after_cap,
                 **kwargs,
             )
         except _requests.Timeout as exc:
@@ -503,6 +504,7 @@ def _fetch_semantic_scholar_data(
         params={"fields": "title,openAccessPdf"},
         timeout=config.get_timeout("semantic_scholar"),
         headers=headers,
+        retry_after_cap=config.retry_after_cap,
     )
     try:
         if response.status_code != 200:
@@ -533,6 +535,7 @@ def _fetch_unpaywall_data(
         params=params,
         timeout=config.get_timeout("unpaywall"),
         headers=headers,
+        retry_after_cap=config.retry_after_cap,
     )
     try:
         if response.status_code != 200:

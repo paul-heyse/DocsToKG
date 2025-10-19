@@ -2508,6 +2508,46 @@ def cosine_batch(
     )
 
 
+def _build_distance_params(
+    *,
+    use_fp16: bool,
+    cuvs_enabled: bool,
+) -> Optional[object]:
+    """Construct a ``GpuDistanceParams`` instance when half precision is requested."""
+
+    if not use_fp16:
+        return None
+
+    params_factory = getattr(faiss, "GpuDistanceParams", None)
+    if params_factory is None:
+        return None
+
+    try:
+        params = params_factory()
+    except Exception:
+        return None
+
+    try:
+        dtype_constant = getattr(faiss, "DistanceDataType_F16", None)
+    except Exception:  # pragma: no cover - defensive guard for unexpected faiss builds
+        dtype_constant = None
+
+    if dtype_constant is not None:
+        try:
+            params.xType = dtype_constant
+            params.yType = dtype_constant
+        except Exception:
+            pass
+
+    if hasattr(params, "use_cuvs"):
+        try:
+            params.use_cuvs = bool(cuvs_enabled)
+        except Exception:
+            pass
+
+    return params
+
+
 def cosine_topk_blockwise(
     q: np.ndarray,
     C: np.ndarray,
@@ -2568,41 +2608,70 @@ def cosine_topk_blockwise(
     faiss.normalize_L2(q)
     q_view = q.astype(np.float16, copy=False) if use_fp16 else q
 
-    if not use_fp16:
-        knn_runner = getattr(faiss, "knn_gpu", None)
-        if knn_runner is not None:
-            try:
-                corpus_copy = np.array(C, dtype=np.float32, copy=True, order="C")
-                faiss.normalize_L2(corpus_copy)
-                row_bytes = np.dtype(np.float32).itemsize * C.shape[1]
-                vector_limit = int(block_rows) * row_bytes
-                query_rows = max(int(block_rows), q.shape[0])
-                query_limit = query_rows * np.dtype(np.float32).itemsize * q.shape[1]
-                cuvs_enabled, _, _ = resolve_cuvs_state(use_cuvs)
-                extra_kwargs: dict[str, object] = {}
-                if cuvs_enabled or use_cuvs is not None:
-                    extra_kwargs["use_cuvs"] = cuvs_enabled
-                distances, indices = knn_runner(
-                    resources,
-                    q_view,
-                    corpus_copy,
-                    k,
-                    metric=faiss.METRIC_INNER_PRODUCT,
-                    device=int(device),
-                    vectorsMemoryLimit=vector_limit,
-                    queriesMemoryLimit=query_limit,
-                    **extra_kwargs,
-                )
-            except TypeError:
-                distances = indices = None
-            except Exception:
-                distances = indices = None
-            else:
-                if distances is not None and indices is not None:
-                    return (
-                        np.asarray(distances, dtype=np.float32),
-                        np.asarray(indices, dtype=np.int64),
+    cuvs_enabled, _, _ = resolve_cuvs_state(use_cuvs)
+    distance_params = _build_distance_params(
+        use_fp16=use_fp16,
+        cuvs_enabled=cuvs_enabled,
+    )
+
+    knn_runner = getattr(faiss, "knn_gpu", None)
+    if knn_runner is not None:
+        try:
+            corpus_copy = np.array(C, dtype=np.float32, copy=True, order="C")
+            faiss.normalize_L2(corpus_copy)
+            corpus_view = (
+                corpus_copy.astype(np.float16, copy=False)
+                if use_fp16
+                else corpus_copy
+            )
+            row_bytes = np.dtype(np.float32).itemsize * C.shape[1]
+            vector_limit = int(block_rows) * row_bytes
+            query_rows = max(int(block_rows), q.shape[0])
+            query_limit = (
+                query_rows * np.dtype(np.float32).itemsize * q.shape[1]
+            )
+            extra_kwargs: dict[str, object] = {}
+            if distance_params is not None:
+                extra_kwargs["params"] = distance_params
+            elif cuvs_enabled or use_cuvs is not None:
+                extra_kwargs["use_cuvs"] = cuvs_enabled
+            distances, indices = knn_runner(
+                resources,
+                q_view,
+                corpus_view,
+                k,
+                metric=faiss.METRIC_INNER_PRODUCT,
+                device=int(device),
+                vectorsMemoryLimit=vector_limit,
+                queriesMemoryLimit=query_limit,
+                **extra_kwargs,
+            )
+        except TypeError:
+            if extra_kwargs.pop("params", None) is not None:
+                try:
+                    distances, indices = knn_runner(
+                        resources,
+                        q_view,
+                        corpus_view,
+                        k,
+                        metric=faiss.METRIC_INNER_PRODUCT,
+                        device=int(device),
+                        vectorsMemoryLimit=vector_limit,
+                        queriesMemoryLimit=query_limit,
+                        **extra_kwargs,
                     )
+                except Exception:
+                    distances = indices = None
+            else:
+                distances = indices = None
+        except Exception:
+            distances = indices = None
+        else:
+            if distances is not None and indices is not None:
+                return (
+                    np.asarray(distances, dtype=np.float32),
+                    np.asarray(indices, dtype=np.int64),
+                )
 
     N, M = q.shape[0], C.shape[0]
     best_scores = np.full((N, k), -np.inf, dtype=np.float32)
@@ -2614,13 +2683,31 @@ def cosine_topk_blockwise(
         block = np.array(C[start:end], dtype=np.float32, copy=True)
         faiss.normalize_L2(block)
         block_view = block.astype(np.float16, copy=False) if use_fp16 else block
-        sims = faiss.pairwise_distance_gpu(
-            resources,
-            q_view,
-            block_view,
-            metric=faiss.METRIC_INNER_PRODUCT,
-            device=int(device),
-        )
+        pairwise_kwargs: dict[str, object] = {
+            "metric": faiss.METRIC_INNER_PRODUCT,
+            "device": int(device),
+        }
+        if distance_params is not None:
+            pairwise_kwargs["params"] = distance_params
+
+        try:
+            sims = faiss.pairwise_distance_gpu(
+                resources,
+                q_view,
+                block_view,
+                **pairwise_kwargs,
+            )
+        except TypeError:
+            if pairwise_kwargs.pop("params", None) is not None:
+                sims = faiss.pairwise_distance_gpu(
+                    resources,
+                    q_view,
+                    block_view,
+                    metric=faiss.METRIC_INNER_PRODUCT,
+                    device=int(device),
+                )
+            else:
+                raise
 
         block_idx = np.arange(start, end, dtype=np.int64)
         cand_scores = np.concatenate([best_scores, sims], axis=1)
