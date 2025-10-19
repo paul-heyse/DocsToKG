@@ -6,6 +6,7 @@ import logging
 import time
 from threading import Event, RLock, Thread
 from types import MethodType, SimpleNamespace
+from typing import Sequence
 
 import numpy as np
 import pytest
@@ -111,6 +112,59 @@ def test_coerce_batch_allows_opt_out_of_normalization(monkeypatch: "pytest.Monke
     np.testing.assert_array_equal(bypassed, vectors)
     norms = np.linalg.norm(bypassed, axis=1)
     assert not np.allclose(norms, np.ones_like(norms)), "Vectors should remain unnormalised"
+
+
+def test_apply_cloner_reservation_scales_per_gpu(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """Reserve vectors should scale based on GPU participation in shard mode."""
+
+    class FakeIntVector(list):
+        def push_back(self, value: int) -> None:
+            self.append(int(value))
+
+    class RecordingLogger:
+        def __init__(self) -> None:
+            self.events: list[dict[str, object] | None] = []
+
+        def info(self, _message: str, *, extra: dict[str, object] | None = None) -> None:
+            self.events.append(extra)
+
+    class RecordingCloner:
+        def __init__(self) -> None:
+            self.reserveVecs: int | None = None
+            self.eachReserveVecs: list[int] | None = None
+            self.set_calls: list[list[int]] = []
+
+        def setReserveVecs(self, values: Sequence[int]) -> None:
+            self.set_calls.append(list(int(v) for v in values))
+
+    fake_faiss = SimpleNamespace(IntVector=FakeIntVector)
+    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+
+    def make_store(mode: str, expected: int) -> FaissVectorStore:
+        store = FaissVectorStore.__new__(FaissVectorStore)
+        store._multi_gpu_mode = mode  # type: ignore[attr-defined]
+        store._expected_ntotal = expected  # type: ignore[attr-defined]
+        store._observability = SimpleNamespace(logger=RecordingLogger())  # type: ignore[attr-defined]
+        return store
+
+    replicate_store = make_store("replicate", expected=120)
+    replicate_cloner = RecordingCloner()
+    replicate_store._apply_cloner_reservation(replicate_cloner, gpu_ids=[0, 1, 2])
+    assert replicate_cloner.reserveVecs == 120
+    assert replicate_cloner.eachReserveVecs == [120, 120, 120]
+    assert replicate_cloner.set_calls == []
+
+    shard_store = make_store("shard", expected=101)
+    shard_cloner = RecordingCloner()
+    shard_store._apply_cloner_reservation(shard_cloner, gpu_ids=[0, 1, 2, 3])
+    assert shard_cloner.reserveVecs == 26
+    assert shard_cloner.eachReserveVecs == [26, 26, 26, 26]
+
+    tiny_store = make_store("shard", expected=2)
+    tiny_cloner = RecordingCloner()
+    tiny_store._apply_cloner_reservation(tiny_cloner, gpu_ids=[0, 1, 2])
+    assert tiny_cloner.reserveVecs == 1
+    assert tiny_cloner.eachReserveVecs == [1, 1, 1]
 
 
 def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> None:
