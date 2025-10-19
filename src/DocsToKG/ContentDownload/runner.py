@@ -412,10 +412,9 @@ def iterate_openalex(
 ) -> Iterable[Dict[str, Any]]:
     """Iterate over OpenAlex works respecting pagination and limits."""
 
-    if max_results == 0:
-        return
-
-    pager = query.paginate(per_page=per_page, n_max=None)
+    pager = query.paginate(
+        per_page=per_page, n_max=max_results if max_results is not None else None
+    )
     retrieved = 0
     for page in pager:
         for work in page:
