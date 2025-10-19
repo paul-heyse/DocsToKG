@@ -111,6 +111,10 @@ __all__ = [
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
 
+_RUN_EXTRA_REF_KEY = "_run_extra"
+_RANGE_RESUME_WARNING_KEY = "range_resume_warning_emitted"
+
+
 def ensure_dir(path: Path) -> None:
     """Create a directory if it does not already exist.
 
@@ -230,6 +234,7 @@ class DownloadConfig:
             "stream_retry_attempts": self.stream_retry_attempts,
             "extra": self.extra,
         }
+        payload[_RUN_EXTRA_REF_KEY] = self.extra
         if overrides:
             for key, value in overrides.items():
                 if key in {"max_bytes", "max_download_size_gb"}:
@@ -443,9 +448,23 @@ def prepare_candidate_download(
         headers["Accept"] = str(accept_value)
 
     resume_requested = bool(getattr(ctx, "enable_range_resume", False))
+    ctx_extra = getattr(ctx, "extra", {})
+    run_extra: Optional[Dict[str, Any]] = None
+    if isinstance(ctx_extra, dict):
+        candidate = ctx_extra.get(_RUN_EXTRA_REF_KEY)
+        if isinstance(candidate, dict):
+            run_extra = candidate
+        else:
+            nested = ctx_extra.get("extra")
+            if isinstance(nested, dict):
+                run_extra = nested
+    if run_extra is None and isinstance(ctx_extra, dict):
+        run_extra = ctx_extra
+
     if resume_requested:
-        ctx.extra["resume_disabled"] = True
-        if not ctx.extra.get("resume_warning_logged"):
+        if isinstance(ctx_extra, dict):
+            ctx_extra["resume_disabled"] = True
+        if isinstance(run_extra, dict) and not run_extra.get(_RANGE_RESUME_WARNING_KEY):
             LOGGER.warning(
                 "Range resume requested for %s; feature is deprecated and will be ignored.",
                 url,
@@ -457,9 +476,10 @@ def prepare_candidate_download(
                     },
                 },
             )
-            ctx.extra["resume_warning_logged"] = True
+            run_extra[_RANGE_RESUME_WARNING_KEY] = True
     else:
-        ctx.extra.pop("resume_disabled", None)
+        if isinstance(ctx_extra, dict):
+            ctx_extra.pop("resume_disabled", None)
     ctx.enable_range_resume = False
     enable_resume = False
 
