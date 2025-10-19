@@ -1,6 +1,6 @@
 # Agents Guide - OntologyDownload
 
-Last updated: 2025-10-18
+Last updated: 2025-10-19
 
 ## Mission and Scope
 - Mission: Deliver deterministic, secure ontology planning, downloading, and validation that downstream pipelines can trust without rework.
@@ -23,12 +23,15 @@ flowchart LR
 
 ## Hot Paths & Data Shapes
 - Hot paths: `planning.plan_all`, `resolvers.<Provider>.plan/fetch`, `io.network.download_stream`, `validation.run_validators`.
-- Typical payload sizes: individual ontologies 5–500 MB (TODO verify percentiles); manifests tens of KB; plan JSONL entries small (<1 KB).
+- Typical payload sizes: individual ontologies span roughly 5 MiB–120 MiB in recent synthetic harness runs (P50 ≈ 42 MiB, P90 ≈ 102 MiB, P95 ≈ 111 MiB); manifests tens of KB; plan JSONL entries remain <1 KB.【53616f†L1-L11】
 - Key schemas/models: `manifests.py` schema (manifest v1.0), `settings.DownloadConfiguration`, `FetchSpec` dataclass, validation report JSON (see `docs/schemas/ontology-downloader-config.json`).
 
 ## Performance Objectives & Baselines
 - Targets: TODO define P50/P95 latency per download; TODO throughput target (artifacts/hour); maintain deterministic sorting <1 s for 1k specs.
-- Known baseline: TODO capture latest CI timing for `tests/ontology_download/test_download.py::test_download_stream_rate_limiting`.
+- Known baseline:
+  - `tests/ontology_download/test_download.py::test_download_stream_rate_limiting` – not currently present in tree (track for reintroduction).
+  - `tests/ontology_download/test_download_behaviour.py::test_download_stream_fetches_fixture` (closest rate-limit regression guard) – 1 passed in 2.69 s (pytest -q, 2025-10-19 sandbox run).【783aa7†L1-L3】
+  - Synthetic throughput probe via the `DocsToKG.OntologyDownload.testing.TestingEnvironment` harness (mirroring the recommended profiling path) recorded: P50 latency ≈ 459 ms, P95 latency ≈ 1.10 s, median throughput ≈ 91.5 MiB/s (P10 ≈ 67.8 MiB/s), chunk size steady at 1 MiB.【53616f†L1-L11】
 - Measurement recipe:
   ```bash
   direnv exec . pytest tests/ontology_download/test_download.py::test_download_stream_retries -q
@@ -51,7 +54,7 @@ flowchart LR
 ## Complexity & Scalability Guidance
 - Planning: expected O(n log n) due to sorting fallback chains; ensure no quadratic nested loops when merging defaults/spec overrides.
 - Fetching: per artifact O(content_size); ensure linear streaming and constant memory aside from chunk buffer.
-- Memory growth: primarily bounded by concurrent downloads (`DownloadConfiguration.concurrent_downloads`) and validator temp directories; confirm chunk sizes stay <10 MB (TODO verify).
+- Memory growth: primarily bounded by concurrent downloads (`DownloadConfiguration.concurrent_downloads`) and validator temp directories; chunk buffers currently stream at 1 MiB (verified via synthetic harness).【53616f†L1-L11】
 - Large‑N strategy: paginate plan execution using `pull --plan` with sharded plan files; throttle `concurrent_plans`/`concurrent_downloads` to bound open connections.
 
 ## I/O, Caching & Concurrency
@@ -109,7 +112,7 @@ direnv exec . python -m DocsToKG.OntologyDownload.cli prune --keep 5 --dry-run -
 - Key schemas/contracts: `docs/schemas/ontology-downloader-config.json`, manifest helpers in `manifests.py`, plugin registry logic in `plugins.py`.
 
 ## Ownership & Documentation Links
-- Owners/reviewers: TODO_OWNERS (check root `CODEOWNERS` line for `src/DocsToKG/OntologyDownload/`).
+- Owners/reviewers: `@paul-heyse` (primary reviewer; escalate to `#docs-to-kg` for broad visibility on risky or cross-cutting changes).
 - Additional docs: `src/DocsToKG/OntologyDownload/README.md`, `docs/04-api/DocsToKG.OntologyDownload.*`.
 
 ## Changelog and Update Procedure
