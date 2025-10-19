@@ -847,6 +847,152 @@ def test_ingest_missing_vector_raises(
 # --- test_hybrid_search.py ---
 
 
+def test_managed_adapter_supports_ingestion_training_sample() -> None:
+    """Managed adapter should expose config/dim for ingestion helpers."""
+
+    class _StubLexicalIndex:
+        def bulk_upsert(self, chunks: Sequence[ChunkPayload]) -> None:  # pragma: no cover - stub
+            self._last_upsert = list(chunks)
+
+        def bulk_delete(self, vector_ids: Sequence[str]) -> None:  # pragma: no cover - stub
+            self._last_delete = list(vector_ids)
+
+        def search_bm25(self, *args, **kwargs):  # pragma: no cover - stub
+            return [], None
+
+        def search_splade(self, *args, **kwargs):  # pragma: no cover - stub
+            return [], None
+
+        def search_bm25_true(self, *args, **kwargs):  # pragma: no cover - stub
+            return [], None
+
+        def highlight(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:  # pragma: no cover - stub
+            return []
+
+        def stats(self):  # pragma: no cover - stub
+            return {}
+
+    class _StubFaissStore:
+        def __init__(self, *, dim: int, config: DenseIndexConfig) -> None:
+            self._dim = dim
+            self._config = config
+            self._needs_training = True
+            self.config_accesses = 0
+            self.adapter_stats = SimpleNamespace(device=0, ntotal=0)
+
+        @property
+        def config(self) -> DenseIndexConfig:
+            self.config_accesses += 1
+            return self._config
+
+        @property
+        def dim(self) -> int:
+            return self._dim
+
+        @property
+        def device(self) -> int:  # pragma: no cover - unused fallback
+            return 0
+
+        @property
+        def ntotal(self) -> int:  # pragma: no cover - unused fallback
+            return 0
+
+        def set_id_resolver(self, resolver):  # pragma: no cover - stub
+            self._resolver = resolver
+
+        def needs_training(self) -> bool:
+            return self._needs_training
+
+        def train(self, vectors: Sequence[np.ndarray]) -> None:
+            self._needs_training = False
+            self.trained = list(vectors)
+
+        def add(self, vectors, vector_ids):  # pragma: no cover - stub
+            self._last_add = (vectors, vector_ids)
+
+        def remove(self, vector_ids):  # pragma: no cover - stub
+            self._last_remove = list(vector_ids)
+
+        def search(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def search_many(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def search_batch(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def range_search(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def serialize(self) -> bytes:  # pragma: no cover - stub
+            return b""
+
+        def restore(self, payload: bytes) -> None:  # pragma: no cover - stub
+            self._last_restore = payload
+
+        def flush_snapshot(self, *, reason: str = "flush") -> None:  # pragma: no cover - stub
+            self._last_flush_reason = reason
+
+    def _make_chunk(vector_id: str, *, dim: int, value: float) -> ChunkPayload:
+        embedding = np.full((dim,), value, dtype=np.float32)
+        features = ChunkFeatures(
+            bm25_terms={"token": value},
+            splade_weights={"token": value * 2},
+            embedding=embedding,
+        )
+        return ChunkPayload(
+            doc_id="doc",
+            chunk_id=vector_id,
+            vector_id=vector_id,
+            namespace="ns",
+            text="",
+            metadata={},
+            features=features,
+            token_count=0,
+            source_chunk_idxs=(),
+            doc_items_refs=(),
+        )
+
+    dim = 3
+    dense_config = DenseIndexConfig(nlist=4, ivf_train_factor=2)
+    stub_faiss = _StubFaissStore(dim=dim, config=dense_config)
+    adapter = ManagedFaissAdapter(stub_faiss)
+    registry = ChunkRegistry()
+    observability = Observability()
+    pipeline = ChunkIngestionPipeline(
+        faiss_index=adapter,
+        opensearch=_StubLexicalIndex(),
+        registry=registry,
+        observability=observability,
+    )
+
+    existing = [_make_chunk(f"existing-{i}", dim=dim, value=float(i)) for i in range(2)]
+    registry.upsert(existing)
+    new_chunks = [_make_chunk(f"new-{i}", dim=dim, value=float(i)) for i in range(2)]
+
+    assert pipeline.faiss_index.config is dense_config
+    assert pipeline.faiss_index.dim == dim
+
+    sample = pipeline._training_sample(new_chunks)
+    assert stub_faiss.config_accesses >= 1
+    assert len(sample) == len(existing) + len(new_chunks)
+    assert all(vec.shape == (dim,) for vec in sample)
+
+    payload = {
+        "BM25": {"terms": ["token"], "weights": [0.1]},
+        "SpladeV3": {"tokens": ["token"], "weights": [0.2]},
+        "Qwen3-4B": {"vector": [0.5, 1.5, 2.5]},
+    }
+    features = pipeline._features_from_vector(payload)
+    np.testing.assert_allclose(features.embedding, np.array([0.5, 1.5, 2.5], dtype=np.float32))
+    assert features.bm25_terms == {"token": 0.1}
+    assert features.splade_weights == {"token": 0.2}
+
+
+# --- test_hybrid_search.py ---
+
+
 def test_faiss_index_uses_registry_bridge(tmp_path: Path) -> None:
     config = DenseIndexConfig(index_type="flat")
     manager = FaissVectorStore(dim=4, config=config)
