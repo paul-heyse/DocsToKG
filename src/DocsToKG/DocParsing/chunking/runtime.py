@@ -1136,7 +1136,7 @@ def _main_inner(
         resolve_attempts_path(MANIFEST_STAGE, resolved_data_root),
         resolve_manifest_path(MANIFEST_STAGE, resolved_data_root),
     )
-    stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=CHUNK_STAGE)
+    stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=MANIFEST_STAGE)
     with telemetry_scope(stage_telemetry):
         if getattr(args, "validate_only", False):
             _run_validate_only(
@@ -1244,6 +1244,7 @@ def _main_inner(
                     input_path=path,
                     reason="unchanged-input",
                     metadata={
+                        "status": "skip",
                         "input_path": str(path),
                         "input_hash": input_hash,
                         "output_path": str(out_path),
@@ -1335,6 +1336,7 @@ def _main_inner(
                 schema_version=CHUNK_SCHEMA_VERSION,
                 duration_s=duration,
                 metadata={
+                    "status": "success",
                     "input_path": str(result.input_path),
                     "input_hash": result.input_hash,
                     "chunk_count": result.chunk_count,
