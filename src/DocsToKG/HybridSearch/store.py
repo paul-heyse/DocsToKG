@@ -279,33 +279,34 @@ class _SearchCoalescer:
         return batch
 
     def _execute(self, batch: List[_PendingSearch]) -> None:
-        if not batch:
-            return
-        vectors = [self._store._ensure_dim(item.vector) for item in batch]
-        k_max = max(item.top_k for item in batch)
-        matrix = np.stack(vectors, dtype=np.float32)
-        try:
-            results = self._store._search_batch_impl(matrix, k_max)
-        except Exception as exc:
-            for pending in batch:
-                pending.set_exception(exc)
-            trailing = self._drain()
-            for pending in trailing:
-                pending.set_exception(exc)
-            raise
-        else:
-            for pending, row in zip(batch, results):
-                pending.set_result(row[: pending.top_k])
-            if self._store._observability is not None:
-                self._store._observability.metrics.observe(
-                    "faiss_coalesced_batch_size", float(len(batch))
+        while batch:
+            vectors = [self._store._ensure_dim(item.vector) for item in batch]
+            k_max = max(item.top_k for item in batch)
+            matrix = np.stack(vectors, dtype=np.float32)
+            try:
+                results = self._store._search_batch_impl(matrix, k_max)
+            except Exception as exc:
+                while True:
+                    for pending in batch:
+                        pending.set_exception(exc)
+                    batch = self._drain()
+                    if not batch:
+                        break
+                raise
+            else:
+                for pending, row in zip(batch, results):
+                    pending.set_result(row[: pending.top_k])
+                if self._store._observability is not None:
+                    self._store._observability.metrics.observe(
+                        "faiss_coalesced_batch_size", float(len(batch))
+                    )
+                rate = (
+                    0.0
+                    if len(batch) <= 1
+                    else float(len(batch) - 1) / float(len(batch))
                 )
-            rate = 0.0 if len(batch) <= 1 else float(len(batch) - 1) / float(len(batch))
-            self._metrics.set_gauge("faiss_coalescer_hit_rate", rate)
-            # If additional requests arrived while executing, process them next.
-            trailing = self._drain()
-            if trailing:
-                self._execute(trailing)
+                self._metrics.set_gauge("faiss_coalescer_hit_rate", rate)
+                batch = self._drain()
 
 
 class FaissVectorStore(DenseVectorStore):
