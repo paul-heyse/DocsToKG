@@ -1786,6 +1786,8 @@ class FaissVectorStore(DenseVectorStore):
         try:
             if hasattr(faiss, "GpuParameterSpace"):
                 gps = faiss.GpuParameterSpace()
+                if hasattr(gps, "initialize"):
+                    gps.initialize(index)
                 gps.set_index_parameter(index, "nprobe", nprobe)
                 self._log_index_configuration(index)
                 return
