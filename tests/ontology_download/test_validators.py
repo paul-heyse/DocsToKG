@@ -157,7 +157,9 @@ import hashlib
 import json
 import logging
 import os
+import platform
 import shutil
+import signal
 import sys
 import threading
 import time
@@ -595,6 +597,33 @@ def test_validate_owlready2_memory_error(owl_file, tmp_path, config):
     assert not result.ok
     payload = json.loads((request.validation_dir / "owlready2_parse.json").read_text())
     assert "memory exceeded" in payload["error"].lower()
+
+
+@pytest.mark.skipif(platform.system() not in {"Linux", "Darwin"}, reason="SIGALRM unavailable")
+def test_run_with_timeout_restores_sigalrm_handler():
+    validation_mod._run_with_timeout(lambda: None, timeout_sec=1)
+
+    handler_called = False
+
+    def _custom_handler(_signum, _frame):
+        nonlocal handler_called
+        handler_called = True
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    try:
+        signal.signal(signal.SIGALRM, _custom_handler)
+
+        def _trigger_alarm():
+            signal.raise_signal(signal.SIGALRM)
+
+        with pytest.raises(validation_mod.ValidationTimeout):
+            validation_mod._run_with_timeout(_trigger_alarm, timeout_sec=1)
+
+        handler_called = False
+        signal.raise_signal(signal.SIGALRM)
+        assert handler_called is True
+    finally:
+        signal.signal(signal.SIGALRM, previous_handler)
 
 
 # --- Helper Functions ---

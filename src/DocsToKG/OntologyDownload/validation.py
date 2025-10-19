@@ -609,12 +609,14 @@ def _run_with_timeout(func, timeout_sec: int) -> None:
             """
             raise ValidationTimeout()  # pragma: no cover - bridges to outer scope
 
+        previous_handler = signal.getsignal(signal.SIGALRM)
         signal.signal(signal.SIGALRM, _handler)
         signal.alarm(timeout_sec)
         try:
             func()
         finally:
             signal.alarm(0)
+            signal.signal(signal.SIGALRM, previous_handler)
     else:  # Windows
         with ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(func)
