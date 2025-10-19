@@ -962,29 +962,57 @@ def test_iter_jsonl_batches(tmp_path: Path) -> None:
         list(doc_io.iter_jsonl_batches([file_one], batch_size=0))
 
 
-def test_make_hasher_invalid_env_fallback(caplog: pytest.LogCaptureFixture) -> None:
-    os.environ["DOCSTOKG_HASH_ALG"] = "sha-1"
+def test_make_hasher_invalid_env_fallback(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    doc_io._clear_hash_algorithm_cache()
+    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha-1")
     with caplog.at_level("WARNING"):
         hasher = doc_io.make_hasher()
     assert hasher.name == "sha256"
     assert "Unknown hash algorithm 'sha-1'" in caplog.text
     assert "falling back to sha256" in caplog.text.lower()
+    doc_io._clear_hash_algorithm_cache()
 
 
-def test_make_hasher_prefers_explicit_algorithm(caplog: pytest.LogCaptureFixture) -> None:
-    os.environ["DOCSTOKG_HASH_ALG"] = "sha-1"
+def test_make_hasher_prefers_explicit_algorithm(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    doc_io._clear_hash_algorithm_cache()
+    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha-1")
     with caplog.at_level("WARNING"):
         hasher = doc_io.make_hasher(name="sha256")
     assert hasher.name == "sha256"
     # Warning emitted for env override but no fallback message because explicit value is valid
     assert "Unknown hash algorithm 'sha-1'" in caplog.text
+    doc_io._clear_hash_algorithm_cache()
 
 
-def test_resolve_hash_algorithm_defaults() -> None:
-    os.environ.pop("DOCSTOKG_HASH_ALG", None)
+def test_resolve_hash_algorithm_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    doc_io._clear_hash_algorithm_cache()
+    monkeypatch.delenv("DOCSTOKG_HASH_ALG", raising=False)
     assert doc_io.resolve_hash_algorithm() == "sha256"
-    os.environ["DOCSTOKG_HASH_ALG"] = "sha256"
+    doc_io._clear_hash_algorithm_cache()
+    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha256")
     assert doc_io.resolve_hash_algorithm() == "sha256"
+    doc_io._clear_hash_algorithm_cache()
+
+
+def test_resolve_hash_algorithm_invalid_env_warns_once(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    doc_io._clear_hash_algorithm_cache()
+    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha-1")
+    with caplog.at_level("WARNING"):
+        first = doc_io.resolve_hash_algorithm()
+        second = doc_io.resolve_hash_algorithm()
+    assert first == second == "sha256"
+    unknown_warnings = [
+        record for record in caplog.records if "Unknown hash algorithm" in record.message
+    ]
+    assert len(unknown_warnings) == 1
+    assert len(caplog.records) == len(unknown_warnings)
+    doc_io._clear_hash_algorithm_cache()
 
 
 def test_batcher() -> None:
