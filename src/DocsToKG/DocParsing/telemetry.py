@@ -70,7 +70,7 @@ class TelemetrySink:
         """Append ``payload`` to ``path`` under a file lock."""
 
         with _acquire_lock_for(path):
-            jsonl_append_iter(path, [payload])
+            jsonl_append_iter(path, [payload], atomic=True)
 
     def write_attempt(self, attempt: Attempt) -> None:
         """Append ``attempt`` to the attempts log."""
