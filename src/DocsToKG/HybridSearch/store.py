@@ -1641,6 +1641,7 @@ class FaissVectorStore(DenseVectorStore):
         if array.ndim != 2 or array.shape[1] != self._dim:
             raise ValueError(f"bad batch shape {array.shape}, expected (*,{self._dim})")
         array = np.ascontiguousarray(array, dtype=np.float32)
+        array = array.copy()
         normalize_rows(array)
         return array
 
