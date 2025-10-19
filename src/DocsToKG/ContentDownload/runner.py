@@ -144,7 +144,11 @@ class DownloadRun:
 
         sinks: List[AttemptSink] = []
         manifest_path = self.resolved.manifest_path
-        log_format = getattr(self.args, "log_format", "jsonl")
+        log_format = getattr(self.args, "log_format", None)
+        if isinstance(log_format, str):
+            log_format = log_format.lower()
+        else:
+            log_format = "jsonl"
 
         if log_format == "jsonl":
             if self.args.log_rotate:
