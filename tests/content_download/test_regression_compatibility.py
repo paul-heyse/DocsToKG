@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
+import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Dict, List
@@ -45,7 +46,10 @@ import pytest
 
 from DocsToKG.ContentDownload import cli as downloader
 from DocsToKG.ContentDownload import pipeline as resolvers
-from DocsToKG.ContentDownload.telemetry import build_manifest_entry
+from DocsToKG.ContentDownload.telemetry import (
+    MANIFEST_SCHEMA_VERSION,
+    build_manifest_entry,
+)
 
 # --- Test Cases ---
 
@@ -192,6 +196,94 @@ def test_load_previous_manifest_missing_file(tmp_path: Path) -> None:
     message = str(excinfo.value)
     assert str(manifest_path) in message
     assert "--resume-from" in message
+
+
+def test_load_previous_manifest_uses_sqlite_fallback(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "resume.jsonl"
+    sqlite_path = tmp_path / "resume.sqlite3"
+    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(sqlite_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE manifests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                run_id TEXT,
+                schema_version INTEGER,
+                work_id TEXT,
+                title TEXT,
+                publication_year INTEGER,
+                resolver TEXT,
+                url TEXT,
+                normalized_url TEXT,
+                path TEXT,
+                path_mtime_ns INTEGER,
+                classification TEXT,
+                content_type TEXT,
+                reason TEXT,
+                reason_detail TEXT,
+                html_paths TEXT,
+                sha256 TEXT,
+                content_length INTEGER,
+                etag TEXT,
+                last_modified TEXT,
+                extracted_text_path TEXT,
+                dry_run INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO manifests (
+                timestamp, run_id, schema_version, work_id, title, publication_year,
+                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                content_type, reason, reason_detail, html_paths, sha256,
+                content_length, etag, last_modified, extracted_text_path, dry_run
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "2025-01-02T00:00:00Z",
+                "resume-run",
+                MANIFEST_SCHEMA_VERSION,
+                "W-SQLITE",
+                "SQLite Resume",
+                2024,
+                "openalex",
+                "https://example.org/W-SQLITE.pdf",
+                "https://example.org/w-sqlite.pdf",
+                "/data/stored.pdf",
+                None,
+                "pdf",
+                "application/pdf",
+                None,
+                None,
+                None,
+                "deadbeef",
+                2048,
+                None,
+                None,
+                None,
+                0,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    per_work, completed = downloader.load_previous_manifest(
+        manifest_path,
+        sqlite_path=sqlite_path,
+        allow_sqlite_fallback=True,
+    )
+
+    assert "W-SQLITE" in completed
+    resume_entry = per_work.get("W-SQLITE")
+    assert resume_entry is not None and resume_entry
+    first_entry = next(iter(resume_entry.values()))
+    assert first_entry["classification"] == "pdf"
+    assert first_entry["path"] == "/data/stored.pdf"
 
 
 def test_load_resolver_config_rejects_legacy_rate_limits(tmp_path: Path):

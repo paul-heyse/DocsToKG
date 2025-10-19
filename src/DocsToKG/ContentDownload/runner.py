@@ -9,6 +9,7 @@ import sqlite3
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -244,14 +245,30 @@ class DownloadRun:
     ) -> DownloadRunState:
         """Initialise download options and counters for the run."""
 
+        resume_lookup: Dict[str, Dict[str, Any]]
+        resume_completed: Set[str]
         resume_path_raw = self.args.resume_from
-        resume_path = Path(resume_path_raw) if resume_path_raw is not None else None
-        if resume_path is None:
+        sqlite_path = self.resolved.sqlite_path
+        if resume_path_raw is not None:
+            resume_path = Path(resume_path_raw)
+            resume_lookup, resume_completed = self._load_resume_state(resume_path)
+        else:
             manifest_path = self.resolved.manifest_path
             if manifest_path.exists():
-                resume_path = manifest_path
-
-        resume_lookup, resume_completed = self._load_resume_state(resume_path)
+                resume_lookup, resume_completed = self._load_resume_state(manifest_path)
+            elif sqlite_path and sqlite_path.exists():
+                LOGGER.warning(
+                    "Resume manifest %s is missing; loading resume metadata from SQLite %s.",
+                    manifest_path,
+                    sqlite_path,
+                )
+                resume_lookup, resume_completed = load_previous_manifest(
+                    manifest_path,
+                    sqlite_path=sqlite_path,
+                    allow_sqlite_fallback=True,
+                )
+            else:
+                resume_lookup, resume_completed = {}, set()
         options = DownloadConfig(
             dry_run=self.args.dry_run,
             list_only=self.args.list_only,
@@ -278,147 +295,32 @@ class DownloadRun:
         return state
 
     def _load_resume_state(
-        self, resume_path: Optional[Path]
+        self, resume_path: Path
     ) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
-        """Load resume metadata from JSONL or fall back to SQLite manifests."""
+        """Load resume metadata from JSON manifests with SQLite fallback."""
 
-        try:
-            return load_previous_manifest(resume_path)
-        except ValueError as exc:
-            if resume_path is None:
-                raise
-            if resume_path.exists():
-                raise
-            sqlite_path = self.resolved.sqlite_path
-            if sqlite_path and sqlite_path.exists():
-                LOGGER.warning(
-                    "Resume manifest %s not found; falling back to SQLite state %s.",
-                    resume_path,
-                    sqlite_path,
-                )
-                return self._load_resume_from_sqlite(sqlite_path)
-            raise exc
+        sqlite_path = self.resolved.sqlite_path
+        needs_warning = False
+        if not resume_path.exists():
+            prefix = f"{resume_path.name}."
+            has_rotated = any(
+                candidate.is_file() and candidate.name[len(prefix) :].isdigit()
+                for candidate in resume_path.parent.glob(f"{resume_path.name}.*")
+            )
+            needs_warning = not has_rotated and sqlite_path and sqlite_path.exists()
 
-    def _load_resume_from_sqlite(
-        self, sqlite_path: Path
-    ) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
-        """Construct resume metadata from the SQLite manifest cache."""
-
-        lookup: Dict[str, Dict[str, Any]] = {}
-        completed: Set[str] = set()
-        if not sqlite_path.exists():
-            LOGGER.error(
-                "Resume fallback requested but SQLite manifest %s is missing.",
+        if needs_warning:
+            LOGGER.warning(
+                "Resume manifest %s is missing; loading resume metadata from SQLite %s.",
+                resume_path,
                 sqlite_path,
             )
-            return lookup, completed
 
-        try:
-            conn = sqlite3.connect(sqlite_path)
-        except sqlite3.Error as exc:  # pragma: no cover - defensive guard
-            LOGGER.error("Unable to open SQLite manifest %s: %s", sqlite_path, exc)
-            return lookup, completed
-
-        try:
-            try:
-                cursor = conn.execute(
-                    (
-                        "SELECT run_id, work_id, url, normalized_url, schema_version, "
-                        "classification, reason, reason_detail, path, path_mtime_ns, sha256, "
-                        "content_length, etag, last_modified "
-                        "FROM manifests ORDER BY timestamp"
-                    )
-                )
-            except sqlite3.OperationalError as exc:
-                LOGGER.error(
-                    "SQLite manifest at %s is missing expected tables: %s",
-                    sqlite_path,
-                    exc,
-                )
-                return lookup, completed
-
-            rows = cursor.fetchall()
-        finally:
-            conn.close()
-
-        for (
-            run_id,
-            work_id,
-            url,
-            normalized_url,
-            schema_version,
-            classification,
-            reason,
-            reason_detail,
-            path_value,
-            path_mtime_ns,
-            sha256,
-            content_length,
-            etag,
-            last_modified,
-        ) in rows:
-            if not work_id or not url:
-                continue
-            normalized = normalized_url or normalize_url(str(url))
-            try:
-                schema_version_int = int(schema_version)
-            except (TypeError, ValueError):
-                schema_version_int = MANIFEST_SCHEMA_VERSION
-
-            classification_value: Optional[str] = None
-            try:
-                classification_enum = Classification.from_wire(classification)
-            except ValueError:
-                classification_enum = None
-            else:
-                classification_value = classification_enum.value
-                if classification_enum in PDF_LIKE:
-                    completed.add(str(work_id))
-
-            reason_value: Optional[str]
-            try:
-                reason_enum = (
-                    ReasonCode.from_wire(reason) if reason is not None else None
-                )
-            except ValueError:
-                reason_enum = None
-            reason_value = reason_enum.value if reason_enum is not None else reason
-
-            try:
-                content_length_value = (
-                    int(content_length) if content_length is not None else None
-                )
-            except (TypeError, ValueError):
-                content_length_value = None
-
-            path_mtime_value: Optional[int] = None
-            if path_mtime_ns is not None:
-                try:
-                    path_mtime_value = int(path_mtime_ns)
-                except (TypeError, ValueError):
-                    path_mtime_value = None
-
-            entry = {
-                "record_type": "manifest",
-                "schema_version": schema_version_int,
-                "run_id": run_id,
-                "work_id": work_id,
-                "url": url,
-                "normalized_url": normalized,
-                "classification": classification_value or str(classification or ""),
-                "reason": reason_value,
-                "reason_detail": reason_detail,
-                "path": path_value,
-                "path_mtime_ns": path_mtime_value,
-                "mtime_ns": path_mtime_value,
-                "sha256": sha256,
-                "content_length": content_length_value,
-                "etag": etag,
-                "last_modified": last_modified,
-            }
-            lookup.setdefault(str(work_id), {})[normalized] = entry
-
-        return lookup, completed
+        return load_previous_manifest(
+            resume_path,
+            sqlite_path=sqlite_path,
+            allow_sqlite_fallback=True,
+        )
 
     def setup_worker_pool(self) -> ThreadPoolExecutor:
         """Create a thread pool when concurrency is enabled."""

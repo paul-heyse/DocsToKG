@@ -329,6 +329,107 @@ def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_pat
     assert sqlite_entry["path"].endswith("stored.pdf")
 
 
+def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
+    resolved = make_resolved_config(tmp_path)
+    bootstrap_run_environment(resolved)
+    resolved.args.log_format = "csv"
+    sqlite_path = resolved.sqlite_path
+    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(sqlite_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE manifests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                run_id TEXT,
+                schema_version INTEGER,
+                work_id TEXT,
+                title TEXT,
+                publication_year INTEGER,
+                resolver TEXT,
+                url TEXT,
+                normalized_url TEXT,
+                path TEXT,
+                path_mtime_ns INTEGER,
+                classification TEXT,
+                content_type TEXT,
+                reason TEXT,
+                reason_detail TEXT,
+                html_paths TEXT,
+                sha256 TEXT,
+                content_length INTEGER,
+                etag TEXT,
+                last_modified TEXT,
+                extracted_text_path TEXT,
+                dry_run INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO manifests (
+                timestamp, run_id, schema_version, work_id, title, publication_year,
+                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                content_type, reason, reason_detail, html_paths, sha256,
+                content_length, etag, last_modified, extracted_text_path, dry_run
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "2025-01-03T00:00:00Z",
+                "resume-run",
+                MANIFEST_SCHEMA_VERSION,
+                "W-CSV",
+                "CSV Resume",
+                2024,
+                "openalex",
+                "https://example.org/W-CSV.pdf",
+                "https://example.org/w-csv.pdf",
+                str(resolved.pdf_dir / "stored.pdf"),
+                None,
+                "pdf",
+                "application/pdf",
+                None,
+                None,
+                None,
+                "feedface",
+                512,
+                None,
+                None,
+                None,
+                0,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    csv_path = resolved.csv_path
+    assert csv_path is not None
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    csv_path.write_text("run_id,work_id\nresume-run,W-CSV\n", encoding="utf-8")
+
+    if resolved.manifest_path.exists():
+        resolved.manifest_path.unlink()
+
+    download_run = DownloadRun(resolved)
+
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        state = download_run.setup_download_state(factory)
+    finally:
+        factory.close_all()
+        download_run.close()
+
+    assert "W-CSV" in state.options.resume_completed
+    csv_lookup = state.options.previous_lookup.get("W-CSV")
+    assert csv_lookup is not None and csv_lookup
+    resume_entry = next(iter(csv_lookup.values()))
+    assert resume_entry["classification"] == "pdf"
+    assert resume_entry["path"].endswith("stored.pdf")
+
+
 def test_setup_worker_pool_creates_executor_when_parallel(tmp_path):
     resolved = make_resolved_config(tmp_path, workers=3)
     download_run = DownloadRun(resolved)
