@@ -39,18 +39,18 @@ Scope boundary: Handles resolver planning, secure HTTP streaming, and manifest/v
 ```bash
 ./scripts/bootstrap_env.sh
 direnv allow                     # or source .venv/bin/activate
-direnv exec . python -m DocsToKG.OntologyDownload.cli config validate configs/sources.yaml
-direnv exec . python -m DocsToKG.OntologyDownload.cli pull hp --config configs/sources.yaml --dry-run --json
+direnv exec . python -m DocsToKG.OntologyDownload.cli config validate --spec configs/sources.yaml
+direnv exec . python -m DocsToKG.OntologyDownload.cli pull hp --spec configs/sources.yaml --dry-run --json
 ```
 
 ## Common commands
 ```bash
-direnv exec . python -m DocsToKG.OntologyDownload.cli pull hp            # download ontology hp
-direnv exec . python -m DocsToKG.OntologyDownload.cli plan hp            # preview resolver plan
-direnv exec . python -m DocsToKG.OntologyDownload.cli plan-diff hp       # compare plan to baseline
+direnv exec . python -m DocsToKG.OntologyDownload.cli pull hp --spec configs/sources.yaml            # download ontology hp
+direnv exec . python -m DocsToKG.OntologyDownload.cli plan hp --spec configs/sources.yaml            # preview resolver plan
+direnv exec . python -m DocsToKG.OntologyDownload.cli plan-diff hp --spec configs/sources.yaml       # compare plan to baseline
 direnv exec . python -m DocsToKG.OntologyDownload.cli doctor             # environment diagnostics
 direnv exec . python -m DocsToKG.OntologyDownload.cli prune --keep 3 --json
-direnv exec . python -m DocsToKG.OntologyDownload.cli config validate configs/sources.yaml
+direnv exec . python -m DocsToKG.OntologyDownload.cli config validate --spec configs/sources.yaml
 ```
 
 ## Core capabilities
@@ -125,7 +125,7 @@ sequenceDiagram
 
 ## Configuration
 
-Configuration is layered: baked-in defaults → YAML file (`--config /path/to/sources.yaml`) → environment variables → CLI overrides. The `settings.py` models (`DefaultsConfig`, `DownloadConfiguration`, `ValidationConfig`, `ResolvedConfig`) combine those sources before any network call occurs.
+Configuration is layered: baked-in defaults → YAML file (`--spec /path/to/sources.yaml`) → environment variables → CLI overrides. The `settings.py` models (`DefaultsConfig`, `DownloadConfiguration`, `ValidationConfig`, `ResolvedConfig`) combine those sources before any network call occurs.
 
 Example YAML (`configs/sources.yaml`):
 
@@ -162,8 +162,8 @@ Key environment variables:
 Validate the effective configuration at any time:
 
 ```bash
-direnv exec . python -m DocsToKG.OntologyDownload.cli config show --config configs/sources.yaml
-direnv exec . python -m DocsToKG.OntologyDownload.cli config validate configs/sources.yaml
+direnv exec . python -m DocsToKG.OntologyDownload.cli config show --spec configs/sources.yaml
+direnv exec . python -m DocsToKG.OntologyDownload.cli config validate --spec configs/sources.yaml
 ```
 
 ## Data contracts & schemas
