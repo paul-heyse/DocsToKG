@@ -44,6 +44,7 @@ _HASH_ALG_ENV_VAR = "DOCSTOKG_HASH_ALG"
 def atomic_write(path: Path) -> Iterator[TextIO]:
     """Write to a temporary file and atomically replace the destination."""
 
+    path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f"{path.name}.tmp.{uuid.uuid4().hex}")
     try:
         with tmp.open("w", encoding="utf-8") as handle:
