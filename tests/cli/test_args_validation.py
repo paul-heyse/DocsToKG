@@ -139,3 +139,23 @@ def test_resolve_config_accepts_positive_max(parser):
     resolved = download_args.resolve_config(args, parser)
 
     assert resolved.args.max == 5
+
+
+def test_resolve_config_sets_pyalex_email_from_config(parser, monkeypatch):
+    from pyalex import config as oa_config
+
+    monkeypatch.setattr(
+        download_args,
+        "load_resolver_config",
+        lambda *_: SimpleNamespace(
+            max_concurrent_resolvers=1,
+            polite_headers={"User-Agent": "stub"},
+            mailto="config@example.org",
+        ),
+    )
+    monkeypatch.setattr(oa_config, "email", "initial@example.org", raising=False)
+
+    args = download_args.parse_args(parser, _base_args())
+    download_args.resolve_config(args, parser)
+
+    assert oa_config.email == "config@example.org"

@@ -133,9 +133,11 @@ def test_normalize_http_timeout_scalar_and_iterables() -> None:
     """HTTP timeout coercion handles scalars, strings, and iterables."""
 
     assert normalize_http_timeout(None) == (5.0, 30.0)
-    assert normalize_http_timeout(12) == (5.0, 12.0)
+    assert normalize_http_timeout(12) == (12.0, 12.0)
+    assert normalize_http_timeout(30) == (30.0, 30.0)
     assert normalize_http_timeout("1.5, 2.5") == (1.5, 2.5)
     assert normalize_http_timeout([2, 3]) == (2.0, 3.0)
+    assert normalize_http_timeout((4, 5)) == (4.0, 5.0)
 
 
 def test_get_http_session_reuses_singleton_without_base_headers() -> None:
@@ -149,7 +151,7 @@ def test_get_http_session_reuses_singleton_without_base_headers() -> None:
         session_b, timeout_b = get_http_session()
 
         assert session_a is session_b
-        assert timeout_a == (5.0, 10.0)
+        assert timeout_a == (10.0, 10.0)
         assert timeout_b == (5.0, 30.0)
 
 
@@ -176,16 +178,32 @@ def test_manifest_resume_controller(tmp_path: Path) -> None:
     """ResumeController mirrors should_skip_output behaviour."""
 
     output = tmp_path / "out.jsonl"
-    manifest_entry = {"input_hash": "abc123"}
+    manifest_success = {"input_hash": "abc123", "status": "success"}
+    manifest_skip = {"input_hash": "abc123", "status": "skip"}
+    manifest_failure = {"input_hash": "abc123", "status": "failure"}
+    manifest_unknown = {"input_hash": "abc123", "status": "other"}
+    manifest_missing_status = {"input_hash": "abc123"}
 
-    assert not should_skip_output(output, manifest_entry, "abc123", resume=True, force=True)
+    assert not should_skip_output(output, manifest_success, "abc123", resume=True, force=True)
 
     output.write_text("data", encoding="utf-8")
-    assert should_skip_output(output, manifest_entry, "abc123", resume=True, force=False)
+    assert should_skip_output(output, manifest_success, "abc123", resume=True, force=False)
+    assert should_skip_output(output, manifest_skip, "abc123", resume=True, force=False)
+    assert not should_skip_output(output, manifest_failure, "abc123", resume=True, force=False)
+    assert not should_skip_output(output, manifest_unknown, "abc123", resume=True, force=False)
+    assert not should_skip_output(output, manifest_missing_status, "abc123", resume=True, force=False)
 
-    controller = ResumeController(resume=True, force=False, manifest_index={"doc1": manifest_entry})
+    controller = ResumeController(
+        resume=True,
+        force=False,
+        manifest_index={"doc1": manifest_success, "doc2": manifest_failure},
+    )
+
     skip, entry = controller.should_skip("doc1", output, "abc123")
-    assert skip is True and entry is manifest_entry
+    assert skip is True and entry is manifest_success
+
+    skip_failure, entry_failure = controller.should_skip("doc2", output, "abc123")
+    assert skip_failure is False and entry_failure is manifest_failure
 
     process, _ = controller.should_process("doc1", output, "zzzz")
     assert process is True
@@ -483,6 +501,39 @@ def test_plan_embed_resume_missing_manifest_skips_hash(
             "--out-dir",
             str(vectors_dir),
             "--resume",
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
+
+
+def test_plan_embed_generate_counts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Embedding planner reports generate counts for discovered chunks."""
+
+    data_root = tmp_path / "data"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    vectors_dir = data_root / "Embeddings"
+    chunks_dir.mkdir(parents=True)
+    vectors_dir.mkdir(parents=True)
+    (chunks_dir / "doc1.chunks.jsonl").write_text("{}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.detect_data_root", lambda *_args, **_kwargs: data_root
+    )
+
+    plan = plan_embed(
+        [
+            "--data-root",
+            str(data_root),
+            "--chunks-dir",
+            str(chunks_dir),
+            "--out-dir",
+            str(vectors_dir),
         ]
     )
 

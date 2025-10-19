@@ -1,6 +1,7 @@
 import argparse
 import contextlib
 import json
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Sequence
@@ -15,6 +16,7 @@ from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.providers import WorkProvider
 from DocsToKG.ContentDownload.runner import DownloadRun
 from DocsToKG.ContentDownload.telemetry import (
+    CsvSink,
     JsonlSink,
     MANIFEST_SCHEMA_VERSION,
     ManifestUrlIndex,
@@ -42,6 +44,8 @@ def _build_args(
     defaults: Dict[str, object] = {
         "log_rotate": None,
         "resume_from": None,
+        "log_format": "jsonl",
+        "log_csv": None,
         "dry_run": False,
         "list_only": False,
         "sniff_bytes": 4096,
@@ -148,6 +152,22 @@ def test_setup_sinks_returns_multisink(tmp_path):
     download_run.close()
 
 
+def test_setup_sinks_csv_format_skips_jsonl(tmp_path):
+    resolved = make_resolved_config(tmp_path)
+    resolved.args.log_format = "csv"
+    resolved.args.log_csv = resolved.csv_path
+    bootstrap_run_environment(resolved)
+    download_run = DownloadRun(resolved)
+
+    with contextlib.ExitStack() as stack:
+        sink = download_run.setup_sinks(stack)
+        assert isinstance(sink, MultiSink)
+        assert not any(isinstance(member, JsonlSink) for member in sink._sinks)
+        assert any(isinstance(member, CsvSink) for member in sink._sinks)
+
+    download_run.close()
+
+
 def test_setup_resolver_pipeline_returns_pipeline(tmp_path):
     resolved = make_resolved_config(tmp_path, csv=False)
     bootstrap_run_environment(resolved)
@@ -213,6 +233,100 @@ def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
     message = str(excinfo.value)
     assert str(missing_manifest) in message
     assert "--resume-from" in message
+
+
+def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+    sqlite_path = resolved.sqlite_path
+    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(sqlite_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE manifests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                run_id TEXT,
+                schema_version INTEGER,
+                work_id TEXT,
+                title TEXT,
+                publication_year INTEGER,
+                resolver TEXT,
+                url TEXT,
+                normalized_url TEXT,
+                path TEXT,
+                path_mtime_ns INTEGER,
+                classification TEXT,
+                content_type TEXT,
+                reason TEXT,
+                reason_detail TEXT,
+                html_paths TEXT,
+                sha256 TEXT,
+                content_length INTEGER,
+                etag TEXT,
+                last_modified TEXT,
+                extracted_text_path TEXT,
+                dry_run INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO manifests (
+                timestamp, run_id, schema_version, work_id, title, publication_year,
+                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                content_type, reason, reason_detail, html_paths, sha256,
+                content_length, etag, last_modified, extracted_text_path, dry_run
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "2025-01-01T00:00:00Z",
+                "resume-run",
+                MANIFEST_SCHEMA_VERSION,
+                "W-SQLITE",
+                "SQLite Resume",
+                2024,
+                "openalex",
+                "https://example.org/W-SQLITE.pdf",
+                "https://example.org/w-sqlite.pdf",
+                str(resolved.pdf_dir / "stored.pdf"),
+                None,
+                "pdf",
+                "application/pdf",
+                None,
+                None,
+                None,
+                "deadbeef",
+                1024,
+                None,
+                None,
+                None,
+                0,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    missing_manifest = resolved.manifest_path
+    resolved.args.resume_from = missing_manifest
+    download_run = DownloadRun(resolved)
+
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        state = download_run.setup_download_state(factory)
+    finally:
+        factory.close_all()
+        download_run.close()
+
+    assert "W-SQLITE" in state.options.resume_completed
+    previous_lookup = state.options.previous_lookup.get("W-SQLITE")
+    assert previous_lookup is not None and previous_lookup
+    sqlite_entry = next(iter(previous_lookup.values()))
+    assert sqlite_entry["classification"] == "pdf"
+    assert sqlite_entry["path"].endswith("stored.pdf")
 
 
 def test_setup_worker_pool_creates_executor_when_parallel(tmp_path):

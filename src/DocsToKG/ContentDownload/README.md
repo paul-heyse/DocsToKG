@@ -54,18 +54,18 @@ python -m DocsToKG.ContentDownload.cli \
 - **Output layout**: `--out` points at the PDF root. `--staging` creates timestamped `PDF/`, `HTML/`, and `XML/` folders. `--html-out` and `--xml-out` override defaults. `--content-addressed` enables hashed storage with friendly symlinks.
 - **Run controls**: `--max` caps processed works; `--dry-run` records resolver coverage only; `--list-only` skips HTTP downloads; `--workers` controls concurrency; `--sleep` throttles sequential runs; `--resume-from` reuses an existing manifest; `--verify-cache-digest` recomputes SHA-256 for cache hits.
 - **Resolver configuration**: `--resolver-config` loads YAML/JSON that mirrors `ResolverConfig`. `--resolver-order`, `--resolver-preset {fast,broad}`, `--enable-resolver`, `--disable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--concurrent-resolvers`, `--max-concurrent-per-host`, `--domain-min-interval`, `--domain-token-bucket`, `--head-precheck`/`--no-head-precheck`, and `--accept` map directly to `ResolverConfig` fields.
-- **Telemetry & logging**: `--manifest` overrides the manifest path; `--log-format {jsonl,csv}`, `--log-csv`, and `--log-rotate` tune sink behaviour; `--warm-manifest-cache` preloads the SQLite manifest index for fast resume checks.
+- **Telemetry & logging**: `--manifest` overrides the manifest path; `--log-format {jsonl,csv}`, `--log-csv`, and `--log-rotate` tune sink behaviour. Selecting `--log-format csv` disables JSONL manifest emission in favour of CSV + SQLite outputs, so plan resumes on the same machine. `--warm-manifest-cache` preloads the SQLite manifest index for fast resume checks.
 - **Classifier tuning**: `--sniff-bytes`, `--min-pdf-bytes`, and `--tail-check-bytes` adjust payload heuristics; HTML text extraction is enabled via `--extract-text html`.
 
 ## Run Outputs
 
-- `manifest.jsonl` (plus `.001`, `.002`, … when `--log-rotate` is active) — JSONL attempts and manifest entries with `record_type`.
+- `manifest.jsonl` (plus `.001`, `.002`, … when `--log-rotate` is active) — JSONL attempts and manifest entries with `record_type` when `--log-format jsonl` is selected.
 - `manifest.index.json` — incremental index keyed by URL for resolver dedupe.
 - `manifest.summary.json` — aggregated resolver counts and latency metrics.
 - `manifest.metrics.json` — human-readable summary produced by `summary.build_summary_record`.
 - `manifest.last.csv` — most recent attempt per work for quick inspection.
 - `manifest.sqlite3` — SQLite cache backing `ManifestUrlIndex` (`SQLITE_SCHEMA_VERSION = 4`).
-- `manifest.csv` — optional attempts CSV when `--log-format csv` or `--log-csv` is supplied.
+- `manifest.csv` — attempts CSV produced when `--log-format csv` (JSONL disabled) or `--log-csv` is supplied.
 - Artifact directories (`PDF/`, `HTML/`, `XML/`) rooted under `--out` (or staging run directory); HTML extraction writes `.txt` sidecars when enabled.
 - Cached resume metadata (`sha256`, `etag`, `last_modified`) is embedded in manifest entries rather than separate files.
 
@@ -144,7 +144,7 @@ sequenceDiagram
 - `DownloadRun.run()` performs the orchestrated flow: `setup_sinks()` → `setup_resolver_pipeline()` → `setup_work_provider()` → `setup_download_state()` → per-work processing (sequential or threaded) followed by summary emission.
 - Each `WorkArtifact` originates from `OpenAlexWorkProvider.iter_artifacts()` and is processed by `process_one_work()` which calls `ResolverPipeline.run()`; successful downloads invoke `download_candidate()` and strategy helpers.
 - Telemetry sinks come from `telemetry.MultiSink`; every manifest record must include `record_type` and obey `MANIFEST_SCHEMA_VERSION`.
-- Resume flow uses `telemetry.load_previous_manifest()` plus `ManifestUrlIndex`. Ensure rotated manifest files keep the `record_type` field so resumes stay compatible.
+- Resume flow uses `telemetry.load_previous_manifest()` plus `ManifestUrlIndex`. When JSONL manifests are missing, the runner falls back to the SQLite cache and logs a warning so operators understand the resume locality constraint.
 
 ## Configuration Surfaces
 

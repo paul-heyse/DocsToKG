@@ -328,7 +328,7 @@ def plan(argv: Sequence[str] | None = None) -> int:
     """Display the doctags → chunk → embed plan without executing."""
 
     args = [] if argv is None else list(argv)
-    if "--plan" not in args:
+    if not any(option in args for option in ("--plan", "--plan-only")):
         args.append("--plan")
     return run_all(args)
 
@@ -754,6 +754,7 @@ def run_all(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--plan",
+        "--plan-only",
         action="store_true",
         help="Show a plan of the files each stage would touch instead of running",
     )

@@ -90,6 +90,7 @@ class OpenAlexWorkProvider:
             per_page=self._per_page,
             n_max=self._max_results if self._max_results is not None else None,
         )
+        retrieved = 0
         for page in pager:
             for work in page:
                 if self._max_results is not None and retrieved >= self._max_results:

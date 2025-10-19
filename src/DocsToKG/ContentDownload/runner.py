@@ -3,18 +3,27 @@
 from __future__ import annotations
 
 import contextlib
-import json
 import logging
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Set
+import json
+import sqlite3
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import requests
 from pyalex import Works
 
 from DocsToKG.ContentDownload.args import ResolvedConfig
-from DocsToKG.ContentDownload.core import WorkArtifact, atomic_write_text
+from DocsToKG.ContentDownload.core import (
+    PDF_LIKE,
+    Classification,
+    ReasonCode,
+    WorkArtifact,
+    atomic_write_text,
+    normalize_url,
+)
 from DocsToKG.ContentDownload.download import (
     DownloadConfig,
     RobotsCache,
@@ -32,6 +41,7 @@ from DocsToKG.ContentDownload.telemetry import (
     CsvSink,
     JsonlSink,
     LastAttemptCsvSink,
+    MANIFEST_SCHEMA_VERSION,
     ManifestIndexSink,
     MultiSink,
     RotatingJsonlSink,
@@ -134,14 +144,22 @@ class DownloadRun:
 
         sinks: List[AttemptSink] = []
         manifest_path = self.resolved.manifest_path
+        log_format = getattr(self.args, "log_format", "jsonl")
 
-        if self.args.log_rotate:
-            jsonl_sink = stack.enter_context(
-                self.rotating_jsonl_sink_factory(manifest_path, max_bytes=self.args.log_rotate)
-            )
-        else:
+        if log_format == "jsonl":
+            if self.args.log_rotate:
+                jsonl_sink = stack.enter_context(
+                    self.rotating_jsonl_sink_factory(
+                        manifest_path, max_bytes=self.args.log_rotate
+                    )
+                )
+            else:
+                jsonl_sink = stack.enter_context(self.jsonl_sink_factory(manifest_path))
+            sinks.append(jsonl_sink)
+        elif log_format != "csv":
+            LOGGER.warning("Unknown log format '%s'; defaulting to JSONL.", log_format)
             jsonl_sink = stack.enter_context(self.jsonl_sink_factory(manifest_path))
-        sinks.append(jsonl_sink)
+            sinks.append(jsonl_sink)
 
         index_path = manifest_path.with_suffix(".index.json")
         index_sink = stack.enter_context(self.manifest_index_sink_factory(index_path))
@@ -158,7 +176,13 @@ class DownloadRun:
         summary_sink = stack.enter_context(self.summary_sink_factory(summary_path))
         sinks.append(summary_sink)
 
-        if self.resolved.csv_path:
+        csv_requested = log_format == "csv"
+        if csv_requested and not self.resolved.csv_path:
+            raise ValueError(
+                "--log-format csv selected but no CSV path was resolved."
+            )
+
+        if self.resolved.csv_path and (csv_requested or getattr(self.args, "log_csv", None)):
             csv_sink = stack.enter_context(self.csv_sink_factory(self.resolved.csv_path))
             sinks.append(csv_sink)
 
@@ -216,13 +240,14 @@ class DownloadRun:
     ) -> DownloadRunState:
         """Initialise download options and counters for the run."""
 
-        resume_path = self.args.resume_from
+        resume_path_raw = self.args.resume_from
+        resume_path = Path(resume_path_raw) if resume_path_raw is not None else None
         if resume_path is None:
             manifest_path = self.resolved.manifest_path
             if manifest_path.exists():
                 resume_path = manifest_path
 
-        resume_lookup, resume_completed = load_previous_manifest(resume_path)
+        resume_lookup, resume_completed = self._load_resume_state(resume_path)
         options = DownloadConfig(
             dry_run=self.args.dry_run,
             list_only=self.args.list_only,
@@ -247,6 +272,149 @@ class DownloadRun:
         )
         self.state = state
         return state
+
+    def _load_resume_state(
+        self, resume_path: Optional[Path]
+    ) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+        """Load resume metadata from JSONL or fall back to SQLite manifests."""
+
+        try:
+            return load_previous_manifest(resume_path)
+        except ValueError as exc:
+            if resume_path is None:
+                raise
+            if resume_path.exists():
+                raise
+            sqlite_path = self.resolved.sqlite_path
+            if sqlite_path and sqlite_path.exists():
+                LOGGER.warning(
+                    "Resume manifest %s not found; falling back to SQLite state %s.",
+                    resume_path,
+                    sqlite_path,
+                )
+                return self._load_resume_from_sqlite(sqlite_path)
+            raise exc
+
+    def _load_resume_from_sqlite(
+        self, sqlite_path: Path
+    ) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+        """Construct resume metadata from the SQLite manifest cache."""
+
+        lookup: Dict[str, Dict[str, Any]] = {}
+        completed: Set[str] = set()
+        if not sqlite_path.exists():
+            LOGGER.error(
+                "Resume fallback requested but SQLite manifest %s is missing.",
+                sqlite_path,
+            )
+            return lookup, completed
+
+        try:
+            conn = sqlite3.connect(sqlite_path)
+        except sqlite3.Error as exc:  # pragma: no cover - defensive guard
+            LOGGER.error("Unable to open SQLite manifest %s: %s", sqlite_path, exc)
+            return lookup, completed
+
+        try:
+            try:
+                cursor = conn.execute(
+                    (
+                        "SELECT run_id, work_id, url, normalized_url, schema_version, "
+                        "classification, reason, reason_detail, path, path_mtime_ns, sha256, "
+                        "content_length, etag, last_modified "
+                        "FROM manifests ORDER BY timestamp"
+                    )
+                )
+            except sqlite3.OperationalError as exc:
+                LOGGER.error(
+                    "SQLite manifest at %s is missing expected tables: %s",
+                    sqlite_path,
+                    exc,
+                )
+                return lookup, completed
+
+            rows = cursor.fetchall()
+        finally:
+            conn.close()
+
+        for (
+            run_id,
+            work_id,
+            url,
+            normalized_url,
+            schema_version,
+            classification,
+            reason,
+            reason_detail,
+            path_value,
+            path_mtime_ns,
+            sha256,
+            content_length,
+            etag,
+            last_modified,
+        ) in rows:
+            if not work_id or not url:
+                continue
+            normalized = normalized_url or normalize_url(str(url))
+            try:
+                schema_version_int = int(schema_version)
+            except (TypeError, ValueError):
+                schema_version_int = MANIFEST_SCHEMA_VERSION
+
+            classification_value: Optional[str] = None
+            try:
+                classification_enum = Classification.from_wire(classification)
+            except ValueError:
+                classification_enum = None
+            else:
+                classification_value = classification_enum.value
+                if classification_enum in PDF_LIKE:
+                    completed.add(str(work_id))
+
+            reason_value: Optional[str]
+            try:
+                reason_enum = (
+                    ReasonCode.from_wire(reason) if reason is not None else None
+                )
+            except ValueError:
+                reason_enum = None
+            reason_value = reason_enum.value if reason_enum is not None else reason
+
+            try:
+                content_length_value = (
+                    int(content_length) if content_length is not None else None
+                )
+            except (TypeError, ValueError):
+                content_length_value = None
+
+            path_mtime_value: Optional[int] = None
+            if path_mtime_ns is not None:
+                try:
+                    path_mtime_value = int(path_mtime_ns)
+                except (TypeError, ValueError):
+                    path_mtime_value = None
+
+            entry = {
+                "record_type": "manifest",
+                "schema_version": schema_version_int,
+                "run_id": run_id,
+                "work_id": work_id,
+                "url": url,
+                "normalized_url": normalized,
+                "classification": classification_value or str(classification or ""),
+                "reason": reason_value,
+                "reason_detail": reason_detail,
+                "path": path_value,
+                "path_mtime_ns": path_mtime_value,
+                "mtime_ns": path_mtime_value,
+                "sha256": sha256,
+                "content_length": content_length_value,
+                "etag": etag,
+                "last_modified": last_modified,
+            }
+            lookup.setdefault(str(work_id), {})[normalized] = entry
+
+        return lookup, completed
 
     def setup_worker_pool(self) -> ThreadPoolExecutor:
         """Create a thread pool when concurrency is enabled."""

@@ -302,7 +302,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--log-format",
         choices=["jsonl", "csv"],
         default="jsonl",
-        help="Log format for attempts (default: jsonl).",
+        help=(
+            "Log format for attempts (default: jsonl). Use 'csv' to emit only CSV logs "
+            "alongside SQLite/summary outputs."
+        ),
     )
     parser.add_argument(
         "--log-csv",
@@ -457,6 +460,10 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         config = load_resolver_config(args, resolver_names, resolver_order_override)
     except ValueError as exc:
         parser.error(str(exc))
+
+    mailto_value = getattr(config, "mailto", None)
+    if mailto_value:
+        oa_config.email = mailto_value
 
     concurrency_product = max(args.workers, 1) * max(config.max_concurrent_resolvers, 1)
     if concurrency_product > 32:
