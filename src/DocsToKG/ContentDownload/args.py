@@ -458,6 +458,10 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
     except ValueError as exc:
         parser.error(str(exc))
 
+    mailto_value = getattr(config, "mailto", None)
+    if mailto_value:
+        oa_config.email = mailto_value
+
     concurrency_product = max(args.workers, 1) * max(config.max_concurrent_resolvers, 1)
     if concurrency_product > 32:
         LOGGER.warning(
