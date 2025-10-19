@@ -527,27 +527,28 @@ class DownloadRun:
                             for future in as_completed(list(in_flight)):
                                 _handle_future(future)
 
+                metrics = self.metrics or ResolverMetrics()
+                summary = metrics.summary()
+                summary_record = build_summary_record(
+                    run_id=self.resolved.run_id,
+                    processed=state.processed if state else 0,
+                    saved=state.saved if state else 0,
+                    html_only=state.html_only if state else 0,
+                    xml_only=state.xml_only if state else 0,
+                    skipped=state.skipped if state else 0,
+                    worker_failures=state.worker_failures if state else 0,
+                    bytes_downloaded=state.downloaded_bytes if state else 0,
+                    summary=summary,
+                )
+                if self.attempt_logger is not None:
+                    try:
+                        self.attempt_logger.log_summary(summary_record)
+                    except Exception:
+                        LOGGER.warning("Failed to log summary record", exc_info=True)
+
         except Exception:
             raise
         else:
-            metrics = self.metrics or ResolverMetrics()
-            summary = metrics.summary()
-            summary_record = build_summary_record(
-                run_id=self.resolved.run_id,
-                processed=state.processed if state else 0,
-                saved=state.saved if state else 0,
-                html_only=state.html_only if state else 0,
-                xml_only=state.xml_only if state else 0,
-                skipped=state.skipped if state else 0,
-                worker_failures=state.worker_failures if state else 0,
-                bytes_downloaded=state.downloaded_bytes if state else 0,
-                summary=summary,
-            )
-            if self.attempt_logger is not None:
-                try:
-                    self.attempt_logger.log_summary(summary_record)
-                except Exception:
-                    LOGGER.warning("Failed to log summary record", exc_info=True)
             metrics_path = self.resolved.manifest_path.with_suffix(".metrics.json")
             try:
                 ensure_dir(metrics_path.parent)
