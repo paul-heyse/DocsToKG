@@ -372,6 +372,25 @@ class DownloadRun:
         self.state.update_from_result(result)
         return result
 
+    def _handle_worker_exception(
+        self,
+        state: DownloadRunState,
+        exc: Exception,
+        *,
+        work_id: Optional[str] = None,
+    ) -> None:
+        """Apply consistent crash handling for sequential and threaded workers."""
+
+        state.worker_failures += 1
+        extra_fields: Dict[str, Any] = {"error": str(exc)}
+        if work_id:
+            extra_fields["work_id"] = work_id
+        LOGGER.exception(
+            "worker_crash",
+            extra={"extra_fields": extra_fields},
+        )
+        state.update_from_result({"skipped": True})
+
     def run(self) -> RunResult:
         """Execute the content download pipeline and return the aggregate result."""
 
@@ -402,7 +421,16 @@ class DownloadRun:
                 if self.args.workers == 1:
                     session = state.session_factory()
                     for artifact in provider.iter_artifacts():
-                        self.process_work_item(artifact, state.options, session=session)
+                        try:
+                            self.process_work_item(
+                                artifact, state.options, session=session
+                            )
+                        except Exception as exc:
+                            self._handle_worker_exception(
+                                state,
+                                exc,
+                                work_id=getattr(artifact, "work_id", None),
+                            )
                         if self.args.sleep > 0:
                             time.sleep(self.args.sleep)
                 else:
@@ -424,15 +452,9 @@ class DownloadRun:
                             try:
                                 completed_future.result()
                             except Exception as exc:
-                                state.worker_failures += 1
-                                extra_fields: Dict[str, Any] = {"error": str(exc)}
-                                if work_id:
-                                    extra_fields["work_id"] = work_id
-                                LOGGER.exception(
-                                    "worker_crash",
-                                    extra={"extra_fields": extra_fields},
+                                self._handle_worker_exception(
+                                    state, exc, work_id=work_id
                                 )
-                                state.update_from_result({"skipped": True})
                                 return
 
                         for artifact in provider.iter_artifacts():

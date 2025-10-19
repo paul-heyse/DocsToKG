@@ -764,6 +764,61 @@ def test_download_run_run_processes_artifacts(patcher, tmp_path):
     download_run.close()
 
 
+def test_run_sequential_worker_exception_increments_failures(patcher, tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+
+    artifacts = [
+        _make_artifact(resolved, "W_FAIL"),
+        _make_artifact(resolved, "W_OK"),
+    ]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: requests.Session,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        if work.work_id == "W_FAIL":
+            raise RuntimeError("boom")
+        return {"saved": True, "downloaded_bytes": 123}
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.processed == 2
+    assert result.worker_failures == 1
+    assert result.skipped == 1
+    assert result.saved == 1
+    assert result.summary_record["worker_failures"] == 1
+    assert result.summary_record["skipped"] == 1
+
+
 def test_run_auto_resume_uses_manifest_path_when_resume_flag_absent(patcher, tmp_path):
     resolved = make_resolved_config(tmp_path, csv=False)
     bootstrap_run_environment(resolved)
