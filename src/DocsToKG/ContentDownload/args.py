@@ -395,7 +395,7 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
     base_pdf_dir = args.out
     manifest_override = args.manifest
     if args.staging:
-        run_dir = base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M")
+        run_dir = base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         pdf_dir = run_dir / "PDF"
         html_dir = run_dir / "HTML"
         xml_dir = run_dir / "XML"
