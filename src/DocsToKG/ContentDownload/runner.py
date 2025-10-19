@@ -255,19 +255,14 @@ class DownloadRun:
             resume_lookup, resume_completed = self._load_resume_state(resume_path)
         else:
             manifest_path = self.resolved.manifest_path
-            if manifest_path.exists():
+            prefix = f"{manifest_path.name}."
+            has_rotated = any(
+                candidate.is_file() and candidate.name[len(prefix) :].isdigit()
+                for candidate in manifest_path.parent.glob(f"{manifest_path.name}.*")
+            )
+            sqlite_available = sqlite_path and sqlite_path.exists()
+            if manifest_path.exists() or has_rotated or sqlite_available:
                 resume_lookup, resume_completed = self._load_resume_state(manifest_path)
-            elif sqlite_path and sqlite_path.exists():
-                LOGGER.warning(
-                    "Resume manifest %s is missing; loading resume metadata from SQLite %s.",
-                    manifest_path,
-                    sqlite_path,
-                )
-                resume_lookup, resume_completed = load_previous_manifest(
-                    manifest_path,
-                    sqlite_path=sqlite_path,
-                    allow_sqlite_fallback=True,
-                )
             else:
                 resume_lookup, resume_completed = {}, set()
         options = DownloadConfig(
@@ -301,37 +296,35 @@ class DownloadRun:
         """Load resume metadata from JSON manifests with SQLite fallback."""
 
         sqlite_path = self.resolved.sqlite_path
-        if looks_like_csv_resume_target(resume_path):
-            if sqlite_path and sqlite_path.exists():
-                LOGGER.warning(
-                    "Resume manifest %s appears to be CSV; loading resume metadata from SQLite %s.",
-                    resume_path,
-                    sqlite_path,
-                )
-        else:
-            needs_warning = False
-            if not resume_path.exists():
-                prefix = f"{resume_path.name}."
-                has_rotated = any(
-                    candidate.is_file() and candidate.name[len(prefix) :].isdigit()
-                    for candidate in resume_path.parent.glob(f"{resume_path.name}.*")
-                )
-                needs_warning = (
-                    not has_rotated and sqlite_path and sqlite_path.exists()
-                )
+        resume_path_exists = resume_path.exists()
+        has_rotated = False
+        if not resume_path_exists:
+            prefix = f"{resume_path.name}."
+            has_rotated = any(
+                candidate.is_file() and candidate.name[len(prefix) :].isdigit()
+                for candidate in resume_path.parent.glob(f"{resume_path.name}.*")
+            )
 
-            if needs_warning:
-                LOGGER.warning(
-                    "Resume manifest %s is missing; loading resume metadata from SQLite %s.",
-                    resume_path,
-                    sqlite_path,
-                )
-
-        return load_previous_manifest(
+        resume_lookup, resume_completed = load_previous_manifest(
             resume_path,
             sqlite_path=sqlite_path,
             allow_sqlite_fallback=True,
         )
+
+        if (
+            not resume_path_exists
+            and not has_rotated
+            and sqlite_path
+            and sqlite_path.exists()
+            and (resume_lookup or resume_completed)
+        ):
+            LOGGER.warning(
+                "Resume manifest %s is missing; loading resume metadata from SQLite %s.",
+                resume_path,
+                sqlite_path,
+            )
+
+        return resume_lookup, resume_completed
 
     def setup_worker_pool(self) -> ThreadPoolExecutor:
         """Create a thread pool when concurrency is enabled."""

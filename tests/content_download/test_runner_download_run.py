@@ -1,6 +1,7 @@
 import argparse
 import contextlib
 import json
+import logging
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
@@ -195,13 +196,14 @@ def test_setup_work_provider_returns_provider(tmp_path):
 def test_setup_download_state_records_manifest_data(patcher, tmp_path):
     resolved = make_resolved_config(tmp_path, csv=False)
     bootstrap_run_environment(resolved)
+    resolved.manifest_path.write_text("", encoding="utf-8")
     download_run = DownloadRun(resolved)
 
     dummy_lookup = {"W1": {"path": "foo"}}
     dummy_completed = {"W2"}
     patcher.setattr(
         "DocsToKG.ContentDownload.runner.load_previous_manifest",
-        lambda _: (dummy_lookup, dummy_completed),
+        lambda *args, **kwargs: (dummy_lookup, dummy_completed),
     )
 
     factory = ThreadLocalSessionFactory(requests.Session)
@@ -213,6 +215,30 @@ def test_setup_download_state_records_manifest_data(patcher, tmp_path):
 
     factory.close_all()
     download_run.close()
+
+
+def test_setup_download_state_fresh_csv_run_has_no_resume_warning(caplog, tmp_path):
+    resolved = make_resolved_config(tmp_path)
+    resolved.args.log_format = "csv"
+    resolved.args.log_csv = resolved.csv_path
+    bootstrap_run_environment(resolved)
+    sqlite_path = resolved.sqlite_path
+    assert sqlite_path is not None
+    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+    sqlite_path.touch(exist_ok=True)
+
+    download_run = DownloadRun(resolved)
+
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        with caplog.at_level(logging.WARNING):
+            download_run.setup_download_state(factory)
+    finally:
+        factory.close_all()
+        download_run.close()
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert not any("Resume manifest" in message for message in messages)
 
 
 def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
@@ -595,7 +621,7 @@ def test_download_run_run_processes_artifacts(patcher, tmp_path):
 
     patcher.setattr(
         "DocsToKG.ContentDownload.runner.load_previous_manifest",
-        lambda _: ({}, set()),
+        lambda *args, **kwargs: ({}, set()),
     )
 
     def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
