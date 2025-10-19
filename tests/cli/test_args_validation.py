@@ -1,0 +1,141 @@
+"""Focused coverage for CLI argument validation helpers."""
+
+from __future__ import annotations
+
+import types
+from types import SimpleNamespace
+
+import argparse
+import typing
+
+import pytest
+
+if not hasattr(typing, "TracebackType"):  # pragma: no cover - python<3.13 shim
+    typing.TracebackType = types.TracebackType
+
+from DocsToKG.ContentDownload import args as download_args
+
+
+class _StubWorks:
+    """Minimal Works stub implementing the chainable API used by build_query."""
+
+    def filter(self, **_: object) -> "_StubWorks":
+        return self
+
+    def search(self, _: object) -> "_StubWorks":
+        return self
+
+    def select(self, _: object) -> "_StubWorks":
+        return self
+
+    def sort(self, **_: object) -> "_StubWorks":
+        return self
+
+
+class _StubManifestIndex:
+    """Stub manifest index that exposes the iterator expected by resolve_config."""
+
+    def __init__(self, path: object, eager: object) -> None:  # pragma: no cover - trivial
+        self.path = path
+        self.eager = eager
+
+    def iter_existing(self):  # pragma: no cover - trivial
+        return []
+
+
+@pytest.fixture(autouse=True)
+def _patch_dependencies(monkeypatch):
+    """Replace heavy dependencies with lightweight test doubles."""
+
+    monkeypatch.setattr(download_args, "Works", _StubWorks)
+    monkeypatch.setattr(download_args, "default_resolvers", lambda: [SimpleNamespace(name="openalex")])
+    monkeypatch.setattr(
+        download_args,
+        "load_resolver_config",
+        lambda *_: SimpleNamespace(max_concurrent_resolvers=1, polite_headers={"User-Agent": "stub"}),
+    )
+    monkeypatch.setattr(download_args, "ManifestUrlIndex", _StubManifestIndex)
+
+
+@pytest.fixture
+def parser() -> argparse.ArgumentParser:
+    """Provide a fresh parser instance for each test."""
+
+    return download_args.build_parser()
+
+
+def _base_args() -> list[str]:
+    return [
+        "--topic",
+        "ai",
+        "--year-start",
+        "2020",
+        "--year-end",
+        "2021",
+        "--ignore-robots",
+    ]
+
+
+@pytest.mark.parametrize("per_page", [0, 201])
+def test_resolve_config_rejects_invalid_per_page(parser, capfd, per_page):
+    argv = _base_args() + ["--per-page", str(per_page)]
+    args = download_args.parse_args(parser, argv)
+
+    with pytest.raises(SystemExit) as excinfo:
+        download_args.resolve_config(args, parser)
+
+    assert excinfo.value.code == 2
+    _, err = capfd.readouterr()
+    assert "--per-page must be between 1 and 200" in err
+
+
+@pytest.mark.parametrize("max_value", [0, -10])
+def test_resolve_config_rejects_non_positive_max(parser, capfd, max_value):
+    argv = _base_args() + ["--max", str(max_value)]
+    args = download_args.parse_args(parser, argv)
+
+    with pytest.raises(SystemExit) as excinfo:
+        download_args.resolve_config(args, parser)
+
+    assert excinfo.value.code == 2
+    _, err = capfd.readouterr()
+    assert "--max must be a positive integer" in err
+
+
+def test_resolve_config_rejects_inverted_year_range(parser, capfd):
+    argv = [
+        "--topic",
+        "ai",
+        "--year-start",
+        "2022",
+        "--year-end",
+        "2020",
+        "--ignore-robots",
+    ]
+    args = download_args.parse_args(parser, argv)
+
+    with pytest.raises(SystemExit) as excinfo:
+        download_args.resolve_config(args, parser)
+
+    assert excinfo.value.code == 2
+    _, err = capfd.readouterr()
+    assert "--year-start cannot be greater than --year-end" in err
+
+
+@pytest.mark.parametrize("per_page", [1, 200])
+def test_resolve_config_accepts_per_page_boundaries(parser, per_page):
+    argv = _base_args() + ["--per-page", str(per_page)]
+    args = download_args.parse_args(parser, argv)
+
+    resolved = download_args.resolve_config(args, parser)
+
+    assert resolved.args.per_page == per_page
+
+
+def test_resolve_config_accepts_positive_max(parser):
+    argv = _base_args() + ["--max", "5"]
+    args = download_args.parse_args(parser, argv)
+
+    resolved = download_args.resolve_config(args, parser)
+
+    assert resolved.args.max == 5
