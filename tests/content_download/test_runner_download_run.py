@@ -6,10 +6,12 @@ import logging
 import os
 import sqlite3
 import time
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pytest
 import requests
@@ -51,20 +53,32 @@ class DummyWorks:
 class FlakyWorks:
     """Works stub that raises once before yielding pages."""
 
-    def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+    def __init__(
+        self,
+        pages: Sequence[Iterable[Dict[str, object]]],
+        *,
+        retry_after: Optional[str] = "1",
+    ) -> None:
         self._pages = [list(page) for page in pages]
+        self._retry_after = retry_after
 
     def paginate(
         self, per_page: int, n_max: Optional[int] = None
     ) -> Iterable[Iterable[Dict[str, object]]]:
-        return _FlakyPager(self._pages)
+        return _FlakyPager(self._pages, retry_after=self._retry_after)
 
 
 class _FlakyPager:
-    def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
+    def __init__(
+        self,
+        pages: Sequence[Iterable[Dict[str, object]]],
+        *,
+        retry_after: Optional[str],
+    ) -> None:
         self._pages = [list(page) for page in pages]
         self._index = 0
         self._raised = False
+        self._retry_after = retry_after
 
     def __iter__(self) -> "_FlakyPager":
         return self
@@ -74,7 +88,8 @@ class _FlakyPager:
             self._raised = True
             response = requests.Response()
             response.status_code = 429
-            response.headers["Retry-After"] = "1"
+            if self._retry_after is not None:
+                response.headers["Retry-After"] = str(self._retry_after)
             error = requests.HTTPError("rate limited")
             error.response = response
             raise error
@@ -107,6 +122,7 @@ def _build_args(
         "sleep": 0.0,
         "openalex_retry_attempts": 3,
         "openalex_retry_backoff": 0.0,
+        "openalex_retry_max_delay": 60.0,
     }
     if overrides:
         defaults.update(overrides)
@@ -152,6 +168,7 @@ def make_resolved_config(
         verify_cache_digest=False,
         openalex_retry_attempts=args.openalex_retry_attempts,
         openalex_retry_backoff=args.openalex_retry_backoff,
+        openalex_retry_max_delay=args.openalex_retry_max_delay,
     )
 
 
@@ -176,6 +193,62 @@ def test_iterate_openalex_retries_then_succeeds(monkeypatch):
 
     assert [item["id"] for item in results] == ["W1", "W2"]
     assert slept and slept[0] >= 1.0
+
+
+def test_iterate_openalex_uses_equal_jitter(monkeypatch):
+    works = FlakyWorks([[{"id": "W1"}]], retry_after=None)
+    slept: List[float] = []
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.time.sleep",
+        lambda seconds: slept.append(seconds),
+    )
+
+    uniform_calls: List[Tuple[float, float]] = []
+
+    def _uniform(low: float, high: float) -> float:
+        uniform_calls.append((low, high))
+        return high
+
+    monkeypatch.setattr("DocsToKG.ContentDownload.runner.random.uniform", _uniform)
+
+    results = list(
+        iterate_openalex(
+            works,
+            per_page=1,
+            max_results=None,
+            retry_attempts=2,
+            retry_backoff=2.0,
+        )
+    )
+
+    assert [item["id"] for item in results] == ["W1"]
+    assert uniform_calls == [(0.0, 1.0)]
+    assert slept and slept[0] == pytest.approx(2.0)
+
+
+def test_iterate_openalex_caps_retry_after(monkeypatch):
+    future = datetime.now(timezone.utc) + timedelta(minutes=30)
+    header = format_datetime(future)
+    works = FlakyWorks([[{"id": "W1"}]], retry_after=header)
+    slept: List[float] = []
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.runner.time.sleep",
+        lambda seconds: slept.append(seconds),
+    )
+
+    results = list(
+        iterate_openalex(
+            works,
+            per_page=1,
+            max_results=None,
+            retry_attempts=2,
+            retry_backoff=0.5,
+            retry_max_delay=5.0,
+        )
+    )
+
+    assert [item["id"] for item in results] == ["W1"]
+    assert slept and slept[0] == pytest.approx(5.0)
 
 
 def _manifest_entry(work_id: str, *, run_id: str = "resume-run") -> str:
@@ -981,6 +1054,7 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, m
         verify_cache_digest=False,
         openalex_retry_attempts=args.openalex_retry_attempts,
         openalex_retry_backoff=args.openalex_retry_backoff,
+        openalex_retry_max_delay=args.openalex_retry_max_delay,
     )
 
     bootstrap_run_environment(resolved)
