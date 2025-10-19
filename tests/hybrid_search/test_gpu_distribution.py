@@ -58,3 +58,50 @@ def test_distribute_to_all_gpus_configures_cloner_options(monkeypatch, shard: bo
     assert cloner.shard is shard
     if shard and hasattr(cloner, "common_ivf_quantizer"):
         assert cloner.common_ivf_quantizer is True
+
+
+@pytest.mark.skipif(faiss is None, reason="faiss not installed")
+@pytest.mark.skipif(
+    faiss is not None
+    and (
+        not hasattr(faiss, "GpuMultipleClonerOptions")
+        or not hasattr(faiss, "index_cpu_to_all_gpus")
+    ),
+    reason="faiss build does not expose GPU replication helpers",
+)
+@pytest.mark.parametrize("mode", ["replicate", "shard"])
+def test_constructor_triggers_multi_gpu_distribution(monkeypatch, mode: str) -> None:
+    """Creating a store in multi-GPU mode should replicate immediately."""
+
+    calls: list[dict[str, object]] = []
+
+    def fake_index_cpu_to_all_gpus(index_arg, co=None, ngpu: int = 0):  # type: ignore[override]
+        calls.append({"index": index_arg, "co": co, "ngpu": ngpu})
+        return index_arg
+
+    class DummyIndex:
+        def __init__(self) -> None:
+            self.ntotal = 0
+
+    def fake_create_index(self) -> DummyIndex:
+        return DummyIndex()
+
+    def fake_init_gpu(self) -> None:
+        self._gpu_resources = object()
+
+    monkeypatch.setattr(faiss, "get_num_gpus", lambda: 2, raising=False)
+    monkeypatch.setattr(faiss, "index_gpu_to_cpu", lambda idx: idx, raising=False)
+    monkeypatch.setattr(faiss, "index_cpu_to_all_gpus", fake_index_cpu_to_all_gpus)
+    monkeypatch.setattr(FaissVectorStore, "_create_index", fake_create_index)
+    monkeypatch.setattr(FaissVectorStore, "_set_nprobe", lambda self: None)
+    monkeypatch.setattr(FaissVectorStore, "_emit_gpu_state", lambda self, *args, **kwargs: None)
+    monkeypatch.setattr(FaissVectorStore, "init_gpu", fake_init_gpu)
+
+    config = DenseIndexConfig(multi_gpu_mode=mode, persist_mode="disabled")
+    store = FaissVectorStore(dim=8, config=config)
+
+    assert calls, "expected constructor to trigger index_cpu_to_all_gpus"
+    assert calls[0]["ngpu"] == 2
+    assert isinstance(calls[0]["co"], faiss.GpuMultipleClonerOptions)
+    assert getattr(calls[0]["co"], "shard", False) is (mode == "shard")
+    assert store._replicated is True
