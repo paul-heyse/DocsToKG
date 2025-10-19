@@ -1033,13 +1033,31 @@ def test_manifest_append_respects_atomic_flag(tmp_path: Path) -> None:
         ),
     ):
         doc_io.manifest_append("chunks", "doc-a", "success")
-        doc_io.manifest_append("chunks", "doc-b", "success", atomic=True)
+        doc_io.manifest_append("chunks", "doc-b", "success", atomic=False)
 
     assert len(calls) == 2
-    assert calls[0]["atomic"] is False
+    assert calls[0]["atomic"] is True
     assert calls[0]["path"] == tmp_path / "chunks.jsonl"
     assert calls[0]["rows"][0]["doc_id"] == "doc-a"
-    assert calls[1]["atomic"] is True
+    assert calls[1]["atomic"] is False
+
+
+def test_jsonl_append_iter_atomic_failure_preserves_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = tmp_path / "docparse.chunks.manifest.jsonl"
+    manifest.write_text(json.dumps({"doc_id": "seed"}) + "\n", encoding="utf-8")
+
+    def failing_write(fd: int, data: bytes) -> int:
+        raise OSError("simulated interruption")
+
+    monkeypatch.setattr(doc_io.os, "write", failing_write)
+
+    with pytest.raises(OSError):
+        doc_io.jsonl_append_iter(manifest, [{"doc_id": "new"}], atomic=True)
+
+    rows = list(doc_io.iter_jsonl(manifest))
+    assert rows == [{"doc_id": "seed"}]
 
 
 # --- Schema validation tests ---

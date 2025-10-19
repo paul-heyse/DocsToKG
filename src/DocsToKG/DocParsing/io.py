@@ -210,15 +210,45 @@ def jsonl_append_iter(
 
     path = Path(target)
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not atomic:
+        count = 0
+        with path.open("ab") as handle:
+            for row in rows:
+                payload = json.dumps(row, ensure_ascii=False).encode("utf-8") + b"\n"
+                handle.write(payload)
+                count += 1
+        return count
+
+    buffer = bytearray()
     count = 0
-    with path.open("ab") as handle:
-        for row in rows:
-            payload = json.dumps(row, ensure_ascii=False).encode("utf-8") + b"\n"
-            handle.write(payload)
-            count += 1
-        if atomic:
-            handle.flush()
-            os.fsync(handle.fileno())
+    for row in rows:
+        buffer.extend(json.dumps(row, ensure_ascii=False).encode("utf-8"))
+        buffer.extend(b"\n")
+        count += 1
+
+    if count == 0:
+        return 0
+
+    data = bytes(buffer)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+    fd = os.open(path, flags, 0o666)
+    try:
+        written = os.write(fd, data)
+        if written != len(data):
+            raise OSError(
+                f"Short write while appending to {path}: expected {len(data)}, wrote {written}"
+            )
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+    dir_fd = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
+
     return count
 
 
@@ -389,7 +419,7 @@ def manifest_append(
     warnings: Optional[List[str]] = None,
     error: Optional[str] = None,
     schema_version: str = "",
-    atomic: bool = False,
+    atomic: bool = True,
     **metadata,
 ) -> None:
     """Append a structured entry to the processing manifest."""
