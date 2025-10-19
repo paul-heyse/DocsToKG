@@ -285,7 +285,8 @@ def _make_fetch_spec(
     if not ontology_id:
         raise ConfigError("Ontology ID cannot be empty")
 
-    prefer_source = _coerce_sequence(raw_spec.get("prefer_source")) or list(defaults.prefer_source)
+    raw_prefer_source = raw_spec.get("prefer_source")
+    prefer_source = _coerce_sequence(raw_prefer_source) or list(defaults.prefer_source)
     normalize_to = _coerce_sequence(raw_spec.get("normalize_to")) or list(defaults.normalize_to)
     extras = raw_spec.get("extras")
     if extras is not None and not isinstance(extras, Mapping):
@@ -294,7 +295,10 @@ def _make_fetch_spec(
     if not allow_missing_resolvers:
         missing = [resolver for resolver in prefer_source if resolver not in RESOLVERS]
         if missing:
-            raise ConfigError("Unknown resolver(s) specified: " + ", ".join(sorted(set(missing))))
+            if raw_prefer_source is None:
+                prefer_source = [resolver for resolver in prefer_source if resolver in RESOLVERS]
+            else:
+                raise ConfigError("Unknown resolver(s) specified: " + ", ".join(sorted(set(missing))))
 
     resolver_override = raw_spec.get("resolver")
     if resolver_override:

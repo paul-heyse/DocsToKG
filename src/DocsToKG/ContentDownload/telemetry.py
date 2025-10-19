@@ -26,6 +26,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -35,7 +36,6 @@ from typing import (
     List,
     Optional,
     Protocol,
-    TracebackType,
     Set,
     Tuple,
     runtime_checkable,

@@ -188,7 +188,6 @@ from __future__ import annotations
 import io
 import logging
 import os
-import sys
 import textwrap
 from contextlib import contextmanager, redirect_stderr
 from datetime import datetime, timezone
@@ -204,14 +203,13 @@ from pydantic import BaseModel, ValidationError
 
 from DocsToKG.OntologyDownload import api as core
 from DocsToKG.OntologyDownload import planning as pipeline_mod
+from DocsToKG.OntologyDownload.errors import OntologyDownloadError
 from DocsToKG.OntologyDownload.planning import (
-    RESOLVERS,
     ConfigurationError,
     FetchPlan,
     ResolverError,
     merge_defaults,
 )
-from DocsToKG.OntologyDownload.errors import OntologyDownloadError
 from DocsToKG.OntologyDownload.settings import (
     ConfigError,
     DefaultsConfig,

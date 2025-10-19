@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
+import sqlite3
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass
@@ -36,11 +38,11 @@ from DocsToKG.ContentDownload.pipeline import ResolverMetrics, ResolverPipeline
 from DocsToKG.ContentDownload.providers import OpenAlexWorkProvider, WorkProvider
 from DocsToKG.ContentDownload.summary import RunResult, build_summary_record
 from DocsToKG.ContentDownload.telemetry import (
+    MANIFEST_SCHEMA_VERSION,
     AttemptSink,
     CsvSink,
     JsonlSink,
     LastAttemptCsvSink,
-    MANIFEST_SCHEMA_VERSION,
     ManifestIndexSink,
     MultiSink,
     RotatingJsonlSink,
@@ -143,7 +145,11 @@ class DownloadRun:
 
         sinks: List[AttemptSink] = []
         manifest_path = self.resolved.manifest_path
-        log_format = getattr(self.args, "log_format", "jsonl")
+        log_format = getattr(self.args, "log_format", None)
+        if isinstance(log_format, str):
+            log_format = log_format.lower()
+        else:
+            log_format = "jsonl"
 
         if log_format == "jsonl":
             if self.args.log_rotate:

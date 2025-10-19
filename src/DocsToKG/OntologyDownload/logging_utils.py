@@ -86,6 +86,10 @@ def setup_logging(
     for handler in list(logger.handlers):
         if getattr(handler, "_ontofetch_managed", False):
             logger.removeHandler(handler)
+            if isinstance(handler, logging.StreamHandler):
+                stream = getattr(handler, "stream", None)
+                if stream in (sys.stdout, sys.stderr):
+                    continue
             handler.close()
 
     console_formatter = logging.Formatter("%(levelname)s: %(message)s")

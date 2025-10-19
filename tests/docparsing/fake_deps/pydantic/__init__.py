@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Tuple, TypeVar
+from typing import Any, Callable, Dict, Tuple, TypeVar
 
 __all__ = [
     "BaseModel",
     "ConfigDict",
     "Field",
+    "GetCoreSchemaHandler",
+    "GetJsonSchemaHandler",
     "PrivateAttr",
     "ValidationError",
     "field_validator",
@@ -35,6 +37,20 @@ def Field(
 
 def ConfigDict(**kwargs: Any) -> Dict[str, Any]:
     return dict(kwargs)
+
+
+class GetCoreSchemaHandler:
+    """Minimal shim returning the provided schema unchanged."""
+
+    def __call__(self, schema: Any, *args: Any, **kwargs: Any) -> Any:
+        return schema
+
+
+class GetJsonSchemaHandler:
+    """Minimal shim compatible with pydantic's handler protocol."""
+
+    def __call__(self, schema: Any, *args: Any, **kwargs: Any) -> Any:
+        return schema
 
 
 def field_validator(*_args: Any, **_kwargs: Any) -> Callable[[Callable[..., T]], Callable[..., T]]:

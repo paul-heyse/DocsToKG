@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import types
-from types import SimpleNamespace
-
 import argparse
+import types
 import typing
+from types import SimpleNamespace
 
 import pytest
 

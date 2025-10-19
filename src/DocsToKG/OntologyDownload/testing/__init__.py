@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import socket
+import sys
 import threading
 import time
 from collections import defaultdict, deque
@@ -20,10 +21,8 @@ from typing import (
     Deque,
     Dict,
     Iterable,
-    Iterator,
     List,
     Mapping,
-    MutableMapping,
     Optional,
     Sequence,
     Tuple,
@@ -33,6 +32,8 @@ from urllib.parse import urljoin
 
 import requests
 
+from ..io import rate_limit as rate_mod
+from ..io import sanitize_filename
 from ..plugins import (
     register_resolver,
     register_validator,
@@ -41,20 +42,12 @@ from ..plugins import (
 )
 from ..resolvers import BaseResolver, FetchPlan
 from ..settings import (
-    CACHE_DIR,
-    CONFIG_DIR,
-    LOG_DIR,
-    LOCAL_ONTOLOGY_DIR,
     DefaultsConfig,
     DownloadConfiguration,
     ResolvedConfig,
-    STORAGE,
-    get_default_config,
     invalidate_default_config_cache,
 )
 from ..settings import StorageBackend as _StorageBackend
-from ..io import rate_limit as rate_mod
-from ..io import sanitize_filename
 
 __all__ = [
     "ResponseSpec",
@@ -341,14 +334,16 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         """Enqueue ``response`` for the specified ``path``."""
 
         key = (response.method.upper(), "/" + path.lstrip("/"))
-        self._responses[key].append(response)
+        self._responses[key].appendleft(response)
 
     def _dequeue_response(self, *, method: str, path: str) -> Optional[ResponseSpec]:
         key = (method.upper(), path)
         responses = self._responses.get(key)
         if not responses:
             return None
-        return responses.popleft()
+        response = responses.popleft()
+        print(f"serve {method} {path} -> {response.status}", file=sys.stderr)
+        return response
 
     # --- Fixture helpers ----------------------------------------------------------
 

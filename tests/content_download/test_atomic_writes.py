@@ -116,7 +116,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import sys
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
@@ -272,10 +271,11 @@ embeddings_manifest_log: List[dict] = []
 # --- Helper Functions ---
 
 
-import DocsToKG.DocParsing.chunking as chunker  # noqa: E402
-import DocsToKG.DocParsing.embedding as embeddings  # noqa: E402
 from docling_core.persistence import manifest_append, manifest_load  # noqa: E402
 from docling_core.serializers import RichSerializerProvider  # noqa: E402
+
+import DocsToKG.DocParsing.chunking as chunker  # noqa: E402
+import DocsToKG.DocParsing.embedding as embeddings  # noqa: E402
 from DocsToKG.ContentDownload.core import Classification  # noqa: E402
 from DocsToKG.ContentDownload.pipeline import DownloadOutcome  # noqa: E402
 from DocsToKG.DocParsing.core import iter_jsonl  # noqa: E402

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, TextIO
+from typing import Any, Dict, List, Optional, Sequence, TextIO, Tuple
 
 from DocsToKG.DocParsing.cli_errors import DoctagsCLIValidationError
 from DocsToKG.DocParsing.env import (
@@ -19,7 +19,6 @@ from DocsToKG.DocParsing.io import (
     load_manifest_index,
 )
 
-from .cli_utils import preview_list
 from .discovery import (
     derive_doc_id_and_chunks_path,
     derive_doc_id_and_doctags_path,

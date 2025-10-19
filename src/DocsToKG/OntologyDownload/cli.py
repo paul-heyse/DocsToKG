@@ -603,25 +603,32 @@ def _handle_pull(
     base_config: Optional[ResolvedConfig],
     *,
     dry_run: bool = False,
+    logger: Optional[logging.Logger] = None,
 ):
     """Execute the ``pull`` subcommand workflow."""
 
     config, specs = _resolve_specs_from_args(args, base_config)
     if dry_run:
-        return plan_all(specs, config=config)
+        return plan_all(specs, config=config, logger=logger)
     return fetch_all(
         specs,
         config=config,
+        logger=logger,
         force=getattr(args, "force", False),
     )
 
 
-def _handle_plan(args, base_config: Optional[ResolvedConfig]) -> List[PlannedFetch]:
+def _handle_plan(
+    args,
+    base_config: Optional[ResolvedConfig],
+    *,
+    logger: Optional[logging.Logger] = None,
+) -> List[PlannedFetch]:
     """Resolve plans without executing downloads."""
 
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config)
-    plans = plan_all(specs, config=config, since=since)
+    plans = plan_all(specs, config=config, since=since, logger=logger)
     if not getattr(args, "no_lock", False):
         lock_path = getattr(args, "lock_output", DEFAULT_LOCKFILE_PATH)
         write_lockfile(plans, lock_path)
@@ -1295,9 +1302,13 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
             retention_days=logging_config.retention_days,
             max_log_size_mb=logging_config.max_log_size_mb,
         )
+        if getattr(args, "json", False):
+            for handler in logger.handlers:
+                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                    handler.setStream(sys.stderr)
         if args.command == "pull":
             if getattr(args, "dry_run", False):
-                plans = _handle_pull(args, base_config, dry_run=True)
+                plans = _handle_pull(args, base_config, dry_run=True, logger=logger)
                 if args.json:
                     json.dump([plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
                     sys.stdout.write("\n")
@@ -1308,7 +1319,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                     else:
                         print("No ontologies to process")
             else:
-                results = _handle_pull(args, base_config, dry_run=False)
+                results = _handle_pull(args, base_config, dry_run=False, logger=logger)
                 if args.json:
                     json.dump([results_to_dict(result) for result in results], sys.stdout, indent=2)
                     sys.stdout.write("\n")
@@ -1327,7 +1338,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                         },
                     )
         elif args.command == "plan":
-            plans = _handle_plan(args, base_config)
+            plans = _handle_plan(args, base_config, logger=logger)
             if args.json:
                 json.dump([plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
                 sys.stdout.write("\n")

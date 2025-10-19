@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict
 
+from . import config as config  # re-export module for attribute access
+
 __all__ = ["Topics", "Works", "config"]
 
 
@@ -27,5 +29,3 @@ class Works:
     def works(self, **_kwargs: Any) -> Dict[str, Any]:
         return self.data or {"results": []}
 
-
-from . import config as config  # re-export module for attribute access
