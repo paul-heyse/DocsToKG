@@ -558,6 +558,34 @@ def test_plan_embed_resume_missing_manifest_skips_hash(
     assert plan["skip"]["count"] == 0
 
 
+def test_plan_embed_validate_only_missing_directories(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Validate-only planning surfaces missing chunk/vector directories."""
+
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.detect_data_root",
+        lambda *_args, **_kwargs: data_root,
+    )
+
+    plan = plan_embed([
+        "--data-root",
+        str(data_root),
+        "--validate-only",
+    ])
+
+    assert plan["validate"]["count"] == 0
+    assert plan["missing"]["count"] == 0
+    assert any(
+        note.startswith("Chunks/Vectors directory missing") for note in plan["notes"]
+    )
+
+
 def test_plan_embed_generate_counts(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

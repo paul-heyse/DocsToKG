@@ -282,15 +282,33 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         resolver=lambda root: data_vectors(root, ensure=False),
     ).resolve()
 
-    missing_notes: List[str] = []
+    missing_components: List[str] = []
     if not chunks_dir.exists():
-        missing_notes.append("Chunks directory missing")
+        missing_components.append("chunks")
     if not vectors_dir.exists():
-        missing_notes.append("Vectors directory missing")
+        missing_components.append("vectors")
+
+    missing_notes: List[str] = []
+    if missing_components:
+        detail = ", ".join(missing_components)
+        note = "Chunks/Vectors directory missing"
+        if detail:
+            note = f"{note}: {detail}"
+        missing_notes.append(note)
 
     if args.validate_only:
         validate_bucket = _new_bucket()
         missing_bucket = _new_bucket()
+        if missing_notes:
+            return {
+                "stage": "embed",
+                "action": "validate",
+                "chunks_dir": str(chunks_dir),
+                "vectors_dir": str(vectors_dir),
+                "validate": validate_bucket,
+                "missing": missing_bucket,
+                "notes": missing_notes,
+            }
         for chunk in iter_chunks(chunks_dir):
             doc_id, vector_path = derive_doc_id_and_vectors_path(
                 chunk, chunks_dir, vectors_dir
