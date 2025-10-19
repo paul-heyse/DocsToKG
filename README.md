@@ -25,9 +25,12 @@ python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 pip install -e .
+pip install ./ci/wheels/faiss-1.12.0-py3-none-any.whl  # install (or validate) the CUDA-enabled FAISS wheel
 pip install -r requirements.in         # optional GPU / ML stack
 pip install -r docs/build/sphinx/requirements.txt  # documentation tooling
 ```
+
+If your environment already ships the wheel, run the verification snippet in [GPU prerequisites](#gpu-prerequisites) instead of reinstalling it.
 
 Or let the bootstrap script handle those steps:
 
@@ -36,7 +39,7 @@ Or let the bootstrap script handle those steps:
 direnv allow  # re-load the environment so .envrc activates .venv automatically
 ```
 
-> ℹ️  The repository ships with a preconfigured `.envrc` that adds `.venv/bin` to `PATH`,
+> ℹ️ The repository ships with a preconfigured `.envrc` that adds `.venv/bin` to `PATH`,
 > exports `VIRTUAL_ENV`, and appends `src/` to `PYTHONPATH`. Any shell (or AI agent) that
 > runs commands via `direnv exec . …` automatically picks up the project virtual environment
 > without additional configuration.
@@ -59,6 +62,45 @@ pytest -q
 python docs/scripts/generate_api_docs.py
 python docs/scripts/validate_docs.py
 ```
+
+## GPU prerequisites
+
+DocsToKG's hybrid search pipeline expects the custom CUDA-enabled FAISS wheel to be present **before** you start GPU ingestion. Ensure the following runtime dependencies are satisfied:
+
+- CUDA 12 runtime libraries on the loader path (at minimum `libcudart.so.12` and `libcublas.so.12`).
+- OpenBLAS runtime (`libopenblas.so.0`).
+- Glibc ≥ 2.38 and libstdc++ ≥ GLIBCXX_3.4.32 (the wheel links against the newer libc/libstdc++ symbols).
+- Supporting libraries exposed by the wheel such as `libjemalloc.so.2` and `libgomp.so.1` (installed on most CUDA hosts).
+
+The wheel honours the loader environment variables documented in `faiss/loader.py`:
+
+- `FAISS_OPT_LEVEL` — override FAISS' CPU feature detection (`generic`, `avx2`, `avx512`, …) to dodge import issues.
+- `FAISS_DISABLE_CPU_FEATURES` — disable individual CPU features if you need to pin the runtime to a conservative baseline.
+
+Operators should read the [Custom FAISS GPU wheel reference](src/DocsToKG/HybridSearch/faiss-gpu-wheel-reference.md) for the full compatibility matrix. At a minimum:
+
+1. Confirm the wheel is installed or available in your environment.
+2. Validate that FAISS can see your GPUs and run the bundled smoke test before ingestion:
+
+    ```bash
+    python - <<'PY'
+    import faiss, numpy as np
+
+    print("Faiss:", getattr(faiss, "__version__", "<no __version__>"), "GPUs:", faiss.get_num_gpus())
+    assert faiss.get_num_gpus() >= 1, "FAISS must see at least one CUDA device"
+
+    resources = faiss.StandardGpuResources()
+    index = faiss.GpuIndexFlatL2(resources, 128)
+    xb = np.random.RandomState(0).randn(1_000, 128).astype("float32")
+    index.add(xb)
+    distances, _ = index.search(xb[:3], 3)
+    print("Smoke test OK. top-1 distance:", float(distances[0, 0]))
+    PY
+    ```
+
+    This reproduces the smoke test bundled with the wheel build scripts and verifies CUDA kernels run end-to-end.
+
+3. Only proceed with ingestion once the smoke test succeeds (`faiss.get_num_gpus()` ≥ 1 and no loader errors).
 
 ## 4. Example Usage
 
@@ -120,21 +162,21 @@ blocked, skipped, fallback, and retry scenarios.
 
 The default resolver registry now includes Zenodo and Figshare, expanding open
 access coverage without additional configuration. Both providers honour
-``ResolverConfig`` timeouts, polite headers, and conditional request metadata.
+`ResolverConfig` timeouts, polite headers, and conditional request metadata.
 
-To opt out, disable them via ``resolver_toggles`` in your configuration file:
+To opt out, disable them via `resolver_toggles` in your configuration file:
 
 ```yaml
 resolver_toggles:
-  zenodo: false
-  figshare: false
+    zenodo: false
+    figshare: false
 ```
 
 ### 5.2 Bounded Concurrency
 
-Use the ``--workers`` flag to enable bounded parallelism when downloading
+Use the `--workers` flag to enable bounded parallelism when downloading
 content via the OpenAlex pipeline. Each worker drives an isolated
-``ResolverPipeline`` that honours per-resolver rate limits and maintains
+`ResolverPipeline` that honours per-resolver rate limits and maintains
 independent HTTP sessions with retry support.
 
 ```bash
@@ -147,14 +189,14 @@ python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 3 --topic "onc
 
 Additional operational flags:
 
-- ``--max-concurrent-per-host 2`` keeps simultaneous downloads per domain polite.
-- ``--domain-bytes-budget example.com=500MB`` guards against single-host bandwidth drain.
-- ``--log-rotate 250MB`` rotates JSONL attempt logs during long-running crawls.
-- ``--domain-token-bucket example.org=0.5:capacity=2`` enforces host-specific request rates.
+- `--max-concurrent-per-host 2` keeps simultaneous downloads per domain polite.
+- `--domain-bytes-budget example.com=500MB` guards against single-host bandwidth drain.
+- `--log-rotate 250MB` rotates JSONL attempt logs during long-running crawls.
+- `--domain-token-bucket example.org=0.5:capacity=2` enforces host-specific request rates.
 
 **Concurrency recommendations:**
 
-- Start with ``--workers=3`` for production workloads.
+- Start with `--workers=3` for production workloads.
 - Monitor rate limit compliance with resolver APIs while scaling.
 - Higher values (>5) may overwhelm downstream services despite per-resolver
   throttling.
@@ -162,61 +204,61 @@ Additional operational flags:
 ### 5.3 HEAD Pre-check Filtering
 
 HEAD preflight checks remove obvious HTML landing pages and zero-byte
-responses before performing costly ``GET`` downloads. The feature is enabled by
+responses before performing costly `GET` downloads. The feature is enabled by
 default and can be tuned per resolver:
 
 ```yaml
 enable_head_precheck: true
 resolver_head_precheck:
-  landing_page: false
-  wayback: false  # opt-out for resolvers that reject HEAD
-  zenodo: true    # explicitly keep HEAD preflight enabled
+    landing_page: false
+    wayback: false # opt-out for resolvers that reject HEAD
+    zenodo: true # explicitly keep HEAD preflight enabled
 ```
 
 When a HEAD request fails (timeout or 5xx), the pipeline automatically falls
-back to the original ``GET`` attempt to avoid false negatives.
+back to the original `GET` attempt to avoid false negatives.
 
 ### 5.4 Additional CLI Flags
 
-- ``--dry-run``: compute resolver coverage without writing files.
-- ``--resume-from <manifest.jsonl>``: skip works already recorded as successful. CSV
-  attempts logs are also supported when a paired ``*.sqlite3``/``*.sqlite`` cache lives
+- `--dry-run`: compute resolver coverage without writing files.
+- `--resume-from <manifest.jsonl>`: skip works already recorded as successful. CSV
+  attempts logs are also supported when a paired `*.sqlite3`/`*.sqlite` cache lives
   alongside the CSV—even outside the active manifest directory. If the
   manifest path is wrong or missing, the downloader now fails fast with a clear
   error so you can fix the flag before rerunning.
-- ``--extract-text=html``: save plaintext alongside HTML fallbacks (requires ``trafilatura``).
-- ``--enable-resolver openaire`` (and ``hal``/``osf``): opt into additional EU/preprint resolvers.
-- ``--resolver-config config.yaml``: load advanced options such as
-  ``max_concurrent_resolvers`` and ``resolver_head_precheck`` (see
-  ``docs/resolver-configuration.md``).
+- `--extract-text=html`: save plaintext alongside HTML fallbacks (requires `trafilatura`).
+- `--enable-resolver openaire` (and `hal`/`osf`): opt into additional EU/preprint resolvers.
+- `--resolver-config config.yaml`: load advanced options such as
+  `max_concurrent_resolvers` and `resolver_head_precheck` (see
+  `docs/resolver-configuration.md`).
 
 ### Resolver Enhancements
 
 - **Zenodo and Figshare support** – the default resolver order now queries
   Zenodo and Figshare APIs, expanding coverage of institutional repositories.
 - **Bounded intra-work concurrency** – configure
-  ``max_concurrent_resolvers`` to execute independent resolvers in parallel
+  `max_concurrent_resolvers` to execute independent resolvers in parallel
   while preserving per-resolver rate limits.
-- **HEAD pre-check filtering** – enable ``enable_head_precheck`` (default) to
+- **HEAD pre-check filtering** – enable `enable_head_precheck` (default) to
   perform lightweight HEAD requests that skip HTML and zero-byte responses
   before downloading.
-- **Migration resources** – see ``docs/migration-modularize-resolvers.md`` for
+- **Migration resources** – see `docs/migration-modularize-resolvers.md` for
   a full list of import path changes, configuration defaults, and testing tips.
 
 ### 5.5 Troubleshooting Content Downloads
 
-- **Partial files remain (``*.part``)** – rerun with fewer workers or check network
+- **Partial files remain (`*.part`)** – rerun with fewer workers or check network
   stability before retrying.
-- **Resolver rate limit warnings** – lower ``--workers`` or increase per-resolver
-  ``resolver_min_interval_s``.
-- **High memory usage** – reduce ``--workers`` to limit in-flight downloads.
+- **Resolver rate limit warnings** – lower `--workers` or increase per-resolver
+  `resolver_min_interval_s`.
+- **High memory usage** – reduce `--workers` to limit in-flight downloads.
 
 ### 5.6 Logging and Exports
 
 - Attempts log to JSONL by default. Convert to CSV with
-  ``python scripts/export_attempts_csv.py attempts.jsonl attempts.csv``.
-- Alternatively, use ``jq``:
-  ``jq -r '[.timestamp,.work_id,.status,.url] | @csv' attempts.jsonl > attempts.csv``.
+  `python scripts/export_attempts_csv.py attempts.jsonl attempts.csv`.
+- Alternatively, use `jq`:
+  `jq -r '[.timestamp,.work_id,.status,.url] | @csv' attempts.jsonl > attempts.csv`.
 
 ## 6. Development
 
@@ -262,7 +304,7 @@ DocsToKG/
 
 The DocParsing toolkit now exposes first-class module entrypoints for each stage
 of the pipeline. The legacy scripts remain available but emit a
-``DeprecationWarning`` on direct invocation.
+`DeprecationWarning` on direct invocation.
 
 ```bash
 # Convert HTML or PDF corpora to DocTags (auto-detects mode when possible)
@@ -276,12 +318,12 @@ python -m DocsToKG.DocParsing.core.cli embed --resume
 
 ```
 
-Use ``--help`` or append ``-- --help`` after the subcommand for the full set of
+Use `--help` or append `-- --help` after the subcommand for the full set of
 flags, including data-root overrides, resume/force controls, and tokenizer
 configuration.
 
 Synthetic benchmarking now lives in the test suite; run
-``pytest tests/docparsing/test_synthetic_benchmark.py`` to exercise the
+`pytest tests/docparsing/test_synthetic_benchmark.py` to exercise the
 deterministic model and verify baseline performance.
 
 ## 9. Support & Community
