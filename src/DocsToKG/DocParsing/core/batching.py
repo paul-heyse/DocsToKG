@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from typing import Iterable, Iterator, List, Optional, Sequence, TypeVar
 
 T = TypeVar("T")
@@ -45,7 +44,7 @@ class Batcher(Iterable[List[T]]):
 
         if length <= 0:
             return 0
-        return 1 << (int(math.log2(length - 1)) + 1)
+        return 1 << ((length - 1).bit_length())
 
     def _ordered_indices(self) -> List[int]:
         """Return indices ordered by bucketed length and original position."""

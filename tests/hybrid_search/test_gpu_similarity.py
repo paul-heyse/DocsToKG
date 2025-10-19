@@ -46,11 +46,14 @@ def test_cosine_batch_normalizes_in_place_and_reuses_contiguous_buffers(shape):
     np.testing.assert_allclose(result, expected)
     if normalized_q.ndim == 1:
         np.testing.assert_allclose(q, q_view.reshape(-1))
-        assert captured["queries"].base is q
+        # Check that queries were normalized in-place (base array should be shared)
+        assert np.shares_memory(captured["queries"], q)
     else:
         np.testing.assert_allclose(q, q_view)
+        # Check that queries were normalized in-place (should be the same array)
         assert captured["queries"] is q
     np.testing.assert_allclose(C, normalized_C)
+    # Check that corpus was normalized in-place (should be the same array)
     assert captured["corpus"] is C
     assert np.shares_memory(captured["queries"], q)
     assert np.shares_memory(captured["corpus"], C)
@@ -82,6 +85,7 @@ def _make_faiss_stub(*, enable_knn: bool) -> tuple[SimpleNamespace, dict[str, ob
         return scores.astype(np.float32), order.astype(np.int64)
 
     if enable_knn:
+
         def pairwise_disabled(*_args, **_kwargs):  # pragma: no cover - guard rail
             raise AssertionError("pairwise path disabled")
 

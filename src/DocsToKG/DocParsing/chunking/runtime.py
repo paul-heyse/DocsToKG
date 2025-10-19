@@ -157,6 +157,7 @@ import itertools
 import json
 import logging
 import statistics
+import unicodedata
 import time
 import uuid
 from dataclasses import dataclass, fields
@@ -229,6 +230,7 @@ from DocsToKG.DocParsing.io import (
     compute_chunk_uuid,
     compute_content_hash,
     iter_doctags,
+    make_hasher,
     load_manifest_index,
     quarantine_artifact,
     relative_path,
@@ -268,6 +270,18 @@ def read_utf8(path: Path) -> str:
     """Load UTF-8 text from ``path`` replacing undecodable bytes."""
 
     return Path(path).read_text(encoding="utf-8", errors="replace")
+
+
+def _hash_doctags_text(text: str) -> str:
+    """Return a normalised content hash for DocTags ``text``."""
+
+    algorithm = resolve_hash_algorithm()
+    hasher = make_hasher(name=algorithm)
+    if text:
+        normalised = unicodedata.normalize("NFKC", text)
+        if normalised:
+            hasher.update(normalised.encode("utf-8"))
+    return hasher.hexdigest()
 
 
 def build_doc(doc_name: str, doctags_text: str) -> DoclingDocument:
@@ -563,6 +577,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
     start_time = time.perf_counter()
     try:
         text = read_utf8(task.doc_path)
+        input_hash = task.input_hash or _hash_doctags_text(text)
         doc = build_doc(task.doc_stem, text)
         raw_chunks = list(chunker.chunk(dl_doc=doc))
 
@@ -651,7 +666,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             duration_s=duration,
             input_path=task.doc_path,
             output_path=task.output_path,
-            input_hash=task.input_hash,
+            input_hash=input_hash,
             chunk_count=len(merged),
             parse_engine=task.parse_engine,
             sanitizer_profile=task.sanitizer_profile,
@@ -659,6 +674,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
         )
     except Exception as exc:  # pragma: no cover - exercised in failure paths
         duration = time.perf_counter() - start_time
+        input_hash = locals().get("input_hash", task.input_hash)
         return ChunkResult(
             doc_id=task.doc_id,
             doc_stem=task.doc_stem,
@@ -666,7 +682,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             duration_s=duration,
             input_path=task.doc_path,
             output_path=task.output_path,
-            input_hash=task.input_hash,
+            input_hash=input_hash,
             chunk_count=0,
             parse_engine=task.parse_engine,
             sanitizer_profile=task.sanitizer_profile,
@@ -1160,7 +1176,7 @@ def _main_inner(
         resolve_attempts_path(MANIFEST_STAGE, resolved_data_root),
         resolve_manifest_path(MANIFEST_STAGE, resolved_data_root),
     )
-    stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=CHUNK_STAGE)
+    stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=MANIFEST_STAGE)
     with telemetry_scope(stage_telemetry):
         if getattr(args, "validate_only", False):
             _run_validate_only(
@@ -1360,6 +1376,7 @@ def _main_inner(
                 schema_version=CHUNK_SCHEMA_VERSION,
                 duration_s=duration,
                 metadata={
+                    "status": "success",
                     "input_path": str(result.input_path),
                     "input_hash": result.input_hash,
                     "chunk_count": result.chunk_count,
