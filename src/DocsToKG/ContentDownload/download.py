@@ -898,6 +898,26 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                             }
                         },
                     )
+                    
+                    # Skip large downloads if configured to do so
+                    if ctx.skip_large_downloads:
+                        elapsed_ms = (time.monotonic() - start) * 1000.0
+                        return DownloadStreamResult(
+                            outcome=DownloadOutcome(
+                                classification=Classification.SKIPPED,
+                                path=None,
+                                http_status=response.status_code,
+                                content_type=response.headers.get("Content-Type"),
+                                elapsed_ms=elapsed_ms,
+                                reason=ReasonCode.SKIP_LARGE_DOWNLOAD,
+                                reason_detail=f"skipped-large-download-{size_mb:.1f}mb",
+                                sha256=None,
+                                content_length=content_length_hint,
+                                etag=response.headers.get("ETag"),
+                                last_modified=response.headers.get("Last-Modified"),
+                                extracted_text_path=None,
+                            )
+                        )
 
                 hasher = hashlib.sha256() if not dry_run else None
                 byte_count = 0
@@ -1098,12 +1118,14 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                         if detected in {Classification.PDF, Classification.HTML, Classification.XML}
                         else Classification.PDF
                     )
+                    resume_supported_flag = bool(resume_bytes_offset) or bool(
+                        getattr(ctx, "enable_range_resume", False)
+                    )
                     cleanup_sidecar_files(
                         artifact,
                         classification_hint,
                         ctx,
-                        resume_supported=bool(resume_bytes_offset),
-                        preserve_partial=True,
+                        resume_supported=resume_supported_flag,
                     )
                     seen_attempts = ctx.stream_retry_attempts
                     if seen_attempts < 1:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from unittest.mock import patch
 
 from DocsToKG.OntologyDownload import cli as cli_module
 from DocsToKG.OntologyDownload.testing import TestingEnvironment
@@ -31,6 +32,25 @@ def test_cli_doctor_handles_missing_ontology_dir(capsys):
 
         disk = output["disk"]
         assert Path(disk["path"]) == missing_dir
+        assert disk["ok"] is True
         assert disk["total_bytes"] is not None
         assert disk["free_bytes"] is not None
         assert "error" not in disk
+
+
+def test_cli_doctor_reports_disk_error(capsys):
+    """Disk probe failures should surface the probe path and error details."""
+
+    with TestingEnvironment() as env:
+        with patch.object(
+            cli_module.shutil, "disk_usage", side_effect=OSError("synthetic disk failure")
+        ):
+            exit_code = cli_module.cli_main(["doctor", "--json"])
+
+        assert exit_code == 0
+
+        output = json.loads(capsys.readouterr().out)
+        disk = output["disk"]
+        assert disk["path"] == str(env.ontology_dir)
+        assert disk["error"] == "synthetic disk failure"
+        assert "total_bytes" not in disk

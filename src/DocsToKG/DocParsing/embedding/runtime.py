@@ -1869,9 +1869,10 @@ def write_vectors(
         writer.write_rows(payloads)
     except Exception as exc:
         output_ref = str(output_path) if output_path is not None else ""
+        failure_logger = getattr(sys.modules[__name__], "manifest_log_failure")
         for row in rows:
             doc_id = row.get("doc_id", "unknown") if isinstance(row, dict) else "unknown"
-            manifest_log_failure(
+            failure_logger(
                 stage="embeddings",
                 doc_id=doc_id,
                 duration_s=0.0,

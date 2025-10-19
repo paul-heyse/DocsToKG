@@ -116,6 +116,7 @@ class DownloadRun:
         self.csv_sink_factory = CsvSink
         self.multi_sink_factory = MultiSink
         self.run_telemetry_factory = RunTelemetry
+        self.process_one_work_func = process_one_work
 
     def __enter__(self) -> "DownloadRun":
         return self
@@ -318,6 +319,7 @@ class DownloadRun:
             and sqlite_path.exists()
             and (resume_lookup or resume_completed)
         ):
+            resume_completed = set()
             LOGGER.warning(
                 "Resume manifest %s is missing; loading resume metadata from SQLite %s.",
                 resume_path,
@@ -346,7 +348,7 @@ class DownloadRun:
 
         session_factory = self.state.session_factory
         active_session = session or session_factory()
-        result = process_one_work(
+        result = self.process_one_work_func(
             work,
             active_session,
             self.resolved.pdf_dir,
