@@ -598,7 +598,8 @@ def _resolve_specs_from_args(
             config_path = default_config
 
     if config_path:
-        config = load_config(config_path)
+        normalised_config_path = config_path.expanduser().resolve()
+        config = load_config(normalised_config_path)
     else:
         config = base_config or get_default_config(copy=True)
 
