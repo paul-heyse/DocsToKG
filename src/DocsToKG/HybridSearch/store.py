@@ -664,8 +664,10 @@ class FaissVectorStore(DenseVectorStore):
             dedupe_threshold = float(getattr(self._config, "ingest_dedupe_threshold", 0.0))
             dropped = 0
             if dedupe_threshold > 0.0 and self.ntotal > 0:
+                probe_matrix = np.ascontiguousarray(matrix.copy(), dtype=np.float32)
+                faiss.normalize_L2(probe_matrix)
                 try:
-                    distances, indices = self._search_matrix(matrix, 1)
+                    distances, indices = self._search_matrix(probe_matrix, 1)
                 except Exception:
                     logger.debug(
                         "ingest dedupe check failed; proceeding without filter", exc_info=True
