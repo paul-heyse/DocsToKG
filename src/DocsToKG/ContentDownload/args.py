@@ -276,6 +276,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Disable global URL deduplication.",
     )
     resolver_group.add_argument(
+        "--global-url-dedup-cap",
+        type=int,
+        default=100000,
+        metavar="N",
+        help=(
+            "Maximum number of URLs hydrated from prior manifests into the persistent dedupe "
+            "set (default: 100000). Set to 0 to disable the cap."
+        ),
+    )
+    resolver_group.add_argument(
         "--domain-min-interval",
         dest="domain_min_interval",
         type=_parse_domain_interval,
@@ -410,6 +420,8 @@ def resolve_config(
         parser.error("--openalex-retry-attempts must be >= 0")
     if args.openalex_retry_backoff < 0:
         parser.error("--openalex-retry-backoff must be >= 0")
+    if getattr(args, "global_url_dedup_cap", 0) < 0:
+        parser.error("--global-url-dedup-cap must be >= 0")
     for field_name in ("sniff_bytes", "min_pdf_bytes", "tail_check_bytes"):
         value = getattr(args, field_name, None)
         if value is not None and value < 0:
@@ -535,12 +547,30 @@ def resolve_config(
     sqlite_path = manifest_path.with_suffix(".sqlite3")
 
     previous_url_index = ManifestUrlIndex(sqlite_path, eager=args.warm_manifest_cache)
-    persistent_seen_urls: Set[str] = {
-        url
-        for url, meta in previous_url_index.iter_existing_paths()
-        if str(meta.get("classification", "")).lower()
-        in {Classification.PDF.value, Classification.CACHED.value, Classification.XML.value}
-    }
+    persistent_seen_urls: Set[str] = set()
+    if getattr(config, "enable_global_url_dedup", True):
+        allowed_classifications = {
+            Classification.PDF.value,
+            Classification.CACHED.value,
+            Classification.XML.value,
+        }
+        cap = getattr(args, "global_url_dedup_cap", 0) or 0
+        truncated = False
+        for url, meta in previous_url_index.iter_existing_paths():
+            classification = str(meta.get("classification", "")).strip().lower()
+            if classification in allowed_classifications:
+                before = len(persistent_seen_urls)
+                persistent_seen_urls.add(url)
+                if cap and len(persistent_seen_urls) >= cap and len(persistent_seen_urls) != before:
+                    truncated = True
+                    break
+        if truncated:
+            LOGGER.info(
+                "Hydrated %s persistent URLs for dedupe (cap=%s). Remaining manifest entries "
+                "were skipped; increase --global-url-dedup-cap to hydrate more.",
+                len(persistent_seen_urls),
+                cap,
+            )
 
     robots_checker: Optional[RobotsCache] = None
     if not args.ignore_robots:
