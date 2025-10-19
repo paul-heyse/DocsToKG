@@ -35,7 +35,7 @@ from .formatters import (
     format_validation_summary,
 )
 from .io import format_bytes
-from .logging_utils import setup_logging
+from .logging_utils import _cleanup_logs, setup_logging
 from .manifests import (
     DEFAULT_LOCKFILE_PATH,
     DEFAULT_PLAN_BASELINE,
@@ -1025,15 +1025,12 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
             actions.append(f"Created directory {path}")
 
     if LOG_DIR.exists():
-        for log_file in LOG_DIR.glob("*.log"):
-            target = log_file.parent / f"{log_file.name}.1"
-            try:
-                if target.exists():
-                    target.unlink()
-                log_file.rename(target)
-                actions.append(f"Rotated log {log_file.name} -> {target.name}")
-            except OSError as exc:
-                actions.append(f"Failed to rotate {log_file.name}: {exc}")
+        retention_days = ResolvedConfig.from_defaults().defaults.logging.retention_days
+        try:
+            rotations = _cleanup_logs(LOG_DIR, retention_days)
+            actions.extend(rotations)
+        except OSError as exc:
+            actions.append(f"Failed to rotate logs in {LOG_DIR}: {exc}")
 
     placeholders = {
         CONFIG_DIR / "bioportal_api_key.txt": "Add your BioPortal API key here\n",
