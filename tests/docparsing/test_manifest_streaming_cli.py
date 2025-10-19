@@ -193,7 +193,7 @@ def test_manifest_streams_large_tail(monkeypatch, tmp_path, capsys, tail: int) -
 
     from DocsToKG.DocParsing.core import cli
 
-    def fake_iter_manifest_entries(stages, data_root):
+    def fake_iter_manifest_entries(stages, data_root, *, limit=None):
         assert stages == [stage_name]
         assert data_root == tmp_path
 
@@ -334,3 +334,100 @@ def test_manifest_read_only_root_existing_manifests(tmp_path, monkeypatch, capsy
     assert stdout[0] == "docparse manifest tail (last 1 entries)"
     assert "doc-2" in stdout[1]
     assert "status=failure" in stdout[1]
+
+
+def test_manifest_tail_reads_bounded_window(monkeypatch, tmp_path, capsys) -> None:
+    """``--tail`` without summary reads only a bounded suffix from manifests."""
+
+    _prepare_manifest_cli_stubs(monkeypatch)
+
+    from DocsToKG.DocParsing.core import cli
+    from DocsToKG.DocParsing import io as manifest_io
+
+    stage_name = "chunks"
+    manifest_dir = tmp_path / "Manifests"
+    manifest_dir.mkdir()
+    manifest_path = manifest_dir / f"docparse.{stage_name}.manifest.jsonl"
+
+    total_entries = 6_000
+    lines = [
+        json.dumps(
+            {
+                "timestamp": f"2025-01-01T00:{index // 60:02d}:{index % 60:02d}",
+                "stage": stage_name,
+                "doc_id": f"doc-{index}",
+                "status": "success",
+                "duration_s": 0.25,
+            }
+        )
+        for index in range(total_entries)
+    ]
+    manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    window_bytes = 4096
+    monkeypatch.setattr(manifest_io, "_MANIFEST_TAIL_MIN_WINDOW", window_bytes)
+    monkeypatch.setattr(manifest_io, "_MANIFEST_TAIL_BYTES_PER_ENTRY", 64)
+
+    read_lengths: list[int] = []
+    target_path = manifest_path.resolve()
+    original_open = manifest_io.Path.open
+
+    class _CountingHandle:
+        def __init__(self, handle):
+            self._handle = handle
+
+        def read(self, size=-1):
+            data = self._handle.read(size)
+            if isinstance(data, bytes):
+                read_lengths.append(len(data))
+            return data
+
+        def __getattr__(self, name):  # pragma: no cover - passthrough helper
+            return getattr(self._handle, name)
+
+        def __enter__(self):
+            self._handle.__enter__()
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return self._handle.__exit__(exc_type, exc, tb)
+
+    def counting_open(self, mode="r", *args, **kwargs):
+        handle = original_open(self, mode, *args, **kwargs)
+        if "b" in mode:
+            try:
+                resolved = self.resolve()
+            except OSError:
+                resolved = self
+            if resolved == target_path:
+                return _CountingHandle(handle)
+        return handle
+
+    monkeypatch.setattr(manifest_io.Path, "open", counting_open)
+
+    tail_count = 5
+    exit_code = cli.manifest(
+        [
+            "--stage",
+            stage_name,
+            "--tail",
+            str(tail_count),
+            "--data-root",
+            str(tmp_path),
+        ]
+    )
+
+    assert exit_code == 0
+
+    stdout = capsys.readouterr().out.splitlines()
+    assert stdout[0] == f"docparse manifest tail (last {tail_count} entries)"
+
+    expected_ids = [f"doc-{index}" for index in range(total_entries - tail_count, total_entries)]
+    tail_lines = stdout[1 : 1 + tail_count]
+    for doc_id, line in zip(expected_ids, tail_lines):
+        assert doc_id in line
+
+    bytes_read = sum(read_lengths)
+    assert bytes_read > 0
+    assert bytes_read <= window_bytes
+    assert manifest_path.stat().st_size > window_bytes * 4

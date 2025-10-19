@@ -551,8 +551,17 @@ def _manifest_main(argv: Sequence[str]) -> int:
         duration_totals = defaultdict(float)
         total_entries = defaultdict(int)
 
+    if tail_count and not need_summary:
+        entry_iter = iter_manifest_entries(
+            stages,
+            args.data_root,
+            limit=tail_count,
+        )
+    else:
+        entry_iter = iter_manifest_entries(stages, args.data_root)
+
     entry_found = False
-    for entry in iter_manifest_entries(stages, args.data_root):
+    for entry in entry_iter:
         entry_found = True
         if tail_count:
             tail_entries.append(entry)
