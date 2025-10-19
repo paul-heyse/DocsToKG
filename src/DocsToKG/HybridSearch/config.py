@@ -125,6 +125,8 @@ class DenseIndexConfig:
         use_pinned_memory: Use pinned host buffers for large add/search batches
         ingest_dedupe_threshold: Skip ingest when cosine similarity exceeds this value (0 disables)
         persist_mode: Persistence policy ("cpu_bytes" default, disable for GPU-only runtime)
+        snapshot_refresh_interval_seconds: Minimum seconds between CPU snapshot refreshes (0 disables interval throttle)
+        snapshot_refresh_writes: Minimum write operations between CPU snapshot refreshes (0 disables write throttle)
         ivf_train_factor: Controls IVF training sample size per nlist shard
 
     Examples:
@@ -161,6 +163,9 @@ class DenseIndexConfig:
     force_remove_ids_fallback: bool = False
     # Persistence: "cpu_bytes" (default, serialize via CPU), or "disabled"
     persist_mode: Literal["cpu_bytes", "disabled"] = "cpu_bytes"
+    # Snapshot throttling: refresh if either interval or write thresholds are satisfied (>0 to enable)
+    snapshot_refresh_interval_seconds: float = 0.0
+    snapshot_refresh_writes: int = 0
     # Controls training sample size for IVF: min(total, max(1024, nlist * ivf_train_factor))
     ivf_train_factor: int = 8
 

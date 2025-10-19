@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import builtins
 import io
 import sys
 import types
@@ -11,6 +12,7 @@ from unittest import mock
 
 import pytest
 
+from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
 import DocsToKG.DocParsing.core.http as core_http
 from DocsToKG.DocParsing.config import ConfigLoadError, load_toml_markers, load_yaml_markers
 from DocsToKG.DocParsing.core import (
@@ -309,8 +311,31 @@ def test_load_toml_markers_failure() -> None:
     assert "TOML" in str(excinfo.value)
 
 
-def test_chunk_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> None:
+def test_chunk_cli_validation_failure(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Chunk CLI surfaces validation errors without tracebacks."""
+
+    import DocsToKG.DocParsing as docparsing_pkg
+
+    stub_chunking = types.ModuleType("DocsToKG.DocParsing.chunking")
+
+    def _build_parser() -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument("--min-tokens", type=int, default=0)
+        return parser
+
+    def _main(_args: argparse.Namespace) -> int:
+        raise ChunkingCLIValidationError(
+            "--min-tokens", "Value must be non-negative", hint="Provide a value >= 0"
+        )
+
+    stub_chunking.build_parser = _build_parser
+    stub_chunking.main = _main
+
+    monkeypatch.setitem(sys.modules, "DocsToKG.DocParsing.chunking", stub_chunking)
+    monkeypatch.setitem(docparsing_pkg._MODULE_CACHE, "chunking", stub_chunking)
+    monkeypatch.setattr(docparsing_pkg, "chunking", stub_chunking, raising=False)
 
     exit_code = core_cli.chunk(["--min-tokens", "-1"])
     captured = capsys.readouterr()
@@ -328,6 +353,31 @@ def test_embed_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> Non
     assert exit_code == 2
     assert "embed" in captured.err
     assert "cannot be combined" in captured.err
+
+
+def test_token_profiles_missing_transformers(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Token profile CLI reports missing transformers dependency gracefully."""
+
+    monkeypatch.delitem(sys.modules, "DocsToKG.DocParsing.token_profiles", raising=False)
+    monkeypatch.delitem(sys.modules, "transformers", raising=False)
+
+    original_import = builtins.__import__
+
+    def fake_import(name: str, *args, **kwargs):
+        if name == "transformers" or name.startswith("transformers."):
+            raise ImportError("No module named 'transformers'")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+
+    exit_code = core_cli.token_profiles([])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "No module named 'transformers'" in captured.err
+    assert "pip install transformers" in captured.err
 
 
 def test_display_plan_stream_output() -> None:
@@ -539,3 +589,37 @@ def test_plan_embed_generate_counts(
 
     assert plan["process"]["count"] == 1
     assert plan["skip"]["count"] == 0
+
+
+def test_plan_embed_accepts_file_chunks_dir(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Embedding planner handles file-valued ``--chunks-dir`` arguments."""
+
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+    chunk_file = tmp_path / "doc.chunks.jsonl"
+    chunk_file.write_text("{}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.detect_data_root", lambda *_args, **_kwargs: data_root
+    )
+
+    def _mock_data_vectors(_root: Path, *, ensure: bool = False) -> Path:
+        return vectors_dir.resolve()
+
+    monkeypatch.setattr("DocsToKG.DocParsing.core.planning.data_vectors", _mock_data_vectors)
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index", lambda *_args, **_kwargs: {}
+    )
+
+    plan = plan_embed(["--chunks-dir", str(chunk_file), "--plan-only"])
+
+    assert plan["process"]["count"] == 1
+    assert plan["process"]["preview"] == ["doc.doctags"]
+    assert plan["skip"]["count"] == 0
+    assert plan["vectors_dir"] == str(vectors_dir.resolve())
