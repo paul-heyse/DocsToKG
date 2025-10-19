@@ -78,7 +78,10 @@ class OpenAlexWorkProvider:
         return self.iter_artifacts()
 
     def _iterate_openalex(self) -> Iterable[Dict[str, Any]]:
-        pager = self._query.paginate(per_page=self._per_page, n_max=None)
+        pager = self._query.paginate(
+            per_page=self._per_page,
+            n_max=self._max_results if self._max_results is not None else None,
+        )
         for page in pager:
             for work in page:
                 yield work
