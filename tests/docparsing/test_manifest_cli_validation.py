@@ -119,6 +119,35 @@ def test_manifest_accepts_known_stage(monkeypatch, tmp_path) -> None:
     assert call_count["value"] == 1
 
 
+def test_manifest_aliases_chunk_and_embed(monkeypatch, tmp_path) -> None:
+    """Singular stage aliases resolve to the canonical manifest identifiers."""
+
+    cli = _load_cli(monkeypatch)
+
+    manifests_dir = tmp_path / "Manifests"
+    manifests_dir.mkdir()
+
+    observed: list[tuple[list[str], Path]] = []
+
+    def fake_iter_manifest_entries(stages, data_root: Path):
+        observed.append((list(stages), data_root))
+        return iter(())
+
+    monkeypatch.setattr(cli, "iter_manifest_entries", fake_iter_manifest_entries)
+    monkeypatch.setattr(
+        cli,
+        "data_manifests",
+        lambda _root, *, ensure=False: manifests_dir,
+    )
+
+    exit_code_chunk = cli.manifest(["--stage", "chunk", "--data-root", str(tmp_path)])
+    exit_code_embed = cli.manifest(["--stage", "embed", "--data-root", str(tmp_path)])
+
+    assert exit_code_chunk == 0
+    assert exit_code_embed == 0
+    assert observed == [(["chunks"], tmp_path), (["embeddings"], tmp_path)]
+
+
 def test_manifest_accepts_discovered_stage(monkeypatch, tmp_path) -> None:
     """A manifest present on disk extends allowable ``--stage`` selections."""
 
