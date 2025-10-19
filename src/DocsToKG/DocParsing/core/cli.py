@@ -316,7 +316,16 @@ def embed(argv: Sequence[str] | None = None) -> int:
 def token_profiles(argv: Sequence[str] | None = None) -> int:
     """Execute the tokenizer profiling subcommand."""
 
-    from DocsToKG.DocParsing import token_profiles as token_profiles_module
+    try:
+        from DocsToKG.DocParsing import token_profiles as token_profiles_module
+    except ImportError as exc:  # pragma: no cover - exercised via CLI test
+        print(str(exc), file=sys.stderr)
+        print(
+            "Optional dependency 'transformers' is required for `docparse token-profiles`. "
+            "Install it with `pip install transformers`.",
+            file=sys.stderr,
+        )
+        return 1
 
     parser = token_profiles_module.build_parser()
     parser.prog = "docparse token-profiles"
