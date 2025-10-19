@@ -36,6 +36,7 @@ def test_download_stream_fetches_fixture(ontology_env, tmp_path):
     )
     config = ontology_env.build_download_config()
     destination = tmp_path / "hp.owl"
+    expected_user_agent = config.polite_http_headers().get("User-Agent")
 
     result = network_mod.download_stream(
         url=url,
@@ -55,6 +56,12 @@ def test_download_stream_fetches_fixture(ontology_env, tmp_path):
     methods = [request.method for request in ontology_env.requests]
     assert methods.count("HEAD") == 1
     assert methods.count("GET") == 1
+    head_requests = [request for request in ontology_env.requests if request.method == "HEAD"]
+    assert head_requests, "Expected at least one HEAD request to be recorded"
+    if expected_user_agent is not None:
+        assert all(
+            request.headers.get("User-Agent") == expected_user_agent for request in head_requests
+        )
 
 
 def test_head_get_connections_remain_bounded(ontology_env, tmp_path):
@@ -141,7 +148,9 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
         host=parsed_url.hostname,
         http_config=config,
     ) as session:
-        content_type, content_length = downloader._preliminary_head_check(url, session)
+        content_type, content_length = downloader._preliminary_head_check(
+            url, session, downloader.custom_headers
+        )
 
     assert content_type == "application/rdf+xml"
     assert content_length is None
@@ -190,7 +199,9 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
         host=parsed_url.hostname,
         http_config=config,
     ) as session:
-        content_type, content_length = downloader._preliminary_head_check(url, session)
+        content_type, content_length = downloader._preliminary_head_check(
+            url, session, downloader.custom_headers
+        )
 
     assert content_type == "application/rdf+xml"
     assert content_length is None

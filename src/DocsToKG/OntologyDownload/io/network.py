@@ -22,6 +22,7 @@ from typing import (
     Dict,
     Iterator,
     List,
+    Mapping,
     Optional,
     Set,
     Tuple,
@@ -590,7 +591,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
     ) -> None:
         super().__init__(headers={}, progressbar=False, timeout=http_config.timeout_sec)
         self.destination = destination
-        self.custom_headers = headers
+        self.custom_headers = dict(headers)
         self.http_config = http_config
         self.previous_manifest = previous_manifest or {}
         self.logger = logger
@@ -676,7 +677,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 response.close()
 
     def _preliminary_head_check(
-        self, url: str, session: requests.Session
+        self, url: str, session: requests.Session, headers: Mapping[str, str]
     ) -> tuple[Optional[str], Optional[int]]:
         """Probe the origin with HEAD to audit media type and size before downloading.
 
@@ -687,6 +688,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         Args:
             url: Fully qualified download URL resolved by the planner.
             session: Prepared requests session used for outbound calls.
+            headers: HTTP headers to include with the HEAD request.
 
         Returns:
             Tuple ``(content_type, content_length)`` extracted from response
@@ -696,12 +698,14 @@ class StreamingDownloader(pooch.HTTPDownloader):
             PolicyError: Propagates download policy errors encountered during the HEAD request.
         """
 
+        request_headers = dict(headers)
+
         try:
             with self._request_with_redirect_audit(
                 session=session,
                 method="HEAD",
                 url=url,
-                headers=self.custom_headers,
+                headers=request_headers,
                 timeout=self.http_config.timeout_sec,
                 stream=False,
             ) as response:
@@ -713,6 +717,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             "method": "HEAD",
                             "status_code": response.status_code,
                             "url": url,
+                            "headers": request_headers,
                         },
                     )
                     return None, None
@@ -731,7 +736,12 @@ class StreamingDownloader(pooch.HTTPDownloader):
         except requests.RequestException as exc:
             self.logger.debug(
                 "HEAD request exception, proceeding with GET",
-                extra={"stage": "download", "error": str(exc), "url": url},
+                extra={
+                    "stage": "download",
+                    "error": str(exc),
+                    "url": url,
+                    "headers": request_headers,
+                },
             )
             return None, None
 
@@ -848,7 +858,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
             last_modified_value = self.previous_manifest.get("last_modified")
             if isinstance(last_modified_value, str) and last_modified_value.strip():
                 manifest_headers["If-Modified-Since"] = last_modified_value
-        request_headers = {**self.custom_headers, **manifest_headers}
+        base_headers = {**self.custom_headers, **manifest_headers}
         part_path = Path(output_file + ".part")
         destination_part_path = Path(str(self.destination) + ".part")
         if not part_path.exists() and destination_part_path.exists():
@@ -865,7 +875,10 @@ class StreamingDownloader(pooch.HTTPDownloader):
             host=self.origin_host,
             http_config=self.http_config,
         ) as session:
-            head_content_type, head_content_length = self._preliminary_head_check(url, session)
+            head_headers = dict(base_headers)
+            head_content_type, head_content_length = self._preliminary_head_check(
+                url, session, head_headers
+            )
             self.head_content_type = head_content_type
             self.head_content_length = head_content_length
             if head_content_type:
@@ -915,10 +928,9 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 resume_position = part_path.stat().st_size if part_path.exists() else 0
                 original_resume_position = resume_position
                 want_range = original_resume_position > 0
+                request_headers = dict(base_headers)
                 if want_range:
                     request_headers["Range"] = f"bytes={original_resume_position}-"
-                else:
-                    request_headers.pop("Range", None)
 
                 if self.bucket is not None:
                     self.bucket.consume()
