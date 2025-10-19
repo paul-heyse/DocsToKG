@@ -52,6 +52,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "test-validator-validation-resources-honor-null-stream-flags",
+#       "name": "test_validator_validation_resources_honor_null_stream_flags",
+#       "anchor": "function-test-validator-validation-resources-honor-null-stream-flags",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "test-schema-manager-bootstrap-and-registration",
 #       "name": "test_schema_manager_bootstrap_and_registration",
 #       "anchor": "function-test-schema-manager-bootstrap-and-registration",
@@ -271,12 +277,14 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import os
 import sys
 import uuid
 from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Callable, List, Mapping, Sequence
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
@@ -308,6 +316,7 @@ from DocsToKG.HybridSearch.service import (
     should_rebuild_index,
     verify_pagination,
 )
+import DocsToKG.HybridSearch.service as service_module
 from DocsToKG.HybridSearch.store import (
     ChunkRegistry,
     FaissVectorStore,
@@ -628,6 +637,82 @@ def test_validation_harness_reports(
     assert report_dirs, "Validation reports were not written"
     summary_file = report_dirs[0] / "summary.json"
     assert summary_file.exists()
+
+
+def test_validator_validation_resources_honor_null_stream_flags(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger="DocsToKG.HybridSearch")
+
+    class StubConfigManager:
+        def __init__(self, config: object) -> None:
+            self._config = config
+
+        def get(self) -> object:
+            return self._config
+
+    class StubRouter:
+        def iter_stores(self) -> Sequence[tuple[str, object]]:
+            return []
+
+    dense_config = replace(
+        DenseIndexConfig(),
+        gpu_use_default_null_stream_all_devices=True,
+        gpu_temp_memory_bytes=None,
+        gpu_pinned_memory_bytes=None,
+    )
+    config = SimpleNamespace(dense=dense_config)
+    service = SimpleNamespace(
+        _config_manager=StubConfigManager(config),
+        _observability=Observability(),
+        _faiss_router=StubRouter(),
+    )
+    validator = HybridSearchValidator(
+        ingestion=SimpleNamespace(),
+        service=service,
+        registry=SimpleNamespace(),
+        opensearch=SimpleNamespace(),
+    )
+
+    class RecordingResource:
+        def __init__(self) -> None:
+            self.temp_memory_calls: list[int] = []
+            self.pinned_memory_calls: list[int] = []
+            self.null_stream_calls: list[object | None] = []
+            self.null_stream_all_calls = 0
+
+        def setTempMemory(self, value: int) -> None:  # pragma: no cover - stub
+            self.temp_memory_calls.append(value)
+
+        def setPinnedMemory(self, value: int) -> None:  # pragma: no cover - stub
+            self.pinned_memory_calls.append(value)
+
+        def setDefaultNullStreamAllDevices(self) -> None:  # pragma: no cover - stub
+            self.null_stream_all_calls += 1
+
+        def setDefaultNullStream(
+            self, device: object | None = None
+        ) -> None:  # pragma: no cover - stub
+            self.null_stream_calls.append(device)
+
+    stub_faiss = SimpleNamespace(StandardGpuResources=RecordingResource)
+    monkeypatch.setattr(service_module, "faiss", stub_faiss, raising=False)
+
+    resource = validator._ensure_validation_resources()
+    assert isinstance(resource, RecordingResource)
+    assert resource.null_stream_all_calls == 1
+    assert resource.null_stream_calls == []
+
+    gauges = {
+        sample.name: sample.value
+        for sample in service._observability.metrics.export_gauges()
+    }
+    assert gauges.get("faiss_gpu_default_null_stream_all_devices") == 1.0
+    assert gauges.get("faiss_gpu_default_null_stream") == 0.0
+
+    assert any(
+        record.message == "faiss-gpu-resource-configured" for record in caplog.records
+    )
 
 
 # --- test_hybrid_search.py ---
