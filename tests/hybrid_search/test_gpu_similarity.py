@@ -251,6 +251,23 @@ def test_cosine_topk_blockwise_honors_cuvs_request(monkeypatch):
     assert kwargs.get("use_cuvs") is True
 
 
+def test_cosine_topk_blockwise_auto_block_rows_uses_memory_budget(monkeypatch):
+    stub, state = _make_faiss_stub(enable_knn=True)
+    monkeypatch.setattr(store_module, "faiss", stub, raising=False)
+
+    class ResourceStub:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def getMemoryInfo(self, device: int) -> tuple[int, int]:
+            self.calls += 1
+            return (8_192, 16_384)
+
+    resources = ResourceStub()
+    q = np.random.default_rng(6).random((2, 4), dtype=np.float32)
+    C = np.random.default_rng(7).random((128, 4), dtype=np.float32)
+
+    cosine_topk_blockwise(
 def test_cosine_topk_blockwise_fp16_knn_uses_distance_params(monkeypatch):
     stub, state = _make_faiss_stub(
         enable_knn=True,
@@ -273,6 +290,23 @@ def test_cosine_topk_blockwise_fp16_knn_uses_distance_params(monkeypatch):
         C,
         k=3,
         device=0,
+        resources=resources,
+    )
+
+    row_bytes = np.dtype(np.float32).itemsize * C.shape[1]
+    safety_fraction = getattr(store_module, "_COSINE_TOPK_AUTO_MEM_FRACTION", 0.5)
+    expected_rows = max(int((8_192 * safety_fraction) // row_bytes), 1)
+    expected_rows = min(
+        expected_rows,
+        getattr(store_module, "_COSINE_TOPK_DEFAULT_BLOCK_ROWS", 65_536),
+    )
+    kwargs = state.get("kwargs")
+    assert isinstance(kwargs, dict)
+    assert kwargs["vectorsMemoryLimit"] == expected_rows * row_bytes
+    expected_query_rows = max(expected_rows, q.shape[0])
+    assert kwargs["queriesMemoryLimit"] == expected_query_rows * q.shape[1] * np.dtype(np.float32).itemsize
+    assert expected_rows < getattr(store_module, "_COSINE_TOPK_DEFAULT_BLOCK_ROWS", 65_536)
+    assert resources.calls >= 1
         resources=object(),
         use_fp16=True,
         use_cuvs=True,
