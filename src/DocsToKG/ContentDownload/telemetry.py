@@ -20,6 +20,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import logging
 import sqlite3
 import threading
 from collections import OrderedDict
@@ -57,6 +58,10 @@ from DocsToKG.ContentDownload.core import (
 
 MANIFEST_SCHEMA_VERSION = 3
 SQLITE_SCHEMA_VERSION = 4
+CSV_HEADER_TOKENS = {"run_id", "work_id"}
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -1469,6 +1474,38 @@ def _load_resume_from_sqlite(sqlite_path: Path) -> Tuple[Dict[str, Dict[str, Any
     return lookup, completed
 
 
+def looks_like_csv_resume_target(path: Path) -> bool:
+    """Return True when ``path`` likely references a CSV attempts log."""
+
+    lower_name = path.name.lower()
+    if lower_name.endswith(".csv") or ".csv." in lower_name:
+        return True
+
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for _ in range(5):
+                sample = handle.readline()
+                if not sample:
+                    break
+                stripped = sample.strip()
+                if not stripped:
+                    continue
+                if stripped.startswith("{") or stripped.startswith("["):
+                    return False
+                if "," in stripped:
+                    header = {
+                        column.strip().strip('"').lower()
+                        for column in stripped.split(",")
+                    }
+                    if CSV_HEADER_TOKENS.issubset(header):
+                        return True
+                break
+    except OSError:
+        return lower_name.endswith(".csv") or ".csv." in lower_name
+
+    return False
+
+
 def load_previous_manifest(
     path: Optional[Path],
     *,
@@ -1483,6 +1520,15 @@ def load_previous_manifest(
         if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
             return _load_resume_from_sqlite(sqlite_path)
         return per_work, completed
+
+    if looks_like_csv_resume_target(path):
+        if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
+            return _load_resume_from_sqlite(sqlite_path)
+        raise ValueError(
+            "Resume manifest '{path}' appears to be a CSV attempts log but no SQLite cache was found. "
+            "Provide the matching manifest.sqlite file or resume from a JSONL manifest."
+            .format(path=path)
+        )
 
     prefix = f"{path.name}."
     rotated: List[Tuple[int, Path]] = []
@@ -1509,13 +1555,46 @@ def load_previous_manifest(
             .format(path=path)
         ) from file_error
 
+    def _handle_manifest_parse_error(
+        file_path: Path,
+        exc: Exception,
+        *,
+        line_number: Optional[int] = None,
+    ) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+        location = f"{file_path}:{line_number}" if line_number is not None else str(file_path)
+        logger.warning(
+            "Failed to parse resume manifest at %s", location, exc_info=exc
+        )
+        if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
+            logger.warning(
+                "Falling back to SQLite resume cache '%s' after manifest parse failure at %s.",
+                sqlite_path,
+                location,
+            )
+            return _load_resume_from_sqlite(sqlite_path)
+        raise ValueError(
+            f"Failed to parse resume manifest at {location}: {exc}"
+        ) from exc
+
     for file_path in ordered_files:
         with file_path.open("r", encoding="utf-8") as handle:
-            for raw in handle:
+            for line_number, raw in enumerate(handle, start=1):
                 line = raw.strip()
                 if not line:
                     continue
-                data = json.loads(line)
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    return _handle_manifest_parse_error(
+                        file_path, exc, line_number=line_number
+                    )
+                if not isinstance(data, dict):
+                    exc = TypeError(
+                        f"Manifest entries must be JSON objects, got {type(data).__name__}"
+                    )
+                    return _handle_manifest_parse_error(
+                        file_path, exc, line_number=line_number
+                    )
                 record_type = data.get("record_type")
                 if record_type is None:
                     raise ValueError(
@@ -1732,6 +1811,7 @@ __all__ = [
     "SummarySink",
     "SqliteSink",
     "build_manifest_entry",
+    "looks_like_csv_resume_target",
     "load_previous_manifest",
     "load_manifest_url_index",
 ]
