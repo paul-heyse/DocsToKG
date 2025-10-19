@@ -14,6 +14,11 @@ jobs:
             AWS_DEFAULT_REGION: "us-east-1"
         steps:
             - uses: actions/checkout@v4
+              with:
+                  lfs: false
+                  fetch-depth: 1
+              env:
+                  GIT_LFS_SKIP_SMUDGE: "1"
 
             - uses: actions/setup-python@v5
               with:
@@ -32,19 +37,25 @@ jobs:
                     (cd ci/wheels && sha256sum -c SHA256SUMS)
                   fi
 
-            - name: Install deps from local wheelhouse
+            # Ensure build tools are present so -e .[gpu12x] can install without PyPI
+            - name: Prep build tooling
               run: |
-                  python -m pip install --upgrade pip
-                  # Nuke any stale cupy installs in the toolcache interpreter
-                  python -m pip uninstall -y cupy cupy-cuda12x || true
-                  python -m pip install --no-cache-dir --no-index --find-links=ci/wheels -r requirements.txt
+                  python -m pip install -U pip setuptools wheel packaging
 
-            - name: CuPy guard (same logic as bootstrap, but brief)
+            - name: Install deps from local wheelhouse (GPU)
+              env:
+                  PIP_NO_BUILD_ISOLATION: "1" # use the setuptools we just installed
+              run: |
+                  # belt & suspenders if the runner has a sticky global install
+                  python -m pip uninstall -y cupy cupy-cuda12x || true
+                  python -m pip install --no-cache-dir --no-index --find-links=ci/wheels \
+                    -r requirements.gpu.txt     # <- use the GPU requirements file
+
+            - name: CuPy guard
               run: |
                   python - <<'PY'
-                  import importlib.util, sys
+                  import importlib.util
                   spec = importlib.util.find_spec("cupy")
-                  ok = bool(spec and spec.origin and spec.origin.endswith("__init__.py"))
-                  assert ok, f"CuPy missing __init__.py (spec={spec})"
+                  assert spec and spec.origin and spec.origin.endswith("__init__.py"), f"Bad CuPy install: {spec}"
                   print("CuPy OK:", spec.origin)
                   PY

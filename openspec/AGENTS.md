@@ -24,7 +24,43 @@ Agents default to **CPU mode** (no private wheels, no CUDA). GPU mode is availab
 ## Modes
 
 - **CPU mode (default):** installs `-e .` (no GPU deps). Runs the full **CPU test set**.
-- **GPU mode (opt-in):** installs `-e .[gpu12x]` from the local wheelhouse that the bootstrap syncs from **MinIO**.
+- **GPU mode (local agents or opt-in):** installs `-e .[gpu12x]` from the local wheelhouse that the bootstrap syncs from **MinIO**.
+
+---
+
+## Local agents (default to **GPU**)
+
+Local agents (running on your workstation / self-hosted box) should **prefer GPU mode** and install the `gpu12x` extra by default.
+
+**Prereqs (local):**
+
+- MinIO wheels reachable (either `mc alias set myminio …` or `MINIO_ACCESS_KEY_ID`/`MINIO_SECRET_ACCESS_KEY` env vars).
+- NVIDIA driver + CUDA 12.x runtime installed (CuPy uses your system CUDA).
+
+**Make GPU the default locally:**
+
+```bash
+# Add this to your shell or .envrc so agents inherit it:
+export AGENT_MODE=gpu
+```
+
+**Then bootstrap + test:**
+
+```bash
+bash scripts/bootstrap_env.sh     # syncs wheels, installs -e .[gpu12x]
+source .venv/bin/activate
+pytest -q                         # runs full suite, incl. @pytest.mark.gpu
+```
+
+**If you need a quick CPU fallback locally:**
+
+```bash
+AGENT_MODE=cpu bash scripts/bootstrap_env.sh
+source .venv/bin/activate
+pytest -q -m "not gpu"
+```
+
+> The bootstrap will fail fast if MinIO wheels are unreachable or a CuPy install is broken (hard-fail guard). Fix access or switch to `AGENT_MODE=cpu` to proceed without GPU deps.
 
 ---
 
@@ -142,7 +178,7 @@ PY
   AWS_S3_FORCE_PATH_STYLE=true aws s3 ls s3://docs2kg-wheels/cp313/ --endpoint-url http://127.0.0.1:9000
   ```
 
-* **CuPy missing `__version__`:** you’ve got a namespace package—rerun the bootstrap (it will uninstall/reinstall from wheelhouse) or see the detailed Troubleshooting section.
+- **CuPy missing `__version__`:** you’ve got a namespace package—rerun the bootstrap (it will uninstall/reinstall from wheelhouse) or see the detailed Troubleshooting section.
 
 ---
 
