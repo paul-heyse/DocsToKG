@@ -175,10 +175,18 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
     for path in files:
         doc_id, out_path = derive_doc_id_and_doctags_path(path, input_dir, output_dir)
         manifest_entry = resume_controller.entry(doc_id)
+
+        if mode == "html" and overwrite:
+            _record_bucket(planned, doc_id)
+            continue
+
         stored_hash, hash_algorithm = _manifest_hash_requirements(manifest_entry)
         should_hash = bool(args.resume and not args.force and stored_hash)
         skip = False
         if should_hash:
+            if not out_path.exists():
+                _record_bucket(planned, doc_id)
+                continue
             if hash_algorithm:
                 input_hash = compute_content_hash(path, hash_algorithm)
             else:
@@ -190,8 +198,6 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
                 resume_controller.resume,
                 resume_controller.force,
             )
-        if mode == "html" and overwrite:
-            skip = False
         if skip:
             _record_bucket(skipped, doc_id)
         else:
