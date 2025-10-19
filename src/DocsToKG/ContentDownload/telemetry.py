@@ -1359,12 +1359,129 @@ class SqliteSink:
         self._conn.commit()
 
 
-def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
-    """Load JSONL manifest entries indexed by work ID and normalised URL."""
+def _load_resume_from_sqlite(sqlite_path: Path) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+    """Return resume metadata reconstructed from the SQLite manifest cache."""
+
+    lookup: Dict[str, Dict[str, Any]] = {}
+    completed: Set[str] = set()
+    if not sqlite_path.exists():
+        return lookup, completed
+
+    try:
+        conn = sqlite3.connect(sqlite_path)
+    except sqlite3.Error:  # pragma: no cover - defensive guard
+        return lookup, completed
+
+    try:
+        try:
+            cursor = conn.execute(
+                (
+                    "SELECT run_id, work_id, url, normalized_url, schema_version, "
+                    "classification, reason, reason_detail, path, path_mtime_ns, sha256, "
+                    "content_length, etag, last_modified "
+                    "FROM manifests ORDER BY timestamp"
+                )
+            )
+        except sqlite3.OperationalError:
+            return lookup, completed
+
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
+
+    for (
+        run_id,
+        work_id,
+        url,
+        normalized_url,
+        schema_version,
+        classification,
+        reason,
+        reason_detail,
+        path_value,
+        path_mtime_ns,
+        sha256,
+        content_length,
+        etag,
+        last_modified,
+    ) in rows:
+        if not work_id or not url:
+            continue
+        normalized = normalized_url or normalize_url(str(url))
+        try:
+            schema_version_int = int(schema_version)
+        except (TypeError, ValueError):
+            schema_version_int = MANIFEST_SCHEMA_VERSION
+
+        classification_value: Optional[str] = None
+        try:
+            classification_enum = Classification.from_wire(classification)
+        except ValueError:
+            classification_enum = None
+        else:
+            classification_value = classification_enum.value
+            if classification_enum in PDF_LIKE:
+                completed.add(str(work_id))
+
+        reason_value: Optional[str]
+        try:
+            reason_enum = (
+                ReasonCode.from_wire(reason) if reason is not None else None
+            )
+        except ValueError:
+            reason_enum = None
+        reason_value = reason_enum.value if reason_enum is not None else reason
+
+        try:
+            content_length_value = (
+                int(content_length) if content_length is not None else None
+            )
+        except (TypeError, ValueError):
+            content_length_value = None
+
+        path_mtime_value: Optional[int] = None
+        if path_mtime_ns is not None:
+            try:
+                path_mtime_value = int(path_mtime_ns)
+            except (TypeError, ValueError):
+                path_mtime_value = None
+
+        entry = {
+            "record_type": "manifest",
+            "schema_version": schema_version_int,
+            "run_id": run_id,
+            "work_id": work_id,
+            "url": url,
+            "normalized_url": normalized,
+            "classification": classification_value or str(classification or ""),
+            "reason": reason_value,
+            "reason_detail": reason_detail,
+            "path": path_value,
+            "path_mtime_ns": path_mtime_value,
+            "mtime_ns": path_mtime_value,
+            "sha256": sha256,
+            "content_length": content_length_value,
+            "etag": etag,
+            "last_modified": last_modified,
+        }
+        lookup.setdefault(str(work_id), {})[normalized] = entry
+
+    return lookup, completed
+
+
+def load_previous_manifest(
+    path: Optional[Path],
+    *,
+    sqlite_path: Optional[Path] = None,
+    allow_sqlite_fallback: bool = False,
+) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+    """Load manifest entries indexed by work ID and normalised URL."""
 
     per_work: Dict[str, Dict[str, Any]] = {}
     completed: Set[str] = set()
     if not path:
+        if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
+            return _load_resume_from_sqlite(sqlite_path)
         return per_work, completed
 
     prefix = f"{path.name}."
@@ -1381,6 +1498,8 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
         ordered_files.append(path)
 
     if not ordered_files:
+        if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
+            return _load_resume_from_sqlite(sqlite_path)
         file_error = FileNotFoundError(
             f"No manifest files found for resume path {path!s}"
         )

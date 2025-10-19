@@ -30,9 +30,13 @@ Return the current time as an ISO 8601 UTC timestamp.
 
 Ensure the parent directory for ``path`` exists.
 
-### `load_previous_manifest(path)`
+### `load_previous_manifest(path, *, sqlite_path=None, allow_sqlite_fallback=False)`
 
-Load JSONL manifest entries indexed by work ID and normalised URL.
+Load manifest entries indexed by work ID and normalised URL.
+
+When ``allow_sqlite_fallback`` is true and ``sqlite_path`` exists, the helper
+reconstructs resume metadata from the SQLite cache if no JSONL manifest segments
+are available.
 
 ### `load_manifest_url_index(path)`
 

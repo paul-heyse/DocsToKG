@@ -94,7 +94,7 @@ that need to inspect or extend the resolver stack.
 Wrapper around :func:`DocsToKG.ContentDownload.pipeline.load_resolver_config`.
 Loads resolver configuration files and applies optional CLI overrides.
 
-### `load_previous_manifest(path)`
+### `load_previous_manifest(path, *, sqlite_path=None, allow_sqlite_fallback=False)`
 
 Re-export of :func:`DocsToKG.ContentDownload.telemetry.load_previous_manifest`.
 Indexes previous manifest runs so resume logic can short-circuit completed
