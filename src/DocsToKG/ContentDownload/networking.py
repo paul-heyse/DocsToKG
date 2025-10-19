@@ -197,17 +197,28 @@ class ThreadLocalSessionFactory:
         self._builder = builder
         self._local = threading.local()
         self._lock = threading.Lock()
-        self._sessions: Dict[int, requests.Session] = {}
+        self._thread_sessions: Dict[int, requests.Session] = {}
 
     def get_thread_session(self) -> requests.Session:
         """Return a session scoped to the current thread."""
 
+        thread_id = threading.get_ident()
         session = getattr(self._local, "session", None)
-        if session is None:
-            session = self._builder()
-            setattr(self._local, "session", session)
+        if session is not None:
             with self._lock:
-                self._sessions[id(session)] = session
+                if self._thread_sessions.get(thread_id) is session:
+                    return session
+            setattr(self._local, "session", None)
+            session = None
+
+        if session is None:
+            with self._lock:
+                session = self._thread_sessions.get(thread_id)
+            if session is None:
+                session = self._builder()
+                with self._lock:
+                    self._thread_sessions[thread_id] = session
+            setattr(self._local, "session", session)
         return session
 
     def __call__(self) -> requests.Session:
@@ -218,12 +229,17 @@ class ThreadLocalSessionFactory:
     def close_current(self) -> None:
         """Close and remove the session bound to the current thread."""
 
-        session = getattr(self._local, "session", None)
+        thread_id = threading.get_ident()
+        setattr(self._local, "session", None)
+        self.close_for_thread(thread_id)
+
+    def close_for_thread(self, thread_id: int) -> None:
+        """Close and discard the session bound to ``thread_id`` if present."""
+
+        with self._lock:
+            session = self._thread_sessions.pop(thread_id, None)
         if session is None:
             return
-        setattr(self._local, "session", None)
-        with self._lock:
-            self._sessions.pop(id(session), None)
         with contextlib.suppress(Exception):
             session.close()
 
@@ -231,8 +247,8 @@ class ThreadLocalSessionFactory:
         """Close all cached sessions and reset thread-local state."""
 
         with self._lock:
-            sessions = list(self._sessions.values())
-            self._sessions.clear()
+            sessions = list(self._thread_sessions.values())
+            self._thread_sessions.clear()
         setattr(self._local, "session", None)
         for session in sessions:
             with contextlib.suppress(Exception):

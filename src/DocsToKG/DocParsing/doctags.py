@@ -263,6 +263,7 @@ if __name__ == "__main__" and __package__ is None:
         sys.path.insert(0, str(package_root))
 
 import argparse
+import heapq
 import os
 import random
 import re
@@ -285,6 +286,7 @@ from typing import (
     Deque,
     Dict,
     Iterable,
+    Iterator,
     List,
     Mapping,
     Optional,
@@ -1369,6 +1371,75 @@ def ensure_vllm(
     return alt, proc, True
 
 
+def _iter_directory_files(
+    root: Path,
+    suffixes: Iterable[str],
+    *,
+    exclude: Callable[[Path], bool] | None = None,
+) -> Iterator[Path]:
+    """Yield files beneath ``root`` whose suffix is in ``suffixes``.
+
+    The traversal is performed in a deterministic, lexicographically sorted
+    order while avoiding materialising the full file list in memory. Hidden
+    directories are not skipped to maintain parity with ``Path.rglob``.
+    """
+
+    normalized_suffixes = {suffix.lower() for suffix in suffixes}
+    root = Path(root)
+
+    if not root.exists():
+        return
+
+    if root.is_file():
+        candidate = root
+        if (
+            candidate.suffix.lower() in normalized_suffixes
+            and (exclude is None or not exclude(candidate))
+        ):
+            yield candidate
+        return
+
+    heap: List[Tuple[str, Path]] = []
+
+    def _enqueue_directory(directory: Path) -> None:
+        try:
+            entries = list(directory.iterdir())
+        except FileNotFoundError:  # pragma: no cover - directory removed mid-iteration
+            return
+        entries.sort(key=lambda path: path.name)
+        for entry in entries:
+            try:
+                relative = entry.relative_to(root).as_posix()
+            except ValueError:
+                # Skip paths that fall outside of the requested root. This mirrors
+                # ``Path.rglob`` behaviour when encountering replaced directories.
+                continue
+            heapq.heappush(heap, (relative, entry))
+
+    if root.is_dir():
+        _enqueue_directory(root)
+
+    while heap:
+        _, candidate = heapq.heappop(heap)
+        if candidate.is_dir():
+            if candidate.is_symlink():
+                continue
+            _enqueue_directory(candidate)
+            continue
+        if candidate.suffix.lower() not in normalized_suffixes:
+            continue
+        if exclude is not None and exclude(candidate):
+            continue
+        if candidate.is_file():
+            yield candidate
+
+
+def iter_pdfs(root: Path) -> Iterator[Path]:
+    """Iterate over PDF files beneath ``root`` lazily."""
+
+    yield from _iter_directory_files(root, {".pdf"})
+
+
 def list_pdfs(root: Path) -> List[Path]:
     """Collect PDF files under a directory recursively.
 
@@ -1378,7 +1449,8 @@ def list_pdfs(root: Path) -> List[Path]:
     Returns:
         Sorted list of paths to PDF files.
     """
-    return sorted([p for p in root.rglob("*.pdf") if p.is_file()])
+
+    return list(iter_pdfs(root))
 
 
 # PDF worker helpers
@@ -2091,6 +2163,17 @@ def _get_converter() -> "DocumentConverter":
     return _CONVERTER
 
 
+def iter_htmls(root: Path) -> Iterator[Path]:
+    """Iterate over HTML-like files beneath ``root`` lazily."""
+
+    excluded_suffix = ".normalized.html"
+
+    def _exclude(path: Path) -> bool:
+        return path.name.endswith(excluded_suffix)
+
+    yield from _iter_directory_files(root, {".html", ".htm", ".xhtml"}, exclude=_exclude)
+
+
 def list_htmls(root: Path) -> List[Path]:
     """Enumerate HTML-like files beneath a directory tree.
 
@@ -2100,12 +2183,8 @@ def list_htmls(root: Path) -> List[Path]:
     Returns:
         Sorted list of discovered HTML file paths excluding normalized outputs.
     """
-    exts = {".html", ".htm", ".xhtml"}
-    out: List[Path] = []
-    for p in root.rglob("*"):
-        if p.is_file() and p.suffix.lower() in exts and not p.name.endswith(".normalized.html"):
-            out.append(p)
-    return sorted(out)
+
+    return list(iter_htmls(root))
 
 
 def _sanitize_html_file(path: Path, profile: str) -> Tuple[Path, Optional[Path]]:

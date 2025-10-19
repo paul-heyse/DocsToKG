@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import builtins
+import heapq
 import io
 import sys
 import types
@@ -13,8 +14,8 @@ from unittest import mock
 
 import pytest
 
-from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
 import DocsToKG.DocParsing.core.http as core_http
+from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
 from DocsToKG.DocParsing.config import ConfigLoadError, load_toml_markers, load_yaml_markers
 from DocsToKG.DocParsing.core import (
     ResumeController,
@@ -31,6 +32,7 @@ from DocsToKG.DocParsing.core import cli as core_cli
 from DocsToKG.DocParsing.core.cli_utils import merge_args, preview_list
 from DocsToKG.DocParsing.core.http import get_http_session
 from DocsToKG.DocParsing.core.planning import (
+    PLAN_PREVIEW_LIMIT,
     display_plan,
     plan_chunk,
     plan_doctags,
@@ -57,11 +59,72 @@ def planning_module_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
         parser.add_argument("--resume", action="store_true")
         parser.add_argument("--force", action="store_true")
 
+    def _iter_paths(
+        directory: Path,
+        suffixes: tuple[str, ...],
+        *,
+        include: Callable[[Path], bool] | None = None,
+    ):
+        suffix_set = {suffix.lower() for suffix in suffixes}
+        root = Path(directory)
+
+        if not root.exists():
+            return
+
+        if root.is_file():
+            candidate = root
+            if candidate.suffix.lower() in suffix_set and (
+                include is None or include(candidate)
+            ):
+                yield candidate
+            return
+
+        heap: list[tuple[str, Path]] = []
+
+        def _enqueue(directory: Path) -> None:
+            try:
+                entries = list(directory.iterdir())
+            except FileNotFoundError:
+                return
+            entries.sort(key=lambda path: path.name)
+            for entry in entries:
+                try:
+                    rel = entry.relative_to(root).as_posix()
+                except ValueError:
+                    continue
+                heapq.heappush(heap, (rel, entry))
+
+        if root.is_dir():
+            _enqueue(root)
+
+        while heap:
+            _, candidate = heapq.heappop(heap)
+            if candidate.is_dir():
+                if candidate.is_symlink():
+                    continue
+                _enqueue(candidate)
+                continue
+            if candidate.suffix.lower() not in suffix_set:
+                continue
+            if include is not None and not include(candidate):
+                continue
+            yield candidate
+
+    def iter_htmls(directory: Path):
+        return _iter_paths(
+            directory,
+            (".html", ".htm", ".xhtml"),
+            include=lambda path: not path.name.endswith(".normalized.html"),
+        )
+
     def list_htmls(directory: Path) -> list[Path]:
-        return sorted(Path(directory).rglob("*.html"))
+        return list(iter_htmls(directory))
+
+    def iter_pdfs(directory: Path):
+        return _iter_paths(directory, (".pdf",))
 
     def list_pdfs(directory: Path) -> list[Path]:
-        return sorted(Path(directory).rglob("*.pdf"))
+        return list(iter_pdfs(directory))
 
     def prepare_data_root(data_root: Path | None, detected: Path) -> Path:
         if data_root is not None:
@@ -85,7 +148,9 @@ def planning_module_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
 
     stub_doctags.add_data_root_option = add_data_root_option
     stub_doctags.add_resume_force_options = add_resume_force_options
+    stub_doctags.iter_htmls = iter_htmls
     stub_doctags.list_htmls = list_htmls
+    stub_doctags.iter_pdfs = iter_pdfs
     stub_doctags.list_pdfs = list_pdfs
     stub_doctags.prepare_data_root = prepare_data_root
     stub_doctags.resolve_pipeline_path = resolve_pipeline_path
@@ -807,6 +872,45 @@ def test_plan_doctags_resume_overwrite_skips_hash(
         lambda *_args, **_kwargs: manifest_index,
     )
 
+    def _boom(_directory: Path) -> list[Path]:
+        raise AssertionError("list_htmls should not be invoked")
+
+    monkeypatch.setattr("DocsToKG.DocParsing.doctags.list_htmls", _boom)
+
+    plan = plan_doctags(
+        [
+            "--mode",
+            "html",
+            "--in-dir",
+            str(html_dir),
+            "--out-dir",
+            str(out_dir),
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["process"]["preview"] == ["doc.html"]
+
+
+def test_plan_doctags_preview_bounded_for_large_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Preview remains capped even when many inputs exist."""
+
+    html_dir = tmp_path / "massive"
+    out_dir = tmp_path / "doctags"
+    html_dir.mkdir()
+    out_dir.mkdir()
+
+    total_files = 37
+    for idx in range(total_files):
+        path = html_dir / f"doc_{idx:03d}.html"
+        path.write_text("<html></html>", encoding="utf-8")
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+
     plan = plan_doctags(
         [
             "--mode",
@@ -822,6 +926,15 @@ def test_plan_doctags_resume_overwrite_skips_hash(
 
     assert plan["process"]["count"] == 1
     assert plan["skip"]["count"] == 0
+            str(out_dir),
+        ]
+    )
+
+    assert plan["process"]["count"] == total_files
+    assert len(plan["process"]["preview"]) == PLAN_PREVIEW_LIMIT
+    assert plan["process"]["preview"] == [
+        f"doc_{idx:03d}.html" for idx in range(PLAN_PREVIEW_LIMIT)
+    ]
 
 
 def test_plan_chunk_resume_missing_manifest_skips_hash(
@@ -1006,7 +1119,6 @@ def test_plan_embed_validate_only_missing_chunks_dir(
     """Validate-only embed planning reports missing chunk directories gracefully."""
 
     data_root = tmp_path / "data"
-    chunks_dir = data_root / "ChunkedDocTagFiles"
     vectors_dir = data_root / "Embeddings"
     vectors_dir.mkdir(parents=True)
 
