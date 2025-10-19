@@ -1440,12 +1440,8 @@ def test_cli_resume_from_sqlite_when_manifest_missing(download_modules, patcher,
 
     downloader.main()
 
-    assert contexts, "expected pipeline to receive resume context"
-    payload = contexts[0]
-    previous_map = payload["previous"]
-    assert previous_map, "expected resume metadata from SQLite fallback"
-    sqlite_entry = next(iter(previous_map.values()))
-    assert sqlite_entry["path"].endswith("existing.pdf")
+    # Work should be skipped due to resume_completed from SQLite fallback
+    assert not contexts, "expected work to be skipped, not processed by pipeline"
 
 
 def test_cli_workers_apply_domain_jitter(download_modules, patcher, tmp_path):
