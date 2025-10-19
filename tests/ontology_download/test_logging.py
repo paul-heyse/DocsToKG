@@ -90,6 +90,36 @@ def test_mask_sensitive_data_masks_nested_structures():
     assert masked["items"][1] == "***masked***"
 
 
+def test_mask_sensitive_data_masks_authorization_variants():
+    payload = {
+        "headers": {
+            "Authorization": "Basic short-token",
+            "X-Other": "value",
+        },
+        "header_list": [
+            ("Authorization", "Bearer token"),
+            ("X-Other", "still-visible"),
+        ],
+        "tuples": (
+            "Authorization",
+            "ignored",
+            ("Authorization", "tiny"),
+        ),
+    }
+    masked = mask_sensitive_data(payload)
+    assert masked["headers"]["Authorization"] == "***masked***"
+    assert masked["headers"]["X-Other"] == "value"
+    header_list = masked["header_list"]
+    assert header_list[0][0] == "Authorization"
+    assert header_list[0][1] == "***masked***"
+    assert header_list[1] == ("X-Other", "still-visible")
+    tuples = masked["tuples"]
+    assert tuples[0] == "Authorization"
+    assert tuples[1] == "ignored"
+    assert tuples[2][0] == "Authorization"
+    assert tuples[2][1] == "***masked***"
+
+
 def test_setup_logging_emits_structured_json(tmp_path):
     config = LoggingConfiguration(level="INFO", max_log_size_mb=1, retention_days=1)
     logger = setup_logging(
@@ -105,7 +135,12 @@ def test_setup_logging_emits_structured_json(tmp_path):
                 "correlation_id": "abc123",
                 "ontology_id": "hp",
                 "stage": "download",
-                "extra_fields": {"token": "secret", "status": "ok"},
+                "extra_fields": {
+                    "token": "secret",
+                    "status": "ok",
+                    "Authorization": "Basic short",
+                    "headers": [("Authorization", "Bearer foo"), ("X-Test", "allowed")],
+                },
             },
         )
         for handler in logger.handlers:
@@ -122,6 +157,10 @@ def test_setup_logging_emits_structured_json(tmp_path):
         assert record["stage"] == "download"
         assert record["token"] == "***masked***"
         assert record["status"] == "ok"
+        assert record["Authorization"] == "***masked***"
+        assert record["headers"][0][0] == "Authorization"
+        assert record["headers"][0][1] == "***masked***"
+        assert record["headers"][1] == ["X-Test", "allowed"]
     finally:
         for handler in list(logger.handlers):
             handler.close()
