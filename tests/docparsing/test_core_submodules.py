@@ -775,6 +775,49 @@ def test_plan_doctags_without_resume_skips_hash(
     assert plan["skip"]["count"] == 0
 
 
+def test_plan_doctags_resume_manifest_missing_hash_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """DocTags planner reprocesses entries lacking stored hashes without hashing."""
+
+    html_dir = tmp_path / "html"
+    output_dir = tmp_path / "doctags"
+    html_dir.mkdir()
+    output_dir.mkdir()
+    (html_dir / "doc.html").write_text("<html></html>", encoding="utf-8")
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+
+    def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
+        raise AssertionError("compute_content_hash should not run when manifest hash missing")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash",
+        _raise_hash,
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index",
+        lambda *_args, **_kwargs: {"doc.html": {"doc_id": "doc.html", "status": "success"}},
+    )
+
+    plan = plan_doctags(
+        [
+            "--mode",
+            "html",
+            "--in-dir",
+            str(html_dir),
+            "--out-dir",
+            str(output_dir),
+            "--resume",
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
+
+
 def test_plan_chunk_resume_missing_manifest_skips_hash(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -815,6 +858,50 @@ def test_plan_chunk_resume_missing_manifest_skips_hash(
     assert plan["skip"]["count"] == 0
 
 
+def test_plan_chunk_resume_manifest_missing_hash_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Chunk planner avoids hashing when manifest hash metadata is absent."""
+
+    data_root = tmp_path / "data"
+    in_dir = data_root / "DocTagsFiles"
+    out_dir = data_root / "ChunkedDocTagFiles"
+    in_dir.mkdir(parents=True)
+    out_dir.mkdir(parents=True)
+    (in_dir / "doc1.doctags").write_text("{}", encoding="utf-8")
+
+    def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
+        raise AssertionError("compute_content_hash should not run without manifest input_hash")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash",
+        _raise_hash,
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index",
+        lambda *_args, **_kwargs: {
+            "doc1.doctags": {"doc_id": "doc1.doctags", "status": "success"}
+        },
+    )
+
+    plan = plan_chunk(
+        [
+            "--data-root",
+            str(data_root),
+            "--in-dir",
+            str(in_dir),
+            "--out-dir",
+            str(out_dir),
+            "--resume",
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
+
+
 def test_plan_embed_resume_missing_manifest_skips_hash(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -837,6 +924,50 @@ def test_plan_embed_resume_missing_manifest_skips_hash(
     )
     monkeypatch.setattr(
         "DocsToKG.DocParsing.core.planning.load_manifest_index", lambda *_args, **_kwargs: {}
+    )
+
+    plan = plan_embed(
+        [
+            "--data-root",
+            str(data_root),
+            "--chunks-dir",
+            str(chunks_dir),
+            "--out-dir",
+            str(vectors_dir),
+            "--resume",
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
+
+
+def test_plan_embed_resume_manifest_missing_hash_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Embedding planner reprocesses entries lacking manifest hashes without hashing."""
+
+    data_root = tmp_path / "data"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    vectors_dir = data_root / "Embeddings"
+    chunks_dir.mkdir(parents=True)
+    vectors_dir.mkdir(parents=True)
+    (chunks_dir / "doc1.chunks.jsonl").write_text("{}\n", encoding="utf-8")
+
+    def _raise_hash(_path: Path, _algorithm: str = "sha256") -> str:
+        raise AssertionError("compute_content_hash should not run when manifest hash missing")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash",
+        _raise_hash,
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index",
+        lambda *_args, **_kwargs: {
+            "doc1.doctags": {"doc_id": "doc1.doctags", "status": "success"}
+        },
     )
 
     plan = plan_embed(

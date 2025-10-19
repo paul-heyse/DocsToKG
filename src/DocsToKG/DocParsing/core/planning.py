@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, TextIO, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, TextIO, Tuple
 
 from DocsToKG.DocParsing.cli_errors import DoctagsCLIValidationError
 from DocsToKG.DocParsing.env import (
@@ -63,6 +63,23 @@ def _bucket_counts(entry: Dict[str, Any], key: str) -> Tuple[int, List[str]]:
     count = len(items)
     preview = items[:PLAN_PREVIEW_LIMIT]
     return count, preview
+
+
+def _manifest_hash_requirements(
+    manifest_entry: Optional[Mapping[str, object]]
+) -> Tuple[Optional[str], Optional[str]]:
+    """Return manifest hash metadata when both entry and hash are present."""
+
+    if not manifest_entry or not isinstance(manifest_entry, Mapping):
+        return None, None
+
+    raw_hash = manifest_entry.get("input_hash")
+    if not isinstance(raw_hash, str) or not raw_hash:
+        return None, None
+
+    hash_alg = manifest_entry.get("hash_alg")
+    algorithm = hash_alg if isinstance(hash_alg, str) and hash_alg else None
+    return raw_hash, algorithm
 
 
 def _render_preview(preview: List[str], count: int) -> str:
@@ -148,10 +165,14 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
     for path in files:
         doc_id, out_path = derive_doc_id_and_doctags_path(path, input_dir, output_dir)
         manifest_entry = resume_controller.entry(doc_id)
-        should_hash = bool(args.resume and not args.force and manifest_entry)
+        stored_hash, hash_algorithm = _manifest_hash_requirements(manifest_entry)
+        should_hash = bool(args.resume and not args.force and stored_hash)
         skip = False
         if should_hash:
-            input_hash = compute_content_hash(path)
+            if hash_algorithm:
+                input_hash = compute_content_hash(path, hash_algorithm)
+            else:
+                input_hash = compute_content_hash(path)
             skip = should_skip_output(
                 out_path,
                 manifest_entry,
@@ -228,13 +249,17 @@ def plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
     for path in iter_doctags(in_dir):
         rel_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
         manifest_entry = resume_controller.entry(rel_id)
-        should_hash = bool(args.resume and not args.force and manifest_entry)
+        stored_hash, hash_algorithm = _manifest_hash_requirements(manifest_entry)
+        should_hash = bool(args.resume and not args.force and stored_hash)
         skip = False
         if should_hash:
             if not out_path.exists():
                 _record_bucket(planned, rel_id)
                 continue
-            input_hash = compute_content_hash(path)
+            if hash_algorithm:
+                input_hash = compute_content_hash(path, hash_algorithm)
+            else:
+                input_hash = compute_content_hash(path)
             skip = should_skip_output(
                 out_path,
                 manifest_entry,
@@ -353,13 +378,17 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
             chunk, chunks_dir, vectors_dir
         )
         manifest_entry = resume_controller.entry(doc_id)
-        should_hash = bool(args.resume and not args.force and manifest_entry)
+        stored_hash, hash_algorithm = _manifest_hash_requirements(manifest_entry)
+        should_hash = bool(args.resume and not args.force and stored_hash)
         skip = False
         if should_hash:
             if not vector_path.exists():
                 _record_bucket(planned, doc_id)
                 continue
-            input_hash = compute_content_hash(chunk.resolved_path)
+            if hash_algorithm:
+                input_hash = compute_content_hash(chunk.resolved_path, hash_algorithm)
+            else:
+                input_hash = compute_content_hash(chunk.resolved_path)
             skip = should_skip_output(
                 vector_path,
                 manifest_entry,
