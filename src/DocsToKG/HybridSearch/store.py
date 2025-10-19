@@ -2374,15 +2374,11 @@ def cosine_batch(
     Returns:
         numpy.ndarray: Pairwise cosine similarities with shape ``(N, M)``.
     """
-    q = np.asarray(q, dtype=np.float32)
+    q = np.array(q, dtype=np.float32, copy=True, order="C")
     if q.ndim == 1:
         q = q.reshape(1, -1)
-    if not q.flags.c_contiguous:
-        q = np.ascontiguousarray(q)
 
-    C = np.asarray(C, dtype=np.float32)
-    if not C.flags.c_contiguous:
-        C = np.ascontiguousarray(C)
+    C = np.array(C, dtype=np.float32, copy=True, order="C")
     faiss.normalize_L2(q)
     faiss.normalize_L2(C)
     kernel = pairwise_fn or faiss.pairwise_distance_gpu
