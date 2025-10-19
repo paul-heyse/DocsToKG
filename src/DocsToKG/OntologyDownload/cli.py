@@ -863,24 +863,27 @@ def _handle_prune(args, logger) -> Dict[str, object]:
     }
 
 
-def _bioportal_api_key_status(path: Path) -> Dict[str, object]:
-    """Return configuration status for the BioPortal API key file."""
+def _read_api_key_status(path: Path) -> Dict[str, object]:
+    """Return diagnostic metadata for an API key file.
 
-    status: Dict[str, object] = {"path": str(path), "configured": False}
+    Args:
+        path: Target file path to inspect.
 
-    if not path.exists():
-        return status
+    Returns:
+        Mapping including the path, whether it exists, configuration status, and
+        any error encountered while reading the contents.
+    """
+
+    info: Dict[str, object] = {"path": str(path), "exists": path.exists(), "configured": False}
+    if not info["exists"]:
+        return info
 
     try:
-        contents = path.read_text()
-    except (OSError, UnicodeDecodeError) as exc:
-        status["error"] = f"{exc.__class__.__name__}: {exc}"
-        return status
+        info["configured"] = path.read_text().strip() != ""
+    except OSError as exc:
+        info["error"] = f"{exc.__class__.__name__}: {exc}"
 
-    if contents.strip():
-        status["configured"] = True
-
-    return status
+    return info
 
 
 def _doctor_report() -> Dict[str, object]:
@@ -976,7 +979,7 @@ def _doctor_report() -> Dict[str, object]:
             robot_info["error"] = str(exc)
 
     api_key_path = CONFIG_DIR / "bioportal_api_key.txt"
-    bioportal = _bioportal_api_key_status(api_key_path)
+    bioportal = _read_api_key_status(api_key_path)
 
     network_targets = {
         "ols": "https://www.ebi.ac.uk/ols4/api/health",
