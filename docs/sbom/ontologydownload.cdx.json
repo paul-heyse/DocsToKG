@@ -1,0 +1,19 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "serialNumber": "urn:uuid:1b8c09d0-2f83-4af3-9363-b1f013b8dc2a",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-10-19T00:00:00Z",
+    "component": {
+      "type": "application",
+      "name": "DocsToKG OntologyDownload",
+      "bomRef": "docstokg-ontology-download",
+      "licenses": [],
+      "supplier": {
+        "name": "DocsToKG"
+      }
+    }
+  },
+  "components": []
+}

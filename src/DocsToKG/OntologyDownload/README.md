@@ -1,18 +1,15 @@
 ---
 subdir_id: docstokg-ontology-download
-owning_team: TODO_TEAM
+owning_team: docs-to-kg
 interfaces: [cli, python]
 stability: stable
 versioning: semver
-codeowners: TODO_CODEOWNERS
+codeowners: none
 last_updated: 2025-10-18
 related_adrs: []
-slos:
-  availability: TODO
-  latency_p50_ms: TODO
+slos: { availability: "none", latency_p50_ms: none }
 data_handling: no-pii
-sbom:
-  path: TODO_SBOM_PATH
+sbom: { path: docs/sbom/ontologydownload.cdx.json }
 ---
 
 # DocsToKG • OntologyDownload
