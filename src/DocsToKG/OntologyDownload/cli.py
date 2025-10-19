@@ -841,29 +841,66 @@ def _doctor_report() -> Dict[str, object]:
         Mapping capturing disk, dependency, network, and configuration status.
     """
 
+    ontology_dir = LOCAL_ONTOLOGY_DIR
+    created_for_diagnostics = False
+    if not ontology_dir.exists():
+        try:
+            ontology_dir.mkdir(parents=True, exist_ok=True)
+            created_for_diagnostics = True
+        except OSError:
+            # The directory could not be created (e.g., permissions). We'll
+            # continue with fallback disk usage handling below.
+            pass
+
     directories = {}
     for name, path in {
         "configs": CONFIG_DIR,
         "cache": CACHE_DIR,
         "logs": LOG_DIR,
-        "ontologies": LOCAL_ONTOLOGY_DIR,
+        "ontologies": ontology_dir,
     }.items():
-        directories[name] = {
+        entry = {
             "path": str(path),
             "exists": path.exists(),
             "writable": os.access(path, os.W_OK),
         }
+        if name == "ontologies" and created_for_diagnostics:
+            entry["created_for_diagnostics"] = True
+        directories[name] = entry
 
-    disk_usage = shutil.disk_usage(LOCAL_ONTOLOGY_DIR)
-    threshold_bytes = max(10 * 1_000_000_000, int(disk_usage.total * 0.1))
-    disk_report = {
-        "total_bytes": disk_usage.total,
-        "free_bytes": disk_usage.free,
-        "total_gb": round(disk_usage.total / 1_000_000_000, 2),
-        "free_gb": round(disk_usage.free / 1_000_000_000, 2),
-        "threshold_bytes": threshold_bytes,
-        "warning": disk_usage.free < threshold_bytes,
-    }
+    probe_path: Path = ontology_dir
+    if not probe_path.exists():
+        for candidate in ontology_dir.parents:
+            if candidate.exists():
+                probe_path = candidate
+                break
+        else:
+            probe_path = Path("/")
+
+    try:
+        disk_usage = shutil.disk_usage(probe_path)
+    except (FileNotFoundError, PermissionError, OSError):  # pragma: no cover - defensive
+        disk_report = {
+            "path": str(probe_path),
+            "total_bytes": None,
+            "free_bytes": None,
+            "total_gb": None,
+            "free_gb": None,
+            "threshold_bytes": None,
+            "warning": True,
+            "error": "Unable to determine disk usage for ontology directory",
+        }
+    else:
+        threshold_bytes = max(10 * 1_000_000_000, int(disk_usage.total * 0.1))
+        disk_report = {
+            "path": str(probe_path),
+            "total_bytes": disk_usage.total,
+            "free_bytes": disk_usage.free,
+            "total_gb": round(disk_usage.total / 1_000_000_000, 2),
+            "free_gb": round(disk_usage.free / 1_000_000_000, 2),
+            "threshold_bytes": threshold_bytes,
+            "warning": disk_usage.free < threshold_bytes,
+        }
 
     dependencies = {
         "rdflib": importlib.util.find_spec("rdflib") is not None,
