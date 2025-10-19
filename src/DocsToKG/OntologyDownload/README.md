@@ -53,6 +53,14 @@ direnv exec . python -m DocsToKG.OntologyDownload.cli prune --keep 3 --json
 direnv exec . python -m DocsToKG.OntologyDownload.cli config validate configs/sources.yaml
 ```
 
+The `plan-diff` command expects an existing baseline file from a prior run. If you are running it for the first time, supply
+`--update-baseline` so the tool seeds the baseline snapshot before calculating subsequent diffs. A typical first run might
+look like:
+
+```bash
+direnv exec . python -m DocsToKG.OntologyDownload.cli plan-diff hp --update-baseline --json
+```
+
 ## Core capabilities
 - **Planning & orchestration** – `planning.plan_all` expands `FetchSpec` inputs into concrete resolver attempts, enforces allowlists/rate limits, and emits deterministic plans/lockfiles suitable for replay.
 - **Resolver catalog** – `resolvers.py` ships first-party resolvers (OBO, BioPortal, Europe PMC, XBRL, etc.) with templated extras, polite header handling, and heuristics for fallback ordering.
