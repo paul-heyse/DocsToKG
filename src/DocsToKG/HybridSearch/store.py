@@ -433,6 +433,8 @@ class FaissVectorStore(DenseVectorStore):
         self._needs_rebuild = False
         self._supports_remove_ids: Optional[bool] = None
         self._last_nprobe_update = 0.0
+        self._last_applied_nprobe: Optional[int] = None
+        self._last_applied_nprobe_monotonic = 0.0
         self._set_nprobe()
         self._search_coalescer = _SearchCoalescer(self)
         self._cpu_replica: Optional[bytes] = None
@@ -510,6 +512,7 @@ class FaissVectorStore(DenseVectorStore):
                 "faiss_set_config_nprobe", nprobe=str(changes["nprobe"])
             ):
                 with self._lock:
+                    self._reset_nprobe_cache()
                     self._set_nprobe()
                     self._last_nprobe_update = time.time()
             self._observability.metrics.set_gauge("faiss_nprobe", float(changes["nprobe"]))
@@ -1203,6 +1206,7 @@ class FaissVectorStore(DenseVectorStore):
                 self._tombstones.clear()
                 self._dirty_deletes = 0
                 self._needs_rebuild = False
+                self._reset_nprobe_cache()
                 self._set_nprobe()
             self._observability.metrics.increment("faiss_restore_calls", amount=1.0)
         if getattr(self._config, "persist_mode", "cpu_bytes") != "disabled":
@@ -1251,6 +1255,7 @@ class FaissVectorStore(DenseVectorStore):
         self._config = replace(self._config, nprobe=target)
         with self._observability.trace("faiss_set_nprobe", nprobe=str(target)):
             with self._lock:
+                self._reset_nprobe_cache()
                 self._set_nprobe()
                 self._last_nprobe_update = now
         self._observability.metrics.set_gauge("faiss_nprobe", float(target))
@@ -1848,29 +1853,49 @@ class FaissVectorStore(DenseVectorStore):
                 f"Unable to transfer FAISS index from GPU to CPU for serialization: {exc}"
             ) from exc
 
+    def _reset_nprobe_cache(self) -> None:
+        """Invalidate cached nprobe state applied to the active FAISS index."""
+
+        self._last_applied_nprobe = None
+        self._last_applied_nprobe_monotonic = 0.0
+
     def _set_nprobe(self) -> None:
         index = getattr(self, "_index", None)
         if index is None or not self._config.index_type.startswith("ivf"):
+            self._reset_nprobe_cache()
             return
         nprobe = int(self._config.nprobe)
+        if (
+            self._last_applied_nprobe == nprobe
+            and self._last_applied_nprobe_monotonic > 0.0
+        ):
+            return
+        applied = False
         try:
             if hasattr(faiss, "GpuParameterSpace"):
                 gps = faiss.GpuParameterSpace()
                 if hasattr(gps, "initialize"):
                     gps.initialize(index)
                 gps.set_index_parameter(index, "nprobe", nprobe)
-                self._log_index_configuration(index)
-                return
+                applied = True
         except Exception:  # pragma: no cover - defensive guard
             logger.debug("Unable to set nprobe via GpuParameterSpace", exc_info=True)
-        base = getattr(index, "index", None) or index
-        try:
-            if hasattr(base, "nprobe"):
-                base.nprobe = nprobe
-            elif hasattr(index, "nprobe"):
-                index.nprobe = nprobe
-        except Exception:  # pragma: no cover - defensive guard
-            logger.debug("Unable to set nprobe attribute on FAISS index", exc_info=True)
+        if not applied:
+            base = getattr(index, "index", None) or index
+            try:
+                if hasattr(base, "nprobe"):
+                    base.nprobe = nprobe
+                    applied = True
+                elif hasattr(index, "nprobe"):
+                    index.nprobe = nprobe
+                    applied = True
+            except Exception:  # pragma: no cover - defensive guard
+                logger.debug("Unable to set nprobe attribute on FAISS index", exc_info=True)
+        if applied:
+            self._last_applied_nprobe = nprobe
+            self._last_applied_nprobe_monotonic = time.monotonic()
+        else:
+            self._reset_nprobe_cache()
         self._log_index_configuration(index)
 
     def _log_index_configuration(self, index: "faiss.Index") -> None:
@@ -2030,6 +2055,7 @@ class FaissVectorStore(DenseVectorStore):
         if current_ids.size == 0:
             self._index = self._create_index()
             self._index = self._maybe_distribute_multi_gpu(self._index)
+            self._reset_nprobe_cache()
             self._set_nprobe()
             return
         if self._tombstones:
@@ -2050,6 +2076,7 @@ class FaissVectorStore(DenseVectorStore):
         vectors = np.ascontiguousarray(vectors, dtype=np.float32)
         self._index = self._create_index()
         self._index = self._maybe_distribute_multi_gpu(self._index)
+        self._reset_nprobe_cache()
         self._set_nprobe()
         if vectors.size:
             base_new = self._index.index if hasattr(self._index, "index") else self._index
