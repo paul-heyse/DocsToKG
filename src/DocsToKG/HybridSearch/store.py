@@ -382,6 +382,14 @@ class FaissVectorStore(DenseVectorStore):
         self._multi_gpu_mode = getattr(config, "multi_gpu_mode", "single")
         self._indices_32_bit = bool(getattr(config, "gpu_indices_32_bit", True))
         self._temp_memory_bytes = getattr(config, "gpu_temp_memory_bytes", None)
+        self._gpu_use_default_null_stream_all_devices = bool(
+            getattr(config, "gpu_use_default_null_stream_all_devices", False)
+            or getattr(config, "gpu_default_null_stream_all_devices", False)
+        )
+        self._gpu_use_default_null_stream = bool(
+            getattr(config, "gpu_use_default_null_stream", False)
+            or getattr(config, "gpu_default_null_stream", False)
+        )
         self._expected_ntotal = int(getattr(config, "expected_ntotal", 0))
         self._rebuild_delete_threshold = int(getattr(config, "rebuild_delete_threshold", 10000))
         self._force_64bit_ids = bool(getattr(config, "force_64bit_ids", False))
@@ -390,6 +398,7 @@ class FaissVectorStore(DenseVectorStore):
         self._reserve_memory_enabled = bool(getattr(config, "enable_reserve_memory", True))
         self._replicated = False
         self._gpu_resources: Optional["faiss.StandardGpuResources"] = None
+        self._replica_gpu_resources: list["faiss.StandardGpuResources"] = []
         self._pinned_buffers: list[object] = []
         self._observability = observability or Observability()
         self.init_gpu()
@@ -1365,15 +1374,84 @@ class FaissVectorStore(DenseVectorStore):
                 "Update DenseIndexConfig.device or adjust CUDA visibility."
             )
         try:
-            resources = faiss.StandardGpuResources()
-            if self._temp_memory_bytes is not None and hasattr(resources, "setTempMemory"):
-                resources.setTempMemory(self._temp_memory_bytes)
+            resources = self._create_gpu_resources(device=device)
             self._gpu_resources = resources
         except Exception as exc:  # pragma: no cover - GPU-specific failure
             raise RuntimeError(
                 "HybridSearch failed to initialise FAISS GPU resources. "
                 "Check CUDA driver installation and faiss-gpu compatibility."
             ) from exc
+
+    def _create_gpu_resources(
+        self, *, device: Optional[int] = None
+    ) -> "faiss.StandardGpuResources":
+        """Instantiate and configure ``StandardGpuResources`` for ``device``."""
+
+        resources = faiss.StandardGpuResources()
+        self._configure_gpu_resource(resources, device=device)
+        return resources
+
+    def _configure_gpu_resource(
+        self, resource: "faiss.StandardGpuResources", *, device: Optional[int] = None
+    ) -> None:
+        """Apply configured knobs to a FAISS GPU resource manager."""
+
+        if self._temp_memory_bytes is not None and hasattr(resource, "setTempMemory"):
+            try:
+                resource.setTempMemory(self._temp_memory_bytes)
+            except Exception:  # pragma: no cover - best effort guard
+                logger.debug("Unable to apply GPU temp memory cap", exc_info=True)
+
+        if self._gpu_use_default_null_stream_all_devices:
+            method = getattr(resource, "setDefaultNullStreamAllDevices", None)
+            if callable(method):
+                try:  # pragma: no cover - hardware/driver dependent
+                    method()
+                except Exception:
+                    logger.debug(
+                        "Unable to enable default CUDA null stream across devices",
+                        exc_info=True,
+                    )
+            return
+
+        if not self._gpu_use_default_null_stream:
+            return
+
+        method = getattr(resource, "setDefaultNullStream", None)
+        if not callable(method):
+            return
+
+        tried_device = False
+        if device is not None:
+            try:  # pragma: no cover - GPU binding specific
+                method(int(device))
+                tried_device = True
+            except TypeError:
+                tried_device = False
+            except Exception:
+                logger.debug(
+                    "Unable to bind default CUDA null stream for device", exc_info=True
+                )
+                tried_device = True
+
+        if tried_device:
+            return
+
+        try:  # pragma: no cover - GPU binding specific
+            method()
+        except TypeError:
+            if device is not None:
+                try:
+                    method(int(device))
+                except Exception:
+                    logger.debug(
+                        "Unable to fall back when binding CUDA null stream", exc_info=True
+                    )
+        except Exception:
+            logger.debug(
+                "Unable to bind default CUDA null stream without explicit device",
+                exc_info=True,
+            )
 
     def distribute_to_all_gpus(self, index: "faiss.Index", *, shard: bool = False) -> "faiss.Index":
         """Clone ``index`` across available GPUs when the build supports it.
@@ -1424,7 +1502,43 @@ class FaissVectorStore(DenseVectorStore):
                 cloner_options.shard = bool(shard)
                 if shard and hasattr(cloner_options, "common_ivf_quantizer"):
                     cloner_options.common_ivf_quantizer = True
-            multi = faiss.index_cpu_to_all_gpus(base_index, co=cloner_options, ngpu=gpu_count)
+
+            resources_vector: "faiss.GpuResourcesVector | None" = None
+            gpu_ids = list(range(gpu_count))
+            if hasattr(faiss, "GpuResourcesVector"):
+                try:
+                    resources_vector = faiss.GpuResourcesVector()
+                except Exception:  # pragma: no cover - fall back to legacy path
+                    resources_vector = None
+
+            self._replica_gpu_resources = []
+            multi: "faiss.Index"
+            if resources_vector is not None and (
+                hasattr(faiss, "index_cpu_to_gpu_multiple")
+                or hasattr(faiss, "index_cpu_to_gpus_list")
+            ):
+                for gpu_id in gpu_ids:
+                    resource: "faiss.StandardGpuResources"
+                    if (
+                        self._gpu_resources is not None
+                        and int(self.device) == gpu_id
+                    ):
+                        resource = self._gpu_resources
+                        self._configure_gpu_resource(resource, device=gpu_id)
+                    else:
+                        resource = self._create_gpu_resources(device=gpu_id)
+                        self._replica_gpu_resources.append(resource)
+                    resources_vector.push_back(resource)
+                if hasattr(faiss, "index_cpu_to_gpu_multiple"):
+                    multi = faiss.index_cpu_to_gpu_multiple(
+                        resources_vector, gpu_ids, base_index, cloner_options
+                    )
+                else:
+                    multi = faiss.index_cpu_to_gpus_list(
+                        resources_vector, gpu_ids, base_index, cloner_options
+                    )
+            else:
+                multi = faiss.index_cpu_to_all_gpus(base_index, co=cloner_options, ngpu=gpu_count)
             self._replicated = True
             return multi
         except RuntimeError:
