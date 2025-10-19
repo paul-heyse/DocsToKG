@@ -755,13 +755,41 @@ def _handle_prune(args, logger) -> Dict[str, object]:
     if threshold is not None and threshold.tzinfo is None:
         threshold = threshold.replace(tzinfo=timezone.utc)
 
-    target_ids = args.ids or STORAGE.available_ontologies()
-    target_ids = sorted(set(target_ids))
+    requested_ids: Sequence[str]
+    if args.ids is not None:
+        requested_ids = list(args.ids)
+    else:
+        requested_ids = STORAGE.available_ontologies()
+
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    target_ids: List[str] = []
+    for ontology_id in requested_ids:
+        if ontology_id in seen:
+            duplicates.add(ontology_id)
+            continue
+        seen.add(ontology_id)
+        target_ids.append(ontology_id)
 
     summary: List[Dict[str, object]] = []
     total_reclaimed = 0
     total_deleted = 0
     messages: List[str] = []
+    if args.dry_run and args.ids is not None:
+        if target_ids:
+            ordered = ", ".join(target_ids)
+        else:
+            ordered = "(none)"
+        if duplicates:
+            messages.append(
+                "[DRY-RUN] Requested ontologies (duplicates ignored, order preserved): "
+                f"{ordered}"
+            )
+        else:
+            messages.append(
+                "[DRY-RUN] Requested ontologies (order preserved): "
+                f"{ordered}"
+            )
 
     for ontology_id in target_ids:
         raw_metadata = collect_version_metadata(ontology_id)
