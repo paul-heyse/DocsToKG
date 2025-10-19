@@ -648,7 +648,7 @@ def _build_stage_args(args: argparse.Namespace) -> tuple[List[str], List[str], L
     if args.chunk_out_dir:
         chunk_args.extend(["--out-dir", str(args.chunk_out_dir)])
         embed_args.extend(["--chunks-dir", str(args.chunk_out_dir)])
-    if args.chunk_workers:
+    if args.chunk_workers is not None:
         chunk_args.extend(["--workers", str(args.chunk_workers)])
     if args.chunk_min_tokens is not None:
         chunk_args.extend(["--min-tokens", str(args.chunk_min_tokens)])
