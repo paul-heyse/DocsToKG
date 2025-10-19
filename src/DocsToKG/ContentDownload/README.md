@@ -199,7 +199,11 @@ python -m DocsToKG.ContentDownload.cli --topic "vision" --year-start 2024 --year
 ## FAQ
 
 - Q: How do I resume a partially completed download run?
-  A: Supply `--resume-from <manifest.jsonl>` (or the staging manifest path). CSV attempts logs are also supported when the matching `manifest.sqlite3` cache is present. The runner uses the SQLite index plus JSONL history (including rotated files) to skip completed works.
+  A: Supply `--resume-from <manifest.jsonl>` (or the staging manifest path). You can
+  also point the flag at `manifest.sqlite` or `manifest.sqlite3` directly—the runner
+  loads the SQLite cache without warnings. CSV attempts logs are supported when the
+  matching cache is present. The runner uses the SQLite index plus JSONL history
+  (including rotated files) to skip completed works.
 
 - Q: How can I target only open-access works?
   A: Add `--oa-only` so the Works query filters to open-access items before resolver execution.
