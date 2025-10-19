@@ -48,6 +48,8 @@ known_stages = [filename.split(".")[1] for filename in _MANIFEST_FILENAMES]
 known_stage_set = frozenset(known_stages)
 STAGE_ALIASES: Dict[str, Sequence[str]] = {
     "doctags": ("doctags-html", "doctags-pdf"),
+    "chunk": ("chunks",),
+    "embed": ("embeddings",),
 }
 
 CLI_DESCRIPTION = """\
@@ -111,7 +113,21 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
         default="auto",
         help="Select conversion backend; auto infers from input directory",
     )
+    parser.add_argument(
+        "--log-level",
+        type=lambda value: str(value).upper(),
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Logging verbosity for console output (default: %(default)s).",
+    )
     doctags_module.add_data_root_option(parser)
+    parser.add_argument(
+        "--log-level",
+        type=lambda value: str(value).upper(),
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Logging verbosity applied to the DocTags stage",
+    )
     parser.add_argument(
         "--in-dir",
         "--input",
@@ -139,6 +155,15 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
         type=str,
         default=None,
         help="Override vLLM model path or identifier for PDF conversion",
+    )
+    parser.add_argument(
+        "--vllm-wait-timeout",
+        type=int,
+        default=None,
+        help=(
+            "Seconds to wait for vLLM readiness before failing (PDF mode only; "
+            "defaults to the PDF runner setting)"
+        ),
     )
     parser.add_argument(
         "--served-model-name",
@@ -235,7 +260,7 @@ def doctags(argv: Sequence[str] | None = None) -> int:
 
     parser = build_doctags_parser()
     parsed = parser.parse_args([] if argv is None else list(argv))
-    logger = get_logger(__name__)
+    logger = get_logger(__name__, level=parsed.log_level)
 
     try:
         mode, input_dir, output_dir, resolved_root = _resolve_doctags_paths(parsed)
@@ -273,6 +298,7 @@ def doctags(argv: Sequence[str] | None = None) -> int:
         "workers": parsed.workers,
         "resume": parsed.resume,
         "force": parsed.force,
+        "log_level": parsed.log_level,
     }
 
     if mode == "html":
@@ -285,6 +311,7 @@ def doctags(argv: Sequence[str] | None = None) -> int:
         "model": parsed.model,
         "served_model_names": parsed.served_model_names,
         "gpu_memory_utilization": parsed.gpu_memory_utilization,
+        "vllm_wait_timeout": parsed.vllm_wait_timeout,
     }
     if parsed.vllm_wait_timeout is not None:
         overrides["vllm_wait_timeout"] = parsed.vllm_wait_timeout
@@ -295,7 +322,18 @@ def doctags(argv: Sequence[str] | None = None) -> int:
 def chunk(argv: Sequence[str] | None = None) -> int:
     """Execute the Docling chunker subcommand."""
 
-    from DocsToKG.DocParsing import chunking as chunk_module
+    try:
+        import DocsToKG.DocParsing as docparsing_pkg
+
+        chunk_module = docparsing_pkg._load_module("chunking")
+    except ImportError as exc:
+        print(str(exc), file=sys.stderr)
+        print(
+            "Optional DocTags/chunking dependencies are required for `docparse chunk`. "
+            "Install them with `pip install DocsToKG[gpu12x]` or `pip install transformers`.",
+            file=sys.stderr,
+        )
+        return 1
 
     parser = chunk_module.build_parser()
     parser.prog = "docparse chunk"
@@ -372,9 +410,10 @@ def _manifest_main(argv: Sequence[str]) -> int:
         default=None,
         help=(
             "Manifest stage to inspect (repeatable). Supported stages: doctags-html,"
-            " doctags-pdf, chunks, embeddings. The alias 'doctags' selects both"
-            " doctags-html and doctags-pdf. Defaults to stages discovered from"
-            " manifest files; falls back to embeddings when no manifests are present."
+            " doctags-pdf, chunks, embeddings. Aliases: 'doctags' selects"
+            " doctags-html and doctags-pdf; 'chunk' selects chunks; 'embed' selects"
+            " embeddings. Defaults to stages discovered from manifest files; falls"
+            " back to embeddings when no manifests are present."
         ),
     )
     parser.add_argument(
@@ -429,11 +468,8 @@ def _manifest_main(argv: Sequence[str]) -> int:
             if stage not in discovered:
                 discovered.append(stage)
 
-    canonical_list = ", ".join(known_stages)
-    discovered_list = ", ".join(discovered) if discovered else "none"
     allowed_stage_set = set(known_stage_set).union(discovered)
-    canonical_list = ", ".join(sorted(known_stage_set))
-    discovered_list = ", ".join(sorted(discovered)) or "none"
+    canonical_display = ", ".join(sorted(known_stage_set))
 
     if args.stages:
         seen: List[str] = []
@@ -442,17 +478,21 @@ def _manifest_main(argv: Sequence[str]) -> int:
             if not trimmed:
                 continue
             normalized = trimmed.lower()
-            resolved = STAGE_ALIASES.get(normalized, (normalized,))
-            invalid = [stage for stage in resolved if stage not in allowed_stage_set]
-            if invalid:
-                canonical_list = ", ".join(sorted(known_stage_set))
-                discovered_list = ", ".join(discovered) if discovered else "<none>"
+            alias_targets = STAGE_ALIASES.get(normalized)
+            if alias_targets is None:
+                resolved: List[str] = [normalized]
+            else:
+                resolved = [stage for stage in alias_targets if stage in allowed_stage_set]
+                if not resolved and normalized in allowed_stage_set:
+                    resolved = [normalized]
+            if not resolved:
+                discovered_message = ", ".join(discovered) if discovered else "<none>"
                 raise CLIValidationError(
                     option="--stage",
                     message=(
                         "Unsupported stage "
-                        f"'{trimmed}'. Canonical stages: {canonical_list}. "
-                        f"Discovered stages: {discovered_list}"
+                        f"'{trimmed}'. Canonical stages: {canonical_display}. "
+                        f"Discovered stages: {discovered_message}"
                     ),
                     hint="Choose a supported manifest stage.",
                 )

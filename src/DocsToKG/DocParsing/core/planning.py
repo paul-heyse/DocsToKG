@@ -92,6 +92,8 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
     parser = build_doctags_parser()
 
     args, _unknown = parser.parse_known_args(argv)
+    raw_log_level = getattr(args, "log_level", None)
+    log_level = str(raw_log_level).upper() if raw_log_level is not None else None
 
     try:
         mode, input_dir, output_dir, resolved_root_str = _resolve_doctags_paths(args)
@@ -105,6 +107,7 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
             "process": [],
             "skip": [],
             "notes": [f"{exc.message}{hint_suffix}"],
+            "log_level": log_level,
             "error": {
                 "option": exc.option,
                 "message": exc.message,
@@ -123,6 +126,7 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
             "process": _new_bucket(),
             "skip": _new_bucket(),
             "notes": ["Input directory missing"],
+            "log_level": log_level,
         }
 
     if mode == "html":
@@ -170,6 +174,7 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
         "process": planned,
         "skip": skipped,
         "notes": [],
+        "log_level": log_level,
     }
 
 
@@ -282,20 +287,18 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         resolver=lambda root: data_vectors(root, ensure=False),
     ).resolve()
 
-    missing_notes: List[str] = []
     chunks_missing = not chunks_dir.exists()
     vectors_missing = not vectors_dir.exists()
-    if chunks_missing and vectors_missing:
-        missing_notes.append("Chunks/Vectors directories missing: chunks, vectors")
-    elif chunks_missing:
-        missing_notes.append("Chunks directory missing")
-    elif vectors_missing:
-        missing_notes.append("Vectors directory missing")
 
     if args.validate_only:
         validate_bucket = _new_bucket()
         missing_bucket = _new_bucket()
-        if missing_notes:
+        notes: List[str] = []
+        if chunks_missing:
+            notes.append("Chunks directory missing")
+        if vectors_missing:
+            notes.append("Vectors directory missing")
+        if notes:
             return {
                 "stage": "embed",
                 "action": "validate",
@@ -303,7 +306,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
                 "vectors_dir": str(vectors_dir),
                 "validate": validate_bucket,
                 "missing": missing_bucket,
-                "notes": missing_notes,
+                "notes": notes,
             }
         for chunk in iter_chunks(chunks_dir):
             doc_id, vector_path = derive_doc_id_and_vectors_path(
@@ -330,7 +333,8 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     planned = _new_bucket()
     skipped = _new_bucket()
 
-    if missing_notes:
+    notes: List[str] = []
+    if chunks_missing:
         return {
             "stage": "embed",
             "action": "generate",
@@ -338,8 +342,10 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
             "vectors_dir": str(vectors_dir),
             "process": _new_bucket(),
             "skip": _new_bucket(),
-            "notes": missing_notes,
+            "notes": ["Chunks directory missing"],
         }
+    if vectors_missing:
+        notes.append("Vectors directory not found; outputs will be created during generation")
 
     files = iter_chunks(chunks_dir)
     for chunk in files:
@@ -373,7 +379,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         "vectors_dir": str(vectors_dir),
         "process": planned,
         "skip": skipped,
-        "notes": [],
+        "notes": notes,
     }
 
 
@@ -391,6 +397,9 @@ def display_plan(plans: Sequence[Dict[str, Any]], stream: Optional[TextIO] = Non
             lines.append(f"- {desc}: process {process_count}, skip {skip_count}")
             lines.append(f"  input:  {entry.get('input_dir')}")
             lines.append(f"  output: {entry.get('output_dir')}")
+            log_level_value = entry.get("log_level")
+            if log_level_value:
+                lines.append(f"  log_level: {log_level_value}")
             if process_count:
                 lines.append(
                     "  process preview: "

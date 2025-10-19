@@ -1432,11 +1432,9 @@ class FaissVectorStore(DenseVectorStore):
     def _create_gpu_resources(
         self, *, device: Optional[int] = None
     ) -> "faiss.StandardGpuResources":
-        """Instantiate and configure ``StandardGpuResources`` for ``device``."""
+        """Instantiate ``StandardGpuResources`` for ``device`` without additional tweaks."""
 
-        resources = faiss.StandardGpuResources()
-        self._configure_gpu_resource(resources, device=device)
-        return resources
+        return faiss.StandardGpuResources()
 
     def _configure_gpu_resource(
         self, resource: "faiss.StandardGpuResources", *, device: Optional[int] = None
@@ -1503,6 +1501,15 @@ class FaissVectorStore(DenseVectorStore):
                 exc_info=True,
             )
 
+    def _requires_gpu_resource_customization(self) -> bool:
+        """Return whether replica resources need to be retained for custom settings."""
+
+        return (
+            getattr(self, "_temp_memory_bytes", None) is not None
+            or getattr(self, "_gpu_use_default_null_stream", False)
+            or getattr(self, "_gpu_use_default_null_stream_all_devices", False)
+        )
+
     def distribute_to_all_gpus(self, index: "faiss.Index", *, shard: bool = False) -> "faiss.Index":
         """Clone ``index`` across available GPUs when the build supports it.
 
@@ -1564,7 +1571,7 @@ class FaissVectorStore(DenseVectorStore):
             target_gpus = self._resolve_replication_targets(available_gpus)
             if len(target_gpus) <= 1:
                 if self._replication_gpu_ids:
-                    logger.debug(
+                    logger.info(
                         "Insufficient GPU targets after filtering explicit replication ids",
                         extra={
                             "event": {
@@ -1634,21 +1641,23 @@ class FaissVectorStore(DenseVectorStore):
             self._replica_gpu_resources = []
             primary_resource = getattr(self, "_gpu_resources", None)
             multi: "faiss.Index"
+            retain_manual_resources = (
+                resources_vector is not None or self._requires_gpu_resource_customization()
+            )
 
-            if resources_vector is not None:
-                for gpu_id in gpu_ids:
-                    resource: "faiss.StandardGpuResources"
-                    if (
-                        primary_resource is not None
-                        and int(self.device) == gpu_id
-                    ):
-                        resource = primary_resource
-                        self._configure_gpu_resource(resource, device=gpu_id)
-                    else:
-                        resource = self._create_gpu_resources(device=gpu_id)
+            for gpu_id in gpu_ids:
+                resource: "faiss.StandardGpuResources"
+                if primary_resource is not None and int(self.device) == gpu_id:
+                    resource = primary_resource
+                else:
+                    resource = self._create_gpu_resources(device=gpu_id)
+                    if retain_manual_resources:
                         self._replica_gpu_resources.append(resource)
+                self._configure_gpu_resource(resource, device=gpu_id)
+                if resources_vector is not None:
                     resources_vector.push_back(resource)
 
+            if resources_vector is not None:
                 if hasattr(faiss, "index_cpu_to_gpu_multiple") and not filtered_targets:
                     try:
                         multi = faiss.index_cpu_to_gpu_multiple(

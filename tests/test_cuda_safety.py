@@ -150,12 +150,13 @@ def _stub_main_setup(monkeypatch, module, tmp_path, list_return: List) -> Simple
     args.output = tmp_path / "output"
     args.model = str(tmp_path / "model")
     args.served_model_names = ("granite-docling-258M",)
-    
+
     # Mark input and output as explicit CLI overrides to prevent defaults from overriding them
     from DocsToKG.DocParsing.config import annotate_cli_overrides
+
     explicit_keys = [name for name in vars(args) if not name.startswith("_")]
     annotate_cli_overrides(args, explicit=explicit_keys, defaults={})
-    
+
     monkeypatch.setattr(
         module, "ensure_vllm", lambda *_a, **_k: (module.PREFERRED_PORT, None, False)
     )
@@ -180,13 +181,13 @@ def _import_pdf_module(monkeypatch):
     mock_response.text = "test"
     mock_response.headers = {"content-type": "application/json"}
     mock_response.json.return_value = {"data": [{"id": "test-model"}]}
-    
+
     mock_session = mock.MagicMock()
     mock_session.get.return_value = mock_response
-    
+
     mock_requests = mock.MagicMock()
     mock_requests.Session.return_value = mock_session
-    
+
     monkeypatch.setitem(sys.modules, "requests", mock_requests)
 
     class _TqdmStub:
