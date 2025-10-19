@@ -934,6 +934,15 @@ def test_batcher() -> None:
     assert list(core.Batcher([], 3)) == []
 
 
+def test_batcher_length_policy_handles_small_lengths() -> None:
+    items = ["one", "zero", "two", "three"]
+    lengths = [1, 0, 2, 3]
+
+    batches = list(core.Batcher(items, 2, policy="length", lengths=lengths))
+
+    assert batches == [["zero", "one"], ["two", "three"]]
+
+
 def test_manifest_append(tmp_path: Path) -> None:
     manifest = tmp_path / "docparse.chunks.manifest.jsonl"
     manifest.parent.mkdir(parents=True, exist_ok=True)
