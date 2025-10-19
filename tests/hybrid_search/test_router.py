@@ -101,10 +101,17 @@ class RecordingFaissStore:
         self.namespace = namespace
         self._dim = 3
         self._device = -1
+        self._nprobe = 17
+        self._use_cuvs = True
         self._vectors: list[str] = []
         self._resolver: Optional[Callable[[int], Optional[str]]] = None
         self.last_restore_meta: Optional[Mapping[str, object]] = None
-        self.last_snapshot_meta: Optional[Mapping[str, object]] = None
+        self._snapshot_meta: dict[str, object] = {
+            "namespace": namespace,
+            "device": self._device,
+            "nprobe": self._nprobe,
+            "use_cuvs": self._use_cuvs,
+        }
 
     @property
     def dim(self) -> int:
@@ -124,7 +131,7 @@ class RecordingFaissStore:
             device=self._device,
             ntotal=self.ntotal,
             index_description="recording",
-            nprobe=0,
+            nprobe=self._nprobe,
             multi_gpu_mode="single",
             replicated=False,
             fp16_enabled=False,
@@ -149,7 +156,10 @@ class RecordingFaissStore:
         data = json.loads(payload.decode("utf-8"))
         ids = data.get("ids", [])
         self._vectors = [str(vector_id) for vector_id in ids]
-        self.last_restore_meta = meta
+        self.last_restore_meta = dict(meta) if meta is not None else None
+
+    def snapshot_meta(self) -> Mapping[str, object]:
+        return dict(self._snapshot_meta)
 
     def snapshot_meta(self) -> Mapping[str, object]:
         return {"namespace": self.namespace, "dim": self._dim}
@@ -267,4 +277,30 @@ def test_serialize_and_restore_roundtrip_carries_metadata() -> None:
     inner_store = restored_store._inner  # type: ignore[attr-defined]
     assert isinstance(inner_store, RecordingFaissStore)
     assert inner_store.last_restore_meta == alpha_payload["meta"]
+    assert inner_store._vectors == ["alpha-vector"]
+
+
+def test_evict_idle_preserves_snapshot_metadata() -> None:
+    """Evicted managed stores should restore with cached snapshot metadata."""
+
+    router = FaissRouter(
+        per_namespace=True,
+        default_store=ManagedFaissAdapter(RecordingFaissStore("__default__")),
+        factory=lambda namespace: ManagedFaissAdapter(RecordingFaissStore(namespace)),
+    )
+    managed_store = router.get("alpha")
+    expected_meta = dict(managed_store.snapshot_meta())
+    managed_store.add([np.zeros(3, dtype=np.float32)], ["alpha-vector"])
+
+    router._last_used["alpha"] = 0.0
+    evicted = router.evict_idle(max_idle_seconds=1, skip_default=True)
+    assert evicted == 1
+    _, meta = router._snapshots["alpha"]
+    assert isinstance(meta, Mapping)
+    assert dict(meta) == expected_meta
+
+    restored_store = router.get("alpha")
+    inner_store = restored_store._inner  # type: ignore[attr-defined]
+    assert isinstance(inner_store, RecordingFaissStore)
+    assert inner_store.last_restore_meta == expected_meta
     assert inner_store._vectors == ["alpha-vector"]
