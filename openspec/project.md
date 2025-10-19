@@ -11,12 +11,12 @@ DocsToKG is an end-to-end document-to-knowledge-graph pipeline that turns hetero
 Together these stages ingest raw content, enrich it with ontological context, and expose a programmable hybrid search surface optimised for AI agent consumption.
 
 ## Tech Stack
-- **Language & runtime**: Python 3.12+ (some tooling supports 3.10/3.11) with dataclasses, `typing`, and protocol-based interfaces.
-- **GPU / numerical**: Custom `faiss-1.12.0` CUDA 12 wheel (cuVS-capable), NumPy, OpenBLAS, CUDA libraries (`libcudart.so.12`, `libcublas.so.12`), jemalloc.
-- **Model serving**: vLLM for Qwen dense embeddings, Docling for DocTags extraction, SPLADE for sparse vectors.
-- **CLI & orchestration**: `argparse`-driven CLIs in each package, composable manifest/telemetry subsystems, `ThreadPoolExecutor` for parallelism.
-- **Observability & storage**: JSONL manifests, SQLite caches, structured logging (`logging_utils`, `telemetry`), optional OpenSearch-compatible lexical simulator.
-- **Tooling**: `black`, `isort`, `ruff`, `mypy`, `pytest`, custom documentation validators, `direnv`, and `scripts/bootstrap_env.sh` for environment preparation.
+- **Language & runtime**: Python 3.12+ (tooling remains compatible with 3.10/3.11 during transitional periods) using dataclasses, protocols, and type hints for explicit contracts.
+- **GPU / numerical**: Custom `faiss-1.12.0` CUDA 12 wheel with cuVS support, NumPy/OpenBLAS, CUDA runtime libraries (`libcudart.so.12`, `libcublas.so.12`), jemalloc, libgomp.
+- **Model serving**: vLLM for Qwen dense embeddings, Docling + Granite DocTags models, SPLADE for sparse representations; model caches managed via `DOCSTOKG_*` environment variables.
+- **CLI & orchestration**: Package-specific `argparse` CLIs, `ThreadPoolExecutor`-based concurrency, manifest and telemetry subsystems for consistent process control.
+- **Observability & storage**: Structured logging (JSONL + console), SQLite manifest indices, FAISS snapshots, namespace stats; optional OpenSearch simulator for lexical testing.
+- **Tooling & automation**: `black`, `isort`, `ruff`, `mypy`, `pytest`, `direnv`, `scripts/bootstrap_env.sh`, documentation validators (`validate_docs.py`, `check_links.py`), and CI workflows enforcing documentation-first commits.
 
 ## Project Conventions
 
@@ -27,18 +27,23 @@ Together these stages ingest raw content, enrich it with ontological context, an
 - Avoid mutating configuration dataclasses directly; rely on helper constructors (`HybridSearchConfigManager`, `ResolvedConfig`, `settings.load_config`) to preserve immutability and validation invariants.
 
 ### Architecture Patterns
-- **Stage separation**: Each package encapsulates a pipeline stage with clear inputs/outputs (ContentDownload manifests, DocParsing chunk/embedding JSONL, ontology lockfiles, FAISS snapshots).
-- **Configuration via dataclasses**: `DenseIndexConfig`, `HybridSearchConfig`, `ResolverConfig`, and ontology `Settings` map 1:1 to CLI/environment overrides and govern runtime behaviour.
-- **Manifest-driven idempotency**: Every stage writes JSONL manifests/SQLite indexes, computes hashes (SHA-256 by default), and resumes work deterministically across reruns.
-- **GPU resource management**: HybridSearch leverages `faiss.StandardGpuResources`, cuVS toggles, FP16 configuration, and namespace-aware routing (`FaissRouter`) for multi-GPU scaling.
-- **Plugin-ready design**: Ontology resolvers/validators and ContentDownload resolvers are discovered via entry points, enabling extensibility without modifying core orchestrators.
-- **Observability baked-in**: Structured logging, telemetry sinks, and stats snapshots (HybridSearch `AdapterStats`, `Observability`) provide metrics for ingestion, search, and validation flows.
+- **Stage separation**: Four primary packages encapsulate ingestion, parsing, ontology management, and retrieval. Each stage consumes the previous stage’s outputs (manifests, chunk/embedding JSONL, ontologies, FAISS snapshots) and maintains clearly defined schemas.
+- **Configuration via dataclasses**: `DenseIndexConfig`, `HybridSearchConfig`, `ResolverConfig`, ontology `Settings`, and DocParsing configuration helpers mirror CLI/environment overrides and enforce validation before execution.
+- **Manifest-driven idempotency**: Stages write append-only JSONL manifests plus SQLite indexes, compute SHA-256 hashes, and respect resume logic to avoid duplicated work.
+- **GPU resource management**: HybridSearch uses `faiss.StandardGpuResources`, cuVS detection, FP16 options, replication/sharding, and namespace routers for multi-GPU deployments; DocParsing embeddings rely on GPU-backed vLLM servers.
+- **Plugin-ready design**: ContentDownload and OntologyDownload use entry-point registries for resolvers/validators, enabling external extensions while preserving core invariants.
+- **Observability baked-in**: Structured logs, telemetry counters/histograms, `AdapterStats`, `Observability`, and diagnostic commands provide visibility across ingestion, validation, and search flows. Documentation and AGENTS guides include canonical metrics/expectations.
+- **Documentation-first**: Every module includes NAVMAP headers, READMEs, and AGENTS guides; behaviour changes must accompany documentation updates and spec revisions.
 
 ### Testing Strategy
-- Prefer deterministic fixtures and manifests for all stages; HybridSearch ships regression suites (`tests/hybrid_search/test_suite.py`, `test_gpu_similarity.py`, `test_router.py`) covering FAISS GPU kernels, namespace routing, and snapshot round-tripping.
-- ContentDownload/DocParsing rely on pytest suites with synthetic artifacts, verifying resume logic, schema adherence, and resolver planning.
-- Lint, type-check, and test in CI: `ruff check`, `mypy`, and targeted `pytest` invocations per package; GPU-specific tests assume the custom CUDA 12 wheel is available.
-- Documentation validation scripts (`docs/scripts/validate_docs.py`, `check_links.py`) run alongside code tests to guarantee README accuracy and style compliance.
+- **Unit & integration coverage**:
+  - HybridSearch: `tests/hybrid_search/test_suite.py` (end-to-end ingestion/search), `test_gpu_similarity.py`, `test_router.py`, `test_store_snapshot.py`, `test_validator_resources.py` to guard FAISS GPU operations, namespace routing, snapshots, and validator memory budgets.
+  - DocParsing: tests for chunk/embedding manifests, resume logic, hashing defaults, CLI planners (`plan`, `manifest`, `token-profiles`), and schema validation.
+  - ContentDownload: resolver planning, manifest writing, resume caches, rate limiting, networking resilience, storage layout.
+  - OntologyDownload: resolver planning/diffing, streaming downloads, validator execution, checksum enforcement, lockfile generation.
+- **Tooling**: `ruff check`, `black --check`, `isort --check`, `mypy`, and targeted `pytest` commands per package; GPU-dependent tests assume the FAISS CUDA 12 wheel and CUDA libraries are installed.
+- **Documentation quality**: `docs/scripts/validate_docs.py`, `check_links.py`, `generate_all_docs.py` ensure READMEs/AGENTS/specs remain accurate and style-compliant.
+- **Performance verification**: Optional scale tests (`test_suite.py::test_hybrid_scale_suite`) monitor latency/throughput budgets; ingestion/resolver benchmarks recorded in manifests or summary logs.
 
 ### Git Workflow
 - Create feature branches off `main`; follow documentation-first workflow—author or update READMEs and AGENTS guides before merging functional changes.
@@ -47,27 +52,24 @@ Together these stages ingest raw content, enrich it with ontological context, an
 - Use GitHub issues/discussions for planning; larger changes should include design docs or updates to `openspec/` specs before implementation.
 
 ## Domain Context
-DocsToKG operates across the scholarly content lifecycle:
+- **Content acquisition (ContentDownload)**: Resolver pipelines (OpenAlex, Unpaywall, Crossref, Core, DOAJ, etc.) fetch scholarly artifacts, honour robots.txt and per-domain token buckets, and persist manifests (`manifest.jsonl`, `manifest.sqlite3`, summary JSON) for auditing/resume. Storage layout includes staging directories, SHA-256 digests, and content-addressed options.
+- **Document parsing & enrichment (DocParsing)**: DocTags conversion (Docling + Granite models), chunking heuristics, embedding generation (Qwen/vLLM, SPLADE), and manifest telemetry produce chunk/embedding JSONL with consistent UUIDs and hash-based idempotency. Schema validation ensures compatibility with HybridSearch ingestion.
+- **Ontology management (OntologyDownload)**: Planning and fetching ontologies with resolver catalogs, rate limiting, TLS enforcement, checksum verification, and validator pipelines (ROBOT, rdflib, Arelle, schematron). Outputs include versioned ontology directories, lockfiles, manifests, and validator reports.
+- **Hybrid retrieval (HybridSearch)**: GPU-accelerated FAISS ingestion, namespace routing (`FaissRouter`), snapshot/restore, synchronous search APIs with RRF/MMR fusion, observability (latency histograms, AdapterStats), and ingestion interoperability with DocParsing outputs.
+- **Cross-stage invariants**: Deterministic hashing (default SHA-256), manifest-driven resumability, doc/chunk ID consistency, namespace preservation, and GPU resource coordination ensure reproducible knowledge graph ingestion and agent-ready retrieval.
 
-- **Acquisition**: ContentDownload fetches scholarly PDFs/HTML/XML via resolver pipelines, handles caching, resumable downloads, polite rate limiting, and logs manifests (`manifest.jsonl`, SQLite indexes) for auditing.
-- **Parsing & enrichment**: DocParsing transforms documents into DocTags using Docling+vLLM, splits them into namespace-aware chunks, and generates dense (Qwen) plus sparse (SPLADE, BM25) embeddings stored as JSONL.
-- **Ontology management**: OntologyDownload ensures controlled vocabularies are current and validated (ROBOT, rdflib, Arelle) so extracted entities align with curated ontologies.
-- **Hybrid retrieval**: HybridSearch fuses lexical indices (BM25/SPLADE) and GPU-backed FAISS vectors, supports namespace routing, warm snapshots, Metrics/Observability, and API workflows for synchronous search consumers.
+- **GPU and library availability**: HybridSearch requires the FAISS CUDA 12 wheel plus CUDA/OpenBLAS/Jemalloc; DocParsing embeddings and DocTags benefit from GPUs/vLLM. Agents are forbidden from altering `.venv` without approval (mandated in AGENTS guides).
+- **Environment layout**: Data roots (`DOCSTOKG_DATA_ROOT`, `LOCAL_ONTOLOGY_DIR`, `DOCSTOKG_MODEL_ROOT`) must follow documented directory structures; manifests, snapshots, and caches rely on colocation for resumability.
+- **Idempotency & determinism**: Manifest-based resumes depend on stable SHA-256 hashes, consistent configuration, and append-only logging. Changing hash algorithms (`DOCSTOKG_HASH_ALG`) or defaults requires migration planning and documentation updates.
+- **Politeness & credentials**: Resolvers obey robots.txt, domain token buckets, global dedupe, and require environment credentials (Unpaywall email, BioPortal API keys). Violations risk throttling or bans.
+- **Snapshot safety**: HybridSearch snapshots must be serialised via CPU conversions (`serialize_state`/`restore_state`) with metadata; direct GPU serialization is unsupported.
+- **Documentation-first**: Behavioural changes demand synchronized updates to module READMEs, AGENTS guides, and relevant specs (`openspec/`). NAVMAP headers must stay accurate.
+- **Security & compliance**: Ontology downloads enforce TLS, checksum validation, controlled extraction (zip traversal protection), and maintain audit logs; content downloads respect license constraints and resolver policies.
+- **Agent guardrails**: AGENTS guides dictate no-install workflows, canonical commands, and troubleshooting; agents must adhere to guardrails to prevent environment drift or policy violations.
 
-Domain invariants include deterministic chunk IDs, schema versioning, consistent doc IDs across stages, and carefully managed GPU resources to guarantee reproducible results suitable for knowledge graph ingestion and AI agent tooling.
-
-## Important Constraints
-- **GPU and library availability**: HybridSearch depends on the custom FAISS CUDA 12 wheel, CUDA runtimes, and OpenBLAS; DocParsing requires GPUs for DocTags and embeddings when performance matters. Agents must not mutate `.venv` packages without approval (see AGENTS guides).
-- **Environment layout**: Data roots (`DOCSTOKG_DATA_ROOT`, `LOCAL_ONTOLOGY_DIR`) follow documented directory structures; manifests and snapshots must remain co-located with their indexes.
-- **Idempotency & determinism**: Manifest-driven resumes rely on stable SHA-256 hashes and configuration; altering hash algorithms or config defaults demands migration planning and documentation updates.
-- **Politeness & credentials**: Resolver configurations honour robots.txt, per-domain token buckets, and demand environment-set API keys (Unpaywall, BioPortal, etc.); misuse risks blacklisting.
-- **Snapshot safety**: HybridSearch snapshots must be converted to CPU-compatible bytes before persistence (`serialize_state`); GPU indexes are not directly serialised to disk.
-- **Documentation-first process**: New behaviour requires READMEs, AGENTS, and `openspec/` specs to be updated before or alongside code changes.
-
-## External Dependencies
-- **Content acquisition services**: OpenAlex, Unpaywall, Crossref, Core, Semantic Scholar, DOAJ, ArXiv, Institutional repositories, plus optional Wayback/OAI endpoints via resolver plugins.
-- **Ontology sources & validators**: BioPortal, OBO Foundry, Europe PMC, XBRL regulators; validators include ROBOT, rdflib, Arelle, Schematron; checksum manifests via `checksums.py`.
-- **Model & ML tooling**: vLLM (Qwen models), Docling (DocTags), SPLADE (sparse embedding), Qwen model repos cached under `DOCSTOKG_QWEN_DIR`.
-- **Search infrastructure**: FAISS GPU runtime, optional OpenSearch or lexical simulators for hybrid retrieval testing.
-- **System libraries**: CUDA 12 runtime, OpenBLAS, jemalloc, libgomp; `direnv` and `scripts/bootstrap_env.sh` orchestrate environments with pre-built wheels.
-- **Observability & storage**: JSONL manifests, SQLite caches, structured logging pipelines; optional dashboards ingest logs/metrics produced by the telemetry subsystems.
+- **Content acquisition services**: OpenAlex, Unpaywall, Crossref, Core, Semantic Scholar, DOAJ, arXiv, Europe PMC, institutional repositories, Wayback, OAI-PMH endpoints; resolvers may require API keys/headers.
+- **Ontology sources & validators**: BioPortal, OBO Foundry, Arelle, ROBOT, rdflib, schematron bundles, checksum manifests; external archives (Zenodo, Figshare) supporting ontology releases.
+- **Model & ML tooling**: vLLM (Qwen embedding models), Docling + Granite DocTags models, SPLADE, tokenizer assets; caches controlled via `DOCSTOKG_QWEN_DIR`, `DOCSTOKG_SPLADE_DIR`, `DOCSTOKG_MODEL_ROOT`.
+- **Search infrastructure**: FAISS GPU runtime, optional OpenSearch simulators, CUDA 12 libraries, OpenBLAS, jemalloc, libgomp, `faiss.should_use_cuvs` heuristics.
+- **Tooling & automation**: `direnv`, `scripts/bootstrap_env.sh`, GitHub Actions workflows, documentation scripts, manifest summarizers, telemetry consumers.
+- **Observability & storage**: JSONL manifests/logs, SQLite caches, snapshot directories, log rotations; dashboards ingest logs for latency/error monitoring.
