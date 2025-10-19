@@ -1310,24 +1310,43 @@ class FaissVectorStore(DenseVectorStore):
         self._replicated = False
         if not self._replication_enabled:
             return index
-        if not hasattr(faiss, "index_cpu_to_all_gpus") or not hasattr(faiss, "index_cpu_to_gpu"):
+        if not hasattr(faiss, "index_cpu_to_all_gpus"):
+            if shard:
+                raise RuntimeError("Sharded multi-GPU not supported by current faiss build")
             return index
-        if shard and hasattr(faiss, "index_cpu_to_all_gpus_knn"):
-            return faiss.index_cpu_to_all_gpus(index, co=None, cloner_options=None, shard=True)
-        if shard and hasattr(faiss, "index_cpu_to_gpu_multiple"):
+        if shard and not hasattr(faiss, "GpuMultipleClonerOptions"):
             raise RuntimeError("Sharded multi-GPU not supported by current faiss build")
-        if shard:
+
+        gpu_count = 0
+        if hasattr(faiss, "get_num_gpus"):
+            try:
+                gpu_count = int(faiss.get_num_gpus())
+            except Exception:  # pragma: no cover - best effort guard
+                gpu_count = 0
+        if gpu_count <= 1:
             return index
         if self._replicated:
             return index
+
         try:
-            cloned = faiss.index_gpu_to_cpu(index)
-            opts = faiss.GpuMultipleClonerOptions()
-            opts.shard = False
-            opts.useFloat16 = bool(getattr(self._config, "flat_use_fp16", False))
-            multi = faiss.index_cpu_to_all_gpus(cloned, opts)
+            base_index = index
+            if hasattr(faiss, "index_gpu_to_cpu"):
+                try:
+                    base_index = faiss.index_gpu_to_cpu(index)
+                except Exception:  # pragma: no cover - gracefully fall back to provided index
+                    base_index = index
+
+            cloner_options: "faiss.GpuMultipleClonerOptions | None" = None
+            if hasattr(faiss, "GpuMultipleClonerOptions"):
+                cloner_options = faiss.GpuMultipleClonerOptions()
+                cloner_options.shard = bool(shard)
+                if shard and hasattr(cloner_options, "common_ivf_quantizer"):
+                    cloner_options.common_ivf_quantizer = True
+            multi = faiss.index_cpu_to_all_gpus(base_index, co=cloner_options, ngpu=gpu_count)
             self._replicated = True
             return multi
+        except RuntimeError:
+            raise
         except Exception:  # pragma: no cover - GPU-specific failure
             logger.warning("Unable to replicate FAISS index across GPUs", exc_info=True)
             return index
@@ -1839,10 +1858,10 @@ def cosine_batch(
     Returns:
         numpy.ndarray: Pairwise cosine similarities with shape ``(N, M)``.
     """
+    q = np.array(q, dtype=np.float32, copy=True, order="C")
     if q.ndim == 1:
         q = q.reshape(1, -1)
-    q = np.ascontiguousarray(q, dtype=np.float32)
-    C = np.ascontiguousarray(C, dtype=np.float32)
+    C = np.array(C, dtype=np.float32, copy=True, order="C")
     faiss.normalize_L2(q)
     faiss.normalize_L2(C)
     kernel = pairwise_fn or faiss.pairwise_distance_gpu

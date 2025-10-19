@@ -595,6 +595,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self.response_content_length: Optional[int] = None
         self.service = service
         self.origin_host = origin_host
+        self.invoked = False
 
     def _preliminary_head_check(
         self, url: str, session: requests.Session
@@ -752,6 +753,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
         Returns:
             None
         """
+        self.invoked = True
+
         manifest_headers: Dict[str, str] = {}
         if self.previous_manifest:
             etag_value = self.previous_manifest.get("etag")
@@ -1218,6 +1221,15 @@ def download_stream(
                 extra={"stage": "download", "url": secure_url, "error": str(exc)},
             )
             raise OntologyDownloadError(f"Download failed for {secure_url}: {exc}") from exc
+
+        if not downloader.invoked and previous_manifest:
+            downloader.status = "cached"
+            etag_value = previous_manifest.get("etag")
+            downloader.response_etag = etag_value if isinstance(etag_value, str) else None
+            last_modified_value = previous_manifest.get("last_modified")
+            downloader.response_last_modified = (
+                last_modified_value if isinstance(last_modified_value, str) else None
+            )
 
         if downloader.status == "cached":
             elapsed_cached = (time.monotonic() - attempt_start) * 1000
