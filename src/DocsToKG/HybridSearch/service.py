@@ -3577,11 +3577,13 @@ def infer_embedding_dim(dataset: Sequence[Mapping[str, object]]) -> int:
         path = Path(str(vector_file))
         if not path.exists():
             continue
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            payload = json.loads(line)
-            vector = payload.get("Qwen3-4B", {}).get("vector")
-            if isinstance(vector, list) and vector:
-                return len(vector)
+        with path.open(encoding="utf-8") as stream:
+            for raw_line in stream:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                payload = json.loads(line)
+                vector = payload.get("Qwen3-4B", {}).get("vector")
+                if isinstance(vector, list) and vector:
+                    return len(vector)
     return 2560
