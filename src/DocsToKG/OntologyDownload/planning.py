@@ -441,6 +441,20 @@ def _cancel_pending_futures(
             cancel_fn()
 
 
+def _executor_is_shutting_down(executor: ThreadPoolExecutor) -> bool:
+    """Return ``True`` when *executor* has begun shutdown processing."""
+
+    return bool(getattr(executor, "_shutdown", False))
+
+
+def _shutdown_executor_nowait(executor: ThreadPoolExecutor) -> None:
+    """Request non-blocking shutdown with cancellation for *executor*."""
+
+    if _executor_is_shutting_down(executor):
+        return
+    executor.shutdown(wait=False, cancel_futures=True)
+
+
 @dataclass(slots=True, frozen=True)
 class Manifest:
     """Provenance information for a downloaded ontology artifact.
@@ -2139,7 +2153,8 @@ def plan_all(
     results: Dict[int, PlannedFetch] = {}
     futures: Dict[object, tuple[int, FetchSpec]] = {}
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    executor = ThreadPoolExecutor(max_workers=max_workers)
+    try:
         for index, spec in enumerate(spec_list):
             future = executor.submit(
                 plan_one,
@@ -2164,6 +2179,7 @@ def plan_all(
                     },
                 )
                 _cancel_pending_futures(futures, current=future)
+                _shutdown_executor_nowait(executor)
                 if isinstance(exc, (ConfigError, ConfigurationError, PolicyError)):
                     raise
                 completed_plans = [results[i] for i in sorted(results)]
@@ -2175,6 +2191,9 @@ def plan_all(
                 ) from exc
             else:
                 results[index] = planned
+    finally:
+        if not _executor_is_shutting_down(executor):
+            executor.shutdown(wait=True)
 
     ordered_indices = sorted(results)
     ordered_plans = [results[i] for i in ordered_indices]
@@ -2262,7 +2281,8 @@ def fetch_all(
     results_map: Dict[int, FetchResult] = {}
     futures: Dict[object, tuple[int, FetchSpec]] = {}
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    executor = ThreadPoolExecutor(max_workers=max_workers)
+    try:
         for index, spec in enumerate(spec_list, start=1):
             adapter.info(
                 "starting ontology fetch",
@@ -2301,6 +2321,7 @@ def fetch_all(
                     extra={"stage": "error", "ontology_id": spec.id, "error": str(exc)},
                 )
                 _cancel_pending_futures(futures, current=future)
+                _shutdown_executor_nowait(executor)
                 completed_results = [results_map[i] for i in sorted(results_map)]
                 raise BatchFetchError(
                     failed_spec=spec,
@@ -2308,6 +2329,9 @@ def fetch_all(
                     completed=completed_results,
                     total=total,
                 ) from exc
+    finally:
+        if not _executor_is_shutting_down(executor):
+            executor.shutdown(wait=True)
 
     ordered_results = [results_map[i] for i in sorted(results_map)]
     return ordered_results
