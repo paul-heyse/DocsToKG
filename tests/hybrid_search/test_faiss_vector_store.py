@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 from threading import Event, RLock, Thread
 from types import MethodType, SimpleNamespace
 
 import numpy as np
+import pytest
 
 from DocsToKG.HybridSearch.config import DenseIndexConfig
 from DocsToKG.HybridSearch import store as store_module
+from DocsToKG.HybridSearch.pipeline import Observability
 from DocsToKG.HybridSearch.store import FaissVectorStore
 
 
@@ -211,6 +214,87 @@ def test_remove_ids_is_atomic_across_threads() -> None:
         ("update", None),
         ("snapshot", 2, "test_atomic_remove"),
     ]
+
+
+@pytest.mark.parametrize("use_all_devices", [False, True])
+def test_init_gpu_configures_resource_knobs(monkeypatch, caplog, use_all_devices: bool) -> None:
+    """Ensure GPU init applies DenseIndexConfig resource tuning on single GPU."""
+
+    temp_memory = 8 << 20
+    config = DenseIndexConfig(
+        device=0,
+        gpu_temp_memory_bytes=temp_memory,
+    )
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._config = config  # type: ignore[attr-defined]
+    store._dim = 16  # type: ignore[attr-defined]
+    store._multi_gpu_mode = "single"  # type: ignore[attr-defined]
+    store._indices_32_bit = True  # type: ignore[attr-defined]
+    store._temp_memory_bytes = temp_memory  # type: ignore[attr-defined]
+    store._gpu_use_default_null_stream_all_devices = use_all_devices  # type: ignore[attr-defined]
+    store._gpu_use_default_null_stream = True  # type: ignore[attr-defined]
+    store._expected_ntotal = 0  # type: ignore[attr-defined]
+    store._rebuild_delete_threshold = 10000  # type: ignore[attr-defined]
+    store._force_64bit_ids = False  # type: ignore[attr-defined]
+    store._force_remove_ids_fallback = False  # type: ignore[attr-defined]
+    store._replication_enabled = False  # type: ignore[attr-defined]
+    store._replication_gpu_ids = None  # type: ignore[attr-defined]
+    store._replica_gpu_resources = []  # type: ignore[attr-defined]
+    store._pinned_buffers = []  # type: ignore[attr-defined]
+    store._observability = Observability()  # type: ignore[attr-defined]
+    store._gpu_resources = None  # type: ignore[attr-defined]
+
+    class RecordingResource:
+        def __init__(self) -> None:
+            self.temp_memory_calls: list[int] = []
+            self.null_stream_calls: list[object | None] = []
+            self.null_stream_all_calls: int = 0
+
+        def setTempMemory(self, value: int) -> None:
+            self.temp_memory_calls.append(value)
+
+        def setDefaultNullStreamAllDevices(self) -> None:  # pragma: no cover - defensive
+            self.null_stream_all_calls += 1
+
+        def setDefaultNullStream(self, device: int | None = None) -> None:  # pragma: no cover - defensive
+            self.null_stream_calls.append(device)
+
+    fake_faiss = SimpleNamespace(
+        StandardGpuResources=RecordingResource,
+        get_num_gpus=lambda: 1,
+    )
+    monkeypatch.setattr(store_module, "faiss", fake_faiss, raising=False)
+
+    caplog.set_level(logging.INFO, logger="DocsToKG.HybridSearch")
+
+    store.init_gpu()
+
+    resource = store._gpu_resources  # type: ignore[attr-defined]
+    assert isinstance(resource, RecordingResource)
+    assert resource.temp_memory_calls == [temp_memory]
+    if use_all_devices:
+        assert resource.null_stream_all_calls == 1
+        assert resource.null_stream_calls == []
+    else:
+        assert resource.null_stream_all_calls == 0
+        assert resource.null_stream_calls == [config.device]
+
+    gauges = {
+        sample.name: sample.value for sample in store._observability.metrics.export_gauges()
+    }
+    assert gauges.get("faiss_gpu_temp_memory_bytes") == float(temp_memory)
+    assert gauges.get("faiss_gpu_default_null_stream") == 1.0
+    expected_all_devices = 1.0 if use_all_devices else 0.0
+    assert gauges.get("faiss_gpu_default_null_stream_all_devices") == expected_all_devices
+
+    records = [record for record in caplog.records if record.getMessage() == "faiss-gpu-resource-configured"]
+    assert records, "resource configuration log event missing"
+    payload = getattr(records[-1], "event", {})
+    assert payload.get("temp_memory_bytes") == temp_memory
+    assert payload.get("default_null_stream_all_devices") is use_all_devices
+
+
 def test_search_coalescer_iterative_execution_handles_many_micro_batches() -> None:
     """Ensure the coalescer drains large queues without recursive overflow."""
 
