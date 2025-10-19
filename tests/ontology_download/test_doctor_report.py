@@ -32,6 +32,40 @@ def _doctor_report_with_disk(total_bytes: int, free_bytes: int):
             return cli._doctor_report()
 
 
+def test_doctor_report_handles_unreadable_bioportal_key():
+    """Unreadable BioPortal API key file is reported instead of crashing."""
+
+    usage = FakeUsage(total=100 * 1_000_000_000, used=0, free=100 * 1_000_000_000)
+    dummy_response = SimpleNamespace(status_code=200, ok=True, reason="OK")
+    dummy_config = SimpleNamespace(defaults=SimpleNamespace(http=SimpleNamespace(rate_limits={})))
+
+    with TestingEnvironment():
+        api_key_path = cli.CONFIG_DIR / "bioportal_api_key.txt"
+        api_key_path.write_text("secret")
+
+        original_read_text = Path.read_text
+
+        def fake_read_text(self, *args, **kwargs):
+            if self == api_key_path:
+                raise PermissionError("mock permission denied")
+            return original_read_text(self, *args, **kwargs)
+
+        with patch.object(cli.shutil, "disk_usage", return_value=usage), patch.object(
+            cli.shutil, "which", return_value=None
+        ), patch.object(cli.requests, "head", return_value=dummy_response), patch.object(
+            cli.requests, "get", return_value=dummy_response
+        ), patch.object(
+            cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: dummy_config)
+        ), patch.object(Path, "read_text", fake_read_text):
+            report = cli._doctor_report()
+
+    bioportal = report["bioportal_api_key"]
+
+    assert bioportal["configured"] is False
+    assert "error" in bioportal
+    assert "mock permission denied" in bioportal["error"]
+
+
 def test_doctor_report_threshold_capped_by_total():
     """Threshold should never exceed the reported total capacity."""
 
