@@ -731,13 +731,13 @@ class FaissVectorStore(DenseVectorStore):
             ids64 = np.asarray(ids, dtype=np.int64)
             if ids64.size == 0:
                 return 0
-        self._remove_ids(ids64)
-        self._flush_pending_deletes(force=force_flush)
-        self._update_gpu_metrics()
-        count = int(ids64.size)
-        if count:
-            self._maybe_refresh_snapshot(writes_delta=count, reason=reason)
-        return count
+            self._remove_ids(ids64)
+            self._flush_pending_deletes(force=force_flush)
+            self._update_gpu_metrics()
+            count = int(ids64.size)
+            if count:
+                self._maybe_refresh_snapshot(writes_delta=count, reason=reason)
+            return count
 
     def _current_index_ids(self) -> np.ndarray:
         # Robustly extract id_map across wrappers / GPU clones.
