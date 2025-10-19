@@ -61,6 +61,11 @@ class OpenAlexWorkProvider:
         xml_dir: Path,
         per_page: int = 200,
         max_results: Optional[int] = None,
+        retry_attempts: int = 3,
+        retry_backoff: float = 1.0,
+        retry_max_delay: float = 75.0,
+        retry_after_cap: Optional[float] = None,
+        iterate_openalex_func: Optional[Callable[..., Iterable[Dict[str, Any]]]] = None,
     ) -> None:
         if query is None and works_iterable is None:
             raise ValueError("Provide an OpenAlex query or an iterable of works.")
@@ -77,6 +82,17 @@ class OpenAlexWorkProvider:
             self._max_results = None
         else:
             self._max_results = max_results
+        self._retry_attempts = max(0, int(retry_attempts))
+        self._retry_backoff = max(0.0, float(retry_backoff))
+        self._retry_max_delay = float(retry_max_delay)
+        self._retry_after_cap = (
+            float(retry_after_cap) if retry_after_cap is not None else None
+        )
+        if iterate_openalex_func is None:
+            from DocsToKG.ContentDownload.runner import iterate_openalex
+
+            iterate_openalex_func = iterate_openalex
+        self._iterate_openalex_func = iterate_openalex_func
 
     def iter_artifacts(self) -> Iterator[WorkArtifact]:
         """Iterate over OpenAlex works and yield normalized :class:`WorkArtifact` objects."""
@@ -96,17 +112,16 @@ class OpenAlexWorkProvider:
         return self.iter_artifacts()
 
     def _iterate_openalex(self) -> Iterable[Dict[str, Any]]:
-        pager = self._query.paginate(
+        assert self._query is not None  # For mypy; guarded by caller.
+        yield from self._iterate_openalex_func(
+            self._query,
             per_page=self._per_page,
-            n_max=self._max_results if self._max_results is not None else None,
+            max_results=self._max_results,
+            retry_attempts=self._retry_attempts,
+            retry_backoff=self._retry_backoff,
+            retry_max_delay=self._retry_max_delay,
+            retry_after_cap=self._retry_after_cap,
         )
-        retrieved = 0
-        for page in pager:
-            for work in page:
-                if self._max_results is not None and retrieved >= self._max_results:
-                    return
-                yield work
-                retrieved += 1
 
     def _iter_source(self) -> Iterator[Dict[str, Any]]:
         if self._works_iterable is not None:
