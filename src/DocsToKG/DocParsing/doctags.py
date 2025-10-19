@@ -275,6 +275,7 @@ import time
 import types
 import uuid
 from collections import deque
+from itertools import chain
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, fields
 from typing import (
@@ -285,9 +286,11 @@ from typing import (
     Deque,
     Dict,
     Iterable,
+    Iterator,
     List,
     Optional,
     Tuple,
+    TypeVar,
 )
 
 import requests
@@ -341,6 +344,8 @@ from DocsToKG.DocParsing.logging import (
     telemetry_scope,
 )
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
+
+_T = TypeVar("_T")
 
 try:  # pragma: no cover - optional dependency
     from packaging.version import InvalidVersion, Version
@@ -1367,16 +1372,41 @@ def ensure_vllm(
     return alt, proc, True
 
 
-def list_pdfs(root: Path) -> List[Path]:
-    """Collect PDF files under a directory recursively.
+def _iter_sorted_paths(root: Path, predicate: Callable[[Path], bool]) -> Iterator[Path]:
+    """Yield ``Path`` objects that satisfy ``predicate`` in lexicographic order."""
 
-    Args:
-        root: Directory whose subtree should be scanned for PDFs.
+    if root.is_file():
+        if predicate(root):
+            yield root
+        return
 
-    Returns:
-        Sorted list of paths to PDF files.
-    """
-    return sorted([p for p in root.rglob("*.pdf") if p.is_file()])
+    try:
+        entries = sorted(root.iterdir(), key=lambda entry: entry.name)
+    except (FileNotFoundError, NotADirectoryError):
+        return
+
+    for entry in entries:
+        if entry.is_dir():
+            yield from _iter_sorted_paths(entry, predicate)
+        elif predicate(entry):
+            yield entry
+
+
+def _peek_iterable(iterable: Iterable[_T]) -> tuple[Iterator[_T], Optional[_T]]:
+    """Return an iterator that includes the first element and the first element itself."""
+
+    iterator = iter(iterable)
+    try:
+        first_item = next(iterator)
+    except StopIteration:
+        return chain.from_iterable(()), None
+    return chain((first_item,), iterator), first_item
+
+
+def list_pdfs(root: Path) -> Iterator[Path]:
+    """Iterate over PDF files under *root* in deterministic lexical order."""
+
+    yield from _iter_sorted_paths(root, lambda path: path.is_file() and path.name.endswith(".pdf"))
 
 
 # PDF worker helpers
@@ -1733,8 +1763,8 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         )
 
         try:
-            pdfs = list_pdfs(input_dir)
-            if not pdfs:
+            pdf_iter, first_pdf = _peek_iterable(list_pdfs(input_dir))
+            if first_pdf is None:
                 log_event(
                     logger,
                     "warning",
@@ -1753,19 +1783,12 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
             resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
 
             workers = max(1, int(cfg.workers))
-            logger.info(
-                "Launching workers",
-                extra={
-                    "extra_fields": {
-                        "pdf_count": len(pdfs),
-                        "workers": workers,
-                    }
-                },
-            )
 
             tasks: List[PdfTask] = []
             ok = fail = skip = 0
-            for pdf_path in pdfs:
+            total_inputs = 0
+            for pdf_path in pdf_iter:
+                total_inputs += 1
                 doc_id, out_path = derive_doc_id_and_doctags_path(pdf_path, input_dir, output_dir)
                 input_hash = compute_content_hash(pdf_path)
                 skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
@@ -1808,6 +1831,16 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                         vlm_stop=tuple(args.vlm_stop or []),
                     )
                 )
+
+            logger.info(
+                "Launching workers",
+                extra={
+                    "extra_fields": {
+                        "pdf_count": total_inputs,
+                        "workers": workers,
+                    }
+                },
+            )
 
             if not tasks:
                 logger.info(
@@ -2089,21 +2122,19 @@ def _get_converter() -> "DocumentConverter":
     return _CONVERTER
 
 
-def list_htmls(root: Path) -> List[Path]:
-    """Enumerate HTML-like files beneath a directory tree.
+def list_htmls(root: Path) -> Iterator[Path]:
+    """Iterate over HTML-like files beneath *root* in deterministic lexical order."""
 
-    Args:
-        root: Directory whose subtree should be searched for HTML files.
+    allowed_suffixes = {".html", ".htm", ".xhtml"}
 
-    Returns:
-        Sorted list of discovered HTML file paths excluding normalized outputs.
-    """
-    exts = {".html", ".htm", ".xhtml"}
-    out: List[Path] = []
-    for p in root.rglob("*"):
-        if p.is_file() and p.suffix.lower() in exts and not p.name.endswith(".normalized.html"):
-            out.append(p)
-    return sorted(out)
+    def _is_html_candidate(path: Path) -> bool:
+        return (
+            path.is_file()
+            and path.suffix.lower() in allowed_suffixes
+            and not path.name.endswith(".normalized.html")
+        )
+
+    yield from _iter_sorted_paths(root, _is_html_candidate)
 
 
 def _sanitize_html_file(path: Path, profile: str) -> Tuple[Path, Optional[Path]]:
@@ -2391,8 +2422,8 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 extra={"extra_fields": {"mode": "resume"}},
             )
 
-        files = list_htmls(input_dir)
-        if not files:
+        files_iter, first_file = _peek_iterable(list_htmls(input_dir))
+        if first_file is None:
             log_event(
                 logger,
                 "warning",
@@ -2412,7 +2443,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
 
         tasks: List[HtmlTask] = []
         ok = fail = skip = 0
-        for path in files:
+        for path in files_iter:
             rel_path = path.relative_to(input_dir)
             doc_id = rel_path.as_posix()
             out_path = (output_dir / rel_path).with_suffix(".doctags")

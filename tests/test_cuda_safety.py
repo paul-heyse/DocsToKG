@@ -150,6 +150,9 @@ def _stub_main_setup(monkeypatch, module, tmp_path, list_return: List) -> Simple
     args.output = tmp_path / "output"
     args.model = str(tmp_path / "model")
     args.served_model_names = ("granite-docling-258M",)
+    args.workers = 1
+    module.DEFAULT_WORKERS = 1
+    module.PROFILE_PRESETS.setdefault("", {})["workers"] = 1
 
     # Mark input and output as explicit CLI overrides to prevent defaults from overriding them
     from DocsToKG.DocParsing.config import annotate_cli_overrides
@@ -164,7 +167,7 @@ def _stub_main_setup(monkeypatch, module, tmp_path, list_return: List) -> Simple
     monkeypatch.setattr(module, "wait_for_vllm", lambda *_a, **_k: ["stub-model"])
     monkeypatch.setattr(module, "validate_served_models", lambda *_a, **_k: None)
     monkeypatch.setattr(module, "stop_vllm", lambda *_a, **_k: None)
-    monkeypatch.setattr(module, "list_pdfs", lambda _dir: list_return)
+    monkeypatch.setattr(module, "list_pdfs", lambda _dir: iter(list_return))
     monkeypatch.setattr(module, "manifest_append", lambda *a, **k: None)
     monkeypatch.setattr(module, "ProcessPoolExecutor", _DummyExecutor)
     monkeypatch.setattr(module, "as_completed", _dummy_as_completed)
@@ -187,6 +190,10 @@ def _import_pdf_module(monkeypatch):
 
     mock_requests = mock.MagicMock()
     mock_requests.Session.return_value = mock_session
+    import requests as real_requests
+
+    mock_requests.RequestException = real_requests.RequestException
+    mock_requests.exceptions = real_requests.exceptions
 
     monkeypatch.setitem(sys.modules, "requests", mock_requests)
 
