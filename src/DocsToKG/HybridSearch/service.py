@@ -147,6 +147,7 @@ from .store import (
     OpenSearchSimulator,
     cosine_batch,
     cosine_topk_blockwise,
+    resolve_cuvs_state,
     normalize_rows,
     pairwise_inner_products,
     restore_state,
@@ -451,6 +452,7 @@ class ResultShaper:
         resources: Optional["faiss.StandardGpuResources"] = None,
         channel_weights: Optional[Mapping[str, float]] = None,
         fp16_enabled: bool = False,
+        cuvs_requested: Optional[bool] = None,
     ) -> None:
         self._opensearch = opensearch
         self._fusion_config = fusion_config
@@ -458,6 +460,7 @@ class ResultShaper:
         self._gpu_resources = resources
         self._channel_weights = dict(channel_weights or {})
         self._fp16_enabled = bool(fp16_enabled)
+        self._use_cuvs = cuvs_requested
 
     def shape(
         self,
@@ -569,6 +572,7 @@ class ResultShaper:
                 device=self._gpu_device,
                 resources=resources,
                 use_fp16=self._fp16_enabled,
+                use_cuvs=self._use_cuvs,
             )
             return float(top1[0, 0]) >= self._fusion_config.cosine_dedupe_threshold
         query_norm = np.linalg.norm(query)
@@ -600,6 +604,7 @@ def apply_mmr_diversification(
     resources: Optional["faiss.StandardGpuResources"] = None,
     use_fp16: bool = False,
     block_rows: int = 4096,
+    use_cuvs: Optional[bool] = None,
 ) -> List[FusionCandidate]:
     """Diversify fused candidates using Maximum Marginal Relevance.
 
@@ -612,6 +617,9 @@ def apply_mmr_diversification(
         device: GPU device id when leveraging FAISS GPU routines.
         resources: Optional FAISS GPU resources handle reused across calls.
         block_rows: Corpus rows processed per block when estimating diversity on GPU.
+        use_cuvs: Optional override that controls cuVS usage during GPU similarity
+            lookups. ``None`` defers to runtime detection; ``True`` forces cuVS when
+            supported and ``False`` disables it.
 
     Returns:
         List of diversified `FusionCandidate` objects.
@@ -663,6 +671,7 @@ def apply_mmr_diversification(
                 resources=resources,
                 block_rows=block_rows,
                 use_fp16=use_fp16,
+                use_cuvs=use_cuvs,
             )
         except Exception:
             scores_block = indices_block = None
@@ -899,6 +908,25 @@ class HybridSearchService:
                 if adapter_stats is not None
                 else bool(getattr(getattr(dense_store, "config", object()), "flat_use_fp16", False))
             )
+            cuvs_requested = getattr(config.dense, "use_cuvs", None)
+            cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(cuvs_requested)
+            self._observability.metrics.set_gauge(
+                "faiss_cuvs_enabled", 1.0 if cuvs_enabled else 0.0, channel="dense"
+            )
+            self._observability.metrics.set_gauge(
+                "faiss_cuvs_available", 1.0 if cuvs_available else 0.0, channel="dense"
+            )
+            self._observability.logger.debug(
+                "faiss-cuvs-state",
+                extra={
+                    "event": {
+                        "requested": cuvs_requested,
+                        "enabled": cuvs_enabled,
+                        "available": cuvs_available,
+                        "reported_available": cuvs_reported,
+                    }
+                },
+            )
 
             f_bm25 = self._executor.submit(
                 self._execute_bm25, request, filters, config, query_features, timings
@@ -996,6 +1024,7 @@ class HybridSearchService:
                     device=device_id,
                     resources=resources,
                     use_fp16=fp16_enabled,
+                    use_cuvs=cuvs_requested,
                 )
                 selected_ids = {candidate.chunk.vector_id for candidate in selected}
                 pool_remaining = [
@@ -1052,6 +1081,7 @@ class HybridSearchService:
                 resources=resources_hint,
                 channel_weights=adaptive_weights,
                 fp16_enabled=fp16_hint,
+                cuvs_requested=cuvs_requested,
             )
             shaped = shaper.shape(
                 ordered_chunks,
@@ -2556,6 +2586,11 @@ class HybridSearchValidator:
             if adapter_stats is not None
             else self._ingestion.faiss_index.device
         )
+        cuvs_request = (
+            getattr(adapter_stats, "cuvs_requested", None)
+            if adapter_stats is not None
+            else getattr(getattr(self._ingestion.faiss_index, "config", object()), "use_cuvs", None)
+        )
         if resources is None:
             vector_matrix = normalize_rows(vector_matrix)
 
@@ -2588,6 +2623,7 @@ class HybridSearchValidator:
                     device=device,
                     resources=resources,
                     use_fp16=fp16_enabled,
+                    use_cuvs=cuvs_request,
                 )
                 top_indices = indices_block[0].astype(int, copy=False)
             else:
