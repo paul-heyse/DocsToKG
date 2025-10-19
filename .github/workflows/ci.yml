@@ -7,6 +7,8 @@ on:
 jobs:
     test:
         runs-on: ubuntu-latest
+        env:
+            DOCSTOKG_SKIP_GPU: "1" # tells tests to skip @pytest.mark.gpu paths
         steps:
             - uses: actions/checkout@v4
               with:
@@ -15,70 +17,50 @@ jobs:
               env:
                   GIT_LFS_SKIP_SMUDGE: "1"
 
-            - name: Free disk space
-              run: |
-                  df -h
-                  sudo rm -rf /usr/local/lib/android
-                  sudo rm -rf /opt/ghc
-                  sudo rm -rf /opt/hostedtoolcache/CodeQL
-                  sudo rm -rf /opt/hostedtoolcache/go
-                  df -h
-            - name: Install system dependencies
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y libopenblas0
-            - name: Install CUDA Toolkit 12.9
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y wget gnupg2
-                  wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-ubuntu2404.pin
-                  sudo mv cuda-ubuntu2404.pin /etc/apt/preferences.d/cuda-repository-pin-600
-                  wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/3bf863cc.pub
-                  sudo install -m 0755 -d /usr/share/keyrings
-                  sudo gpg --dearmor -o /usr/share/keyrings/nvidia-cuda.gpg 3bf863cc.pub
-                  echo "deb [signed-by=/usr/share/keyrings/nvidia-cuda.gpg] https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/ /" | sudo tee /etc/apt/sources.list.d/cuda-ubuntu2404.list
-                  sudo apt-get update
-                  sudo apt-get install -y cuda-runtime-12-9 cuda-nvrtc-12-9 cuda-cudart-dev-12-9
-            - name: Set up Python
-              id: setup-python
-              uses: actions/setup-python@v5
+            - uses: actions/setup-python@v5
               with:
                   python-version: "3.13"
-            - name: Restore cached virtualenv
+
+            # Optional: cache venv + pip (keeps CPU CI snappy)
+            - name: Cache virtualenv
               id: cache-venv
               uses: actions/cache@v4
               with:
                   path: .venv
-                  key: ${{ runner.os }}-venv-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('requirements.txt', 'pyproject.toml', 'ci/wheels/*.whl') }}
+                  key: ${{ runner.os }}-venv-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('requirements.txt','pyproject.toml') }}
                   restore-keys: |
                       ${{ runner.os }}-venv-${{ steps.setup-python.outputs.python-version }}-
                   save-if: always()
-            - name: Restore pip download cache
-              id: cache-pip
+
+            - name: Cache pip downloads
               uses: actions/cache@v4
               with:
                   path: ~/.cache/pip
-                  key: ${{ runner.os }}-pip-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('requirements.txt', 'pyproject.toml', 'ci/wheels/*.whl') }}
+                  key: ${{ runner.os }}-pip-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('requirements.txt','pyproject.toml') }}
                   restore-keys: |
                       ${{ runner.os }}-pip-${{ steps.setup-python.outputs.python-version }}-
                   save-if: always()
-            - name: Install dependencies
+
+            - name: Install dependencies (CPU only)
               if: steps.cache-venv.outputs.cache-hit != 'true'
               shell: bash
               run: |
                   python -m venv .venv
                   source .venv/bin/activate
-                  python -m pip install --upgrade pip
+                  python -m pip install -U pip setuptools wheel
+                  # requirements.txt should be CPU path: "-e ." plus test tools
                   pip install --no-cache-dir -r requirements.txt
-                  pip install --no-cache-dir pytest pytest-cov pytest-logging
+
             - name: Add virtualenv to PATH
-              run: echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
-            - name: Run tests
+              run: echo "${{ github.workspace }}/.venv/bin" >> "$GITHUB_PATH"
+
+            - name: Run tests (skip GPU)
               shell: bash
               run: |
                   source .venv/bin/activate
                   python -V
-                  pytest -q
+                  pytest -q -m "not gpu"
+
             - name: HybridSearch validation CLI smoke test
               shell: bash
               run: |

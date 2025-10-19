@@ -13,109 +13,138 @@ Instructions for AI coding assistants using OpenSpec for spec-driven development
 - Validate: `openspec validate [change-id] --strict` and fix issues
 - Request approval: Do not start implementation until proposal is approved
 
-Here’s a drop-in replacement for that section of **AGENTS.md** that matches your new setup (MinIO wheelhouse, gpu12x extra, hard-fail guard, no more Git LFS wheels).
+Perfect—since you’ve moved **all GPU deps into the `gpu12x` extra**, here’s a clean, drop-in **Agents.md** update that defaults agents to **CPU-only** (works on hosted runners and fresh machines) while keeping a clear **GPU path** for your self-hosted box.
 
 ---
 
 # Environment Activation (Agents & Automation)
 
-All agents **must** run inside the project virtualenv with the **DocsToKG GPU extra** enabled. The bootstrap script now **syncs wheels from MinIO** (not Git LFS), builds the venv, and installs via a local wheelhouse.
+Agents default to **CPU mode** (no private wheels, no CUDA). GPU mode is available on your self-hosted runner or any machine with MinIO access.
 
-## 0) Prereqs (one-time per machine)
+## Modes
 
-- **Python**: 3.13 available as `python3.13` (script will fall back to `python3`/`python` if needed).
-- **MinIO access for wheels** (pick one):
+- **CPU mode (default):** installs `-e .` (no GPU deps). Runs the full **CPU test set**.
+- **GPU mode (opt-in):** installs `-e .[gpu12x]` from the local wheelhouse that the bootstrap syncs from **MinIO**.
 
-  - **Alias already set** (preferred): `mc alias set myminio http://127.0.0.1:9000 <ACCESS_KEY> <SECRET>`
-    The bootstrap auto-uses `myminio` if present.
-  - **Env vars** (no alias):
+---
 
-    ```bash
-    export MINIO_ACCESS_KEY_ID="ci-reader"          # or your Access Key
-    export MINIO_SECRET_ACCESS_KEY="<SECRET>"
-    ```
+## 0) Prereqs (one-time)
 
-* (Optional) **direnv** installed if you want auto-activation.
+- **Python:** 3.13 available as `python3.13` (bootstrap falls back to `python3`/`python`).
+- (Optional) **direnv** if you want auto-activation.
+- **No Git LFS needed for wheels** (we no longer store wheels in LFS).
 
-> We no longer store CuPy/FAISS/vLLM wheels in Git LFS. **Do not** rely on `git lfs pull` for wheels.
+> `.wheelhouse/` and `ci/wheels/` are **git-ignored**; wheels come from MinIO only in GPU mode.
 
-## 1) Bootstrap the venv (idempotent)
+---
+
+## 1) CPU quickstart (agents & hosted CI)
 
 ```bash
-./scripts/bootstrap_env.sh
+# from repo root
+bash scripts/bootstrap_env.sh            # auto-detects CPU mode when no wheelhouse
+source .venv/bin/activate
+pytest -q -m "not gpu"                   # skip GPU-marked tests
 ```
 
-What this does:
+This path uses `requirements.cpu.txt` (thin wrapper around `-e .` + test tools).
 
-- **Syncs wheels** from MinIO → `./.wheelhouse` (uses alias/env you provided).
-- **Installs** from `requirements.txt`, which includes `-e .[gpu12x]` (CuPy CUDA12x, vLLM, FAISS, etc.).
-- Runs a **CuPy hard-fail guard** (auto-repairs a broken install and aborts if the wheel is bad).
-- Leaves the project in **editable mode**.
+---
 
-Toggles you can set before running:
+## 2) GPU quickstart (self-hosted / local with MinIO)
+
+**Provide MinIO creds** (choose one):
+
+- Alias (preferred):
 
 ```bash
-export ENABLE_MINIO_WHEELHOUSE=1     # default: use MinIO
-export WHEELHOUSE_STRICT=1           # require wheels ONLY (no PyPI fallback)
+mc alias set myminio http://127.0.0.1:9000 <ACCESS_KEY> <SECRET>
+```
+
+- Or env vars:
+
+```bash
+export MINIO_ACCESS_KEY_ID="ci-reader"     # or your Access Key
+export MINIO_SECRET_ACCESS_KEY="<SECRET>"
+```
+
+**Bootstrap in GPU mode:**
+
+```bash
+AGENT_MODE=gpu bash scripts/bootstrap_env.sh
+source .venv/bin/activate
+pytest -q                                   # runs full test suite (incl. @pytest.mark.gpu)
+```
+
+Toggles (optional):
+
+```bash
+export WHEELHOUSE_STRICT=1                  # require wheels only (no PyPI)
 export MINIO_BUCKET="docs2kg-wheels"
 export MINIO_PREFIX="cp313/"
 ```
 
-## 2) Load `.envrc` (recommended)
+---
+
+## 3) With/without direnv
 
 ```bash
+# Recommended
 direnv allow
-```
+direnv exec . pytest -q -m "not gpu"       # CPU mode
 
-This exports `VIRTUAL_ENV=.venv`, prepends `.venv/bin` to `PATH`, and appends `src/` to `PYTHONPATH`.
-
-## 3) Run commands through direnv (preferred)
-
-```bash
-direnv exec . python -m DocsToKG.DocParsing.core.cli embed --help
-direnv exec . pytest -q
-```
-
-## 4) Fallback when direnv isn’t available
-
-```bash
+# Fallback
 source .venv/bin/activate
 export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
-# or use the wrapper, which sets PATH/VIRTUAL_ENV for you:
-./scripts/dev.sh python -m DocsToKG.HybridSearch.validation --help
-./scripts/dev.sh pytest -q
 ```
 
-## 5) Quick sanity checks
+---
+
+## 4) Sanity checks
 
 ```bash
 # interpreter & platform
 python -c "import sys,platform; print(sys.version); print(platform.platform())"
 
-# GPU stack
+# GPU stack (only in GPU mode)
 python - <<'PY'
-import cupy as cp, faiss, vllm
+import cupy as cp
 print("CuPy:", cp.__version__)
-cp.show_config()              # prints CUDA/toolkit info
-print("FAISS ok")
-print("vLLM ok")
+cp.show_config()
 PY
 ```
 
-> ❗ **Never** run project scripts with the system Python. If dependencies are missing, re-run Step 1 to rebuild the venv.
-
-> 💡 **System packages:** If FAISS or other libs complain about system BLAS/GLIBC, install the matching runtime for your OS (e.g., `sudo apt-get install libopenblas0` on Ubuntu). For GPU, ensure NVIDIA driver + CUDA 12.x runtime are present.
+> If CPU mode is active, GPU tests should be marked `@pytest.mark.gpu` and will be skipped automatically when `DOCSTOKG_SKIP_GPU=1` is set by the bootstrap.
 
 ---
 
-## CI note (self-hosted runner)
+## 5) What the bootstrap does
 
-- The workflow `wheels-ci.yml` runs on your **self-hosted runner** on the same machine as MinIO; it:
+- Creates `.venv`, upgrades `pip`.
+- **CPU mode:** installs from `requirements.cpu.txt` (`-e .` + test tools).
+- **GPU mode:** syncs wheels from MinIO → `./.wheelhouse`, installs from `requirements.gpu.txt` using the wheelhouse, and runs a **CuPy hard-fail guard** (auto-repair once; aborts if the wheel is bad).
 
-  - syncs wheels from `http://127.0.0.1:9000` to `ci/wheels/`,
-  - installs with `--no-index --find-links=ci/wheels`,
-  - (optionally) runs a CuPy guard.
-- No Git LFS is used for wheels. `.wheelhouse/` and `ci/wheels/` are **git-ignored**.
+---
+
+## CI notes
+
+- **Hosted CI (ubuntu-latest):** CPU-only job installs from `requirements.cpu.txt` and runs `pytest -m "not gpu"`.
+- **Self-hosted GPU job:** syncs wheels from local MinIO, installs from `requirements.gpu.txt` with `--no-index --find-links`, then runs the GPU subset.
+
+---
+
+## Troubleshooting (short)
+
+- **Still seeing LFS fetches:** ensure `actions/checkout@v4` uses `lfs: false` and `GIT_LFS_SKIP_SMUDGE=1`. Wheels are not in LFS anymore.
+- **MinIO `AccessDenied` / `SignatureDoesNotMatch`:** re-attach the read-only policy to `ci-reader` and re-create the access key/secret; verify with:
+
+  ```bash
+  AWS_S3_FORCE_PATH_STYLE=true aws s3 ls s3://docs2kg-wheels/cp313/ --endpoint-url http://127.0.0.1:9000
+  ```
+
+* **CuPy missing `__version__`:** you’ve got a namespace package—rerun the bootstrap (it will uninstall/reinstall from wheelhouse) or see the detailed Troubleshooting section.
+
+---
 
 ## Three-Stage Workflow
 
