@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Optional, Sequence
 
-from pyalex import config as oa_config
-
 from DocsToKG.ContentDownload import pipeline as resolvers
 from DocsToKG.ContentDownload.args import (
     bootstrap_run_environment,
@@ -60,6 +58,7 @@ from DocsToKG.ContentDownload.telemetry import (
     SummarySink,
     load_previous_manifest,
 )
+from DocsToKG.ContentDownload.pyalex_shim import ConfigProxy
 
 __all__ = (
     "AttemptSink",
@@ -102,11 +101,13 @@ __all__ = (
     "resolve_topic_id_if_needed",
     "slugify",
     "DownloadConfig",
-    "DownloadOptions",
-    "oa_config",
+"DownloadOptions",
+"oa_config",
 )
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
+
+oa_config = ConfigProxy()
 
 
 def main(argv: Optional[Sequence[str]] = None) -> RunResult:

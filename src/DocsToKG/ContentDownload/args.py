@@ -19,7 +19,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import requests
 from pyalex import Topics, Works
-from pyalex import config as oa_config
 
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
@@ -31,6 +30,7 @@ from DocsToKG.ContentDownload.download import RobotsCache, ensure_dir
 from DocsToKG.ContentDownload.pipeline import load_resolver_config
 from DocsToKG.ContentDownload.resolvers import DEFAULT_RESOLVER_ORDER, default_resolvers
 from DocsToKG.ContentDownload.telemetry import ManifestUrlIndex
+from DocsToKG.ContentDownload.pyalex_shim import apply_mailto
 
 __all__ = [
     "ResolvedConfig",
@@ -383,7 +383,7 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
             parser.error(f"--{field_name.replace('_', '-')} must be non-negative")
 
     if args.mailto:
-        oa_config.email = args.mailto
+        apply_mailto(args.mailto)
 
     topic_id = args.topic_id
     if not topic_id and args.topic:
@@ -466,7 +466,7 @@ def resolve_config(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
 
     mailto_value = getattr(config, "mailto", None)
     if mailto_value:
-        oa_config.email = mailto_value
+        apply_mailto(mailto_value)
 
     concurrency_product = max(args.workers, 1) * max(config.max_concurrent_resolvers, 1)
     if concurrency_product > 32:
