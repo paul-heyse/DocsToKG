@@ -112,6 +112,7 @@ import logging
 import time
 import uuid
 from dataclasses import asdict, dataclass, replace
+import inspect
 from pathlib import Path
 from threading import Event, RLock
 from typing import Callable, ClassVar, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
@@ -2842,6 +2843,62 @@ class ManagedFaissAdapter(DenseVectorStore):
         """Delegate range search to the managed store."""
 
         return list(self._inner.range_search(query, min_score, limit=limit))
+
+    def serialize(self) -> bytes:
+        """Serialize the managed FAISS index to bytes."""
+
+        return self._inner.serialize()
+
+    def restore(
+        self,
+        payload: bytes,
+        *,
+        meta: Optional[Mapping[str, object]] = None,
+    ) -> None:
+        """Restore the managed FAISS index from ``payload``."""
+
+        restore_fn = getattr(self._inner, "restore")
+        if meta is None:
+            restore_fn(payload)
+            return
+
+        try:
+            signature = inspect.signature(restore_fn)
+        except (TypeError, ValueError):
+            signature = None
+
+        if signature is not None:
+            for parameter in signature.parameters.values():
+                if parameter.name == "meta" and parameter.kind in (
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    inspect.Parameter.KEYWORD_ONLY,
+                ):
+                    restore_fn(payload, meta=meta)
+                    return
+
+        # Fallback for stores that do not accept snapshot metadata.
+        restore_fn(payload)
+
+    def save(self, path: str) -> None:
+        """Persist the managed FAISS index to ``path``."""
+
+        self._inner.save(path)
+
+    @classmethod
+    def load(
+        cls,
+        path: str,
+        config: DenseIndexConfig,
+        dim: int,
+        *,
+        observability: Optional[Observability] = None,
+    ) -> "ManagedFaissAdapter":
+        """Load a managed FAISS adapter from ``path``."""
+
+        inner = FaissVectorStore.load(
+            path, config=config, dim=dim, observability=observability
+        )
+        return cls(inner)
 
     def needs_training(self) -> bool:
         """Return ``True`` when the underlying index requires training."""
