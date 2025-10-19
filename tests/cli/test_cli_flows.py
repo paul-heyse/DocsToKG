@@ -1268,6 +1268,187 @@ def test_cli_resume_from_partial_metadata(download_modules, patcher, tmp_path):
     assert any(record.get("resolver") == "stub" for record in manifest_records)
 
 
+def test_cli_resume_from_external_csv_discovers_adjacent_sqlite(download_modules, patcher, tmp_path):
+    downloader = download_modules.downloader
+    resolvers = download_modules.resolvers
+
+    external_dir = tmp_path / "external_resume"
+    external_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = external_dir / "attempts.csv"
+    sqlite_path = csv_path.with_suffix(".sqlite3")
+
+    conn = sqlite3.connect(sqlite_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE manifests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                run_id TEXT,
+                schema_version INTEGER,
+                work_id TEXT,
+                title TEXT,
+                publication_year INTEGER,
+                resolver TEXT,
+                url TEXT,
+                normalized_url TEXT,
+                path TEXT,
+                path_mtime_ns INTEGER,
+                classification TEXT,
+                content_type TEXT,
+                reason TEXT,
+                reason_detail TEXT,
+                html_paths TEXT,
+                sha256 TEXT,
+                content_length INTEGER,
+                etag TEXT,
+                last_modified TEXT,
+                extracted_text_path TEXT,
+                dry_run INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO manifests (
+                timestamp, run_id, schema_version, work_id, title, publication_year,
+                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                content_type, reason, reason_detail, html_paths, sha256,
+                content_length, etag, last_modified, extracted_text_path, dry_run
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "2025-03-10T00:00:00Z",
+                "resume-run",
+                MANIFEST_SCHEMA_VERSION,
+                "WSQLITE",
+                "SQLite Resume",
+                2023,
+                "stub",
+                "https://oa.example/sqlite.pdf",
+                "https://oa.example/sqlite.pdf",
+                str(tmp_path / "out" / "pdfs" / "existing.pdf"),
+                None,
+                "pdf",
+                "application/pdf",
+                None,
+                None,
+                None,
+                "feedface",
+                1024,
+                None,
+                None,
+                None,
+                0,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    csv_path.write_text("run_id,work_id\nresume-run,WSQLITE\n", encoding="utf-8")
+
+    manifest_path = tmp_path / "manifest.jsonl"
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    (out_dir / "pdfs").mkdir(parents=True, exist_ok=True)
+
+    work = {
+        "id": "https://openalex.org/WSQLITE",
+        "title": "SQLite Resume",
+        "publication_year": 2023,
+        "ids": {"doi": "10.1000/sqlite"},
+        "open_access": {"oa_url": None},
+        "best_oa_location": {"pdf_url": "https://oa.example/sqlite.pdf"},
+        "primary_location": {},
+        "locations": [],
+    }
+
+    contexts: List[Dict[str, Any]] = []
+
+    patcher.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([work]))
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.iterate_openalex", lambda *args, **kwargs: iter([work])
+    )
+    patcher.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.resolve_topic_id_if_needed", lambda value, *_: value
+    )
+    patcher.setattr(downloader, "default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.resolvers.default_resolvers", lambda: [])
+    patcher.setattr("DocsToKG.ContentDownload.args.default_resolvers", lambda: [])
+
+    class _RecordingPipeline:
+        def __init__(self, *_, logger=None, metrics=None, **kwargs):
+            self.logger = logger
+            self.metrics = metrics
+            self.run_id = kwargs.get("run_id")
+
+        def run(self, session, artifact, context=None, session_factory=None):  # pragma: no cover
+            payload = context.to_dict() if hasattr(context, "to_dict") else context
+            contexts.append(payload)
+            outcome = resolvers.DownloadOutcome(
+                classification="pdf",
+                path=str(out_dir / "pdfs" / "downloaded.pdf"),
+                http_status=200,
+                content_type="application/pdf",
+                elapsed_ms=1.0,
+                error=None,
+            )
+            if self.logger is not None:
+                self.logger.log_attempt(
+                    resolvers.AttemptRecord(
+                        run_id=self.run_id,
+                        work_id=artifact.work_id,
+                        resolver_name="stub",
+                        resolver_order=1,
+                        url="https://oa.example/sqlite.pdf",
+                        status=outcome.classification.value,
+                        http_status=outcome.http_status,
+                        content_type=outcome.content_type,
+                        elapsed_ms=outcome.elapsed_ms,
+                        dry_run=False,
+                    )
+                )
+            if self.metrics is not None:
+                self.metrics.record_attempt("stub", outcome)
+            return resolvers.PipelineResult(
+                success=True,
+                resolver_name="stub",
+                url="https://oa.example/sqlite.pdf",
+                outcome=outcome,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    patcher.setattr(downloader, "ResolverPipeline", _RecordingPipeline)
+    patcher.setattr("DocsToKG.ContentDownload.runner.ResolverPipeline", _RecordingPipeline)
+
+    patcher.setattr(
+        "sys.argv",
+        value=[
+            "download_pyalex_pdfs.py",
+            "--topic",
+            "sqlite resume",
+            "--year-start",
+            "2023",
+            "--year-end",
+            "2023",
+            "--out",
+            str(out_dir),
+            "--manifest",
+            str(manifest_path),
+            "--resume-from",
+            str(csv_path),
+        ],
+    )
+
+    downloader.main()
+
+    # Work should be skipped because the adjacent SQLite cache populated resume_completed
+    assert not contexts, "expected work to be skipped when CSV resume is paired with SQLite"
+
+
 def test_cli_resume_from_sqlite_when_manifest_missing(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers

@@ -290,7 +290,21 @@ class DownloadRun:
     def _load_resume_state(self, resume_path: Path) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
         """Load resume metadata from JSON manifests with SQLite fallback."""
 
-        sqlite_path = self.resolved.sqlite_path
+        resolved_sqlite_path = self.resolved.sqlite_path
+        sqlite_candidates: List[Path] = []
+        for suffix in (".sqlite3", ".sqlite"):
+            candidate = resume_path.with_suffix(suffix)
+            if candidate not in sqlite_candidates:
+                sqlite_candidates.append(candidate)
+        sqlite_path = next((candidate for candidate in sqlite_candidates if candidate.is_file()), None)
+        if sqlite_path is None:
+            sqlite_path = resolved_sqlite_path
+        elif resolved_sqlite_path and sqlite_path != resolved_sqlite_path:
+            LOGGER.debug(
+                "Using SQLite cache %s located alongside resume target %s.",
+                sqlite_path,
+                resume_path,
+            )
         resume_path_exists = resume_path.exists()
         has_rotated = False
         if not resume_path_exists:

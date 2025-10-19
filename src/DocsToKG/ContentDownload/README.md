@@ -52,7 +52,7 @@ python -m DocsToKG.ContentDownload.cli \
 
 - **Required selectors**: `--topic` or `--topic-id`, plus `--year-start` and `--year-end`. `resolve_topic_id_if_needed()` maps textual topics to OpenAlex IDs when possible.
 - **Output layout**: `--out` points at the PDF root. `--staging` creates timestamped `PDF/`, `HTML/`, and `XML/` folders. `--html-out` and `--xml-out` override defaults. `--content-addressed` enables hashed storage with friendly symlinks.
-- **Run controls**: `--max` caps processed works; `--dry-run` records resolver coverage only; `--list-only` skips HTTP downloads; `--workers` controls concurrency; `--sleep` throttles sequential runs; `--resume-from` reuses an existing manifest JSONL or CSV attempts log (using the SQLite cache for the latter); `--verify-cache-digest` recomputes SHA-256 for cache hits.
+- **Run controls**: `--max` caps processed works; `--dry-run` records resolver coverage only; `--list-only` skips HTTP downloads; `--workers` controls concurrency; `--sleep` throttles sequential runs; `--resume-from` reuses an existing manifest JSONL or CSV attempts log (the CSV path may live in any directory so long as a paired `*.sqlite3`/`*.sqlite` cache sits beside it); `--verify-cache-digest` recomputes SHA-256 for cache hits.
 - **Resolver configuration**: `--resolver-config` loads YAML/JSON that mirrors `ResolverConfig`. `--resolver-order`, `--resolver-preset {fast,broad}`, `--enable-resolver`, `--disable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--concurrent-resolvers`, `--max-concurrent-per-host`, `--domain-min-interval`, `--domain-token-bucket`, `--head-precheck`/`--no-head-precheck`, and `--accept` map directly to `ResolverConfig` fields.
 - **Telemetry & logging**: `--manifest` overrides the manifest path; `--log-format {jsonl,csv}`, `--log-csv`, and `--log-rotate` tune sink behaviour. Selecting `--log-format csv` disables JSONL manifest emission in favour of CSV + SQLite outputs, so plan resumes on the same machine. `--warm-manifest-cache` preloads the SQLite manifest index for fast resume checks.
 - **Classifier tuning**: `--sniff-bytes`, `--min-pdf-bytes`, and `--tail-check-bytes` adjust payload heuristics; HTML text extraction is enabled via `--extract-text html`.
@@ -199,11 +199,7 @@ python -m DocsToKG.ContentDownload.cli --topic "vision" --year-start 2024 --year
 ## FAQ
 
 - Q: How do I resume a partially completed download run?
-  A: Supply `--resume-from <manifest.jsonl>` (or the staging manifest path). You can
-  also point the flag at `manifest.sqlite` or `manifest.sqlite3` directly—the runner
-  loads the SQLite cache without warnings. CSV attempts logs are supported when the
-  matching cache is present. The runner uses the SQLite index plus JSONL history
-  (including rotated files) to skip completed works.
+  A: Supply `--resume-from <manifest.jsonl>` (or the staging manifest path). CSV attempts logs are also supported when a paired SQLite cache (`*.sqlite3`/`*.sqlite`) lives next to the CSV—even if the resume target is outside the active manifest directory. The runner uses the SQLite index plus JSONL history (including rotated files) to skip completed works.
 
 - Q: How can I target only open-access works?
   A: Add `--oa-only` so the Works query filters to open-access items before resolver execution.

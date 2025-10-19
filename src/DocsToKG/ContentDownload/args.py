@@ -331,8 +331,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Resume from a manifest log, skipping completed works. Provide JSONL files "
-            "for direct parsing; CSV attempt logs rely on the SQLite cache, and pointing "
-            "to manifest.sqlite or manifest.sqlite3 resumes directly without warnings."
+            "for direct parsing; CSV attempt logs rely on a SQLite cache stored alongside "
+            "the CSV file (e.g., resume.csv with resume.sqlite3)."
         ),
     )
     parser.add_argument(
