@@ -27,6 +27,7 @@ from DocsToKG.ContentDownload.telemetry import (
     MultiSink,
     RunTelemetry,
     SummarySink,
+    load_previous_manifest,
 )
 
 
@@ -262,6 +263,40 @@ def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
     message = str(excinfo.value)
     assert str(missing_manifest) in message
     assert "--resume-from" in message
+
+
+def test_setup_download_state_expands_user_resume_path(
+    tmp_path, patcher, monkeypatch
+):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    monkeypatch.setenv("HOME", str(home_dir))
+
+    expected_resume = home_dir / "manifests" / "resume.jsonl"
+    expected_resume.parent.mkdir(parents=True, exist_ok=True)
+
+    captured: Dict[str, object] = {}
+
+    def _capture_resume_path(_self, resume_path):
+        captured["path"] = resume_path
+        return {}, set()
+
+    patcher.setattr(DownloadRun, "_load_resume_state", _capture_resume_path)
+
+    resolved.args.resume_from = "~/manifests/resume.jsonl"
+    download_run = DownloadRun(resolved)
+
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        download_run.setup_download_state(factory)
+    finally:
+        factory.close_all()
+        download_run.close()
+
+    assert captured.get("path") == expected_resume
 
 
 def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_path):
@@ -926,6 +961,82 @@ def test_download_run_run_processes_artifacts(patcher, tmp_path):
     assert result.saved == 2
     assert result.bytes_downloaded == 84
 
+    summary_path = resolved.manifest_path.with_suffix(".summary.json")
+    metrics_path = resolved.manifest_path.with_suffix(".metrics.json")
+
+    assert summary_path.exists()
+    summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert summary_payload == result.summary_record
+
+    assert metrics_path.exists()
+    metrics_payload = json.loads(metrics_path.read_text(encoding="utf-8"))
+    assert metrics_payload == result.summary_record
+
+    download_run.close()
+
+
+def test_run_parallel_workers_aggregates_state(patcher, tmp_path):
+    worker_count = 4
+    total_artifacts = 40
+    failure_ids = {f"W{index}" for index in range(0, total_artifacts, 7)}
+    payload_size = 13
+
+    resolved = make_resolved_config(tmp_path, csv=False, workers=worker_count)
+    bootstrap_run_environment(resolved)
+
+    artifacts = [_make_artifact(resolved, f"W{index}") for index in range(total_artifacts)]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.load_previous_manifest",
+        lambda *args, **kwargs: ({}, set()),
+    )
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: requests.Session,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        time.sleep(0.002)
+        if work.work_id in failure_ids:
+            raise RuntimeError("boom")
+        return {"saved": True, "downloaded_bytes": payload_size}
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.processed == total_artifacts
+    assert result.saved == total_artifacts - len(failure_ids)
+    assert result.skipped == len(failure_ids)
+    assert result.worker_failures == len(failure_ids)
+    assert result.bytes_downloaded == (total_artifacts - len(failure_ids)) * payload_size
+
     download_run.close()
 
 
@@ -1045,3 +1156,65 @@ def test_run_respects_explicit_resume_from_override(patcher, tmp_path):
     assert result.saved == 1
     # Explicit override should prefer override.jsonl, leaving W_BASE unskipped.
     assert resolved.args.resume_from == override_path
+
+
+def test_worker_crash_records_manifest_reason(patcher, tmp_path):
+    resolved = make_resolved_config(tmp_path, workers=2, csv=False)
+    bootstrap_run_environment(resolved)
+
+    failure_id = "W_FAIL"
+    artifacts = [
+        _make_artifact(resolved, failure_id),
+        _make_artifact(resolved, "W_OK"),
+    ]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: requests.Session,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        if work.work_id == failure_id:
+            raise RuntimeError("boom")
+        return {"saved": True, "downloaded_bytes": 5}
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.worker_failures == 1
+    per_work, completed = load_previous_manifest(resolved.manifest_path)
+    assert failure_id not in completed
+
+    crash_entries = per_work.get(failure_id)
+    assert crash_entries is not None and crash_entries
+    failure_record = next(iter(crash_entries.values()))
+
+    assert failure_record["classification"] == Classification.SKIPPED.value
+    assert failure_record["reason"] == ReasonCode.WORKER_EXCEPTION.value
+    assert failure_record["reason_detail"] == "worker-crash"
+

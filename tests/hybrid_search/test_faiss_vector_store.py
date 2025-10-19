@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from threading import Event, RLock, Thread
 from types import MethodType, SimpleNamespace
@@ -39,7 +40,9 @@ class _NullContext:
         return False
 
 
-def test_faiss_vector_store_search_batch_preserves_queries(monkeypatch: "pytest.MonkeyPatch") -> None:
+def test_faiss_vector_store_search_batch_preserves_queries(
+    monkeypatch: "pytest.MonkeyPatch",
+) -> None:
     """Ensure ``search_batch`` does not mutate the caller-provided query matrix."""
 
     def fake_normalize_rows(matrix: np.ndarray) -> np.ndarray:
@@ -115,9 +118,7 @@ def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> No
 
     store = FaissVectorStore.__new__(FaissVectorStore)
     store._dim = 3  # type: ignore[attr-defined]
-    store._config = SimpleNamespace(
-        ingest_dedupe_threshold=0.0, nlist=1, ivf_train_factor=1
-    )  # type: ignore[attr-defined]
+    store._config = SimpleNamespace(ingest_dedupe_threshold=0.0, nlist=1, ivf_train_factor=1)  # type: ignore[attr-defined]
     store._lock = RLock()  # type: ignore[attr-defined]
     store._observability = SimpleNamespace(  # type: ignore[attr-defined]
         trace=lambda *a, **k: _NullContext(),
@@ -127,13 +128,9 @@ def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> No
     store._release_pinned_buffers = MethodType(lambda self: None, store)  # type: ignore[attr-defined]
     store._flush_pending_deletes = MethodType(lambda self, *, force: None, store)  # type: ignore[attr-defined]
     store._probe_remove_support = MethodType(lambda self: False, store)  # type: ignore[attr-defined]
-    store._lookup_existing_ids = MethodType(
-        lambda self, ids: np.empty(0, dtype=np.int64), store
-    )  # type: ignore[attr-defined]
+    store._lookup_existing_ids = MethodType(lambda self, ids: np.empty(0, dtype=np.int64), store)  # type: ignore[attr-defined]
     store._update_gpu_metrics = MethodType(lambda self: None, store)  # type: ignore[attr-defined]
-    store._maybe_refresh_snapshot = MethodType(
-        lambda self, *, writes_delta, reason: None, store
-    )  # type: ignore[attr-defined]
+    store._maybe_refresh_snapshot = MethodType(lambda self, *, writes_delta, reason: None, store)  # type: ignore[attr-defined]
     store._dirty_deletes = 0  # type: ignore[attr-defined]
     store._needs_rebuild = False  # type: ignore[attr-defined]
     store._supports_remove_ids = False  # type: ignore[attr-defined]
@@ -172,7 +169,9 @@ def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> No
     original_coerce = FaissVectorStore._coerce_batch
     normalize_flags: list[bool] = []
 
-    def recording_coerce(self: FaissVectorStore, xb: np.ndarray, *, normalize: bool = True) -> np.ndarray:
+    def recording_coerce(
+        self: FaissVectorStore, xb: np.ndarray, *, normalize: bool = True
+    ) -> np.ndarray:
         normalize_flags.append(bool(normalize))
         return original_coerce(self, xb, normalize=normalize)
 
@@ -247,7 +246,9 @@ def test_search_batch_impl_normalizes_once(monkeypatch: "pytest.MonkeyPatch") ->
     original_coerce = FaissVectorStore._coerce_batch
     normalize_flags: list[bool] = []
 
-    def recording_coerce(self: FaissVectorStore, xb: np.ndarray, *, normalize: bool = True) -> np.ndarray:
+    def recording_coerce(
+        self: FaissVectorStore, xb: np.ndarray, *, normalize: bool = True
+    ) -> np.ndarray:
         normalize_flags.append(bool(normalize))
         return original_coerce(self, xb, normalize=normalize)
 
@@ -300,6 +301,8 @@ def test_set_nprobe_initializes_gpu_parameter_space(monkeypatch: "pytest.MonkeyP
 
     store = FaissVectorStore.__new__(FaissVectorStore)
     store._config = DenseIndexConfig(index_type="ivf_flat", nprobe=11)
+    store._last_applied_nprobe = None
+    store._last_applied_nprobe_monotonic = 0.0
 
     class RecordingShard:
         def __init__(self, label: str) -> None:
@@ -455,9 +458,7 @@ def test_remove_ids_is_atomic_across_threads() -> None:
             self._search_attempted.set()
             with self._lock:
                 self._search_entered.set()
-                assert self._allow_search_finish.wait(
-                    timeout=1.0
-                ), "search wait timed out"
+                assert self._allow_search_finish.wait(timeout=1.0), "search wait timed out"
             return []
 
     store = DummyStore()
@@ -465,9 +466,7 @@ def test_remove_ids_is_atomic_across_threads() -> None:
     remove_counts: list[int] = []
 
     def run_remove() -> None:
-        remove_counts.append(
-            store.remove_ids(ids, force_flush=True, reason="test_atomic_remove")
-        )
+        remove_counts.append(store.remove_ids(ids, force_flush=True, reason="test_atomic_remove"))
 
     def run_search() -> None:
         store.search(np.zeros((1,), dtype=np.float32), top_k=1)
@@ -540,7 +539,9 @@ def test_init_gpu_configures_resource_knobs(monkeypatch, caplog, use_all_devices
         def setDefaultNullStreamAllDevices(self) -> None:  # pragma: no cover - defensive
             self.null_stream_all_calls += 1
 
-        def setDefaultNullStream(self, device: int | None = None) -> None:  # pragma: no cover - defensive
+        def setDefaultNullStream(
+            self, device: int | None = None
+        ) -> None:  # pragma: no cover - defensive
             self.null_stream_calls.append(device)
 
     fake_faiss = SimpleNamespace(
@@ -563,15 +564,17 @@ def test_init_gpu_configures_resource_knobs(monkeypatch, caplog, use_all_devices
         assert resource.null_stream_all_calls == 0
         assert resource.null_stream_calls == [config.device]
 
-    gauges = {
-        sample.name: sample.value for sample in store._observability.metrics.export_gauges()
-    }
+    gauges = {sample.name: sample.value for sample in store._observability.metrics.export_gauges()}
     assert gauges.get("faiss_gpu_temp_memory_bytes") == float(temp_memory)
     assert gauges.get("faiss_gpu_default_null_stream") == 1.0
     expected_all_devices = 1.0 if use_all_devices else 0.0
     assert gauges.get("faiss_gpu_default_null_stream_all_devices") == expected_all_devices
 
-    records = [record for record in caplog.records if record.getMessage() == "faiss-gpu-resource-configured"]
+    records = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "faiss-gpu-resource-configured"
+    ]
     assert records, "resource configuration log event missing"
     payload = getattr(records[-1], "event", {})
     assert payload.get("temp_memory_bytes") == temp_memory
