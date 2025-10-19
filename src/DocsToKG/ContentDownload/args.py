@@ -445,6 +445,7 @@ def resolve_config(
     html_override = _expand_path(args.html_out)
     xml_override = _expand_path(args.xml_out)
     manifest_override = _expand_path(args.manifest)
+    csv_override = _expand_path(args.log_csv)
     if args.staging:
         run_dir = (base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M%S")).resolve(
             strict=False
@@ -529,7 +530,7 @@ def resolve_config(
 
     if manifest_path.suffix != ".jsonl":
         manifest_path = manifest_path.with_suffix(".jsonl")
-    csv_path = args.log_csv
+    csv_path = csv_override
     if args.log_format == "csv":
         csv_path = csv_path or manifest_path.with_suffix(".csv")
     sqlite_path = manifest_path.with_suffix(".sqlite3")
