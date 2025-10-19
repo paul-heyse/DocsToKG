@@ -28,7 +28,7 @@ try:  # pragma: no cover - platform specific availability
 except ImportError:  # pragma: no cover - non-windows
     msvcrt = None  # type: ignore[assignment]
 
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 
 import requests
 from jsonschema import Draft202012Validator
@@ -2094,6 +2094,7 @@ def plan_all(
     config: Optional[ResolvedConfig] = None,
     logger: Optional[logging.Logger] = None,
     since: Optional[datetime] = None,
+    total: Optional[int] = None,
 ) -> List[PlannedFetch]:
     """Return resolver plans for a collection of ontologies.
 
@@ -2102,6 +2103,8 @@ def plan_all(
         config: Optional resolved configuration reused across plans.
         logger: Logger instance used for annotation-aware logging.
         since: Optional cutoff date; plans older than this timestamp are filtered out.
+        total: Optional total number of specifications, used for progress metadata when
+            the iterable cannot be sized cheaply.
 
     Returns:
         List of PlannedFetch entries describing each ontology plan.
@@ -2122,59 +2125,86 @@ def plan_all(
     correlation = generate_correlation_id()
     adapter = logging.LoggerAdapter(log, extra={"correlation_id": correlation})
 
-    spec_list = list(specs)
-    if not spec_list:
+    total_hint = total
+    if total_hint is None:
+        try:
+            total_hint = len(specs)  # type: ignore[arg-type]
+        except TypeError:
+            total_hint = None
+
+    spec_iter = iter(specs)
+
+    try:
+        first_item = next(spec_iter)
+    except StopIteration:
         return []
 
+    index_counter = 0
     max_workers = max(1, active_config.defaults.http.concurrent_plans)
-    adapter.info(
-        "planning batch",
-        extra={
-            "stage": "plan",
-            "progress": {"total": len(spec_list)},
-            "workers": max_workers,
-        },
-    )
+    progress_payload: Dict[str, object] = {"stage": "plan", "workers": max_workers}
+    if total_hint is not None:
+        progress_payload["progress"] = {"total": total_hint}
+    adapter.info("planning batch", extra=progress_payload)
 
     results: Dict[int, PlannedFetch] = {}
-    futures: Dict[object, tuple[int, FetchSpec]] = {}
+    futures: Dict[Future[PlannedFetch], tuple[int, FetchSpec]] = {}
+
+    exhausted = False
+
+    def _submit(spec: FetchSpec, index: int) -> None:
+        future = executor.submit(
+            plan_one,
+            spec,
+            config=active_config,
+            correlation_id=correlation,
+            logger=log,
+        )
+        futures[future] = (index, spec)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for index, spec in enumerate(spec_list):
-            future = executor.submit(
-                plan_one,
-                spec,
-                config=active_config,
-                correlation_id=correlation,
-                logger=log,
-            )
-            futures[future] = (index, spec)
+        _submit(first_item, index_counter)
+        index_counter += 1
 
-        for future in as_completed(futures):
-            index, spec = futures[future]
-            try:
-                planned = future.result()
-            except Exception as exc:  # pylint: disable=broad-except
-                adapter.error(
-                    "planning failed",
-                    extra={
-                        "stage": "plan",
-                        "ontology_id": spec.id,
-                        "error": str(exc),
-                    },
-                )
-                _cancel_pending_futures(futures, current=future)
-                if isinstance(exc, (ConfigError, ConfigurationError, PolicyError)):
-                    raise
-                completed_plans = [results[i] for i in sorted(results)]
-                raise BatchPlanningError(
-                    failed_spec=spec,
-                    original=exc,
-                    completed=completed_plans,
-                    total=len(spec_list),
-                ) from exc
-            else:
-                results[index] = planned
+        while futures or not exhausted:
+            while not exhausted and len(futures) < max_workers:
+                try:
+                    spec = next(spec_iter)
+                except StopIteration:
+                    exhausted = True
+                    break
+                _submit(spec, index_counter)
+                index_counter += 1
+
+            if not futures:
+                break
+
+            done, _ = wait(list(futures.keys()), return_when=FIRST_COMPLETED)
+            for future in done:
+                index, spec = futures.pop(future)
+                try:
+                    planned = future.result()
+                except Exception as exc:  # pylint: disable=broad-except
+                    adapter.error(
+                        "planning failed",
+                        extra={
+                            "stage": "plan",
+                            "ontology_id": spec.id,
+                            "error": str(exc),
+                        },
+                    )
+                    _cancel_pending_futures(futures, current=future)
+                    if isinstance(exc, (ConfigError, ConfigurationError, PolicyError)):
+                        raise
+                    completed_plans = [results[i] for i in sorted(results)]
+                    total_known = total_hint if total_hint is not None else index_counter
+                    raise BatchPlanningError(
+                        failed_spec=spec,
+                        original=exc,
+                        completed=completed_plans,
+                        total=total_known,
+                    ) from exc
+                else:
+                    results[index] = planned
 
     ordered_indices = sorted(results)
     ordered_plans = [results[i] for i in ordered_indices]
@@ -2213,6 +2243,7 @@ def fetch_all(
     config: Optional[ResolvedConfig] = None,
     logger: Optional[logging.Logger] = None,
     force: bool = False,
+    total: Optional[int] = None,
 ) -> List[FetchResult]:
     """Fetch a sequence of ontologies sequentially.
 
@@ -2221,6 +2252,8 @@ def fetch_all(
         config: Optional resolved configuration shared across downloads.
         logger: Logger used to emit progress and error events.
         force: When True, skip manifest reuse and download everything again.
+        total: Optional total number of specifications for progress metadata when
+            the iterable cannot be cheaply materialised.
 
     Returns:
         List of FetchResult entries corresponding to completed downloads.
@@ -2248,66 +2281,94 @@ def fetch_all(
     correlation = generate_correlation_id()
     adapter = logging.LoggerAdapter(log, extra={"correlation_id": correlation})
 
-    spec_list = list(specs)
-    total = len(spec_list)
-    if not spec_list:
+    total_hint = total
+    if total_hint is None:
+        try:
+            total_hint = len(specs)  # type: ignore[arg-type]
+        except TypeError:
+            total_hint = None
+
+    spec_iter = iter(specs)
+
+    try:
+        first_spec = next(spec_iter)
+    except StopIteration:
         return []
 
     max_workers = max(1, active_config.defaults.http.concurrent_downloads)
-    adapter.info(
-        "starting batch",
-        extra={"stage": "batch", "progress": {"total": total}, "workers": max_workers},
-    )
+    batch_extra: Dict[str, object] = {"stage": "batch", "workers": max_workers}
+    if total_hint is not None:
+        batch_extra["progress"] = {"total": total_hint}
+    adapter.info("starting batch", extra=batch_extra)
 
     results_map: Dict[int, FetchResult] = {}
-    futures: Dict[object, tuple[int, FetchSpec]] = {}
+    futures: Dict[Future[FetchResult], tuple[int, FetchSpec]] = {}
+    exhausted = False
+    submitted = 0
+
+    def _submit(spec: FetchSpec, index: int) -> None:
+        progress: Dict[str, object] = {"current": index}
+        if total_hint is not None:
+            progress["total"] = total_hint
+        adapter.info(
+            "starting ontology fetch",
+            extra={"stage": "start", "ontology_id": spec.id, "progress": progress},
+        )
+        future = executor.submit(
+            fetch_one,
+            spec,
+            config=active_config,
+            correlation_id=correlation,
+            logger=log,
+            force=force,
+        )
+        futures[future] = (index, spec)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for index, spec in enumerate(spec_list, start=1):
-            adapter.info(
-                "starting ontology fetch",
-                extra={
-                    "stage": "start",
-                    "ontology_id": spec.id,
-                    "progress": {"current": index, "total": total},
-                },
-            )
-            future = executor.submit(
-                fetch_one,
-                spec,
-                config=active_config,
-                correlation_id=correlation,
-                logger=log,
-                force=force,
-            )
-            futures[future] = (index, spec)
+        submitted += 1
+        _submit(first_spec, submitted)
 
-        for future in as_completed(futures):
-            index, spec = futures[future]
-            try:
-                result = future.result()
-                results_map[index] = result
-                adapter.info(
-                    "progress update",
-                    extra={
-                        "stage": "progress",
-                        "ontology_id": spec.id,
-                        "progress": {"current": len(results_map), "total": total},
-                    },
-                )
-            except Exception as exc:  # pylint: disable=broad-except
-                adapter.error(
-                    "ontology fetch failed",
-                    extra={"stage": "error", "ontology_id": spec.id, "error": str(exc)},
-                )
-                _cancel_pending_futures(futures, current=future)
-                completed_results = [results_map[i] for i in sorted(results_map)]
-                raise BatchFetchError(
-                    failed_spec=spec,
-                    original=exc,
-                    completed=completed_results,
-                    total=total,
-                ) from exc
+        while futures or not exhausted:
+            while not exhausted and len(futures) < max_workers:
+                try:
+                    spec = next(spec_iter)
+                except StopIteration:
+                    exhausted = True
+                    break
+                submitted += 1
+                _submit(spec, submitted)
+
+            if not futures:
+                break
+
+            done, _ = wait(list(futures.keys()), return_when=FIRST_COMPLETED)
+            for future in done:
+                index, spec = futures.pop(future)
+                try:
+                    result = future.result()
+                except Exception as exc:  # pylint: disable=broad-except
+                    adapter.error(
+                        "ontology fetch failed",
+                        extra={"stage": "error", "ontology_id": spec.id, "error": str(exc)},
+                    )
+                    _cancel_pending_futures(futures, current=future)
+                    completed_results = [results_map[i] for i in sorted(results_map)]
+                    total_known = total_hint if total_hint is not None else submitted
+                    raise BatchFetchError(
+                        failed_spec=spec,
+                        original=exc,
+                        completed=completed_results,
+                        total=total_known,
+                    ) from exc
+                else:
+                    results_map[index] = result
+                    progress = {"current": len(results_map)}
+                    if total_hint is not None:
+                        progress["total"] = total_hint
+                    adapter.info(
+                        "progress update",
+                        extra={"stage": "progress", "ontology_id": spec.id, "progress": progress},
+                    )
 
     ordered_results = [results_map[i] for i in sorted(results_map)]
     return ordered_results
