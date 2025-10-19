@@ -164,8 +164,10 @@ import sys
 import threading
 import time
 import zipfile
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Optional
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -599,31 +601,57 @@ def test_validate_owlready2_memory_error(owl_file, tmp_path, config):
     assert "memory exceeded" in payload["error"].lower()
 
 
-@pytest.mark.skipif(platform.system() not in {"Linux", "Darwin"}, reason="SIGALRM unavailable")
-def test_run_with_timeout_restores_sigalrm_handler():
-    validation_mod._run_with_timeout(lambda: None, timeout_sec=1)
+def test_run_with_timeout_cancels_long_running_callable():
+    stop_event = threading.Event()
+    started = threading.Event()
+    finished = threading.Event()
+    call_count = {"value": 0}
+    shutdown_calls: list[tuple[bool, bool]] = []
 
-    handler_called = False
+    def long_running_callable() -> None:
+        started.set()
+        while not stop_event.is_set():
+            call_count["value"] += 1
+            time.sleep(0.01)
+        finished.set()
 
-    def _custom_handler(_signum, _frame):
-        nonlocal handler_called
-        handler_called = True
+    class DummyFuture:
+        def __init__(self, worker: threading.Thread) -> None:
+            self._worker = worker
 
-    previous_handler = signal.getsignal(signal.SIGALRM)
-    try:
-        signal.signal(signal.SIGALRM, _custom_handler)
+        def result(self, timeout: float):  # pragma: no cover - deterministic behavior
+            assert started.wait(1), "callable did not start"
+            raise FuturesTimeoutError()
 
-        def _trigger_alarm():
-            signal.raise_signal(signal.SIGALRM)
+        def cancel(self) -> bool:  # pragma: no cover - deterministic behavior
+            stop_event.set()
+            self._worker.join(timeout=1)
+            return not self._worker.is_alive()
 
-        with pytest.raises(validation_mod.ValidationTimeout):
-            validation_mod._run_with_timeout(_trigger_alarm, timeout_sec=1)
+    class DummyExecutor:
+        def __init__(self, max_workers: int = 1) -> None:
+            assert max_workers == 1
+            self._worker: Optional[threading.Thread] = None
 
-        handler_called = False
-        signal.raise_signal(signal.SIGALRM)
-        assert handler_called is True
-    finally:
-        signal.signal(signal.SIGALRM, previous_handler)
+        def submit(self, func):  # pragma: no cover - deterministic behavior
+            self._worker = threading.Thread(target=func, daemon=True)
+            self._worker.start()
+            return DummyFuture(self._worker)
+
+        def shutdown(self, wait: bool = True, cancel_futures: bool = False):
+            shutdown_calls.append((wait, cancel_futures))
+            if wait and self._worker is not None:
+                self._worker.join(timeout=1)
+
+    with patch.object(validation_mod.platform, "system", return_value="Windows"):
+        with patch.object(validation_mod, "ThreadPoolExecutor", DummyExecutor):
+            with pytest.raises(validation_mod.ValidationTimeout):
+                validation_mod._run_with_timeout(long_running_callable, timeout_sec=1)
+
+    assert stop_event.is_set()
+    assert finished.wait(1), "callable did not terminate after cancellation"
+    assert call_count["value"] > 0
+    assert any(call == (False, True) for call in shutdown_calls)
 
 
 # --- Helper Functions ---
