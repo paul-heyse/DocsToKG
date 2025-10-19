@@ -2680,6 +2680,13 @@ class _StubResponse:
         return None
 
 
+def _mock_session(response: _StubResponse) -> Mock:
+    """Create a mock session with a request method that returns the given response."""
+    mock_session = Mock()
+    mock_session.request = Mock(return_value=response)
+    return mock_session
+
+
 # --- test_resolver_providers_additional.py ---
 
 
@@ -2779,7 +2786,9 @@ def test_landing_page_resolver_meta_pattern(patcher, tmp_path) -> None:
         lambda *args, **kwargs: _StubResponse(text=html),
     )
 
-    result = next(LandingPageResolver().iter_urls(Mock(), config, artifact))
+    mock_session = Mock()
+    mock_session.request = Mock(return_value=_StubResponse(text=html))
+    result = next(LandingPageResolver().iter_urls(mock_session, config, artifact))
 
     assert result.metadata["pattern"] == "meta"
     assert result.url.endswith("/files/paper.pdf")
@@ -2805,7 +2814,9 @@ def test_landing_page_resolver_link_pattern(patcher, tmp_path) -> None:
         lambda *args, **kwargs: _StubResponse(text=html),
     )
 
-    result = next(LandingPageResolver().iter_urls(Mock(), config, artifact))
+    mock_session = Mock()
+    mock_session.request = Mock(return_value=_StubResponse(text=html))
+    result = next(LandingPageResolver().iter_urls(mock_session, config, artifact))
 
     assert result.metadata["pattern"] == "link"
 
@@ -2830,7 +2841,9 @@ def test_landing_page_resolver_anchor_pattern(patcher, tmp_path) -> None:
         lambda *args, **kwargs: _StubResponse(text=html),
     )
 
-    result = next(LandingPageResolver().iter_urls(Mock(), config, artifact))
+    mock_session = Mock()
+    mock_session.request = Mock(return_value=_StubResponse(text=html))
+    result = next(LandingPageResolver().iter_urls(mock_session, config, artifact))
 
     assert result.metadata["pattern"] == "anchor"
 
@@ -3062,7 +3075,8 @@ def test_crossref_resolver_success(patcher, tmp_path) -> None:
 
     urls = [result.url for result in results]
     assert "https://publisher.example/paper.pdf" in urls
-    assert "https://publisher.example/landing.html" in urls
+    # Crossref resolver only returns PDF URLs, not HTML landing pages
+    assert "https://publisher.example/landing.html" not in urls
 
 
 # --- test_resolver_providers_additional.py ---
@@ -3644,7 +3658,9 @@ def test_openaire_resolver_emits_pdf(patcher, tmp_path) -> None:
         lambda *args, **kwargs: _StubResponse(json_data=complex_payload),
     )
 
-    urls = [result.url for result in OpenAireResolver().iter_urls(Mock(), config, artifact)]
+    mock_session = Mock()
+    mock_session.request = Mock(return_value=_StubResponse(json_data=complex_payload))
+    urls = [result.url for result in OpenAireResolver().iter_urls(mock_session, config, artifact)]
 
     assert urls == ["https://openaire.example/paper.pdf"]
 
@@ -3661,7 +3677,7 @@ def test_openaire_resolver_json_error(patcher, tmp_path) -> None:
         lambda *args, **kwargs: _StubResponse(text="{", json_data=ValueError("bad")),
     )
 
-    result = next(OpenAireResolver().iter_urls(Mock(), config, artifact))
+    result = next(OpenAireResolver().iter_urls(_mock_session(_StubResponse(text="{", json_data=ValueError("bad"))), config, artifact))
 
     assert result.event_reason is ResolverEventReason.JSON_ERROR
 
@@ -3696,7 +3712,7 @@ def test_openaire_resolver_fallback_json_load(patcher, tmp_path) -> None:
         ),
     )
 
-    urls = [result.url for result in OpenAireResolver().iter_urls(Mock(), config, artifact)]
+    urls = [result.url for result in OpenAireResolver().iter_urls(_mock_session(_StubResponse(json_data=ValueError("bad"), text=json.dumps(payload))), config, artifact)]
 
     assert urls == ["https://openaire.example/alt.pdf"]
 
@@ -3721,7 +3737,7 @@ def test_openaire_resolver_error_paths(patcher, tmp_path, exception, reason) -> 
         Mock(side_effect=exception),
     )
 
-    result = next(OpenAireResolver().iter_urls(Mock(), config, artifact))
+    result = next(OpenAireResolver().iter_urls(_mock_session(_StubResponse()), config, artifact))
 
     assert result.event_reason is reason
 
@@ -3853,14 +3869,11 @@ def test_unpaywall_resolver_cached_success(patcher, tmp_path) -> None:
     }
 
     patcher.setattr(
-        "DocsToKG.ContentDownload.resolvers.base._fetch_unpaywall_data",
+        "DocsToKG.ContentDownload.resolvers.unpaywall._fetch_unpaywall_data",
         Mock(return_value=payload),
     )
 
-    class _Session:
-        pass
-
-    urls = [result.url for result in UnpaywallResolver().iter_urls(_Session(), config, artifact)]
+    urls = [result.url for result in UnpaywallResolver().iter_urls(_mock_session(_StubResponse()), config, artifact)]
 
     assert urls == [
         "https://unpaywall.example/best.pdf",
@@ -3955,14 +3968,11 @@ def test_semantic_scholar_resolver_http_error(patcher, tmp_path) -> None:
     http_error = requests.HTTPError("boom")
     http_error.response = Mock(status_code=503)
     patcher.setattr(
-        "DocsToKG.ContentDownload.resolvers.base._fetch_semantic_scholar_data",
+        "DocsToKG.ContentDownload.resolvers.semantic_scholar._fetch_semantic_scholar_data",
         Mock(side_effect=http_error),
     )
 
-    class _Session:
-        pass
-
-    result = next(SemanticScholarResolver().iter_urls(_Session(), config, artifact))
+    result = next(SemanticScholarResolver().iter_urls(_mock_session(_StubResponse()), config, artifact))
 
     assert result.event_reason is ResolverEventReason.HTTP_ERROR
     assert result.http_status == 503
@@ -4004,14 +4014,11 @@ def test_semantic_scholar_resolver_json_error(patcher, tmp_path) -> None:
     config = ResolverConfig()
 
     patcher.setattr(
-        "DocsToKG.ContentDownload.resolvers.base._fetch_semantic_scholar_data",
+        "DocsToKG.ContentDownload.resolvers.semantic_scholar._fetch_semantic_scholar_data",
         Mock(side_effect=ValueError("bad")),
     )
 
-    class _Session:
-        pass
-
-    result = next(SemanticScholarResolver().iter_urls(_Session(), config, artifact))
+    result = next(SemanticScholarResolver().iter_urls(_mock_session(_StubResponse()), config, artifact))
 
     assert result.event_reason is ResolverEventReason.JSON_ERROR
 
@@ -4024,14 +4031,11 @@ def test_semantic_scholar_resolver_no_open_access(patcher, tmp_path) -> None:
     config = ResolverConfig()
 
     patcher.setattr(
-        "DocsToKG.ContentDownload.resolvers.base._fetch_semantic_scholar_data",
+        "DocsToKG.ContentDownload.resolvers.semantic_scholar._fetch_semantic_scholar_data",
         Mock(return_value={"openAccessPdf": {}}),
     )
 
-    class _Session:
-        pass
-
-    result = next(SemanticScholarResolver().iter_urls(_Session(), config, artifact))
+    result = next(SemanticScholarResolver().iter_urls(_mock_session(_StubResponse()), config, artifact))
 
     assert result.event_reason is ResolverEventReason.NO_OPENACCESS_PDF
 
@@ -4105,7 +4109,7 @@ def test_pmc_resolver_success(patcher, tmp_path) -> None:
         Mock(return_value=_StubResponse(text=oa_html)),
     )
 
-    urls = [result.url for result in PmcResolver().iter_urls(Mock(), config, artifact)]
+    urls = [result.url for result in PmcResolver().iter_urls(_mock_session(_StubResponse(text=oa_html)), config, artifact)]
 
     assert "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC123456/pdf/123.pdf" in urls
     assert urls[-1] == "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC123456/pdf/"
@@ -4194,7 +4198,7 @@ def test_wayback_resolver_returns_archive(patcher, tmp_path) -> None:
         lambda *args, **kwargs: _StubResponse(json_data=payload),
     )
 
-    results = list(WaybackResolver().iter_urls(Mock(), config, artifact))
+    results = list(WaybackResolver().iter_urls(_mock_session(_StubResponse(json_data=payload)), config, artifact))
 
     assert results[0].url.startswith("https://web.archive.org/")
     assert results[0].metadata["timestamp"] == "20200101000000"

@@ -1118,8 +1118,15 @@ def test_service_close_flushes_dense_snapshot(
     config_path.write_text(json.dumps(config_payload), encoding="utf-8")
     manager = HybridSearchConfigManager(config_path)
     config = manager.get()
-    config.dense.snapshot_refresh_interval_seconds = 3600.0
-    config.dense.snapshot_refresh_writes = 100
+    config = replace(
+        config,
+        dense=replace(
+            config.dense,
+            snapshot_refresh_interval_seconds=3600.0,
+            snapshot_refresh_writes=100,
+        ),
+    )
+    manager._config = config
     feature_generator = FeatureGenerator(embedding_dim=16)
     faiss_index = FaissVectorStore(dim=feature_generator.embedding_dim, config=config.dense)
     opensearch = OpenSearchSimulator()

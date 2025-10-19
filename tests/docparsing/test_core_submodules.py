@@ -357,7 +357,7 @@ def test_embed_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> Non
 
 
 @pytest.mark.filterwarnings(
-    "ignore:Using `@model_validator`:pydantic.warnings.PydanticDeprecatedSince212"
+    "ignore:Using `@model_validator`:pydantic.warnings.PydanticDeprecatedSince210"
 )
 def test_embed_plan_only_stops_after_summary(
     monkeypatch: pytest.MonkeyPatch,
@@ -756,7 +756,7 @@ def test_plan_embed_validate_only_missing_directories(
     assert plan["validate"]["count"] == 0
     assert plan["missing"]["count"] == 0
     assert any(
-        note.startswith("Chunks/Vectors directory missing") for note in plan["notes"]
+        note.startswith("Chunks/Vectors directories missing") for note in plan["notes"]
     )
 
 

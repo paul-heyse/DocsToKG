@@ -1636,6 +1636,19 @@ class FaissVectorStore(DenseVectorStore):
                         co=cloner_options,
                         resources=resources_vector,
                     )
+                    self._observability.metrics.increment(
+                        "faiss_gpu_manual_resource_path", amount=1.0
+                    )
+                    self._observability.logger.info(
+                        "faiss-manual-resource-path-engaged",
+                        extra={
+                            "event": {
+                                "component": "faiss",
+                                "action": "manual_resource_replication",
+                                "gpu_ids": tuple(gpu_ids),
+                            }
+                        },
+                    )
                     self._replicated = True
                     return multi
 

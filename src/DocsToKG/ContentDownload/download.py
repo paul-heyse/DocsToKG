@@ -240,7 +240,9 @@ class DownloadConfig:
     @classmethod
     def from_options(
         cls,
-        options: Optional[Union["DownloadOptions", "DownloadConfig", DownloadContext, Mapping[str, Any]]],
+        options: Optional[
+            Union["DownloadOptions", "DownloadConfig", DownloadContext, Mapping[str, Any]]
+        ],
         **overrides: Any,
     ) -> "DownloadConfig":
         """Build a configuration instance from legacy option surfaces."""
@@ -717,7 +719,8 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                                 classification=Classification.HTTP_ERROR,
                                 path=None,
                                 http_status=response.status_code,
-                                content_type=response.headers.get("Content-Type") or content_type_hint,
+                                content_type=response.headers.get("Content-Type")
+                                or content_type_hint,
                                 elapsed_ms=elapsed_ms,
                                 reason=ReasonCode.UNEXPECTED_304,
                                 reason_detail="unexpected-304",
@@ -801,7 +804,8 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                                 classification=Classification.HTTP_ERROR,
                                 path=None,
                                 http_status=response.status_code,
-                                content_type=response.headers.get("Content-Type") or content_type_hint,
+                                content_type=response.headers.get("Content-Type")
+                                or content_type_hint,
                                 elapsed_ms=elapsed_ms,
                                 reason=ReasonCode.UNKNOWN,
                                 reason_detail="unexpected-206-partial-content",
@@ -898,7 +902,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                             }
                         },
                     )
-                    
+
                     # Skip large downloads if configured to do so
                     if ctx.skip_large_downloads:
                         elapsed_ms = (time.monotonic() - start) * 1000.0
@@ -2221,6 +2225,7 @@ def download_candidate(
 
     stream_result = stream_candidate_payload(plan)
     return finalize_candidate_download(plan, stream_result)
+
 
 def process_one_work(
     work: Union[WorkArtifact, Dict[str, Any]],
