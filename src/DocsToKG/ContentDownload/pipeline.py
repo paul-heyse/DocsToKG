@@ -1524,9 +1524,12 @@ class ResolverPipeline:
             None
         """
 
-        if self.config.sleep_jitter <= 0:
+        base_jitter = self.config.sleep_jitter
+        if base_jitter <= 0:
             return
-        _time.sleep(self.config.sleep_jitter + random.random() * 0.1)
+        concurrency = max(self.config.max_concurrent_resolvers, 1)
+        effective = base_jitter if concurrency == 1 else base_jitter / concurrency
+        _time.sleep(effective + random.random() * 0.1)
 
     def _should_attempt_head_check(self, resolver_name: str, url: Optional[str]) -> bool:
         """Return ``True`` when a resolver should perform a HEAD preflight request.

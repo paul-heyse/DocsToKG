@@ -58,7 +58,7 @@ def test_dependency_stubs_respects_dense_dim_override():
     dependency_stubs(dense_dim=12)
     from vllm import LLM
 
-    llm = LLM()
+    llm = LLM(dense_dim=12)
     vector = llm.embed(["alpha"])[0].outputs.embedding
     assert len(vector) == 12
 

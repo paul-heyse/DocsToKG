@@ -156,9 +156,7 @@ class DownloadRun:
         if log_format == "jsonl":
             if self.args.log_rotate:
                 jsonl_sink = stack.enter_context(
-                    self.rotating_jsonl_sink_factory(
-                        manifest_path, max_bytes=self.args.log_rotate
-                    )
+                    self.rotating_jsonl_sink_factory(manifest_path, max_bytes=self.args.log_rotate)
                 )
             else:
                 jsonl_sink = stack.enter_context(self.jsonl_sink_factory(manifest_path))
@@ -185,9 +183,7 @@ class DownloadRun:
 
         csv_requested = log_format == "csv"
         if csv_requested and not self.resolved.csv_path:
-            raise ValueError(
-                "--log-format csv selected but no CSV path was resolved."
-            )
+            raise ValueError("--log-format csv selected but no CSV path was resolved.")
 
         if self.resolved.csv_path and (csv_requested or getattr(self.args, "log_csv", None)):
             csv_sink = stack.enter_context(self.csv_sink_factory(self.resolved.csv_path))
@@ -291,9 +287,7 @@ class DownloadRun:
         self.state = state
         return state
 
-    def _load_resume_state(
-        self, resume_path: Path
-    ) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+    def _load_resume_state(self, resume_path: Path) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
         """Load resume metadata from JSON manifests with SQLite fallback."""
 
         sqlite_path = self.resolved.sqlite_path
@@ -319,7 +313,6 @@ class DownloadRun:
             and sqlite_path.exists()
             and (resume_lookup or resume_completed)
         ):
-            resume_completed = set()
             LOGGER.warning(
                 "Resume manifest %s is missing; loading resume metadata from SQLite %s.",
                 resume_path,

@@ -597,9 +597,9 @@ def _build_stage_args(args: argparse.Namespace) -> tuple[List[str], List[str], L
         embed_args.extend(["--chunks-dir", str(args.chunk_out_dir)])
     if args.chunk_workers:
         chunk_args.extend(["--workers", str(args.chunk_workers)])
-    if args.chunk_min_tokens:
+    if args.chunk_min_tokens is not None:
         chunk_args.extend(["--min-tokens", str(args.chunk_min_tokens)])
-    if args.chunk_max_tokens:
+    if args.chunk_max_tokens is not None:
         chunk_args.extend(["--max-tokens", str(args.chunk_max_tokens)])
     if args.structural_markers:
         chunk_args.extend(["--structural-markers", str(args.structural_markers)])
@@ -622,8 +622,10 @@ def _build_stage_args(args: argparse.Namespace) -> tuple[List[str], List[str], L
         embed_args.extend(["--shard-count", str(embed_shard_count)])
     if embed_shard_index is not None:
         embed_args.extend(["--shard-index", str(embed_shard_index)])
-    if args.splade_sparsity_warn_pct is not None:
-        embed_args.extend(["--splade-sparsity-warn-pct", str(args.splade_sparsity_warn_pct)])
+    if args.sparsity_warn_threshold_pct is not None:
+        embed_args.extend(
+            ["--sparsity-warn-threshold-pct", str(args.sparsity_warn_threshold_pct)]
+        )
 
     return doctags_args, chunk_args, embed_args
 
@@ -732,8 +734,8 @@ def run_all(argv: Sequence[str] | None = None) -> int:
         help="Skip embedding generation and only validate existing vectors",
     )
     parser.add_argument(
-        "--splade-sparsity-warn-pct",
-        dest="splade_sparsity_warn_pct",
+        "--sparsity-warn-threshold-pct",
+        dest="sparsity_warn_threshold_pct",
         type=float,
         default=None,
         help="Override SPLADE sparsity warning threshold for the embed stage",

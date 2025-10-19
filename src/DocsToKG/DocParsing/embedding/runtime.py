@@ -471,6 +471,7 @@ from DocsToKG.DocParsing.logging import (
 from DocsToKG.DocParsing.logging import (
     manifest_log_success as _logging_manifest_log_success,
 )
+from DocsToKG.DocParsing.io import manifest_append as _manifest_append
 from DocsToKG.DocParsing.schemas import (
     SchemaKind,
     ensure_chunk_schema,
@@ -499,6 +500,7 @@ VectorRow = _VectorRow
 manifest_log_failure = _logging_manifest_log_failure
 manifest_log_success = _logging_manifest_log_success
 manifest_log_skip = _logging_manifest_log_skip
+manifest_append = _manifest_append
 
 
 def _build_bm25_vector(**kwargs):
