@@ -202,26 +202,30 @@ def test_plan_chunk_streams_doctags(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 
     def fake_derive(doc: _StreamingStub, _in_dir: Path, out_dir: Path) -> tuple[str, Path]:
         doc_id = f"doc-{doc.identifier}"
-        return doc_id, out_dir / f"{doc_id}.chunks.jsonl"
+        out_path = out_dir / f"{doc_id}.chunks.jsonl"
+        if doc.identifier in skips:
+            out_path.write_text("{}", encoding="utf-8")
+        elif out_path.exists():
+            out_path.unlink()
+        return doc_id, out_path
 
     def fake_hash(doc: _StreamingStub) -> str:
         return f"hash-{doc.identifier}"
 
-    class _StubResumeController:
-        def __init__(self, *_args, **_kwargs) -> None:
-            return None
+    import DocsToKG.DocParsing.chunking as chunking_module
 
-        def should_skip(self, doc_id: str, _out: Path, _hash: str):
-            idx = int(doc_id.split("-")[-1])
-            return (idx in skips, None)
+    monkeypatch.setattr(
+        chunking_module, "MANIFEST_STAGE", "docparse.chunks.manifest", raising=False
+    )
+    manifest = {f"doc-{idx}": {"input_hash": f"hash-{idx}"} for idx in range(total)}
 
     monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
     monkeypatch.setattr(planning, "iter_doctags", fake_iter_doctags)
     monkeypatch.setattr(planning, "derive_doc_id_and_chunks_path", fake_derive)
     monkeypatch.setattr(planning, "compute_content_hash", fake_hash)
-    monkeypatch.setattr(planning, "ResumeController", _StubResumeController)
+    monkeypatch.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
 
-    result = planning.plan_chunk(["--data-root", str(data_root)])
+    result = planning.plan_chunk(["--data-root", str(data_root), "--resume"])
 
     gc.collect()
     assert tracker["active"] == 0
@@ -249,26 +253,30 @@ def test_plan_embed_streams_chunks(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
     def fake_derive(doc: _StreamingStub, _chunks_dir: Path, vectors_dir: Path) -> tuple[str, Path]:
         doc_id = f"doc-{doc.identifier}"
-        return doc_id, vectors_dir / f"{doc_id}.vectors.jsonl"
+        vector_path = vectors_dir / f"{doc_id}.vectors.jsonl"
+        if doc.identifier in skips:
+            vector_path.write_text("{}", encoding="utf-8")
+        elif vector_path.exists():
+            vector_path.unlink()
+        return doc_id, vector_path
 
     def fake_hash(doc: _StreamingStub) -> str:
         return f"hash-{doc.identifier}"
 
-    class _StubResumeController:
-        def __init__(self, *_args, **_kwargs) -> None:
-            return None
+    import DocsToKG.DocParsing.embedding as embedding_module
 
-        def should_skip(self, doc_id: str, _out: Path, _hash: str):
-            idx = int(doc_id.split("-")[-1])
-            return (idx in skips, None)
+    monkeypatch.setattr(
+        embedding_module, "MANIFEST_STAGE", "docparse.embeddings.manifest", raising=False
+    )
+    manifest = {f"doc-{idx}": {"input_hash": f"hash-{idx}"} for idx in range(total)}
 
     monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
     monkeypatch.setattr(planning, "iter_chunks", fake_iter_chunks)
     monkeypatch.setattr(planning, "derive_doc_id_and_vectors_path", fake_derive)
     monkeypatch.setattr(planning, "compute_content_hash", fake_hash)
-    monkeypatch.setattr(planning, "ResumeController", _StubResumeController)
+    monkeypatch.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
 
-    result = planning.plan_embed(["--data-root", str(data_root)])
+    result = planning.plan_embed(["--data-root", str(data_root), "--resume"])
 
     gc.collect()
     assert tracker["active"] == 0
@@ -277,3 +285,97 @@ def test_plan_embed_streams_chunks(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     expected_skip = len(skips)
     assert result["process"]["count"] == total - expected_skip
     assert result["skip"]["count"] == expected_skip
+
+
+def test_plan_chunk_missing_output_skips_hash(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    data_root = tmp_path / "Data"
+    doctags_dir = data_root / "DocTagsFiles"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    doctags_dir.mkdir(parents=True)
+    chunks_dir.mkdir()
+
+    doc_path = doctags_dir / "doc-1.doctags"
+    doc_path.write_text("{}", encoding="utf-8")
+
+    doc_id = "doc-1"
+    out_path = chunks_dir / f"{doc_id}.chunks.jsonl"
+
+    import DocsToKG.DocParsing.chunking as chunking_module
+
+    monkeypatch.setattr(
+        chunking_module, "MANIFEST_STAGE", "docparse.chunks.manifest", raising=False
+    )
+
+    monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
+    monkeypatch.setattr(planning, "iter_doctags", lambda _directory: [doc_path])
+    monkeypatch.setattr(
+        planning,
+        "derive_doc_id_and_chunks_path",
+        lambda _path, _in_dir, _out_dir: (doc_id, out_path),
+    )
+
+    manifest = {doc_id: {"input_hash": "previous"}}
+    monkeypatch.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
+
+    calls = {"count": 0}
+
+    def _fake_hash(_path: Path) -> str:
+        calls["count"] += 1
+        return "new-hash"
+
+    monkeypatch.setattr(planning, "compute_content_hash", _fake_hash)
+
+    result = planning.plan_chunk(["--data-root", str(data_root), "--resume"])
+
+    assert result["process"]["count"] == 1
+    assert result["skip"]["count"] == 0
+    assert calls["count"] == 0
+
+
+def test_plan_embed_missing_output_skips_hash(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    data_root = tmp_path / "Data"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    vectors_dir = data_root / "Embeddings"
+    chunks_dir.mkdir(parents=True)
+    vectors_dir.mkdir()
+
+    chunk_path = chunks_dir / "doc-1.chunks.jsonl"
+    chunk_path.write_text("{}", encoding="utf-8")
+
+    doc_id = "doc-1"
+    vector_path = vectors_dir / f"{doc_id}.vectors.jsonl"
+
+    import DocsToKG.DocParsing.embedding as embedding_module
+
+    monkeypatch.setattr(
+        embedding_module, "MANIFEST_STAGE", "docparse.embeddings.manifest", raising=False
+    )
+
+    monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
+    monkeypatch.setattr(planning, "iter_chunks", lambda _directory: [chunk_path])
+    monkeypatch.setattr(
+        planning,
+        "derive_doc_id_and_vectors_path",
+        lambda _path, _chunks_dir, _vectors_dir: (doc_id, vector_path),
+    )
+
+    manifest = {doc_id: {"input_hash": "previous"}}
+    monkeypatch.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
+
+    calls = {"count": 0}
+
+    def _fake_hash(_path: Path) -> str:
+        calls["count"] += 1
+        return "new-hash"
+
+    monkeypatch.setattr(planning, "compute_content_hash", _fake_hash)
+
+    result = planning.plan_embed(["--data-root", str(data_root), "--resume"])
+
+    assert result["process"]["count"] == 1
+    assert result["skip"]["count"] == 0
+    assert calls["count"] == 0

@@ -227,6 +227,9 @@ def plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
         should_hash = bool(args.resume and not args.force and manifest_entry)
         skip = False
         if should_hash:
+            if not out_path.exists():
+                _record_bucket(planned, rel_id)
+                continue
             input_hash = compute_content_hash(path)
             skip = should_skip_output(
                 out_path,
@@ -308,6 +311,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     planned = _new_bucket()
     skipped = _new_bucket()
 
+    files = iter_chunks(chunks_dir)
     for chunk_path in files:
         doc_id, vector_path = derive_doc_id_and_vectors_path(
             chunk_path, chunks_dir, vectors_dir
@@ -316,6 +320,9 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         should_hash = bool(args.resume and not args.force and manifest_entry)
         skip = False
         if should_hash:
+            if not vector_path.exists():
+                _record_bucket(planned, doc_id)
+                continue
             input_hash = compute_content_hash(chunk_path)
             skip = should_skip_output(
                 vector_path,
