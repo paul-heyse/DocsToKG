@@ -193,10 +193,7 @@ class DenseVectorStore(Protocol):
         """Return a serialised representation of the index."""
 
     def restore(
-        self,
-        payload: bytes,
-        *,
-        meta: Optional[Mapping[str, object]] = None,
+        self, payload: bytes, *, meta: Optional[Mapping[str, object]] = None
     ) -> None:
         """Restore index state from ``payload``."""
 

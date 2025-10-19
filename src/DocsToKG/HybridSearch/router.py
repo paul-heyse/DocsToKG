@@ -6,7 +6,7 @@ import inspect
 import logging
 import time
 from threading import RLock
-from typing import Callable, Dict, Mapping, Optional, Sequence, Tuple
+from typing import Callable, Dict, Mapping, Optional, Sequence, Tuple, Union, cast
 
 from .interfaces import DenseVectorStore
 
@@ -119,6 +119,16 @@ class FaissRouter:
     def serialize_all(self) -> Dict[str, Dict[str, object]]:
         """Serialize every managed store including snapshot metadata."""
 
+        payloads: Dict[str, Dict[str, object]] = {}
+        if not self._per_namespace:
+            payloads[DEFAULT_NAMESPACE] = self._serialize_with_meta(self._default_store)
+            return payloads
+        with self._lock:
+            for namespace, store in self._stores.items():
+                payloads[namespace] = self._serialize_with_meta(store)
+            for namespace, snapshot in self._snapshots.items():
+                payload, meta = snapshot
+                payloads.setdefault(namespace, {"payload": payload, "meta": meta})
         def build_entry(
             payload: bytes, meta: Optional[Mapping[str, object]]
         ) -> Dict[str, object]:
@@ -149,6 +159,13 @@ class FaissRouter:
                 payload, meta = snapshot
                 payloads.setdefault(namespace, build_entry(payload, meta))
         return payloads
+
+    @staticmethod
+    def _serialize_with_meta(store: DenseVectorStore) -> Dict[str, object]:
+        payload = store.serialize()
+        meta_getter = getattr(store, "snapshot_meta", None)
+        meta = meta_getter() if callable(meta_getter) else None
+        return {"payload": payload, "meta": meta}
 
     def iter_stores(self) -> Sequence[Tuple[str, DenseVectorStore]]:
         """Return a snapshot of managed stores keyed by namespace."""
@@ -207,10 +224,7 @@ class FaissRouter:
             return
 
         with self._lock:
-            for namespace, entry in payloads.items():
-                blob, meta = coerce_entry(entry)
-                if blob is None:
-                    continue
+            for namespace, packed in payloads.items():
                 store = self._stores.get(namespace)
                 if store is None:
                     if self._factory is None:
@@ -221,11 +235,25 @@ class FaissRouter:
                     self._stores[namespace] = store
                 elif self._resolver:
                     store.set_id_resolver(self._resolver)
+                payload, meta = self._extract_payload_and_meta(packed)
                 try:
-                    restore_store(store, blob, meta)
+                    store.restore(payload, meta=meta)
                 finally:
                     self._last_used[namespace] = time.time()
                     self._snapshots.pop(namespace, None)
+
+    @staticmethod
+    def _extract_payload_and_meta(
+        packed: Union[bytes, Mapping[str, object]]
+    ) -> Tuple[bytes, Optional[Mapping[str, object]]]:
+        if isinstance(packed, (bytes, bytearray, memoryview)):
+            return (bytes(packed), None)
+        payload_obj = cast(Optional[bytes], packed.get("payload"))
+        if payload_obj is None:
+            raise ValueError("Serialized namespace payload is missing 'payload' bytes")
+        meta_obj = packed.get("meta")
+        meta = cast(Optional[Mapping[str, object]], meta_obj)
+        return payload_obj, meta
 
     def rebuild_if_needed(self) -> bool:
         """Attempt to rebuild all managed stores; returns True if any rebuild occurs."""

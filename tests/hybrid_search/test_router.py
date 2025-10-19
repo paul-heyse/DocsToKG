@@ -163,6 +163,9 @@ class RecordingFaissStore:
     def rebuild_if_needed(self) -> bool:
         return False
 
+    def snapshot_meta(self) -> Mapping[str, object]:
+        return {"namespace": self.namespace, "vector_count": len(self._vectors)}
+
 
 def test_restore_all_rehydrates_multiple_namespaces() -> None:
     """Ensure per-namespace restores hydrate every serialized store."""
@@ -177,6 +180,10 @@ def test_restore_all_rehydrates_multiple_namespaces() -> None:
         store.add([np.zeros(3, dtype=np.float32)], [f"{namespace}-vector"])
 
     payloads = router.serialize_all()
+    for namespace, packed in payloads.items():
+        assert set(packed.keys()) == {"payload", "meta"}
+        assert isinstance(packed["payload"], bytes)
+        assert packed.get("meta") is None
 
     restored_router = FaissRouter(
         per_namespace=True,
@@ -212,12 +219,31 @@ def test_managed_adapter_restores_with_snapshot_metadata() -> None:
     router._snapshots["alpha"] = (payloads["alpha"]["faiss"], snapshot_meta)
     del router._stores["alpha"]
 
-    restored_store = router.get("alpha")
+    restored_router = FaissRouter(
+        per_namespace=True,
+        default_store=ManagedFaissAdapter(RecordingFaissStore("__default__")),
+        factory=lambda namespace: ManagedFaissAdapter(RecordingFaissStore(namespace)),
+    )
+    restored_router.restore_all(payloads)
+
+    restored_store = restored_router.get("alpha")
     inner_store = restored_store._inner  # type: ignore[attr-defined]
     assert isinstance(inner_store, RecordingFaissStore)
-    assert inner_store.last_restore_meta == snapshot_meta
+    assert inner_store.last_restore_meta == alpha_payload["meta"]
     assert inner_store._vectors == ["alpha-vector"]
 
+    snapshot_meta = {"namespace": "alpha", "marker": "router-test"}
+    router._snapshots["alpha"] = (
+        alpha_payload["payload"],
+        snapshot_meta,
+    )
+    del router._stores["alpha"]
+
+    rehydrated_store = router.get("alpha")
+    inner_rehydrated = rehydrated_store._inner  # type: ignore[attr-defined]
+    assert isinstance(inner_rehydrated, RecordingFaissStore)
+    assert inner_rehydrated.last_restore_meta == snapshot_meta
+    assert inner_rehydrated._vectors == ["alpha-vector"]
 
 def test_serialize_and_restore_roundtrip_carries_metadata() -> None:
     """Router serialization should retain metadata for restore_all."""
