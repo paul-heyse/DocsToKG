@@ -119,7 +119,7 @@ def test_resolve_config_rejects_inverted_year_range(parser, capfd):
 
     assert excinfo.value.code == 2
     _, err = capfd.readouterr()
-    assert "--year-start cannot be greater than --year-end" in err
+    assert "--year-start must be less than or equal to --year-end" in err
 
 
 @pytest.mark.parametrize("per_page", [1, 200])
