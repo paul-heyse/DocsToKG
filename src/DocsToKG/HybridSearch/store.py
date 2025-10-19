@@ -114,7 +114,7 @@ import uuid
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from threading import Event, RLock
-from typing import Callable, ClassVar, Dict, Iterator, List, Mapping, Optional, Sequence
+from typing import Callable, ClassVar, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -395,6 +395,22 @@ class FaissVectorStore(DenseVectorStore):
         self._force_64bit_ids = bool(getattr(config, "force_64bit_ids", False))
         self._force_remove_ids_fallback = bool(getattr(config, "force_remove_ids_fallback", False))
         self._replication_enabled = bool(getattr(config, "enable_replication", True))
+        raw_replication_ids = getattr(config, "replication_gpu_ids", None)
+        self._has_explicit_replication_ids = raw_replication_ids is not None
+        if raw_replication_ids is None:
+            self._replication_gpu_ids: Optional[Tuple[int, ...]] = None
+        else:
+            normalised_ids: list[int] = []
+            for raw_id in raw_replication_ids:
+                try:
+                    candidate = int(raw_id)
+                except (TypeError, ValueError):
+                    logger.debug(
+                        "Ignoring invalid replication gpu id", extra={"event": {"value": raw_id}}
+                    )
+                    continue
+                normalised_ids.append(candidate)
+            self._replication_gpu_ids = tuple(normalised_ids)
         self._reserve_memory_enabled = bool(getattr(config, "enable_reserve_memory", True))
         self._replicated = False
         self._gpu_resources: Optional["faiss.StandardGpuResources"] = None
@@ -1382,6 +1398,34 @@ class FaissVectorStore(DenseVectorStore):
                 "Check CUDA driver installation and faiss-gpu compatibility."
             ) from exc
 
+    def _resolve_replication_targets(self, available: int) -> Tuple[int, ...]:
+        """Return the filtered GPU ids that should participate in replication."""
+
+        if not self._replication_gpu_ids:
+            return tuple()
+        allowed: list[int] = []
+        seen: set[int] = set()
+        skipped: list[int] = []
+        for gpu_id in self._replication_gpu_ids:
+            if gpu_id in seen:
+                continue
+            seen.add(gpu_id)
+            if 0 <= gpu_id < available:
+                allowed.append(gpu_id)
+            else:
+                skipped.append(gpu_id)
+        if skipped:
+            logger.info(
+                "Skipping unavailable GPUs during FAISS replication",
+                extra={
+                    "event": {
+                        "requested_gpu_ids": tuple(self._replication_gpu_ids),
+                        "allowed_gpu_ids": tuple(allowed),
+                        "skipped_gpu_ids": tuple(skipped),
+                    }
+                },
+            )
+        return tuple(allowed)
     def _create_gpu_resources(
         self, *, device: Optional[int] = None
     ) -> "faiss.StandardGpuResources":
@@ -1470,23 +1514,45 @@ class FaissVectorStore(DenseVectorStore):
         self._replicated = False
         if not self._replication_enabled:
             return index
-        if not hasattr(faiss, "index_cpu_to_all_gpus"):
+        explicit_targets_configured = bool(self._has_explicit_replication_ids)
+        if explicit_targets_configured and not hasattr(faiss, "index_cpu_to_gpus_list"):
+            logger.warning(
+                "FAISS build missing index_cpu_to_gpus_list; cannot honour explicit replication gpu ids"
+            )
+            return index
+        if not explicit_targets_configured and not hasattr(faiss, "index_cpu_to_all_gpus"):
             if shard:
                 raise RuntimeError("Sharded multi-GPU not supported by current faiss build")
             return index
         if shard and not hasattr(faiss, "GpuMultipleClonerOptions"):
             raise RuntimeError("Sharded multi-GPU not supported by current faiss build")
 
-        gpu_count = 0
+        available_gpus = 0
         if hasattr(faiss, "get_num_gpus"):
             try:
-                gpu_count = int(faiss.get_num_gpus())
+                available_gpus = int(faiss.get_num_gpus())
             except Exception:  # pragma: no cover - best effort guard
-                gpu_count = 0
-        if gpu_count <= 1:
+                available_gpus = 0
+        if available_gpus <= 1:
             return index
         if self._replicated:
             return index
+
+        target_gpus: Tuple[int, ...] = tuple()
+        if explicit_targets_configured:
+            target_gpus = self._resolve_replication_targets(available_gpus)
+            if len(target_gpus) <= 1:
+                if self._replication_gpu_ids:
+                    logger.debug(
+                        "Insufficient GPU targets after filtering explicit replication ids",
+                        extra={
+                            "event": {
+                                "requested_gpu_ids": tuple(self._replication_gpu_ids),
+                                "filtered_gpu_ids": target_gpus,
+                            }
+                        },
+                    )
+                return index
 
         try:
             base_index = index
@@ -1502,6 +1568,18 @@ class FaissVectorStore(DenseVectorStore):
                 cloner_options.shard = bool(shard)
                 if shard and hasattr(cloner_options, "common_ivf_quantizer"):
                     cloner_options.common_ivf_quantizer = True
+            if explicit_targets_configured:
+                multi = faiss.index_cpu_to_gpus_list(
+                    base_index,
+                    gpus=list(target_gpus),
+                    co=cloner_options,
+                )
+            else:
+                multi = faiss.index_cpu_to_all_gpus(
+                    base_index,
+                    co=cloner_options,
+                    ngpu=available_gpus,
+                )
 
             resources_vector: "faiss.GpuResourcesVector | None" = None
             gpu_ids = list(range(gpu_count))
