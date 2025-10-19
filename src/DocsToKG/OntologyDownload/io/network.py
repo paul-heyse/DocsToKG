@@ -20,8 +20,10 @@ from pathlib import Path
 from typing import (
     Callable,
     Dict,
+    Iterable,
     Iterator,
     List,
+    Mapping,
     Optional,
     Set,
     Tuple,
@@ -34,12 +36,7 @@ import requests
 
 from ..errors import ConfigError, DownloadFailure, OntologyDownloadError, PolicyError
 from ..settings import DownloadConfiguration
-from .filesystem import (
-    _compute_file_hash,
-    _materialize_cached_file,
-    sanitize_filename,
-    sha256_file,
-)
+from .filesystem import _compute_file_hash, _materialize_cached_file, sanitize_filename
 from .rate_limit import TokenBucket, apply_retry_after, get_bucket
 
 try:  # pragma: no cover - psutil may be unavailable in minimal environments
@@ -542,6 +539,75 @@ def is_retryable_error(exc: BaseException) -> bool:
 SESSION_POOL = SessionPool()
 
 
+@contextmanager
+def request_with_redirect_audit(
+    *,
+    session: requests.Session,
+    method: str,
+    url: str,
+    headers: Dict[str, str],
+    timeout: float,
+    stream: bool,
+    http_config: DownloadConfiguration,
+) -> Iterator[requests.Response]:
+    """Issue an HTTP request while validating every redirect target."""
+
+    redirects = 0
+    response: Optional[requests.Response] = None
+    current_url = url
+    raw_limit = getattr(http_config, "max_redirects", 5)
+    try:
+        max_redirects = int(raw_limit)
+    except (TypeError, ValueError):
+        max_redirects = 5
+    if max_redirects < 0:
+        max_redirects = 0
+
+    try:
+        while True:
+            secure_url = validate_url_security(current_url, http_config)
+            try:
+                response = session.request(
+                    method,
+                    secure_url,
+                    headers=headers,
+                    timeout=timeout,
+                    stream=stream,
+                    allow_redirects=False,
+                )
+            except requests.RequestException:
+                raise
+
+            if response.is_redirect:
+                redirects += 1
+                if redirects > max_redirects:
+                    response.close()
+                    raise PolicyError("Too many redirects during download")
+                location = response.headers.get("Location")
+                if not location:
+                    response.close()
+                    raise PolicyError("Redirect response missing Location header")
+                next_url = urljoin(secure_url, location)
+                try:
+                    current_url = validate_url_security(next_url, http_config)
+                finally:
+                    response.close()
+                    response = None
+                continue
+
+            try:
+                validate_url_security(response.url, http_config)
+            except Exception:
+                response.close()
+                raise
+
+            yield response
+            return
+    finally:
+        if response is not None:
+            response.close()
+
+
 class StreamingDownloader(pooch.HTTPDownloader):
     """Custom downloader supporting HEAD validation, conditional requests, resume, and caching.
 
@@ -560,6 +626,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         response_etag: ETag returned by the upstream server, if present.
         response_last_modified: Last-modified timestamp provided by the server.
         expected_media_type: MIME type provided by the resolver for validation.
+        streamed_digests: Mapping of hash algorithm names to hex digests computed during streaming.
 
     Examples:
         >>> from pathlib import Path
@@ -587,10 +654,11 @@ class StreamingDownloader(pooch.HTTPDownloader):
         service: Optional[str] = None,
         origin_host: Optional[str] = None,
         bucket: Optional[TokenBucket] = None,
+        hash_algorithms: Optional[Iterable[str]] = None,
     ) -> None:
         super().__init__(headers={}, progressbar=False, timeout=http_config.timeout_sec)
         self.destination = destination
-        self.custom_headers = headers
+        self.custom_headers = dict(headers)
         self.http_config = http_config
         self.previous_manifest = previous_manifest or {}
         self.logger = logger
@@ -606,6 +674,56 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self.origin_host = origin_host
         self.invoked = False
         self.bucket = bucket
+        requested_algorithms: List[str] = ["sha256"]
+        if hash_algorithms:
+            for algorithm in hash_algorithms:
+                normalized = algorithm.strip().lower()
+                if normalized and normalized not in requested_algorithms:
+                    requested_algorithms.append(normalized)
+        self._requested_hash_algorithms: Tuple[str, ...] = tuple(requested_algorithms)
+        self._unsupported_hash_algorithms: Set[str] = set()
+        self._hashers: Dict[str, object] = {}
+        self.streamed_digests: Dict[str, str] = {}
+        self._reset_hashers()
+
+    def _reset_hashers(self) -> None:
+        """Initialise hashlib objects for all supported algorithms."""
+
+        self.streamed_digests = {}
+        self._hashers = {}
+        for algorithm in self._requested_hash_algorithms:
+            try:
+                self._hashers[algorithm] = hashlib.new(algorithm)
+            except ValueError:
+                if algorithm not in self._unsupported_hash_algorithms:
+                    self.logger.warning(
+                        "unsupported checksum algorithm for streaming",
+                        extra={
+                            "stage": "download",
+                            "algorithm": algorithm,
+                        },
+                    )
+                    self._unsupported_hash_algorithms.add(algorithm)
+
+    def _seed_hashers_from_file(self, path: Path) -> None:
+        """Update hashers with the bytes already present on disk."""
+
+        if not self._hashers:
+            return
+        if not path.exists():
+            return
+        try:
+            with path.open("rb") as existing:
+                for chunk in iter(lambda: existing.read(1 << 20), b""):
+                    if not chunk:
+                        continue
+                    for hasher in self._hashers.values():
+                        hasher.update(chunk)
+        except OSError as exc:
+            self.logger.debug(
+                "failed to seed hashers from partial file",
+                extra={"stage": "download", "error": str(exc)},
+            )
 
     @contextmanager
     def _request_with_redirect_audit(
@@ -620,63 +738,19 @@ class StreamingDownloader(pooch.HTTPDownloader):
     ) -> Iterator[requests.Response]:
         """Issue an HTTP request while validating every redirect target."""
 
-        redirects = 0
-        response: Optional[requests.Response] = None
-        current_url = url
-        raw_limit = getattr(self.http_config, "max_redirects", 5)
-        try:
-            max_redirects = int(raw_limit)
-        except (TypeError, ValueError):
-            max_redirects = 5
-        if max_redirects < 0:
-            max_redirects = 0
-
-        try:
-            while True:
-                secure_url = validate_url_security(current_url, self.http_config)
-                try:
-                    response = session.request(
-                        method,
-                        secure_url,
-                        headers=headers,
-                        timeout=timeout,
-                        stream=stream,
-                        allow_redirects=False,
-                    )
-                except requests.RequestException:
-                    raise
-
-                if response.is_redirect:
-                    redirects += 1
-                    if redirects > max_redirects:
-                        response.close()
-                        raise PolicyError("Too many redirects during download")
-                    location = response.headers.get("Location")
-                    if not location:
-                        response.close()
-                        raise PolicyError("Redirect response missing Location header")
-                    next_url = urljoin(secure_url, location)
-                    try:
-                        current_url = validate_url_security(next_url, self.http_config)
-                    finally:
-                        response.close()
-                        response = None
-                    continue
-
-                try:
-                    validate_url_security(response.url, self.http_config)
-                except Exception:
-                    response.close()
-                    raise
-
-                yield response
-                return
-        finally:
-            if response is not None:
-                response.close()
+        with request_with_redirect_audit(
+            session=session,
+            method=method,
+            url=url,
+            headers=headers,
+            timeout=timeout,
+            stream=stream,
+            http_config=self.http_config,
+        ) as response:
+            yield response
 
     def _preliminary_head_check(
-        self, url: str, session: requests.Session
+        self, url: str, session: requests.Session, headers: Mapping[str, str]
     ) -> tuple[Optional[str], Optional[int]]:
         """Probe the origin with HEAD to audit media type and size before downloading.
 
@@ -687,6 +761,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         Args:
             url: Fully qualified download URL resolved by the planner.
             session: Prepared requests session used for outbound calls.
+            headers: HTTP headers to include with the HEAD request.
 
         Returns:
             Tuple ``(content_type, content_length)`` extracted from response
@@ -696,12 +771,14 @@ class StreamingDownloader(pooch.HTTPDownloader):
             PolicyError: Propagates download policy errors encountered during the HEAD request.
         """
 
+        request_headers = dict(headers)
+
         try:
             with self._request_with_redirect_audit(
                 session=session,
                 method="HEAD",
                 url=url,
-                headers=self.custom_headers,
+                headers=request_headers,
                 timeout=self.http_config.timeout_sec,
                 stream=False,
             ) as response:
@@ -713,6 +790,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             "method": "HEAD",
                             "status_code": response.status_code,
                             "url": url,
+                            "headers": request_headers,
                         },
                     )
                     return None, None
@@ -731,7 +809,12 @@ class StreamingDownloader(pooch.HTTPDownloader):
         except requests.RequestException as exc:
             self.logger.debug(
                 "HEAD request exception, proceeding with GET",
-                extra={"stage": "download", "error": str(exc), "url": url},
+                extra={
+                    "stage": "download",
+                    "error": str(exc),
+                    "url": url,
+                    "headers": request_headers,
+                },
             )
             return None, None
 
@@ -848,7 +931,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
             last_modified_value = self.previous_manifest.get("last_modified")
             if isinstance(last_modified_value, str) and last_modified_value.strip():
                 manifest_headers["If-Modified-Since"] = last_modified_value
-        request_headers = {**self.custom_headers, **manifest_headers}
+        base_headers = {**self.custom_headers, **manifest_headers}
         part_path = Path(output_file + ".part")
         destination_part_path = Path(str(self.destination) + ".part")
         if not part_path.exists() and destination_part_path.exists():
@@ -865,7 +948,10 @@ class StreamingDownloader(pooch.HTTPDownloader):
             host=self.origin_host,
             http_config=self.http_config,
         ) as session:
-            head_content_type, head_content_length = self._preliminary_head_check(url, session)
+            head_headers = dict(base_headers)
+            head_content_type, head_content_length = self._preliminary_head_check(
+                url, session, head_headers
+            )
             self.head_content_type = head_content_type
             self.head_content_length = head_content_length
             if head_content_type:
@@ -873,22 +959,52 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
             resume_position = part_path.stat().st_size if part_path.exists() else 0
 
+            overall_start = time.monotonic()
+            timeout_limit = float(self.http_config.download_timeout_sec)
+
+            def _clear_partial_files() -> None:
+                for candidate in (part_path, destination_part_path):
+                    try:
+                        candidate.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+
+            def _raise_timeout(elapsed: float) -> None:
+                _clear_partial_files()
+                timeout_sec = timeout_limit
+                self.logger.error(
+                    "download timeout",
+                    extra={
+                        "stage": "download",
+                        "error": "timeout",
+                        "elapsed_sec": round(elapsed, 2),
+                        "timeout_sec": timeout_sec,
+                        "service": self.service,
+                        "host": self.origin_host,
+                    },
+                )
+                raise DownloadFailure(
+                    (
+                        f"Download exceeded timeout of {timeout_sec:.2f} seconds "
+                        f"(elapsed {elapsed:.2f} seconds)"
+                    ),
+                    retryable=False,
+                )
+
+            def _enforce_timeout() -> None:
+                elapsed = time.monotonic() - overall_start
+                if elapsed > timeout_limit:
+                    _raise_timeout(elapsed)
+
             def _stream_once() -> str:
                 nonlocal resume_position
+                self._reset_hashers()
                 resume_position = part_path.stat().st_size if part_path.exists() else 0
                 original_resume_position = resume_position
                 want_range = original_resume_position > 0
+                request_headers = dict(base_headers)
                 if want_range:
                     request_headers["Range"] = f"bytes={original_resume_position}-"
-                else:
-                    request_headers.pop("Range", None)
-
-                def _clear_partial_files() -> None:
-                    for candidate in (part_path, destination_part_path):
-                        try:
-                            candidate.unlink(missing_ok=True)
-                        except OSError:
-                            pass
 
                 if self.bucket is not None:
                     self.bucket.consume()
@@ -998,6 +1114,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
                     if range_honored:
                         self.status = "updated"
+                        if resume_position > 0:
+                            self._seed_hashers_from_file(part_path)
                     response.raise_for_status()
 
                     self._validate_media_type(
@@ -1035,6 +1153,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                 if not chunk:
                                     continue
                                 fh.write(chunk)
+                                for hasher in self._hashers.values():
+                                    hasher.update(chunk)
                                 bytes_downloaded += len(chunk)
                                 if total_bytes and next_progress:
                                     progress = bytes_downloaded / total_bytes
@@ -1065,7 +1185,18 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             ) from exc
                         raise OntologyDownloadError(f"Failed to write download: {exc}") from exc
 
+                    if self._hashers:
+                        self.streamed_digests = {
+                            algorithm: hasher.hexdigest()
+                            for algorithm, hasher in self._hashers.items()
+                        }
                     return "success"
+
+            def _stream_once_with_timeout() -> str:
+                _enforce_timeout()
+                result = _stream_once()
+                _enforce_timeout()
+                return result
 
             def _retry_after_hint(exc: BaseException) -> Optional[float]:
                 delay = getattr(exc, "_retry_after_delay", None)
@@ -1088,7 +1219,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 )
 
             result_state = retry_with_backoff(
-                _stream_once,
+                _stream_once_with_timeout,
                 retryable=is_retryable_error,
                 max_attempts=max(1, self.http_config.max_retries),
                 backoff_base=self.http_config.backoff_factor,
@@ -1206,7 +1337,7 @@ def download_stream(
     cache_key = f"{url_hash}_{safe_name}"
 
     def _verify_expected_checksum(
-        sha256_value: Optional[str],
+        digests: Dict[str, str],
         *,
         artifact_path: Path,
         cache_path: Optional[Path],
@@ -1214,8 +1345,10 @@ def download_stream(
         if not expected_algorithm or not expected_digest:
             return
         try:
-            if expected_algorithm == "sha256" and sha256_value is not None:
-                actual = sha256_value.lower()
+            actual: Optional[str]
+            digest_value = digests.get(expected_algorithm)
+            if digest_value is not None:
+                actual = digest_value.lower()
             else:
                 actual = _compute_file_hash(artifact_path, expected_algorithm).lower()
         except ValueError:
@@ -1246,6 +1379,24 @@ def download_stream(
                 retryable=False,
             )
 
+    def _resolve_digests(
+        *,
+        current_downloader: StreamingDownloader,
+        manifest: Optional[Dict[str, object]],
+        artifact_path: Path,
+    ) -> Dict[str, str]:
+        digests = {algorithm: value.lower() for algorithm, value in current_downloader.streamed_digests.items()}
+        if not digests and manifest:
+            manifest_sha = manifest.get("sha256") if manifest else None
+            if isinstance(manifest_sha, str) and manifest_sha:
+                digests.setdefault("sha256", manifest_sha.lower())
+        if "sha256" not in digests:
+            try:
+                digests["sha256"] = _compute_file_hash(artifact_path, "sha256").lower()
+            except ValueError:
+                pass
+        return digests
+
     raw_attempts = getattr(http_config, "checksum_mismatch_retries", 3)
     try:
         max_checksum_attempts = int(raw_attempts)
@@ -1267,6 +1418,7 @@ def download_stream(
             service=service,
             origin_host=host,
             bucket=bucket,
+            hash_algorithms=[expected_algorithm] if expected_algorithm else None,
         )
         attempt_start = time.monotonic()
         try:
@@ -1308,6 +1460,8 @@ def download_stream(
             ) from exc
         except PolicyError:
             raise
+        except DownloadFailure:
+            raise
         except Exception as exc:  # pragma: no cover - defensive catch for pooch errors
             logger.error(
                 "pooch download error",
@@ -1339,9 +1493,18 @@ def download_stream(
                 cache_reference: Optional[Path] = cached_path if cached_path.exists() else None
             else:
                 artifact_path, cache_reference = _materialize_cached_file(cached_path, destination)
-            sha256 = sha256_file(artifact_path)
+            digest_map = _resolve_digests(
+                current_downloader=downloader,
+                manifest=manifest_for_attempt,
+                artifact_path=artifact_path,
+            )
+            sha256 = digest_map.get("sha256")
+            if sha256 is None:
+                raise OntologyDownloadError(
+                    f"failed to compute sha256 for cached artifact: {secure_url}"
+                )
             _verify_expected_checksum(
-                sha256,
+                digest_map,
                 artifact_path=artifact_path,
                 cache_path=cache_reference,
             )
@@ -1361,9 +1524,18 @@ def download_stream(
 
         artifact_path, cache_reference = _materialize_cached_file(cached_path, destination)
 
-        sha256 = sha256_file(artifact_path)
+        digest_map = _resolve_digests(
+            current_downloader=downloader,
+            manifest=manifest_for_attempt,
+            artifact_path=artifact_path,
+        )
+        sha256 = digest_map.get("sha256")
+        if sha256 is None:
+            raise OntologyDownloadError(
+                f"failed to compute sha256 for downloaded artifact: {secure_url}"
+            )
         _verify_expected_checksum(
-            sha256,
+            digest_map,
             artifact_path=artifact_path,
             cache_path=cache_reference,
         )

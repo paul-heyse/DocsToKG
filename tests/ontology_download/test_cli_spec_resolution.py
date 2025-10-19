@@ -4,9 +4,15 @@
 #   "purpose": "Regression coverage for CLI spec resolution overrides",
 #   "sections": [
 #     {
-#       "id": "test-pull-spec-retains-configured-fetch-spec",
-#       "name": "test_pull_spec_retains_configured_fetch_spec",
-#       "anchor": "function-test-pull-spec-retains-configured-fetch-spec",
+#       "id": "test-pull-spec-cli-target-formats-override",
+#       "name": "test_pull_spec_cli_target_formats_override",
+#       "anchor": "function-test-pull-spec-cli-target-formats-override",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test-cli-ad-hoc-ids-use-cli-target-formats",
+#       "name": "test_cli_ad_hoc_ids_use_cli_target_formats",
+#       "anchor": "function-test-cli-ad-hoc-ids-use-cli-target-formats",
 #       "kind": "function"
 #     }
 #   ]
@@ -20,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import textwrap
+from typing import Iterable
 from pathlib import Path
 
 import pytest
@@ -70,6 +77,25 @@ def test_pull_spec_applies_resolver_override(tmp_path: Path) -> None:
         concurrent_plans=None,
         allowed_hosts=None,
         planner_probes=None,
+        since=None,
+        no_lock=False,
+        lock_output=None,
+        baseline=Path("baseline.json"),
+        use_manifest=use_manifest,
+        update_baseline=False,
+    )
+
+
+def test_pull_spec_cli_target_formats_override(tmp_path: Path) -> None:
+    """CLI formats override configured formats while preserving resolver/extras."""
+
+    config_path = _write_sources_yaml(tmp_path / "sources.yaml")
+    args = _make_args(
+        command="pull",
+        ids=["hp"],
+        spec=config_path,
+        resolver="custom-resolver",
+        target_formats="ttl, owl",
     )
 
     _, specs = cli_module._resolve_specs_from_args(args, base_config=None)

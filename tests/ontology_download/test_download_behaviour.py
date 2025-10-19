@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import logging
 import tarfile
 import zipfile
-from urllib.parse import urlparse
-
+from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
@@ -36,6 +36,7 @@ def test_download_stream_fetches_fixture(ontology_env, tmp_path):
     )
     config = ontology_env.build_download_config()
     destination = tmp_path / "hp.owl"
+    expected_user_agent = config.polite_http_headers().get("User-Agent")
 
     result = network_mod.download_stream(
         url=url,
@@ -55,6 +56,12 @@ def test_download_stream_fetches_fixture(ontology_env, tmp_path):
     methods = [request.method for request in ontology_env.requests]
     assert methods.count("HEAD") == 1
     assert methods.count("GET") == 1
+    head_requests = [request for request in ontology_env.requests if request.method == "HEAD"]
+    assert head_requests, "Expected at least one HEAD request to be recorded"
+    if expected_user_agent is not None:
+        assert all(
+            request.headers.get("User-Agent") == expected_user_agent for request in head_requests
+        )
 
 
 def test_head_get_connections_remain_bounded(ontology_env, tmp_path):
@@ -141,7 +148,9 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
         host=parsed_url.hostname,
         http_config=config,
     ) as session:
-        content_type, content_length = downloader._preliminary_head_check(url, session)
+        content_type, content_length = downloader._preliminary_head_check(
+            url, session, downloader.custom_headers
+        )
 
     assert content_type == "application/rdf+xml"
     assert content_length is None
@@ -190,7 +199,9 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
         host=parsed_url.hostname,
         http_config=config,
     ) as session:
-        content_type, content_length = downloader._preliminary_head_check(url, session)
+        content_type, content_length = downloader._preliminary_head_check(
+            url, session, downloader.custom_headers
+        )
 
     assert content_type == "application/rdf+xml"
     assert content_length is None
@@ -255,12 +266,65 @@ def test_download_stream_uses_cached_manifest(ontology_env, tmp_path):
         logger=_logger(),
         expected_media_type="application/rdf+xml",
         service="obo",
+        expected_hash=f"sha256:{initial.sha256}",
     )
 
     assert cached.status == "cached"
     assert destination.read_bytes() == payload
     assert cached.sha256 == initial.sha256
     assert cached.content_type == initial.content_type
+
+
+def test_download_stream_resumes_and_streams_hash(ontology_env, tmp_path):
+    """Resume downloads should stitch content and report streamed hashes."""
+
+    payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
+    resume_offset = 16
+    destination = tmp_path / "resume.owl"
+    destination_part = Path(str(destination) + ".part")
+    destination_part.write_bytes(payload[:resume_offset])
+
+    config = ontology_env.build_download_config()
+    url = ontology_env.http_url("fixtures/resume.owl")
+    headers = {
+        "Content-Type": "application/rdf+xml",
+        "Content-Length": str(len(payload)),
+    }
+    ontology_env.queue_response(
+        "fixtures/resume.owl",
+        ResponseSpec(method="HEAD", status=200, headers=headers),
+    )
+    ontology_env.queue_response(
+        "fixtures/resume.owl",
+        ResponseSpec(
+            method="GET",
+            status=206,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Range": f"bytes {resume_offset}-{len(payload) - 1}/{len(payload)}",
+                "Content-Length": str(len(payload) - resume_offset),
+            },
+            body=payload[resume_offset:],
+        ),
+    )
+
+    result = network_mod.download_stream(
+        url=url,
+        destination=destination,
+        headers={},
+        previous_manifest=None,
+        http_config=config,
+        cache_dir=ontology_env.cache_dir,
+        logger=_logger(),
+        expected_media_type="application/rdf+xml",
+        service="obo",
+    )
+
+    assert result.status == "updated"
+    assert destination.read_bytes() == payload
+    assert result.sha256 == hashlib.sha256(payload).hexdigest()
+    get_requests = [request for request in ontology_env.requests if request.method == "GET"]
+    assert get_requests[-1].headers.get("Range") == f"bytes={resume_offset}-"
 
 
 def test_extract_zip_rejects_traversal(tmp_path):
