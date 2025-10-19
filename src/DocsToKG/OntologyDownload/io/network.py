@@ -550,12 +550,15 @@ def request_with_redirect_audit(
     timeout: float,
     stream: bool,
     http_config: DownloadConfiguration,
+    assume_url_validated: bool = False,
 ) -> Iterator[requests.Response]:
     """Issue an HTTP request while validating every redirect target."""
 
     redirects = 0
     response: Optional[requests.Response] = None
     current_url = url
+    last_validated_url: Optional[str] = None
+    assume_validated_flag = assume_url_validated
     raw_limit = getattr(http_config, "max_redirects", 5)
     try:
         max_redirects = int(raw_limit)
@@ -566,7 +569,12 @@ def request_with_redirect_audit(
 
     try:
         while True:
-            secure_url = validate_url_security(current_url, http_config)
+            if assume_validated_flag:
+                secure_url = current_url
+            else:
+                secure_url = validate_url_security(current_url, http_config)
+            assume_validated_flag = False
+            last_validated_url = secure_url
             try:
                 response = session.request(
                     method,
@@ -591,17 +599,21 @@ def request_with_redirect_audit(
                 next_url = urljoin(secure_url, location)
                 try:
                     current_url = validate_url_security(next_url, http_config)
+                    last_validated_url = current_url
+                    assume_validated_flag = True
                 finally:
                     response.close()
                     response = None
                 continue
 
             try:
-                validate_url_security(response.url, http_config)
+                if response.url != last_validated_url:
+                    last_validated_url = validate_url_security(response.url, http_config)
             except Exception:
                 response.close()
                 raise
 
+            setattr(response, "validated_url", last_validated_url)
             yield response
             return
     finally:
@@ -657,6 +669,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         bucket: Optional[TokenBucket] = None,
         hash_algorithms: Optional[Iterable[str]] = None,
         cancellation_token: Optional[CancellationToken] = None,
+        url_already_validated: bool = False,
     ) -> None:
         super().__init__(headers={}, progressbar=False, timeout=http_config.timeout_sec)
         self.destination = destination
@@ -689,6 +702,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self.cancellation_token = cancellation_token
         self._reset_hashers()
         self._reuse_head_token = False
+        self._assume_url_validated = url_already_validated
 
     def _reset_hashers(self) -> None:
         """Initialise hashlib objects for all supported algorithms."""
@@ -750,6 +764,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
             timeout=timeout,
             stream=stream,
             http_config=self.http_config,
+            assume_url_validated=self._assume_url_validated,
         ) as response:
             yield response
 
@@ -1416,6 +1431,7 @@ def download_stream(
     service: Optional[str] = None,
     expected_hash: Optional[str] = None,
     cancellation_token: Optional[CancellationToken] = None,
+    url_already_validated: bool = False,
 ) -> DownloadResult:
     """Download ontology content with HEAD validation, rate limiting, caching, retries, and hash checks.
 
@@ -1431,6 +1447,9 @@ def download_stream(
         service: Logical service identifier for per-service rate limiting.
         expected_hash: Optional ``<algorithm>:<hex>`` string enforcing a known hash.
         cancellation_token: Optional token for cooperative cancellation.
+        url_already_validated: When ``True``, assumes *url* has already passed
+            :func:`validate_url_security` checks and skips redundant
+            validations.
 
     Returns:
         DownloadResult describing the final artifact and metadata.
@@ -1439,7 +1458,7 @@ def download_stream(
         PolicyError: If policy validation fails or limits are exceeded.
         OntologyDownloadError: If retryable download mechanisms exhaust or IO fails.
     """
-    secure_url = validate_url_security(url, http_config)
+    secure_url = url if url_already_validated else validate_url_security(url, http_config)
     parsed = urlparse(secure_url)
     host = parsed.hostname
     bucket = get_bucket(http_config=http_config, host=host, service=service)
@@ -1583,6 +1602,7 @@ def download_stream(
             bucket=bucket,
             hash_algorithms=[expected_algorithm] if expected_algorithm else None,
             cancellation_token=cancellation_token,
+            url_already_validated=True,
         )
         attempt_start = time.monotonic()
         try:

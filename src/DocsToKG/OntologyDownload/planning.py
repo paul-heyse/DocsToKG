@@ -938,6 +938,7 @@ def planner_http_probe(
                     timeout=timeout,
                     stream=current_method != "HEAD",
                     http_config=http_config,
+                    assume_url_validated=True,
                 ) as response:
                     status_code = response.status_code
                     if status_code in {429, 503}:
@@ -956,7 +957,7 @@ def planner_http_probe(
                         setattr(http_error, delay_attr, retry_delay)
                         raise http_error
 
-                    final_url = validate_url_security(response.url, http_config)
+                    final_url = getattr(response, "validated_url", response.url)
                     headers_map = CaseInsensitiveDict(response.headers)
                     return status_code, response.ok, headers_map, final_url
 
@@ -1820,6 +1821,7 @@ def fetch_one(
                     service=candidate.plan.service,
                     expected_hash=expected_hash_value,
                     cancellation_token=cancellation_token,
+                    url_already_validated=True,
                 )
 
                 if expected_checksum:
