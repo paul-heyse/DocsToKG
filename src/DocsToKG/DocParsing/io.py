@@ -38,6 +38,44 @@ from .env import data_manifests
 
 _SAFE_HASH_ALGORITHM = "sha256"
 _HASH_ALG_ENV_VAR = "DOCSTOKG_HASH_ALG"
+_TEXT_HASH_READ_SIZE = 65536
+
+
+def _partition_normalisation_buffer(buffer: str) -> tuple[str, str]:
+    """Split ``buffer`` into a flushable prefix and a retained suffix.
+
+    The suffix preserves the trailing grapheme cluster so that Unicode
+    normalisation remains stable when additional combining marks are read from
+    subsequent chunks.
+    """
+
+    if not buffer:
+        return "", ""
+
+    index = len(buffer)
+    while index > 0:
+        index -= 1
+        if unicodedata.combining(buffer[index]) == 0:
+            return buffer[:index], buffer[index:]
+    # All characters are combining marks; retain them for the next chunk.
+    return "", buffer
+
+
+def _iter_normalised_text_chunks(handle: TextIO) -> Iterator[bytes]:
+    """Yield UTF-8 encoded NFKC-normalised chunks from ``handle``."""
+
+    buffer = ""
+    for chunk in iter(lambda: handle.read(_TEXT_HASH_READ_SIZE), ""):
+        if not chunk:
+            break
+        buffer += chunk
+        prefix, buffer = _partition_normalisation_buffer(buffer)
+        if prefix:
+            normalised = unicodedata.normalize("NFKC", prefix)
+            if normalised:
+                yield normalised.encode("utf-8")
+    if buffer:
+        yield unicodedata.normalize("NFKC", buffer).encode("utf-8")
 
 
 @contextlib.contextmanager
@@ -545,16 +583,15 @@ def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
 
     hasher = make_hasher(name=algorithm)
     try:
-        text = path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(65536), b""):
+        with path.open("r", encoding="utf-8") as handle:
+            for chunk in _iter_normalised_text_chunks(handle):
                 hasher.update(chunk)
         return hasher.hexdigest()
-
-    normalised = unicodedata.normalize("NFKC", text)
-    hasher.update(normalised.encode("utf-8"))
-    return hasher.hexdigest()
+    except UnicodeDecodeError:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(_TEXT_HASH_READ_SIZE), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest()
 
 
 def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, dict]:
