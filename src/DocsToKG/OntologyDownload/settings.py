@@ -39,8 +39,11 @@ from typing import (
 try:  # pragma: no cover - dependency check
     import yaml  # type: ignore
 except ModuleNotFoundError as exc:  # pragma: no cover - explicit guidance for users
+    # Guardrail: align messaging with OntologyDownload/AGENTS.md environment policy.
     raise ImportError(
-        "PyYAML is required for configuration parsing. Install it with: pip install pyyaml"
+        "PyYAML is required for configuration parsing. "
+        "Ensure the project-managed .venv is set up (rerun the approved bootstrap script) "
+        "instead of installing packages directly."
     ) from exc
 
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
