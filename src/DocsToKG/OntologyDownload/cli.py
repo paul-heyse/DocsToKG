@@ -863,6 +863,29 @@ def _handle_prune(args, logger) -> Dict[str, object]:
     }
 
 
+def _read_api_key_status(path: Path) -> Dict[str, object]:
+    """Return diagnostic metadata for an API key file.
+
+    Args:
+        path: Target file path to inspect.
+
+    Returns:
+        Mapping including the path, whether it exists, configuration status, and
+        any error encountered while reading the contents.
+    """
+
+    info: Dict[str, object] = {"path": str(path), "exists": path.exists(), "configured": False}
+    if not info["exists"]:
+        return info
+
+    try:
+        info["configured"] = path.read_text().strip() != ""
+    except OSError as exc:
+        info["error"] = f"{exc.__class__.__name__}: {exc}"
+
+    return info
+
+
 def _doctor_report() -> Dict[str, object]:
     """Collect diagnostic information for the ``doctor`` command.
 
@@ -949,10 +972,7 @@ def _doctor_report() -> Dict[str, object]:
             robot_info["error"] = str(exc)
 
     api_key_path = CONFIG_DIR / "bioportal_api_key.txt"
-    bioportal = {
-        "path": str(api_key_path),
-        "configured": api_key_path.exists() and api_key_path.read_text().strip() != "",
-    }
+    bioportal = _read_api_key_status(api_key_path)
 
     network_targets = {
         "ols": "https://www.ebi.ac.uk/ols4/api/health",
