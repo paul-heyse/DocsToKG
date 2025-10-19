@@ -227,6 +227,46 @@ def test_download_timeout_aborts_retries(ontology_env, tmp_path, caplog):
     assert timeout_records
 
 
+def test_head_retry_after_timeout_fails_fast(ontology_env, tmp_path):
+    """HEAD 429 responses with long Retry-After should trip the timeout budget immediately."""
+
+    retry_path = "fixtures/head-retry-after.owl"
+    ontology_env.queue_response(
+        retry_path,
+        ResponseSpec(
+            method="HEAD",
+            status=429,
+            headers={"Retry-After": "5"},
+        ),
+    )
+
+    url = ontology_env.http_url(retry_path)
+    destination = tmp_path / "head-retry-after.owl"
+    config = ontology_env.build_download_config()
+    config.download_timeout_sec = 1
+
+    start = time.monotonic()
+    with pytest.raises(DownloadFailure) as exc_info:
+        network_mod.download_stream(
+            url=url,
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=ontology_env.cache_dir,
+            logger=_logger(),
+            expected_media_type="application/rdf+xml",
+            service="test",
+        )
+
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 0.5
+    assert "timeout" in str(exc_info.value).lower()
+    assert not destination.exists()
+    assert [record.method for record in ontology_env.requests] == ["HEAD"]
+
+
 def test_stream_timeout_removes_partial_files(ontology_env, tmp_path):
     """Slow streaming responses exceeding the timeout must clean up partial files."""
 
