@@ -135,6 +135,8 @@ sequenceDiagram
 
 Configuration is layered: baked-in defaults → YAML file (`--spec /path/to/sources.yaml`) → environment variables → CLI overrides. The `settings.py` models (`DefaultsConfig`, `DownloadConfiguration`, `ValidationConfig`, `ResolvedConfig`) combine those sources before any network call occurs.
 
+CLI flags that accept configuration files (`--spec`, `--config`, `config validate/show` positional args) expand `~` to the caller's home directory before reading, so invocations like `ontofetch pull hp --spec ~/configs/sources.yaml` work reliably across shells.
+
 Example YAML (`configs/sources.yaml`):
 
 ```yaml

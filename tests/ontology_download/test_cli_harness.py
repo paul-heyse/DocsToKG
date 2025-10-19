@@ -9,6 +9,8 @@ golden path for automation and documentation snippets.
 from __future__ import annotations
 
 import json
+import textwrap
+from pathlib import Path
 
 from DocsToKG.OntologyDownload import cli as cli_module
 from DocsToKG.OntologyDownload.testing import temporary_resolver
@@ -112,3 +114,45 @@ def test_cli_plan_json_respects_resolver(ontology_env, capsys, tmp_path):
     assert payload[0]["spec"]["id"] == "go"
     assert payload[0]["plan"]["url"].startswith("http://127.0.0.1")
     assert lock_path.exists()
+
+
+def test_cli_pull_accepts_tilde_spec_path(monkeypatch, ontology_env, tmp_path, capsys):
+    """`ontofetch pull` should expand ``~`` when resolving ``--spec`` configuration paths."""
+
+    resolver_name, resolver = _static_resolver_for(ontology_env, name="hp-tilde", filename="hp.owl")
+    home_dir = tmp_path / "home"
+    home_dir.mkdir(parents=True, exist_ok=True)
+    config_path = home_dir / "sources.yaml"
+    config_payload = textwrap.dedent(
+        f"""
+        defaults:
+          normalize_to: [ttl]
+        ontologies:
+          - id: hp
+            resolver: {resolver_name}
+            extras:
+              acronym: HP
+            normalize_to: [ttl]
+        """
+    ).strip()
+    config_path.write_text(config_payload, encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home_dir))
+    tilde_spec = Path("~") / "sources.yaml"
+
+    with temporary_resolver(resolver_name, resolver):
+        exit_code = cli_module.cli_main(
+            [
+                "pull",
+                "hp",
+                "--spec",
+                str(tilde_spec),
+                "--allowed-hosts",
+                _allowed_hosts_arg(ontology_env),
+                "--json",
+            ]
+        )
+
+    assert exit_code == 0
+    stdout = capsys.readouterr().out
+    payload = json.loads(stdout)
+    assert payload[0]["id"] == "hp"
