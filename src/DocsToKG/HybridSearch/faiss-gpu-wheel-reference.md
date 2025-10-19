@@ -1,4 +1,23 @@
 # Custom FAISS GPU Wheel — Essential Reference for AI Agents
+
+## Table of Contents
+- [1) Runtime prerequisites (from the built extension)](#1-runtime-prerequisites-from-the-built-extension)
+- [2) Installation & environment](#2-installation--environment)
+- [3) Package layout (what this wheel ships)](#3-package-layout-what-this-wheel-ships)
+- [4) GPU resource model & streams](#4-gpu-resource-model--streams)
+- [5) Single‑GPU index types available](#5-singlegpu-index-types-available)
+- [6) Multi‑GPU: replication, sharding, and conversion utilities](#6-multi‑gpu-replication-sharding-and-conversion-utilities)
+- [7) No‑index GPU routines (brute‑force search / pairwise distance)](#7-noindex-gpu-routines-bruteforce-search--pairwise-distance)
+- [8) PyTorch tensor interoperability](#8-pytorch-tensor-interoperability)
+- [9) Persistence & device transfers](#9-persistence--device-transfers)
+- [10) Tuning checklist for agents](#10-tuning-checklist-for-agents)
+- [11) cuVS bindings & current limitations](#11-cuvs-bindings--current-limitations)
+- [12) What’s actually present in this wheel (symbol inventory)](#12-whats-actually-present-in-this-wheel-symbol-inventory)
+- [13) Quick smoke test (from your build script)](#13-quick-smoke-test-from-your-build-script)
+- [14) Notes from the provided build script](#14-notes-from-the-provided-build-script)
+- [15) Common pitfalls & remedies](#15-common-pitfalls--remedies)
+- [16) Minimal recipes (copy‑paste)](#16-minimal-recipes-copypaste)
+- [Appendix — snippets from `gpu_wrappers.py` (signatures)](#appendix--snippets-from-gpu_wrapperspy-signatures)
 **Wheel**: `faiss-1.12.0-py3-none-any.whl`  
 **FAISS version label**: `1.12.0`  
 **Generated**: 2025-10-19 01:46 UTC

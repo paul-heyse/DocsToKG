@@ -1,4 +1,21 @@
 # cuVS GPU Toolkit — Reference for DocsToKG Agents
+
+## Table of Contents
+- [1) Runtime prerequisites](#1-runtime-prerequisites)
+- [2) Package layout](#2-package-layout)
+- [3) Common runtime building blocks](#3-common-runtime-building-blocks)
+  - [3.1 Resources & streams](#31-resources--streams)
+  - [3.2 Device vs host arrays](#32-device-vs-host-arrays)
+  - [3.3 Error handling](#33-error-handling)
+- [4) Nearest-neighbor algorithms](#4-nearest-neighbor-algorithms)
+- [5) Clustering (KMeans)](#5-clustering-kmeans)
+- [6) Distance utilities](#6-distance-utilities)
+- [7) Common module utilities](#7-common-module-utilities)
+- [8) Interoperability & external tooling](#8-interoperability--external-tooling)
+- [9) Integration with DocsToKG HybridSearch](#9-integration-with-docstokg-hybridsearch)
+- [10) Testing & troubleshooting](#10-testing--troubleshooting)
+- [11) Minimal smoke test](#11-minimal-smoke-test)
+- [12) Useful references](#12-useful-references)
 **Package**: `cuvs` (Python)  
 **Version**: `25.10.00` (see `cuvs/VERSION`)  
 **Companion libs**: `libcuvs` (CUDA shared objects), `librmm`, `rapids_logger`, CUDA 12 toolchain
