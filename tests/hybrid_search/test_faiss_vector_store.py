@@ -192,6 +192,75 @@ def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> No
     )
 
 
+def test_add_dedupe_rejects_scaled_duplicates(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """Scaled duplicates should be rejected when the dedupe threshold is strict."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._dim = 3  # type: ignore[attr-defined]
+    store._config = SimpleNamespace(ingest_dedupe_threshold=0.99, nlist=1, ivf_train_factor=1)  # type: ignore[attr-defined]
+    store._observability = SimpleNamespace(  # type: ignore[attr-defined]
+        trace=lambda *a, **k: _NullContext(),
+        metrics=SimpleNamespace(increment=lambda *a, **k: None),
+    )
+
+    metrics_calls: list[tuple[str, float]] = []
+
+    def recording_increment(name: str, amount: float = 1.0) -> None:
+        metrics_calls.append((name, float(amount)))
+
+    store._observability.metrics.increment = recording_increment  # type: ignore[attr-defined]
+
+    class RecordingIndex:
+        def __init__(self) -> None:
+            self.ntotal = 1
+            self.add_calls: list[tuple[np.ndarray, np.ndarray]] = []
+
+        def add_with_ids(self, matrix: np.ndarray, ids: np.ndarray) -> None:  # pragma: no cover - sanity guard
+            self.add_calls.append((matrix.copy(), ids.copy()))
+
+    store._index = RecordingIndex()  # type: ignore[attr-defined]
+
+    search_inputs: list[np.ndarray] = []
+
+    def fake_search_matrix(self: FaissVectorStore, matrix: np.ndarray, top_k: int):
+        search_inputs.append(matrix.copy())
+        distances = np.array([[0.9995]], dtype=np.float32)
+        indices = np.array([[123]], dtype=np.int64)
+        return distances, indices
+
+    store._search_matrix = MethodType(fake_search_matrix, store)  # type: ignore[attr-defined]
+
+    normalize_calls: list[np.ndarray] = []
+
+    def fake_normalize(matrix: np.ndarray) -> None:
+        copied = matrix.copy()
+        norms = np.linalg.norm(copied, axis=1, keepdims=True)
+        norms[norms == 0.0] = 1.0
+        copied /= norms
+        matrix[:] = copied
+        normalize_calls.append(copied)
+
+    monkeypatch.setattr(
+        store_module,
+        "faiss",
+        SimpleNamespace(normalize_L2=fake_normalize),
+        raising=False,
+    )
+
+    original_vector = np.array([10.0, -4.0, 0.5], dtype=np.float32)
+    payload = original_vector.copy()
+    vector_id = "00000000-0000-0000-0000-000000000099"
+
+    store.add([payload], [vector_id])
+
+    assert not store._index.add_calls  # type: ignore[attr-defined]
+    assert metrics_calls == [("faiss_ingest_deduped", 1.0)]
+    assert normalize_calls, "dedupe path should normalise the copied queries"
+    assert search_inputs, "dedupe path should perform a search"
+    np.testing.assert_allclose(np.linalg.norm(search_inputs[0], axis=1), 1.0, rtol=1e-6)
+    np.testing.assert_array_equal(payload, original_vector)
+
+
 def test_search_batch_impl_normalizes_once(monkeypatch: "pytest.MonkeyPatch") -> None:
     """``_search_batch_impl`` should bypass redundant normalisation steps."""
 
