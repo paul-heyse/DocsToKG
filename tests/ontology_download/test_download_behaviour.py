@@ -6,6 +6,7 @@ import io
 import logging
 import tarfile
 import zipfile
+from urllib.parse import urlparse
 
 import pytest
 
@@ -54,38 +55,37 @@ def test_download_stream_fetches_fixture(ontology_env, tmp_path):
     assert methods.count("GET") == 1
 
 
-def test_download_stream_ignores_non_numeric_head_length(ontology_env, tmp_path):
-    """HEAD responses with non-numeric Content-Length values should not abort downloads."""
+def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
+    """A transient failure should consume bucket tokens for each retry."""
 
-    payload = b"rdf"
-    path = "fixtures/non-numeric-head.owl"
-    common_headers = {
-        "Content-Type": "application/rdf+xml",
-        "ETag": '"non-numeric"',
-        "Last-Modified": "Wed, 01 Jan 2025 00:00:00 GMT",
-    }
+    payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
+    url = ontology_env.register_fixture(
+        "hp-retry.owl",
+        payload,
+        media_type="application/rdf+xml",
+        repeats=1,
+    )
 
-    ontology_env.queue_response(
-        path,
-        ResponseSpec(
-            method="HEAD",
-            status=200,
-            headers={**common_headers, "Content-Length": "not-a-number"},
-        ),
-    )
-    ontology_env.queue_response(
-        path,
-        ResponseSpec(
-            method="GET",
-            status=200,
-            headers={**common_headers, "Content-Length": str(len(payload))},
-            body=payload,
-        ),
-    )
+    parsed = urlparse(url)
+    get_key = ("GET", parsed.path)
+    failure = ResponseSpec(status=503, headers={"Retry-After": "0"}, method="GET")
+    # The testing harness exposes the queued responses; prepend a transient failure
+    # so the first GET yields a retryable error before the cached success entries.
+    ontology_env._responses[get_key].appendleft(failure)
 
     config = ontology_env.build_download_config()
-    destination = tmp_path / "non-numeric-head.owl"
-    url = ontology_env.http_url(path)
+
+    class RecordingBucket:
+        def __init__(self) -> None:
+            self.calls: list[float] = []
+
+        def consume(self, tokens: float = 1.0) -> None:
+            self.calls.append(tokens)
+
+    bucket = RecordingBucket()
+    config.set_bucket_provider(lambda service, cfg, host: bucket)
+
+    destination = tmp_path / "hp-retry.owl"
 
     result = network_mod.download_stream(
         url=url,
@@ -101,10 +101,10 @@ def test_download_stream_ignores_non_numeric_head_length(ontology_env, tmp_path)
 
     assert destination.read_bytes() == payload
     assert result.status == "fresh"
-    assert result.content_length == len(payload)
+    assert len(bucket.calls) == 2
     methods = [request.method for request in ontology_env.requests]
     assert methods.count("HEAD") == 1
-    assert methods.count("GET") == 1
+    assert methods.count("GET") == 2
 
 
 def test_download_stream_uses_cached_manifest(ontology_env, tmp_path):

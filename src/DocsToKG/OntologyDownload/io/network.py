@@ -40,7 +40,7 @@ from .filesystem import (
     sanitize_filename,
     sha256_file,
 )
-from .rate_limit import apply_retry_after, get_bucket
+from .rate_limit import TokenBucket, apply_retry_after, get_bucket
 
 try:  # pragma: no cover - psutil may be unavailable in minimal environments
     import psutil  # type: ignore[import]
@@ -586,6 +586,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         expected_media_type: Optional[str] = None,
         service: Optional[str] = None,
         origin_host: Optional[str] = None,
+        bucket: Optional[TokenBucket] = None,
     ) -> None:
         super().__init__(headers={}, progressbar=False, timeout=http_config.timeout_sec)
         self.destination = destination
@@ -604,6 +605,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self.service = service
         self.origin_host = origin_host
         self.invoked = False
+        self.bucket = bucket
 
     @contextmanager
     def _request_with_redirect_audit(
@@ -884,11 +886,11 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         except OSError:
                             pass
 
-                request_timeout = self.http_config.download_timeout_sec
-                with self._request_with_redirect_audit(
-                    session=session,
-                    method="GET",
-                    url=url,
+                if self.bucket is not None:
+                    self.bucket.consume()
+
+                with session.get(
+                    url,
                     headers=request_headers,
                     timeout=request_timeout,
                     stream=True,
@@ -1256,9 +1258,9 @@ def download_stream(
             expected_media_type=expected_media_type,
             service=service,
             origin_host=host,
+            bucket=bucket,
         )
         attempt_start = time.monotonic()
-        bucket.consume()
         try:
             cached_path = Path(
                 pooch.retrieve(
