@@ -877,30 +877,20 @@ def _doctor_report() -> Dict[str, object]:
         else:
             probe_path = Path("/")
 
-    try:
-        disk_usage = shutil.disk_usage(probe_path)
-    except (FileNotFoundError, PermissionError, OSError):  # pragma: no cover - defensive
-        disk_report = {
-            "path": str(probe_path),
-            "total_bytes": None,
-            "free_bytes": None,
-            "total_gb": None,
-            "free_gb": None,
-            "threshold_bytes": None,
-            "warning": True,
-            "error": "Unable to determine disk usage for ontology directory",
-        }
-    else:
-        threshold_bytes = max(10 * 1_000_000_000, int(disk_usage.total * 0.1))
-        disk_report = {
-            "path": str(probe_path),
-            "total_bytes": disk_usage.total,
-            "free_bytes": disk_usage.free,
-            "total_gb": round(disk_usage.total / 1_000_000_000, 2),
-            "free_gb": round(disk_usage.free / 1_000_000_000, 2),
-            "threshold_bytes": threshold_bytes,
-            "warning": disk_usage.free < threshold_bytes,
-        }
+    disk_usage = shutil.disk_usage(LOCAL_ONTOLOGY_DIR)
+    default_floor_bytes = 10 * 1_000_000_000
+    threshold_bytes = min(
+        disk_usage.total,
+        max(default_floor_bytes, int(disk_usage.total * 0.1)),
+    )
+    disk_report = {
+        "total_bytes": disk_usage.total,
+        "free_bytes": disk_usage.free,
+        "total_gb": round(disk_usage.total / 1_000_000_000, 2),
+        "free_gb": round(disk_usage.free / 1_000_000_000, 2),
+        "threshold_bytes": threshold_bytes,
+        "warning": disk_usage.free < threshold_bytes,
+    }
 
     dependencies = {
         "rdflib": importlib.util.find_spec("rdflib") is not None,
@@ -1116,7 +1106,10 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
     )
     if disk.get("warning"):
         threshold_gb = disk["threshold_bytes"] / 1_000_000_000
-        print(f"  Warning: free space below threshold ({threshold_gb:.2f} GB).")
+        print(
+            "  Warning: free space below threshold "
+            f"({threshold_gb:.2f} GB; min(total capacity, max(10 GB, 10% of capacity)))."
+        )
 
     print("Optional dependencies:")
     for name, available in report["dependencies"].items():
