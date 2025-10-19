@@ -758,6 +758,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         url: str,
         session: requests.Session,
         *,
+        headers: Optional[Mapping[str, str]] = None,
         token_consumed: bool = False,
     ) -> tuple[Optional[str], Optional[int]]:
         """Probe the origin with HEAD to audit media type and size before downloading.
@@ -769,6 +770,9 @@ class StreamingDownloader(pooch.HTTPDownloader):
         Args:
             url: Fully qualified download URL resolved by the planner.
             session: Prepared requests session used for outbound calls.
+            headers: Headers to include with the HEAD probe. When omitted the
+                downloader will send the polite header set merged with any
+                resolver-supplied headers.
             token_consumed: Indicates whether the caller already consumed a
                 rate-limit token prior to invoking the HEAD request.
 
@@ -801,12 +805,20 @@ class StreamingDownloader(pooch.HTTPDownloader):
             token_consumed = True
             consumed_here = True
 
+        if headers is None:
+            request_headers = self.http_config.polite_http_headers(
+                correlation_id=_extract_correlation_id(self.logger)
+            )
+            request_headers.update(self.custom_headers)
+        else:
+            request_headers = dict(headers)
+
         try:
             with self._request_with_redirect_audit(
                 session=session,
                 method="HEAD",
                 url=url,
-                headers=self.custom_headers,
+                headers=request_headers,
                 timeout=self.http_config.timeout_sec,
                 stream=False,
             ) as response:
@@ -872,7 +884,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     "stage": "download",
                     "error": str(exc),
                     "url": url,
-                    "headers": self.custom_headers,
+                    "headers": request_headers,
                 },
             )
             return None, None
@@ -1015,6 +1027,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
             head_content_type, head_content_length = self._preliminary_head_check(
                 url,
                 session,
+                headers=base_headers,
                 token_consumed=head_token_consumed,
             )
             self.head_content_type = head_content_type
@@ -1255,6 +1268,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     try:
                         with part_path.open(mode) as fh:
                             for chunk in response.iter_content(chunk_size=1 << 20):
+                                _enforce_timeout()
                                 if not chunk:
                                     continue
 
