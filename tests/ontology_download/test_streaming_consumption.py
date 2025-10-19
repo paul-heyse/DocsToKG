@@ -44,7 +44,7 @@ def test_plan_all_consumes_generator_lazily(ontology_env, resolved_config):
     class _StreamingResolver(BaseResolver):
         NAME = resolver_name
 
-        def plan(self_inner, spec, config, logger):  # type: ignore[override]
+        def plan(self_inner, spec, config, logger, *, cancellation_token=None):  # type: ignore[override]
             nonlocal completed, max_inflight
             with lock:
                 completed += 1
@@ -118,7 +118,7 @@ def test_fetch_all_consumes_generator_lazily(ontology_env, resolved_config):
     class _StreamingResolver(BaseResolver):
         NAME = resolver_name
 
-        def plan(self_inner, spec, config, logger):  # type: ignore[override]
+        def plan(self_inner, spec, config, logger, *, cancellation_token=None):  # type: ignore[override]
             nonlocal completed, max_inflight
             with lock:
                 completed += 1

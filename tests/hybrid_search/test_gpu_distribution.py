@@ -32,7 +32,9 @@ def test_configure_gpu_resource_respects_default_null_stream_flags() -> None:
         def setDefaultNullStreamAllDevices(self) -> None:  # pragma: no cover - trivial stub
             self.calls.append(("all", None))
 
-        def setDefaultNullStream(self, device: int | None = None) -> None:  # pragma: no cover - trivial stub
+        def setDefaultNullStream(
+            self, device: int | None = None
+        ) -> None:  # pragma: no cover - trivial stub
             self.calls.append(("device", device))
 
     resource = RecordingResource()
@@ -64,8 +66,6 @@ def test_configure_gpu_resource_respects_default_null_stream_flags() -> None:
 def test_distribute_to_all_gpus_configures_cloner_options(
     monkeypatch, caplog, shard: bool, force_legacy_path: bool
 ) -> None:
-
-
     """Ensure the GPU distributor forwards supported arguments only."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
@@ -101,7 +101,9 @@ def test_distribute_to_all_gpus_configures_cloner_options(
         def setDefaultNullStreamAllDevices(self) -> None:  # pragma: no cover - stubbed
             self.null_stream_calls.append(("all", None))
 
-        def setDefaultNullStream(self, device: int | None = None) -> None:  # pragma: no cover - stubbed
+        def setDefaultNullStream(
+            self, device: int | None = None
+        ) -> None:  # pragma: no cover - stubbed
             self.null_stream_calls.append(("device", device))
 
     class RecordingVector:
@@ -130,15 +132,14 @@ def test_distribute_to_all_gpus_configures_cloner_options(
             self.useFloat16: bool | None = None
             self.useFloat16CoarseQuantizer: bool | None = None
             self.useFloat16LookupTables: bool | None = None
+            self.reserveVecs: int | None = None
 
     monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", DummyClonerOptions, raising=False)
 
     if force_legacy_path:
         monkeypatch.delattr(faiss, "index_cpu_to_gpu_multiple", raising=False)
 
-        def fake_index_cpu_to_gpus_list(
-            index_arg, *, gpus=None, co=None, resources=None
-        ):  # type: ignore[override]
+        def fake_index_cpu_to_gpus_list(index_arg, *, gpus=None, co=None, resources=None):  # type: ignore[override]
             captured["co"] = co
             captured["gpus"] = list(gpus or [])
             captured["resources_vector"] = resources
@@ -157,17 +158,13 @@ def test_distribute_to_all_gpus_configures_cloner_options(
         )
     else:
 
-        def fake_index_cpu_to_gpu_multiple(
-            resources_vector, gpu_ids, index_arg, co=None
-        ):  # type: ignore[override]
+        def fake_index_cpu_to_gpu_multiple(resources_vector, gpu_ids, index_arg, co=None):  # type: ignore[override]
             captured["co"] = co
             captured["gpu_ids"] = list(gpu_ids)
             captured["resources_vector"] = resources_vector
             return index_arg
 
-        monkeypatch.setattr(
-            faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple
-        )
+        monkeypatch.setattr(faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple)
         monkeypatch.setattr(
             faiss,
             "index_cpu_to_gpus_list",
@@ -215,8 +212,7 @@ def test_distribute_to_all_gpus_configures_cloner_options(
         assert captured["gpus"] == expected_gpu_ids
         assert counters.get(("faiss_gpu_manual_resource_path", ())) == 1.0
         assert any(
-            record.getMessage() == "faiss-manual-resource-path-engaged"
-            for record in caplog.records
+            record.getMessage() == "faiss-manual-resource-path-engaged" for record in caplog.records
         )
     else:
         assert captured["gpu_ids"] == expected_gpu_ids
@@ -303,7 +299,10 @@ def test_distribute_to_all_gpus_propagates_gpu_flags(monkeypatch) -> None:
 
     def fake_index_cpu_to_gpu_multiple(resources_vector, gpu_ids, index_arg, co=None):
         captured["co"] = co
-        shards = [FakeShard(getattr(co, "indicesOptions", None), getattr(co, "useFloat16", None)) for _ in gpu_ids]
+        shards = [
+            FakeShard(getattr(co, "indicesOptions", None), getattr(co, "useFloat16", None))
+            for _ in gpu_ids
+        ]
         return FakeDistributedIndex(shards)
 
     monkeypatch.setattr(faiss, "index_cpu_to_gpu_multiple", fake_index_cpu_to_gpu_multiple)
@@ -345,8 +344,6 @@ def test_distribute_to_all_gpus_propagates_gpu_flags(monkeypatch) -> None:
     ),
     reason="faiss build missing multi-GPU replication helpers",
 )
-
-
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
 @pytest.mark.skipif(
     faiss is not None
@@ -421,6 +418,7 @@ def test_distribute_to_all_gpus_uses_non_contiguous_ids(monkeypatch) -> None:
             self.useFloat16: bool | None = None
             self.useFloat16CoarseQuantizer: bool | None = None
             self.useFloat16LookupTables: bool | None = None
+            self.reserveVecs: int | None = None
 
     monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", DummyClonerOptions, raising=False)
 
@@ -499,9 +497,7 @@ def test_distribute_to_all_gpus_manual_path_without_resources(monkeypatch) -> No
             captured_options.append(co)
         return sentinel_index
 
-    monkeypatch.setattr(
-        faiss, "index_cpu_to_gpus_list", fake_index_cpu_to_gpus_list, raising=False
-    )
+    monkeypatch.setattr(faiss, "index_cpu_to_gpus_list", fake_index_cpu_to_gpus_list, raising=False)
     monkeypatch.setattr(
         faiss,
         "index_cpu_to_all_gpus",
@@ -520,7 +516,7 @@ def test_distribute_to_all_gpus_manual_path_without_resources(monkeypatch) -> No
     }
     assert counters.get(("faiss_gpu_manual_resource_path", ())) == 1.0
     assert store._replica_gpu_resources == []
-    assert captured_options, 'cloner options should be captured'
+    assert captured_options, "cloner options should be captured"
     manual_co = captured_options[-1]
     expected_indices = getattr(faiss, "INDICES_32_BIT", 0)
     assert getattr(manual_co, "indicesOptions", None) == expected_indices
@@ -574,12 +570,8 @@ def test_distribute_to_all_gpus_respects_explicit_gpu_list(monkeypatch, shard: b
             self.useFloat16LookupTables: bool | None = None
 
     monkeypatch.setattr(faiss, "GpuMultipleClonerOptions", DummyCloner, raising=False)
-    monkeypatch.setattr(
-        faiss, "index_cpu_to_gpus_list", fake_index_cpu_to_gpus_list, raising=False
-    )
-    monkeypatch.setattr(
-        faiss, "index_cpu_to_all_gpus", fake_index_cpu_to_all_gpus, raising=False
-    )
+    monkeypatch.setattr(faiss, "index_cpu_to_gpus_list", fake_index_cpu_to_gpus_list, raising=False)
+    monkeypatch.setattr(faiss, "index_cpu_to_all_gpus", fake_index_cpu_to_all_gpus, raising=False)
 
     replicated = store.distribute_to_all_gpus(cpu_index, shard=shard)
 
@@ -640,12 +632,15 @@ def test_distribute_to_all_gpus_skips_invalid_targets(monkeypatch, caplog) -> No
         (sample.name, tuple(sorted(sample.labels.items()))): sample.value
         for sample in store._observability.metrics.export_counters()
     }
-    assert counters.get(
-        (
-            "faiss_gpu_explicit_target_unavailable",
-            (("reason", "insufficient_filtered_targets"),),
+    assert (
+        counters.get(
+            (
+                "faiss_gpu_explicit_target_unavailable",
+                (("reason", "insufficient_filtered_targets"),),
+            )
         )
-    ) == 1.0
+        == 1.0
+    )
 
     assert any(
         record.getMessage() == "faiss-explicit-gpu-targets-partially-unavailable"
@@ -782,12 +777,15 @@ def test_distribute_to_all_gpus_reports_missing_manual_helper(monkeypatch, caplo
         (sample.name, tuple(sorted(sample.labels.items()))): sample.value
         for sample in store._observability.metrics.export_counters()
     }
-    assert counters.get(
-        (
-            "faiss_gpu_explicit_target_unavailable",
-            (("reason", "missing_index_cpu_to_gpus_list"),),
+    assert (
+        counters.get(
+            (
+                "faiss_gpu_explicit_target_unavailable",
+                (("reason", "missing_index_cpu_to_gpus_list"),),
+            )
         )
-    ) == 1.0
+        == 1.0
+    )
 
     assert any(
         record.getMessage() == "faiss-explicit-gpu-targets-unavailable"

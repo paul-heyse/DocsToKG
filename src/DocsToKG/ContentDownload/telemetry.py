@@ -1903,6 +1903,7 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
         self._closed = False
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._missing: Set[str] = set()
+        self._preload_on_close = False
 
     def close(self) -> None:
         """Close the underlying SQLite connection."""
@@ -1910,6 +1911,9 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
         with self._lock:
             if self._closed:
                 return
+            if self._preload_on_close:
+                # Preload all entries before closing for offline access
+                self._preload_all_entries_unlocked()
             self._closed = True
             self._conn.close()
 
@@ -1918,6 +1922,9 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
         if lookup_key in self._cache:
             return self._cache[lookup_key]
         if lookup_key in self._missing:
+            raise KeyError(lookup_key)
+        # If connection is closed, only return cached data
+        if self._closed:
             raise KeyError(lookup_key)
         entries = self._fetch_work_entries(lookup_key)
         if entries is None:
@@ -1953,7 +1960,8 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
             try:
                 row = self._conn.execute("SELECT COUNT(DISTINCT work_id) FROM manifests").fetchone()
             except sqlite3.OperationalError:
-                row = None
+                # Connection closed or table doesn't exist
+                return len(self._cache)
         total = int(row[0]) if row and row[0] is not None else 0
         return max(total, len(self._cache))
 
@@ -1962,6 +1970,9 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
         if lookup_key in self._cache:
             return True
         if lookup_key in self._missing:
+            return False
+        # If connection is closed, only check cached data
+        if self._closed:
             return False
         try:
             entries = self._fetch_work_entries(lookup_key)
@@ -2008,6 +2019,68 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
             _, normalized, entry, _ = parsed
             entries[normalized] = entry
         return entries if entries else None
+
+    def _fetch_work_entries_unlocked(self, work_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch work entries without acquiring lock (must be called with lock held)."""
+        if self._closed:
+            raise RuntimeError("SqliteResumeLookup has been closed")
+        try:
+            cursor = self._conn.execute(
+                (
+                    "SELECT run_id, work_id, url, normalized_url, schema_version, classification, "
+                    "reason, reason_detail, path, path_mtime_ns, sha256, content_length, etag, last_modified "
+                    "FROM manifests WHERE work_id = ? ORDER BY normalized_url"
+                ),
+                (work_id,),
+            )
+        except sqlite3.OperationalError:
+            rows: Tuple[Tuple[Any, ...], ...] = tuple()
+        else:
+            rows = tuple(cursor)
+
+        if not rows:
+            return None
+
+        entries: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            parsed = _manifest_entry_from_sqlite_row(*row)
+            if parsed is None:
+                continue
+            _, normalized, entry, _ = parsed
+            entries[normalized] = entry
+        return entries if entries else None
+
+    def _preload_all_entries_unlocked(self) -> None:
+        """Preload all manifest entries into the cache (must be called with lock held)."""
+        if self._closed:
+            return
+        try:
+            cursor = self._conn.execute("SELECT DISTINCT work_id FROM manifests ORDER BY work_id")
+            work_ids = [row[0] for row in cursor if row[0]]
+        except sqlite3.OperationalError:
+            return
+
+        # Load each work_id into cache using lock-free fetch
+        for work_id in work_ids:
+            if work_id not in self._cache and work_id not in self._missing:
+                try:
+                    entries = self._fetch_work_entries_unlocked(work_id)
+                    if entries is not None:
+                        self._cache[work_id] = entries
+                    else:
+                        self._missing.add(work_id)
+                except RuntimeError:
+                    # Connection closed during iteration
+                    break
+
+    def enable_preload_on_close(self) -> None:
+        """Enable preloading all entries when close() is called."""
+        self._preload_on_close = True
+
+    def preload_all_entries(self) -> None:
+        """Preload all manifest entries into the cache for offline access after close."""
+        with self._lock:
+            self._preload_all_entries_unlocked()
 
 
 def load_resume_completed_from_sqlite(sqlite_path: Path) -> Set[str]:

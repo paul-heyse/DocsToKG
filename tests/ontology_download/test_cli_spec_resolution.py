@@ -58,6 +58,34 @@ def _write_sources_yaml(path: Path) -> Path:
     return path
 
 
+def _make_args(**kwargs) -> argparse.Namespace:
+    """Create argparse.Namespace with default values."""
+    defaults = {
+        "command": "pull",
+        "ids": [],
+        "spec": None,
+        "resolver": None,
+        "target_formats": None,
+        "log_level": "INFO",
+        "lock": None,
+        "json": False,
+        "dry_run": False,
+        "force": False,
+        "concurrent_downloads": None,
+        "concurrent_plans": None,
+        "allowed_hosts": None,
+        "planner_probes": None,
+        "since": None,
+        "no_lock": False,
+        "lock_output": None,
+        "baseline": Path("baseline.json"),
+        "use_manifest": True,
+        "update_baseline": False,
+    }
+    defaults.update(kwargs)
+    return argparse.Namespace(**defaults)
+
+
 def test_pull_spec_applies_resolver_override(tmp_path: Path) -> None:
     """`ontofetch pull --spec <file> hp --resolver direct` should override the resolver."""
 
@@ -81,7 +109,7 @@ def test_pull_spec_applies_resolver_override(tmp_path: Path) -> None:
         no_lock=False,
         lock_output=None,
         baseline=Path("baseline.json"),
-        use_manifest=use_manifest,
+        use_manifest=True,
         update_baseline=False,
     )
 
@@ -94,7 +122,7 @@ def test_pull_spec_cli_target_formats_override(tmp_path: Path) -> None:
         command="pull",
         ids=["hp"],
         spec=config_path,
-        resolver="custom-resolver",
+        resolver="direct",
         target_formats="ttl, owl",
     )
 
@@ -105,7 +133,7 @@ def test_pull_spec_cli_target_formats_override(tmp_path: Path) -> None:
     assert spec.id == "hp"
     assert spec.resolver == "direct"
     assert spec.extras == {"acronym": "HP"}
-    assert tuple(spec.target_formats) == ("owl", "obo")
+    assert tuple(spec.target_formats) == ("ttl", "owl")
 
 
 def test_resolver_override_validated(tmp_path: Path) -> None:

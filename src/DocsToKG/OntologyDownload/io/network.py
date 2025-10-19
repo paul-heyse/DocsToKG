@@ -34,6 +34,7 @@ from urllib.parse import ParseResult, urljoin, urlparse, urlunparse
 import pooch
 import requests
 
+from ..cancellation import CancellationToken
 from ..errors import ConfigError, DownloadFailure, OntologyDownloadError, PolicyError
 from ..settings import DownloadConfiguration
 from .filesystem import _compute_file_hash, _materialize_cached_file, sanitize_filename
@@ -655,6 +656,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         origin_host: Optional[str] = None,
         bucket: Optional[TokenBucket] = None,
         hash_algorithms: Optional[Iterable[str]] = None,
+        cancellation_token: Optional[CancellationToken] = None,
     ) -> None:
         super().__init__(headers={}, progressbar=False, timeout=http_config.timeout_sec)
         self.destination = destination
@@ -684,6 +686,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self._unsupported_hash_algorithms: Set[str] = set()
         self._hashers: Dict[str, object] = {}
         self.streamed_digests: Dict[str, str] = {}
+        self.cancellation_token = cancellation_token
         self._reset_hashers()
 
     def _reset_hashers(self) -> None:
@@ -776,6 +779,20 @@ class StreamingDownloader(pooch.HTTPDownloader):
             PolicyError: Propagates download policy errors encountered during the HEAD request.
         """
 
+        # Check for cancellation before HEAD request
+        if self.cancellation_token and self.cancellation_token.is_cancelled():
+            self.logger.info(
+                "download cancelled before HEAD request",
+                extra={
+                    "stage": "download",
+                    "status": "cancelled",
+                },
+            )
+            raise DownloadFailure(
+                "Download was cancelled before HEAD request",
+                retryable=False,
+            )
+
         if self.bucket is not None and not token_consumed:
             self.bucket.consume()
 
@@ -784,7 +801,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 session=session,
                 method="HEAD",
                 url=url,
-                headers=request_headers,
+                headers=self.custom_headers,
                 timeout=self.http_config.timeout_sec,
                 stream=False,
             ) as response:
@@ -796,7 +813,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             "method": "HEAD",
                             "status_code": response.status_code,
                             "url": url,
-                            "headers": request_headers,
+                            "headers": self.custom_headers,
                         },
                     )
                     return None, None
@@ -819,7 +836,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     "stage": "download",
                     "error": str(exc),
                     "url": url,
-                    "headers": request_headers,
+                    "headers": self.custom_headers,
                 },
             )
             return None, None
@@ -1010,6 +1027,21 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
             def _stream_once() -> str:
                 nonlocal resume_position
+
+                # Check for cancellation before starting the download
+                if self.cancellation_token and self.cancellation_token.is_cancelled():
+                    self.logger.info(
+                        "download cancelled before request",
+                        extra={
+                            "stage": "download",
+                            "status": "cancelled",
+                        },
+                    )
+                    raise DownloadFailure(
+                        "Download was cancelled before request",
+                        retryable=False,
+                    )
+
                 self._reset_hashers()
                 resume_position = part_path.stat().st_size if part_path.exists() else 0
                 original_resume_position = resume_position
@@ -1022,6 +1054,20 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     self.bucket.consume()
 
                 request_timeout = self.http_config.timeout_sec
+
+                # Check for cancellation immediately before HTTP request
+                if self.cancellation_token and self.cancellation_token.is_cancelled():
+                    self.logger.info(
+                        "download cancelled before GET request",
+                        extra={
+                            "stage": "download",
+                            "status": "cancelled",
+                        },
+                    )
+                    raise DownloadFailure(
+                        "Download was cancelled before GET request",
+                        retryable=False,
+                    )
 
                 with self._request_with_redirect_audit(
                     session=session,
@@ -1164,6 +1210,26 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             for chunk in response.iter_content(chunk_size=1 << 20):
                                 if not chunk:
                                     continue
+
+                                # Check for cancellation before processing chunk
+                                if (
+                                    self.cancellation_token
+                                    and self.cancellation_token.is_cancelled()
+                                ):
+                                    part_path.unlink(missing_ok=True)
+                                    self.logger.info(
+                                        "download cancelled",
+                                        extra={
+                                            "stage": "download",
+                                            "status": "cancelled",
+                                            "bytes_downloaded": bytes_downloaded,
+                                        },
+                                    )
+                                    raise DownloadFailure(
+                                        "Download was cancelled",
+                                        retryable=False,
+                                    )
+
                                 fh.write(chunk)
                                 for hasher in self._hashers.values():
                                     hasher.update(chunk)
@@ -1269,6 +1335,7 @@ def download_stream(
     expected_media_type: Optional[str] = None,
     service: Optional[str] = None,
     expected_hash: Optional[str] = None,
+    cancellation_token: Optional[CancellationToken] = None,
 ) -> DownloadResult:
     """Download ontology content with HEAD validation, rate limiting, caching, retries, and hash checks.
 
@@ -1283,6 +1350,7 @@ def download_stream(
         expected_media_type: Expected Content-Type for validation, if known.
         service: Logical service identifier for per-service rate limiting.
         expected_hash: Optional ``<algorithm>:<hex>`` string enforcing a known hash.
+        cancellation_token: Optional token for cooperative cancellation.
 
     Returns:
         DownloadResult describing the final artifact and metadata.
@@ -1397,7 +1465,10 @@ def download_stream(
         manifest: Optional[Dict[str, object]],
         artifact_path: Path,
     ) -> Dict[str, str]:
-        digests = {algorithm: value.lower() for algorithm, value in current_downloader.streamed_digests.items()}
+        digests = {
+            algorithm: value.lower()
+            for algorithm, value in current_downloader.streamed_digests.items()
+        }
         if not digests and manifest:
             manifest_sha = manifest.get("sha256") if manifest else None
             if isinstance(manifest_sha, str) and manifest_sha:
@@ -1431,6 +1502,7 @@ def download_stream(
             origin_host=host,
             bucket=bucket,
             hash_algorithms=[expected_algorithm] if expected_algorithm else None,
+            cancellation_token=cancellation_token,
         )
         attempt_start = time.monotonic()
         try:

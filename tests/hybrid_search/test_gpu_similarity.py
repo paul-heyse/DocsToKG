@@ -11,7 +11,7 @@ from DocsToKG.HybridSearch.store import cosine_batch, cosine_topk_blockwise
 
 
 @pytest.mark.parametrize("shape", [(3,), (2, 3)])
-def test_cosine_batch_normalizes_in_place_and_reuses_contiguous_buffers(shape):
+def test_cosine_batch_normalizes_copies_and_reuses_contiguous_buffers(shape):
     faiss = pytest.importorskip("faiss", reason="FAISS runtime is required for cosine_batch")
 
     q = np.arange(np.prod(shape), dtype=np.float32).reshape(shape)
@@ -36,27 +36,20 @@ def test_cosine_batch_normalizes_in_place_and_reuses_contiguous_buffers(shape):
 
     assert result.shape == (1, 2) if len(shape) == 1 else (shape[0], 2)
 
-    normalized_q = np.asarray(q_before, dtype=np.float32)
+    normalized_q = np.asarray(q_before, dtype=np.float32, copy=True)
     q_view = normalized_q.reshape(1, -1) if normalized_q.ndim == 1 else normalized_q
-    normalized_C = np.asarray(C_before, dtype=np.float32)
+    normalized_C = np.asarray(C_before, dtype=np.float32, copy=True)
     faiss.normalize_L2(q_view)
     faiss.normalize_L2(normalized_C)
     expected = q_view @ normalized_C.T
 
     np.testing.assert_allclose(result, expected)
-    if normalized_q.ndim == 1:
-        np.testing.assert_allclose(q, q_view.reshape(-1))
-        # Check that queries were normalized in-place (base array should be shared)
-        assert np.shares_memory(captured["queries"], q)
-    else:
-        np.testing.assert_allclose(q, q_view)
-        # Check that queries were normalized in-place (should be the same array)
-        assert captured["queries"] is q
-    np.testing.assert_allclose(C, normalized_C)
-    # Check that corpus was normalized in-place (should be the same array)
-    assert captured["corpus"] is C
-    assert np.shares_memory(captured["queries"], q)
-    assert np.shares_memory(captured["corpus"], C)
+    # Verify that input arrays are not modified (cosine_batch copies internally)
+    np.testing.assert_array_equal(q, q_before)
+    np.testing.assert_array_equal(C, C_before)
+    # Verify that captured arrays are normalized versions
+    np.testing.assert_allclose(captured["queries"], q_view)
+    np.testing.assert_allclose(captured["corpus"], normalized_C)
 
 
 def _make_faiss_stub(*, enable_knn: bool) -> tuple[SimpleNamespace, dict[str, object]]:
@@ -180,9 +173,7 @@ def test_cosine_topk_blockwise_falls_back_without_knn(monkeypatch):
 
 
 def test_cosine_topk_blockwise_honors_cuvs_request(monkeypatch):
-    faiss = pytest.importorskip(
-        "faiss", reason="cuVS integration test requires faiss GPU runtime"
-    )
+    faiss = pytest.importorskip("faiss", reason="cuVS integration test requires faiss GPU runtime")
     if not hasattr(faiss, "knn_gpu") or not hasattr(faiss, "StandardGpuResources"):
         pytest.skip("faiss GPU helpers unavailable")
     get_num_gpus = getattr(faiss, "get_num_gpus", None)

@@ -373,7 +373,7 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
 
         headers = {
             "Content-Type": media_type,
-            "ETag": etag or f"W/\"{hash(content)}\"",
+            "ETag": etag or f'W/"{hash(content)}"',
             "Last-Modified": last_modified or "Wed, 01 Jan 2025 00:00:00 GMT",
         }
 
@@ -400,7 +400,9 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
             if self._http_port is not None:
                 allowed.append(f"{self._http_host}:{self._http_port}")
             config.allowed_hosts = allowed
-            config.allowed_ports = list({80, 443, self._http_port} if self._http_port else {80, 443})
+            config.allowed_ports = list(
+                {80, 443, self._http_port} if self._http_port else {80, 443}
+            )
         return config
 
     def build_resolved_config(self) -> ResolvedConfig:
@@ -451,7 +453,7 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         class _StaticResolver(BaseResolver):
             NAME = name
 
-            def plan(self_inner, spec, config, logger):
+            def plan(self_inner, spec, config, logger, *, cancellation_token=None):
                 headers = {"Accept": media_type}
                 return FetchPlan(
                     url=fixture_url,

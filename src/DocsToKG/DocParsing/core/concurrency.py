@@ -148,14 +148,17 @@ class ReservedPort(contextlib.AbstractContextManager["ReservedPort"]):
     """Context manager representing a reserved TCP port."""
 
     def __init__(self, sock: socket.socket, host: str) -> None:
+        """Initialize a reserved port context manager."""
         self._socket = sock
         self._host = host
         self._closed = False
 
     def __enter__(self) -> "ReservedPort":
+        """Enter the context manager and return self."""
         return self
 
     def __exit__(self, exc_type, exc, tb) -> Optional[bool]:
+        """Exit the context manager and close the socket."""
         self.close()
         return None
 
@@ -188,6 +191,7 @@ class ReservedPort(contextlib.AbstractContextManager["ReservedPort"]):
 
 
 def _bind_reserved_socket(host: str, port: int) -> Optional[socket.socket]:
+    """Bind a socket to the specified host and port, returning None on failure."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         sock.bind((host, port))

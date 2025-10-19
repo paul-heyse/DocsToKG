@@ -1638,11 +1638,7 @@ class FaissVectorStore(DenseVectorStore):
             getattr(self, "_indices_32_bit", getattr(config_obj, "gpu_indices_32_bit", False))
         )
         indices_flag = 0
-        if (
-            not force_64bit_ids
-            and indices_32_enabled
-            and hasattr(faiss, "INDICES_32_BIT")
-        ):
+        if not force_64bit_ids and indices_32_enabled and hasattr(faiss, "INDICES_32_BIT"):
             indices_flag = getattr(faiss, "INDICES_32_BIT")
 
         if hasattr(options, "indicesOptions"):
@@ -1669,9 +1665,7 @@ class FaissVectorStore(DenseVectorStore):
             try:  # pragma: no cover - rarely exposed attribute
                 setattr(options, "useFloat16LookupTables", fp16_enabled)
             except Exception:
-                logger.debug(
-                    "Unable to configure useFloat16LookupTables on cloner", exc_info=True
-                )
+                logger.debug("Unable to configure useFloat16LookupTables on cloner", exc_info=True)
 
     def distribute_to_all_gpus(self, index: "faiss.Index", *, shard: bool = False) -> "faiss.Index":
         """Clone ``index`` across available GPUs when the build supports it.
@@ -1787,6 +1781,7 @@ class FaissVectorStore(DenseVectorStore):
                     cloner_options.common_ivf_quantizer = True
 
                 self._configure_gpu_cloner_options(cloner_options)
+                self._apply_cloner_reservation(cloner_options, gpu_ids=gpu_ids)
 
             gpu_ids: List[int]
             if explicit_targets_configured:
@@ -1922,6 +1917,7 @@ class FaissVectorStore(DenseVectorStore):
                 co.verbose = True
                 co.allowCpuCoarseQuantizer = False
                 self._configure_gpu_cloner_options(co)
+                self._apply_cloner_reservation(co)
                 promoted = faiss.index_cpu_to_gpu(self._gpu_resources, device, index, co)
                 return self._maybe_distribute_multi_gpu(promoted)
             cloned = faiss.index_cpu_to_gpu(self._gpu_resources, device, index)
@@ -1981,7 +1977,9 @@ class FaissVectorStore(DenseVectorStore):
         if gpu_ids:
             try:
                 if hasattr(cloner_options, "eachReserveVecs"):
-                    vector_factory = getattr(faiss, "IntVector", None) if faiss is not None else None
+                    vector_factory = (
+                        getattr(faiss, "IntVector", None) if faiss is not None else None
+                    )
                     if vector_factory is not None:
                         reserve_vector = vector_factory()
                         for _gpu in gpu_ids:
@@ -2007,7 +2005,9 @@ class FaissVectorStore(DenseVectorStore):
 
         if applied or per_device_applied:
             observer = getattr(self, "_observability", None)
-            structured_logger = getattr(observer, "logger", logger) if observer is not None else logger
+            structured_logger = (
+                getattr(observer, "logger", logger) if observer is not None else logger
+            )
             event: Dict[str, object] = {
                 "component": "faiss",
                 "action": "gpu_cloner_reserve",
@@ -2309,7 +2309,9 @@ class FaissVectorStore(DenseVectorStore):
                 continue
             raw_value = meta[key]
             try:
-                if isinstance(expected_value, bool):
+                if expected_value is None:
+                    actual_value = None if raw_value in (None, "None") else raw_value
+                elif isinstance(expected_value, bool):
                     actual_value = bool(raw_value)
                 elif isinstance(expected_value, int) and not isinstance(expected_value, bool):
                     actual_value = int(raw_value)

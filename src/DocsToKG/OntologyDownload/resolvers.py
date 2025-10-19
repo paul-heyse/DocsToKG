@@ -98,6 +98,7 @@ from urllib.parse import urlparse
 import requests
 
 from . import io
+from .cancellation import CancellationToken
 from .errors import ResolverError, UserConfigError
 from .io import (
     get_bucket,
@@ -219,8 +220,25 @@ class FetchPlan:
 class Resolver(Protocol):
     """Protocol describing resolver planning behaviour."""
 
-    def plan(self, spec: "FetchSpec", config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
-        """Produce a :class:`FetchPlan` describing how to retrieve ``spec``."""
+    def plan(
+        self,
+        spec: "FetchSpec",
+        config: ResolvedConfig,
+        logger: logging.Logger,
+        *,
+        cancellation_token: Optional[CancellationToken] = None,
+    ) -> FetchPlan:
+        """Produce a :class:`FetchPlan` describing how to retrieve ``spec``.
+
+        Args:
+            spec: The fetch specification to plan for.
+            config: The resolved configuration.
+            logger: Logger for this operation.
+            cancellation_token: Optional token for cooperative cancellation.
+
+        Returns:
+            A fetch plan describing how to retrieve the specification.
+        """
         ...
 
 
@@ -479,8 +497,18 @@ class BaseResolver:
 class OBOResolver(BaseResolver):
     """Resolve ontologies hosted on the OBO Library using Bioregistry helpers."""
 
-    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+    def plan(
+        self,
+        spec,
+        config: ResolvedConfig,
+        logger: logging.Logger,
+        *,
+        cancellation_token: Optional[CancellationToken] = None,
+    ) -> FetchPlan:
         """Build a :class:`FetchPlan` by resolving OBO-hosted download URLs."""
+
+        if cancellation_token and cancellation_token.is_cancelled():
+            raise ResolverError("Operation cancelled")
 
         if get_obo_download is None or get_owl_download is None or get_rdf_download is None:
             raise UserConfigError(
@@ -489,6 +517,8 @@ class OBOResolver(BaseResolver):
 
         preferred_formats = list(spec.target_formats) or ["owl", "obo", "rdf"]
         for fmt in preferred_formats:
+            if cancellation_token and cancellation_token.is_cancelled():
+                raise ResolverError("Operation cancelled")
             if fmt == "owl":
                 url = get_owl_download(spec.id)
             elif fmt == "obo":
@@ -536,8 +566,18 @@ class OLSResolver(BaseResolver):
                 self.client = client_factory(base_url="https://www.ebi.ac.uk/ols4")
         self.credentials_path = pystow.join("ontology-fetcher", "configs") / "ols_api_token.txt"
 
-    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+    def plan(
+        self,
+        spec,
+        config: ResolvedConfig,
+        logger: logging.Logger,
+        *,
+        cancellation_token: Optional[CancellationToken] = None,
+    ) -> FetchPlan:
         """Plan an OLS download by negotiating media type and authentication."""
+
+        if cancellation_token and cancellation_token.is_cancelled():
+            raise ResolverError("Operation cancelled")
 
         ontology_id = spec.id.lower()
         headers = self._build_polite_headers(config, logger)
@@ -623,8 +663,18 @@ class BioPortalResolver(BaseResolver):
             return self.api_key_path.read_text().strip() or None
         return None
 
-    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+    def plan(
+        self,
+        spec,
+        config: ResolvedConfig,
+        logger: logging.Logger,
+        *,
+        cancellation_token: Optional[CancellationToken] = None,
+    ) -> FetchPlan:
         """Plan a BioPortal download by combining ontology and submission metadata."""
+
+        if cancellation_token and cancellation_token.is_cancelled():
+            raise ResolverError("Operation cancelled")
 
         acronym = spec.extras.get("acronym", spec.id.upper())
         headers = self._build_polite_headers(config, logger)
@@ -727,7 +777,14 @@ class LOVResolver(BaseResolver):
             for item in payload:
                 yield from LOVResolver._iter_dicts(item)
 
-    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+    def plan(
+        self,
+        spec,
+        config: ResolvedConfig,
+        logger: logging.Logger,
+        *,
+        cancellation_token: Optional[CancellationToken] = None,
+    ) -> FetchPlan:
         """Plan a LOV download by inspecting linked metadata for URLs and licenses."""
 
         uri = spec.extras.get("uri")
@@ -798,7 +855,14 @@ class LOVResolver(BaseResolver):
 class SKOSResolver(BaseResolver):
     """Resolve SKOS vocabularies specified directly via configuration."""
 
-    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+    def plan(
+        self,
+        spec,
+        config: ResolvedConfig,
+        logger: logging.Logger,
+        *,
+        cancellation_token: Optional[CancellationToken] = None,
+    ) -> FetchPlan:
         """Plan a SKOS vocabulary download from explicit configuration metadata."""
 
         url = spec.extras.get("url")
@@ -832,8 +896,18 @@ class SKOSResolver(BaseResolver):
 class DirectResolver(BaseResolver):
     """Resolve direct download links specified in configuration extras."""
 
-    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+    def plan(
+        self,
+        spec,
+        config: ResolvedConfig,
+        logger: logging.Logger,
+        *,
+        cancellation_token: Optional[CancellationToken] = None,
+    ) -> FetchPlan:
         """Plan a direct download from declarative extras without discovery."""
+
+        if cancellation_token and cancellation_token.is_cancelled():
+            raise ResolverError("Operation cancelled")
 
         extras = spec.extras
         if not isinstance(extras, Mapping):
@@ -883,7 +957,14 @@ class DirectResolver(BaseResolver):
 class XBRLResolver(BaseResolver):
     """Resolve XBRL taxonomy downloads from regulator endpoints."""
 
-    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+    def plan(
+        self,
+        spec,
+        config: ResolvedConfig,
+        logger: logging.Logger,
+        *,
+        cancellation_token: Optional[CancellationToken] = None,
+    ) -> FetchPlan:
         """Plan an XBRL taxonomy download using declarative resolver extras."""
 
         url = spec.extras.get("url")
@@ -919,7 +1000,14 @@ class OntobeeResolver(BaseResolver):
         "ttl": ("ttl", "text/turtle"),
     }
 
-    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+    def plan(
+        self,
+        spec,
+        config: ResolvedConfig,
+        logger: logging.Logger,
+        *,
+        cancellation_token: Optional[CancellationToken] = None,
+    ) -> FetchPlan:
         """Plan an Ontobee download by composing the appropriate REST endpoint."""
 
         prefix = spec.id.strip()

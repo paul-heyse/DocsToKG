@@ -241,6 +241,7 @@ def temporary_env(**overrides: str):
             else:
                 os.environ[key] = old
 
+
 # --- Test Cases ---
 
 
@@ -589,7 +590,7 @@ def test_fetch_one_rejects_disallowed_license() -> None:
     """fetch_one should reject ontologies with disallowed licenses."""
 
     class StubResolver:
-        def plan(self, spec, config, logger):
+        def plan(self, spec, config, logger, *, cancellation_token=None):
             return FetchPlan(
                 url="https://example.org/onto.owl",
                 headers={},
@@ -625,8 +626,12 @@ def test_fetch_one_download_error(ontology_env) -> None:
     failing_path = "failures/error.owl"
     failing_url = ontology_env.http_url(failing_path)
     headers = {"Content-Type": "application/rdf+xml"}
-    ontology_env.queue_response(failing_path, ResponseSpec(method="HEAD", status=200, headers=headers))
-    ontology_env.queue_response(failing_path, ResponseSpec(method="GET", status=503, headers=headers))
+    ontology_env.queue_response(
+        failing_path, ResponseSpec(method="HEAD", status=200, headers=headers)
+    )
+    ontology_env.queue_response(
+        failing_path, ResponseSpec(method="GET", status=503, headers=headers)
+    )
 
     class StubResolver:
         NAME = resolver_name
@@ -642,7 +647,9 @@ def test_fetch_one_download_error(ontology_env) -> None:
                 service=spec.resolver,
             )
 
-    spec = pipeline_mod.FetchSpec(id="hp", resolver=resolver_name, extras={}, target_formats=["owl"])
+    spec = pipeline_mod.FetchSpec(
+        id="hp", resolver=resolver_name, extras={}, target_formats=["owl"]
+    )
 
     config = ontology_env.build_resolved_config()
     config.defaults.http = ontology_env.build_download_config()

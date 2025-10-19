@@ -280,7 +280,9 @@ class DownloadRun:
             )
             sqlite_available = sqlite_path and sqlite_path.exists()
             if manifest_path.exists() or has_rotated or sqlite_available:
-                resume_lookup, resume_completed, resume_cleanup = self._load_resume_state(manifest_path)
+                resume_lookup, resume_completed, resume_cleanup = self._load_resume_state(
+                    manifest_path
+                )
             else:
                 resume_lookup, resume_completed, resume_cleanup = {}, set(), None
         options = DownloadConfig(
@@ -325,7 +327,9 @@ class DownloadRun:
                 sqlite_candidates.append(candidate)
         if looks_like_sqlite_resume_target(resume_path):
             sqlite_candidates.insert(0, resume_path)
-        sqlite_path = next((candidate for candidate in sqlite_candidates if candidate.is_file()), None)
+        sqlite_path = next(
+            (candidate for candidate in sqlite_candidates if candidate.is_file()), None
+        )
         if sqlite_path is None:
             sqlite_path = resolved_sqlite_path
         elif resolved_sqlite_path and sqlite_path != resolved_sqlite_path:
@@ -366,6 +370,8 @@ class DownloadRun:
                 else:
                     resume_lookup = sqlite_lookup
                     used_sqlite = True
+                    # Enable preloading for offline access after close (when using SQLite fallback)
+                    sqlite_lookup.enable_preload_on_close()
             except Exception:
                 if cleanup_callback is not None:
                     with contextlib.suppress(Exception):
@@ -383,7 +389,10 @@ class DownloadRun:
             and not has_rotated
             and sqlite_path
             and sqlite_path.exists()
-            and (len(resume_completed) > 0 or (hasattr(resume_lookup, "__len__") and len(resume_lookup) > 0))
+            and (
+                len(resume_completed) > 0
+                or (hasattr(resume_lookup, "__len__") and len(resume_lookup) > 0)
+            )
         ):
             LOGGER.warning(
                 "Resume manifest %s is missing; loading resume metadata from SQLite %s.",
@@ -447,9 +456,7 @@ class DownloadRun:
 
         artifact, dry_run_flag, run_id_token = artifact_context
         normalized_run_id = run_id_token or self.resolved.run_id
-        crash_url = (
-            f"worker-crash://{normalized_run_id or 'unknown-run'}/{artifact.work_id}"
-        )
+        crash_url = f"worker-crash://{normalized_run_id or 'unknown-run'}/{artifact.work_id}"
         try:
             outcome = DownloadOutcome(
                 classification=Classification.SKIPPED,
@@ -526,9 +533,7 @@ class DownloadRun:
                     session = state.session_factory()
                     for artifact in provider.iter_artifacts():
                         try:
-                            self.process_work_item(
-                                artifact, state.options, session=session
-                            )
+                            self.process_work_item(artifact, state.options, session=session)
                         except Exception as exc:
                             self._handle_worker_exception(
                                 state,

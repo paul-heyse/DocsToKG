@@ -31,6 +31,8 @@ except ImportError:  # pragma: no cover - non-windows
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 
 import requests
+
+from .cancellation import CancellationToken, CancellationTokenGroup
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 from requests.structures import CaseInsensitiveDict
@@ -298,7 +300,9 @@ def _make_fetch_spec(
             if raw_prefer_source is None:
                 prefer_source = [resolver for resolver in prefer_source if resolver in RESOLVERS]
             else:
-                raise ConfigError("Unknown resolver(s) specified: " + ", ".join(sorted(set(missing))))
+                raise ConfigError(
+                    "Unknown resolver(s) specified: " + ", ".join(sorted(set(missing)))
+                )
 
     resolver_override = raw_spec.get("resolver")
     if resolver_override:
@@ -1584,7 +1588,11 @@ def _resolver_candidates(spec: FetchSpec, config: ResolvedConfig) -> List[str]:
 
 
 def _resolve_plan_with_fallback(
-    spec: FetchSpec, config: ResolvedConfig, adapter: logging.LoggerAdapter
+    spec: FetchSpec,
+    config: ResolvedConfig,
+    adapter: logging.LoggerAdapter,
+    *,
+    cancellation_token: Optional[CancellationToken] = None,
 ) -> Tuple[ResolverCandidate, Sequence[ResolverCandidate]]:
     attempts: List[str] = []
     candidates: List[ResolverCandidate] = []
@@ -1613,7 +1621,7 @@ def _resolve_plan_with_fallback(
             },
         )
         try:
-            plan = resolver.plan(spec, config, adapter)
+            plan = resolver.plan(spec, config, adapter, cancellation_token=cancellation_token)
         except PolicyError as exc:
             message = str(exc)
             attempts.append(f"{resolver_name}: {message}")
@@ -1689,6 +1697,7 @@ def fetch_one(
     correlation_id: Optional[str] = None,
     logger: Optional[logging.Logger] = None,
     force: bool = False,
+    cancellation_token: Optional[CancellationToken] = None,
 ) -> FetchResult:
     """Fetch, validate, and persist a single ontology described by *spec*.
 
@@ -1698,6 +1707,7 @@ def fetch_one(
         correlation_id: Correlation identifier for structured logging.
         logger: Optional logger to reuse instead of configuring a new one.
         force: When ``True``, bypass local cache checks and redownload artifacts.
+        cancellation_token: Optional token for cooperative cancellation.
 
     Returns:
         FetchResult: Structured result containing manifest metadata and resolver attempts.
@@ -1720,7 +1730,9 @@ def fetch_one(
     )
     adapter.info("planning fetch", extra={"stage": "plan"})
 
-    primary, candidates = _resolve_plan_with_fallback(spec, active_config, adapter)
+    primary, candidates = _resolve_plan_with_fallback(
+        spec, active_config, adapter, cancellation_token=cancellation_token
+    )
     download_config = active_config.defaults.http
     candidate_list = list(candidates) or [primary]
 
@@ -1807,6 +1819,7 @@ def fetch_one(
                     expected_media_type=candidate.plan.media_type,
                     service=candidate.plan.service,
                     expected_hash=expected_hash_value,
+                    cancellation_token=cancellation_token,
                 )
 
                 if expected_checksum:
@@ -2048,6 +2061,7 @@ def plan_one(
     config: Optional[ResolvedConfig] = None,
     correlation_id: Optional[str] = None,
     logger: Optional[logging.Logger] = None,
+    cancellation_token: Optional[CancellationToken] = None,
 ) -> PlannedFetch:
     """Return a resolver plan for a single ontology without performing downloads.
 
@@ -2056,6 +2070,7 @@ def plan_one(
         config: Optional resolved configuration providing defaults and limits.
         correlation_id: Correlation identifier reused for logging context.
         logger: Logger instance used to emit resolver telemetry.
+        cancellation_token: Optional token for cooperative cancellation.
 
     Returns:
         PlannedFetch containing the normalized spec, resolver name, and plan.
@@ -2079,7 +2094,9 @@ def plan_one(
     )
     adapter.info("planning fetch", extra={"stage": "plan"})
 
-    primary, candidates = _resolve_plan_with_fallback(spec, active_config, adapter)
+    primary, candidates = _resolve_plan_with_fallback(
+        spec, active_config, adapter, cancellation_token=cancellation_token
+    )
     effective_spec = FetchSpec(
         id=spec.id,
         resolver=primary.resolver,
@@ -2113,6 +2130,7 @@ def plan_all(
     logger: Optional[logging.Logger] = None,
     since: Optional[datetime] = None,
     total: Optional[int] = None,
+    cancellation_token_group: Optional[CancellationTokenGroup] = None,
 ) -> List[PlannedFetch]:
     """Return resolver plans for a collection of ontologies.
 
@@ -2123,6 +2141,7 @@ def plan_all(
         since: Optional cutoff date; plans older than this timestamp are filtered out.
         total: Optional total number of specifications, used for progress metadata when
             the iterable cannot be sized cheaply.
+        cancellation_token_group: Optional group of cancellation tokens for cooperative cancellation.
 
     Returns:
         List of PlannedFetch entries describing each ontology plan.
@@ -2142,6 +2161,10 @@ def plan_all(
     )
     correlation = generate_correlation_id()
     adapter = logging.LoggerAdapter(log, extra={"correlation_id": correlation})
+
+    # Create cancellation token group if not provided
+    if cancellation_token_group is None:
+        cancellation_token_group = CancellationTokenGroup()
 
     total_hint = total
     if total_hint is None:
@@ -2170,12 +2193,20 @@ def plan_all(
     exhausted = False
 
     def _submit(spec: FetchSpec, index: int) -> None:
+        # Create a cancellation token for this task
+        token = (
+            cancellation_token_group.create_token()
+            if cancellation_token_group is not None
+            else None
+        )
+
         future = executor.submit(
             plan_one,
             spec,
             config=active_config,
             correlation_id=correlation,
             logger=log,
+            cancellation_token=token,
         )
         futures[future] = (index, spec)
 
@@ -2210,7 +2241,8 @@ def plan_all(
                             "error": str(exc),
                         },
                     )
-                    _cancel_pending_futures(futures, current=future)
+                    # Cancel all pending tasks using cancellation tokens
+                    cancellation_token_group.cancel_all()
                     _shutdown_executor_nowait(executor)
                     if isinstance(exc, (ConfigError, ConfigurationError, PolicyError)):
                         raise
@@ -2263,6 +2295,7 @@ def fetch_all(
     logger: Optional[logging.Logger] = None,
     force: bool = False,
     total: Optional[int] = None,
+    cancellation_token_group: Optional[CancellationTokenGroup] = None,
 ) -> List[FetchResult]:
     """Fetch a sequence of ontologies sequentially.
 
@@ -2273,6 +2306,7 @@ def fetch_all(
         force: When True, skip manifest reuse and download everything again.
         total: Optional total number of specifications for progress metadata when
             the iterable cannot be cheaply materialised.
+        cancellation_token_group: Optional group of cancellation tokens for cooperative cancellation.
 
     Returns:
         List of FetchResult entries corresponding to completed downloads.
@@ -2299,6 +2333,10 @@ def fetch_all(
             )
     correlation = generate_correlation_id()
     adapter = logging.LoggerAdapter(log, extra={"correlation_id": correlation})
+
+    # Create cancellation token group if not provided
+    if cancellation_token_group is None:
+        cancellation_token_group = CancellationTokenGroup()
 
     total_hint = total
     if total_hint is None:
@@ -2333,6 +2371,14 @@ def fetch_all(
             "starting ontology fetch",
             extra={"stage": "start", "ontology_id": spec.id, "progress": progress},
         )
+
+        # Create a cancellation token for this task
+        token = (
+            cancellation_token_group.create_token()
+            if cancellation_token_group is not None
+            else None
+        )
+
         future = executor.submit(
             fetch_one,
             spec,
@@ -2340,6 +2386,7 @@ def fetch_all(
             correlation_id=correlation,
             logger=log,
             force=force,
+            cancellation_token=token,
         )
         futures[future] = (index, spec)
 
@@ -2370,7 +2417,8 @@ def fetch_all(
                         "ontology fetch failed",
                         extra={"stage": "error", "ontology_id": spec.id, "error": str(exc)},
                     )
-                    _cancel_pending_futures(futures, current=future)
+                    # Cancel all pending tasks using cancellation tokens
+                    cancellation_token_group.cancel_all()
                     _shutdown_executor_nowait(executor)
                     completed_results = [results_map[i] for i in sorted(results_map)]
                     total_known = total_hint if total_hint is not None else submitted

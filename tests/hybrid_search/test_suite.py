@@ -322,6 +322,7 @@ from DocsToKG.HybridSearch.store import (
     FaissVectorStore,
     ManagedFaissAdapter,
     cosine_against_corpus_gpu,
+    pairwise_inner_products,
     restore_state,
     serialize_state,
 )
@@ -402,9 +403,9 @@ def stack(
         feature_generator = FeatureGenerator()
         dense_config = replace(config.dense, force_remove_ids_fallback=force_remove_ids_fallback)
         faiss_index = FaissVectorStore(dim=feature_generator.embedding_dim, config=dense_config)
-        assert (
-            faiss_index.dim == feature_generator.embedding_dim
-        ), "Faiss index dimensionality must match feature generator"
+        assert faiss_index.dim == feature_generator.embedding_dim, (
+            "Faiss index dimensionality must match feature generator"
+        )
         opensearch = OpenSearchSimulator()
         registry = ChunkRegistry()
         observability = Observability()
@@ -704,15 +705,12 @@ def test_validator_validation_resources_honor_null_stream_flags(
     assert resource.null_stream_calls == []
 
     gauges = {
-        sample.name: sample.value
-        for sample in service._observability.metrics.export_gauges()
+        sample.name: sample.value for sample in service._observability.metrics.export_gauges()
     }
     assert gauges.get("faiss_gpu_default_null_stream_all_devices") == 1.0
     assert gauges.get("faiss_gpu_default_null_stream") == 0.0
 
-    assert any(
-        record.message == "faiss-gpu-resource-configured" for record in caplog.records
-    )
+    assert any(record.message == "faiss-gpu-resource-configured" for record in caplog.records)
 
 
 # --- test_hybrid_search.py ---
@@ -938,7 +936,9 @@ def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput
 
 @REAL_VECTOR_MARK
 @pytest.fixture
-def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Callable[  # noqa: F811
+def stack(
+    tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]
+) -> Callable[  # noqa: F811
     ...,
     tuple[
         ChunkIngestionPipeline,
@@ -1298,7 +1298,9 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
 
 
 @pytest.fixture
-def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -> Callable[
+def scale_stack(
+    tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]
+) -> Callable[
     ...,
     tuple[
         ChunkIngestionPipeline,

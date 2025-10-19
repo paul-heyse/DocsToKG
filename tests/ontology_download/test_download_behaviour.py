@@ -108,6 +108,8 @@ def test_head_get_connections_remain_bounded(ontology_env, tmp_path):
     assert all(len(stack) <= max_per_key for stack in pool_snapshot.values())
     normalized_key = normalize("obo", parsed.hostname)
     assert len(pool_snapshot.get(normalized_key, [])) <= max_per_key
+
+
 def test_preliminary_head_check_handles_malformed_content_length(ontology_env, tmp_path):
     """Malformed Content-Length headers should be ignored by the downloader."""
 
@@ -148,9 +150,7 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
         host=parsed_url.hostname,
         http_config=config,
     ) as session:
-        content_type, content_length = downloader._preliminary_head_check(
-            url, session, downloader.custom_headers
-        )
+        content_type, content_length = downloader._preliminary_head_check(url, session)
 
     assert content_type == "application/rdf+xml"
     assert content_length is None
@@ -199,9 +199,7 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
         host=parsed_url.hostname,
         http_config=config,
     ) as session:
-        content_type, content_length = downloader._preliminary_head_check(
-            url, session, downloader.custom_headers
-        )
+        content_type, content_length = downloader._preliminary_head_check(url, session)
 
     assert content_type == "application/rdf+xml"
     assert content_length is None

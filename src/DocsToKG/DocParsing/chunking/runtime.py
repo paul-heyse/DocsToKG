@@ -208,6 +208,7 @@ from DocsToKG.DocParsing.core import (
     derive_doc_id_and_chunks_path,
     load_structural_marker_config,
     set_spawn_or_warn,
+    should_skip_output,
 )
 from DocsToKG.DocParsing.env import (
     data_chunks,
@@ -1281,11 +1282,10 @@ def _main_inner(
             for path in files:
                 doc_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
                 name = path.stem
-                input_hash = ""
                 manifest_entry = resume_controller.entry(doc_id) if resume_enabled else None
                 output_exists = out_path.exists() if resume_enabled else False
-                if resume_needs_hash and manifest_entry and output_exists:
-                    input_hash = compute_content_hash(path)
+                should_hash = resume_enabled
+                input_hash = compute_content_hash(path) if should_hash else ""
                 parse_engine = parse_engine_lookup.get(doc_id, "docling-html")
                 if doc_id not in parse_engine_lookup:
                     logger.debug(
@@ -1293,8 +1293,14 @@ def _main_inner(
                         extra={"extra_fields": {"doc_id": doc_id}},
                     )
 
-                if resume_needs_hash and manifest_entry and output_exists:
-                    skip_doc, _ = resume_controller.should_skip(doc_id, out_path, input_hash)
+                if resume_controller.resume:
+                    skip_doc = should_skip_output(
+                        out_path,
+                        manifest_entry,
+                        input_hash,
+                        resume_controller.resume,
+                        resume_controller.force,
+                    )
                 else:
                     skip_doc = False
                 if skip_doc:
@@ -1379,9 +1385,7 @@ def _main_inner(
                     metadata=failure_metadata.copy(),
                     manifest_metadata=failure_metadata,
                 )
-                raise RuntimeError(
-                    f"Chunking failed for {result.doc_id}: {error_message}"
-                )
+                raise RuntimeError(f"Chunking failed for {result.doc_id}: {error_message}")
 
             log_event(
                 logger,

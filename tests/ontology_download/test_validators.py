@@ -461,7 +461,7 @@ def test_run_validators_respects_concurrency(tmp_path, config):
 
 def test_run_validators_mixed_pools_respects_budget(tmp_path, config):
     if multiprocessing.get_start_method(allow_none=True) == "spawn":
-        pytest.skip("spawn start method breaks validator monkeypatching for this test")
+        pytest.skip("spawn start method breaks validator patching for this test")
 
     config = config.model_copy(deep=True)
     config.defaults.validation.max_concurrent_validators = 3
@@ -544,6 +544,7 @@ def test_run_validators_mixed_pools_respects_budget(tmp_path, config):
                 artifact = tmp_path / f"val-{name}" / f"{name}_parse.json"
                 assert artifact.exists()
 
+
 def test_run_validators_matches_sequential(tmp_path, config):
     config_seq = config.model_copy(deep=True)
     config_seq.defaults.validation.max_concurrent_validators = 1
@@ -564,6 +565,7 @@ def test_run_validators_matches_sequential(tmp_path, config):
         "gamma": _validator,
     }
     with patch.object(validation_mod, "VALIDATORS", validators):
+
         def _build_requests(prefix: str, cfg: ResolvedConfig) -> list[ValidationRequest]:
             requests = []
             for name in validators:
@@ -677,7 +679,9 @@ def test_validate_owlready2_success(owl_file, tmp_path, config):
         pytest.skip(f"owlready2 unavailable: {exc}")
     pytest.importorskip("ols_client")
     with temporary_env(PYSTOW_HOME=str(tmp_path / "pystow")):
-        request = ValidationRequest("owlready2", owl_file, tmp_path / "norm", tmp_path / "val", config)
+        request = ValidationRequest(
+            "owlready2", owl_file, tmp_path / "norm", tmp_path / "val", config
+        )
         result = validate_owlready2(request, _noop_logger())
         if not result.ok:  # pragma: no cover - optional dependency pipeline misconfigured
             pytest.skip(f"Owlready2 validator unavailable: {result.details.get('error')}")
@@ -702,7 +706,9 @@ def test_validate_arelle_with_stub(xbrl_package, tmp_path, config):
 
     dummy_module = SimpleNamespace(Cntlr=SimpleNamespace(Cntlr=DummyController))
     with patch.dict(sys.modules, {"arelle": dummy_module}, clear=False):
-        request = ValidationRequest("arelle", xbrl_package, tmp_path / "norm", tmp_path / "val", config)
+        request = ValidationRequest(
+            "arelle", xbrl_package, tmp_path / "norm", tmp_path / "val", config
+        )
         result = validate_arelle(request, _noop_logger())
     assert result.ok
     payload = json.loads((request.validation_dir / "arelle_validation.json").read_text())

@@ -3378,16 +3378,18 @@ class HybridSearchValidator:
                     metrics = getattr(observability, "metrics", None)
                     if metrics is not None and temp_memory is not None:
                         metrics.set_gauge(
-                            "faiss_gpu_temp_memory_bytes", float(temp_memory)
+                            "faiss_gpu_temp_memory_bytes", float(temp_memory), scope="validation"
                         )
                     if metrics is not None:
                         metrics.set_gauge(
                             "faiss_gpu_default_null_stream",
                             1.0 if use_null else 0.0,
+                            scope="validation",
                         )
                         metrics.set_gauge(
                             "faiss_gpu_default_null_stream_all_devices",
                             1.0 if use_null_all else 0.0,
+                            scope="validation",
                         )
                     if logger is not None:
                         logger.info(
@@ -3398,6 +3400,7 @@ class HybridSearchValidator:
                                     "temp_memory_bytes": temp_memory,
                                     "default_null_stream": use_null,
                                     "default_null_stream_all_devices": use_null_all,
+                                    "scope": "validation",
                                 }
                             },
                         )

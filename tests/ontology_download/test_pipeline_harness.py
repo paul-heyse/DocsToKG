@@ -17,6 +17,7 @@ from DocsToKG.OntologyDownload.planning import (
     fetch_all,
     plan_all,
 )
+from DocsToKG.OntologyDownload.cancellation import CancellationTokenGroup
 from DocsToKG.OntologyDownload.resolvers import BaseResolver, FetchPlan
 from DocsToKG.OntologyDownload.testing import ResponseSpec, temporary_resolver
 
@@ -61,8 +62,9 @@ def test_fetch_all_downloads_and_writes_manifest(ontology_env, tmp_path):
 
     config = _resolved_config(ontology_env)
 
-    with temporary_resolver(hp_resolver_name, hp_resolver), temporary_resolver(
-        go_resolver_name, go_resolver
+    with (
+        temporary_resolver(hp_resolver_name, hp_resolver),
+        temporary_resolver(go_resolver_name, go_resolver),
     ):
         results = core.fetch_all(
             [hp_spec, go_spec],
@@ -84,7 +86,9 @@ def test_fetch_all_downloads_and_writes_manifest(ontology_env, tmp_path):
 def test_fetch_all_second_run_uses_cache(ontology_env):
     """Subsequent fetches should return cached results when no changes occur."""
 
-    resolver_name, resolver = _static_resolver_for(ontology_env, name="cached", filename="cached.owl")
+    resolver_name, resolver = _static_resolver_for(
+        ontology_env, name="cached", filename="cached.owl"
+    )
     spec = FetchSpec(id="cached", resolver=resolver_name, extras={}, target_formats=("owl",))
     config = _resolved_config(ontology_env)
 
@@ -123,15 +127,19 @@ def test_plan_all_batch_failure_cancels_blocking_workers(ontology_env):
     class _BlockingPlanResolver(BaseResolver):
         NAME = "blocking-plan"
 
-        def plan(self, spec, config, logger):  # noqa: D401 - simple blocking stub
+        def plan(self, spec, config, logger, *, cancellation_token=None):  # noqa: D401 - simple blocking stub
             blocking_started.set()
-            release_blocking.wait(timeout=5)
+            # Check for cancellation periodically while waiting
+            while not release_blocking.is_set():
+                if cancellation_token and cancellation_token.is_cancelled():
+                    raise RuntimeError("blocking resolver was cancelled")
+                release_blocking.wait(timeout=0.1)  # Check every 100ms
             raise RuntimeError("blocking resolver should have been cancelled")
 
     class _FailingPlanResolver(BaseResolver):
         NAME = "failing-plan"
 
-        def plan(self, spec, config, logger):  # noqa: D401 - simple failure stub
+        def plan(self, spec, config, logger, *, cancellation_token=None):  # noqa: D401 - simple failure stub
             time.sleep(0.1)
             raise RuntimeError("planner boom")
 
@@ -151,15 +159,23 @@ def test_plan_all_batch_failure_cancels_blocking_workers(ontology_env):
     config.defaults.http.concurrent_plans = 2
     config.defaults.resolver_fallback_enabled = False
     config.defaults.prefer_source = []
-    timer = threading.Timer(2.0, release_blocking.set)
+    timer = threading.Timer(0.5, release_blocking.set)
     try:
-        with temporary_resolver(_BlockingPlanResolver.NAME, _BlockingPlanResolver()), temporary_resolver(
-            _FailingPlanResolver.NAME, _FailingPlanResolver()
+        with (
+            temporary_resolver(_BlockingPlanResolver.NAME, _BlockingPlanResolver()),
+            temporary_resolver(_FailingPlanResolver.NAME, _FailingPlanResolver()),
         ):
             timer.start()
             start = time.monotonic()
             with pytest.raises(BatchPlanningError):
-                plan_all([blocking_spec, failing_spec], config=config, logger=_logger())
+                # Create a cancellation token group for the test
+                token_group = CancellationTokenGroup()
+                plan_all(
+                    [blocking_spec, failing_spec],
+                    config=config,
+                    logger=_logger(),
+                    cancellation_token_group=token_group,
+                )
             elapsed = time.monotonic() - start
     finally:
         release_blocking.set()
@@ -186,7 +202,7 @@ def test_fetch_all_batch_failure_cancels_blocking_workers(ontology_env):
     )
     ontology_env.queue_response(
         blocking_path,
-        ResponseSpec(method="GET", status=200, headers=headers, body=b"blocking", delay_sec=2.0),
+        ResponseSpec(method="GET", status=200, headers=headers, body=b"blocking", delay_sec=0.1),
     )
     ontology_env.queue_response(
         failing_path,
@@ -199,10 +215,11 @@ def test_fetch_all_batch_failure_cancels_blocking_workers(ontology_env):
 
     blocking_url = ontology_env.http_url(blocking_path)
     failing_url = ontology_env.http_url(failing_path)
+
     class _BlockingFetchResolver(BaseResolver):
         NAME = "blocking-fetch"
 
-        def plan(self, spec, config, logger):  # noqa: D401 - simple blocking plan
+        def plan(self, spec, config, logger, *, cancellation_token=None):  # noqa: D401 - simple blocking plan
             return FetchPlan(
                 url=blocking_url,
                 headers={"Accept": "application/rdf+xml"},
@@ -216,7 +233,7 @@ def test_fetch_all_batch_failure_cancels_blocking_workers(ontology_env):
     class _FailingFetchResolver(BaseResolver):
         NAME = "failing-fetch"
 
-        def plan(self, spec, config, logger):  # noqa: D401 - simple failure plan
+        def plan(self, spec, config, logger, *, cancellation_token=None):  # noqa: D401 - simple failure plan
             time.sleep(0.1)
             return FetchPlan(
                 url=failing_url,
@@ -246,12 +263,21 @@ def test_fetch_all_batch_failure_cancels_blocking_workers(ontology_env):
     config.defaults.resolver_fallback_enabled = False
     config.defaults.prefer_source = []
 
-    with temporary_resolver(_BlockingFetchResolver.NAME, _BlockingFetchResolver()), temporary_resolver(
-        _FailingFetchResolver.NAME, _FailingFetchResolver()
+    with (
+        temporary_resolver(_BlockingFetchResolver.NAME, _BlockingFetchResolver()),
+        temporary_resolver(_FailingFetchResolver.NAME, _FailingFetchResolver()),
     ):
         start = time.monotonic()
         with pytest.raises(BatchFetchError):
-            fetch_all([blocking_spec, failing_spec], config=config, logger=_logger(), force=True)
+            # Create a cancellation token group for the test
+            token_group = CancellationTokenGroup()
+            fetch_all(
+                [blocking_spec, failing_spec],
+                config=config,
+                logger=_logger(),
+                force=True,
+                cancellation_token_group=token_group,
+            )
         elapsed = time.monotonic() - start
 
     assert any(
