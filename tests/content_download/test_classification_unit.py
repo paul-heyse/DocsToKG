@@ -101,7 +101,7 @@ def test_build_download_outcome_respects_head_flag(tmp_path):
     )
 
     assert outcome.classification is Classification.PDF
-    assert outcome.path == str(pdf_path)
+    assert outcome.path == str(pdf_path.resolve())
 
     pdf_path.write_bytes(b"short")
     outcome_small = downloader.build_download_outcome(

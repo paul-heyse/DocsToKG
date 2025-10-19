@@ -1109,7 +1109,7 @@ def test_build_download_outcome_accepts_small_pdf_with_head_pass(tmp_path: Path)
         retry_after=None,
     )
     assert outcome.classification is Classification.PDF
-    assert outcome.path == str(pdf_path)
+        assert outcome.path == str(pdf_path.resolve())
 
 def test_build_download_outcome_rejects_small_pdf_without_head(tmp_path: Path) -> None:
     artifact = _make_artifact(tmp_path)
@@ -2417,7 +2417,7 @@ def _download(
         )
     
         assert outcome.classification is Classification.CACHED
-        assert outcome.path == str(cached_file)
+        assert outcome.path == str(cached_file.resolve())
         assert outcome.sha256 == cached_sha
         assert outcome.content_length == len(cached_bytes)
         assert outcome.etag == '"etag-cached"'

@@ -66,6 +66,43 @@ CSV_HEADER_TOKENS = {"run_id", "work_id"}
 logger = logging.getLogger(__name__)
 
 
+def normalize_manifest_path(
+    path: Optional[str | Path],
+    *,
+    base: Optional[Path] = None,
+) -> Optional[str]:
+    """Return an absolute filesystem path suitable for manifest storage.
+
+    Older manifests stored artifact paths relative to the working directory in
+    effect when the run executed. To keep those entries usable when resuming a
+    run from another working directory, callers may provide ``base`` so that
+    relative paths can be resolved against a known directory such as the
+    manifest location. For new entries, the helper upgrades any provided path
+    (``Path`` objects or strings) to an absolute representation.
+    """
+
+    if path is None:
+        return None
+
+    if isinstance(path, str):
+        candidate_text = path.strip()
+        if not candidate_text:
+            return None
+        candidate = Path(candidate_text)
+    else:
+        candidate = Path(path)
+
+    if base is not None and not candidate.is_absolute():
+        candidate = Path(base) / candidate
+
+    try:
+        resolved = candidate.resolve(strict=False)
+    except OSError:
+        resolved = candidate if candidate.is_absolute() else candidate.absolute()
+
+    return str(resolved)
+
+
 @dataclass(frozen=True)
 class ManifestEntry:
     """Structured manifest entry describing a resolved artifact.
@@ -289,9 +326,10 @@ class ManifestUrlIndex:
             content_length,
             path_mtime_ns,
         ) = row
+        base_dir = self._path.parent if self._path else None
         return {
             "url": url,
-            "path": stored_path,
+            "path": normalize_manifest_path(stored_path, base=base_dir),
             "sha256": sha256,
             "classification": classification,
             "etag": etag,
@@ -1431,6 +1469,8 @@ def _load_resume_from_sqlite(sqlite_path: Path) -> Tuple[Dict[str, Dict[str, Any
     finally:
         conn.close()
 
+    base_dir = sqlite_path.parent
+
     for (
         run_id,
         work_id,
@@ -1498,7 +1538,7 @@ def _load_resume_from_sqlite(sqlite_path: Path) -> Tuple[Dict[str, Dict[str, Any
             "classification": classification_value or str(classification or ""),
             "reason": reason_value,
             "reason_detail": reason_detail,
-            "path": path_value,
+            "path": normalize_manifest_path(path_value, base=base_dir),
             "path_mtime_ns": path_mtime_value,
             "mtime_ns": path_mtime_value,
             "sha256": sha256,
@@ -1648,6 +1688,7 @@ def load_previous_manifest(
 
     for file_path in ordered_files:
         with file_path.open("r", encoding="utf-8") as handle:
+            base_dir = file_path.parent
             for line_number, raw in enumerate(handle, start=1):
                 line = raw.strip()
                 if not line:
@@ -1719,6 +1760,24 @@ def load_previous_manifest(
                         data["path_mtime_ns"] = None
                 data["mtime_ns"] = data.get("path_mtime_ns")
 
+                normalized_path = normalize_manifest_path(data.get("path"), base=base_dir)
+                data["path"] = normalized_path
+
+                html_paths_value = data.get("html_paths")
+                normalized_html_paths: List[str] = []
+                if isinstance(html_paths_value, list):
+                    for html_path in html_paths_value:
+                        normalized_html = normalize_manifest_path(html_path, base=base_dir)
+                        if normalized_html is not None:
+                            normalized_html_paths.append(normalized_html)
+                data["html_paths"] = normalized_html_paths
+
+                extracted_text = data.get("extracted_text_path")
+                if extracted_text is not None:
+                    data["extracted_text_path"] = normalize_manifest_path(
+                        extracted_text, base=base_dir
+                    )
+
                 key = normalize_url(url)
                 per_work.setdefault(work_id, {})[key] = data
 
@@ -1766,6 +1825,7 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
         except sqlite3.OperationalError:
             return {}
         mapping: Dict[str, Dict[str, Any]] = {}
+        base_dir = path.parent
         for (
             url,
             normalized_url,
@@ -1780,9 +1840,10 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
             if not url:
                 continue
             normalized_value = normalized_url or normalize_url(url)
+            normalized_path = normalize_manifest_path(stored_path, base=base_dir)
             mapping[normalized_value] = {
                 "url": url,
-                "path": stored_path,
+                "path": normalized_path,
                 "sha256": sha256,
                 "classification": classification,
                 "etag": etag,
@@ -1833,10 +1894,12 @@ def build_manifest_entry(
         last_modified = None
         extracted_text_path = None
 
+    normalized_path = normalize_manifest_path(path)
+
     path_mtime_ns: Optional[int] = None
-    if path:
+    if normalized_path:
         try:
-            path_mtime_ns = Path(path).stat().st_mtime_ns
+            path_mtime_ns = Path(normalized_path).stat().st_mtime_ns
         except OSError:
             path_mtime_ns = None
 
@@ -1849,6 +1912,14 @@ def build_manifest_entry(
     detail_token = normalize_reason(detail_source)
     detail_value = detail_token.value if isinstance(detail_token, ReasonCode) else detail_token
 
+    normalized_html_paths: List[str] = []
+    for html_path in html_paths:
+        normalized = normalize_manifest_path(html_path)
+        if normalized is not None:
+            normalized_html_paths.append(normalized)
+
+    normalized_text_path = normalize_manifest_path(extracted_text_path)
+
     return ManifestEntry(
         schema_version=MANIFEST_SCHEMA_VERSION,
         timestamp=timestamp,
@@ -1858,18 +1929,18 @@ def build_manifest_entry(
         publication_year=getattr(artifact, "publication_year"),
         resolver=resolver,
         url=url,
-        path=path,
+        path=normalized_path,
         path_mtime_ns=path_mtime_ns,
         classification=classification,
         content_type=content_type,
         reason=reason_value,
         reason_detail=detail_value,
-        html_paths=list(html_paths),
+        html_paths=normalized_html_paths,
         sha256=sha256,
         content_length=content_length,
         etag=etag,
         last_modified=last_modified,
-        extracted_text_path=extracted_text_path,
+        extracted_text_path=normalized_text_path,
         dry_run=dry_run,
     )
 
@@ -1889,6 +1960,7 @@ __all__ = [
     "SummarySink",
     "SqliteSink",
     "build_manifest_entry",
+    "normalize_manifest_path",
     "looks_like_csv_resume_target",
     "load_previous_manifest",
     "load_manifest_url_index",
