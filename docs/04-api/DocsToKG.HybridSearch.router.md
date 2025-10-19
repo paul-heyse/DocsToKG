@@ -30,11 +30,11 @@ Return stats for all managed stores (namespaced and aggregate).
 
 ### `serialize_all(self)`
 
-Serialize every managed store (namespace -> payload).
+Serialize every managed store, returning a mapping of namespace to payload/metadata pairs.
 
 ### `restore_all(self, payloads)`
 
-Restore stores from serialized payloads.
+Restore stores from serialized payloads, forwarding associated snapshot metadata.
 
 ### `rebuild_if_needed(self)`
 
