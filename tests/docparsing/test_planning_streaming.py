@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import gc
-from pathlib import Path
-from typing import Dict
 import sys
 import types
+from pathlib import Path
+from typing import Dict
 
 import pytest
 
@@ -166,7 +166,8 @@ from tests.docparsing.stubs import dependency_stubs
 
 dependency_stubs()
 
-from DocsToKG.DocParsing.core import planning
+# Import after dependency stubs so core modules use fake optional deps.
+from DocsToKG.DocParsing.core import planning  # noqa: E402
 
 
 class _StreamingStub:

@@ -598,9 +598,10 @@ from tests.content_download import stubs as content_stubs
 
 content_stubs.dependency_stubs()
 
-from DocsToKG.ContentDownload import cli as downloader
-from DocsToKG.ContentDownload import download as download_impl
-from DocsToKG.ContentDownload.cli import (
+# Import after dependency stubs so production modules see fake optional deps.
+from DocsToKG.ContentDownload import cli as downloader  # noqa: E402
+from DocsToKG.ContentDownload import download as download_impl  # noqa: E402
+from DocsToKG.ContentDownload.cli import (  # noqa: E402
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
     DEFAULT_TAIL_CHECK_BYTES,
@@ -609,8 +610,7 @@ from DocsToKG.ContentDownload.cli import (
     download_candidate,
     process_one_work,
 )
-from DocsToKG.ContentDownload.download import DownloadConfig
-from DocsToKG.ContentDownload.core import (
+from DocsToKG.ContentDownload.core import (  # noqa: E402
     Classification,
     DownloadContext,
     ReasonCode,
@@ -623,7 +623,8 @@ from DocsToKG.ContentDownload.core import (
     normalize_url,
     strip_prefix,
 )
-from DocsToKG.ContentDownload.networking import (
+from DocsToKG.ContentDownload.download import DownloadConfig  # noqa: E402
+from DocsToKG.ContentDownload.networking import (  # noqa: E402
     CachedResult,
     ConditionalRequestHelper,
     ModifiedResult,
@@ -632,7 +633,7 @@ from DocsToKG.ContentDownload.networking import (
     parse_retry_after_header,
     request_with_retries,
 )
-from DocsToKG.ContentDownload.pipeline import (
+from DocsToKG.ContentDownload.pipeline import (  # noqa: E402
     AttemptRecord,
     DownloadOutcome,
     OpenAlexResolver,
@@ -642,7 +643,7 @@ from DocsToKG.ContentDownload.pipeline import (
     ResolverResult,
     WaybackResolver,
 )
-from DocsToKG.ContentDownload.telemetry import (
+from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
     JsonlSink,
     ManifestEntry,
     ManifestUrlIndex,
@@ -971,10 +972,10 @@ if HAS_PYALEX:
             referer=None,
             timeout=5.0,
             context=context,
-    )
+        )
 
-    assert outcome.classification is Classification.SKIPPED
-    assert outcome.reason is ReasonCode.DOMAIN_DISALLOWED_MIME
+        assert outcome.classification is Classification.SKIPPED
+        assert outcome.reason is ReasonCode.DOMAIN_DISALLOWED_MIME
 
 def test_download_candidate_cleans_partial_on_stream_failure(tmp_path: Path, monkeypatch):
     artifact = _make_artifact(tmp_path)

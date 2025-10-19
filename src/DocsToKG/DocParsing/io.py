@@ -10,8 +10,8 @@ dependencies.
 from __future__ import annotations
 
 import contextlib
-import heapq
 import hashlib
+import heapq
 import json
 import logging
 import os
@@ -19,8 +19,8 @@ import unicodedata
 import uuid
 import warnings
 from datetime import datetime, timezone
-from pathlib import Path
 from itertools import count
+from pathlib import Path
 from typing import (
     Callable,
     Dict,

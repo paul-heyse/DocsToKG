@@ -4,18 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
-import tracemalloc
 import sys
 import types
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-
-from typing import Dict
 
 import pytest
-
-from DocsToKG.DocParsing.env import data_manifests
-from DocsToKG.DocParsing.io import iter_manifest_entries
 
 from tests.docparsing.stubs import dependency_stubs
 

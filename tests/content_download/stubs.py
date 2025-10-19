@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import sys
 from typing import Tuple
 
@@ -11,7 +12,7 @@ from tests.docparsing.stubs import dependency_stubs as _docparsing_dependency_st
 _CONTENT_FAKE_MODULES: Tuple[Tuple[str, str, bool], ...] = (
     ("pyalex", "tests.content_download.fakes.pyalex", True),
     ("pyalex.config", "tests.content_download.fakes.pyalex.config", True),
-    ("pydantic_core", "tests.content_download.fakes.pydantic_core", True),
+    ("pydantic_core", "tests.content_download.fakes.pydantic_core", False),
     (
         "pydantic_settings",
         "tests.content_download.fakes.pydantic_settings",
@@ -37,7 +38,10 @@ def dependency_stubs() -> None:
     _docparsing_dependency_stubs()
 
     for module_name, fake_path, force in _CONTENT_FAKE_MODULES:
-        if not force and module_name in sys.modules:
-            continue
+        if not force:
+            if importlib.util.find_spec(module_name) is not None:
+                continue
+            if module_name in sys.modules:
+                continue
         module = importlib.import_module(fake_path)
         sys.modules[module_name] = module

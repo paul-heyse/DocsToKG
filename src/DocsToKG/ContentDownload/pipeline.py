@@ -4,6 +4,9 @@
 #   "purpose": "Resolver definitions and pipeline orchestration",
 #   "sections": [
 #     {
+#       "id": "coerce-download-context",
+#       "name": "_coerce_download_context",
+#       "anchor": "function-coerce-download-context",
 #       "kind": "function"
 #     },
 #     {
@@ -163,7 +166,6 @@ from DocsToKG.ContentDownload.core import (
     normalize_classification,
     normalize_reason,
     normalize_url,
-    parse_size,
 )
 from DocsToKG.ContentDownload.networking import (
     CircuitBreaker,

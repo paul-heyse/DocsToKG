@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from DocsToKG.DocParsing.cli_errors import CLIValidationError
-
 from tests.docparsing.test_manifest_streaming_cli import _prepare_manifest_cli_stubs
 
 

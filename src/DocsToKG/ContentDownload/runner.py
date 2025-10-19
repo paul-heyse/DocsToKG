@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
+import sqlite3
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass
-import json
-import sqlite3
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -37,11 +37,11 @@ from DocsToKG.ContentDownload.pipeline import ResolverMetrics, ResolverPipeline
 from DocsToKG.ContentDownload.providers import OpenAlexWorkProvider, WorkProvider
 from DocsToKG.ContentDownload.summary import RunResult, build_summary_record
 from DocsToKG.ContentDownload.telemetry import (
+    MANIFEST_SCHEMA_VERSION,
     AttemptSink,
     CsvSink,
     JsonlSink,
     LastAttemptCsvSink,
-    MANIFEST_SCHEMA_VERSION,
     ManifestIndexSink,
     MultiSink,
     RotatingJsonlSink,

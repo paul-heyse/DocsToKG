@@ -6,8 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-import requests
 import pytest
+import requests
 
 from DocsToKG.ContentDownload.args import ResolvedConfig, bootstrap_run_environment
 from DocsToKG.ContentDownload.core import WorkArtifact
@@ -16,9 +16,9 @@ from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.providers import WorkProvider
 from DocsToKG.ContentDownload.runner import DownloadRun
 from DocsToKG.ContentDownload.telemetry import (
+    MANIFEST_SCHEMA_VERSION,
     CsvSink,
     JsonlSink,
-    MANIFEST_SCHEMA_VERSION,
     ManifestUrlIndex,
     MultiSink,
     RunTelemetry,

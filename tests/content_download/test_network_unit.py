@@ -60,10 +60,8 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
 from DocsToKG.ContentDownload.networking import (
     CircuitBreaker,
     ConditionalRequestHelper,
-    ContentPolicyViolation,
     TokenBucket,
     head_precheck,
-    request_with_retries,
 )
 
 

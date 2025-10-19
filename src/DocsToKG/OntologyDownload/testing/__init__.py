@@ -20,10 +20,8 @@ from typing import (
     Deque,
     Dict,
     Iterable,
-    Iterator,
     List,
     Mapping,
-    MutableMapping,
     Optional,
     Sequence,
     Tuple,
@@ -33,6 +31,8 @@ from urllib.parse import urljoin
 
 import requests
 
+from ..io import rate_limit as rate_mod
+from ..io import sanitize_filename
 from ..plugins import (
     register_resolver,
     register_validator,
@@ -41,20 +41,12 @@ from ..plugins import (
 )
 from ..resolvers import BaseResolver, FetchPlan
 from ..settings import (
-    CACHE_DIR,
-    CONFIG_DIR,
-    LOG_DIR,
-    LOCAL_ONTOLOGY_DIR,
     DefaultsConfig,
     DownloadConfiguration,
     ResolvedConfig,
-    STORAGE,
-    get_default_config,
     invalidate_default_config_cache,
 )
 from ..settings import StorageBackend as _StorageBackend
-from ..io import rate_limit as rate_mod
-from ..io import sanitize_filename
 
 __all__ = [
     "ResponseSpec",

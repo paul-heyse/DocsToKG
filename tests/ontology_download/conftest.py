@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
 import os
 import sys
 import types
@@ -44,13 +46,52 @@ def _ensure_optional_dependency_stubs() -> None:
         onto_client.BioPortalClient = lambda *args, **kwargs: types.SimpleNamespace()  # type: ignore[attr-defined]
         sys.modules["ontoportal_client"] = onto_client
 
-    if "pystow" not in sys.modules:
-        def _pystow_join(*segments):
-            root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
-            return root.joinpath(*segments)
+    if "pystow" not in sys.modules and importlib.util.find_spec("pystow") is None:
+        data_root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
+
+        def _ensure_parent(path: Path) -> Path:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            return path
+
+        def _pystow_join(*segments: str) -> Path:
+            return _ensure_parent(data_root.joinpath(*segments))
+
+        class _PystowModule:
+            def __init__(self, base: Path) -> None:
+                self.base = base
+
+            def join(self, *segments: str) -> Path:
+                return _ensure_parent(self.base.joinpath(*segments))
+
+            joinpath = join
+
+            def ensure(self, *segments: str, directory: bool = True) -> Path:
+                target = self.base.joinpath(*segments)
+                if directory:
+                    target.mkdir(parents=True, exist_ok=True)
+                else:
+                    _ensure_parent(target)
+                    target.touch(exist_ok=True)
+                return target
+
+            def module(self, *segments: str, ensure_exists: bool = True) -> "_PystowModule":
+                return _pystow_module(*segments, ensure_exists=ensure_exists)
+
+        def _pystow_module(*segments: str, ensure_exists: bool = True) -> _PystowModule:
+            module_root = data_root.joinpath(*segments)
+            if ensure_exists:
+                module_root.mkdir(parents=True, exist_ok=True)
+            return _PystowModule(module_root)
+
+        def _pystow_get_config(_module: str, _key: str, *, default=None, **_kwargs):
+            return default
 
         pystow_mod = types.ModuleType("pystow")
         pystow_mod.join = _pystow_join  # type: ignore[attr-defined]
+        pystow_mod.joinpath = _pystow_join  # type: ignore[attr-defined]
+        pystow_mod.module = _pystow_module  # type: ignore[attr-defined]
+        pystow_mod.ensure = lambda *segments, **kwargs: _pystow_module(*segments, **kwargs).base  # type: ignore[attr-defined]
+        pystow_mod.get_config = _pystow_get_config  # type: ignore[attr-defined]
         sys.modules["pystow"] = pystow_mod
 
 

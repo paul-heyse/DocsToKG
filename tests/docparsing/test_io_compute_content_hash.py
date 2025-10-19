@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import unicodedata
-
 from pathlib import Path
 
 from DocsToKG.DocParsing.io import compute_content_hash

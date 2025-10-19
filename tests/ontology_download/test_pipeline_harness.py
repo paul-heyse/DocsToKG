@@ -6,8 +6,6 @@ import json
 import logging
 from pathlib import Path
 
-import pytest
-
 from DocsToKG.OntologyDownload import api as core
 from DocsToKG.OntologyDownload.planning import FetchSpec, plan_all
 from DocsToKG.OntologyDownload.testing import temporary_resolver

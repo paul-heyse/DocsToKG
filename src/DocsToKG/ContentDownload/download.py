@@ -295,6 +295,16 @@ class DownloadOptions(DownloadConfig):
     """Compatibility shim preserving the legacy ``DownloadOptions`` surface."""
 
     def to_context(self, overrides: Optional[Mapping[str, Any]] = None) -> DownloadContext:  # type: ignore[override]
+        """Return a `DownloadContext` derived from this options payload.
+
+        Args:
+            overrides: Optional mapping of field names to values that should
+                replace the existing attributes when constructing the context.
+
+        Returns:
+            DownloadContext: Fully-populated context object consumed by the
+            content download pipeline.
+        """
         return super().to_context(overrides)
 
 
@@ -858,7 +868,6 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
 
                 content_type = response.headers.get("Content-Type") or content_type_hint
                 disposition = response.headers.get("Content-Disposition")
-                content_type_lower = content_type.lower() if content_type else ""
                 content_length_header = response.headers.get("Content-Length")
                 content_length_hint: Optional[int] = None
                 if content_length_header:
@@ -2233,13 +2242,7 @@ def process_one_work(
     run_id = options.run_id
     dry_run = options.dry_run
     list_only = options.list_only
-    extract_html_text = options.extract_html_text
     previous_lookup = options.previous_lookup
-    sniff_bytes = options.sniff_bytes
-    min_pdf_bytes = options.min_pdf_bytes
-    tail_check_bytes = options.tail_check_bytes
-    robots_checker = options.robots_checker
-    content_addressed = options.content_addressed
 
     result = {
         "work_id": artifact.work_id,

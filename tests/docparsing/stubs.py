@@ -24,6 +24,7 @@ module name so imports succeed when optional dependencies are absent.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import sys
 from pathlib import Path
 from typing import Iterable, Tuple
@@ -118,7 +119,10 @@ def dependency_stubs(dense_dim: int = 2560) -> None:
     setattr(fake_vllm, "DEFAULT_DENSE_DIM", dense_dim)
 
     for module_name, fake_path, force in _FAKE_MODULES:
-        if not force and module_name in sys.modules:
-            continue
+        if not force:
+            if importlib.util.find_spec(module_name) is not None:
+                continue
+            if module_name in sys.modules:
+                continue
         module = importlib.import_module(fake_path)
         sys.modules[module_name] = module
