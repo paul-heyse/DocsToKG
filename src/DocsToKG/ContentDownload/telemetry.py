@@ -20,6 +20,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import logging
 import sqlite3
 import threading
 from collections import OrderedDict
@@ -57,6 +58,9 @@ from DocsToKG.ContentDownload.core import (
 
 MANIFEST_SCHEMA_VERSION = 3
 SQLITE_SCHEMA_VERSION = 4
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -1509,13 +1513,46 @@ def load_previous_manifest(
             .format(path=path)
         ) from file_error
 
+    def _handle_manifest_parse_error(
+        file_path: Path,
+        exc: Exception,
+        *,
+        line_number: Optional[int] = None,
+    ) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+        location = f"{file_path}:{line_number}" if line_number is not None else str(file_path)
+        logger.warning(
+            "Failed to parse resume manifest at %s", location, exc_info=exc
+        )
+        if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
+            logger.warning(
+                "Falling back to SQLite resume cache '%s' after manifest parse failure at %s.",
+                sqlite_path,
+                location,
+            )
+            return _load_resume_from_sqlite(sqlite_path)
+        raise ValueError(
+            f"Failed to parse resume manifest at {location}: {exc}"
+        ) from exc
+
     for file_path in ordered_files:
         with file_path.open("r", encoding="utf-8") as handle:
-            for raw in handle:
+            for line_number, raw in enumerate(handle, start=1):
                 line = raw.strip()
                 if not line:
                     continue
-                data = json.loads(line)
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    return _handle_manifest_parse_error(
+                        file_path, exc, line_number=line_number
+                    )
+                if not isinstance(data, dict):
+                    exc = TypeError(
+                        f"Manifest entries must be JSON objects, got {type(data).__name__}"
+                    )
+                    return _handle_manifest_parse_error(
+                        file_path, exc, line_number=line_number
+                    )
                 record_type = data.get("record_type")
                 if record_type is None:
                     raise ValueError(
