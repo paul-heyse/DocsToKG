@@ -262,6 +262,40 @@ def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
     assert "--resume-from" in message
 
 
+def test_setup_download_state_expands_user_resume_path(
+    tmp_path, patcher, monkeypatch
+):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    monkeypatch.setenv("HOME", str(home_dir))
+
+    expected_resume = home_dir / "manifests" / "resume.jsonl"
+    expected_resume.parent.mkdir(parents=True, exist_ok=True)
+
+    captured: Dict[str, object] = {}
+
+    def _capture_resume_path(_self, resume_path):
+        captured["path"] = resume_path
+        return {}, set()
+
+    patcher.setattr(DownloadRun, "_load_resume_state", _capture_resume_path)
+
+    resolved.args.resume_from = "~/manifests/resume.jsonl"
+    download_run = DownloadRun(resolved)
+
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        download_run.setup_download_state(factory)
+    finally:
+        factory.close_all()
+        download_run.close()
+
+    assert captured.get("path") == expected_resume
+
+
 def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_path):
     resolved = make_resolved_config(tmp_path, csv=False)
     bootstrap_run_environment(resolved)
@@ -763,6 +797,61 @@ def test_download_run_run_processes_artifacts(patcher, tmp_path):
     assert result.bytes_downloaded == 84
 
     download_run.close()
+
+
+def test_run_sequential_worker_exception_increments_failures(patcher, tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+
+    artifacts = [
+        _make_artifact(resolved, "W_FAIL"),
+        _make_artifact(resolved, "W_OK"),
+    ]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: requests.Session,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        if work.work_id == "W_FAIL":
+            raise RuntimeError("boom")
+        return {"saved": True, "downloaded_bytes": 123}
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.processed == 2
+    assert result.worker_failures == 1
+    assert result.skipped == 1
+    assert result.saved == 1
+    assert result.summary_record["worker_failures"] == 1
+    assert result.summary_record["skipped"] == 1
 
 
 def test_run_auto_resume_uses_manifest_path_when_resume_flag_absent(patcher, tmp_path):

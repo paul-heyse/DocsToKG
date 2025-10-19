@@ -403,14 +403,26 @@ def resolve_config(
     query = build_query(argparse.Namespace(**query_kwargs))
     run_id = uuid.uuid4().hex
 
-    base_pdf_dir = args.out
-    manifest_override = args.manifest
+    def _expand_path(value: Optional[Path | str]) -> Optional[Path]:
+        if value is None:
+            return None
+        return Path(value).expanduser().resolve(strict=False)
+
+    base_pdf_dir = _expand_path(args.out)
+    if base_pdf_dir is None:
+        parser.error("--out is required")
+
+    html_override = _expand_path(args.html_out)
+    xml_override = _expand_path(args.xml_out)
+    manifest_override = _expand_path(args.manifest)
     if args.staging:
-        run_dir = base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-        pdf_dir = run_dir / "PDF"
-        html_dir = run_dir / "HTML"
-        xml_dir = run_dir / "XML"
-        manifest_path = run_dir / "manifest.jsonl"
+        run_dir = (base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M%S")).resolve(
+            strict=False
+        )
+        pdf_dir = (run_dir / "PDF").resolve(strict=False)
+        html_dir = (run_dir / "HTML").resolve(strict=False)
+        xml_dir = (run_dir / "XML").resolve(strict=False)
+        manifest_path = (run_dir / "manifest.jsonl").resolve(strict=False)
         if args.html_out:
             LOGGER.info("Staging mode overrides --html-out; using %s", html_dir)
         if args.xml_out:
@@ -419,9 +431,13 @@ def resolve_config(
             LOGGER.info("Staging mode overrides --manifest; writing to %s", manifest_path)
     else:
         pdf_dir = base_pdf_dir
-        html_dir = args.html_out or (pdf_dir.parent / "HTML")
-        xml_dir = args.xml_out or (pdf_dir.parent / "XML")
+        html_dir = html_override or (pdf_dir.parent / "HTML")
+        xml_dir = xml_override or (pdf_dir.parent / "XML")
         manifest_path = manifest_override or (pdf_dir / "manifest.jsonl")
+
+        html_dir = Path(html_dir).expanduser().resolve(strict=False)
+        xml_dir = Path(xml_dir).expanduser().resolve(strict=False)
+        manifest_path = Path(manifest_path).expanduser().resolve(strict=False)
 
     resolver_factory = resolver_factory or default_resolvers
     resolver_instances = resolver_factory()
