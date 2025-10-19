@@ -407,7 +407,9 @@ class DownloadRun:
         resume_completed: Set[str]
         cleanup_callback: Optional[Callable[[], None]] = None
 
-        def _build_json_lookup() -> Tuple[Mapping[str, Dict[str, Any]], Set[str], Optional[Callable[[], None]]]:
+        def _build_json_lookup() -> Tuple[
+            Mapping[str, Dict[str, Any]], Set[str], Optional[Callable[[], None]]
+        ]:
             json_lookup = JsonlResumeLookup(resume_path)
             completed_ids = set(json_lookup.completed_work_ids)
             return json_lookup, completed_ids, getattr(json_lookup, "close", None)
@@ -623,9 +625,7 @@ class DownloadRun:
                             def _runner() -> Dict[str, Any]:
                                 thread_info["thread_id"] = threading.get_ident()
                                 try:
-                                    return self.process_work_item(
-                                        work_item, state.options
-                                    )
+                                    return self.process_work_item(work_item, state.options)
                                 except Exception:
                                     state.session_factory.close_current()
                                     raise
@@ -645,9 +645,7 @@ class DownloadRun:
                             artifact_context = future_context.pop(completed_future, None)
                             thread_info = future_thread_ids.pop(completed_future, None)
                             thread_id = (
-                                thread_info.get("thread_id")
-                                if thread_info is not None
-                                else None
+                                thread_info.get("thread_id") if thread_info is not None else None
                             )
                             try:
                                 completed_future.result()

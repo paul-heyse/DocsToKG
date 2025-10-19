@@ -539,11 +539,7 @@ def prepare_candidate_download(
             )
 
     head_precheck_state = head_precheck_passed or ctx.head_precheck_passed
-    if (
-        skip_outcome is None
-        and not head_precheck_state
-        and not ctx.skip_head_precheck
-    ):
+    if skip_outcome is None and not head_precheck_state and not ctx.skip_head_precheck:
         head_precheck_state = head_precheck(session, url, timeout, content_policy=content_policy)
         ctx.head_precheck_passed = head_precheck_state
 

@@ -833,11 +833,10 @@ def _handle_prune(args, logger) -> Dict[str, object]:
             ordered = "(none)"
         if duplicates:
             messages.append(
-                "[DRY-RUN] Requested ontologies (duplicates ignored, order preserved): "
-                f"{ordered}"
+                f"[DRY-RUN] Requested ontologies (duplicates ignored, order preserved): {ordered}"
             )
         else:
-            messages.append("[DRY-RUN] Requested ontologies (order preserved): " f"{ordered}")
+            messages.append(f"[DRY-RUN] Requested ontologies (order preserved): {ordered}")
 
     for ontology_id in target_ids:
         raw_metadata = collect_version_metadata(ontology_id)
