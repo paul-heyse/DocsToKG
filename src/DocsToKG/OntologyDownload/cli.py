@@ -583,13 +583,40 @@ def _resolve_specs_from_args(
         return config, specs
 
     if ids:
-        resolver_name = getattr(args, "resolver", None) or config.defaults.prefer_source[0]
-        formats = target_formats or config.defaults.normalize_to
-        specs = [
-            FetchSpec(id=oid, resolver=resolver_name, extras={}, target_formats=formats)
-            for oid in ids
-        ]
-        return config, specs
+        resolver_override = getattr(args, "resolver", None)
+        default_resolver = None
+        if config.defaults.prefer_source:
+            default_resolver = config.defaults.prefer_source[0]
+        fallback_resolver = resolver_override or default_resolver or "obo"
+        fallback_formats = (
+            tuple(target_formats)
+            if target_formats
+            else tuple(config.defaults.normalize_to)
+        )
+
+        specs_by_id = {spec.id: spec for spec in config.specs or []}
+        resolved_specs: List[FetchSpec] = []
+        for oid in ids:
+            existing = specs_by_id.get(oid)
+            if existing is not None:
+                resolved_specs.append(
+                    FetchSpec(
+                        id=existing.id,
+                        resolver=existing.resolver,
+                        extras=dict(existing.extras),
+                        target_formats=tuple(existing.target_formats),
+                    )
+                )
+            else:
+                resolved_specs.append(
+                    FetchSpec(
+                        id=oid,
+                        resolver=fallback_resolver,
+                        extras={},
+                        target_formats=fallback_formats,
+                    )
+                )
+        return config, resolved_specs
 
     if config.specs:
         return config, config.specs
