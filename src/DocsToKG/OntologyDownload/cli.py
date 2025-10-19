@@ -906,20 +906,30 @@ def _doctor_report() -> Dict[str, object]:
         else:
             probe_path = Path("/")
 
-    disk_usage = shutil.disk_usage(LOCAL_ONTOLOGY_DIR)
-    default_floor_bytes = 10 * 1_000_000_000
-    threshold_bytes = min(
-        disk_usage.total,
-        max(default_floor_bytes, int(disk_usage.total * 0.1)),
-    )
-    disk_report = {
-        "total_bytes": disk_usage.total,
-        "free_bytes": disk_usage.free,
-        "total_gb": round(disk_usage.total / 1_000_000_000, 2),
-        "free_gb": round(disk_usage.free / 1_000_000_000, 2),
-        "threshold_bytes": threshold_bytes,
-        "warning": disk_usage.free < threshold_bytes,
-    }
+    disk_report: Dict[str, object] = {"path": str(probe_path)}
+    try:
+        disk_usage = shutil.disk_usage(probe_path)
+    except OSError as exc:
+        disk_report["error"] = {
+            "type": exc.__class__.__name__,
+            "message": str(exc),
+        }
+    else:
+        default_floor_bytes = 10 * 1_000_000_000
+        threshold_bytes = min(
+            disk_usage.total,
+            max(default_floor_bytes, int(disk_usage.total * 0.1)),
+        )
+        disk_report.update(
+            {
+                "total_bytes": disk_usage.total,
+                "free_bytes": disk_usage.free,
+                "total_gb": round(disk_usage.total / 1_000_000_000, 2),
+                "free_gb": round(disk_usage.free / 1_000_000_000, 2),
+                "threshold_bytes": threshold_bytes,
+                "warning": disk_usage.free < threshold_bytes,
+            }
+        )
 
     dependencies = {
         "rdflib": importlib.util.find_spec("rdflib") is not None,
@@ -1125,17 +1135,32 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
         print(f"  - {name}: {', '.join(status)} ({info['path']})")
 
     disk = report["disk"]
-    print(
-        "Disk space: {free:.2f} GB free / {total:.2f} GB total".format(
-            free=disk["free_gb"], total=disk["total_gb"]
-        )
-    )
-    if disk.get("warning"):
-        threshold_gb = disk["threshold_bytes"] / 1_000_000_000
+    disk_path = disk.get("path")
+    label = f"Disk space ({disk_path})" if disk_path else "Disk space"
+    if "free_gb" in disk and "total_gb" in disk:
         print(
-            "  Warning: free space below threshold "
-            f"({threshold_gb:.2f} GB; min(total capacity, max(10 GB, 10% of capacity)))."
+            f"{label}: {disk['free_gb']:.2f} GB free / {disk['total_gb']:.2f} GB total"
         )
+        if disk.get("warning"):
+            threshold_gb = disk["threshold_bytes"] / 1_000_000_000
+            print(
+                "  Warning: free space below threshold "
+                f"({threshold_gb:.2f} GB; min(total capacity, max(10 GB, 10% of capacity)))."
+            )
+    else:
+        print(f"{label}: unavailable")
+        error_info = disk.get("error")
+        if error_info:
+            if isinstance(error_info, dict):
+                error_type = error_info.get("type")
+                message = error_info.get("message")
+                if error_type and message:
+                    detail = f"{error_type}: {message}"
+                else:
+                    detail = message or error_type or "Unknown error"
+            else:
+                detail = str(error_info)
+            print(f"  Error: {detail}")
 
     print("Optional dependencies:")
     for name, available in report["dependencies"].items():
