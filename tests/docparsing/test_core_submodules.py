@@ -775,6 +775,55 @@ def test_plan_doctags_without_resume_skips_hash(
     assert plan["skip"]["count"] == 0
 
 
+def test_plan_doctags_resume_overwrite_skips_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """DocTags planner omits hashing when overwrite disables resume checks."""
+
+    html_dir = tmp_path / "html"
+    output_dir = tmp_path / "doctags"
+    html_dir.mkdir()
+    output_dir.mkdir()
+    (html_dir / "doc.html").write_text("<html></html>", encoding="utf-8")
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+
+    manifest_index = {
+        "doc.html": {"input_hash": "old", "status": "success"},
+    }
+
+    def _raise_hash(_path: Path) -> str:
+        raise AssertionError(
+            "compute_content_hash should not run when overwrite disables resume"
+        )
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.compute_content_hash", _raise_hash
+    )
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.load_manifest_index",
+        lambda *_args, **_kwargs: manifest_index,
+    )
+
+    plan = plan_doctags(
+        [
+            "--mode",
+            "html",
+            "--in-dir",
+            str(html_dir),
+            "--out-dir",
+            str(output_dir),
+            "--resume",
+            "--overwrite",
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
+
+
 def test_plan_chunk_resume_missing_manifest_skips_hash(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
