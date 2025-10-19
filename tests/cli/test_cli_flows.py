@@ -376,7 +376,7 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, patcher, tmp_pat
     assert index_payload[manifest["work_id"]]["pdf_path"].endswith("out.pdf")
 
 
-def test_main_with_csv_writes_last_attempt_csv(download_modules, patcher, tmp_path):
+def _run_cli_with_csv_logging(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
 
@@ -478,6 +478,14 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, patcher, tmp_pa
 
     downloader.main()
 
+    return out_dir, manifest_path, csv_path
+
+
+def test_main_with_csv_writes_last_attempt_csv(download_modules, patcher, tmp_path):
+    out_dir, manifest_path, csv_path = _run_cli_with_csv_logging(
+        download_modules, patcher, tmp_path
+    )
+
     assert not manifest_path.exists()
     assert csv_path.exists()
 
@@ -504,6 +512,25 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, patcher, tmp_pa
         "last_modified": "",
     }
 
+
+def test_main_with_csv_creates_expected_non_json_outputs(download_modules, patcher, tmp_path):
+    out_dir, manifest_path, csv_path = _run_cli_with_csv_logging(
+        download_modules, patcher, tmp_path
+    )
+
+    jsonl_outputs = list(out_dir.glob("manifest.jsonl*"))
+    assert jsonl_outputs == []
+
+    sqlite_path = manifest_path.with_suffix(".sqlite")
+    last_attempt_path = manifest_path.with_suffix(".last.csv")
+    summary_path = manifest_path.with_suffix(".summary.json")
+    index_path = manifest_path.with_suffix(".index.json")
+
+    assert csv_path.exists()
+    assert sqlite_path.exists()
+    assert last_attempt_path.exists()
+    assert summary_path.exists()
+    assert index_path.exists()
 
 def test_main_with_staging_creates_timestamped_directories(download_modules, patcher, tmp_path):
     downloader = download_modules.downloader
