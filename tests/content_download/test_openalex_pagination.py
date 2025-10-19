@@ -81,3 +81,21 @@ def test_provider_iterates_minimal_pages_with_max(tmp_path) -> None:
     assert artifacts == ["W1", "W2", "W3"]
     assert works.paginate_calls == [{"per_page": 2, "n_max": 3}]
     assert works.pages_iterated == 2
+
+
+def test_provider_with_query_only_iterates_all_results(tmp_path) -> None:
+    works = RecordingWorks(_sample_pages())
+
+    provider = OpenAlexWorkProvider(
+        query=works,
+        artifact_factory=lambda work, *_: work["id"],
+        pdf_dir=tmp_path / "pdf",
+        html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
+    )
+
+    artifacts = list(provider.iter_artifacts())
+
+    assert artifacts == ["W1", "W2", "W3", "W4", "W5"]
+    assert works.paginate_calls == [{"per_page": 200, "n_max": None}]
+    assert works.pages_iterated == 3
