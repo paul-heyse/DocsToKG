@@ -491,7 +491,7 @@ def resolve_config(
     previous_url_index = ManifestUrlIndex(sqlite_path, eager=args.warm_manifest_cache)
     persistent_seen_urls: Set[str] = {
         url
-        for url, meta in previous_url_index.iter_existing()
+        for url, meta in previous_url_index.iter_existing_paths()
         if str(meta.get("classification", "")).lower()
         in {Classification.PDF.value, Classification.CACHED.value, Classification.XML.value}
     }

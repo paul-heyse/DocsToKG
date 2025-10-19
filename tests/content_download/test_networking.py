@@ -3839,40 +3839,123 @@ def _download(
         sink.close()
     
         index = ManifestUrlIndex(db_path)
-        existing_items = list(index.iter_existing())
+        existing_items = list(index.iter_existing_paths())
         assert len(existing_items) == 1
         key, payload = existing_items[0]
         assert key == normalize_url(present_entry.url)
         assert payload["path"] == str(existing_path)
-    
-    
-    def test_manifest_url_index_eager_load_invokes_loader_once(tmp_path: Path, patcher) -> None:
-        db_path = tmp_path / "manifest.sqlite3"
-        db_path.touch()
-        url = "https://example.org/eager.pdf"
-        normalized = normalize_url(url)
-        mapping = {
-            normalized: {
-                "url": url,
-                "path": str(tmp_path / "eager.pdf"),
-                "sha256": "eagerhash",
-                "classification": Classification.PDF.value,
-                "etag": None,
-                "last_modified": None,
-                "content_length": 1024,
-                "mtime_ns": None,
-            }
+
+
+def test_manifest_url_index_iter_existing_paths_streams_without_full_load(
+    tmp_path: Path, patcher
+) -> None:
+    db_path = tmp_path / "manifest.sqlite3"
+    sink = SqliteSink(db_path)
+    artifact_path = tmp_path / "stream.pdf"
+    artifact_path.write_bytes(b"%PDF-1.7\n")
+    entry = ManifestEntry(
+        schema_version=downloader.MANIFEST_SCHEMA_VERSION,
+        timestamp="2025-01-04T00:00:00Z",
+        run_id="run-stream",
+        work_id="W-stream",
+        title="Streamed",
+        publication_year=2024,
+        resolver="resolver",
+        url="https://example.org/stream.pdf",
+        path=str(artifact_path),
+        classification=Classification.PDF,
+        content_type="application/pdf",
+        reason=None,
+        html_paths=[],
+        sha256="streamhash",
+        content_length=artifact_path.stat().st_size,
+        etag=None,
+        last_modified=None,
+        extracted_text_path=None,
+        dry_run=False,
+    )
+    sink.log_manifest(entry)
+    sink.close()
+
+    def _fail_loader(path: Path):
+        raise AssertionError(
+            "ManifestUrlIndex.iter_existing_paths should not trigger load_manifest_url_index"
+        )
+
+    patcher.setattr("DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _fail_loader)
+
+    index = ManifestUrlIndex(db_path, eager=False)
+    rows = list(index.iter_existing_paths())
+    assert rows and rows[0][0] == normalize_url(entry.url)
+
+
+def test_manifest_url_index_iter_existing_paths_handles_large_manifest(tmp_path: Path) -> None:
+    db_path = tmp_path / "manifest.sqlite3"
+    sink = SqliteSink(db_path)
+    expected: Dict[str, str] = {}
+    for idx in range(256):
+        artifact_path = tmp_path / f"large-{idx}.pdf"
+        artifact_path.write_bytes(b"%PDF-1.4\n")
+        url = f"https://example.org/large/{idx}.pdf"
+        entry = ManifestEntry(
+            schema_version=downloader.MANIFEST_SCHEMA_VERSION,
+            timestamp=f"2025-01-04T00:{idx:02d}:00Z",
+            run_id="run-large",
+            work_id=f"W-large-{idx}",
+            title=f"Large {idx}",
+            publication_year=2024,
+            resolver="resolver",
+            url=url,
+            path=str(artifact_path),
+            classification=Classification.PDF,
+            content_type="application/pdf",
+            reason=None,
+            html_paths=[],
+            sha256=f"largehash-{idx}",
+            content_length=artifact_path.stat().st_size,
+            etag=None,
+            last_modified=None,
+            extracted_text_path=None,
+            dry_run=False,
+        )
+        sink.log_manifest(entry)
+        expected[normalize_url(url)] = str(artifact_path)
+    sink.close()
+
+    index = ManifestUrlIndex(db_path, eager=False)
+    streamed = dict(index.iter_existing_paths())
+    assert streamed.keys() == expected.keys()
+    for key, path_value in expected.items():
+        assert streamed[key]["path"] == path_value
+
+
+def test_manifest_url_index_eager_load_invokes_loader_once(tmp_path: Path, patcher) -> None:
+    db_path = tmp_path / "manifest.sqlite3"
+    db_path.touch()
+    url = "https://example.org/eager.pdf"
+    normalized = normalize_url(url)
+    mapping = {
+        normalized: {
+            "url": url,
+            "path": str(tmp_path / "eager.pdf"),
+            "sha256": "eagerhash",
+            "classification": Classification.PDF.value,
+            "etag": None,
+            "last_modified": None,
+            "content_length": 1024,
+            "mtime_ns": None,
         }
-        calls: List[Path] = []
-    
-        def _tracking_loader(path: Path):
-            calls.append(path)
-            return mapping
-    
-        patcher.setattr("DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _tracking_loader)
-    
-        index = ManifestUrlIndex(db_path, eager=True)
-        assert calls == [db_path]
-        assert index.get(url) == mapping[normalized]
-        assert index.as_dict() == mapping
-        assert calls == [db_path]
+    }
+    calls: List[Path] = []
+
+    def _tracking_loader(path: Path):
+        calls.append(path)
+        return mapping
+
+    patcher.setattr("DocsToKG.ContentDownload.telemetry.load_manifest_url_index", _tracking_loader)
+
+    index = ManifestUrlIndex(db_path, eager=True)
+    assert calls == [db_path]
+    assert index.get(url) == mapping[normalized]
+    assert index.as_dict() == mapping
+    assert calls == [db_path]
