@@ -388,6 +388,7 @@ class ResolverConfig:
         max_concurrent_resolvers: Upper bound on concurrent resolver threads per work.
         max_concurrent_per_host: Upper bound on simultaneous downloads per hostname.
         enable_global_url_dedup: Enable global URL deduplication across works when True.
+        global_url_dedup_cap: Maximum URLs hydrated into the global dedupe cache.
         domain_token_buckets: Mapping of hostname to token bucket parameters.
         domain_content_rules: Mapping of hostname to MIME allow-lists.
         resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
@@ -430,6 +431,7 @@ class ResolverConfig:
     max_concurrent_resolvers: int = 1
     max_concurrent_per_host: int = 3
     enable_global_url_dedup: bool = True
+    global_url_dedup_cap: Optional[int] = 100_000
     domain_token_buckets: Dict[str, Dict[str, float]] = field(default_factory=dict)
     domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     resolver_circuit_breakers: Dict[str, Dict[str, float]] = field(default_factory=dict)
@@ -688,6 +690,7 @@ def apply_config_overrides(
         "max_concurrent_per_host",
         "enable_global_url_dedup",
         "domain_content_rules",
+        "global_url_dedup_cap",
     ):
         if field_name in data and data[field_name] is not None:
             value = data[field_name]
@@ -776,6 +779,9 @@ def load_resolver_config(
 
     if hasattr(args, "global_url_dedup") and args.global_url_dedup is not None:
         config.enable_global_url_dedup = args.global_url_dedup
+
+    if hasattr(args, "global_url_dedup_cap") and args.global_url_dedup_cap is not None:
+        config.global_url_dedup_cap = args.global_url_dedup_cap
 
     if getattr(args, "domain_min_interval", None):
         domain_limits = dict(config.domain_min_interval_s)
