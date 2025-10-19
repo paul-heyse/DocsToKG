@@ -324,7 +324,11 @@ def chunk(argv: Sequence[str] | None = None) -> int:
     try:
         import DocsToKG.DocParsing as docparsing_pkg
 
-        chunk_module = docparsing_pkg._load_module("chunking")
+        docparsing_pkg._MODULE_CACHE.pop("chunking", None)
+        if hasattr(docparsing_pkg, "chunking"):
+            delattr(docparsing_pkg, "chunking")
+
+        from DocsToKG.DocParsing import chunking as chunk_module
     except ImportError as exc:
         print(str(exc), file=sys.stderr)
         print(
