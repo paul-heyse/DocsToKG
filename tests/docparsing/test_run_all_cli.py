@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import argparse
 import importlib
 import types
+from pathlib import Path
 from typing import Dict, List
 
 import pytest
@@ -49,3 +51,49 @@ def test_run_all_forwards_sparsity_warn_threshold_pct(
     assert "--sparsity-warn-threshold-pct" in embed_args
     flag_index = embed_args.index("--sparsity-warn-threshold-pct")
     assert embed_args[flag_index + 1] == "12.5"
+
+
+def test_doctags_forwards_vllm_wait_timeout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """DocTags CLI forwards custom vLLM wait timeout into the PDF pipeline."""
+
+    module = _reload_core_cli()
+
+    from DocsToKG.DocParsing import doctags as doctags_module
+
+    captured: Dict[str, argparse.Namespace] = {}
+
+    def fake_pdf_main(args: argparse.Namespace) -> int:
+        captured["namespace"] = args
+        return 0
+
+    monkeypatch.setattr(doctags_module, "pdf_main", fake_pdf_main)
+
+    data_root = tmp_path / "Data"
+    pdf_dir = tmp_path / "pdf"
+    out_dir = tmp_path / "doctags"
+
+    data_root.mkdir()
+    pdf_dir.mkdir()
+    out_dir.mkdir()
+
+    timeout_s = 432
+    exit_code = module.doctags(
+        [
+            "--mode",
+            "pdf",
+            "--data-root",
+            str(data_root),
+            "--in-dir",
+            str(pdf_dir),
+            "--out-dir",
+            str(out_dir),
+            "--vllm-wait-timeout",
+            str(timeout_s),
+        ]
+    )
+
+    assert exit_code == 0
+    assert "namespace" in captured
+    assert captured["namespace"].vllm_wait_timeout == timeout_s

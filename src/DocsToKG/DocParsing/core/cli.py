@@ -183,7 +183,7 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
         "--vllm-wait-timeout",
         type=int,
         default=None,
-        help="Seconds to wait for vLLM readiness in PDF mode",
+        help="Seconds to wait for vLLM readiness during PDF conversion",
     )
     doctags_module.add_resume_force_options(
         parser,
@@ -286,7 +286,6 @@ def doctags(argv: Sequence[str] | None = None) -> int:
                 "model": parsed.model,
                 "served_model_names": parsed.served_model_names,
                 "gpu_memory_utilization": parsed.gpu_memory_utilization,
-                "log_level": parsed.log_level,
                 "vllm_wait_timeout": parsed.vllm_wait_timeout,
             }
         },
@@ -314,6 +313,8 @@ def doctags(argv: Sequence[str] | None = None) -> int:
         "gpu_memory_utilization": parsed.gpu_memory_utilization,
         "vllm_wait_timeout": parsed.vllm_wait_timeout,
     }
+    if parsed.vllm_wait_timeout is not None:
+        overrides["vllm_wait_timeout"] = parsed.vllm_wait_timeout
     pdf_args = merge_args(doctags_module.pdf_build_parser(), overrides)
     return doctags_module.pdf_main(pdf_args)
 
