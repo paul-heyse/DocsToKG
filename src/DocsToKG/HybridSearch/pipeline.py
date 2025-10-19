@@ -538,6 +538,31 @@ class ChunkIngestionPipeline:
             chunk_count=total_chunks,
             namespaces=tuple(sorted(namespaces)),
             vector_ids=tuple(vector_ids) if vector_ids is not None else None,
+        flush_batch()
+        return ingested
+
+    def _commit_batch(self, batch: Sequence[ChunkPayload]) -> None:
+        """Persist a batch of chunk payloads across dense and sparse stores."""
+
+        if not batch:
+            return
+        with self._observability.trace("ingest_dual_write", count=str(len(batch))):
+            self._prepare_faiss(batch)
+            embeddings = [chunk.features.embedding for chunk in batch]
+            vector_ids = [chunk.vector_id for chunk in batch]
+            self._faiss.add(embeddings, vector_ids)
+            self._opensearch.bulk_upsert(batch)
+            self._registry.upsert(batch)
+        self._metrics.chunks_upserted += len(batch)
+        self._observability.metrics.increment("ingest_chunks", len(batch))
+        self._observability.logger.info(
+            "chunk-upsert",
+            extra={
+                "event": {
+                    "count": len(batch),
+                    "namespaces": sorted({chunk.namespace for chunk in batch}),
+                }
+            },
         )
 
     def delete_chunks(self, vector_ids: Sequence[str]) -> None:
@@ -774,25 +799,65 @@ class ChunkIngestionPipeline:
         weights = payload.get("weights") or []
         return {str(term): float(weight) for term, weight in zip(terms, weights)}
 
-    def _read_jsonl(self, path: Path) -> List[Dict[str, object]]:
-        """Load JSONL content from disk and parse each line into a dictionary.
+    def _iter_jsonl(self, path: Path) -> Iterator[Dict[str, object]]:
+        """Yield parsed JSON objects from a JSONL artifact lazily."""
 
-        Args:
-            path: Path to the JSONL artifact.
-
-        Returns:
-            List of parsed entries.
-
-        Raises:
-            IngestError: If the artifact file is missing.
-            json.JSONDecodeError: If any JSON line cannot be parsed.
-        """
         if not path.exists():
             raise IngestError(f"Artifact file {path} not found")
-        lines = path.read_text(encoding="utf-8").splitlines()
-        entries: List[Dict[str, object]] = []
-        for line in lines:
-            if not line.strip():
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                yield json.loads(line)
+
+    def _load_precomputed_chunks(self, document: DocumentInput) -> Iterator[ChunkPayload]:
+        """Stream chunk and vector artifacts from disk for ``document``."""
+
+        chunk_iter = self._iter_jsonl(document.chunk_path)
+        vector_iter = self._iter_jsonl(document.vector_path)
+        vector_cache: Dict[str, Mapping[str, object]] = {}
+
+        def pop_vector(vector_id: str) -> Optional[Mapping[str, object]]:
+            cached = vector_cache.pop(vector_id, None)
+            if cached is not None:
+                return cached
+            for entry in vector_iter:
+                candidate_id = str(entry.get("uuid") or entry.get("UUID"))
+                vector_cache[candidate_id] = entry
+                if candidate_id == vector_id:
+                    return vector_cache.pop(candidate_id)
+            return None
+
+        missing: List[str] = []
+        for chunk_entry in chunk_iter:
+            vector_id = str(chunk_entry.get("uuid") or chunk_entry.get("UUID"))
+            vector_payload = pop_vector(vector_id)
+            if vector_payload is None:
+                missing.append(vector_id)
                 continue
-            entries.append(json.loads(line))
-        return entries
+            features = self._features_from_vector(vector_payload)
+            metadata = dict(document.metadata)
+            metadata.update(
+                {
+                    "doc_id": document.doc_id,
+                    "chunk_id": chunk_entry.get("chunk_id"),
+                    "source_path": chunk_entry.get("source_path"),
+                }
+            )
+            yield ChunkPayload(
+                doc_id=document.doc_id,
+                chunk_id=str(chunk_entry.get("chunk_id")),
+                vector_id=vector_id,
+                namespace=document.namespace,
+                text=str(chunk_entry.get("text", "")),
+                metadata=metadata,
+                features=features,
+                token_count=int(chunk_entry.get("num_tokens", 0)),
+                source_chunk_idxs=tuple(int(idx) for idx in chunk_entry.get("source_chunk_idxs", [])),
+                doc_items_refs=tuple(str(ref) for ref in chunk_entry.get("doc_items_refs", [])),
+                char_offset=(0, len(str(chunk_entry.get("text", "")))),
+            )
+        if missing:
+            raise IngestError(
+                "Missing vector entries for chunk UUIDs: " + ", ".join(sorted(set(missing)))
+            )

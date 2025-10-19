@@ -1,4 +1,11 @@
 # === NAVMAP v1 ===
+"""End-to-end hybrid search suite validating ingestion, FAISS GPU usage, API, and snapshots.
+
+Stitches together config management, DocParsing fixtures, FAISS GPU ingestion,
+API requests, validator resource budgets, and snapshot/restore flows. Mirrors
+the README quickstart and ensures the custom `faiss-1.12.0` wheel (CUDA 12 +
+OpenBLAS) works across ingestion, query, and scale scenarios."""
+
 # {
 #   "module": "tests.hybrid_search.test_suite",
 #   "purpose": "Pytest coverage for hybrid search suite scenarios",
@@ -271,13 +278,6 @@
 # }
 # === /NAVMAP ===
 
-"""End-to-end hybrid search suite using real FAISS/BM25 pipelines.
-
-Bootstraps config, fixture data, ingestion pipeline, and query service to
-validate ranking quality, pagination, diagnostics, and API contracts. Mirrors
-the critical smoke suite used in CI and documentation.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -374,6 +374,19 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
 @pytest.fixture
 def dataset() -> Sequence[Mapping[str, object]]:
     return load_dataset(Path("tests/data/hybrid_dataset.jsonl"))
+
+
+def test_infer_embedding_dim_returns_after_first_valid_vector(tmp_path: Path) -> None:
+    vector_path = tmp_path / "mock_vectors.jsonl"
+    with vector_path.open("w", encoding="utf-8") as handle:
+        handle.write(json.dumps({"Qwen3-4B": {"vector": [0.0, 1.0, 2.0]}}) + "\n")
+        # Subsequent lines are intentionally invalid JSON to prove we exit early.
+        for _ in range(1000):
+            handle.write("not-json\n")
+
+    dataset = [{"document": {"vector_file": str(vector_path)}}]
+
+    assert infer_embedding_dim(dataset) == 3
 
 
 # --- test_hybrid_search.py ---

@@ -1,11 +1,28 @@
-"""Feature generation helpers used during ingestion and synthetic tests.
+"""Deterministic feature generation used by ingestion and validation harnesses.
 
-The ingestion pipeline expects chunk payloads to carry BM25 stats, SPLADE-style
-weights, and dense vectors. Production runs obtain these from DocParsing; test
-fixtures use the deterministic helpers in this module (`FeatureGenerator`,
-`tokenize`, `sliding_window`) to emulate the same shapes. The resulting
-structures feed directly into `ChunkIngestionPipeline` and the FAISS-backed
-store described in the README.
+Production ingest jobs rely on external DocParsing services to attach BM25,
+SPLADE, and dense embeddings to each chunk. For reproducible tests we need those
+features to be synthesised locally with the same schema and numeric ranges that
+``store.ManagedFaissAdapter`` and ``service.HybridSearchService`` expect. This
+module provides that reference implementation:
+
+- ``tokenize`` / ``tokenize_with_spans`` implement the lower-casing tokeniser
+  assumed by the README examples and the in-memory OpenSearch simulator.
+- ``sliding_window`` mirrors the chunk segmentation controlled by
+  :class:`~DocsToKG.HybridSearch.config.ChunkingConfig`, ensuring that synthetic
+  datasets exercise identical window/overlap behaviour as production pipelines.
+- ``FeatureGenerator`` turns raw text into ``ChunkFeatures`` by computing
+  BM25-esque term weights (``1 + log1p(tf)``), SPLADE-style activations with a
+  max-TF normaliser, and a dense embedding derived from SHA-256 token hashing.
+  Tokens hash to 32-byte blocks that are tiled to a configurable dimension,
+  summed, and L2-normalised to approximate the cosine geometry used by the FAISS
+  GPU helpers (cosine similarity is implemented via inner products on unit
+  vectors). The exact same normalisation and dtype handling appear in the GPU
+  utilities inside ``store.py``.
+
+Because every transformation is deterministic, the ingestion pipeline and unit
+tests can regenerate fixtures on demand and compare FAISS results across GPU,
+CPU, or simulator backends with zero drift.
 """
 
 from __future__ import annotations

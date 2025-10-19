@@ -1,13 +1,28 @@
-"""In-memory OpenSearch simulator and schema helpers for development.
+"""In-memory analogue of the OpenSearch integration used by hybrid search.
 
-Args:
-    None
+The real deployment writes chunks to OpenSearch for BM25/SPLADE retrieval. Tests
+and local development environments cannot depend on an actual cluster, so this
+module provides feature-complete stand-ins:
 
-Returns:
-    None
+- ``OpenSearchIndexTemplate`` and ``OpenSearchSchemaManager`` describe and
+  validate namespace-specific index templates. The schema manager mirrors the
+  subset of the OpenSearch API that the README’s “Index provisioning” section
+  references, ensuring token-count and SPLADE mappings exist before ingesting
+  data.
+- ``OpenSearchSimulator`` implements the
+  :class:`~DocsToKG.HybridSearch.interfaces.LexicalIndex` protocol entirely in
+  memory. It maintains DF statistics for Okapi BM25 (``search_bm25_true``),
+  exposes heuristic BM25/SPLADE scorers that align with ingestion’s synthetic
+  feature generation, supports cursor-based pagination, and provides deterministic
+  highlighting. The scoring routines intentionally mirror the mathematics that
+  production OpenSearch applies so that fusion tests exercise realistic values.
+- ``matches_filters`` performs the metadata filtering logic shared between the
+  simulator and ``HybridSearchService`` when narrowing searches by namespace,
+  ACLs, or arbitrary document tags.
 
-Raises:
-    None
+Together these helpers let the ingestion pipeline, fusion logic, and diagnostics
+run without external services while still exercising the same interfaces,
+metadata layouts, and scoring curves expected in production.
 """
 
 from __future__ import annotations

@@ -6,6 +6,32 @@ last_updated: 2025-02-15
 
 > _Metadata backlog_: owning_team, stability, versioning, codeowners, related_adrs, slos, data_handling, and sbom will be populated in a future revision.
 
+## Table of Contents
+- [DocsToKG • HybridSearch](#docstokg--hybridsearch)
+  - [Prerequisites & dependencies](#prerequisites--dependencies)
+  - [Data inputs & expected layout](#data-inputs--expected-layout)
+  - [Quickstart](#quickstart)
+  - [GPU prerequisites & validation checklist](#gpu-prerequisites--validation-checklist)
+  - [Common commands](#common-commands)
+  - [Module architecture](#module-architecture)
+  - [Core capabilities](#core-capabilities)
+    - [Ingestion workflow](#ingestion-workflow)
+    - [Search API contract](#search-api-contract)
+    - [Configuration quick reference](#configuration-quick-reference)
+    - [Failure recovery & snapshot management](#failure-recovery--snapshot-management)
+    - [Deployment considerations](#deployment-considerations)
+  - [Folder map](#folder-map)
+  - [System overview](#system-overview)
+  - [Entry points & contracts](#entry-points--contracts)
+  - [Configuration](#configuration)
+  - [Data contracts & schemas](#data-contracts--schemas)
+  - [Interactions with other packages](#interactions-with-other-packages)
+  - [Observability](#observability)
+  - [Security & data handling](#security--data-handling)
+  - [Development tasks](#development-tasks)
+  - [Agent guardrails](#agent-guardrails)
+  - [FAQ](#faq)
+
 # DocsToKG • HybridSearch
 
 Purpose: Hybrid retrieval engine combining lexical and dense vector search with configurable fusion and observability.
@@ -15,7 +41,7 @@ Scope boundary: Ingests chunked documents, maintains FAISS/OpenSearch-style inde
 
 ## Prerequisites & dependencies
 - **Runtime**: Linux with CUDA 12-capable NVIDIA GPUs; Python 3.10+. CPU-only usage is possible (fallback to FAISS CPU) but sacrifices latency/fusion quality.
-- **Packages**: Install `DocsToKG[hybrid-search]` plus the bundled `faiss-gpu` wheel. Optional extras:
+- **Packages**: Install `DocsToKG[hybrid-search]` plus the bundled `faiss-gpu` wheel. The wheel surface area, CUDA/OpenBLAS requirements, and GPU helper APIs are documented in [faiss-gpu-wheel-reference.md](./faiss-gpu-wheel-reference.md); keep that file handy whenever you upgrade drivers or CUDA runtimes. Optional extras:
   - `torch` / `sentence-transformers` when running lexical transformers externally.
   - `uvicorn` / FastAPI (or similar) when embedding the service in an API server.
 - **Upstream data**: Requires DocParsing outputs:
@@ -137,21 +163,32 @@ print(adapter.stats())
 PY
 ```
 
+## Module architecture
+HybridSearch is organised as a set of focused modules that mirror the end-to-end ingestion → storage → query flow. Read these alongside the FAISS wheel reference to understand how CUDA resources and tensor shapes propagate through the system.
+
+- `config.py` – Dataclass-based configuration surface (`ChunkingConfig`, `DenseIndexConfig`, `FusionConfig`, `RetrievalConfig`, `HybridSearchConfig`). `DenseIndexConfig` maps directly to FAISS GPU constructs such as `GpuMultipleClonerOptions`, `StandardGpuResources` sizing, FP16/cuVS toggles, and tiling limits used during ingestion and search. `HybridSearchConfigManager` provides thread-safe JSON/YAML loading, legacy key normalisation, and snapshot persistence.
+- `pipeline.py` – Ingestion engine (`ChunkIngestionPipeline`) that streams DocParsing artifacts, applies deterministic normalisation (BM25, SPLADE, dense vectors), and coordinates lexical + FAISS GPU adapters while emitting observability data.
+- `store.py` – Dense retrieval backbone (`FaissVectorStore`, `ManagedFaissAdapter`) that trains CPU indexes, migrates them to GPU via `faiss.index_cpu_to_gpu(_multiple)`, manages `StandardGpuResources` pools, and exposes cosine/inner-product helpers built on `knn_gpu` and `pairwise_distance_gpu`. Handles snapshots, chunk registries, cuVS/FP16 overrides, and adapter telemetry.
+- `router.py` – Namespace router that provisions managed FAISS adapters per tenant, caches serialized payloads when evicting inactive namespaces, and rehydrates snapshots lazily while tracking last-use timestamps.
+- `service.py` – Synchronous hybrid search orchestration: validates requests, issues concurrent lexical + dense searches, fuses scores (RRF + optional MMR), enforces pagination budgets, and surfaces diagnostics expected by the API contract.
+- `types.py` & `interfaces.py` – Shared dataclasses and protocols (`LexicalIndex`, `DenseVectorStore`) that keep ingestion, storage, and service layers decoupled. All tensor dtypes/contiguity expectations and result shapes are defined here.
+- `devtools/` – Deterministic feature generators and an in-memory OpenSearch simulator that implement the above interfaces for unit tests and notebooks without external dependencies.
+
 ## Core capabilities
-- **Ingestion pipeline** – `pipeline.ChunkIngestionPipeline` loads chunked documents, normalises features (BM25, SPLADE, dense vectors), and streams them into lexical and dense indices with observability hooks.
-- **Vector store management** – `store.ManagedFaissAdapter`, `FaissRouter`, and `StoreSnapshot` helpers manage FAISS GPU replicas, namespace routing, snapshot/restore, and GPU memory telemetry.
-- **Hybrid retrieval** – `service.HybridSearchService` queries lexical + dense backends in parallel, applies reciprocal-rank fusion, MMR diversification, and pagination guards before shaping `HybridSearchResponse`.
-- **Namespace routing** – `router.FaissRouter` provisions dedicated FAISS stores per namespace (or shared), tracks idle stores, and supports lazy restore from serialized payloads.
-- **Configuration surface** – `config.py` provides Pydantic models (`HybridSearchConfig`, `DenseIndexConfig`, `FusionConfig`, `RetrievalConfig`) plus `HybridSearchConfigManager` for loading/snapshotting JSON/YAML configs.
-- **Developer tooling** – `devtools.OpenSearchSimulator`, `examples/hybrid_search_quickstart.py`, and the pytest suite exercise the stack without external OpenSearch dependencies.
-- **Observability** – `pipeline.Observability`, `store.AdapterStats`, and `service.build_stats_snapshot` aggregate per-channel metrics (latency, GPU utilisation, hit counts) for dashboards and smoke checks.
+- **Ingestion pipeline** – `pipeline.ChunkIngestionPipeline` coordinates lexical and dense ingestion in lockstep. It verifies manifests, normalises chunk payloads into contiguous `float32` tensors, and ensures FAISS adapters receive the shapes/dtypes required by GPU kernels while capturing metrics through `Observability`.
+- **Vector store management** – `store.ManagedFaissAdapter` and `FaissVectorStore` encapsulate FAISS GPU lifecycle operations: CPU training, multi-GPU cloning (replication/sharding), `StandardGpuResources` provisioning, and snapshot/restore with accompanying metadata. GPU similarity helpers (`cosine_against_corpus_gpu`, `cosine_topk_blockwise`, `pairwise_inner_products`) expose “no-index” cosine/inner-product routines built on FAISS `knn_gpu` / `pairwise_distance_gpu`, respecting cuVS and FP16 settings from `DenseIndexConfig`.
+- **Namespace routing** – `router.FaissRouter` owns the namespace→adapter map, lazily instantiating `ManagedFaissAdapter` instances, caching serialized snapshots when evicting idle namespaces, and aggregating per-namespace stats for health checks.
+- **Hybrid retrieval** – `service.HybridSearchService` validates `HybridSearchRequest`, fans out lexical (`LexicalIndex`) and dense (`DenseVectorStore`) searches concurrently, applies reciprocal-rank fusion with optional MMR diversification, and returns channel-attributed scores plus diagnostics expected by clients.
+- **Configuration surface** – `config.py` contains dataclass-backed configuration objects and a thread-safe `HybridSearchConfigManager` that loads, caches, and atomically reloads JSON/YAML files while normalising legacy keys (e.g., `gpu_default_null_stream*`).
+- **Developer tooling** – `devtools.OpenSearchSimulator`, `FeatureGenerator`, and the `examples/hybrid_search_quickstart.py` script provide a fully in-memory stack that still exercises FAISS GPU behaviours, making regression tests deterministic.
+- **Observability** – `pipeline.Observability`, `store.AdapterStats`, and `service.build_stats_snapshot` collect GPU memory usage, latency histograms, fusion counters, and namespace activity to feed dashboards and smoke tests.
 
 ### Ingestion workflow
 1. **Source artifacts** – Copy DocParsing outputs (`ChunkedDocTagFiles/*.chunk.jsonl`, `Embeddings/*.vectors.jsonl`) and their manifests into the configured data root.
 2. **Load configuration** – Build a `HybridSearchConfig` via `HybridSearchConfigManager.from_path(...)`, describing namespaces, budgets, and the snapshot directory.
 3. **Initialise indexes** – Call `ManagedFaissAdapter.from_config(config)` to create FAISS stores (GPU shards, CPU fallbacks) and a chunk registry. Optional lexical indexes are brought up by `pipeline.ChunkIngestionPipeline`.
 4. **Stream ingestion** – Invoke `ChunkIngestionPipeline.ingest()` to iterate chunks/vectors lazily, normalise features (BM25/SPLADE), and populate dense + lexical indices. Metrics are emitted via `Observability`.
-5. **Snapshot & persist** – Use `adapter.serialize_all()` or `store.write_snapshot()` to persist FAISS payloads and metadata per namespace. Store snapshots in durable storage (object store or persistent disk).
+5. **Snapshot & persist** – Use `FaissRouter.serialize_all()` (or call `ManagedFaissAdapter.serialize()` / `snapshot_meta()` per namespace) to capture FAISS bytes plus metadata. Persist the resulting payloads in durable storage (object store or persistent disk) so workers can restore quickly.
 6. **Serve queries** – Wire `HybridSearchService` into an application server or instantiate `HybridSearchAPI` for direct programmatic access; load snapshots on worker start-up for low-latency readiness.
 
 ### Search API contract

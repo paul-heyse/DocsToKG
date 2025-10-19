@@ -1,136 +1,337 @@
-# Agents Guide - HybridSearch
 
-Last updated: 2025-10-18
+## Table of Contents
+
+- [0) Guard rails (set once per session)](#0-guard-rails-set-once-per-session)
+- [1) Verify the environment exists (no install)](#1-verify-the-environment-exists-no-install)
+- [2) Run commands strictly from the project `.venv`](#2-run-commands-strictly-from-the-project-venv)
+- [3) Quick health checks (no network)](#3-quick-health-checks-no-network)
+- [4) Typical tasks (all no-install)](#4-typical-tasks-all-no-install)
+- [5) Troubleshooting (stay no-install)](#5-troubleshooting-stay-no-install)
+- [6) “Absolutely no installs” policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
+- [7) Fallback (only with **explicit approval** to install)](#7-fallback-only-with-explicit-approval-to-install)
+- [8) One-page quick reference (copy/paste safe)](#8-one-page-quick-reference-copy-paste-safe)
+- [Mission and Scope](#mission-and-scope)
+- [Runtime prerequisites](#runtime-prerequisites)
+- [Module architecture](#module-architecture)
+- [Core capabilities](#core-capabilities)
+- [Ingestion workflow](#ingestion-workflow)
+- [Search API quick reference](#search-api-quick-reference)
+- [Key invariants](#key-invariants)
+- [Test matrix & verification](#test-matrix-verification)
+- [Troubleshooting cues](#troubleshooting-cues)
+- [Reference commands](#reference-commands)
+- [Ownership & change management](#ownership-change-management)
+- [Coding Standards & Module Organization](#coding-standards-module-organization)
+
+# Project Environment — **No-Install** Runbook (for AI agents)
+
+> **Prime directive:** **Use the packages already installed in `./.venv`.**
+> Do **not** fetch or install anything unless you are explicitly told to. The project `.venv` includes custom wheels and GPU-specific builds that must not be disturbed.
+
+---
+
+## 0) Guard rails (set once per session)
+
+To make accidental installs impossible:
+
+```bash
+# Always run inside the project venv (enforced)
+export PIP_REQUIRE_VIRTUALENV=1
+
+# Never hit the network/package index unless explicitly allowed
+export PIP_NO_INDEX=1
+
+# Don’t read user site-packages (avoid leakage)
+export PYTHONNOUSERSITE=1
+```
+
+> If you later receive explicit approval to install, temporarily unset `PIP_NO_INDEX` (and only follow the “Fallback (with approval)” section at the end).
+
+---
+
+## 1) Verify the environment exists (no install)
+
+```bash
+# from repo root
+test -x .venv/bin/python || { echo "ERROR: .venv is missing — STOP (no installs)."; exit 1; }
+```
+
+If missing or broken: **stop and report**. Do **not** create or modify the environment without authorization.
+
+---
+
+## 2) Run commands strictly from the project `.venv`
+
+Pick **one** method below. All of them resolve **imports and console scripts from `./.venv`** and avoid installs.
+
+### A) Most explicit (activation-free; recommended for agents)
+
+```bash
+# Call tools by absolute path inside the venv
+./.venv/bin/python -m pip --version      # proves you're on ./.venv/bin/python
+./.venv/bin/python -m DocsToKG.ContentDownload.cli --help
+./.venv/bin/pytest -q
+./.venv/bin/ruff check .
+./.venv/bin/mypy src
+```
+
+### B) `direnv` (auto-env; if available)
+
+```bash
+direnv allow                             # trust once per machine
+direnv exec . python -m pip --version
+direnv exec . python -m DocsToKG.ContentDownload.cli --help
+direnv exec . pytest -q
+```
+
+### C) `./scripts/dev.sh` (portable wrapper; no direnv needed)
+
+```bash
+./scripts/dev.sh doctor                  # prints interpreter/env and importability
+./scripts/dev.sh python -m DocsToKG.ContentDownload.cli --help
+./scripts/dev.sh exec pytest -q
+./scripts/dev.sh pip list                # safe: listing does not install
+```
+
+### D) Classic activation (if explicitly requested)
+
+```bash
+# Linux/macOS
+source .venv/bin/activate
+export PYTHONPATH="\$PWD/src:${PYTHONPATH:-}"    # mirrors project behavior
+python -m pip --version
+python -m DocsToKG.ContentDownload.cli --help
+pytest -q
+```
+
+> Prefer **A–C** for automation. **D** is acceptable in interactive shells but easier to get wrong.
+
+---
+
+## 3) Quick health checks (no network)
+
+Run these **before** heavy work:
+
+```bash
+# 1) Interpreter identity (must be the project venv)
+./.venv/bin/python - <<'PY'
+import sys
+assert sys.executable.endswith("/.venv/bin/python"), sys.executable
+print("OK: using", sys.executable)
+PY
+
+# 2) Package presence WITHOUT installing (examples)
+./.venv/bin/python -c "import DocsToKG, pkgutil; print('DocsToKG OK');"
+./.venv/bin/python -c "import faiss; print('FAISS OK')"
+./.venv/bin/python -c "import cupy; import numpy; print('CuPy OK', cupy.__version__)"
+```
+
+If any import fails: **do not install**. Go to Troubleshooting.
+
+---
+
+## 4) Typical tasks (all no-install)
+
+```bash
+# CLIs (module form)
+./.venv/bin/python -m DocsToKG.ContentDownload.cli --help
+
+# Tests
+./.venv/bin/pytest -q
+
+# Lint/format
+./.venv/bin/ruff check .
+./.venv/bin/black --check .
+
+# Type check
+./.venv/bin/mypy src
+```
+
+> Always prefer `python -m <module>` and `.venv/bin/<tool>` — these guarantee resolution from the project environment.
+
+---
+
+## 5) Troubleshooting (stay no-install)
+
+**Symptom → Action (no installs):**
+
+- **`ModuleNotFoundError`**
+  You’re not using the project interpreter. Re-run via one of §2 methods, then re-check `sys.executable`.
+
+- **GPU/FAISS/CuPy errors** (e.g., missing `.so`/DLL)
+  Do **not** build or fetch wheels. Report the exact error. These packages are customized; replacing them may break GPU paths.
+
+- **`pip` tries to fetch**
+  You forgot the guard rails. Ensure `PIP_REQUIRE_VIRTUALENV=1` and `PIP_NO_INDEX=1` are set. Never pass `-U/--upgrade`.
+
+---
+
+## 6) “Absolutely no installs” policy (what you may do)
+
+- You **may**:
+
+  - Inspect environment: `./.venv/bin/pip list`, `./.venv/bin/pip show <pkg>`.
+  - Run any console script from `./.venv/bin/…`.
+  - Read code and run module CLIs with `python -m …`.
+
+- You **must not**:
+
+  - Run `pip install`, `pip wheel`, `pip cache purge`, or `pip uninstall`.
+  - Upgrade/downgrade packages (including `pip` itself).
+  - Recreate or modify `./.venv` without explicit approval.
+
+---
+
+## 7) Fallback (only with **explicit approval** to install)
+
+If (and only if) you have written approval to modify the environment, apply the **smallest necessary** action **inside** the venv:
+
+```bash
+# ensure you are in the project venv first:
+source .venv/bin/activate  # or use ./.venv/bin/python -m pip ...
+unset PIP_NO_INDEX         # allow index access if instructed
+
+# project code (editable) and pinned deps ONLY:
+pip install -e .
+pip install -r requirements.txt
+
+# If a local wheelhouse exists (to avoid network):
+# pip install --no-index --find-links ./ci/wheels -r requirements.txt
+```
+
+> Never “try versions” or compile GPU libs. If a wheel is missing, escalate.
+
+---
+
+## 8) One-page quick reference (copy/paste safe)
+
+```bash
+# Guard rails (no accidental installs)
+export PIP_REQUIRE_VIRTUALENV=1 PIP_NO_INDEX=1 PYTHONNOUSERSITE=1
+
+# Verify venv exists (stop if missing)
+test -x .venv/bin/python || { echo "Missing .venv — STOP (no installs)."; exit 1; }
+
+# Preferred run patterns (choose ONE)
+./.venv/bin/python -m DocsToKG.ContentDownload.cli --help
+./.venv/bin/pytest -q
+# or
+direnv exec . python -m DocsToKG.ContentDownload.cli --help
+direnv exec . pytest -q
+# or
+./scripts/dev.sh doctor
+./scripts/dev.sh python -m DocsToKG.ContentDownload.cli --help
+./scripts/dev.sh exec pytest -q
+
+# Health checks (no network)
+./.venv/bin/python - <<'PY'
+import sys; assert sys.executable.endswith("/.venv/bin/python"); print("OK:", sys.executable)
+PY
+./.venv/bin/python -c "import DocsToKG, faiss, cupy; print('Core imports OK')"
+```
+
+---
+
+### Final note for agents
+
+This repository’s environment includes **custom wheels and GPU-optimized packages**. Treat the `.venv` as **immutable** unless you are explicitly told to modify it. Your default posture is **execute only**: run what’s already installed, verify, and report issues rather than “fixing” them by installing.
+
+# Agents Guide – HybridSearch
+
+Last updated: 2025-02-15
+
+> For full detail, read [README.md](./README.md) and the [FAISS GPU wheel reference](./faiss-gpu-wheel-reference.md). This section mirrors the high-level guidance there so agents have a consistent source of truth.
 
 ## Mission and Scope
-- Mission: Deliver low-latency hybrid retrieval (lexical + dense) with deterministic fusion, scalable ingestion, and GPU-aware storage for DocsToKG.
-- Scope boundary: In-scope—chunk ingestion, feature generation, FAISS/OpenSearch orchestration, fusion logic, API/service layer, observability. Out-of-scope—downstream answer generation, long-term document storage policy, embedding model training.
 
-## High-Level Architecture & Data Flow
-```mermaid
-flowchart LR
-  A[DocumentInput / ChunkPayload] --> B[ChunkIngestionPipeline]
-  B --> C[ChunkRegistry + LexicalIndex]
-  B --> D[ManagedFaissAdapter (FAISS)]
-  subgraph Query Path
-    Q[HybridSearchAPI] --> S[HybridSearchService]
-    S --> C
-    S --> D
-    S --> F[ReciprocalRankFusion + MMR]
-    F --> R[HybridSearchResponse]
-  end
-  D -.-> G[(Serialized snapshots)]:::cache
-  classDef cache stroke-dasharray: 3 3;
-```
-- Components: ingestion pipeline (`pipeline.py`), dense store (`store.py`), namespace router (`router.py`), service/API (`service.py`), configuration manager (`config.py`), feature generators (`features.py`).
-- Primary data edges: document artifacts → chunk features → lexical + dense indexes → fused results.
-- One failure path to consider: GPU FAISS allocation failure during ingest triggers CPU fallback and increases latency—monitor `AdapterStats` and ensure snapshot restore works.
+- Mission: Provide hybrid (lexical + dense) retrieval with deterministic fusion, GPU-accelerated storage, and robust observability for DocsToKG.
+- In scope: DocParsing‑driven ingestion, feature normalisation, FAISS/OpenSearch orchestration, namespace routing, fusion logic, API/service layer, metrics.
+- Out of scope: Embedding model training, downstream answer generation, long-term archival policy.
 
-## Hot Paths & Data Shapes
-- Hot paths:
-  - `HybridSearchService.search()` orchestrates sparse/dense retrieval and fusion.
-  - `ManagedFaissAdapter.search_many()` / `cosine_topk_blockwise()` for dense similarity.
-  - `ChunkIngestionPipeline.ingest()` for bulk document onboarding.
-  - `ResultShaper.shape()` for token/byte budget trimming.
-- Typical payload sizes: embeddings 768–1536 dims (float32) (TODO verify actual dims per config); chunk payloads ~1–4 KB JSON; ingestion batches often 100–10k chunks.
-- Key schemas/models: `ChunkPayload`, `ChunkFeatures`, `HybridSearchRequest/Response`, `DenseIndexConfig`, `FusionConfig`; ensure docstrings reflect required fields.
+## Runtime prerequisites
 
-## Performance Objectives & Baselines
-- Targets: TODO establish P50 < 120 ms, P95 < 250 ms for single-namespace search at top_k=20; ingestion throughput TODO (e.g., 5k chunks/min on GPU).
-- Known baseline: TODO capture latest CI benchmark from `tests/hybrid_search/test_suite.py::test_hybrid_scale_suite`.
-- Measurement recipes:
-  ```bash
-  direnv exec . pytest tests/hybrid_search/test_suite.py::test_hybrid_retrieval_end_to_end -q
-  direnv exec . python -m cProfile -m DocsToKG.HybridSearch.service --profile-search '{"query":"hybrid search"}'
-  ```
+- Linux with CUDA‑12 capable NVIDIA GPUs plus the custom FAISS 1.12 GPU wheel. Required shared libraries: `libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, `libgomp.so.1`, compatible `GLIBC_2.38`/`GLIBCXX_3.4.32`.
+- Environment variables: `DOCSTOKG_DATA_ROOT` (defaults to `./Data`), optional `DOCSTOKG_HYBRID_CONFIG`, `TEMP_DIR`/`TMPDIR` for snapshot staging, `FAISS_OPT_LEVEL` / `FAISS_DISABLE_CPU_FEATURES` for loader overrides.
+- Inputs: DocParsing chunk JSONL + embedding JSONL (aligned via `chunk_id`) and their manifests; ingestion trusts DocParsing for ID consistency.
 
-## Profiling & Optimization Playbook
-- Quick profile:
-  ```bash
-  direnv exec . python -m cProfile -m DocsToKG.HybridSearch.service --profile-search '{"query":"example"}'
-  direnv exec . pyinstrument -r html -o profile.html python -m DocsToKG.HybridSearch.service --profile-search '{"query":"example"}'
-  direnv exec . pytest tests/hybrid_search/test_suite.py::test_hybrid_scale_suite --maxfail=1 -q
-  ```
-- Tactics:
-  - Batch sparse + dense searches (reduce per-document dispatch over thread pool).
-  - Use blockwise cosine (`cosine_topk_blockwise`) instead of naive loops; tune block size.
-  - Normalize once (`normalize_rows`) and reuse across fusion stages.
-  - Avoid repeated JSON encode/decode in hot loops (reuse `ChunkPayload` objects).
-  - Cache query features when reranking similar queries; respect invalidation rules.
-  - For GPU indices, pre-reserve memory (`DenseIndexConfig.expected_ntotal`) and use pinned buffers.
+## Module architecture
 
-## Complexity & Scalability Guidance
-- Retrieval complexity: O(k log k) for fusion after O(n) sparse/dense fetch (n = hits per channel), ensure `k` stays small (FusionConfig.max_chunks_per_doc).
-- Ingestion complexity: O(N) over chunks with dedupe thresholds; memory proportional to chunk batch size.
-- Memory growth: FAISS indices scale with `ntotal * dim * bytes`; monitor GPU VRAM and use IVFPQ when ntotal > ~1e6 (config).
-- Large-N strategies: sharded namespaces via `FaissRouter(per_namespace=True)`; streaming ingestion with chunk batching, snapshot/restore to migrate indices.
+- `config.py` – Dataclass configs (`ChunkingConfig`, `DenseIndexConfig`, `FusionConfig`, `RetrievalConfig`, `HybridSearchConfig`) plus `HybridSearchConfigManager` for thread-safe JSON/YAML loading and legacy key normalisation. `DenseIndexConfig` maps directly to FAISS GPU options (`GpuMultipleClonerOptions`, `StandardGpuResources`, FP16/cuVS toggles, tiling limits).
+- `pipeline.py` – `ChunkIngestionPipeline` streams DocParsing artifacts, normalises BM25/SPLADE/dense features into contiguous `float32` tensors, drives lexical + FAISS adapters, and emits metrics through `Observability`.
+- `store.py` – `FaissVectorStore` / `ManagedFaissAdapter` manage CPU training, `index_cpu_to_gpu(_multiple)` cloning, multi-GPU replication/sharding, `StandardGpuResources` pools, cuVS/FP16 overrides, cosine/inner-product helpers built on `knn_gpu` / `pairwise_distance_gpu`, plus snapshot/restore and the `ChunkRegistry`.
+- `router.py` – `FaissRouter` provisions namespace-scoped adapters, caches serialized payloads for evicted stores, rehydrates snapshots lazily, and reports per-namespace stats/last-used timestamps.
+- `service.py` – Validates `HybridSearchRequest`, launches concurrent lexical (`LexicalIndex`) and dense (`DenseVectorStore`) searches, applies reciprocal-rank fusion with optional MMR diversification, shapes `HybridSearchResponse`, and records diagnostics.
+- `types.py` & `interfaces.py` – Shared dataclasses and protocols that define tensor shapes, adapter contracts, and response structures so ingestion, storage, and service layers interoperate.
+- `devtools/` – Deterministic `FeatureGenerator` plus the in-memory `OpenSearchSimulator` for regression tests and notebooks without external services.
 
-## I/O, Caching & Concurrency
-- I/O patterns: CPU/GPU FAISS operations, optional OpenSearch simulator for lexical; serialized snapshots persisted via `serialize_state`.
-- Cache keys & invalidation: namespace-keyed FAISS router snapshots; chunk registry maps vector_id → payload and must stay in sync with dense store (remove/add pair).
-- Concurrency: `HybridSearchService` uses `ThreadPoolExecutor` for channels; `ManagedFaissAdapter` guarded by locks; `FaissRouter` ensures thread-safe namespace creation. Avoid manual threading—use provided executors.
+## Core capabilities
 
-## Invariants to Preserve (change with caution)
-- Stable mapping between vector UUIDs and FAISS ids (`_vector_uuid_to_faiss_int`).
-- Fusion determinism: same inputs/config → same ordering (RRf/MMR results).
-- Pagination guarantees: `verify_pagination` must reject unsupported page sizes/filters.
-- Chunk registry consistency: lexical index and dense store must receive identical add/remove sequences.
-- Observability budgets: `ResultShaper` enforces token/byte limits—never bypass without updating budget checks/tests.
+- **Ingestion pipeline** – Validates manifests, normalises chunk payloads, keeps lexical and dense stores in sync, and surfaces metrics (latency histograms, GPU usage).
+- **Vector store management** – Handles FAISS GPU lifecycle (training, replication, memory reservations, cosine/inner-product helpers) and snapshot metadata used for cold starts.
+- **Namespace routing** – Maintains namespace→adapter mappings, caches snapshots when evicting idle stores, and aggregates stats for multi-tenant deployments.
+- **Hybrid retrieval** – Executes dense + lexical lookups in parallel, fuses results via RRF/MMR, enforces pagination and token budgets, returns per-channel diagnostics.
+- **Configuration surface** – Exposes the knobs that map YAML/JSON configs to FAISS runtime behaviour with atomic reload and legacy alias handling.
+- **Observability** – Provides `Observability`, `AdapterStats`, and `service.build_stats_snapshot` for dashboards, health checks, and regression harnesses.
 
-## Preferred Refactor Surfaces
-- Extend retrieval by implementing `DenseVectorStore` or `LexicalIndex` protocols in new modules and wiring via `HybridSearchConfigManager`.
-- Improve metrics in `pipeline.Observability` or adapters in `store.ManagedFaissAdapter`.
-- Add fusion heuristics inside `service.ReciprocalRankFusion` / `apply_mmr_diversification`.
-- Avoid first-touch changes inside low-level FAISS wrappers unless you have extensive test coverage.
+## Ingestion workflow
 
-## Code Documentation Requirements
-- Maintain NAVMAP headers in `service.py`, `pipeline.py`, `store.py`, `types.py`, etc.—update when adding sections.
-- Public methods/classes require docstrings describing data contracts (`ChunkPayload`, `HybridSearchRequest`).
-- Provide usage snippets for new API surfaces (similar to examples in `__init__.py` docstring).
-- Follow `MODULE_ORGANIZATION_GUIDE.md`, `CODE_ANNOTATION_STANDARDS.md`, and `STYLE_GUIDE.md`; tests should assert docstring invariants when feasible.
+1. **Source artifacts** – Place chunk and embedding JSONL (plus manifests) under `${DOCSTOKG_DATA_ROOT}`.
+2. **Load configuration** – Build a `HybridSearchConfig` via `HybridSearchConfigManager.from_path(...)` to define namespaces, budgets, GPU settings, and snapshot directories.
+3. **Initialise indexes** – Instantiate `ManagedFaissAdapter` (and optional lexical indexes) using the loaded config; ensure `ChunkRegistry` is ready.
+4. **Stream ingestion** – Call `ChunkIngestionPipeline.ingest()` to normalise features, upsert lexical payloads, add dense vectors to FAISS, and emit telemetry.
+5. **Snapshot & persist** – Use `FaissRouter.serialize_all()` or per-adapter `serialize()`/`snapshot_meta()` to capture FAISS bytes + metadata; store in durable storage for fast restore.
+6. **Serve queries** – Wire `HybridSearchService` / `HybridSearchAPI` into your runtime, load snapshots on start-up, then serve hybrid queries with deterministic fusion.
 
-## Test Matrix & Quality Gates
+## Search API quick reference
+
+- **Request** – `HybridSearchRequest` includes query text, namespace, channel weights/top-k/filters, and optional MMR diversifier settings.
+- **Response** – `HybridSearchResponse` returns fused results with per-channel scores, highlights, metadata, plus diagnostics (`dense_latency_ms`, `lexical_latency_ms`, fusion parameters).
+- **Validation errors** – Surface as `RequestValidationError` with JSON payload; pagination guards reject out-of-budget requests.
+
+## Key invariants
+
+- Stable UUID→FAISS-id mapping via `_vector_uuid_to_faiss_int`; never mutate directly.
+- Fusion determinism: identical inputs/config must yield identical ranking; update tests if fusion logic changes.
+- Chunk registry parity: lexical and dense stores must process identical add/remove sequences.
+- Token/byte budgets enforced by `ResultShaper`; adjust only with accompanying tests and config updates.
+
+## Test matrix & verification
+
 ```bash
 direnv exec . ruff check src/DocsToKG/HybridSearch tests/hybrid_search
 direnv exec . mypy src/DocsToKG/HybridSearch
 direnv exec . pytest tests/hybrid_search/test_suite.py -q
-direnv exec . pytest tests/hybrid_search/test_suite.py::test_hybrid_scale_suite -q  # optional perf smoke
+direnv exec . pytest tests/hybrid_search/test_suite.py::test_hybrid_scale_suite -q  # optional perf check
 ```
-- TODO add GPU-targeted test markers for IVFPQ scenarios; ensure CPU fallback covered.
-- Maintain fixtures under `tests/hybrid_search/fixtures/` (TODO create if missing) for deterministic regression.
 
-## Failure Modes & Debug Hints
+- GPU-specific scenarios rely on the custom wheel; run on hardware with CUDA 12.
+- Keep fixtures under `tests/hybrid_search/` consistent with DocParsing schema expectations.
+
+## Troubleshooting cues
+
 | Symptom | Likely cause | Quick checks |
 |---|---|---|
-| Search latency spikes | Dense store evicted to CPU or nprobe too high | Inspect `AdapterStats`; check `FaissRouter.stats()` for `evicted=True`; tune `DenseIndexConfig.nprobe`. |
-| Missing highlights | Lexical index out of date after ingest | Verify `ChunkRegistry` vs lexical bulk_upsert; rerun ingestion pipeline for namespace. |
-| GPU OOM during ingest | IVFPQ config mis-sized or replication enabled on large datasets | Lower `expected_ntotal`, disable replication, switch to CPU persist mode. |
-| Pagination duplicates | `verify_pagination` disabled or cursor misuse | Ensure page_size <= config limit; run `test_hybrid_retrieval_end_to_end`. |
+| Search latency spike | FAISS replica evicted or `nprobe` too high | Inspect `AdapterStats`; run `FaissRouter.stats()`; tune `DenseIndexConfig.nprobe`. |
+| Missing highlights | Lexical index not updated | Compare `ChunkRegistry` entries vs lexical bulk upsert; rerun ingestion for namespace. |
+| GPU OOM during ingest | Oversized IVFPQ / replication | Lower `expected_ntotal`, disable replication, use CPU persist mode temporarily. |
+| Pagination duplicates | Cursor misuse or disabled verification | Ensure `verify_pagination` remains enabled and respect configured page size limits. |
 
-## Canonical Commands
+## Reference commands
+
 ```bash
-# Ingest toy dataset and run search (example harness)
-direnv exec . python examples/hybrid_search/ingest_and_search.py  # TODO script path
+# Hybrid quickstart harness (writes tmp config, ingests sample data, runs search)
+direnv exec . python examples/hybrid_search_quickstart.py
 
-# Run full hybrid search test suite
+# Regression suite
 direnv exec . pytest tests/hybrid_search/test_suite.py -q
-
-# Snapshot and restore FAISS index (example)
-direnv exec . python - <<'PY'
-from DocsToKG.HybridSearch.store import serialize_state, restore_state, ManagedFaissAdapter
-# TODO: fill in adapter initialization and snapshot usage
-PY
 ```
 
-## Indexing Hints
-- Read first: `service.py` (search orchestration), `store.py` (FAISS adapter), `pipeline.py` (ingestion + metrics), `config.py` (knobs), `types.py` (data contracts).
-- High-signal tests: `tests/hybrid_search/test_suite.py::test_hybrid_retrieval_end_to_end`, `test_operations_snapshot_and_restore_roundtrip`, `test_gpu_ivfpq_build_and_search`.
-- Key schemas/contracts: ensure alignment with `HybridSearchRequest`, `HybridSearchResponse`, and config dataclasses.
+## Ownership & change management
 
-## Ownership & Documentation Links
-- Owners/reviewers: TODO_OWNERS (check root `CODEOWNERS` for `src/DocsToKG/HybridSearch/`).
-- Additional docs: `src/DocsToKG/HybridSearch/README.md` (TODO if absent), architecture notes in `docs/` (TODO link).
+- Code owners: see repository `CODEOWNERS` entry for `src/DocsToKG/HybridSearch/`.
+- Update this guide alongside `README.md` whenever you change ingestion flow, fusion behaviour, GPU requirements, or configuration fields.
 
-## Changelog and Update Procedure
-- Update this guide when adding new retrieval channels, changing fusion logic, or adjusting performance targets.
-- Keep TODO placeholders in sync with actual metrics/config; bump `Last updated` after substantive edits.
+## Coding Standards & Module Organization
+
+- Follow the documentation in [CODE_ANNOTATION_STANDARDS.md](../docs/CODE_ANNOTATION_STANDARDS.md) when annotating code or updating NAVMAP headers.
+- Structure modules according to [MODULE_ORGANIZATION_GUIDE.md.txt](../docs/html/_sources/MODULE_ORGANIZATION_GUIDE.md.txt) so imports, dataclasses, and public APIs remain predictable for downstream agents.
