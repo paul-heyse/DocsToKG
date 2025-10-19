@@ -88,7 +88,7 @@ def test_resolve_config_rejects_invalid_per_page(parser, capfd, per_page):
     assert "--per-page must be between 1 and 200" in err
 
 
-@pytest.mark.parametrize("max_value", [0, -10])
+@pytest.mark.parametrize("max_value", [-10])
 def test_resolve_config_rejects_non_positive_max(parser, capfd, max_value):
     argv = _base_args() + ["--max", str(max_value)]
     args = download_args.parse_args(parser, argv)
@@ -98,7 +98,7 @@ def test_resolve_config_rejects_non_positive_max(parser, capfd, max_value):
 
     assert excinfo.value.code == 2
     _, err = capfd.readouterr()
-    assert "--max must be a positive integer" in err
+    assert "--max must be greater than or equal to 0" in err
 
 
 def test_resolve_config_rejects_inverted_year_range(parser, capfd):
@@ -131,13 +131,14 @@ def test_resolve_config_accepts_per_page_boundaries(parser, per_page):
     assert resolved.args.per_page == per_page
 
 
-def test_resolve_config_accepts_positive_max(parser):
-    argv = _base_args() + ["--max", "5"]
+@pytest.mark.parametrize("max_value", [5, 0])
+def test_resolve_config_accepts_non_negative_max(parser, max_value):
+    argv = _base_args() + ["--max", str(max_value)]
     args = download_args.parse_args(parser, argv)
 
     resolved = download_args.resolve_config(args, parser)
 
-    assert resolved.args.max == 5
+    assert resolved.args.max == max_value
 
 
 def test_resolve_config_sets_pyalex_email_from_config(parser, monkeypatch):
