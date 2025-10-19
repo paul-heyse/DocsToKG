@@ -174,6 +174,7 @@ sequenceDiagram
 
 - CLI flags in `args.py` hydrate `ResolverConfig`, `DownloadConfig`, and `DownloadContext` helpers. `DownloadOptions` remains as a compatibility shim that subclasses `DownloadConfig` for legacy imports.
 - Resolver configuration files (`--resolver-config`) mirror `ResolverConfig` fields. Unknown keys raise `ValueError`; add new fields to `ResolverConfig` with defaults before accepting them via CLI.
+- File overrides now cover concurrency and dedupe toggles: set `max_concurrent_resolvers` (must be >= 1) to fan out resolver threads per work item, and toggle `enable_global_url_dedup` to opt into or out of run-wide URL suppression.
 - Environment variables:
   - `UNPAYWALL_EMAIL` — polite contact for Unpaywall resolver; fallback to `--mailto`.
   - `CORE_API_KEY`, `S2_API_KEY`, `DOAJ_API_KEY` — credentials for Core, Semantic Scholar, and DOAJ resolvers.
@@ -187,8 +188,10 @@ resolver_order:
   - openalex
   - unpaywall
   - crossref
+
 max_concurrent_resolvers: 8
 max_concurrent_per_host: 4
+enable_global_url_dedup: false   # disable run-level dedupe when comparing resolver strategies
 polite_headers:
   User-Agent: "DocsToKG-Downloader/1.0 (+mailto:you@example.org)"
   Accept: "application/pdf, text/html;q=0.9, */*;q=0.7"
