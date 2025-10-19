@@ -69,6 +69,31 @@ def test_list_htmls_filters_and_sorts(tmp_path: Path) -> None:
     assert actual == expected
 
 
+def test_list_helpers_enumerate_without_error(tmp_path: Path) -> None:
+    """Regression: listing helpers should enumerate without raising on fresh trees."""
+
+    pdf_targets = {
+        "docs/a.pdf",
+        "docs/nested/b/report.pdf",
+        "docs/nested/c/summary.PDF",
+    }
+    html_targets = {
+        "docs/index.html",
+        "docs/nested/c/page.xhtml",
+        "docs/nested/c/sub/page.htm",
+    }
+
+    for relative in {*pdf_targets, *html_targets}:
+        _write(tmp_path / relative)
+
+    assert {
+        path.relative_to(tmp_path).as_posix() for path in list_pdfs(tmp_path)
+    } == {Path(rel).as_posix() for rel in sorted(pdf_targets)}
+    assert {
+        path.relative_to(tmp_path).as_posix() for path in list_htmls(tmp_path)
+    } == {Path(rel).as_posix() for rel in sorted(html_targets)}
+
+
 def test_list_generators_scale_streaming(tmp_path: Path) -> None:
     """Large directory trees should be consumed incrementally without materialising lists."""
 
