@@ -273,7 +273,7 @@ class DownloadRun:
             "max_results": self.args.max,
             "retry_attempts": self.resolved.openalex_retry_attempts,
             "retry_backoff": self.resolved.openalex_retry_backoff,
-            "retry_max_delay": self.resolved.openalex_max_retry_delay,
+            "retry_max_delay": self.resolved.openalex_retry_max_delay,
             "retry_after_cap": self.resolved.retry_after_cap,
         }
         try:
@@ -793,20 +793,6 @@ def iterate_openalex(
     retry_backoff = max(0.0, float(retry_backoff))
     max_delay = max(0.0, float(retry_max_delay)) if retry_max_delay is not None else 0.0
 
-    def _jittered_delay(attempt_number: int) -> float:
-        if attempt_number <= 0 or retry_backoff <= 0:
-            return 0.0
-        zero_index_attempt = max(attempt_number - 1, 0)
-        base_delay = retry_backoff * (2**zero_index_attempt)
-        effective_cap = max_delay if max_delay > 0 else base_delay
-        if effective_cap <= 0:
-            return 0.0
-        return _calculate_equal_jitter_delay(
-            zero_index_attempt,
-            backoff_factor=retry_backoff,
-            backoff_max=effective_cap,
-        )
-
     pager = query.paginate(
         per_page=per_page, n_max=max_results if max_results is not None else None
     )
@@ -830,17 +816,38 @@ def iterate_openalex(
                     raise
                 attempt += 1
                 retry_after = _retry_after_seconds(exc)
-                delay = _jittered_delay(attempt)
+                jitter_delay = 0.0
+                if retry_backoff > 0:
+                    base_attempt = max(attempt - 1, 0)
+                    backoff_cap = max_delay if max_delay > 0 else retry_backoff * (2**base_attempt)
+                    jitter_delay = _calculate_equal_jitter_delay(
+                        base_attempt,
+                        backoff_factor=retry_backoff,
+                        backoff_max=backoff_cap,
+                    )
+
+                bounded_retry_after: Optional[float] = None
                 if retry_after is not None:
                     bounded_retry_after = retry_after
                     if retry_after_cap is not None and retry_after_cap > 0:
                         bounded_retry_after = min(bounded_retry_after, retry_after_cap)
                     if max_delay > 0:
                         bounded_retry_after = min(bounded_retry_after, max_delay)
-                    delay = max(delay, bounded_retry_after)
-                if retry_after_cap is not None and retry_after_cap > 0:
-                    delay = min(delay, retry_after_cap)
-                if max_delay > 0:
+
+                delay = max(jitter_delay, bounded_retry_after or 0.0)
+
+                if bounded_retry_after is not None:
+                    effective_limit: Optional[float] = None
+                    if retry_after_cap is not None and retry_after_cap > 0:
+                        effective_limit = retry_after_cap
+                    if max_delay > 0:
+                        if effective_limit is None:
+                            effective_limit = max_delay
+                        else:
+                            effective_limit = min(effective_limit, max_delay)
+                    if effective_limit is not None:
+                        delay = min(delay, effective_limit)
+                elif max_delay > 0:
                     delay = min(delay, max_delay)
                 delay = max(0.0, delay)
                 LOGGER.warning(

@@ -407,6 +407,37 @@ def test_iterate_openalex_caps_retry_after(patcher):
     assert slept and slept[0] == pytest.approx(5.0)
 
 
+def test_iterate_openalex_retry_after_cap_bounds_jitter(patcher):
+    works = FlakyWorks([[{"id": "W1"}]], retry_after="3600")
+
+    sleeps: List[float] = []
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.time.sleep",
+        lambda value: sleeps.append(value),
+    )
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.random.uniform",
+        lambda _low, high: high,
+    )
+
+    results = list(
+        iterate_openalex(
+            works,
+            per_page=1,
+            max_results=None,
+            retry_attempts=2,
+            retry_backoff=200.0,
+            retry_max_delay=150.0,
+            retry_after_cap=100.0,
+        )
+    )
+
+    assert [item["id"] for item in results] == ["W1"]
+    assert sleeps and sleeps[0] == pytest.approx(100.0)
+
+
 def _manifest_entry(work_id: str, *, run_id: str = "resume-run") -> str:
     return json.dumps(
         {
