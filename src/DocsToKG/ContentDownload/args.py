@@ -73,6 +73,8 @@ class ResolvedConfig:
     concurrency_product: int
     extract_html_text: bool
     verify_cache_digest: bool
+    openalex_retry_attempts: int
+    openalex_retry_backoff: float
 
 
 def bootstrap_run_environment(resolved: ResolvedConfig) -> None:
@@ -158,6 +160,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="SIZE",
         help="Rotate JSONL logs after SIZE bytes (e.g., 250MB).",
+    )
+
+    openalex_group = parser.add_argument_group("OpenAlex pagination")
+    openalex_group.add_argument(
+        "--openalex-retry-attempts",
+        type=int,
+        default=3,
+        help="Number of times to retry a failed OpenAlex page request before giving up.",
+    )
+    openalex_group.add_argument(
+        "--openalex-retry-backoff",
+        type=float,
+        default=1.0,
+        help="Base backoff (seconds) used between OpenAlex pagination retries.",
     )
 
     classifier_group = parser.add_argument_group("Classifier settings")
@@ -390,6 +406,10 @@ def resolve_config(
         parser.error("--year-start must be less than or equal to --year-end")
     if not topic and not topic_id_input:
         parser.error("Provide --topic or --topic-id.")
+    if args.openalex_retry_attempts < 0:
+        parser.error("--openalex-retry-attempts must be >= 0")
+    if args.openalex_retry_backoff < 0:
+        parser.error("--openalex-retry-backoff must be >= 0")
     for field_name in ("sniff_bytes", "min_pdf_bytes", "tail_check_bytes"):
         value = getattr(args, field_name, None)
         if value is not None and value < 0:
@@ -544,6 +564,8 @@ def resolve_config(
         concurrency_product=concurrency_product,
         extract_html_text=extract_html_text,
         verify_cache_digest=args.verify_cache_digest,
+        openalex_retry_attempts=args.openalex_retry_attempts,
+        openalex_retry_backoff=args.openalex_retry_backoff,
     )
 
 

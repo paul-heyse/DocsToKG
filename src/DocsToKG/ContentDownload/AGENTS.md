@@ -118,6 +118,8 @@ python tools/manifest_to_index.py runs/T12345/manifest.jsonl runs/T12345/manifes
 python scripts/export_attempts_csv.py runs/T12345/manifest.jsonl reports/T12345_attempts.csv
 ```
 
+- Pagination retries against OpenAlex are configurable via `--openalex-retry-attempts` (default 3) and `--openalex-retry-backoff` (default 1.0s, exponential backoff). Tests often override the backoff to 0 to avoid real sleeps.
+
 ## Indexing Hints
 - Read first: `pipeline.py`, `download.py`, `runner.py`, `telemetry.py`, `networking.py`.
 - High-signal tests: `tests/cli/test_cli_flows.py`, `tests/content_download/test_runner_download_run.py`, `tests/content_download/test_rate_control.py`, `tests/content_download/test_networking.py`.
