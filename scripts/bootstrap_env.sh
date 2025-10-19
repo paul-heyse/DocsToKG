@@ -153,7 +153,7 @@ if [[ -n "$REQ_FILE" ]]; then
 elif (( choose_cpu )); then
   echo "[bootstrap] CPU mode selected"
   export DOCSTOKG_SKIP_GPU=1
-  REQ_FILE="$ROOT_DIR/requirements.cpu.txt"
+  REQ_FILE="$ROOT_DIR/requirements.txt"
 else
   echo "[bootstrap] GPU mode selected"
   REQ_FILE="$ROOT_DIR/requirements.gpu.txt"
