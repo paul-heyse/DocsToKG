@@ -118,10 +118,11 @@ import json
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterator, List
 
 import pytest
 
+from DocsToKG.DocParsing.core.batching import Batcher
 from DocsToKG.DocParsing.io import iter_jsonl
 from tests._stubs import dependency_stubs
 
@@ -306,6 +307,36 @@ def test_process_chunk_file_vectors_reads_texts(
 
     assert captured_texts == ["Hello world"]
     assert captured_write_texts == ["Hello world"]
+
+
+def test_batcher_streams_generator_inputs() -> None:
+    """Batcher should consume generator inputs incrementally when streaming."""
+
+    consumed: List[int] = []
+
+    def _generator() -> Iterator[int]:
+        for value in range(5):
+            consumed.append(value)
+            yield value
+
+    iterator = iter(Batcher(_generator(), 2))
+
+    assert consumed == []
+
+    first = next(iterator)
+    assert first == [0, 1]
+    assert consumed == [0, 1]
+
+    second = next(iterator)
+    assert second == [2, 3]
+    assert consumed == [0, 1, 2, 3]
+
+    third = next(iterator)
+    assert third == [4]
+    assert consumed == [0, 1, 2, 3, 4]
+
+    with pytest.raises(StopIteration):
+        next(iterator)
 
 
 def test_cli_path_overrides_take_precedence(
