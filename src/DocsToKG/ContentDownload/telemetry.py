@@ -1554,7 +1554,7 @@ def load_previous_manifest(
     per_work: Dict[str, Dict[str, Any]] = {}
     completed: Set[str] = set()
 
-    def _sqlite_resume(clear_completed: bool = True) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+    def _sqlite_resume(clear_completed: bool = False) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
         lookup, done = _load_resume_from_sqlite(sqlite_path) if sqlite_path else ({}, set())
         if clear_completed:
             return lookup, set()
@@ -1567,7 +1567,7 @@ def load_previous_manifest(
 
     if looks_like_csv_resume_target(path):
         if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
-            return _sqlite_resume()
+            return _sqlite_resume(clear_completed=False)
         raise ValueError(
             "Resume manifest '{path}' appears to be a CSV attempts log but no SQLite cache was found. "
             "Provide the matching manifest.sqlite file or resume from a JSONL manifest."
@@ -1589,7 +1589,7 @@ def load_previous_manifest(
 
     if not ordered_files:
         if allow_sqlite_fallback and sqlite_path and sqlite_path.exists():
-            return _sqlite_resume()
+            return _sqlite_resume(clear_completed=False)
         file_error = FileNotFoundError(
             f"No manifest files found for resume path {path!s}"
         )
@@ -1720,7 +1720,7 @@ def load_previous_manifest(
             path,
             sqlite_path,
         )
-        return _sqlite_resume()
+        return _sqlite_resume(clear_completed=False)
 
     return per_work, completed
 
