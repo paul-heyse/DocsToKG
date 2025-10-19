@@ -1582,7 +1582,11 @@ class FaissVectorStore(DenseVectorStore):
                 )
 
             resources_vector: "faiss.GpuResourcesVector | None" = None
-            gpu_ids = list(range(gpu_count))
+            if explicit_targets_configured:
+                gpu_ids = list(target_gpus)
+            else:
+                gpu_ids = list(range(available_gpus))
+            gpu_count = len(gpu_ids)
             if hasattr(faiss, "GpuResourcesVector"):
                 try:
                     resources_vector = faiss.GpuResourcesVector()
@@ -1612,8 +1616,31 @@ class FaissVectorStore(DenseVectorStore):
                         resources_vector, gpu_ids, base_index, cloner_options
                     )
                 else:
+                    if not gpu_ids:
+                        logger.error(
+                            "index_cpu_to_gpus_list fallback requires at least one GPU id"
+                        )
+                        raise AssertionError(
+                            "gpu_ids must not be empty when invoking manual GPU replication"
+                        )
+                    self._observability.metrics.increment(
+                        "faiss_gpu_manual_resource_path", amount=1.0
+                    )
+                    self._observability.logger.info(
+                        "faiss-manual-resource-path-engaged",
+                        extra={
+                            "event": {
+                                "component": "faiss",
+                                "action": "manual_resource_replication",
+                                "gpu_ids": tuple(gpu_ids),
+                            }
+                        },
+                    )
                     multi = faiss.index_cpu_to_gpus_list(
-                        resources_vector, gpu_ids, base_index, cloner_options
+                        base_index,
+                        gpus=gpu_ids,
+                        co=cloner_options,
+                        resources=resources_vector,
                     )
             else:
                 multi = faiss.index_cpu_to_all_gpus(base_index, co=cloner_options, ngpu=gpu_count)
