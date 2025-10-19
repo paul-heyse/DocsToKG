@@ -48,6 +48,8 @@ known_stages = [filename.split(".")[1] for filename in _MANIFEST_FILENAMES]
 known_stage_set = frozenset(known_stages)
 STAGE_ALIASES: Dict[str, Sequence[str]] = {
     "doctags": ("doctags-html", "doctags-pdf"),
+    "chunk": ("chunks",),
+    "embed": ("embeddings",),
 }
 
 CLI_DESCRIPTION = """\
@@ -392,9 +394,10 @@ def _manifest_main(argv: Sequence[str]) -> int:
         default=None,
         help=(
             "Manifest stage to inspect (repeatable). Supported stages: doctags-html,"
-            " doctags-pdf, chunks, embeddings. The alias 'doctags' selects both"
-            " doctags-html and doctags-pdf. Defaults to stages discovered from"
-            " manifest files; falls back to embeddings when no manifests are present."
+            " doctags-pdf, chunks, embeddings. Aliases: 'doctags' selects"
+            " doctags-html and doctags-pdf; 'chunk' selects chunks; 'embed' selects"
+            " embeddings. Defaults to stages discovered from manifest files; falls"
+            " back to embeddings when no manifests are present."
         ),
     )
     parser.add_argument(
