@@ -1554,6 +1554,13 @@ class FaissVectorStore(DenseVectorStore):
                     )
                 return index
 
+        gpu_count = len(target_gpus) if explicit_targets_configured else available_gpus
+        gpu_ids: List[int]
+        if explicit_targets_configured:
+            gpu_ids = list(target_gpus)
+        else:
+            gpu_ids = list(range(gpu_count))
+
         try:
             base_index = index
             if hasattr(faiss, "index_gpu_to_cpu"):
@@ -1571,18 +1578,17 @@ class FaissVectorStore(DenseVectorStore):
             if explicit_targets_configured:
                 multi = faiss.index_cpu_to_gpus_list(
                     base_index,
-                    gpus=list(target_gpus),
+                    gpus=gpu_ids,
                     co=cloner_options,
                 )
             else:
                 multi = faiss.index_cpu_to_all_gpus(
                     base_index,
                     co=cloner_options,
-                    ngpu=available_gpus,
+                    ngpu=gpu_count,
                 )
 
             resources_vector: "faiss.GpuResourcesVector | None" = None
-            gpu_ids = list(range(gpu_count))
             if hasattr(faiss, "GpuResourcesVector"):
                 try:
                     resources_vector = faiss.GpuResourcesVector()
