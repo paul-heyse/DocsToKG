@@ -6,10 +6,10 @@ import contextlib
 import json
 import logging
 import sqlite3
+import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
-from dataclasses import dataclass
-import json
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -73,24 +73,32 @@ class DownloadRunState:
     skipped: int = 0
     downloaded_bytes: int = 0
     worker_failures: int = 0
+    _lock: threading.Lock = field(init=False, repr=False, default_factory=threading.Lock)
 
     def update_from_result(self, result: Dict[str, Any]) -> None:
         """Update aggregate counters from an individual work result."""
 
-        self.processed += 1
-        if result.get("saved"):
-            self.saved += 1
-        if result.get("html_only"):
-            self.html_only += 1
-        if result.get("xml_only"):
-            self.xml_only += 1
-        if result.get("skipped"):
-            self.skipped += 1
-        downloaded = result.get("downloaded_bytes") or 0
-        try:
-            self.downloaded_bytes += int(downloaded)
-        except (TypeError, ValueError):
-            pass
+        with self._lock:
+            self.processed += 1
+            if result.get("saved"):
+                self.saved += 1
+            if result.get("html_only"):
+                self.html_only += 1
+            if result.get("xml_only"):
+                self.xml_only += 1
+            if result.get("skipped"):
+                self.skipped += 1
+            downloaded = result.get("downloaded_bytes") or 0
+            try:
+                self.downloaded_bytes += int(downloaded)
+            except (TypeError, ValueError):
+                pass
+
+    def record_worker_failure(self) -> None:
+        """Increment the worker failure counter in a thread-safe manner."""
+
+        with self._lock:
+            self.worker_failures += 1
 
 
 class DownloadRun:
@@ -424,7 +432,7 @@ class DownloadRun:
                             try:
                                 completed_future.result()
                             except Exception as exc:
-                                state.worker_failures += 1
+                                state.record_worker_failure()
                                 extra_fields: Dict[str, Any] = {"error": str(exc)}
                                 if work_id:
                                     extra_fields["work_id"] = work_id

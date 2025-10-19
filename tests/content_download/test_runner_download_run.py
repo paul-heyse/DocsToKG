@@ -2,6 +2,7 @@ import argparse
 import contextlib
 import json
 import logging
+import time
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
@@ -760,6 +761,71 @@ def test_download_run_run_processes_artifacts(patcher, tmp_path):
     assert result.processed == 2
     assert result.saved == 2
     assert result.bytes_downloaded == 84
+
+    download_run.close()
+
+
+def test_run_parallel_workers_aggregates_state(patcher, tmp_path):
+    worker_count = 4
+    total_artifacts = 40
+    failure_ids = {f"W{index}" for index in range(0, total_artifacts, 7)}
+    payload_size = 13
+
+    resolved = make_resolved_config(tmp_path, csv=False, workers=worker_count)
+    bootstrap_run_environment(resolved)
+
+    artifacts = [_make_artifact(resolved, f"W{index}") for index in range(total_artifacts)]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.load_previous_manifest",
+        lambda *args, **kwargs: ({}, set()),
+    )
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: requests.Session,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        time.sleep(0.002)
+        if work.work_id in failure_ids:
+            raise RuntimeError("boom")
+        return {"saved": True, "downloaded_bytes": payload_size}
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.processed == total_artifacts
+    assert result.saved == total_artifacts - len(failure_ids)
+    assert result.skipped == len(failure_ids)
+    assert result.worker_failures == len(failure_ids)
+    assert result.bytes_downloaded == (total_artifacts - len(failure_ids)) * payload_size
 
     download_run.close()
 
