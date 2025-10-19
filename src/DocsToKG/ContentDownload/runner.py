@@ -216,7 +216,13 @@ class DownloadRun:
     ) -> DownloadRunState:
         """Initialise download options and counters for the run."""
 
-        resume_lookup, resume_completed = load_previous_manifest(self.args.resume_from)
+        resume_path = self.args.resume_from
+        if resume_path is None:
+            manifest_path = self.resolved.manifest_path
+            if manifest_path.exists():
+                resume_path = manifest_path
+
+        resume_lookup, resume_completed = load_previous_manifest(resume_path)
         options = DownloadConfig(
             dry_run=self.args.dry_run,
             list_only=self.args.list_only,
@@ -414,7 +420,7 @@ def iterate_openalex(
         for work in page:
             yield work
             retrieved += 1
-            if max_results and retrieved >= max_results:
+            if max_results is not None and retrieved >= max_results:
                 return
 
 

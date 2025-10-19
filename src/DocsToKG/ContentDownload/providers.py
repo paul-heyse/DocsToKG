@@ -61,10 +61,18 @@ class OpenAlexWorkProvider:
         self._html_dir = html_dir
         self._xml_dir = xml_dir
         self._per_page = max(1, per_page)
-        self._max_results = max_results if (max_results is None or max_results > 0) else None
+        if max_results is None:
+            self._max_results = None
+        elif max_results < 0:
+            self._max_results = None
+        else:
+            self._max_results = max_results
 
     def iter_artifacts(self) -> Iterator[WorkArtifact]:
         """Iterate over OpenAlex works and yield normalized :class:`WorkArtifact` objects."""
+
+        if self._max_results == 0:
+            return
 
         yielded = 0
         for work in self._iter_source():
@@ -84,7 +92,10 @@ class OpenAlexWorkProvider:
         )
         for page in pager:
             for work in page:
+                if self._max_results is not None and retrieved >= self._max_results:
+                    return
                 yield work
+                retrieved += 1
 
     def _iter_source(self) -> Iterator[Dict[str, Any]]:
         if self._works_iterable is not None:

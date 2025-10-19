@@ -1,10 +1,12 @@
 import argparse
 import contextlib
+import json
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import requests
+import pytest
 
 from DocsToKG.ContentDownload.args import ResolvedConfig, bootstrap_run_environment
 from DocsToKG.ContentDownload.core import WorkArtifact
@@ -14,6 +16,7 @@ from DocsToKG.ContentDownload.providers import WorkProvider
 from DocsToKG.ContentDownload.runner import DownloadRun
 from DocsToKG.ContentDownload.telemetry import (
     JsonlSink,
+    MANIFEST_SCHEMA_VERSION,
     ManifestUrlIndex,
     MultiSink,
     RunTelemetry,
@@ -97,6 +100,39 @@ def make_resolved_config(
     )
 
 
+def _manifest_entry(work_id: str, *, run_id: str = "resume-run") -> str:
+    return json.dumps(
+        {
+            "record_type": "manifest",
+            "schema_version": MANIFEST_SCHEMA_VERSION,
+            "run_id": run_id,
+            "work_id": work_id,
+            "url": f"https://example.org/{work_id}.pdf",
+            "classification": "pdf",
+        }
+    )
+
+
+def _make_artifact(resolved: ResolvedConfig, work_id: str) -> WorkArtifact:
+    return WorkArtifact(
+        work_id=work_id,
+        title=f"Title {work_id}",
+        publication_year=2024,
+        doi=None,
+        pmid=None,
+        pmcid=None,
+        arxiv_id=None,
+        landing_urls=[],
+        pdf_urls=[],
+        open_access_url=None,
+        source_display_names=[],
+        base_stem=work_id.lower(),
+        pdf_dir=resolved.pdf_dir,
+        html_dir=resolved.html_dir,
+        xml_dir=resolved.xml_dir,
+    )
+
+
 def test_setup_sinks_returns_multisink(tmp_path):
     resolved = make_resolved_config(tmp_path)
     bootstrap_run_environment(resolved)
@@ -157,6 +193,26 @@ def test_setup_download_state_records_manifest_data(patcher, tmp_path):
 
     factory.close_all()
     download_run.close()
+
+
+def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+    missing_manifest = resolved.manifest_path
+    resolved.args.resume_from = missing_manifest
+    download_run = DownloadRun(resolved)
+
+    factory = ThreadLocalSessionFactory(requests.Session)
+    try:
+        with pytest.raises(ValueError) as excinfo:
+            download_run.setup_download_state(factory)
+    finally:
+        factory.close_all()
+        download_run.close()
+
+    message = str(excinfo.value)
+    assert str(missing_manifest) in message
+    assert "--resume-from" in message
 
 
 def test_setup_worker_pool_creates_executor_when_parallel(tmp_path):
@@ -259,3 +315,121 @@ def test_download_run_run_processes_artifacts(patcher, tmp_path):
     assert result.bytes_downloaded == 84
 
     download_run.close()
+
+
+def test_run_auto_resume_uses_manifest_path_when_resume_flag_absent(patcher, tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+    resolved.manifest_path.write_text(_manifest_entry("W_SKIP") + "\n", encoding="utf-8")
+
+    artifacts = [
+        _make_artifact(resolved, "W_SKIP"),
+        _make_artifact(resolved, "W_RUN"),
+    ]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: requests.Session,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        skipped = work.work_id in options.resume_completed
+        return {
+            "skipped": skipped,
+            "saved": not skipped,
+            "downloaded_bytes": 0,
+        }
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.processed == 2
+    assert result.skipped == 1
+    assert result.saved == 1
+
+
+def test_run_respects_explicit_resume_from_override(patcher, tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+    resolved.manifest_path.write_text(_manifest_entry("W_BASE") + "\n", encoding="utf-8")
+
+    override_path = resolved.manifest_path.with_name("override.jsonl")
+    override_path.write_text(_manifest_entry("W_OVERRIDE") + "\n", encoding="utf-8")
+    resolved.args.resume_from = override_path
+
+    artifacts = [
+        _make_artifact(resolved, "W_BASE"),
+        _make_artifact(resolved, "W_OVERRIDE"),
+    ]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: requests.Session,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        skipped = work.work_id in options.resume_completed
+        return {
+            "skipped": skipped,
+            "saved": not skipped,
+            "downloaded_bytes": 0,
+        }
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.processed == 2
+    assert result.skipped == 1
+    assert result.saved == 1
+    # Explicit override should prefer override.jsonl, leaving W_BASE unskipped.
+    assert resolved.args.resume_from == override_path
