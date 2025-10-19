@@ -394,6 +394,7 @@ class FaissVectorStore(DenseVectorStore):
         self.init_gpu()
         self._lock = RLock()
         self._index = self._create_index()
+        self._index = self._maybe_distribute_multi_gpu(self._index)
         if self._dim != dim:
             raise RuntimeError(
                 f"HybridSearch initialised with dim={dim} but created index expects {self._dim}"
@@ -1431,6 +1432,18 @@ class FaissVectorStore(DenseVectorStore):
             logger.warning("Unable to replicate FAISS index across GPUs", exc_info=True)
             return index
 
+    def _maybe_distribute_multi_gpu(self, index: "faiss.Index") -> "faiss.Index":
+        """Conditionally replicate or shard ``index`` based on configuration."""
+
+        if self._multi_gpu_mode not in ("replicate", "shard"):
+            self._replicated = False
+            return index
+        if not self._replication_enabled:
+            self._replicated = False
+            return index
+        shard = self._multi_gpu_mode == "shard"
+        return self.distribute_to_all_gpus(index, shard=shard)
+
     def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
         self.init_gpu()
         if self._gpu_resources is None:
@@ -1451,17 +1464,9 @@ class FaissVectorStore(DenseVectorStore):
                 ):
                     co.indicesOptions = faiss.INDICES_32_BIT
                 promoted = faiss.index_cpu_to_gpu(self._gpu_resources, device, index, co)
-                return (
-                    self.distribute_to_all_gpus(promoted, shard=self._multi_gpu_mode == "shard")
-                    if self._multi_gpu_mode in ("replicate", "shard")
-                    else promoted
-                )
+                return self._maybe_distribute_multi_gpu(promoted)
             cloned = faiss.index_cpu_to_gpu(self._gpu_resources, device, index)
-            return (
-                self.distribute_to_all_gpus(cloned, shard=self._multi_gpu_mode == "shard")
-                if self._multi_gpu_mode in ("replicate", "shard")
-                else cloned
-            )
+            return self._maybe_distribute_multi_gpu(cloned)
         except Exception as exc:  # pragma: no cover - hardware specific failure
             raise RuntimeError(
                 "Failed to promote FAISS index to GPU "
@@ -1681,6 +1686,7 @@ class FaissVectorStore(DenseVectorStore):
         current_ids = self._current_index_ids()
         if current_ids.size == 0:
             self._index = self._create_index()
+            self._index = self._maybe_distribute_multi_gpu(self._index)
             self._set_nprobe()
             return
         if self._tombstones:
@@ -1700,6 +1706,7 @@ class FaissVectorStore(DenseVectorStore):
         )
         vectors = np.ascontiguousarray(vectors, dtype=np.float32)
         self._index = self._create_index()
+        self._index = self._maybe_distribute_multi_gpu(self._index)
         self._set_nprobe()
         if vectors.size:
             base_new = self._index.index if hasattr(self._index, "index") else self._index
