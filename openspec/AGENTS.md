@@ -37,11 +37,11 @@ Local agents (running on your workstation / self-hosted box) should **prefer GPU
 - MinIO wheels reachable (either `mc alias set myminio …` or `MINIO_ACCESS_KEY_ID`/`MINIO_SECRET_ACCESS_KEY` env vars).
 - NVIDIA driver + CUDA 12.x runtime installed (CuPy uses your system CUDA).
 
-**Make GPU the default locally:**
+**Make CPU the default:**
 
 ```bash
 # Add this to your shell or .envrc so agents inherit it:
-export AGENT_MODE=gpu
+export AGENT_MODE=cpu
 ```
 
 **Then bootstrap + test:**
@@ -83,7 +83,7 @@ source .venv/bin/activate
 pytest -q -m "not gpu"                   # skip GPU-marked tests
 ```
 
-This path uses `requirements.cpu.txt` (thin wrapper around `-e .` + test tools).
+This path uses `requirements.txt` (thin wrapper around `-e .` + test tools).
 
 ---
 
