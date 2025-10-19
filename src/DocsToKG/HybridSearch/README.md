@@ -45,6 +45,31 @@ Expected output includes an ingestion summary similar to:
 
 The harness accepts `--query`, `--namespace`, `--page-size`, and `--no-diversify` flags for ad-hoc searches against the in-memory stack.
 
+## GPU prerequisites & validation checklist
+- Ensure the GPU runtime exposes the shared libraries required by the custom FAISS wheel: `libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, and `libgomp.so.1`. Linux glibc/glibcxx versions must satisfy the wheel’s `GLIBC_2.38` / `GLIBCXX_3.4.32` requirements.
+- Confirm your `LD_LIBRARY_PATH` (or distro-specific loader config) includes the directories that host the CUDA 12 runtime and OpenBLAS libraries; install the CUDA toolkit or runtime packages if any of the libraries are missing.
+- Optional tuning knobs provided by the wheel loader: set `FAISS_OPT_LEVEL=<generic|avx2|avx512>` to bypass CPU feature probes, and `FAISS_DISABLE_CPU_FEATURES=...` to opt out of specific instruction sets when debugging.
+- Full compatibility notes live in the [Custom FAISS GPU wheel reference](./faiss-gpu-wheel-reference.md); keep it nearby when upgrading drivers or containers.
+
+**Quick validation before running ingestion**
+
+```bash
+# 1) Verify the loader can locate required CUDA/OpenBLAS libraries
+ldconfig -p | grep -E 'libcudart|libcublas|libopenblas'
+
+# 2) Sanity-check FAISS import, version, and visible GPUs
+python - <<'PY'
+import faiss
+print('faiss version:', getattr(faiss, '__version__', 'unknown'))
+print('visible GPUs:', faiss.get_num_gpus())
+PY
+
+# 3) (Optional) Lock FAISS to a known CPU code path if needed
+export FAISS_OPT_LEVEL=avx2  # or unset once the environment is stable
+```
+
+If the GPU count is `0`, double-check driver installation and ensure `nvidia-smi` reports healthy devices before retrying ingestion.
+
 ## Common commands
 ```bash
 # Re-run the quickstart search with a different query/namespace

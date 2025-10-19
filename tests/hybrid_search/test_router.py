@@ -104,6 +104,7 @@ class RecordingFaissStore:
         self._vectors: list[str] = []
         self._resolver: Optional[Callable[[int], Optional[str]]] = None
         self.last_restore_meta: Optional[Mapping[str, object]] = None
+        self.last_snapshot_meta: Optional[Mapping[str, object]] = None
 
     @property
     def dim(self) -> int:
@@ -149,6 +150,9 @@ class RecordingFaissStore:
         ids = data.get("ids", [])
         self._vectors = [str(vector_id) for vector_id in ids]
         self.last_restore_meta = meta
+
+    def snapshot_meta(self) -> Mapping[str, object]:
+        return {"namespace": self.namespace, "dim": self._dim}
 
     def stats(self) -> Mapping[str, float | str]:
         return {"ntotal": float(self.ntotal)}
@@ -211,8 +215,9 @@ def test_managed_adapter_restores_with_snapshot_metadata() -> None:
     managed_store.add([np.zeros(3, dtype=np.float32)], ["alpha-vector"])
 
     payloads = router.serialize_all()
-    alpha_payload = payloads["alpha"]
-    assert alpha_payload["meta"] == {"namespace": "alpha", "vector_count": 1}
+    snapshot_meta = {"namespace": "alpha", "marker": "router-test"}
+    router._snapshots["alpha"] = (payloads["alpha"]["faiss"], snapshot_meta)
+    del router._stores["alpha"]
 
     restored_router = FaissRouter(
         per_namespace=True,
@@ -239,3 +244,27 @@ def test_managed_adapter_restores_with_snapshot_metadata() -> None:
     assert isinstance(inner_rehydrated, RecordingFaissStore)
     assert inner_rehydrated.last_restore_meta == snapshot_meta
     assert inner_rehydrated._vectors == ["alpha-vector"]
+
+def test_serialize_and_restore_roundtrip_carries_metadata() -> None:
+    """Router serialization should retain metadata for restore_all."""
+
+    router = FaissRouter(
+        per_namespace=True,
+        default_store=ManagedFaissAdapter(RecordingFaissStore("__default__")),
+        factory=lambda namespace: ManagedFaissAdapter(RecordingFaissStore(namespace)),
+    )
+    store = router.get("alpha")
+    store.add([np.zeros(3, dtype=np.float32)], ["alpha-vector"])
+
+    payloads = router.serialize_all()
+    alpha_payload = payloads["alpha"]
+    assert isinstance(alpha_payload["meta"], Mapping)
+
+    router._stores.pop("alpha")
+    router.restore_all(payloads)
+
+    restored_store = router._stores["alpha"]
+    inner_store = restored_store._inner  # type: ignore[attr-defined]
+    assert isinstance(inner_store, RecordingFaissStore)
+    assert inner_store.last_restore_meta == alpha_payload["meta"]
+    assert inner_store._vectors == ["alpha-vector"]
