@@ -278,9 +278,11 @@ def data_manifests(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
 def prepare_data_root(data_root_arg: Optional[Path], default_root: Path) -> Path:
     """Resolve and prepare the DocsToKG data root for a pipeline invocation."""
 
-    resolved = detect_data_root(data_root_arg) if data_root_arg is not None else default_root
     if data_root_arg is not None:
+        resolved = Path(data_root_arg).expanduser().resolve()
         os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved)
+    else:
+        resolved = default_root
     _ensure_dir((resolved / "Manifests").resolve())
     return resolved
 

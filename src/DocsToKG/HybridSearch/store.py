@@ -559,7 +559,10 @@ class FaissVectorStore(DenseVectorStore):
         Returns:
             int: Configured CUDA device identifier.
         """
-        return int(getattr(self._config, "device", self._device))
+        config_device = getattr(self._config, "device", None)
+        if config_device is not None:
+            return int(config_device)
+        return int(getattr(self, "_device", 0))
 
     @property
     def adapter_stats(self) -> AdapterStats:
@@ -1440,13 +1443,15 @@ class FaissVectorStore(DenseVectorStore):
     ) -> None:
         """Apply configured knobs to a FAISS GPU resource manager."""
 
-        if self._temp_memory_bytes is not None and hasattr(resource, "setTempMemory"):
+        temp_memory = getattr(self, "_temp_memory_bytes", None)
+        if temp_memory is not None and hasattr(resource, "setTempMemory"):
             try:
-                resource.setTempMemory(self._temp_memory_bytes)
+                resource.setTempMemory(temp_memory)
             except Exception:  # pragma: no cover - best effort guard
                 logger.debug("Unable to apply GPU temp memory cap", exc_info=True)
 
-        if self._gpu_use_default_null_stream_all_devices:
+        use_null_all = getattr(self, "_gpu_use_default_null_stream_all_devices", False)
+        if use_null_all:
             method = getattr(resource, "setDefaultNullStreamAllDevices", None)
             if callable(method):
                 try:  # pragma: no cover - hardware/driver dependent
@@ -1458,7 +1463,8 @@ class FaissVectorStore(DenseVectorStore):
                     )
             return
 
-        if not self._gpu_use_default_null_stream:
+        use_null = getattr(self, "_gpu_use_default_null_stream", False)
+        if not use_null:
             return
 
         method = getattr(resource, "setDefaultNullStream", None)
@@ -1596,6 +1602,7 @@ class FaissVectorStore(DenseVectorStore):
                     resources_vector = None
 
             self._replica_gpu_resources = []
+            primary_resource = getattr(self, "_gpu_resources", None)
             multi: "faiss.Index"
             if resources_vector is not None and (
                 hasattr(faiss, "index_cpu_to_gpu_multiple")
@@ -1604,10 +1611,10 @@ class FaissVectorStore(DenseVectorStore):
                 for gpu_id in gpu_ids:
                     resource: "faiss.StandardGpuResources"
                     if (
-                        self._gpu_resources is not None
+                        primary_resource is not None
                         and int(self.device) == gpu_id
                     ):
-                        resource = self._gpu_resources
+                        resource = primary_resource
                         self._configure_gpu_resource(resource, device=gpu_id)
                     else:
                         resource = self._create_gpu_resources(device=gpu_id)

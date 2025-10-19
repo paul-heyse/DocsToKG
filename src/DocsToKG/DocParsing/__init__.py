@@ -34,6 +34,7 @@ def _import_module(module_name: str):
 
 
 def _load_module(name: str) -> ModuleType:
+    """Load a module by name, using cache for performance."""
     if name in _MODULE_CACHE:
         return _MODULE_CACHE[name]
 
@@ -45,13 +46,15 @@ def _load_module(name: str) -> ModuleType:
         raise ImportError(
             "DocsToKG.DocParsing.{name} could not be imported because the optional "
             "dependency '{missing}' is not installed. Install the appropriate extras, "
-            "for example `pip install \"DocsToKG[docling,gpu]\"` to enable this module."
-            .format(name=name, missing=missing)
+            'for example `pip install "DocsToKG[docling,gpu]"` to enable this module.'.format(
+                name=name, missing=missing
+            )
         ) from exc
 
     globals()[name] = module
     _MODULE_CACHE[name] = module
     return module
+
 
 __all__ = [
     "core",
@@ -69,6 +72,7 @@ __all__ = [
     "html_parse_args",
     "html_main",
 ]
+
 
 def __getattr__(name: str) -> Any:
     """Dynamically import submodules only when they are requested."""

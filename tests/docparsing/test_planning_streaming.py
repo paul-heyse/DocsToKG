@@ -225,8 +225,7 @@ def test_plan_chunk_streams_doctags(monkeypatch: pytest.MonkeyPatch, tmp_path: P
         chunking_module, "MANIFEST_STAGE", "docparse.chunks.manifest", raising=False
     )
     manifest = {
-        f"doc-{idx}": {"input_hash": f"hash-{idx}", "status": "success"}
-        for idx in range(total)
+        f"doc-{idx}": {"input_hash": f"hash-{idx}", "status": "success"} for idx in range(total)
     }
 
     monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
@@ -293,8 +292,7 @@ def test_plan_embed_streams_chunks(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         embedding_module, "MANIFEST_STAGE", "docparse.embeddings.manifest", raising=False
     )
     manifest = {
-        f"doc-{idx}": {"input_hash": f"hash-{idx}", "status": "success"}
-        for idx in range(total)
+        f"doc-{idx}": {"input_hash": f"hash-{idx}", "status": "success"} for idx in range(total)
     }
 
     monkeypatch.setattr(planning, "detect_data_root", lambda *_args, **_kwargs: data_root)
@@ -409,8 +407,13 @@ def test_plan_embed_missing_output_skips_hash(
     assert calls["count"] == 0
 
 
-def test_plan_embed_handles_symlinked_chunks(tmp_path: Path) -> None:
-    data_root = tmp_path / "Data"
+def test_plan_embed_handles_symlinked_chunks(tmp_path: Path, monkeypatch) -> None:
+    # Temporarily disable the shared DOCSTOKG_DATA_ROOT to avoid interference from other tests
+    monkeypatch.delenv("DOCSTOKG_DATA_ROOT", raising=False)
+
+    # Use a completely isolated data root to avoid interference from other tests
+    isolated_root = tmp_path / "IsolatedData"
+    data_root = isolated_root / "Data"
     chunks_dir = data_root / "ChunkedDocTagFiles"
     vectors_dir = data_root / "Embeddings"
     chunks_dir.mkdir(parents=True)
