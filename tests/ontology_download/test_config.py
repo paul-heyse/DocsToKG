@@ -200,8 +200,6 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from unittest.mock import patch
-
 from pydantic import BaseModel, ValidationError
 
 from DocsToKG.OntologyDownload import api as core
@@ -227,7 +225,7 @@ from DocsToKG.OntologyDownload.settings import (
     load_raw_yaml,
     validate_config,
 )
-from DocsToKG.OntologyDownload.testing import temporary_resolver
+from DocsToKG.OntologyDownload.testing import ResponseSpec, temporary_resolver
 
 
 @contextmanager
@@ -622,35 +620,38 @@ def test_fetch_one_unknown_resolver() -> None:
         )
 
 
-def test_fetch_one_download_error() -> None:
+def test_fetch_one_download_error(ontology_env) -> None:
     """Download failures should be wrapped in OntologyDownloadError."""
 
-    spec = pipeline_mod.FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
+    resolver_name = "obo-test-error"
+    failing_path = "failures/error.owl"
+    failing_url = ontology_env.http_url(failing_path)
+    headers = {"Content-Type": "application/rdf+xml"}
+    ontology_env.queue_response(failing_path, ResponseSpec(method="HEAD", status=200, headers=headers))
+    ontology_env.queue_response(failing_path, ResponseSpec(method="GET", status=503, headers=headers))
 
     class StubResolver:
+        NAME = resolver_name
+
         def plan(self, spec, config, logger):
             return FetchPlan(
-                url="https://example.org/hp.owl",
+                url=failing_url,
                 headers={},
-                filename_hint="hp.owl",
+                filename_hint="error.owl",
                 version="2024",
                 license="CC0-1.0",
                 media_type="application/rdf+xml",
                 service=spec.resolver,
             )
 
-    failing_download = lambda **_: (_ for _ in ()).throw(ConfigError("boom"))
+    spec = pipeline_mod.FetchSpec(id="hp", resolver=resolver_name, extras={}, target_formats=["owl"])
 
-    with temporary_resolver("obo", StubResolver()):
-        with patch.object(
-            pipeline_mod,
-            "download_stream",
-            side_effect=lambda **_: failing_download(),
-        ):
-            with pytest.raises(OntologyDownloadError):
-                pipeline_mod.fetch_one(
-                    spec, config=ResolvedConfig.from_defaults(), force=True, logger=_noop_logger()
-                )
+    config = ontology_env.build_resolved_config()
+    config.defaults.http = ontology_env.build_download_config()
+
+    with temporary_resolver(resolver_name, StubResolver()):
+        with pytest.raises(OntologyDownloadError):
+            pipeline_mod.fetch_one(spec, config=config, force=True, logger=_noop_logger())
 
 
 # --- Helper Functions ---
