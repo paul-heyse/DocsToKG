@@ -659,7 +659,9 @@ class FaissVectorStore(DenseVectorStore):
             faiss_ids = np.asarray(
                 [_vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64
             )
-            matrix = self._coerce_batch(np.stack([self._ensure_dim(vec) for vec in vectors]))
+            matrix = self._coerce_batch(
+                np.stack([self._ensure_dim(vec) for vec in vectors]), normalize=False
+            )
             dedupe_threshold = float(getattr(self._config, "ingest_dedupe_threshold", 0.0))
             dropped = 0
             if dedupe_threshold > 0.0 and self.ntotal > 0:
@@ -819,7 +821,7 @@ class FaissVectorStore(DenseVectorStore):
         return self._search_batch_impl(matrix, top_k)
 
     def _search_batch_impl(self, matrix: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
-        matrix = self._coerce_batch(matrix)
+        matrix = self._coerce_batch(matrix, normalize=False)
         matrix = self._as_pinned(matrix)
         faiss.normalize_L2(matrix)
         batch = matrix.shape[0]
@@ -2044,7 +2046,7 @@ class FaissVectorStore(DenseVectorStore):
             raise ValueError(f"vector dimension mismatch: expected {self._dim}, got {arr.size}")
         return arr
 
-    def _coerce_batch(self, xb: np.ndarray) -> np.ndarray:
+    def _coerce_batch(self, xb: np.ndarray, *, normalize: bool = True) -> np.ndarray:
         array = np.asarray(xb, dtype=np.float32)
         if array.ndim == 1:
             array = array.reshape(1, -1)
@@ -2052,7 +2054,8 @@ class FaissVectorStore(DenseVectorStore):
             raise ValueError(f"bad batch shape {array.shape}, expected (*,{self._dim})")
         array = np.ascontiguousarray(array, dtype=np.float32)
         array = array.copy()
-        normalize_rows(array)
+        if normalize:
+            normalize_rows(array)
         return array
 
     def _coerce_query(self, x: np.ndarray) -> np.ndarray:
