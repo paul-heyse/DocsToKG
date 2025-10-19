@@ -873,6 +873,43 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
             resume_position = part_path.stat().st_size if part_path.exists() else 0
 
+            overall_start = time.monotonic()
+            timeout_limit = float(self.http_config.download_timeout_sec)
+
+            def _clear_partial_files() -> None:
+                for candidate in (part_path, destination_part_path):
+                    try:
+                        candidate.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+
+            def _raise_timeout(elapsed: float) -> None:
+                _clear_partial_files()
+                timeout_sec = timeout_limit
+                self.logger.error(
+                    "download timeout",
+                    extra={
+                        "stage": "download",
+                        "error": "timeout",
+                        "elapsed_sec": round(elapsed, 2),
+                        "timeout_sec": timeout_sec,
+                        "service": self.service,
+                        "host": self.origin_host,
+                    },
+                )
+                raise DownloadFailure(
+                    (
+                        f"Download exceeded timeout of {timeout_sec:.2f} seconds "
+                        f"(elapsed {elapsed:.2f} seconds)"
+                    ),
+                    retryable=False,
+                )
+
+            def _enforce_timeout() -> None:
+                elapsed = time.monotonic() - overall_start
+                if elapsed > timeout_limit:
+                    _raise_timeout(elapsed)
+
             def _stream_once() -> str:
                 nonlocal resume_position
                 resume_position = part_path.stat().st_size if part_path.exists() else 0
@@ -882,13 +919,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     request_headers["Range"] = f"bytes={original_resume_position}-"
                 else:
                     request_headers.pop("Range", None)
-
-                def _clear_partial_files() -> None:
-                    for candidate in (part_path, destination_part_path):
-                        try:
-                            candidate.unlink(missing_ok=True)
-                        except OSError:
-                            pass
 
                 if self.bucket is not None:
                     self.bucket.consume()
@@ -1067,6 +1097,12 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
                     return "success"
 
+            def _stream_once_with_timeout() -> str:
+                _enforce_timeout()
+                result = _stream_once()
+                _enforce_timeout()
+                return result
+
             def _retry_after_hint(exc: BaseException) -> Optional[float]:
                 delay = getattr(exc, "_retry_after_delay", None)
                 if delay is not None:
@@ -1088,7 +1124,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 )
 
             result_state = retry_with_backoff(
-                _stream_once,
+                _stream_once_with_timeout,
                 retryable=is_retryable_error,
                 max_attempts=max(1, self.http_config.max_retries),
                 backoff_base=self.http_config.backoff_factor,
@@ -1307,6 +1343,8 @@ def download_stream(
                 f"HTTP error while downloading {secure_url}: {exc}", retryable=True
             ) from exc
         except PolicyError:
+            raise
+        except DownloadFailure:
             raise
         except Exception as exc:  # pragma: no cover - defensive catch for pooch errors
             logger.error(
