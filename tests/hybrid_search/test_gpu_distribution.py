@@ -19,6 +19,36 @@ except Exception:  # pragma: no cover - gracefully handle missing wheel
 temp_memory = 1 << 20
 
 
+def test_configure_gpu_resource_respects_default_null_stream_flags() -> None:
+    """Toggle null-stream flags and ensure FAISS resource hooks fire as expected."""
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._temp_memory_bytes = None
+
+    class RecordingResource:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, object | None]] = []
+
+        def setDefaultNullStreamAllDevices(self) -> None:  # pragma: no cover - trivial stub
+            self.calls.append(("all", None))
+
+        def setDefaultNullStream(self, device: int | None = None) -> None:  # pragma: no cover - trivial stub
+            self.calls.append(("device", device))
+
+    resource = RecordingResource()
+
+    store._gpu_use_default_null_stream_all_devices = True
+    store._gpu_use_default_null_stream = False
+    store._configure_gpu_resource(resource)
+    assert resource.calls == [("all", None)]
+
+    resource.calls.clear()
+    store._gpu_use_default_null_stream_all_devices = False
+    store._gpu_use_default_null_stream = True
+    store._configure_gpu_resource(resource, device=1)
+    assert resource.calls == [("device", 1)]
+
+
 @pytest.mark.skipif(faiss is None, reason="faiss not installed")
 @pytest.mark.skipif(
     faiss is not None

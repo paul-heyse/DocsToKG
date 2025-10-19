@@ -157,7 +157,9 @@ import hashlib
 import json
 import logging
 import os
+import platform
 import shutil
+import signal
 import sys
 import threading
 import time
