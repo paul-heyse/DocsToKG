@@ -167,6 +167,12 @@ class DownloadConfiguration(BaseModel):
         le=200.0,
         description="Maximum allowed uncompressed archive size in gigabytes",
     )
+    max_checksum_response_bytes: int = Field(
+        default=262_144,
+        ge=1_024,
+        le=8_388_608,
+        description="Maximum number of bytes permitted when downloading checksum manifests",
+    )
     concurrent_downloads: int = Field(default=1, ge=1, le=10)
     concurrent_plans: int = Field(default=8, ge=1, le=32)
     validate_media_type: bool = Field(default=True)
@@ -243,6 +249,11 @@ class DownloadConfiguration(BaseModel):
         """Return the maximum allowed uncompressed archive size in bytes."""
 
         return int(self.max_uncompressed_size_gb * (1024**3))
+
+    def max_checksum_bytes(self) -> int:
+        """Return the configured ceiling for checksum downloads in bytes."""
+
+        return int(self.max_checksum_response_bytes)
 
     def parse_service_rate_limit(self, service: str) -> Optional[float]:
         """Return service-specific rate limits expressed as requests per second."""

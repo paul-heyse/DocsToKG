@@ -10,12 +10,15 @@ import pytest
 
 from DocsToKG.OntologyDownload.checksums import (
     ExpectedChecksum,
+    _fetch_checksum_from_url,
     parse_checksum_extra,
     parse_checksum_url_extra,
     resolve_expected_checksum,
 )
+from DocsToKG.OntologyDownload.errors import OntologyDownloadError
 from DocsToKG.OntologyDownload.planning import FetchSpec
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
+import requests
 
 
 @pytest.mark.parametrize(
@@ -152,3 +155,78 @@ def test_resolve_expected_checksum_matrix(
         else:
             assert algorithm == expected[0]
         assert url_value.startswith("http://") or url_value.startswith("https://")
+
+
+def test_fetch_checksum_retries_consume_bucket(ontology_env, download_config) -> None:
+    """Verify checksum fetch retries consume bucket tokens on each attempt."""
+
+    config = download_config.model_copy()
+
+    class RecordingBucket:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def consume(self, tokens: float = 1.0) -> None:
+            self.calls += 1
+            if self.calls == 1:
+                raise requests.ConnectionError("transient bucket failure")
+
+    bucket = RecordingBucket()
+    config.set_bucket_provider(lambda service, cfg, host: bucket)
+
+    digest = "abc123".ljust(64, "0")
+    body = f"preface\n{digest}\n".encode("utf-8")
+    checksum_url = ontology_env.register_fixture(
+        "retry-checksum.txt",
+        body,
+        media_type="text/plain",
+        repeats=2,
+    )
+
+    result = _fetch_checksum_from_url(
+        url=checksum_url,
+        algorithm="sha256",
+        http_config=config,
+        logger=logging.getLogger("checksum-retry-test"),
+    )
+
+    assert result == digest
+    assert bucket.calls == 2
+    # Only one HTTP request should have been issued because the first attempt
+    # failed before the network call.
+    get_requests = [req for req in ontology_env.requests if req.method == "GET"]
+    assert len(get_requests) == 1
+
+
+def test_fetch_checksum_aborts_when_limit_exceeded(
+    ontology_env, download_config, caplog
+) -> None:
+    """Ensure oversized checksum payloads are aborted and logged."""
+
+    config = download_config.model_copy()
+    config.max_checksum_response_bytes = 1_024
+
+    digest = "deadbeef".ljust(64, "f")
+    body = ("x" * 2048 + digest).encode("utf-8")
+    checksum_url = ontology_env.register_fixture(
+        "overflow-checksum.txt",
+        body,
+        media_type="text/plain",
+        repeats=1,
+    )
+
+    logger = logging.getLogger("checksum-limit-test")
+    caplog.set_level(logging.ERROR, logger="checksum-limit-test")
+
+    with pytest.raises(OntologyDownloadError) as excinfo:
+        _fetch_checksum_from_url(
+            url=checksum_url,
+            algorithm="sha256",
+            http_config=config,
+            logger=logger,
+        )
+
+    assert "exceeded" in str(excinfo.value)
+    assert any("checksum response exceeded limit" in record.message for record in caplog.records)
+    # The request should still be recorded even though it was aborted mid-stream.
+    assert any(req.method == "GET" for req in ontology_env.requests)
