@@ -52,5 +52,6 @@ def test_cli_doctor_reports_disk_error(capsys):
         output = json.loads(capsys.readouterr().out)
         disk = output["disk"]
         assert disk["path"] == str(env.ontology_dir)
+        assert disk["ok"] is False
         assert disk["error"] == "synthetic disk failure"
         assert "total_bytes" not in disk

@@ -933,9 +933,11 @@ def _doctor_report() -> Dict[str, object]:
     try:
         disk_usage = shutil.disk_usage(probe_path)
     except OSError as exc:
+        disk_report["ok"] = False
         disk_report["error"] = str(exc)
         disk_report["ok"] = False
     else:
+        disk_report["ok"] = True
         default_floor_bytes = 10 * 1_000_000_000
         threshold_bytes = min(
             disk_usage.total,
