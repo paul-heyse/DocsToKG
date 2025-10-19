@@ -526,6 +526,7 @@ class ResultShaper:
                 dense_score=channel_scores.get("dense", {}).get(chunk.vector_id),
                 fusion_weights=dict(self._channel_weights) if self._channel_weights else None,
             )
+            doc_buckets[chunk.doc_id] += 1
             results.append(
                 HybridSearchResult(
                     doc_id=chunk.doc_id,
@@ -546,9 +547,8 @@ class ResultShaper:
             bytes_used += chunk_bytes
         return results
 
-    def _within_doc_limit(self, doc_id: str, doc_buckets: Dict[str, int]) -> bool:
-        doc_buckets[doc_id] += 1
-        return doc_buckets[doc_id] <= self._fusion_config.max_chunks_per_doc
+    def _within_doc_limit(self, doc_id: str, doc_buckets: Mapping[str, int]) -> bool:
+        return doc_buckets.get(doc_id, 0) < self._fusion_config.max_chunks_per_doc
 
     def _is_near_duplicate(
         self,
