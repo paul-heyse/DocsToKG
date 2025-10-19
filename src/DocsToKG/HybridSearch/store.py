@@ -2343,7 +2343,7 @@ def cosine_topk_blockwise(
 
     if q.ndim == 1:
         q = q.reshape(1, -1)
-    q = np.ascontiguousarray(q, dtype=np.float32).copy()
+    q = np.array(q, dtype=np.float32, copy=True, order="C")
     C = np.ascontiguousarray(C, dtype=np.float32)
 
     if q.shape[1] != C.shape[1]:
@@ -2359,6 +2359,37 @@ def cosine_topk_blockwise(
 
     faiss.normalize_L2(q)
     q_view = q.astype(np.float16, copy=False) if use_fp16 else q
+
+    if not use_fp16:
+        knn_runner = getattr(faiss, "knn_gpu", None)
+        if knn_runner is not None:
+            try:
+                corpus_copy = np.array(C, dtype=np.float32, copy=True, order="C")
+                faiss.normalize_L2(corpus_copy)
+                row_bytes = np.dtype(np.float32).itemsize * C.shape[1]
+                vector_limit = int(block_rows) * row_bytes
+                query_rows = max(int(block_rows), q.shape[0])
+                query_limit = query_rows * np.dtype(np.float32).itemsize * q.shape[1]
+                distances, indices = knn_runner(
+                    resources,
+                    q_view,
+                    corpus_copy,
+                    k,
+                    metric=faiss.METRIC_INNER_PRODUCT,
+                    device=int(device),
+                    vectorsMemoryLimit=vector_limit,
+                    queriesMemoryLimit=query_limit,
+                )
+            except TypeError:
+                distances = indices = None
+            except Exception:
+                distances = indices = None
+            else:
+                if distances is not None and indices is not None:
+                    return (
+                        np.asarray(distances, dtype=np.float32),
+                        np.asarray(indices, dtype=np.int64),
+                    )
 
     N, M = q.shape[0], C.shape[0]
     best_scores = np.full((N, k), -np.inf, dtype=np.float32)
