@@ -543,6 +543,75 @@ def is_retryable_error(exc: BaseException) -> bool:
 SESSION_POOL = SessionPool()
 
 
+@contextmanager
+def request_with_redirect_audit(
+    *,
+    session: requests.Session,
+    method: str,
+    url: str,
+    headers: Dict[str, str],
+    timeout: float,
+    stream: bool,
+    http_config: DownloadConfiguration,
+) -> Iterator[requests.Response]:
+    """Issue an HTTP request while validating every redirect target."""
+
+    redirects = 0
+    response: Optional[requests.Response] = None
+    current_url = url
+    raw_limit = getattr(http_config, "max_redirects", 5)
+    try:
+        max_redirects = int(raw_limit)
+    except (TypeError, ValueError):
+        max_redirects = 5
+    if max_redirects < 0:
+        max_redirects = 0
+
+    try:
+        while True:
+            secure_url = validate_url_security(current_url, http_config)
+            try:
+                response = session.request(
+                    method,
+                    secure_url,
+                    headers=headers,
+                    timeout=timeout,
+                    stream=stream,
+                    allow_redirects=False,
+                )
+            except requests.RequestException:
+                raise
+
+            if response.is_redirect:
+                redirects += 1
+                if redirects > max_redirects:
+                    response.close()
+                    raise PolicyError("Too many redirects during download")
+                location = response.headers.get("Location")
+                if not location:
+                    response.close()
+                    raise PolicyError("Redirect response missing Location header")
+                next_url = urljoin(secure_url, location)
+                try:
+                    current_url = validate_url_security(next_url, http_config)
+                finally:
+                    response.close()
+                    response = None
+                continue
+
+            try:
+                validate_url_security(response.url, http_config)
+            except Exception:
+                response.close()
+                raise
+
+            yield response
+            return
+    finally:
+        if response is not None:
+            response.close()
+
+
 class StreamingDownloader(pooch.HTTPDownloader):
     """Custom downloader supporting HEAD validation, conditional requests, resume, and caching.
 
@@ -621,60 +690,16 @@ class StreamingDownloader(pooch.HTTPDownloader):
     ) -> Iterator[requests.Response]:
         """Issue an HTTP request while validating every redirect target."""
 
-        redirects = 0
-        response: Optional[requests.Response] = None
-        current_url = url
-        raw_limit = getattr(self.http_config, "max_redirects", 5)
-        try:
-            max_redirects = int(raw_limit)
-        except (TypeError, ValueError):
-            max_redirects = 5
-        if max_redirects < 0:
-            max_redirects = 0
-
-        try:
-            while True:
-                secure_url = validate_url_security(current_url, self.http_config)
-                try:
-                    response = session.request(
-                        method,
-                        secure_url,
-                        headers=headers,
-                        timeout=timeout,
-                        stream=stream,
-                        allow_redirects=False,
-                    )
-                except requests.RequestException:
-                    raise
-
-                if response.is_redirect:
-                    redirects += 1
-                    if redirects > max_redirects:
-                        response.close()
-                        raise PolicyError("Too many redirects during download")
-                    location = response.headers.get("Location")
-                    if not location:
-                        response.close()
-                        raise PolicyError("Redirect response missing Location header")
-                    next_url = urljoin(secure_url, location)
-                    try:
-                        current_url = validate_url_security(next_url, self.http_config)
-                    finally:
-                        response.close()
-                        response = None
-                    continue
-
-                try:
-                    validate_url_security(response.url, self.http_config)
-                except Exception:
-                    response.close()
-                    raise
-
-                yield response
-                return
-        finally:
-            if response is not None:
-                response.close()
+        with request_with_redirect_audit(
+            session=session,
+            method=method,
+            url=url,
+            headers=headers,
+            timeout=timeout,
+            stream=stream,
+            http_config=self.http_config,
+        ) as response:
+            yield response
 
     def _preliminary_head_check(
         self, url: str, session: requests.Session, headers: Mapping[str, str]
