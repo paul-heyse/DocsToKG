@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, List, Tuple
 
@@ -20,6 +21,7 @@ DEFAULT_CAPTION_MARKERS: Tuple[str, ...] = (
 __all__ = [
     "DEFAULT_CAPTION_MARKERS",
     "DEFAULT_HEADING_MARKERS",
+    "ChunkDiscovery",
     "compute_relative_doc_id",
     "compute_stable_shard",
     "derive_doc_id_and_chunks_path",
@@ -29,6 +31,22 @@ __all__ = [
     "load_structural_marker_config",
     "load_structural_marker_profile",
 ]
+
+
+@dataclass(frozen=True)
+class ChunkDiscovery:
+    """Discovery record that retains logical and resolved chunk paths."""
+
+    logical_path: Path
+    """Path of the chunk file relative to the traversal root."""
+
+    resolved_path: Path
+    """Canonical filesystem path of the chunk file (after symlink resolution)."""
+
+    def __fspath__(self) -> str:
+        """Return the resolved path for :func:`os.fspath` compatibility."""
+
+        return str(self.resolved_path)
 
 
 def _ensure_str_sequence(value: object, label: str) -> List[str]:
@@ -132,14 +150,23 @@ def derive_doc_id_and_chunks_path(
 
 
 def derive_doc_id_and_vectors_path(
-    chunk_file: Path, chunks_root: Path, vectors_root: Path
+    chunk_file: Path | ChunkDiscovery, chunks_root: Path, vectors_root: Path
 ) -> tuple[str, Path]:
     """Return manifest doc identifier and vectors output path for ``chunk_file``."""
 
-    if chunks_root.is_file():
-        relative = Path(chunk_file.name)
+    if isinstance(chunk_file, ChunkDiscovery):
+        relative = chunk_file.logical_path
     else:
-        relative = chunk_file.relative_to(chunks_root)
+        if chunk_file.is_absolute():
+            try:
+                relative = chunk_file.relative_to(chunks_root)
+            except ValueError as exc:
+                raise ValueError(
+                    "Chunk file is outside the provided chunks_root; pass a ChunkDiscovery "
+                    "instance to preserve the logical tree path."
+                ) from exc
+        else:
+            relative = chunk_file
     base = relative
     if base.suffix == ".jsonl":
         base = base.with_suffix("")
@@ -165,20 +192,22 @@ def compute_stable_shard(identifier: str, shard_count: int) -> int:
     return int.from_bytes(digest[:8], "big") % shard_count
 
 
-def iter_chunks(directory: Path) -> Iterator[Path]:
-    """Yield chunk JSONL files from ``directory`` and all descendants."""
+def iter_chunks(directory: Path) -> Iterator[ChunkDiscovery]:
+    """Yield :class:`ChunkDiscovery` records for chunk files under ``directory``."""
+
+    if not directory.exists():
+        return
+
+    if directory.is_file():
+        if directory.name.endswith(".chunks.jsonl"):
+            resolved = directory.resolve()
+            yield ChunkDiscovery(Path(directory.name), resolved)
+        return
 
     root = directory.resolve()
-    if root.is_file():
-        if root.name.endswith(".chunks.jsonl"):
-            yield root
-        return
-    if not root.exists():
-        return
-
     yielded_symlink_targets: set[Path] = set()
 
-    def _walk(current: Path) -> Iterator[Path]:
+    def _walk(current: Path) -> Iterator[ChunkDiscovery]:
         """Yield chunk files beneath ``current`` depth-first with symlink guards."""
 
         try:
@@ -196,6 +225,7 @@ def iter_chunks(directory: Path) -> Iterator[Path]:
                     if resolved in yielded_symlink_targets:
                         continue
                     yielded_symlink_targets.add(resolved)
-                yield resolved
+                relative = entry.relative_to(root)
+                yield ChunkDiscovery(relative, resolved)
 
     yield from _walk(root)
