@@ -7,7 +7,7 @@ import builtins
 import json
 import sys
 import textwrap
-from collections import Counter, defaultdict, deque
+from collections import Counter, OrderedDict, deque
 from pathlib import Path
 from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
 
@@ -539,17 +539,18 @@ def _manifest_main(argv: Sequence[str]) -> int:
         stages = discovered
     if not stages:
         stages = ["embeddings"]
+    summary_order = list(stages)
 
     tail_count = max(0, int(args.tail))
     need_summary = bool(args.summarize or not tail_count)
     tail_entries: Deque[Dict[str, Any]] = deque(maxlen=tail_count or None)
-    status_counter: Optional[Dict[str, Counter]] = None
-    duration_totals: Optional[Dict[str, float]] = None
-    total_entries: Optional[Dict[str, int]] = None
+    status_counter: Optional[OrderedDict[str, Counter[str]]] = None
+    duration_totals: Optional[OrderedDict[str, float]] = None
+    total_entries: Optional[OrderedDict[str, int]] = None
     if need_summary:
-        status_counter = defaultdict(Counter)
-        duration_totals = defaultdict(float)
-        total_entries = defaultdict(int)
+        status_counter = OrderedDict((stage, Counter()) for stage in summary_order)
+        duration_totals = OrderedDict((stage, 0.0) for stage in summary_order)
+        total_entries = OrderedDict((stage, 0) for stage in summary_order)
 
     if tail_count and not need_summary:
         entry_iter = iter_manifest_entries(
@@ -567,6 +568,10 @@ def _manifest_main(argv: Sequence[str]) -> int:
             tail_entries.append(entry)
         if need_summary and total_entries is not None and status_counter is not None and duration_totals is not None:
             stage = entry.get("stage", "unknown")
+            if stage not in total_entries:
+                total_entries[stage] = 0
+                status_counter[stage] = Counter()
+                duration_totals[stage] = 0.0
             status = entry.get("status", "unknown")
             total_entries[stage] += 1
             status_counter[stage][status] += 1
@@ -610,19 +615,11 @@ def _manifest_main(argv: Sequence[str]) -> int:
                 print(line)
 
     if need_summary and total_entries is not None and status_counter is not None and duration_totals is not None:
-        summary = {
-            stage: {
-                "total": total_entries[stage],
-                "statuses": dict(status_counter[stage]),
-                "duration_s": round(duration_totals[stage], 3),
-            }
-            for stage in total_entries
-        }
         print("\nManifest summary")
-        for stage in sorted(summary):
-            data = summary[stage]
-            print(f"- {stage}: total={data['total']} duration_s={data['duration_s']}")
-            status_map = data.get("statuses", {})
+        for stage, total in total_entries.items():
+            duration = round(duration_totals[stage], 3)
+            print(f"- {stage}: total={total} duration_s={duration}")
+            status_map = status_counter[stage]
             if status_map:
                 statuses = ", ".join(
                     f"{name}={count}" for name, count in sorted(status_map.items())
