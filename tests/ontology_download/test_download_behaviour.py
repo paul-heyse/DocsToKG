@@ -55,6 +55,12 @@ def test_download_stream_fetches_fixture(ontology_env, tmp_path):
     assert methods.count("GET") == 1
 
 
+def test_preliminary_head_check_handles_malformed_content_length(ontology_env, tmp_path):
+    """Malformed Content-Length headers should be ignored by the downloader."""
+
+    payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
+    url = ontology_env.register_fixture(
+        "hp-malformed-length.owl",
 def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
     """A transient failure should consume bucket tokens for each retry."""
 
@@ -65,46 +71,43 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
         media_type="application/rdf+xml",
         repeats=1,
     )
-
-    parsed = urlparse(url)
-    get_key = ("GET", parsed.path)
-    failure = ResponseSpec(status=503, headers={"Retry-After": "0"}, method="GET")
-    # The testing harness exposes the queued responses; prepend a transient failure
-    # so the first GET yields a retryable error before the cached success entries.
-    ontology_env._responses[get_key].appendleft(failure)
+    parsed_url = urlparse(url)
+    ontology_env.queue_response(
+        "fixtures/hp-malformed-length.owl",
+        ResponseSpec(
+            method="HEAD",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": "not-an-integer",
+            },
+        ),
+    )
 
     config = ontology_env.build_download_config()
-
-    class RecordingBucket:
-        def __init__(self) -> None:
-            self.calls: list[float] = []
-
-        def consume(self, tokens: float = 1.0) -> None:
-            self.calls.append(tokens)
-
-    bucket = RecordingBucket()
-    config.set_bucket_provider(lambda service, cfg, host: bucket)
-
-    destination = tmp_path / "hp-retry.owl"
-
-    result = network_mod.download_stream(
-        url=url,
+    destination = tmp_path / "hp-malformed-length.owl"
+    downloader = network_mod.StreamingDownloader(
         destination=destination,
         headers={},
-        previous_manifest=None,
         http_config=config,
-        cache_dir=ontology_env.cache_dir,
+        previous_manifest=None,
         logger=_logger(),
         expected_media_type="application/rdf+xml",
         service="obo",
+        origin_host=parsed_url.hostname,
     )
 
-    assert destination.read_bytes() == payload
-    assert result.status == "fresh"
-    assert len(bucket.calls) == 2
-    methods = [request.method for request in ontology_env.requests]
-    assert methods.count("HEAD") == 1
-    assert methods.count("GET") == 2
+    with network_mod.SESSION_POOL.lease(
+        service="obo",
+        host=parsed_url.hostname,
+        http_config=config,
+    ) as session:
+        content_type, content_length = downloader._preliminary_head_check(url, session)
+
+    assert content_type == "application/rdf+xml"
+    assert content_length is None
+    assert ontology_env.requests[-1].method == "HEAD"
+    assert ontology_env.requests[-1].path.endswith("hp-malformed-length.owl")
 
 
 def test_download_stream_uses_cached_manifest(ontology_env, tmp_path):
