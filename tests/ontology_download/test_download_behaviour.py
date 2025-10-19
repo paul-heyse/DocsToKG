@@ -6,6 +6,7 @@ import io
 import hashlib
 import logging
 import tarfile
+import time
 import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
@@ -156,6 +157,52 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
     assert content_length is None
     assert ontology_env.requests[-1].method == "HEAD"
     assert ontology_env.requests[-1].path.endswith("hp-malformed-length.owl")
+
+
+def test_head_retry_after_honours_delay_before_get(ontology_env, tmp_path):
+    """A Retry-After header on the HEAD response should delay the subsequent GET."""
+
+    payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
+    retry_after_sec = 0.35
+    url = ontology_env.register_fixture(
+        "hp-retry-after.owl",
+        payload,
+        media_type="application/rdf+xml",
+        repeats=1,
+    )
+    ontology_env.queue_response(
+        "fixtures/hp-retry-after.owl",
+        ResponseSpec(
+            method="HEAD",
+            status=429,
+            headers={"Retry-After": f"{retry_after_sec:.2f}"},
+        ),
+    )
+
+    config = ontology_env.build_download_config()
+    destination = tmp_path / "hp-retry-after.owl"
+
+    start = time.monotonic()
+    result = network_mod.download_stream(
+        url=url,
+        destination=destination,
+        headers={},
+        previous_manifest=None,
+        http_config=config,
+        cache_dir=ontology_env.cache_dir,
+        logger=_logger(),
+        expected_media_type="application/rdf+xml",
+        service="obo",
+    )
+    elapsed = time.monotonic() - start
+
+    assert result.status == "fresh"
+    assert destination.read_bytes() == payload
+    assert elapsed >= retry_after_sec - 0.05
+
+    methods = [request.method for request in ontology_env.requests]
+    assert methods.count("HEAD") == 1
+    assert methods.count("GET") == 1
 
 
 def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):

@@ -688,6 +688,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self.streamed_digests: Dict[str, str] = {}
         self.cancellation_token = cancellation_token
         self._reset_hashers()
+        self._reuse_head_token = False
 
     def _reset_hashers(self) -> None:
         """Initialise hashlib objects for all supported algorithms."""
@@ -793,8 +794,12 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 retryable=False,
             )
 
+        self._reuse_head_token = False
+        consumed_here = False
         if self.bucket is not None and not token_consumed:
             self.bucket.consume()
+            token_consumed = True
+            consumed_here = True
 
         try:
             with self._request_with_redirect_audit(
@@ -806,6 +811,35 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 stream=False,
             ) as response:
                 if response.status_code >= 400:
+                    retry_after_header = response.headers.get("Retry-After")
+                    retry_after_delay = _parse_retry_after(retry_after_header)
+                    if retry_after_delay is not None:
+                        self.logger.warning(
+                            "head retry-after",
+                            extra={
+                                "stage": "download",
+                                "method": "HEAD",
+                                "status_code": response.status_code,
+                                "retry_after_sec": round(retry_after_delay, 2),
+                                "service": self.service,
+                                "host": self.origin_host,
+                            },
+                        )
+                        apply_retry_after(
+                            http_config=self.http_config,
+                            service=self.service,
+                            host=self.origin_host,
+                            delay=retry_after_delay,
+                        )
+                        if (
+                            retry_after_delay > 0
+                            and self.bucket is not None
+                            and token_consumed
+                        ):
+                            self._reuse_head_token = True
+                            time.sleep(retry_after_delay)
+                        elif retry_after_delay > 0:
+                            time.sleep(retry_after_delay)
                     self.logger.debug(
                         "HEAD request failed, proceeding with GET",
                         extra={
@@ -814,6 +848,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             "status_code": response.status_code,
                             "url": url,
                             "headers": self.custom_headers,
+                            "token_consumed": token_consumed,
+                            "consumed_here": consumed_here,
                         },
                     )
                     return None, None
@@ -1051,7 +1087,18 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     request_headers["Range"] = f"bytes={original_resume_position}-"
 
                 if self.bucket is not None:
-                    self.bucket.consume()
+                    if self._reuse_head_token:
+                        self.logger.debug(
+                            "reusing head token after retry-after",
+                            extra={
+                                "stage": "download",
+                                "service": self.service,
+                                "host": self.origin_host,
+                            },
+                        )
+                        self._reuse_head_token = False
+                    else:
+                        self.bucket.consume()
 
                 request_timeout = self.http_config.timeout_sec
 
