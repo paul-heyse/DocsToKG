@@ -53,6 +53,8 @@ from .manifests import (
 )
 from .planning import (
     MANIFEST_SCHEMA_VERSION,
+    BatchFetchError,
+    BatchPlanningError,
     FetchSpec,
     PlannedFetch,
     fetch_all,
@@ -1273,6 +1275,27 @@ def _handle_config_validate(path: Path) -> dict:
     }
 
 
+# --- Error handling helpers ---
+
+
+def _emit_batch_failure(exc: Union[BatchPlanningError, BatchFetchError], args) -> None:
+    """Print a concise error message and optionally serialize partial results."""
+
+    message = exc.args[0] if exc.args else str(exc)
+    print(f"Error: {message}", file=sys.stderr)
+    if not getattr(args, "json", False):
+        return
+
+    payload: List[dict]
+    if isinstance(exc, BatchPlanningError):
+        payload = [plan_to_dict(plan) for plan in getattr(exc, "completed", [])]
+    else:
+        payload = [results_to_dict(result) for result in getattr(exc, "completed", [])]
+
+    json.dump(payload, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+
+
 # --- Module Entry Points ---
 
 
@@ -1430,6 +1453,12 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
         else:  # pragma: no cover - argparse should prevent unknown commands
             parser.error(f"Unsupported command: {args.command}")
         return 0
+    except BatchPlanningError as exc:
+        _emit_batch_failure(exc, args)
+        return 1
+    except BatchFetchError as exc:
+        _emit_batch_failure(exc, args)
+        return 1
     except ConfigError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
