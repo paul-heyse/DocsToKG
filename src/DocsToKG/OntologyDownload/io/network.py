@@ -87,7 +87,7 @@ for canonical, aliases in _RDF_ALIAS_GROUPS.items():
         RDF_MIME_FORMAT_LABELS[alias] = label
 
 SESSION_POOL_CACHE_DEFAULT = 2
-_RETRYABLE_HTTP_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
+_RETRYABLE_HTTP_STATUSES = {408, 409, 416, 425, 429, 500, 502, 503, 504}
 
 T = TypeVar("T")
 
@@ -1225,6 +1225,24 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         setattr(http_error, "_retry_after_delay", retry_after_delay)
                         response.close()
                         raise http_error
+
+                    if response.status_code == 416:
+                        self.logger.warning(
+                            "range request rejected; retrying without resume",
+                            extra={
+                                "stage": "download",
+                                "status_code": response.status_code,
+                                "resume_position": original_resume_position,
+                                "service": self.service,
+                                "host": self.origin_host,
+                            },
+                        )
+                        _clear_partial_files()
+                        resume_position = 0
+                        want_range = False
+                        raise requests.HTTPError(
+                            f"HTTP error {response.status_code}", response=response
+                        )
 
                     range_honored = response.status_code == 206
                     if want_range and range_honored:
