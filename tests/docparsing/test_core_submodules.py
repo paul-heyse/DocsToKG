@@ -8,6 +8,7 @@ import io
 import sys
 import types
 from pathlib import Path
+from typing import Callable, Sequence
 from unittest import mock
 
 import pytest
@@ -353,6 +354,73 @@ def test_embed_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> Non
     assert exit_code == 2
     assert "embed" in captured.err
     assert "cannot be combined" in captured.err
+
+
+def test_run_all_forwards_zero_token_bounds(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Run-all CLI forwards explicit zero token bounds and shard settings."""
+
+    recorded: dict[str, list[str]] = {}
+
+    def _stage(name: str) -> Callable[[Sequence[str]], int]:
+        def _capture(argv: Sequence[str]) -> int:
+            recorded[name] = list(argv)
+            return 0
+
+        return _capture
+
+    monkeypatch.setattr(core_cli, "doctags", _stage("doctags"))
+    monkeypatch.setattr(core_cli, "chunk", _stage("chunk"))
+    monkeypatch.setattr(core_cli, "embed", _stage("embed"))
+
+    doctags_out_dir = tmp_path / "DocTagsFiles"
+    chunk_out_dir = tmp_path / "ChunkedDocTagFiles"
+    doctags_out_dir.mkdir()
+    chunk_out_dir.mkdir()
+
+    exit_code = core_cli.run_all(
+        [
+            "--doctags-out-dir",
+            str(doctags_out_dir),
+            "--chunk-out-dir",
+            str(chunk_out_dir),
+            "--chunk-workers",
+            "5",
+            "--chunk-min-tokens",
+            "0",
+            "--chunk-max-tokens",
+            "0",
+            "--chunk-shard-count",
+            "8",
+            "--chunk-shard-index",
+            "3",
+            "--log-level",
+            "DEBUG",
+        ]
+    )
+
+    assert exit_code == 0
+    assert {"doctags", "chunk", "embed"} <= recorded.keys()
+
+    doctags_args = recorded["doctags"]
+    assert "--out-dir" in doctags_args
+    assert doctags_args[doctags_args.index("--out-dir") + 1] == str(doctags_out_dir)
+    assert "--min-tokens" not in doctags_args
+
+    chunk_args = recorded["chunk"]
+    assert chunk_args[chunk_args.index("--in-dir") + 1] == str(doctags_out_dir)
+    assert chunk_args[chunk_args.index("--out-dir") + 1] == str(chunk_out_dir)
+    assert chunk_args[chunk_args.index("--workers") + 1] == "5"
+    assert chunk_args[chunk_args.index("--min-tokens") + 1] == "0"
+    assert chunk_args[chunk_args.index("--max-tokens") + 1] == "0"
+    assert chunk_args[chunk_args.index("--shard-count") + 1] == "8"
+    assert chunk_args[chunk_args.index("--shard-index") + 1] == "3"
+
+    embed_args = recorded["embed"]
+    assert embed_args[embed_args.index("--chunks-dir") + 1] == str(chunk_out_dir)
+    assert embed_args[embed_args.index("--shard-count") + 1] == "8"
+    assert embed_args[embed_args.index("--shard-index") + 1] == "3"
 
 
 def test_token_profiles_missing_transformers(

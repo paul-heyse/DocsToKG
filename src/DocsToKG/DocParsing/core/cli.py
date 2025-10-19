@@ -597,9 +597,9 @@ def _build_stage_args(args: argparse.Namespace) -> tuple[List[str], List[str], L
         embed_args.extend(["--chunks-dir", str(args.chunk_out_dir)])
     if args.chunk_workers:
         chunk_args.extend(["--workers", str(args.chunk_workers)])
-    if args.chunk_min_tokens:
+    if args.chunk_min_tokens is not None:
         chunk_args.extend(["--min-tokens", str(args.chunk_min_tokens)])
-    if args.chunk_max_tokens:
+    if args.chunk_max_tokens is not None:
         chunk_args.extend(["--max-tokens", str(args.chunk_max_tokens)])
     if args.structural_markers:
         chunk_args.extend(["--structural-markers", str(args.structural_markers)])
