@@ -1397,6 +1397,9 @@ class FaissVectorStore(DenseVectorStore):
         try:
             resources = self._create_gpu_resources(device=device)
             self._gpu_resources = resources
+            if self._gpu_resources is not None:
+                self._configure_gpu_resource(self._gpu_resources, device=device)
+                self._record_gpu_resource_configuration(device=device)
         except Exception as exc:  # pragma: no cover - GPU-specific failure
             raise RuntimeError(
                 "HybridSearch failed to initialise FAISS GPU resources. "
@@ -1502,6 +1505,40 @@ class FaissVectorStore(DenseVectorStore):
                 "Unable to bind default CUDA null stream without explicit device",
                 exc_info=True,
             )
+
+    def _record_gpu_resource_configuration(self, *, device: Optional[int] = None) -> None:
+        """Emit observability breadcrumbs for configured GPU resource settings."""
+
+        observability = getattr(self, "_observability", None)
+        if observability is None:
+            return
+
+        temp_memory = getattr(self, "_temp_memory_bytes", None)
+        if temp_memory is not None:
+            observability.metrics.set_gauge("faiss_gpu_temp_memory_bytes", float(temp_memory))
+        observability.metrics.set_gauge(
+            "faiss_gpu_default_null_stream",
+            1.0 if getattr(self, "_gpu_use_default_null_stream", False) else 0.0,
+        )
+        observability.metrics.set_gauge(
+            "faiss_gpu_default_null_stream_all_devices",
+            1.0 if getattr(self, "_gpu_use_default_null_stream_all_devices", False) else 0.0,
+        )
+        observability.logger.info(
+            "faiss-gpu-resource-configured",
+            extra={
+                "event": {
+                    "device": None if device is None else int(device),
+                    "temp_memory_bytes": temp_memory,
+                    "default_null_stream": bool(
+                        getattr(self, "_gpu_use_default_null_stream", False)
+                    ),
+                    "default_null_stream_all_devices": bool(
+                        getattr(self, "_gpu_use_default_null_stream_all_devices", False)
+                    ),
+                }
+            },
+        )
 
     def _requires_gpu_resource_customization(self) -> bool:
         """Return whether replica resources need to be retained for custom settings."""
