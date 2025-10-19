@@ -148,6 +148,10 @@ __all__ = (
 
 _MASK_63_BITS = (1 << 63) - 1
 
+_COSINE_TOPK_DEFAULT_BLOCK_ROWS = 65_536
+_COSINE_TOPK_AUTO_BLOCK_ROWS_SENTINEL = -1
+_COSINE_TOPK_AUTO_MEM_FRACTION = 0.5
+
 
 def _vector_uuid_to_faiss_int(vector_id: str) -> int:
     """Translate a vector UUID into a FAISS-compatible 63-bit integer."""
@@ -2508,6 +2512,31 @@ def cosine_batch(
     )
 
 
+def _auto_block_rows(
+    resources: "faiss.StandardGpuResources",
+    device: int,
+    dim: int,
+) -> tuple[int, Optional[dict[str, int]]]:
+    """Estimate a safe block row count from GPU memory metrics."""
+
+    get_memory_info = getattr(resources, "getMemoryInfo", None)
+    if not callable(get_memory_info):
+        return _COSINE_TOPK_DEFAULT_BLOCK_ROWS, None
+    try:
+        free_bytes, total_bytes = get_memory_info(int(device))
+    except Exception:  # pragma: no cover - defensive guard
+        logger.debug("cosine_topk_blockwise: unable to read GPU memory info", exc_info=True)
+        return _COSINE_TOPK_DEFAULT_BLOCK_ROWS, None
+
+    row_width = max(np.dtype(np.float32).itemsize * max(dim, 1), 1)
+    permitted = max(
+        int((free_bytes * _COSINE_TOPK_AUTO_MEM_FRACTION) // row_width),
+        1,
+    )
+    effective = min(permitted, _COSINE_TOPK_DEFAULT_BLOCK_ROWS)
+    return effective, {"free_bytes": int(free_bytes), "total_bytes": int(total_bytes)}
+
+
 def cosine_topk_blockwise(
     q: np.ndarray,
     C: np.ndarray,
@@ -2515,7 +2544,7 @@ def cosine_topk_blockwise(
     k: int,
     device: int,
     resources: "faiss.StandardGpuResources",
-    block_rows: int = 65_536,
+    block_rows: int = _COSINE_TOPK_AUTO_BLOCK_ROWS_SENTINEL,
     use_fp16: bool = False,
     use_cuvs: Optional[bool] = None,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -2524,7 +2553,9 @@ def cosine_topk_blockwise(
     The helper avoids materialising the full ``(N x M)`` similarity matrix by
     iterating over ``C`` in row blocks and maintaining a running Top-K per query
     row. Inputs are copied and normalised inside the routine so callers retain
-    ownership of their buffers.
+    ownership of their buffers. When ``block_rows`` is left at the sentinel value
+    (``-1``), the helper inspects ``resources.getMemoryInfo`` to pick a block
+    size that fits comfortably within the currently free GPU memory.
 
     Args:
         q: Query vector or matrix (``N x D``).
@@ -2532,7 +2563,10 @@ def cosine_topk_blockwise(
         k: Number of neighbours to return per query row.
         device: CUDA device ordinal used for FAISS kernels.
         resources: FAISS GPU resources backing ``pairwise_distance_gpu``.
-        block_rows: Number of corpus rows processed per iteration.
+        block_rows: Number of corpus rows processed per iteration. Provide a
+            positive value to override the automatic sizing. The default
+            sentinel (``-1``) enables adaptive sizing derived from GPU memory
+            telemetry when available.
         use_fp16: Enable float16 compute for pairwise distance kernels.
         use_cuvs: Optional override forcing cuVS acceleration when supported
             (``True``) or disabling it (``False``). ``None`` defers to
@@ -2546,8 +2580,24 @@ def cosine_topk_blockwise(
 
     if resources is None:
         raise RuntimeError("FAISS GPU resources are required for cosine comparisons")
+    requested_block_rows = block_rows
+    memory_snapshot: Optional[dict[str, int]] = None
+    if block_rows == _COSINE_TOPK_AUTO_BLOCK_ROWS_SENTINEL:
+        block_rows, memory_snapshot = _auto_block_rows(resources, device, C.shape[1])
     if block_rows <= 0:
         raise ValueError("block_rows must be positive")
+
+    log_payload: dict[str, object] = {
+        "action": "cosine_topk_blockwise",
+        "block_rows": int(block_rows),
+        "requested_block_rows": int(requested_block_rows),
+        "auto_block_rows": requested_block_rows == _COSINE_TOPK_AUTO_BLOCK_ROWS_SENTINEL,
+        "dim": int(C.shape[1]),
+        "device": int(device),
+    }
+    if memory_snapshot is not None:
+        log_payload.update(memory_snapshot)
+    logger.info("cosine-topk-block-config", extra={"event": log_payload})
 
     if q.ndim == 1:
         q = q.reshape(1, -1)
