@@ -192,95 +192,73 @@ def test_add_calls_faiss_normalize_once(monkeypatch: "pytest.MonkeyPatch") -> No
     )
 
 
-def test_add_dedupe_probe_uses_normalised_vectors(monkeypatch: "pytest.MonkeyPatch") -> None:
-    """The dedupe probe must operate on unit-normalised vectors."""
+def test_add_dedupe_rejects_scaled_duplicates(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """Scaled duplicates should be rejected when the dedupe threshold is strict."""
 
     store = FaissVectorStore.__new__(FaissVectorStore)
     store._dim = 3  # type: ignore[attr-defined]
-    store._config = SimpleNamespace(  # type: ignore[attr-defined]
-        ingest_dedupe_threshold=0.99,
-        nlist=1,
-        ivf_train_factor=1,
-    )
-    store._lock = RLock()  # type: ignore[attr-defined]
+    store._config = SimpleNamespace(ingest_dedupe_threshold=0.99, nlist=1, ivf_train_factor=1)  # type: ignore[attr-defined]
     store._observability = SimpleNamespace(  # type: ignore[attr-defined]
         trace=lambda *a, **k: _NullContext(),
-        metrics=SimpleNamespace(
-            increment=lambda *a, **k: None,
-            observe=lambda *a, **k: None,
-            set_gauge=lambda *a, **k: None,
-        ),
+        metrics=SimpleNamespace(increment=lambda *a, **k: None),
     )
-    store._as_pinned = MethodType(lambda self, matrix: matrix, store)  # type: ignore[attr-defined]
-    store._release_pinned_buffers = MethodType(lambda self: None, store)  # type: ignore[attr-defined]
-    store._flush_pending_deletes = MethodType(lambda self, *, force: None, store)  # type: ignore[attr-defined]
-    store._probe_remove_support = MethodType(lambda self: False, store)  # type: ignore[attr-defined]
-    store._lookup_existing_ids = MethodType(
-        lambda self, ids: np.empty(0, dtype=np.int64), store
-    )  # type: ignore[attr-defined]
-    store._update_gpu_metrics = MethodType(lambda self: None, store)  # type: ignore[attr-defined]
-    store._maybe_refresh_snapshot = MethodType(
-        lambda self, *, writes_delta, reason: None, store
-    )  # type: ignore[attr-defined]
-    store._dirty_deletes = 0  # type: ignore[attr-defined]
-    store._needs_rebuild = False  # type: ignore[attr-defined]
-    store._supports_remove_ids = False  # type: ignore[attr-defined]
-    store._search_coalescer = None  # type: ignore[attr-defined]
 
-    class _Index:
+    metrics_calls: list[tuple[str, float]] = []
+
+    def recording_increment(name: str, amount: float = 1.0) -> None:
+        metrics_calls.append((name, float(amount)))
+
+    store._observability.metrics.increment = recording_increment  # type: ignore[attr-defined]
+
+    class RecordingIndex:
         def __init__(self) -> None:
-            self.index = self
             self.ntotal = 1
-            self.is_trained = True
             self.add_calls: list[tuple[np.ndarray, np.ndarray]] = []
 
-        def add_with_ids(self, matrix: np.ndarray, ids: np.ndarray) -> None:
+        def add_with_ids(self, matrix: np.ndarray, ids: np.ndarray) -> None:  # pragma: no cover - sanity guard
             self.add_calls.append((matrix.copy(), ids.copy()))
 
-    fake_index = _Index()
-    store._index = fake_index  # type: ignore[attr-defined]
+    store._index = RecordingIndex()  # type: ignore[attr-defined]
 
-    if store_module.faiss is None:
-        monkeypatch.setattr(store_module, "faiss", SimpleNamespace(), raising=False)
-
-    def fake_normalize(matrix: np.ndarray) -> None:
-        norms = np.linalg.norm(matrix, axis=1, keepdims=True)
-        norms[norms == 0.0] = 1.0
-        matrix[:] = matrix / norms
-
-    monkeypatch.setattr(store_module.faiss, "normalize_L2", fake_normalize, raising=False)
-    monkeypatch.setattr(store_module.faiss, "downcast_index", lambda index: index, raising=False)
-
-    existing_unit = np.array([1.0, 0.0, 0.0], dtype=np.float32)
-    recorded: dict[str, np.ndarray] = {}
+    search_inputs: list[np.ndarray] = []
 
     def fake_search_matrix(self: FaissVectorStore, matrix: np.ndarray, top_k: int):
-        recorded["matrix"] = matrix.copy()
-        np.testing.assert_allclose(
-            np.linalg.norm(matrix, axis=1), np.ones(matrix.shape[0]), rtol=1e-6
-        )
-        scores = (matrix @ existing_unit.reshape(-1, 1)).astype(np.float32)
-        recorded["scores"] = scores.copy()
-        indices = np.full((matrix.shape[0], top_k), 123, dtype=np.int64)
-        return scores, indices
+        search_inputs.append(matrix.copy())
+        distances = np.array([[0.9995]], dtype=np.float32)
+        indices = np.array([[123]], dtype=np.int64)
+        return distances, indices
 
     store._search_matrix = MethodType(fake_search_matrix, store)  # type: ignore[attr-defined]
 
-    base = np.array([0.5, np.sqrt(3.0) / 2.0, 0.0], dtype=np.float32)
-    vector = base * 7.0
-    vectors = [vector]
-    ids = ["00000000-0000-0000-0000-000000000099"]
+    normalize_calls: list[np.ndarray] = []
 
-    store.add(vectors, ids)
+    def fake_normalize(matrix: np.ndarray) -> None:
+        copied = matrix.copy()
+        norms = np.linalg.norm(copied, axis=1, keepdims=True)
+        norms[norms == 0.0] = 1.0
+        copied /= norms
+        matrix[:] = copied
+        normalize_calls.append(copied)
 
-    assert "matrix" in recorded, "dedupe probe should execute"
-    np.testing.assert_allclose(recorded["scores"], np.array([[0.5]], dtype=np.float32), atol=1e-6)
-    assert fake_index.add_calls, "vector should be ingested when cosine score is below threshold"
-    stored_matrix, stored_ids = fake_index.add_calls[0]
-    np.testing.assert_allclose(np.linalg.norm(stored_matrix, axis=1), 1.0, rtol=1e-6)
-    np.testing.assert_array_equal(
-        stored_ids, np.array([store_module._vector_uuid_to_faiss_int(ids[0])])
+    monkeypatch.setattr(
+        store_module,
+        "faiss",
+        SimpleNamespace(normalize_L2=fake_normalize),
+        raising=False,
     )
+
+    original_vector = np.array([10.0, -4.0, 0.5], dtype=np.float32)
+    payload = original_vector.copy()
+    vector_id = "00000000-0000-0000-0000-000000000099"
+
+    store.add([payload], [vector_id])
+
+    assert not store._index.add_calls  # type: ignore[attr-defined]
+    assert metrics_calls == [("faiss_ingest_deduped", 1.0)]
+    assert normalize_calls, "dedupe path should normalise the copied queries"
+    assert search_inputs, "dedupe path should perform a search"
+    np.testing.assert_allclose(np.linalg.norm(search_inputs[0], axis=1), 1.0, rtol=1e-6)
+    np.testing.assert_array_equal(payload, original_vector)
 
 
 def test_search_batch_impl_normalizes_once(monkeypatch: "pytest.MonkeyPatch") -> None:
