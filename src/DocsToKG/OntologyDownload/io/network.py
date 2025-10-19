@@ -191,10 +191,18 @@ def register_dns_stub(host: str, handler: Callable[[str], List[Tuple]]) -> None:
 
 
 def clear_dns_stubs() -> None:
-    """Remove all registered DNS stubs."""
+    """Remove all registered DNS stubs and purge cached stub lookups."""
 
     with _DNS_STUB_LOCK:
+        stubbed_hosts = list(_DNS_STUBS.keys())
         _DNS_STUBS.clear()
+
+    if not stubbed_hosts:
+        return
+
+    with _DNS_CACHE_LOCK:
+        for ascii_host in stubbed_hosts:
+            _DNS_CACHE.pop(ascii_host, None)
 
 
 def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
