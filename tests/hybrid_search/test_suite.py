@@ -292,7 +292,7 @@ from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, List, Mapping, Sequence
+from typing import Callable, Dict, List, Mapping, Sequence
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import numpy as np
@@ -336,6 +336,7 @@ from DocsToKG.HybridSearch.store import (
 from DocsToKG.HybridSearch.types import (
     ChunkFeatures,
     ChunkPayload,
+    EmbeddingProxy,
 )
 from tests.conftest import PatchManager
 
@@ -902,6 +903,7 @@ def test_managed_adapter_supports_ingestion_training_sample() -> None:
             self._needs_training = True
             self.config_accesses = 0
             self.adapter_stats = SimpleNamespace(device=0, ntotal=0)
+            self._store: Dict[str, np.ndarray] = {}
 
         @property
         def config(self) -> DenseIndexConfig:
@@ -932,9 +934,13 @@ def test_managed_adapter_supports_ingestion_training_sample() -> None:
 
         def add(self, vectors, vector_ids):  # pragma: no cover - stub
             self._last_add = (vectors, vector_ids)
+            for vec, vid in zip(vectors, vector_ids):
+                self._store[str(vid)] = np.asarray(vec, dtype=np.float32)
 
         def remove(self, vector_ids):  # pragma: no cover - stub
             self._last_remove = list(vector_ids)
+            for vid in vector_ids:
+                self._store.pop(str(vid), None)
 
         def search(self, *args, **kwargs):  # pragma: no cover - stub
             return []
@@ -947,6 +953,9 @@ def test_managed_adapter_supports_ingestion_training_sample() -> None:
 
         def range_search(self, *args, **kwargs):  # pragma: no cover - stub
             return []
+
+        def reconstruct_batch(self, vector_ids: Sequence[str]) -> np.ndarray:
+            return np.stack([self._store[str(vid)] for vid in vector_ids], dtype=np.float32)
 
         def serialize(self) -> bytes:  # pragma: no cover - stub
             return b""
@@ -991,7 +1000,14 @@ def test_managed_adapter_supports_ingestion_training_sample() -> None:
     )
 
     existing = [_make_chunk(f"existing-{i}", dim=dim, value=float(i)) for i in range(2)]
+    pipeline.faiss_index.add(
+        [chunk.features.embedding for chunk in existing],
+        [chunk.vector_id for chunk in existing],
+    )
     registry.upsert(existing)
+    assert all(
+        isinstance(chunk.features.embedding, EmbeddingProxy) for chunk in existing
+    )
     new_chunks = [_make_chunk(f"new-{i}", dim=dim, value=float(i)) for i in range(2)]
 
     assert pipeline.faiss_index.config is dense_config
@@ -1043,6 +1059,55 @@ def test_faiss_index_uses_registry_bridge(tmp_path: Path) -> None:
 
     hits = manager.search(embedding, 1)
     assert hits and hits[0].vector_id == chunk.vector_id
+
+
+# --- test_hybrid_search_real_vectors.py ---
+
+
+def test_chunk_registry_lazy_embeddings_roundtrip(tmp_path: Path) -> None:
+    dim = 8
+    config = DenseIndexConfig(index_type="flat")
+    faiss_index = FaissVectorStore(dim=dim, config=config)
+    registry = ChunkRegistry()
+    observability = Observability()
+    pipeline = ChunkIngestionPipeline(
+        faiss_index=faiss_index,
+        opensearch=OpenSearchSimulator(),
+        registry=registry,
+        observability=observability,
+    )
+
+    chunks = [_make_chunk(f"registry-{i}", dim=dim, value=float(i)) for i in range(6)]
+    originals = {chunk.vector_id: chunk.features.embedding.copy() for chunk in chunks}
+    pipeline.faiss_index.add(
+        [chunk.features.embedding for chunk in chunks],
+        [chunk.vector_id for chunk in chunks],
+    )
+
+    registry.upsert(chunks)
+    assert registry.count() == len(chunks)
+    assert all(isinstance(chunk.features.embedding, EmbeddingProxy) for chunk in registry.all())
+
+    pre_bytes = sum(vector.nbytes for vector in originals.values())
+    post_bytes = sum(
+        getattr(chunk.features.embedding, "nbytes", 0)
+        for chunk in registry.all()
+        if isinstance(chunk.features.embedding, np.ndarray)
+    )
+    assert pre_bytes > 0 and post_bytes == 0
+
+    ordered_ids = list(originals.keys())
+    reconstructed = registry.resolve_embeddings(ordered_ids)
+    for idx, vector_id in enumerate(ordered_ids):
+        np.testing.assert_allclose(
+            reconstructed[idx], originals[vector_id], rtol=1e-5, atol=1e-6
+        )
+
+    cache: Dict[str, np.ndarray] = {}
+    sample_id = ordered_ids[0]
+    first = registry.resolve_embedding(sample_id, cache=cache)
+    second = registry.resolve_embedding(sample_id, cache=cache)
+    np.testing.assert_allclose(first, second, rtol=1e-5, atol=1e-6)
 
 
 # --- test_hybrid_search_real_vectors.py ---

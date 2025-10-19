@@ -171,7 +171,18 @@ import uuid
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from threading import Event, RLock
-from typing import Callable, ClassVar, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
+from typing import (
+    Callable,
+    ClassVar,
+    Dict,
+    Iterator,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 import numpy as np
 
@@ -179,7 +190,7 @@ from .config import DenseIndexConfig
 from .devtools.opensearch_simulator import OpenSearchSimulator
 from .interfaces import DenseVectorStore
 from .pipeline import Observability
-from .types import ChunkPayload
+from .types import ChunkPayload, EmbeddingProxy
 
 # --- Globals ---
 
@@ -854,6 +865,40 @@ class FaissVectorStore(DenseVectorStore):
             with self._lock:
                 self.remove_ids(ids, force_flush=True, reason="remove")
         self._update_gpu_metrics()
+
+    def reconstruct_batch(self, vector_ids: Sequence[str]) -> np.ndarray:
+        """Reconstruct dense vectors for the supplied identifiers."""
+
+        if not vector_ids:
+            return np.empty((0, self._dim), dtype=np.float32)
+        ids = np.array([_vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
+        with self._lock:
+            base = self._index.index if hasattr(self._index, "index") else self._index
+            try:
+                if hasattr(base, "reconstruct_batch"):
+                    rows = base.reconstruct_batch(np.ascontiguousarray(ids, dtype=np.int64))
+                else:  # pragma: no cover - GPU fallback
+                    rows = np.vstack([base.reconstruct(int(faiss_id)) for faiss_id in ids])
+            except RuntimeError as exc:
+                raise KeyError(f"Unable to reconstruct embeddings for {vector_ids!r}") from exc
+        matrix = np.ascontiguousarray(rows, dtype=np.float32)
+        if matrix.shape[0] != len(vector_ids):  # pragma: no cover - defensive guard
+            raise RuntimeError(
+                "Embedding reconstruction returned mismatched row count "
+                f"(expected {len(vector_ids)}, received {matrix.shape[0]})"
+            )
+        return matrix
+
+    def reconstruct_vector(self, vector_id: str) -> np.ndarray:
+        """Reconstruct a single embedding referenced by ``vector_id``."""
+
+        matrix = self.reconstruct_batch([vector_id])
+        if matrix.shape[0] != 1:  # pragma: no cover - defensive guard
+            raise RuntimeError(
+                f"Expected to reconstruct a single vector for {vector_id!r}, "
+                f"received shape {matrix.shape}"
+            )
+        return matrix[0]
 
     def remove_ids(
         self, ids: np.ndarray, *, force_flush: bool = False, reason: str = "remove"
@@ -3010,6 +3055,7 @@ class ChunkRegistry:
     def __init__(self) -> None:
         self._chunks: Dict[str, ChunkPayload] = {}
         self._bridge: Dict[int, str] = {}
+        self._embedding_store: Optional[DenseVectorStore] = None
 
     @staticmethod
     def to_faiss_id(vector_id: str) -> int:
@@ -3017,10 +3063,21 @@ class ChunkRegistry:
 
         return _vector_uuid_to_faiss_int(vector_id)
 
+    def attach_dense_store(self, store: DenseVectorStore) -> None:
+        """Attach a dense store used to reconstruct embeddings on demand."""
+
+        self._embedding_store = store
+
     def upsert(self, chunks: Sequence[ChunkPayload]) -> None:
-        """Insert or update registry entries for ``chunks``."""
+        """Insert or update registry entries for ``chunks``.
+
+        Embeddings are replaced with :class:`~DocsToKG.HybridSearch.types.EmbeddingProxy`
+        instances so the registry retains text/metadata while delegating vector
+        materialisation to FAISS.
+        """
 
         for chunk in chunks:
+            chunk.features.embedding = EmbeddingProxy(chunk.vector_id)
             self._chunks[chunk.vector_id] = chunk
             self._bridge[self.to_faiss_id(chunk.vector_id)] = chunk.vector_id
 
@@ -3065,6 +3122,76 @@ class ChunkRegistry:
         """Return all vector identifiers in insertion order."""
 
         return list(self._chunks.keys())
+
+    def resolve_embeddings(
+        self,
+        vector_ids: Sequence[str],
+        *,
+        cache: Optional[MutableMapping[str, np.ndarray]] = None,
+        dtype: np.dtype = np.float32,
+    ) -> np.ndarray:
+        """Resolve embeddings for ``vector_ids`` using attached dense storage."""
+
+        if not vector_ids:
+            dim = getattr(self._embedding_store, "dim", 0) if self._embedding_store else 0
+            return np.empty((0, dim), dtype=dtype)
+        if self._embedding_store is None:
+            raise RuntimeError("ChunkRegistry requires an attached dense store to resolve embeddings")
+
+        dtype = np.dtype(dtype)
+        results: list[Optional[np.ndarray]] = [None] * len(vector_ids)
+        missing: list[str] = []
+        missing_positions: list[int] = []
+
+        if cache is not None:
+            for idx, vector_id in enumerate(vector_ids):
+                cached = cache.get(vector_id)
+                if cached is not None:
+                    results[idx] = np.asarray(cached, dtype=np.float32)
+                else:
+                    missing.append(vector_id)
+                    missing_positions.append(idx)
+        else:
+            missing = list(vector_ids)
+            missing_positions = list(range(len(vector_ids)))
+
+        if missing:
+            reconstructed = self._embedding_store.reconstruct_batch(missing)
+            if reconstructed.shape[0] != len(missing):  # pragma: no cover - defensive guard
+                raise RuntimeError(
+                    "Dense store returned mismatched reconstruction rows "
+                    f"(expected {len(missing)}, received {reconstructed.shape[0]})"
+                )
+            for offset, idx in enumerate(missing_positions):
+                row = np.asarray(reconstructed[offset], dtype=np.float32)
+                results[idx] = row
+                if cache is not None:
+                    cache[vector_ids[idx]] = row
+
+        resolved: list[np.ndarray] = []
+        missing_ids: list[str] = []
+        for idx, candidate in enumerate(results):
+            if candidate is None:
+                missing_ids.append(vector_ids[idx])
+            else:
+                resolved.append(candidate)
+        if missing_ids:
+            raise KeyError(f"Embeddings missing for {missing_ids!r}")
+
+        matrix = np.ascontiguousarray(np.stack(resolved), dtype=dtype)
+        return matrix
+
+    def resolve_embedding(
+        self,
+        vector_id: str,
+        *,
+        cache: Optional[MutableMapping[str, np.ndarray]] = None,
+        dtype: np.dtype = np.float32,
+    ) -> np.ndarray:
+        """Resolve a single embedding referenced by ``vector_id``."""
+
+        matrix = self.resolve_embeddings([vector_id], cache=cache, dtype=dtype)
+        return matrix[0]
 
 
 class ManagedFaissAdapter(DenseVectorStore):
@@ -3122,6 +3249,16 @@ class ManagedFaissAdapter(DenseVectorStore):
                 "use ChunkRegistry for FAISS id bridging"
             )
         self._inner.add(vectors, vector_ids)
+
+    def reconstruct_batch(self, vector_ids: Sequence[str]) -> np.ndarray:
+        """Delegate embedding reconstruction to the managed store."""
+
+        return self._inner.reconstruct_batch(vector_ids)
+
+    def reconstruct_vector(self, vector_id: str) -> np.ndarray:
+        """Return a single embedding reconstructed from the managed store."""
+
+        return self._inner.reconstruct_vector(vector_id)
 
     def set_nprobe(
         self,

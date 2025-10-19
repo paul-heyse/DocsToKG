@@ -207,6 +207,12 @@ class DenseVectorStore(Protocol):
     ) -> Sequence["FaissSearchResult"]:
         """Return all vectors scoring above ``min_score`` for ``query``."""
 
+    def reconstruct_batch(self, vector_ids: Sequence[str]) -> np.ndarray:
+        """Reconstruct embeddings for ``vector_ids`` from the dense store."""
+
+    def reconstruct_vector(self, vector_id: str) -> np.ndarray:
+        """Reconstruct a single embedding referenced by ``vector_id``."""
+
     def serialize(self) -> bytes:
         """Return a serialised representation of the index."""
 
