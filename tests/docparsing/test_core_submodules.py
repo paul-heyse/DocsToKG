@@ -473,7 +473,11 @@ def test_run_all_forwards_zero_token_bounds(
 
     def _stage(name: str) -> Callable[[Sequence[str]], int]:
         def _capture(argv: Sequence[str]) -> int:
-            recorded[name] = list(argv)
+            argv_list = list(argv)
+            if name == "doctags":
+                parser = core_cli.build_doctags_parser()
+                parser.parse_args(argv_list)
+            recorded[name] = argv_list
             return 0
 
         return _capture
@@ -505,6 +509,8 @@ def test_run_all_forwards_zero_token_bounds(
             "3",
             "--log-level",
             "DEBUG",
+            "--vllm-wait-timeout",
+            "90",
         ]
     )
 
@@ -515,6 +521,7 @@ def test_run_all_forwards_zero_token_bounds(
     assert "--out-dir" in doctags_args
     assert doctags_args[doctags_args.index("--out-dir") + 1] == str(doctags_out_dir)
     assert "--min-tokens" not in doctags_args
+    assert "--vllm-wait-timeout" in doctags_args
 
     chunk_args = recorded["chunk"]
     assert chunk_args[chunk_args.index("--in-dir") + 1] == str(doctags_out_dir)
@@ -529,6 +536,65 @@ def test_run_all_forwards_zero_token_bounds(
     assert embed_args[embed_args.index("--chunks-dir") + 1] == str(chunk_out_dir)
     assert embed_args[embed_args.index("--shard-count") + 1] == "8"
     assert embed_args[embed_args.index("--shard-index") + 1] == "3"
+
+
+def test_run_all_plan_reports_log_level(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    planning_module_stubs: None,
+) -> None:
+    """`docparse all --plan` surfaces the forwarded log level in the plan output."""
+
+    html_dir = tmp_path / "html"
+    doctags_out_dir = tmp_path / "DocTagsFiles"
+    html_dir.mkdir()
+    doctags_out_dir.mkdir()
+    (html_dir / "doc.html").write_text("<html></html>", encoding="utf-8")
+
+    def _fake_plan_chunk(_argv: Sequence[str]) -> dict[str, object]:
+        return {
+            "stage": "chunk",
+            "input_dir": str(doctags_out_dir),
+            "output_dir": str(tmp_path / "ChunkedDocTagFiles"),
+            "process": {"count": 0, "preview": []},
+            "skip": {"count": 0, "preview": []},
+            "notes": [],
+        }
+
+    def _fake_plan_embed(_argv: Sequence[str]) -> dict[str, object]:
+        return {
+            "stage": "embed",
+            "action": "generate",
+            "chunks_dir": str(tmp_path / "ChunkedDocTagFiles"),
+            "vectors_dir": str(tmp_path / "Embeddings"),
+            "process": {"count": 0, "preview": []},
+            "skip": {"count": 0, "preview": []},
+            "notes": [],
+        }
+
+    monkeypatch.setattr(core_cli, "plan_chunk", _fake_plan_chunk)
+    monkeypatch.setattr(core_cli, "plan_embed", _fake_plan_embed)
+
+    exit_code = core_cli.run_all(
+        [
+            "--mode",
+            "html",
+            "--log-level",
+            "DEBUG",
+            "--doctags-in-dir",
+            str(html_dir),
+            "--doctags-out-dir",
+            str(doctags_out_dir),
+            "--plan",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "docparse all plan" in captured.out
+    assert "log_level: DEBUG" in captured.out
 
 
 def test_token_profiles_missing_transformers(
@@ -554,6 +620,34 @@ def test_token_profiles_missing_transformers(
     assert exit_code == 1
     assert "No module named 'transformers'" in captured.err
     assert "pip install transformers" in captured.err
+
+
+def test_chunk_missing_transformers_dependency(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Chunk CLI surfaces actionable guidance when transformers is missing."""
+
+    import DocsToKG.DocParsing as docparsing_pkg
+
+    monkeypatch.delitem(sys.modules, "DocsToKG.DocParsing.chunking", raising=False)
+    monkeypatch.delitem(docparsing_pkg._MODULE_CACHE, "chunking", raising=False)
+
+    original_import = builtins.__import__
+
+    def fake_import(name: str, *args, **kwargs):
+        if name == "DocsToKG.DocParsing.chunking":
+            raise ImportError("No module named 'transformers'")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+
+    exit_code = core_cli.chunk([])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "DocsToKG.DocParsing.chunking could not be imported" in captured.err
+    assert "transformers" in captured.err
+    assert "DocTags/chunking dependencies" in captured.err
 
 
 def test_display_plan_stream_output() -> None:
@@ -757,9 +851,7 @@ def test_plan_embed_validate_only_missing_directories(
 
     assert plan["validate"]["count"] == 0
     assert plan["missing"]["count"] == 0
-    assert any(
-        note.startswith("Chunks/Vectors directories missing") for note in plan["notes"]
-    )
+    assert plan["notes"] == ["Chunks directory missing", "Vectors directory missing"]
 
 
 def test_plan_embed_generate_counts(
@@ -793,6 +885,41 @@ def test_plan_embed_generate_counts(
 
     assert plan["process"]["count"] == 1
     assert plan["skip"]["count"] == 0
+
+
+def test_plan_embed_generate_vectors_dir_absent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    planning_module_stubs: None,
+) -> None:
+    """Generate-mode planning tolerates an absent vectors directory."""
+
+    data_root = tmp_path / "data"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    vectors_dir = data_root / "Embeddings"
+    chunks_dir.mkdir(parents=True)
+    (chunks_dir / "doc1.chunks.jsonl").write_text("{}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "DocsToKG.DocParsing.core.planning.detect_data_root", lambda *_args, **_kwargs: data_root
+    )
+
+    plan = plan_embed(
+        [
+            "--data-root",
+            str(data_root),
+            "--chunks-dir",
+            str(chunks_dir),
+            "--out-dir",
+            str(vectors_dir),
+        ]
+    )
+
+    assert plan["process"]["count"] == 1
+    assert plan["skip"]["count"] == 0
+    assert plan["notes"] == [
+        "Vectors directory not found; outputs will be created during generation"
+    ]
 
 
 def test_plan_embed_validate_only_missing_chunks_dir(

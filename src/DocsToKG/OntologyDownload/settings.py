@@ -523,6 +523,39 @@ class ResolvedConfig(BaseModel):
 _DEFAULT_CONFIG_LOCK = threading.RLock()
 _DEFAULT_CONFIG_CACHE: Optional[ResolvedConfig] = None
 
+_HAS_PYDANTIC_SETTINGS = hasattr(BaseSettings, "model_dump")
+
+
+def _read_env_value(name: str) -> Optional[str]:
+    """Fetch and normalise an environment variable, treating empty values as absent."""
+
+    raw = os.environ.get(name)
+    if raw is None:
+        return None
+    value = raw.strip()
+    return value or None
+
+
+def _read_env_int(name: str) -> Optional[int]:
+    value = _read_env_value(name)
+    if value is None:
+        return None
+    return int(value)
+
+
+def _read_env_float(name: str) -> Optional[float]:
+    value = _read_env_value(name)
+    if value is None:
+        return None
+    return float(value)
+
+
+def _read_env_path(name: str) -> Optional[Path]:
+    value = _read_env_value(name)
+    if value is None:
+        return None
+    return Path(value)
+
 
 def get_default_config(*, copy: bool = False) -> ResolvedConfig:
     """Return a memoised :class:`ResolvedConfig` constructed from defaults."""
@@ -547,25 +580,72 @@ def invalidate_default_config_cache() -> None:
         _DEFAULT_CONFIG_CACHE = None
 
 
-class EnvironmentOverrides(BaseSettings):
-    """Pydantic settings model exposing environment-derived overrides."""
+if _HAS_PYDANTIC_SETTINGS:
+    class EnvironmentOverrides(BaseSettings):
+        """Pydantic settings model exposing environment-derived overrides."""
 
-    max_retries: Optional[int] = Field(default=None, alias="ONTOFETCH_MAX_RETRIES")
-    timeout_sec: Optional[int] = Field(default=None, alias="ONTOFETCH_TIMEOUT_SEC")
-    download_timeout_sec: Optional[int] = Field(
-        default=None, alias="ONTOFETCH_DOWNLOAD_TIMEOUT_SEC"
-    )
-    per_host_rate_limit: Optional[str] = Field(default=None, alias="ONTOFETCH_PER_HOST_RATE_LIMIT")
-    backoff_factor: Optional[float] = Field(default=None, alias="ONTOFETCH_BACKOFF_FACTOR")
-    log_level: Optional[str] = Field(default=None, alias="ONTOFETCH_LOG_LEVEL")
-    shared_rate_limit_dir: Optional[Path] = Field(
-        default=None, alias="ONTOFETCH_SHARED_RATE_LIMIT_DIR"
-    )
-    max_uncompressed_size_gb: Optional[float] = Field(
-        default=None, alias="ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB"
-    )
+        max_retries: Optional[int] = Field(default=None, alias="ONTOFETCH_MAX_RETRIES")
+        timeout_sec: Optional[int] = Field(default=None, alias="ONTOFETCH_TIMEOUT_SEC")
+        download_timeout_sec: Optional[int] = Field(
+            default=None, alias="ONTOFETCH_DOWNLOAD_TIMEOUT_SEC"
+        )
+        per_host_rate_limit: Optional[str] = Field(
+            default=None, alias="ONTOFETCH_PER_HOST_RATE_LIMIT"
+        )
+        backoff_factor: Optional[float] = Field(default=None, alias="ONTOFETCH_BACKOFF_FACTOR")
+        log_level: Optional[str] = Field(default=None, alias="ONTOFETCH_LOG_LEVEL")
+        shared_rate_limit_dir: Optional[Path] = Field(
+            default=None, alias="ONTOFETCH_SHARED_RATE_LIMIT_DIR"
+        )
+        max_uncompressed_size_gb: Optional[float] = Field(
+            default=None, alias="ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB"
+        )
 
-    model_config = SettingsConfigDict(env_prefix="ONTOFETCH_", case_sensitive=False, extra="ignore")
+        model_config = SettingsConfigDict(
+            env_prefix="ONTOFETCH_", case_sensitive=False, extra="ignore"
+        )
+
+else:
+    class EnvironmentOverrides:
+        """Fallback environment reader when ``pydantic-settings`` is unavailable."""
+
+        model_config: Dict[str, object] = {}
+
+        def __init__(self) -> None:
+            self.max_retries = _read_env_int("ONTOFETCH_MAX_RETRIES")
+            self.timeout_sec = _read_env_int("ONTOFETCH_TIMEOUT_SEC")
+            self.download_timeout_sec = _read_env_int("ONTOFETCH_DOWNLOAD_TIMEOUT_SEC")
+            self.per_host_rate_limit = _read_env_value("ONTOFETCH_PER_HOST_RATE_LIMIT")
+            self.backoff_factor = _read_env_float("ONTOFETCH_BACKOFF_FACTOR")
+            self.log_level = _read_env_value("ONTOFETCH_LOG_LEVEL")
+            self.shared_rate_limit_dir = _read_env_path("ONTOFETCH_SHARED_RATE_LIMIT_DIR")
+            self.max_uncompressed_size_gb = _read_env_float("ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB")
+
+        max_retries: Optional[int]
+        timeout_sec: Optional[int]
+        download_timeout_sec: Optional[int]
+        per_host_rate_limit: Optional[str]
+        backoff_factor: Optional[float]
+        log_level: Optional[str]
+        shared_rate_limit_dir: Optional[Path]
+        max_uncompressed_size_gb: Optional[float]
+
+        def model_dump(
+            self, *, by_alias: bool = False, exclude_none: bool = False
+        ) -> Dict[str, object]:
+            data: Dict[str, object] = {
+                "max_retries": self.max_retries,
+                "timeout_sec": self.timeout_sec,
+                "download_timeout_sec": self.download_timeout_sec,
+                "per_host_rate_limit": self.per_host_rate_limit,
+                "backoff_factor": self.backoff_factor,
+                "log_level": self.log_level,
+                "shared_rate_limit_dir": self.shared_rate_limit_dir,
+                "max_uncompressed_size_gb": self.max_uncompressed_size_gb,
+            }
+            if exclude_none:
+                data = {key: value for key, value in data.items() if value is not None}
+            return data
 
 
 def get_env_overrides() -> Dict[str, str]:
