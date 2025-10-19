@@ -59,6 +59,11 @@ def planning_module_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
         parser.add_argument("--resume", action="store_true")
         parser.add_argument("--force", action="store_true")
 
+    def list_htmls(directory: Path):
+        return (path for path in sorted(Path(directory).rglob("*.html")))
+
+    def list_pdfs(directory: Path):
+        return (path for path in sorted(Path(directory).rglob("*.pdf")))
     def _iter_paths(
         directory: Path,
         suffixes: tuple[str, ...],
@@ -410,6 +415,8 @@ def test_chunk_cli_validation_failure(
     """Chunk CLI surfaces validation errors without tracebacks."""
 
     import DocsToKG.DocParsing as docparsing_pkg
+
+    monkeypatch.syspath_prepend(str(Path(__file__).with_name("fake_deps")))
 
     stub_chunking = types.ModuleType("DocsToKG.DocParsing.chunking")
 
