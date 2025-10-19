@@ -75,6 +75,33 @@ def _base_args() -> list[str]:
     ]
 
 
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--year-start", "2020", "--year-end", "2021", "--ignore-robots"],
+        ["--topic", "", "--year-start", "2020", "--year-end", "2021", "--ignore-robots"],
+        [
+            "--topic-id",
+            "   ",
+            "--year-start",
+            "2020",
+            "--year-end",
+            "2021",
+            "--ignore-robots",
+        ],
+    ],
+)
+def test_resolve_config_requires_topic_or_topic_id(parser, capfd, argv):
+    args = download_args.parse_args(parser, argv)
+
+    with pytest.raises(SystemExit) as excinfo:
+        download_args.resolve_config(args, parser)
+
+    assert excinfo.value.code == 2
+    _, err = capfd.readouterr()
+    assert "Provide --topic or --topic-id." in err
+
+
 @pytest.mark.parametrize("per_page", [0, 201])
 def test_resolve_config_rejects_invalid_per_page(parser, capfd, per_page):
     argv = _base_args() + ["--per-page", str(per_page)]

@@ -368,6 +368,11 @@ def resolve_config(
     """Validate arguments, resolve configuration, and prepare run state."""
     extract_html_text = args.extract_text == "html"
 
+    topic = args.topic.strip() if isinstance(args.topic, str) else args.topic
+    topic_id_input = (
+        args.topic_id.strip() if isinstance(args.topic_id, str) else args.topic_id
+    )
+
     if args.workers < 1:
         parser.error("--workers must be >= 1")
     if args.concurrent_resolvers is not None and args.concurrent_resolvers < 1:
@@ -380,7 +385,7 @@ def resolve_config(
         parser.error("--max must be greater than or equal to 0")
     if args.year_start > args.year_end:
         parser.error("--year-start must be less than or equal to --year-end")
-    if not args.topic and not args.topic_id:
+    if not topic and not topic_id_input:
         parser.error("Provide --topic or --topic-id.")
     for field_name in ("sniff_bytes", "min_pdf_bytes", "tail_check_bytes"):
         value = getattr(args, field_name, None)
@@ -390,14 +395,16 @@ def resolve_config(
     if args.mailto:
         apply_mailto(args.mailto)
 
-    topic_id = args.topic_id
-    if not topic_id and args.topic:
+    topic_id = topic_id_input
+    if not topic_id and topic:
         try:
-            topic_id = resolve_topic_id_if_needed(args.topic)
+            topic_id = resolve_topic_id_if_needed(topic)
         except Exception as exc:
-            LOGGER.warning("Failed to resolve topic ID for '%s': %s", args.topic, exc)
+            LOGGER.warning("Failed to resolve topic ID for '%s': %s", topic, exc)
             topic_id = None
     query_kwargs = vars(args).copy()
+    if topic is not None:
+        query_kwargs["topic"] = topic
     if topic_id:
         query_kwargs["topic_id"] = topic_id
     query = build_query(argparse.Namespace(**query_kwargs))
