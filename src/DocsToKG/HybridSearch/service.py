@@ -2591,27 +2591,87 @@ class HybridSearchValidator:
         recalls: List[float] = []
 
         # Precompute matrix for brute-force recall estimates.
-        vector_matrix = np.ascontiguousarray(
-            np.stack([chunk.features.embedding for chunk in all_chunks], dtype=np.float32)
-        )
-        vector_ids = [chunk.vector_id for chunk in all_chunks]
         try:
             adapter_stats = self._ingestion.faiss_index.adapter_stats  # type: ignore[attr-defined]
         except AttributeError:
             adapter_stats = None
+
         resources = adapter_stats.resources if adapter_stats is not None else None
-        device = (
-            adapter_stats.device
-            if adapter_stats is not None
-            else self._ingestion.faiss_index.device
+        try:
+            ingestion_device = getattr(self._ingestion.faiss_index, "device", 0)
+        except Exception:
+            ingestion_device = 0
+        try:
+            device = int(adapter_stats.device) if adapter_stats is not None else int(ingestion_device)
+        except Exception:
+            device = 0
+
+        gpu_resources = resources
+        scratch_index = None
+        using_gpu_ground_truth = False
+        vector_ids: List[str] = []
+        normalized_cpu_vectors: Optional[List[np.ndarray]] = None
+        embedding_dim = int(
+            np.array(sampled_chunks[0].features.embedding, dtype=np.float32, copy=False)
+            .reshape(-1)
+            .shape[0]
         )
-        cuvs_request = (
-            getattr(adapter_stats, "cuvs_requested", None)
-            if adapter_stats is not None
-            else getattr(getattr(self._ingestion.faiss_index, "config", object()), "use_cuvs", None)
-        )
-        if resources is None:
-            vector_matrix = normalize_rows(vector_matrix)
+
+        if gpu_resources is None and faiss is not None and hasattr(faiss, "StandardGpuResources"):
+            try:
+                gpu_resources = self._ensure_validation_resources()
+            except Exception:
+                gpu_resources = None
+
+        if (
+            faiss is not None
+            and gpu_resources is not None
+            and hasattr(faiss, "GpuIndexFlatIP")
+        ):
+            try:
+                gpu_config_cls = getattr(faiss, "GpuIndexFlatConfig", None)
+                if gpu_config_cls is not None:
+                    gpu_config = gpu_config_cls()
+                    gpu_config.device = int(device)
+                    if adapter_stats is not None and hasattr(gpu_config, "useFloat16"):
+                        gpu_config.useFloat16 = bool(
+                            getattr(adapter_stats, "fp16_enabled", False)
+                        )
+                    scratch_index = faiss.GpuIndexFlatIP(gpu_resources, embedding_dim, gpu_config)
+                else:
+                    scratch_index = faiss.index_cpu_to_gpu(
+                        gpu_resources,
+                        int(device),
+                        faiss.IndexFlatIP(embedding_dim),
+                    )
+            except Exception:
+                scratch_index = None
+
+        if scratch_index is not None:
+            using_gpu_ground_truth = True
+            try:
+                for chunk in all_chunks:
+                    vector_ids.append(chunk.vector_id)
+                    embedding = np.array(chunk.features.embedding, dtype=np.float32, copy=True)
+                    if embedding.ndim == 1:
+                        embedding = embedding.reshape(1, -1)
+                    faiss.normalize_L2(embedding)
+                    scratch_index.add(embedding)
+            except Exception:
+                scratch_index.reset()
+                scratch_index = None
+                using_gpu_ground_truth = False
+                vector_ids = []
+
+        if not using_gpu_ground_truth:
+            normalized_cpu_vectors = []
+            for chunk in all_chunks:
+                vector_ids.append(chunk.vector_id)
+                embedding = np.array(chunk.features.embedding, dtype=np.float32, copy=True)
+                flat_embedding = embedding.reshape(-1)
+                norm = float(np.linalg.norm(flat_embedding)) or 1.0
+                normalized = (flat_embedding / norm).astype(np.float32, copy=False)
+                normalized_cpu_vectors.append(normalized)
 
         noise_rng = np.random.default_rng(2024)
 
@@ -2631,28 +2691,27 @@ class HybridSearchValidator:
             ):
                 perturb_hits += 1
 
-            if resources is not None:
-                fp16_enabled = (
-                    bool(adapter_stats.fp16_enabled) if adapter_stats is not None else False
-                )
-                _scores, indices_block = cosine_topk_blockwise(
-                    query_vec,
-                    vector_matrix,
-                    k=top_k,
-                    device=device,
-                    resources=resources,
-                    use_fp16=fp16_enabled,
-                    use_cuvs=cuvs_request,
-                )
-                top_indices = indices_block[0].astype(int, copy=False)
+            if using_gpu_ground_truth and scratch_index is not None and faiss is not None:
+                q = np.array(query_vec, dtype=np.float32, copy=True)
+                if q.ndim == 1:
+                    q = q.reshape(1, -1)
+                faiss.normalize_L2(q)
+                _scores, indices_block = scratch_index.search(q, top_k)
+                top_indices = indices_block[0]
             else:
-                q = np.ascontiguousarray(query_vec, dtype=np.float32)
-                norm = np.linalg.norm(q) or 1.0
+                q = np.array(query_vec, dtype=np.float32, copy=True)
+                norm = float(np.linalg.norm(q)) or 1.0
                 q = (q / norm).astype(np.float32, copy=False)
-                scores = vector_matrix @ q
+                assert normalized_cpu_vectors is not None
+                scores = np.fromiter(
+                    (float(np.dot(q, corpus_vec)) for corpus_vec in normalized_cpu_vectors),
+                    dtype=np.float32,
+                    count=len(normalized_cpu_vectors),
+                )
                 top_indices = np.argpartition(scores, -top_k)[-top_k:]
                 top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
-            ground_truth_ids = [vector_ids[idx] for idx in top_indices]
+            valid_indices = [idx for idx in top_indices if 0 <= idx < len(vector_ids)]
+            ground_truth_ids = [vector_ids[idx] for idx in valid_indices]
             overlap = len(set(retrieved_ids) & set(ground_truth_ids))
             recalls.append(overlap / min(top_k, len(ground_truth_ids)) if ground_truth_ids else 0.0)
 
@@ -2672,6 +2731,9 @@ class HybridSearchValidator:
             and perturb_rate >= thresholds.get("dense_perturb_top3", 0.0)
             and avg_recall >= thresholds.get("dense_recall_at_10", 0.0)
         )
+        if scratch_index is not None:
+            scratch_index.reset()
+
         return ValidationReport(name="scale_dense_metrics", passed=passed, details=details)
 
     def _scale_channel_relevance(

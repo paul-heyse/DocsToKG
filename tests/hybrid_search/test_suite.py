@@ -280,10 +280,12 @@ OpenBLAS) works across ingestion, query, and scale scenarios."""
 
 from __future__ import annotations
 
+import gc
 import importlib
 import json
 import logging
 import os
+import random
 import sys
 import uuid
 from dataclasses import replace
@@ -1571,6 +1573,22 @@ def test_hybrid_scale_suite(
     assert metrics_file.exists()
     metrics_payload = json.loads(metrics_file.read_text(encoding="utf-8"))
     assert "scale_dense_metrics" in metrics_payload
+
+    psutil = pytest.importorskip("psutil")
+    process = psutil.Process()
+    gc.collect()
+    before_rss = process.memory_info().rss
+    dense_report = validator._scale_dense_metrics(  # pylint: disable=protected-access
+        service_module.DEFAULT_SCALE_THRESHOLDS,
+        random.Random(9876),
+    )
+    gc.collect()
+    after_rss = process.memory_info().rss
+    delta_gib = max(0.0, (after_rss - before_rss) / (1024 ** 3))
+    assert (
+        delta_gib < 0.5
+    ), f"scale_dense_metrics should not increase RSS by >=0.5 GiB (observed {delta_gib:.2f} GiB)"
+    assert dense_report.details.get("sampled_chunks", 0) > 0
 
 
 # --- test_hybridsearch_gpu_only.py ---
