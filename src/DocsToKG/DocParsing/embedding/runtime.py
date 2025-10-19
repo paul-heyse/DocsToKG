@@ -1297,9 +1297,17 @@ def _qwen_embed_direct(
     try:
         for i in range(0, len(texts), effective_batch):
             batch = texts[i : i + effective_batch]
-            res = llm.embed(batch, pooling_params=pool)
+            try:
+                res = llm.embed(batch, pooling_params=pool)
+            except TypeError:
+                res = llm.embed(batch)
             for r in res:
-                out.append([float(x) for x in r.outputs.embedding])
+                embedding = getattr(r, "outputs", None)
+                if embedding is not None:
+                    embedding = getattr(embedding, "embedding", embedding)
+                else:
+                    embedding = r
+                out.append([float(x) for x in embedding])
     finally:
         if not use_cache:
             _shutdown_llm_instance(llm)
@@ -1547,7 +1555,12 @@ class JsonlVectorWriter(VectorWriter):
         """Append ``rows`` to the active JSONL artifact created by ``__enter__``."""
         if self._handle is None:
             raise RuntimeError("JsonlVectorWriter not initialised; call __enter__ first.")
+        crash_after = getattr(sys.modules[__name__], "_crash_after_write", None)
+        writes = 0
         for row in rows:
+            writes += 1
+            if isinstance(crash_after, int) and writes > crash_after:
+                raise RuntimeError("Simulated crash")
             self._handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
@@ -1852,7 +1865,23 @@ def write_vectors(
 
         payloads.append(vector_row.model_dump(by_alias=True))
 
-    writer.write_rows(payloads)
+    try:
+        writer.write_rows(payloads)
+    except Exception as exc:
+        output_ref = str(output_path) if output_path is not None else ""
+        for row in rows:
+            doc_id = row.get("doc_id", "unknown") if isinstance(row, dict) else "unknown"
+            manifest_log_failure(
+                stage="embeddings",
+                doc_id=doc_id,
+                duration_s=0.0,
+                schema_version=VECTOR_SCHEMA_VERSION,
+                input_path=row.get("source_path", "unknown") if isinstance(row, dict) else "unknown",
+                input_hash=row.get("input_hash", "") if isinstance(row, dict) else "",
+                output_path=output_ref,
+                error=str(exc),
+            )
+        raise
 
     return len(uuids), splade_nnz, qwen_norms
 

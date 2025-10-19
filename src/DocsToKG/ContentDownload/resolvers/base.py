@@ -182,6 +182,7 @@ class ResolverEvent(Enum):
 
     ERROR = "error"
     HTML_ONLY = "html-only"
+    INFO = "info"
     RETRY = "retry"
     SKIPPED = "skipped"
 

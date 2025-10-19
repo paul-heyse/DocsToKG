@@ -1554,6 +1554,13 @@ class FaissVectorStore(DenseVectorStore):
                     )
                 return index
 
+        gpu_count = len(target_gpus) if explicit_targets_configured else available_gpus
+        gpu_ids: List[int]
+        if explicit_targets_configured:
+            gpu_ids = list(target_gpus)
+        else:
+            gpu_ids = list(range(gpu_count))
+
         try:
             base_index = index
             if hasattr(faiss, "index_gpu_to_cpu"):
@@ -1568,18 +1575,13 @@ class FaissVectorStore(DenseVectorStore):
                 cloner_options.shard = bool(shard)
                 if shard and hasattr(cloner_options, "common_ivf_quantizer"):
                     cloner_options.common_ivf_quantizer = True
+
+            gpu_ids: List[int]
             if explicit_targets_configured:
-                multi = faiss.index_cpu_to_gpus_list(
-                    base_index,
-                    gpus=list(target_gpus),
-                    co=cloner_options,
-                )
+                gpu_ids = list(target_gpus)
             else:
-                multi = faiss.index_cpu_to_all_gpus(
-                    base_index,
-                    co=cloner_options,
-                    ngpu=available_gpus,
-                )
+                gpu_ids = list(range(available_gpus))
+            gpu_count = len(gpu_ids)
 
             resources_vector: "faiss.GpuResourcesVector | None" = None
             if explicit_targets_configured:
@@ -1643,7 +1645,18 @@ class FaissVectorStore(DenseVectorStore):
                         resources=resources_vector,
                     )
             else:
-                multi = faiss.index_cpu_to_all_gpus(base_index, co=cloner_options, ngpu=gpu_count)
+                if explicit_targets_configured:
+                    multi = faiss.index_cpu_to_gpus_list(
+                        base_index,
+                        gpus=gpu_ids,
+                        co=cloner_options,
+                    )
+                else:
+                    multi = faiss.index_cpu_to_all_gpus(
+                        base_index,
+                        co=cloner_options,
+                        ngpu=gpu_count,
+                    )
             self._replicated = True
             return multi
         except RuntimeError:

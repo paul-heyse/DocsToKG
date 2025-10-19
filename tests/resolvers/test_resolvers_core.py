@@ -1241,7 +1241,7 @@ pytest.importorskip("pyalex")
 
 def test_legacy_resolver_rate_limits_rejected(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
-    config_path.write_text("{" '"resolver_rate_limits": {"unpaywall": 2.0}' "}")
+    config_path.write_text('{"resolver_rate_limits": {"unpaywall": 2.0}}')
     args = Namespace(
         resolver_config=str(config_path),
         unpaywall_email=None,
@@ -2234,7 +2234,7 @@ def test_collect_resolver_results_handles_exception(tmp_path):
     pipeline = ResolverPipeline([resolver], config, lambda *args, **kwargs: None, logger, metrics)
 
     results, wall_ms = pipeline._collect_resolver_results(
-        resolver.name, resolver, DummySession({}), artifact
+        resolver.name, resolver, lambda: DummySession({}), artifact
     )
 
     assert wall_ms >= 0.0
@@ -2871,8 +2871,7 @@ def test_landing_page_resolver_request_errors(patcher, tmp_path, exception, reas
     config = ResolverConfig()
 
     patcher.setattr(
-        providers_module,
-        "request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.landing_page.request_with_retries",
         Mock(side_effect=exception),
     )
 
@@ -3718,7 +3717,7 @@ def test_openaire_resolver_error_paths(patcher, tmp_path, exception, reason) -> 
     config = ResolverConfig()
 
     patcher.setattr(
-        "DocsToKG.ContentDownload.resolvers.base.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.openaire.request_with_retries",
         Mock(side_effect=exception),
     )
 
@@ -3827,10 +3826,10 @@ def test_unpaywall_resolver_cached_http_error(patcher, tmp_path) -> None:
         Mock(side_effect=http_error),
     )
 
-    class _Session:
-        pass
+    session = Mock(spec=requests.Session)
+    session.request = Mock(side_effect=http_error)
 
-    results = list(UnpaywallResolver().iter_urls(_Session(), config, artifact))
+    results = list(UnpaywallResolver().iter_urls(session, config, artifact))
 
     assert results[0].event_reason is ResolverEventReason.HTTP_ERROR
     assert results[0].http_status == 404
@@ -3989,10 +3988,10 @@ def test_semantic_scholar_resolver_errors(patcher, tmp_path, exception, reason) 
         Mock(side_effect=exception),
     )
 
-    class _Session:
-        pass
+    session = Mock(spec=requests.Session)
+    session.request = Mock(side_effect=exception)
 
-    result = next(SemanticScholarResolver().iter_urls(_Session(), config, artifact))
+    result = next(SemanticScholarResolver().iter_urls(session, config, artifact))
 
     assert result.event_reason is reason
 
@@ -4058,7 +4057,7 @@ def test_pmc_resolver_timeout_fallback(patcher, tmp_path) -> None:
     config = ResolverConfig()
 
     patcher.setattr(
-        "DocsToKG.ContentDownload.resolvers.base.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.pmc.request_with_retries",
         Mock(side_effect=requests.Timeout("slow")),
     )
 
@@ -4083,7 +4082,7 @@ def test_pmc_resolver_other_errors(patcher, tmp_path, exception, reason) -> None
     config = ResolverConfig()
 
     patcher.setattr(
-        "DocsToKG.ContentDownload.resolvers.base.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.pmc.request_with_retries",
         Mock(side_effect=[exception, _StubResponse(text="")]),
     )
 
@@ -4236,7 +4235,7 @@ def test_wayback_resolver_error_paths(patcher, tmp_path, exception, reason) -> N
     config = ResolverConfig()
 
     patcher.setattr(
-        "DocsToKG.ContentDownload.resolvers.base.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.wayback.request_with_retries",
         Mock(side_effect=exception),
     )
 
