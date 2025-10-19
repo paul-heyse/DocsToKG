@@ -132,9 +132,9 @@ fi
 ###############################################
 # Select install mode (CPU/GPU) and requirements file
 ###############################################
-# Default to GPU when not in CI and AGENT_MODE not set (local agents prefer GPU)
+# Default to CPU mode generally
 if [[ -z "${CI:-}" && -z "${AGENT_MODE:-}" ]]; then
-  AGENT_MODE="gpu"
+  AGENT_MODE="cpu"
 fi
 AGENT_MODE="${AGENT_MODE:-auto}"   # auto | gpu | cpu
 
