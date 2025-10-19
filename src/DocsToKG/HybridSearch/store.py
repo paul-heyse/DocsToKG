@@ -433,6 +433,8 @@ class FaissVectorStore(DenseVectorStore):
         self._needs_rebuild = False
         self._supports_remove_ids: Optional[bool] = None
         self._last_nprobe_update = 0.0
+        self._last_applied_nprobe: Optional[int] = None
+        self._last_applied_nprobe_monotonic = 0.0
         self._set_nprobe()
         self._search_coalescer = _SearchCoalescer(self)
         self._cpu_replica: Optional[bytes] = None
@@ -510,6 +512,7 @@ class FaissVectorStore(DenseVectorStore):
                 "faiss_set_config_nprobe", nprobe=str(changes["nprobe"])
             ):
                 with self._lock:
+                    self._reset_nprobe_cache()
                     self._set_nprobe()
                     self._last_nprobe_update = time.time()
             self._observability.metrics.set_gauge("faiss_nprobe", float(changes["nprobe"]))
@@ -659,7 +662,9 @@ class FaissVectorStore(DenseVectorStore):
             faiss_ids = np.asarray(
                 [_vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64
             )
-            matrix = self._coerce_batch(np.stack([self._ensure_dim(vec) for vec in vectors]))
+            matrix = self._coerce_batch(
+                np.stack([self._ensure_dim(vec) for vec in vectors]), normalize=False
+            )
             dedupe_threshold = float(getattr(self._config, "ingest_dedupe_threshold", 0.0))
             dropped = 0
             if dedupe_threshold > 0.0 and self.ntotal > 0:
@@ -819,7 +824,7 @@ class FaissVectorStore(DenseVectorStore):
         return self._search_batch_impl(matrix, top_k)
 
     def _search_batch_impl(self, matrix: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
-        matrix = self._coerce_batch(matrix)
+        matrix = self._coerce_batch(matrix, normalize=False)
         matrix = self._as_pinned(matrix)
         faiss.normalize_L2(matrix)
         batch = matrix.shape[0]
@@ -1201,6 +1206,7 @@ class FaissVectorStore(DenseVectorStore):
                 self._tombstones.clear()
                 self._dirty_deletes = 0
                 self._needs_rebuild = False
+                self._reset_nprobe_cache()
                 self._set_nprobe()
             self._observability.metrics.increment("faiss_restore_calls", amount=1.0)
         if getattr(self._config, "persist_mode", "cpu_bytes") != "disabled":
@@ -1249,6 +1255,7 @@ class FaissVectorStore(DenseVectorStore):
         self._config = replace(self._config, nprobe=target)
         with self._observability.trace("faiss_set_nprobe", nprobe=str(target)):
             with self._lock:
+                self._reset_nprobe_cache()
                 self._set_nprobe()
                 self._last_nprobe_update = now
         self._observability.metrics.set_gauge("faiss_nprobe", float(target))
@@ -1395,6 +1402,9 @@ class FaissVectorStore(DenseVectorStore):
         try:
             resources = self._create_gpu_resources(device=device)
             self._gpu_resources = resources
+            if self._gpu_resources is not None:
+                self._configure_gpu_resource(self._gpu_resources, device=device)
+                self._record_gpu_resource_configuration(device=device)
         except Exception as exc:  # pragma: no cover - GPU-specific failure
             raise RuntimeError(
                 "HybridSearch failed to initialise FAISS GPU resources. "
@@ -1500,6 +1510,40 @@ class FaissVectorStore(DenseVectorStore):
                 "Unable to bind default CUDA null stream without explicit device",
                 exc_info=True,
             )
+
+    def _record_gpu_resource_configuration(self, *, device: Optional[int] = None) -> None:
+        """Emit observability breadcrumbs for configured GPU resource settings."""
+
+        observability = getattr(self, "_observability", None)
+        if observability is None:
+            return
+
+        temp_memory = getattr(self, "_temp_memory_bytes", None)
+        if temp_memory is not None:
+            observability.metrics.set_gauge("faiss_gpu_temp_memory_bytes", float(temp_memory))
+        observability.metrics.set_gauge(
+            "faiss_gpu_default_null_stream",
+            1.0 if getattr(self, "_gpu_use_default_null_stream", False) else 0.0,
+        )
+        observability.metrics.set_gauge(
+            "faiss_gpu_default_null_stream_all_devices",
+            1.0 if getattr(self, "_gpu_use_default_null_stream_all_devices", False) else 0.0,
+        )
+        observability.logger.info(
+            "faiss-gpu-resource-configured",
+            extra={
+                "event": {
+                    "device": None if device is None else int(device),
+                    "temp_memory_bytes": temp_memory,
+                    "default_null_stream": bool(
+                        getattr(self, "_gpu_use_default_null_stream", False)
+                    ),
+                    "default_null_stream_all_devices": bool(
+                        getattr(self, "_gpu_use_default_null_stream_all_devices", False)
+                    ),
+                }
+            },
+        )
 
     def _requires_gpu_resource_customization(self) -> bool:
         """Return whether replica resources need to be retained for custom settings."""
@@ -1809,29 +1853,49 @@ class FaissVectorStore(DenseVectorStore):
                 f"Unable to transfer FAISS index from GPU to CPU for serialization: {exc}"
             ) from exc
 
+    def _reset_nprobe_cache(self) -> None:
+        """Invalidate cached nprobe state applied to the active FAISS index."""
+
+        self._last_applied_nprobe = None
+        self._last_applied_nprobe_monotonic = 0.0
+
     def _set_nprobe(self) -> None:
         index = getattr(self, "_index", None)
         if index is None or not self._config.index_type.startswith("ivf"):
+            self._reset_nprobe_cache()
             return
         nprobe = int(self._config.nprobe)
+        if (
+            self._last_applied_nprobe == nprobe
+            and self._last_applied_nprobe_monotonic > 0.0
+        ):
+            return
+        applied = False
         try:
             if hasattr(faiss, "GpuParameterSpace"):
                 gps = faiss.GpuParameterSpace()
                 if hasattr(gps, "initialize"):
                     gps.initialize(index)
                 gps.set_index_parameter(index, "nprobe", nprobe)
-                self._log_index_configuration(index)
-                return
+                applied = True
         except Exception:  # pragma: no cover - defensive guard
             logger.debug("Unable to set nprobe via GpuParameterSpace", exc_info=True)
-        base = getattr(index, "index", None) or index
-        try:
-            if hasattr(base, "nprobe"):
-                base.nprobe = nprobe
-            elif hasattr(index, "nprobe"):
-                index.nprobe = nprobe
-        except Exception:  # pragma: no cover - defensive guard
-            logger.debug("Unable to set nprobe attribute on FAISS index", exc_info=True)
+        if not applied:
+            base = getattr(index, "index", None) or index
+            try:
+                if hasattr(base, "nprobe"):
+                    base.nprobe = nprobe
+                    applied = True
+                elif hasattr(index, "nprobe"):
+                    index.nprobe = nprobe
+                    applied = True
+            except Exception:  # pragma: no cover - defensive guard
+                logger.debug("Unable to set nprobe attribute on FAISS index", exc_info=True)
+        if applied:
+            self._last_applied_nprobe = nprobe
+            self._last_applied_nprobe_monotonic = time.monotonic()
+        else:
+            self._reset_nprobe_cache()
         self._log_index_configuration(index)
 
     def _log_index_configuration(self, index: "faiss.Index") -> None:
@@ -1991,6 +2055,7 @@ class FaissVectorStore(DenseVectorStore):
         if current_ids.size == 0:
             self._index = self._create_index()
             self._index = self._maybe_distribute_multi_gpu(self._index)
+            self._reset_nprobe_cache()
             self._set_nprobe()
             return
         if self._tombstones:
@@ -2011,6 +2076,7 @@ class FaissVectorStore(DenseVectorStore):
         vectors = np.ascontiguousarray(vectors, dtype=np.float32)
         self._index = self._create_index()
         self._index = self._maybe_distribute_multi_gpu(self._index)
+        self._reset_nprobe_cache()
         self._set_nprobe()
         if vectors.size:
             base_new = self._index.index if hasattr(self._index, "index") else self._index
@@ -2044,7 +2110,7 @@ class FaissVectorStore(DenseVectorStore):
             raise ValueError(f"vector dimension mismatch: expected {self._dim}, got {arr.size}")
         return arr
 
-    def _coerce_batch(self, xb: np.ndarray) -> np.ndarray:
+    def _coerce_batch(self, xb: np.ndarray, *, normalize: bool = True) -> np.ndarray:
         array = np.asarray(xb, dtype=np.float32)
         if array.ndim == 1:
             array = array.reshape(1, -1)
@@ -2052,7 +2118,8 @@ class FaissVectorStore(DenseVectorStore):
             raise ValueError(f"bad batch shape {array.shape}, expected (*,{self._dim})")
         array = np.ascontiguousarray(array, dtype=np.float32)
         array = array.copy()
-        normalize_rows(array)
+        if normalize:
+            normalize_rows(array)
         return array
 
     def _coerce_query(self, x: np.ndarray) -> np.ndarray:
@@ -2308,7 +2375,7 @@ def cosine_topk_blockwise(
 
     if q.ndim == 1:
         q = q.reshape(1, -1)
-    q = np.ascontiguousarray(q, dtype=np.float32).copy()
+    q = np.array(q, dtype=np.float32, copy=True, order="C")
     C = np.ascontiguousarray(C, dtype=np.float32)
 
     if q.shape[1] != C.shape[1]:
@@ -2324,6 +2391,37 @@ def cosine_topk_blockwise(
 
     faiss.normalize_L2(q)
     q_view = q.astype(np.float16, copy=False) if use_fp16 else q
+
+    if not use_fp16:
+        knn_runner = getattr(faiss, "knn_gpu", None)
+        if knn_runner is not None:
+            try:
+                corpus_copy = np.array(C, dtype=np.float32, copy=True, order="C")
+                faiss.normalize_L2(corpus_copy)
+                row_bytes = np.dtype(np.float32).itemsize * C.shape[1]
+                vector_limit = int(block_rows) * row_bytes
+                query_rows = max(int(block_rows), q.shape[0])
+                query_limit = query_rows * np.dtype(np.float32).itemsize * q.shape[1]
+                distances, indices = knn_runner(
+                    resources,
+                    q_view,
+                    corpus_copy,
+                    k,
+                    metric=faiss.METRIC_INNER_PRODUCT,
+                    device=int(device),
+                    vectorsMemoryLimit=vector_limit,
+                    queriesMemoryLimit=query_limit,
+                )
+            except TypeError:
+                distances = indices = None
+            except Exception:
+                distances = indices = None
+            else:
+                if distances is not None and indices is not None:
+                    return (
+                        np.asarray(distances, dtype=np.float32),
+                        np.asarray(indices, dtype=np.int64),
+                    )
 
     N, M = q.shape[0], C.shape[0]
     best_scores = np.full((N, k), -np.inf, dtype=np.float32)
