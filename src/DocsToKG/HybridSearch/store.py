@@ -138,6 +138,7 @@ __all__ = (
     "cosine_against_corpus_gpu",
     "cosine_batch",
     "cosine_topk_blockwise",
+    "resolve_cuvs_state",
     "max_inner_product",
     "normalize_rows",
     "pairwise_inner_products",
@@ -173,6 +174,40 @@ except Exception:  # pragma: no cover - dependency not present in test rig
     _FAISS_AVAILABLE = False
 
 
+# --- Helpers ---
+
+
+def resolve_cuvs_state(requested: Optional[bool]) -> tuple[bool, bool, Optional[bool]]:
+    """Determine whether cuVS kernels should be enabled for FAISS helpers."""
+
+    if not _FAISS_AVAILABLE:
+        return False, False, None
+    knn_runner = getattr(faiss, "knn_gpu", None)
+    if knn_runner is None:
+        return False, False, None
+
+    reported_available: Optional[bool]
+    should_use = getattr(faiss, "should_use_cuvs", None)
+    if callable(should_use):
+        try:
+            reported_available = bool(should_use())
+        except Exception:  # pragma: no cover - defensive best effort
+            reported_available = None
+    else:
+        reported_available = None
+
+    if requested is None:
+        enabled = bool(reported_available)
+    else:
+        enabled = bool(requested)
+
+    enabled = bool(knn_runner) and enabled
+    available = bool(knn_runner) and (
+        bool(reported_available) if reported_available is not None else True
+    )
+    return enabled, available, reported_available
+
+
 # --- Public Classes ---
 
 
@@ -205,6 +240,10 @@ class AdapterStats:
     replicated: bool
     fp16_enabled: bool
     resources: Optional["faiss.StandardGpuResources"]
+    cuvs_enabled: bool
+    cuvs_available: bool
+    cuvs_reported: Optional[bool]
+    cuvs_requested: Optional[bool]
 
 
 class _PendingSearch:
@@ -568,6 +607,8 @@ class FaissVectorStore(DenseVectorStore):
         """Return a read-only snapshot of adapter state."""
 
         index_desc = self._describe_index(getattr(self, "_index", None))
+        requested_cuvs = getattr(self._config, "use_cuvs", None)
+        cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(requested_cuvs)
         return AdapterStats(
             device=self.device,
             ntotal=self.ntotal,
@@ -577,6 +618,10 @@ class FaissVectorStore(DenseVectorStore):
             replicated=bool(self._replicated),
             fp16_enabled=bool(getattr(self._config, "flat_use_fp16", False)),
             resources=self._gpu_resources,
+            cuvs_enabled=cuvs_enabled,
+            cuvs_available=cuvs_available,
+            cuvs_reported=cuvs_reported,
+            cuvs_requested=requested_cuvs,
         )
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
@@ -664,8 +709,10 @@ class FaissVectorStore(DenseVectorStore):
             dedupe_threshold = float(getattr(self._config, "ingest_dedupe_threshold", 0.0))
             dropped = 0
             if dedupe_threshold > 0.0 and self.ntotal > 0:
+                dedupe_matrix = np.ascontiguousarray(matrix.copy(), dtype=np.float32)
                 try:
-                    distances, indices = self._search_matrix(matrix, 1)
+                    faiss.normalize_L2(dedupe_matrix)
+                    distances, indices = self._search_matrix(dedupe_matrix, 1)
                 except Exception:
                     logger.debug(
                         "ingest dedupe check failed; proceeding without filter", exc_info=True
@@ -1054,6 +1101,12 @@ class FaissVectorStore(DenseVectorStore):
         stats = self.adapter_stats
         self._observability.metrics.set_gauge("faiss_ntotal", float(stats.ntotal))
         self._observability.metrics.set_gauge("faiss_nprobe_effective", float(stats.nprobe))
+        self._observability.metrics.set_gauge(
+            "faiss_cuvs_enabled", 1.0 if stats.cuvs_enabled else 0.0
+        )
+        self._observability.metrics.set_gauge(
+            "faiss_cuvs_available", 1.0 if stats.cuvs_available else 0.0
+        )
         resources = stats.resources
         if resources is None or not hasattr(resources, "getMemoryInfo"):
             return
@@ -1079,6 +1132,10 @@ class FaissVectorStore(DenseVectorStore):
             "indices_32_bit": bool(self._indices_32_bit and not self._force_64bit_ids),
             "nprobe": stats.nprobe,
             "ntotal": stats.ntotal,
+            "cuvs_enabled": stats.cuvs_enabled,
+            "cuvs_available": stats.cuvs_available,
+            "cuvs_requested": stats.cuvs_requested,
+            "cuvs_reported": stats.cuvs_reported,
         }
         log_fn = (
             self._observability.logger.info if level == "info" else self._observability.logger.debug
@@ -1295,6 +1352,15 @@ class FaissVectorStore(DenseVectorStore):
             "snapshot_writes_since_refresh": float(self._writes_since_snapshot),
             "snapshot_last_refresh_epoch": float(self._last_snapshot_refresh),
         }
+        cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(
+            getattr(self._config, "use_cuvs", None)
+        )
+        stats["cuvs_enabled"] = cuvs_enabled
+        stats["cuvs_available"] = cuvs_available
+        stats["cuvs_reported_available"] = (
+            bool(cuvs_reported) if cuvs_reported is not None else False
+        )
+        stats["cuvs_requested"] = getattr(self._config, "use_cuvs", None)
         if self._temp_memory_bytes is not None:
             stats["gpu_temp_memory_bytes"] = float(self._temp_memory_bytes)
         try:
@@ -1328,6 +1394,7 @@ class FaissVectorStore(DenseVectorStore):
             "flat_use_fp16": bool(getattr(self._config, "flat_use_fp16", False)),
             "multi_gpu_mode": str(self._multi_gpu_mode),
             "device": int(getattr(self._config, "device", 0)),
+            "use_cuvs": getattr(self._config, "use_cuvs", None),
         }
 
     def rebuild_needed(self) -> bool:
@@ -1556,6 +1623,56 @@ class FaissVectorStore(DenseVectorStore):
             or getattr(self, "_gpu_use_default_null_stream_all_devices", False)
         )
 
+    def _configure_gpu_cloner_options(self, options: Optional[object]) -> None:
+        """Apply DenseIndexConfig-aware flags to FAISS GPU cloner options."""
+
+        if options is None:
+            return
+
+        config_obj = getattr(self, "_config", None)
+        fp16_enabled = bool(getattr(config_obj, "flat_use_fp16", False))
+        force_64bit_ids = bool(
+            getattr(self, "_force_64bit_ids", getattr(config_obj, "force_64bit_ids", False))
+        )
+        indices_32_enabled = bool(
+            getattr(self, "_indices_32_bit", getattr(config_obj, "gpu_indices_32_bit", False))
+        )
+        indices_flag = 0
+        if (
+            not force_64bit_ids
+            and indices_32_enabled
+            and hasattr(faiss, "INDICES_32_BIT")
+        ):
+            indices_flag = getattr(faiss, "INDICES_32_BIT")
+
+        if hasattr(options, "indicesOptions"):
+            try:
+                setattr(options, "indicesOptions", indices_flag)
+            except Exception:  # pragma: no cover - defensive best effort
+                logger.debug("Unable to configure indicesOptions on cloner", exc_info=True)
+
+        if hasattr(options, "useFloat16"):
+            try:
+                setattr(options, "useFloat16", fp16_enabled)
+            except Exception:  # pragma: no cover - defensive best effort
+                logger.debug("Unable to configure useFloat16 on cloner", exc_info=True)
+
+        if hasattr(options, "useFloat16CoarseQuantizer"):
+            try:  # pragma: no cover - rarely exposed attribute
+                setattr(options, "useFloat16CoarseQuantizer", fp16_enabled)
+            except Exception:
+                logger.debug(
+                    "Unable to configure useFloat16CoarseQuantizer on cloner", exc_info=True
+                )
+
+        if hasattr(options, "useFloat16LookupTables"):
+            try:  # pragma: no cover - rarely exposed attribute
+                setattr(options, "useFloat16LookupTables", fp16_enabled)
+            except Exception:
+                logger.debug(
+                    "Unable to configure useFloat16LookupTables on cloner", exc_info=True
+                )
+
     def distribute_to_all_gpus(self, index: "faiss.Index", *, shard: bool = False) -> "faiss.Index":
         """Clone ``index`` across available GPUs when the build supports it.
 
@@ -1643,12 +1760,11 @@ class FaissVectorStore(DenseVectorStore):
                 )
                 return index
 
-        gpu_count = len(target_gpus) if explicit_targets_configured else available_gpus
-        gpu_ids: List[int]
         if explicit_targets_configured:
-            gpu_ids = list(target_gpus)
+            gpu_ids: List[int] = list(target_gpus)
         else:
-            gpu_ids = list(range(gpu_count))
+            gpu_ids = list(range(available_gpus))
+        gpu_count = len(gpu_ids)
 
         original_ids = (
             tuple(self._replication_gpu_ids or ()) if explicit_targets_configured else tuple()
@@ -1669,6 +1785,8 @@ class FaissVectorStore(DenseVectorStore):
                 cloner_options.shard = bool(shard)
                 if shard and hasattr(cloner_options, "common_ivf_quantizer"):
                     cloner_options.common_ivf_quantizer = True
+
+                self._configure_gpu_cloner_options(cloner_options)
 
             gpu_ids: List[int]
             if explicit_targets_configured:
@@ -1803,12 +1921,7 @@ class FaissVectorStore(DenseVectorStore):
                 co.device = device
                 co.verbose = True
                 co.allowCpuCoarseQuantizer = False
-                if (
-                    not self._force_64bit_ids
-                    and self._indices_32_bit
-                    and hasattr(faiss, "INDICES_32_BIT")
-                ):
-                    co.indicesOptions = faiss.INDICES_32_BIT
+                self._configure_gpu_cloner_options(co)
                 promoted = faiss.index_cpu_to_gpu(self._gpu_resources, device, index, co)
                 return self._maybe_distribute_multi_gpu(promoted)
             cloned = faiss.index_cpu_to_gpu(self._gpu_resources, device, index)
@@ -1840,6 +1953,69 @@ class FaissVectorStore(DenseVectorStore):
                     extra={"event": {"expected_ntotal": expected}},
                     exc_info=True,
                 )
+
+    def _apply_cloner_reservation(
+        self,
+        cloner_options: object | None,
+        *,
+        gpu_ids: Optional[Sequence[int]] = None,
+    ) -> None:
+        """Populate FAISS cloner reservation knobs when ``expected_ntotal`` is set."""
+
+        if cloner_options is None:
+            return
+        expected = getattr(self, "_expected_ntotal", 0)
+        if expected <= 0:
+            return
+        reserve = int(expected)
+
+        applied = False
+        try:
+            if hasattr(cloner_options, "reserveVecs"):
+                setattr(cloner_options, "reserveVecs", reserve)
+                applied = True
+        except Exception:  # pragma: no cover - defensive guard
+            logger.debug("Unable to set reserveVecs on FAISS cloner options", exc_info=True)
+
+        per_device_applied = False
+        if gpu_ids:
+            try:
+                if hasattr(cloner_options, "eachReserveVecs"):
+                    vector_factory = getattr(faiss, "IntVector", None) if faiss is not None else None
+                    if vector_factory is not None:
+                        reserve_vector = vector_factory()
+                        for _gpu in gpu_ids:
+                            reserve_vector.push_back(reserve)
+                    else:
+                        reserve_vector = [reserve for _ in gpu_ids]
+                    setattr(cloner_options, "eachReserveVecs", reserve_vector)
+                    per_device_applied = True
+            except Exception:  # pragma: no cover - defensive guard
+                logger.debug(
+                    "Unable to configure per-device reserve vector on FAISS cloner options",
+                    exc_info=True,
+                )
+
+            if not per_device_applied and hasattr(cloner_options, "setReserveVecs"):
+                try:  # pragma: no cover - defensive guard
+                    cloner_options.setReserveVecs([reserve for _ in gpu_ids])
+                    per_device_applied = True
+                except Exception:
+                    logger.debug(
+                        "Unable to invoke setReserveVecs on FAISS cloner options", exc_info=True
+                    )
+
+        if applied or per_device_applied:
+            observer = getattr(self, "_observability", None)
+            structured_logger = getattr(observer, "logger", logger) if observer is not None else logger
+            event: Dict[str, object] = {
+                "component": "faiss",
+                "action": "gpu_cloner_reserve",
+                "reserve_vecs": reserve,
+            }
+            if gpu_ids is not None:
+                event["gpu_ids"] = tuple(int(gpu) for gpu in gpu_ids)
+            structured_logger.info("faiss-gpu-cloner-reserve", extra={"event": event})
 
     def _to_cpu(self, index: "faiss.Index") -> "faiss.Index":
         if not hasattr(faiss, "index_gpu_to_cpu"):
@@ -2313,15 +2489,11 @@ def cosine_batch(
     Returns:
         numpy.ndarray: Pairwise cosine similarities with shape ``(N, M)``.
     """
-    q = np.asarray(q, dtype=np.float32)
+    q = np.array(q, dtype=np.float32, copy=True, order="C")
     if q.ndim == 1:
         q = q.reshape(1, -1)
-    if not q.flags.c_contiguous:
-        q = np.ascontiguousarray(q)
 
-    C = np.asarray(C, dtype=np.float32)
-    if not C.flags.c_contiguous:
-        C = np.ascontiguousarray(C)
+    C = np.array(C, dtype=np.float32, copy=True, order="C")
     faiss.normalize_L2(q)
     faiss.normalize_L2(C)
     kernel = pairwise_fn or faiss.pairwise_distance_gpu
@@ -2343,6 +2515,7 @@ def cosine_topk_blockwise(
     resources: "faiss.StandardGpuResources",
     block_rows: int = 65_536,
     use_fp16: bool = False,
+    use_cuvs: Optional[bool] = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return Top-K cosine similarities between ``q`` and ``C`` using GPU tiling.
 
@@ -2358,6 +2531,10 @@ def cosine_topk_blockwise(
         device: CUDA device ordinal used for FAISS kernels.
         resources: FAISS GPU resources backing ``pairwise_distance_gpu``.
         block_rows: Number of corpus rows processed per iteration.
+        use_fp16: Enable float16 compute for pairwise distance kernels.
+        use_cuvs: Optional override forcing cuVS acceleration when supported
+            (``True``) or disabling it (``False``). ``None`` defers to
+            :func:`faiss.should_use_cuvs` when available.
 
     Returns:
         Tuple ``(scores, indices)`` where each has shape ``(N x K)``. Scores are
@@ -2399,6 +2576,10 @@ def cosine_topk_blockwise(
                 vector_limit = int(block_rows) * row_bytes
                 query_rows = max(int(block_rows), q.shape[0])
                 query_limit = query_rows * np.dtype(np.float32).itemsize * q.shape[1]
+                cuvs_enabled, _, _ = resolve_cuvs_state(use_cuvs)
+                extra_kwargs: dict[str, object] = {}
+                if cuvs_enabled or use_cuvs is not None:
+                    extra_kwargs["use_cuvs"] = cuvs_enabled
                 distances, indices = knn_runner(
                     resources,
                     q_view,
@@ -2408,6 +2589,7 @@ def cosine_topk_blockwise(
                     device=int(device),
                     vectorsMemoryLimit=vector_limit,
                     queriesMemoryLimit=query_limit,
+                    **extra_kwargs,
                 )
             except TypeError:
                 distances = indices = None

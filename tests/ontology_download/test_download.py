@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from DocsToKG.OntologyDownload.errors import PolicyError
+from DocsToKG.OntologyDownload.errors import DownloadFailure, PolicyError
 from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.io.rate_limit import TokenBucket
 from DocsToKG.OntologyDownload.testing import ResponseSpec
@@ -155,3 +155,72 @@ def test_download_stream_consumes_tokens_for_head_and_get(ontology_env, tmp_path
     assert destination.read_bytes() == b"rate-limit-body"
     assert bucket.calls == [1.0, 1.0]
     assert [record.method for record in ontology_env.requests] == ["HEAD", "GET"]
+def test_download_timeout_aborts_retries(ontology_env, tmp_path, caplog):
+    """Downloads exceeding the configured timeout must fail without retrying."""
+
+    slow_path = "fixtures/slow-timeout.owl"
+    ontology_env.queue_response(
+        slow_path,
+        ResponseSpec(
+            method="HEAD",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": "5",
+            },
+        ),
+    )
+    ontology_env.queue_response(
+        slow_path,
+        ResponseSpec(
+            method="GET",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": "5",
+            },
+            body="hello",
+            delay_sec=2.5,
+        ),
+    )
+
+    url = ontology_env.http_url(slow_path)
+    destination = tmp_path / "slow-timeout.owl"
+    config = ontology_env.build_download_config()
+    config.download_timeout_sec = 1
+    config.max_retries = 3
+
+    logger = _logger()
+
+    with caplog.at_level(logging.INFO):
+        with pytest.raises(DownloadFailure) as exc_info:
+            network_mod.download_stream(
+                url=url,
+                destination=destination,
+                headers={},
+                previous_manifest=None,
+                http_config=config,
+                cache_dir=ontology_env.cache_dir,
+                logger=logger,
+                expected_media_type="application/rdf+xml",
+                service="test",
+            )
+
+    assert "timeout" in str(exc_info.value).lower()
+    assert not exc_info.value.retryable
+    assert not destination.exists()
+
+    methods_paths = [(record.method, record.path) for record in ontology_env.requests]
+    assert methods_paths == [
+        ("HEAD", "/" + slow_path),
+        ("GET", "/" + slow_path),
+    ]
+
+    timeout_records = [
+        record
+        for record in caplog.records
+        if getattr(record, "stage", None) == "download"
+        and getattr(record, "error", None) == "timeout"
+        and record.getMessage() == "download timeout"
+    ]
+    assert timeout_records

@@ -147,6 +147,7 @@ from .store import (
     OpenSearchSimulator,
     cosine_batch,
     cosine_topk_blockwise,
+    resolve_cuvs_state,
     normalize_rows,
     pairwise_inner_products,
     restore_state,
@@ -451,6 +452,7 @@ class ResultShaper:
         resources: Optional["faiss.StandardGpuResources"] = None,
         channel_weights: Optional[Mapping[str, float]] = None,
         fp16_enabled: bool = False,
+        cuvs_requested: Optional[bool] = None,
     ) -> None:
         self._opensearch = opensearch
         self._fusion_config = fusion_config
@@ -458,6 +460,7 @@ class ResultShaper:
         self._gpu_resources = resources
         self._channel_weights = dict(channel_weights or {})
         self._fp16_enabled = bool(fp16_enabled)
+        self._use_cuvs = cuvs_requested
 
     def shape(
         self,
@@ -569,6 +572,7 @@ class ResultShaper:
                 device=self._gpu_device,
                 resources=resources,
                 use_fp16=self._fp16_enabled,
+                use_cuvs=self._use_cuvs,
             )
             return float(top1[0, 0]) >= self._fusion_config.cosine_dedupe_threshold
         query_norm = np.linalg.norm(query)
@@ -600,6 +604,7 @@ def apply_mmr_diversification(
     resources: Optional["faiss.StandardGpuResources"] = None,
     use_fp16: bool = False,
     block_rows: int = 4096,
+    use_cuvs: Optional[bool] = None,
 ) -> List[FusionCandidate]:
     """Diversify fused candidates using Maximum Marginal Relevance.
 
@@ -612,6 +617,9 @@ def apply_mmr_diversification(
         device: GPU device id when leveraging FAISS GPU routines.
         resources: Optional FAISS GPU resources handle reused across calls.
         block_rows: Corpus rows processed per block when estimating diversity on GPU.
+        use_cuvs: Optional override that controls cuVS usage during GPU similarity
+            lookups. ``None`` defers to runtime detection; ``True`` forces cuVS when
+            supported and ``False`` disables it.
 
     Returns:
         List of diversified `FusionCandidate` objects.
@@ -663,6 +671,7 @@ def apply_mmr_diversification(
                 resources=resources,
                 block_rows=block_rows,
                 use_fp16=use_fp16,
+                use_cuvs=use_cuvs,
             )
         except Exception:
             scores_block = indices_block = None
@@ -899,6 +908,25 @@ class HybridSearchService:
                 if adapter_stats is not None
                 else bool(getattr(getattr(dense_store, "config", object()), "flat_use_fp16", False))
             )
+            cuvs_requested = getattr(config.dense, "use_cuvs", None)
+            cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(cuvs_requested)
+            self._observability.metrics.set_gauge(
+                "faiss_cuvs_enabled", 1.0 if cuvs_enabled else 0.0, channel="dense"
+            )
+            self._observability.metrics.set_gauge(
+                "faiss_cuvs_available", 1.0 if cuvs_available else 0.0, channel="dense"
+            )
+            self._observability.logger.debug(
+                "faiss-cuvs-state",
+                extra={
+                    "event": {
+                        "requested": cuvs_requested,
+                        "enabled": cuvs_enabled,
+                        "available": cuvs_available,
+                        "reported_available": cuvs_reported,
+                    }
+                },
+            )
 
             f_bm25 = self._executor.submit(
                 self._execute_bm25, request, filters, config, query_features, timings
@@ -996,6 +1024,7 @@ class HybridSearchService:
                     device=device_id,
                     resources=resources,
                     use_fp16=fp16_enabled,
+                    use_cuvs=cuvs_requested,
                 )
                 selected_ids = {candidate.chunk.vector_id for candidate in selected}
                 pool_remaining = [
@@ -1052,6 +1081,7 @@ class HybridSearchService:
                 resources=resources_hint,
                 channel_weights=adaptive_weights,
                 fp16_enabled=fp16_hint,
+                cuvs_requested=cuvs_requested,
             )
             shaped = shaper.shape(
                 ordered_chunks,
@@ -2556,6 +2586,11 @@ class HybridSearchValidator:
             if adapter_stats is not None
             else self._ingestion.faiss_index.device
         )
+        cuvs_request = (
+            getattr(adapter_stats, "cuvs_requested", None)
+            if adapter_stats is not None
+            else getattr(getattr(self._ingestion.faiss_index, "config", object()), "use_cuvs", None)
+        )
         if resources is None:
             vector_matrix = normalize_rows(vector_matrix)
 
@@ -2588,6 +2623,7 @@ class HybridSearchValidator:
                     device=device,
                     resources=resources,
                     use_fp16=fp16_enabled,
+                    use_cuvs=cuvs_request,
                 )
                 top_indices = indices_block[0].astype(int, copy=False)
             else:
@@ -3220,7 +3256,153 @@ class HybridSearchValidator:
         if faiss is None:
             raise RuntimeError("faiss is required for validation checks")
         if self._validation_resources is None:
-            self._validation_resources = faiss.StandardGpuResources()
+            service = self._service
+            observability = getattr(service, "_observability", None)
+            logger = getattr(observability, "logger", None)
+
+            candidate_stores: Sequence[DenseVectorStore] = ()
+            router = getattr(service, "_faiss_router", None)
+            if router is not None:
+                iter_fn = getattr(router, "iter_stores", None)
+                if callable(iter_fn):
+                    try:
+                        candidate_stores = [store for _, store in iter_fn()]
+                    except Exception:
+                        candidate_stores = ()
+                else:
+                    default_store = getattr(router, "default_store", None)
+                    if default_store is not None:
+                        candidate_stores = (default_store,)
+            else:
+                default_store = getattr(service, "_faiss", None)
+                if default_store is not None:
+                    candidate_stores = (default_store,)
+
+            for store in candidate_stores:
+                getter = getattr(store, "get_gpu_resources", None)
+                if not callable(getter):
+                    continue
+                try:
+                    reused = getter()
+                except Exception:
+                    continue
+                if reused is not None:
+                    self._validation_resources = reused
+                    break
+
+            if self._validation_resources is None:
+                config = service._config_manager.get()
+                dense_cfg = getattr(config, "dense", DenseIndexConfig())
+                resource = faiss.StandardGpuResources()
+
+                temp_memory_raw = getattr(dense_cfg, "gpu_temp_memory_bytes", None)
+                try:
+                    temp_memory: Optional[int] = (
+                        int(temp_memory_raw) if temp_memory_raw is not None else None
+                    )
+                except (TypeError, ValueError):
+                    temp_memory = None
+                if temp_memory is not None and hasattr(resource, "setTempMemory"):
+                    try:
+                        resource.setTempMemory(temp_memory)
+                    except Exception:
+                        if logger is not None:
+                            logger.debug(
+                                "validation-gpu-temp-memory-config-failed",
+                                exc_info=True,
+                            )
+
+                pinned_raw = getattr(dense_cfg, "gpu_pinned_memory_bytes", None)
+                try:
+                    pinned_memory: Optional[int] = (
+                        int(pinned_raw) if pinned_raw is not None else None
+                    )
+                except (TypeError, ValueError):
+                    pinned_memory = None
+                if pinned_memory is not None and hasattr(resource, "setPinnedMemory"):
+                    try:
+                        resource.setPinnedMemory(pinned_memory)
+                    except Exception:
+                        if logger is not None:
+                            logger.debug(
+                                "validation-gpu-pinned-memory-config-failed",
+                                exc_info=True,
+                            )
+
+                use_null_all = bool(
+                    getattr(dense_cfg, "gpu_use_default_null_stream_all_devices", False)
+                    or getattr(dense_cfg, "gpu_default_null_stream_all_devices", False)
+                )
+                use_null = bool(
+                    getattr(dense_cfg, "gpu_use_default_null_stream", False)
+                    or getattr(dense_cfg, "gpu_default_null_stream", False)
+                )
+                try:
+                    device = int(getattr(dense_cfg, "device", 0))
+                except (TypeError, ValueError):
+                    device = 0
+
+                if use_null_all:
+                    method = getattr(resource, "setDefaultNullStreamAllDevices", None)
+                    if callable(method):
+                        try:
+                            method()
+                        except Exception:
+                            if logger is not None:
+                                logger.debug(
+                                    "validation-gpu-null-stream-all-devices-failed",
+                                    exc_info=True,
+                                )
+                elif use_null:
+                    method = getattr(resource, "setDefaultNullStream", None)
+                    if callable(method):
+                        try:
+                            method(device)
+                        except TypeError:
+                            try:
+                                method()
+                            except Exception:
+                                if logger is not None:
+                                    logger.debug(
+                                        "validation-gpu-null-stream-config-failed",
+                                        exc_info=True,
+                                    )
+                        except Exception:
+                            if logger is not None:
+                                logger.debug(
+                                    "validation-gpu-null-stream-config-failed",
+                                    exc_info=True,
+                                )
+
+                if observability is not None:
+                    metrics = getattr(observability, "metrics", None)
+                    if metrics is not None and temp_memory is not None:
+                        metrics.set_gauge(
+                            "faiss_gpu_temp_memory_bytes", float(temp_memory)
+                        )
+                    if metrics is not None:
+                        metrics.set_gauge(
+                            "faiss_gpu_default_null_stream",
+                            1.0 if use_null else 0.0,
+                        )
+                        metrics.set_gauge(
+                            "faiss_gpu_default_null_stream_all_devices",
+                            1.0 if use_null_all else 0.0,
+                        )
+                    if logger is not None:
+                        logger.info(
+                            "faiss-gpu-resource-configured",
+                            extra={
+                                "event": {
+                                    "device": device,
+                                    "temp_memory_bytes": temp_memory,
+                                    "default_null_stream": use_null,
+                                    "default_null_stream_all_devices": use_null_all,
+                                }
+                            },
+                        )
+
+                self._validation_resources = resource
         return self._validation_resources
 
     def _percentile(self, values: Sequence[float], percentile: float) -> float:

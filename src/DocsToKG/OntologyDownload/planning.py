@@ -58,7 +58,7 @@ from .io import (
     sanitize_filename,
     validate_url_security,
 )
-from .io.network import _extract_correlation_id, _parse_retry_after
+from .io.network import _extract_correlation_id, _parse_retry_after, request_with_redirect_audit
 from .logging_utils import setup_logging
 from .migrations import migrate_manifest
 from .resolvers import (
@@ -921,34 +921,40 @@ def planner_http_probe(
         http_config=http_config,
     ) as session:
 
-        def _issue(current_method: str) -> requests.Response:
-            def _perform_once() -> requests.Response:
+        def _issue(
+            current_method: str,
+        ) -> Tuple[int, bool, CaseInsensitiveDict[str], str]:
+            def _perform_once() -> Tuple[int, bool, CaseInsensitiveDict[str], str]:
                 bucket.consume()
-                response = session.request(
-                    current_method,
-                    url,
+                with request_with_redirect_audit(
+                    session=session,
+                    method=current_method,
+                    url=url,
                     headers=merged_headers,
                     timeout=timeout,
-                    allow_redirects=True,
                     stream=current_method != "HEAD",
-                )
-                if response.status_code in {429, 503}:
-                    retry_after_header = response.headers.get("Retry-After")
-                    retry_delay = _parse_retry_after(retry_after_header)
-                    if retry_delay is not None:
-                        apply_retry_after(
-                            http_config=http_config,
-                            service=service,
-                            host=host,
-                            delay=retry_delay,
+                    http_config=http_config,
+                ) as response:
+                    status_code = response.status_code
+                    if status_code in {429, 503}:
+                        retry_after_header = response.headers.get("Retry-After")
+                        retry_delay = _parse_retry_after(retry_after_header)
+                        if retry_delay is not None:
+                            apply_retry_after(
+                                http_config=http_config,
+                                service=service,
+                                host=host,
+                                delay=retry_delay,
+                            )
+                        http_error = requests.HTTPError(
+                            f"HTTP error {status_code}", response=response
                         )
-                    http_error = requests.HTTPError(
-                        f"HTTP error {response.status_code}", response=response
-                    )
-                    setattr(http_error, delay_attr, retry_delay)
-                    response.close()
-                    raise http_error
-                return response
+                        setattr(http_error, delay_attr, retry_delay)
+                        raise http_error
+
+                    final_url = validate_url_security(response.url, http_config)
+                    headers_map = CaseInsensitiveDict(response.headers)
+                    return status_code, response.ok, headers_map, final_url
 
             def _on_retry(attempt: int, exc: Exception, delay: float) -> None:
                 retry_extra = dict(base_extra)
@@ -974,19 +980,20 @@ def planner_http_probe(
             )
 
         try:
-            response = _issue(primary_method)
+            status_code, ok, headers_map, resolved_url = _issue(primary_method)
         except Exception as exc:  # pragma: no cover - exercised via tests
             failure_extra = dict(base_extra)
             failure_extra.update(
                 {"method": primary_method, "error": str(exc), "event": "planner_probe_failed"}
             )
             _log_with_extra(logger, logging.WARNING, "planner probe failed", failure_extra)
+            if isinstance(exc, (PolicyError, ConfigError)):
+                raise
             return None
 
         method_used = primary_method
 
-        if response.status_code == 405 and primary_method == "HEAD":
-            response.close()
+        if status_code == 405 and primary_method == "HEAD":
             _log_with_extra(
                 logger,
                 logging.INFO,
@@ -999,20 +1006,17 @@ def planner_http_probe(
                 },
             )
             try:
-                response = _issue("GET")
+                status_code, ok, headers_map, resolved_url = _issue("GET")
             except Exception as exc:  # pragma: no cover - exercised via tests
                 failure_extra = dict(base_extra)
                 failure_extra.update(
                     {"method": "GET", "error": str(exc), "event": "planner_probe_failed"}
                 )
                 _log_with_extra(logger, logging.WARNING, "planner probe failed", failure_extra)
+                if isinstance(exc, (PolicyError, ConfigError)):
+                    raise
                 return None
             method_used = "GET"
-
-        headers_map: CaseInsensitiveDict[str] = CaseInsensitiveDict(response.headers)
-        status_code = response.status_code
-        ok = response.ok
-        response.close()
 
         completion_extra = dict(base_extra)
         completion_extra.update(
@@ -1026,7 +1030,7 @@ def planner_http_probe(
         _log_with_extra(logger, logging.INFO, "planner probe complete", completion_extra)
 
         return PlannerProbeResult(
-            url=url,
+            url=resolved_url,
             method=method_used,
             status_code=status_code,
             ok=ok,

@@ -129,6 +129,9 @@ class DenseIndexConfig:
             for the configured device when available (False default)
         gpu_use_default_null_stream_all_devices: Use FAISS APIs to bind the default
             CUDA null stream across every visible GPU (False default)
+        use_cuvs: Optional override to force-enable or disable cuVS acceleration
+            for FAISS GPU distance kernels. ``None`` defers to FAISS heuristics
+            (``faiss.should_use_cuvs``).
         ingest_dedupe_threshold: Skip ingest when cosine similarity exceeds this value (0 disables)
         persist_mode: Persistence policy ("cpu_bytes" default, disable for GPU-only runtime)
         snapshot_refresh_interval_seconds: Minimum seconds between CPU snapshot refreshes (0 disables interval throttle)
@@ -164,6 +167,7 @@ class DenseIndexConfig:
     force_64bit_ids: bool = False
     interleaved_layout: bool = True
     flat_use_fp16: bool = False
+    use_cuvs: Optional[bool] = None
     enable_replication: bool = True
     enable_reserve_memory: bool = True
     use_pinned_memory: bool = True
