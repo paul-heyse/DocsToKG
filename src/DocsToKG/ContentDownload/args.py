@@ -704,13 +704,27 @@ def build_query(args: argparse.Namespace) -> Works:
 def _lookup_topic_id(topic_text: str) -> Optional[str]:
     """Cached helper to resolve an OpenAlex topic identifier."""
     try:
-        hits = Topics().search(topic_text).get()
+        query = Topics().search(topic_text).select(["id"]).per_page(1)
+        hits = query.get()
     except requests.RequestException as exc:  # pragma: no cover - network guard
         LOGGER.warning("Topic lookup failed for %s: %s", topic_text, exc)
         return None
     if not hits:
         return None
-    resolved = hits[0].get("id")
+    candidate: Optional[Dict[str, Any]]
+    if isinstance(hits, list):
+        if not hits:
+            return None
+        candidate = hits[0] if isinstance(hits[0], dict) else None
+    elif isinstance(hits, dict):
+        candidate = hits
+    else:
+        candidate = None
+
+    if not candidate:
+        return None
+
+    resolved = candidate.get("id")
     if resolved:
         LOGGER.info("Resolved topic '%s' -> %s", topic_text, resolved)
     return resolved
