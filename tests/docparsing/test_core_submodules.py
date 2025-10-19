@@ -563,6 +563,34 @@ def test_token_profiles_missing_transformers(
     assert "pip install transformers" in captured.err
 
 
+def test_chunk_missing_transformers_dependency(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Chunk CLI surfaces actionable guidance when transformers is missing."""
+
+    import DocsToKG.DocParsing as docparsing_pkg
+
+    monkeypatch.delitem(sys.modules, "DocsToKG.DocParsing.chunking", raising=False)
+    monkeypatch.delitem(docparsing_pkg._MODULE_CACHE, "chunking", raising=False)
+
+    original_import = builtins.__import__
+
+    def fake_import(name: str, *args, **kwargs):
+        if name == "DocsToKG.DocParsing.chunking":
+            raise ImportError("No module named 'transformers'")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+
+    exit_code = core_cli.chunk([])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "DocsToKG.DocParsing.chunking could not be imported" in captured.err
+    assert "transformers" in captured.err
+    assert "DocTags/chunking dependencies" in captured.err
+
+
 def test_display_plan_stream_output() -> None:
     """Planner display writes to injected stream and returns lines."""
 
