@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import logging
 import uuid
+from itertools import islice
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -313,7 +314,7 @@ def build_parser() -> argparse.ArgumentParser:
     resolver_group.add_argument(
         "--global-url-dedup-cap",
         type=int,
-        default=100000,
+        default=None,
         metavar="N",
         help=(
             "Maximum number of URLs hydrated from prior manifests into the persistent dedupe "
@@ -459,6 +460,8 @@ def resolve_config(
         parser.error("--openalex-retry-max-delay must be > 0")
     if args.retry_after_cap <= 0:
         parser.error("--retry-after-cap must be > 0")
+    if args.global_url_dedup_cap is not None and args.global_url_dedup_cap < 0:
+        parser.error("--global-url-dedup-cap must be >= 0")
     for field_name in ("sniff_bytes", "min_pdf_bytes", "tail_check_bytes"):
         value = getattr(args, field_name, None)
         if value is not None and value < 0:
@@ -585,12 +588,29 @@ def resolve_config(
     previous_url_index = ManifestUrlIndex(sqlite_path, eager=args.warm_manifest_cache)
     persistent_seen_urls: Set[str]
     if config.enable_global_url_dedup:
+        allowed_classifications = {
+            Classification.PDF.value.lower(),
+            Classification.CACHED.value.lower(),
+            Classification.XML.value.lower(),
+        }
+        existing_iterator = previous_url_index.iter_existing_paths()
+        cap_value = config.global_url_dedup_cap
+        limited_iterator = (
+            islice(existing_iterator, cap_value)
+            if cap_value is not None and cap_value > 0
+            else existing_iterator
+        )
         persistent_seen_urls = {
             url
-            for url, meta in previous_url_index.iter_existing_paths()
-            if str(meta.get("classification", "")).lower()
-            in {Classification.PDF.value, Classification.CACHED.value, Classification.XML.value}
+            for url, meta in limited_iterator
+            if str(meta.get("classification", "")).lower() in allowed_classifications
         }
+        if cap_value is not None and cap_value > 0 and next(existing_iterator, None) is not None:
+            LOGGER.info(
+                "Hydrated %s persistent resolver URLs (truncated to configured cap of %s).",
+                len(persistent_seen_urls),
+                cap_value,
+            )
     else:
         persistent_seen_urls = set()
 

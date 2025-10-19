@@ -211,6 +211,56 @@ def test_resolver_pipeline_receives_seen_urls_when_dedup_enabled(tmp_path: Path,
     assert pipeline._global_seen_urls == resolved.persistent_seen_urls
 
 
+def test_resolve_config_truncates_persistent_seen_urls_at_cap(
+    tmp_path: Path, patcher, caplog
+) -> None:
+    parser = build_parser()
+    manifest_path = tmp_path / "manifest.jsonl"
+    manifest_path.touch()
+    argv = [
+        "--topic-id",
+        "https://openalex.org/T12345",
+        "--year-start",
+        "2020",
+        "--year-end",
+        "2020",
+        "--out",
+        str(tmp_path / "pdfs"),
+        "--manifest",
+        str(manifest_path),
+        "--global-url-dedup-cap",
+        "2",
+    ]
+    args = parse_args(parser, argv)
+
+    manifest_entries = [
+        ("https://example.org/1", {"classification": Classification.PDF.value}),
+        ("https://example.org/2", {"classification": Classification.PDF.value}),
+        ("https://example.org/3", {"classification": Classification.PDF.value}),
+    ]
+
+    def _iter_existing_paths(*_args, **_kwargs):
+        yield from manifest_entries
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.args.ManifestUrlIndex.iter_existing_paths",
+        _iter_existing_paths,
+    )
+
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+
+    resolved = resolve_config(args, parser)
+
+    assert resolved.persistent_seen_urls == {
+        "https://example.org/1",
+        "https://example.org/2",
+    }
+    assert any(
+        "truncated to configured cap" in record.message for record in caplog.records
+    )
+
+
 def test_lookup_topic_id_requests_minimal_payload(patcher, caplog) -> None:
     args_module._lookup_topic_id.cache_clear()
 
