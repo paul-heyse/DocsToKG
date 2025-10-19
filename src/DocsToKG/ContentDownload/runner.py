@@ -561,22 +561,43 @@ class DownloadRun:
                             Future[Dict[str, Any]],
                             Tuple[WorkArtifact, bool, Optional[str]],
                         ] = {}
+                        future_thread_ids: Dict[
+                            Future[Dict[str, Any]],
+                            Dict[str, int],
+                        ] = {}
 
                         def _submit(work_item: WorkArtifact) -> Future[Dict[str, Any]]:
-                            future = executor.submit(
-                                self.process_work_item, work_item, state.options
-                            )
+                            thread_info: Dict[str, int] = {}
+
+                            def _runner() -> Dict[str, Any]:
+                                thread_info["thread_id"] = threading.get_ident()
+                                try:
+                                    return self.process_work_item(
+                                        work_item, state.options
+                                    )
+                                except Exception:
+                                    state.session_factory.close_current()
+                                    raise
+
+                            future = executor.submit(_runner)
                             future_work_ids[future] = getattr(work_item, "work_id", None)
                             future_context[future] = (
                                 work_item,
                                 bool(state.options.dry_run),
                                 state.options.run_id or self.resolved.run_id,
                             )
+                            future_thread_ids[future] = thread_info
                             return future
 
                         def _handle_future(completed_future: Future[Dict[str, Any]]) -> None:
                             work_id = future_work_ids.pop(completed_future, None)
                             artifact_context = future_context.pop(completed_future, None)
+                            thread_info = future_thread_ids.pop(completed_future, None)
+                            thread_id = (
+                                thread_info.get("thread_id")
+                                if thread_info is not None
+                                else None
+                            )
                             try:
                                 completed_future.result()
                             except Exception as exc:
@@ -586,6 +607,8 @@ class DownloadRun:
                                     work_id=work_id,
                                     artifact_context=artifact_context,
                                 )
+                                if thread_id is not None:
+                                    state.session_factory.close_for_thread(thread_id)
                                 return
 
                         for artifact in provider.iter_artifacts():
