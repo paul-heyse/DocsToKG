@@ -2854,6 +2854,18 @@ class ManagedFaissAdapter(DenseVectorStore):
         self._inner.train(vectors)
 
     @property
+    def config(self) -> DenseIndexConfig:
+        """Return the dense index configuration for the managed store."""
+
+        return self._inner.config
+
+    @property
+    def dim(self) -> int:
+        """Return the embedding dimensionality exposed by the inner store."""
+
+        return self._inner.dim
+
+    @property
     def device(self) -> int:
         """Return the CUDA device identifier for the managed index."""
 
