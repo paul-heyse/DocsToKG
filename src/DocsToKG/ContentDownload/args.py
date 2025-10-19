@@ -535,12 +535,16 @@ def resolve_config(
     sqlite_path = manifest_path.with_suffix(".sqlite3")
 
     previous_url_index = ManifestUrlIndex(sqlite_path, eager=args.warm_manifest_cache)
-    persistent_seen_urls: Set[str] = {
-        url
-        for url, meta in previous_url_index.iter_existing_paths()
-        if str(meta.get("classification", "")).lower()
-        in {Classification.PDF.value, Classification.CACHED.value, Classification.XML.value}
-    }
+    persistent_seen_urls: Set[str]
+    if config.enable_global_url_dedup:
+        persistent_seen_urls = {
+            url
+            for url, meta in previous_url_index.iter_existing_paths()
+            if str(meta.get("classification", "")).lower()
+            in {Classification.PDF.value, Classification.CACHED.value, Classification.XML.value}
+        }
+    else:
+        persistent_seen_urls = set()
 
     robots_checker: Optional[RobotsCache] = None
     if not args.ignore_robots:
