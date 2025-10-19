@@ -27,28 +27,50 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
     lock_dir = lock_path.parent
     start = time.time()
     lock_dir.mkdir(parents=True, exist_ok=True)
-    while lock_path.exists():
-        try:
-            pid_text = lock_path.read_text(encoding="utf-8").strip()
-            existing_pid = int(pid_text) if pid_text else None
-        except (OSError, ValueError):
-            existing_pid = None
-
-        if existing_pid and not _pid_is_running(existing_pid):
-            lock_path.unlink(missing_ok=True)
-            continue
-
-        if time.time() - start > timeout:
-            raise TimeoutError(f"Could not acquire lock on {path} after {timeout}s")
-        time.sleep(0.1)
-        lock_dir.mkdir(parents=True, exist_ok=True)
+    owning_pid = str(os.getpid())
+    acquired = False
 
     try:
-        lock_dir.mkdir(parents=True, exist_ok=True)
-        lock_path.write_text(str(os.getpid()), encoding="utf-8")
+        while True:
+            try:
+                fd = os.open(
+                    lock_path,
+                    os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                    0o644,
+                )
+            except FileExistsError:
+                existing_pid = _read_lock_owner(lock_path)
+
+                if existing_pid and not _pid_is_running(existing_pid):
+                    try:
+                        lock_path.unlink()
+                    except FileNotFoundError:
+                        pass
+                    continue
+
+                if time.time() - start > timeout:
+                    raise TimeoutError(f"Could not acquire lock on {path} after {timeout}s")
+
+                time.sleep(0.1)
+                lock_dir.mkdir(parents=True, exist_ok=True)
+                continue
+
+            with os.fdopen(fd, "w", encoding="utf-8") as lock_file:
+                lock_file.write(owning_pid)
+                lock_file.flush()
+            acquired = True
+            break
+
         yield True
     finally:
-        lock_path.unlink(missing_ok=True)
+        if acquired:
+            try:
+                pid_text = lock_path.read_text(encoding="utf-8").strip()
+            except OSError:
+                pid_text = ""
+
+            if pid_text == owning_pid:
+                lock_path.unlink(missing_ok=True)
 
 
 def _pid_is_running(pid: int) -> bool:
@@ -65,6 +87,23 @@ def _pid_is_running(pid: int) -> bool:
     except OSError:  # pragma: no cover - defensive guard
         return False
     return True
+
+
+def _read_lock_owner(lock_path: Path) -> Optional[int]:
+    """Read the PID stored in ``lock_path`` if available."""
+
+    try:
+        pid_text = lock_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+
+    if not pid_text:
+        return None
+
+    try:
+        return int(pid_text)
+    except ValueError:
+        return None
 
 
 def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
