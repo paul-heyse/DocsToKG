@@ -807,18 +807,32 @@ def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig]
         raise UserConfigError("Configuration validation failed:\n- " + "\n- ".join(errors))
 
 
+def normalize_config_path(config_path: Path) -> Path:
+    """Return a user-supplied configuration path with ``~`` and symlinks resolved."""
+
+    expanded = Path(config_path).expanduser()
+    try:
+        return expanded.resolve(strict=False)
+    except (OSError, RuntimeError):  # pragma: no cover - only triggered on rare filesystems
+        return expanded
+
+
 def load_raw_yaml(config_path: Path) -> Mapping[str, object]:
     """Read a YAML configuration file and return its top-level mapping."""
 
-    if not config_path.exists():
-        print(f"Configuration file not found: {config_path}", file=sys.stderr)
+    normalized_path = normalize_config_path(config_path)
+
+    if not normalized_path.exists():
+        print(f"Configuration file not found: {normalized_path}", file=sys.stderr)
         raise SystemExit(2)
 
     try:
-        with config_path.open("r", encoding="utf-8") as handle:
+        with normalized_path.open("r", encoding="utf-8") as handle:
             data = yaml.safe_load(handle)
     except yaml.YAMLError as exc:  # pragma: no cover - exercised via tests
-        raise UserConfigError(f"Configuration file '{config_path}' contains invalid YAML") from exc
+        raise UserConfigError(
+            f"Configuration file '{normalized_path}' contains invalid YAML"
+        ) from exc
 
     if not isinstance(data, Mapping):
         raise UserConfigError("Configuration file must contain a mapping at the root")
@@ -828,7 +842,8 @@ def load_raw_yaml(config_path: Path) -> Mapping[str, object]:
 def load_config(config_path: Path) -> ResolvedConfig:
     """Load, validate, and resolve configuration suitable for execution."""
 
-    raw = load_raw_yaml(config_path)
+    normalized_path = normalize_config_path(config_path)
+    raw = load_raw_yaml(normalized_path)
     config = build_resolved_config(raw)
     _validate_schema(raw, config)
     return config
@@ -837,7 +852,8 @@ def load_config(config_path: Path) -> ResolvedConfig:
 def validate_config(config_path: Path) -> ResolvedConfig:
     """Load a configuration solely for validation feedback."""
 
-    raw = load_raw_yaml(config_path)
+    normalized_path = normalize_config_path(config_path)
+    raw = load_raw_yaml(normalized_path)
     config = build_resolved_config(raw)
     _validate_schema(raw, config)
     return config
@@ -1489,6 +1505,7 @@ __all__ = [
     "get_env_overrides",
     "load_config",
     "load_raw_yaml",
+    "normalize_config_path",
     "parse_rate_limit_to_rps",
     "validate_config",
     "get_pystow",

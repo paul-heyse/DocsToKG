@@ -225,12 +225,19 @@ _COSINE_TOPK_AUTO_MEM_FRACTION = 0.5
 
 
 _CUVS_LIBRARIES_LOADED = False
+_CUVS_LIB_HANDLES: list[ctypes.CDLL] = []
 
 
 def _ensure_cuvs_loader_path() -> None:
-    """Preload cuVS shared objects so extension modules resolve correctly."""
+    """Preload cuVS shared objects so extension modules resolve correctly.
 
-    global _CUVS_LIBRARIES_LOADED
+    Regression note: ``mode=ctypes.RTLD_GLOBAL`` is required so the cuVS
+    extension modules (``cuvs.*``) can discover RAFT/RMM symbols without
+    manual ``LD_LIBRARY_PATH`` hacks. Dropping the global load reintroduces the
+    import failures we fixed here.
+    """
+
+    global _CUVS_LIBRARIES_LOADED, _CUVS_LIB_HANDLES
     if _CUVS_LIBRARIES_LOADED:
         return
 
@@ -262,15 +269,18 @@ def _ensure_cuvs_loader_path() -> None:
         candidates.append(rapids_logger_root / "lib64" / "librapids_logger.so")
 
     loaded_any = False
-    search_dirs: set[str] = set()
+    search_dirs: list[str] = []
 
     for path in candidates:
         if not path.exists():
             continue
         try:
-            ctypes.CDLL(str(path))
+            handle = ctypes.CDLL(str(path), mode=ctypes.RTLD_GLOBAL)
+            _CUVS_LIB_HANDLES.append(handle)
             loaded_any = True
-            search_dirs.add(str(path.parent))
+            parent = str(path.parent)
+            if parent not in search_dirs:
+                search_dirs.append(parent)
         except OSError:
             log.debug(
                 "Unable to preload cuVS dependency",
@@ -278,11 +288,16 @@ def _ensure_cuvs_loader_path() -> None:
                 exc_info=True,
             )
 
-    if search_dirs:
-        existing = os.environ.get("LD_LIBRARY_PATH")
-        dirs = set(filter(None, (existing or "").split(":")))
-        dirs.update(search_dirs)
-        os.environ["LD_LIBRARY_PATH"] = ":".join(sorted(dirs))
+    if not loaded_any:
+        log.info("No cuVS shared objects were preloaded; continuing without GPU shims")
+        return
+
+    existing = os.environ.get("LD_LIBRARY_PATH")
+    existing_dirs = [part for part in (existing or "").split(":") if part]
+    new_dirs = [directory for directory in search_dirs if directory not in existing_dirs]
+    if new_dirs:
+        updated = existing_dirs + new_dirs
+        os.environ["LD_LIBRARY_PATH"] = ":".join(updated)
 
     _CUVS_LIBRARIES_LOADED = True
 

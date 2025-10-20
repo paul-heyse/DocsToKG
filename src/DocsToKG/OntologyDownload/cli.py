@@ -90,6 +90,7 @@ from .settings import (
     get_env_overrides,
     load_config,
     parse_rate_limit_to_rps,
+    normalize_config_path,
     validate_config,
 )
 from .validation import (
@@ -1506,6 +1507,7 @@ def _handle_init(path: Path) -> None:
     Raises:
         ConfigError: If the target file already exists.
     """
+    path = path.expanduser().resolve()
     if path.exists():
         raise ConfigError(f"Refusing to overwrite existing file {path}")
     path.write_text(EXAMPLE_SOURCES_YAML)
@@ -1513,7 +1515,7 @@ def _handle_init(path: Path) -> None:
 
 
 def _handle_config_validate(path: Path) -> dict:
-    """Validate a configuration file and return a summary report.
+    """Validate a configuration file and return a summary report."""
 
     Args:
         path: Filesystem path to the configuration file under validation.
@@ -1523,10 +1525,12 @@ def _handle_config_validate(path: Path) -> dict:
     """
     config = validate_config(path)
 
+    normalized_path = normalize_config_path(path)
+    config = validate_config(normalized_path)
     return {
         "ok": True,
         "ontologies": len(config.specs),
-        "path": str(path),
+        "path": str(normalized_path),
     }
 
 
