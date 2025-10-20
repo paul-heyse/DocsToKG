@@ -1620,6 +1620,130 @@ def test_managed_adapter_supports_ingestion_training_sample() -> None:
 # --- test_hybrid_search.py ---
 
 
+def test_commit_batch_rolls_back_on_lexical_failure() -> None:
+    class _FailingLexicalIndex:
+        def __init__(self) -> None:
+            self.deleted: Optional[List[str]] = None
+
+        def bulk_upsert(self, chunks: Sequence[ChunkPayload]) -> None:
+            raise RuntimeError("lexical failure")
+
+        def bulk_delete(self, vector_ids: Sequence[str]) -> None:
+            self.deleted = list(vector_ids)
+
+    class _TrackingFaissStore:
+        def __init__(self, *, dim: int) -> None:
+            self._dim = dim
+            self._config = DenseIndexConfig(index_type="flat")
+            self._needs_training = False
+            self.adapter_stats = SimpleNamespace(device=0, ntotal=0)
+            self._store: Dict[str, np.ndarray] = {}
+            self._last_remove: List[str] = []
+
+        @property
+        def config(self) -> DenseIndexConfig:
+            return self._config
+
+        @property
+        def dim(self) -> int:
+            return self._dim
+
+        @property
+        def device(self) -> int:  # pragma: no cover - unused fallback
+            return 0
+
+        @property
+        def ntotal(self) -> int:  # pragma: no cover - unused fallback
+            return 0
+
+        def set_id_resolver(self, resolver) -> None:
+            self._resolver = resolver
+
+        def needs_training(self) -> bool:
+            return self._needs_training
+
+        def train(self, vectors: Sequence[np.ndarray]) -> None:  # pragma: no cover - stub
+            self._needs_training = False
+            self.trained = list(vectors)
+
+        def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
+            self._last_add = (list(vectors), list(vector_ids))
+            for vec, vid in zip(vectors, vector_ids):
+                self._store[str(vid)] = np.asarray(vec, dtype=np.float32)
+
+        def remove(self, vector_ids: Sequence[str]) -> None:
+            self._last_remove = list(vector_ids)
+            for vid in vector_ids:
+                self._store.pop(str(vid), None)
+
+        def search(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def search_many(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def search_batch(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def range_search(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def reconstruct_batch(self, vector_ids: Sequence[str]) -> np.ndarray:
+            if not vector_ids:
+                return np.empty((0, self._dim), dtype=np.float32)
+            return np.stack([self._store[str(vid)] for vid in vector_ids], dtype=np.float32)
+
+        def serialize(self) -> bytes:  # pragma: no cover - stub
+            return b""
+
+        def restore(self, payload: bytes) -> None:  # pragma: no cover - stub
+            self._last_restore = payload
+
+        def flush_snapshot(self, *, reason: str = "flush") -> None:  # pragma: no cover - stub
+            self._last_flush_reason = reason
+
+    dim = 4
+    chunk = ChunkPayload(
+        doc_id="doc",
+        chunk_id="chunk-0",
+        vector_id="vec-0",
+        namespace="research",
+        text="",
+        metadata={},
+        features=ChunkFeatures(
+            bm25_terms={},
+            splade_weights={},
+            embedding=np.ones((dim,), dtype=np.float32),
+        ),
+        token_count=0,
+        source_chunk_idxs=(),
+        doc_items_refs=(),
+    )
+
+    faiss = _TrackingFaissStore(dim=dim)
+    adapter = ManagedFaissAdapter(faiss)
+    registry = ChunkRegistry()
+    observability = Observability()
+    lexical = _FailingLexicalIndex()
+    pipeline = ChunkIngestionPipeline(
+        faiss_index=adapter,
+        opensearch=lexical,
+        registry=registry,
+        observability=observability,
+    )
+
+    with pytest.raises(RuntimeError, match="lexical failure"):
+        pipeline._commit_batch([chunk])
+
+    assert faiss._store == {}
+    assert faiss._last_remove == [chunk.vector_id]
+    assert registry.count() == 0
+    assert lexical.deleted is None
+
+
+# --- test_hybrid_search.py ---
+
+
 def test_faiss_index_uses_registry_bridge(tmp_path: Path) -> None:
     config = DenseIndexConfig(index_type="flat")
     manager = FaissVectorStore(dim=4, config=config)
@@ -1869,29 +1993,155 @@ def test_delete_existing_for_doc_uses_registry_index(
     patcher.setattr(registry, "vector_ids_for", spy_vector_ids_for)
     patcher.setattr(registry, "all", fail_all)
 
-    for iteration in range(3):
+    baseline_ids = tuple(original_vector_ids_for(data.target_doc, data.target_namespace))
+
+    for _ in range(3):
         before = call_count
-        pipeline._delete_existing_for_doc(data.target_doc, data.target_namespace)
+        staged = pipeline._delete_existing_for_doc(data.target_doc, data.target_namespace)
         assert call_count == before + 1
-        assert opensearch.deleted_batches, "Expected lexical index deletes to be recorded"
-        assert faiss_store.removed_batches, "Expected dense store deletes to be recorded"
-        assert set(opensearch.deleted_batches[-1]) == expected_vector_ids
-        assert set(faiss_store.removed_batches[-1]) == expected_vector_ids
-        assert not tuple(original_vector_ids_for(data.target_doc, data.target_namespace))
+        assert set(staged) == expected_vector_ids
+        assert staged == baseline_ids
+        assert not opensearch.deleted_batches
+        assert not faiss_store.removed_batches
+        assert tuple(original_vector_ids_for(data.target_doc, data.target_namespace)) == baseline_ids
 
-        if iteration < 2:
-            refreshed = data.make_target_chunks()
-            pipeline.faiss_index.add(
-                [chunk.features.embedding for chunk in refreshed],
-                [chunk.vector_id for chunk in refreshed],
-            )
-            registry.upsert(refreshed)
-
-    assert registry.count() == background_total
-    assert len(faiss_store.removed_batches) == 3
-    assert len(opensearch.deleted_batches) == 3
+    assert registry.count() == background_total + len(target_chunks)
+    assert not faiss_store.removed_batches
+    assert not opensearch.deleted_batches
     sample_doc, sample_namespace = next(iter(data.background))
     assert tuple(original_vector_ids_for(sample_doc, sample_namespace))
+
+
+# --- Regression coverage for deferred deletions ---
+
+
+def test_upsert_documents_skips_deletes_on_commit_failure(
+    patcher: PatchManager, tmp_path: Path
+) -> None:
+    class _StubLexicalIndex:
+        def __init__(self) -> None:
+            self.upserts: List[Tuple[str, ...]] = []
+            self.deletes: List[Tuple[str, ...]] = []
+
+        def bulk_upsert(self, chunks: Sequence[ChunkPayload]) -> None:
+            self.upserts.append(tuple(chunk.vector_id for chunk in chunks))
+
+        def bulk_delete(self, vector_ids: Sequence[str]) -> None:
+            self.deletes.append(tuple(vector_ids))
+
+    class _StubDenseStore:
+        def __init__(self) -> None:
+            self.added: List[Tuple[str, ...]] = []
+            self.removed: List[Tuple[str, ...]] = []
+            self._dim = 3
+            self.config = SimpleNamespace(nlist=1, ivf_train_factor=1)
+
+        @property
+        def dim(self) -> int:
+            return self._dim
+
+        def set_id_resolver(self, resolver) -> None:  # pragma: no cover - stub
+            self._resolver = resolver
+
+        def needs_training(self) -> bool:
+            return False
+
+        def train(self, _: Sequence[np.ndarray]) -> None:  # pragma: no cover - stub
+            raise AssertionError("train should not be invoked when needs_training() is False")
+
+        def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
+            self.added.append(tuple(vector_ids))
+
+        def remove(self, vector_ids: Sequence[str]) -> None:
+            self.removed.append(tuple(vector_ids))
+
+    faiss_store = _StubDenseStore()
+    opensearch = _StubLexicalIndex()
+    registry = ChunkRegistry()
+    pipeline = ChunkIngestionPipeline(
+        faiss_index=faiss_store,
+        opensearch=opensearch,
+        registry=registry,
+        observability=Observability(),
+    )
+
+    features = ChunkFeatures(
+        bm25_terms={},
+        splade_weights={},
+        embedding=np.zeros(3, dtype=np.float32),
+    )
+    existing_chunk = ChunkPayload(
+        doc_id="doc-1",
+        chunk_id="chunk-old",
+        vector_id="vec-old",
+        namespace="ns-1",
+        text="existing",
+        metadata={},
+        features=features,
+        token_count=0,
+        source_chunk_idxs=(),
+        doc_items_refs=(),
+    )
+    registry.upsert([existing_chunk])
+
+    new_features = ChunkFeatures(
+        bm25_terms={},
+        splade_weights={},
+        embedding=np.ones(3, dtype=np.float32),
+    )
+    new_chunk = ChunkPayload(
+        doc_id="doc-1",
+        chunk_id="chunk-new",
+        vector_id="vec-new",
+        namespace="ns-1",
+        text="replacement",
+        metadata={},
+        features=new_features,
+        token_count=0,
+        source_chunk_idxs=(),
+        doc_items_refs=(),
+    )
+
+    chunk_path = tmp_path / "chunks.jsonl"
+    vector_path = tmp_path / "vectors.jsonl"
+    chunk_path.write_text("{}\n", encoding="utf-8")
+    vector_path.write_text("{}\n", encoding="utf-8")
+
+    document = DocumentInput(
+        doc_id="doc-1",
+        namespace="ns-1",
+        chunk_path=chunk_path,
+        vector_path=vector_path,
+        metadata={},
+    )
+
+    patcher.setattr(
+        pipeline,
+        "_load_precomputed_chunks",
+        lambda doc: [new_chunk] if doc.doc_id == "doc-1" else [],
+    )
+
+    delete_calls: List[Tuple[str, ...]] = []
+
+    def record_delete(vector_ids: Sequence[str]) -> None:
+        delete_calls.append(tuple(vector_ids))
+
+    patcher.setattr(pipeline, "delete_chunks", record_delete)
+
+    def failing_commit(
+        batch: Sequence[ChunkPayload], *, collect_vector_ids: bool = False
+    ) -> None:
+        raise RetryableIngestError("commit failure")
+
+    patcher.setattr(pipeline, "_commit_batch", failing_commit)
+
+    with pytest.raises(RetryableIngestError):
+        pipeline.upsert_documents([document])
+
+    assert delete_calls == []
+    assert tuple(registry.vector_ids_for("doc-1", "ns-1")) == ("vec-old",)
+    assert not faiss_store.removed
+    assert not opensearch.deletes
 
 
 # --- test_hybrid_search_real_vectors.py ---

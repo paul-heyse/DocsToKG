@@ -601,7 +601,9 @@ class ChunkIngestionPipeline:
                     loaded = self._load_precomputed_chunks(document)
                 if not loaded:
                     continue
-                self._delete_existing_for_doc(document.doc_id, document.namespace)
+                staged_deletions = self._delete_existing_for_doc(
+                    document.doc_id, document.namespace
+                )
                 batch = self._commit_batch(
                     loaded, collect_vector_ids=collect_vector_ids
                 )
@@ -609,6 +611,8 @@ class ChunkIngestionPipeline:
                 namespaces.update(batch.namespaces)
                 if vector_ids is not None and batch.vector_ids:
                     vector_ids.extend(batch.vector_ids)
+                if staged_deletions:
+                    self.delete_chunks(staged_deletions)
         except RetryableIngestError:
             raise
         except IngestError:
@@ -660,14 +664,49 @@ class ChunkIngestionPipeline:
             )
 
         count = len(batch)
+        vector_ids = [chunk.vector_id for chunk in batch]
+        faiss_added = False
+        lexical_upserted = False
+
         with self._observability.trace("ingest_dual_write", count=str(count)):
-            self._prepare_faiss(batch)
-            self._faiss.add(
-                [chunk.features.embedding for chunk in batch],
-                [chunk.vector_id for chunk in batch],
-            )
-            self._opensearch.bulk_upsert(batch)
-            self._registry.upsert(batch)
+            try:
+                self._prepare_faiss(batch)
+                self._faiss.add(
+                    [chunk.features.embedding for chunk in batch],
+                    vector_ids,
+                )
+                faiss_added = True
+                self._opensearch.bulk_upsert(batch)
+                lexical_upserted = True
+                self._registry.upsert(batch)
+            except Exception:
+                if lexical_upserted:
+                    try:
+                        self._opensearch.bulk_delete(vector_ids)
+                    except Exception:
+                        self._observability.logger.exception(
+                            "chunk-ingest-rollback-lexical-error",
+                            extra={
+                                "event": {
+                                    "vector_ids": vector_ids,
+                                    "stage": "lexical",
+                                }
+                            },
+                        )
+                if faiss_added:
+                    try:
+                        self._faiss.remove(vector_ids)
+                    except Exception:
+                        self._observability.logger.exception(
+                            "chunk-ingest-rollback-faiss-error",
+                            extra={
+                                "event": {
+                                    "vector_ids": vector_ids,
+                                    "stage": "faiss",
+                                }
+                            },
+                        )
+                raise
 
         self._metrics.chunks_upserted += count
         self._observability.metrics.increment("ingest_chunks", count)
@@ -678,8 +717,8 @@ class ChunkIngestionPipeline:
             extra={"event": {"count": count, "namespaces": list(namespaces)}},
         )
 
-        vector_ids = (
-            tuple(chunk.vector_id for chunk in batch)
+        vector_ids_result = (
+            tuple(vector_ids)
             if collect_vector_ids
             else None
         )
@@ -687,7 +726,7 @@ class ChunkIngestionPipeline:
         return BatchCommitResult(
             chunk_count=count,
             namespaces=namespaces,
-            vector_ids=vector_ids,
+            vector_ids=vector_ids_result,
         )
 
     def _prepare_faiss(self, new_chunks: Sequence[ChunkPayload]) -> None:
@@ -830,6 +869,42 @@ class ChunkIngestionPipeline:
             raise IngestError(
                 "Missing vector entries for chunk UUIDs: " + ", ".join(sorted(set(missing)))
             )
+
+        extra_vector_ids: List[str] = []
+        max_preview = 10
+        truncated = False
+        if vector_cache:
+            cache_ids = [str(vector_id) for vector_id in vector_cache.keys()]
+            if len(cache_ids) > max_preview:
+                extra_vector_ids.extend(sorted(cache_ids)[:max_preview])
+                truncated = True
+            else:
+                extra_vector_ids.extend(sorted(cache_ids))
+
+        missing_uuid_entries = False
+        for extra_entry in vector_iter:
+            extra_uuid = extra_entry.get("uuid") or extra_entry.get("UUID")
+            if extra_uuid:
+                if len(extra_vector_ids) < max_preview:
+                    extra_vector_ids.append(str(extra_uuid))
+                else:
+                    truncated = True
+            else:
+                missing_uuid_entries = True
+
+        if extra_vector_ids or missing_uuid_entries:
+            details = sorted(set(extra_vector_ids))
+            message = "Found vector entries without matching chunks"
+            if details:
+                preview = ", ".join(details[:max_preview])
+                if truncated or len(details) > max_preview:
+                    preview += ", ..."
+                message += f": {preview}"
+            if missing_uuid_entries and not details:
+                message += ": <missing UUID>"
+            elif missing_uuid_entries:
+                message += " (additional entries missing UUIDs)"
+            raise IngestError(message)
         return payloads
 
     def _resolve_char_offset(
@@ -917,11 +992,9 @@ class ChunkIngestionPipeline:
             namespace: Namespace to scope the deletion.
 
         Returns:
-            None
+            Tuple of vector identifiers currently associated with the document.
         """
-        existing_vector_ids = tuple(self._registry.vector_ids_for(doc_id, namespace))
-        if existing_vector_ids:
-            self.delete_chunks(existing_vector_ids)
+        return tuple(self._registry.vector_ids_for(doc_id, namespace))
 
     def _features_from_vector(self, payload: Mapping[str, object]) -> ChunkFeatures:
         """Convert stored vector payload into ChunkFeatures.
