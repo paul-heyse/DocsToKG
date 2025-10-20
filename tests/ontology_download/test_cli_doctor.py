@@ -9,9 +9,12 @@ emitted for common misconfigurations.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from DocsToKG.OntologyDownload import cli as cli_module
 from DocsToKG.OntologyDownload.testing import TestingEnvironment
@@ -91,3 +94,81 @@ def test_cli_doctor_reports_invalid_rate_limit_override_tty(monkeypatch, capsys)
     stdout = capsys.readouterr().out
     assert "Rate limit check error" in stdout
     assert "not-a-limit" in stdout
+@pytest.mark.skipif(os.name == "nt", reason="POSIX-style permissions required")
+def test_cli_doctor_reports_missing_execute_permission_in_json(capsys):
+    """The JSON report should surface directories lacking execute permissions."""
+
+    with TestingEnvironment() as env:
+        restricted_dir = env.cache_dir
+        original_access = cli_module.os.access
+
+        def fake_access(path, mode, *, dir_fd=None, effective_ids=False, follow_symlinks=True):
+            path_obj = Path(path)
+            if path_obj == restricted_dir:
+                if mode == cli_module.os.W_OK:
+                    return True
+                if mode == cli_module.os.X_OK:
+                    return False
+                if mode == (cli_module.os.W_OK | cli_module.os.X_OK):
+                    return False
+            return original_access(
+                path,
+                mode,
+                dir_fd=dir_fd,
+                effective_ids=effective_ids,
+                follow_symlinks=follow_symlinks,
+            )
+
+        with patch.object(cli_module.os, "access", side_effect=fake_access):
+            exit_code = cli_module.cli_main(["doctor", "--json"])
+
+    assert exit_code == 0
+
+    captured = capsys.readouterr()
+    output = json.loads(captured.out)
+    cache_entry = output["directories"]["cache"]
+    assert cache_entry["exists"] is True
+    assert cache_entry["directory"] is True
+    assert cache_entry["write_permission"] is True
+    assert cache_entry["execute_permission"] is False
+    assert cache_entry["writable"] is False
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX-style permissions required")
+def test_cli_doctor_prints_missing_execute_permission(capsys):
+    """Human-readable doctor output should note missing directory execute permissions."""
+
+    with TestingEnvironment() as env:
+        restricted_dir = env.cache_dir
+        original_access = cli_module.os.access
+
+        def fake_access(path, mode, *, dir_fd=None, effective_ids=False, follow_symlinks=True):
+            path_obj = Path(path)
+            if path_obj == restricted_dir:
+                if mode == cli_module.os.W_OK:
+                    return True
+                if mode == cli_module.os.X_OK:
+                    return False
+                if mode == (cli_module.os.W_OK | cli_module.os.X_OK):
+                    return False
+            return original_access(
+                path,
+                mode,
+                dir_fd=dir_fd,
+                effective_ids=effective_ids,
+                follow_symlinks=follow_symlinks,
+            )
+
+        with patch.object(cli_module.os, "access", side_effect=fake_access):
+            exit_code = cli_module.cli_main(["doctor"])
+
+    assert exit_code == 0
+
+    captured = capsys.readouterr()
+    cache_line = next(
+        (line for line in captured.out.splitlines() if "cache:" in line),
+        "",
+    )
+    assert cache_line
+    assert "no execute permission" in cache_line
+    assert "read-only" not in cache_line.split(":", 1)[-1]
