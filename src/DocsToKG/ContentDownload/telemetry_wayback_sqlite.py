@@ -73,7 +73,7 @@ class SQLiteSink:
         tuning: SQLiteTuning | None = None,
         lock_ctx=default_sqlite_lock,  # pass your locks.sqlite_lock here
         auto_commit_every: int = 1,  # commit after N events (>=1)
-        schema_version: str = "1",  # bump if you change shapes
+        schema_version: str = "2",  # bump if you change shapes
         enable_metrics: bool = True,  # track performance metrics
         backpressure_threshold_ms: float = 50.0,  # warn if emit takes > X ms
     ) -> None:
@@ -118,12 +118,17 @@ class SQLiteSink:
         self.backpressure_threshold_ms = backpressure_threshold_ms
 
         self._conn = sqlite3.connect(
-            self.db_path, isolation_level=None, detect_types=0, check_same_thread=False
+            self.db_path,
+            isolation_level="DEFERRED",
+            detect_types=0,
+            check_same_thread=False,
         )
         self._conn.row_factory = sqlite3.Row
         self._apply_pragmas()
         self._ensure_schema()
+        self._conn.commit()
         self._pending = 0
+        self._transaction_open = False
 
         # Performance metrics
         self._metrics: Dict[str, Any] = {
@@ -156,41 +161,43 @@ class SQLiteSink:
         if not et:
             return  # ignore malformed events silently
 
+        handler = None
+        if et == "wayback_attempt":
+            handler = self._emit_attempt
+        elif et == "wayback_discovery":
+            handler = self._emit_discovery
+        elif et == "wayback_candidate":
+            handler = self._emit_candidate
+        elif et == "wayback_html_parse":
+            handler = self._emit_html_parse
+        elif et == "wayback_pdf_check":
+            handler = self._emit_pdf_check
+        elif et == "wayback_emit":
+            handler = self._emit_emit
+        elif et == "wayback_skip":
+            handler = self._emit_skip
+        else:
+            # Unknown event_type; ignore to be forward-compatible
+            return
+
         # Retry logic for database locked errors
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 with self.lock_ctx(self.db_path):
+                    self._ensure_transaction()
                     cur = self._conn.cursor()
-                    if et == "wayback_attempt":
-                        self._emit_attempt(cur, event)
-                    elif et == "wayback_discovery":
-                        self._emit_discovery(cur, event)
-                    elif et == "wayback_candidate":
-                        self._emit_candidate(cur, event)
-                    elif et == "wayback_html_parse":
-                        self._emit_html_parse(cur, event)
-                    elif et == "wayback_pdf_check":
-                        self._emit_pdf_check(cur, event)
-                    elif et == "wayback_emit":
-                        self._emit_emit(cur, event)
-                    elif et == "wayback_skip":
-                        self._emit_skip(cur, event)
-                    else:
-                        # Unknown event_type; ignore to be forward-compatible
-                        return
+                    handler(cur, event)
 
                     self._pending += 1
                     if self._pending >= self.auto_commit_every:
-                        self._conn.commit()
-                        self._pending = 0
-                        if self.enable_metrics:
-                            self._metrics["commits_total"] = int(self._metrics["commits_total"]) + 1
+                        self._commit_transaction()
 
                 # Success - break out of retry loop
                 break
 
             except sqlite3.OperationalError as e:
+                self._rollback_transaction()
                 if "database is locked" in str(e) and attempt < max_retries - 1:
                     # Retry with jitter
                     import random
@@ -229,11 +236,73 @@ class SQLiteSink:
                         f"Consider increasing auto_commit_every from {self.auto_commit_every}."
                     )
 
+    def _ensure_transaction(self) -> None:
+        """Start a transaction if one is not already active."""
+
+        if self._transaction_open:
+            return
+
+        # Explicit BEGIN ensures deterministic transaction boundaries even when
+        # sqlite3 would otherwise lazily create them for us.
+        self._conn.execute("BEGIN DEFERRED")
+        self._transaction_open = True
+        self._pending = 0
+
+    def _commit_transaction(self) -> None:
+        """Commit the current transaction and update metrics."""
+
+        if not self._conn:
+            return
+
+        try:
+            in_tx = self._conn.in_transaction
+        except sqlite3.ProgrammingError:
+            return
+
+        was_open = self._transaction_open or in_tx
+        if not was_open:
+            return
+
+        pending_before_commit = self._pending
+        try:
+            self._conn.commit()
+        except sqlite3.ProgrammingError:
+            self._transaction_open = False
+            self._pending = 0
+            return
+
+        if self.enable_metrics and was_open and pending_before_commit > 0:
+            self._metrics["commits_total"] = int(self._metrics["commits_total"]) + 1
+
+        self._transaction_open = False
+        self._pending = 0
+
+    def _rollback_transaction(self) -> None:
+        """Rollback the active transaction if present."""
+
+        if not self._conn:
+            return
+
+        try:
+            in_tx = self._conn.in_transaction
+        except sqlite3.ProgrammingError:
+            in_tx = False
+
+        if not (self._transaction_open or in_tx):
+            return
+
+        try:
+            self._conn.rollback()
+        except sqlite3.ProgrammingError:
+            pass
+        finally:
+            self._transaction_open = False
+            self._pending = 0
+
     def close(self) -> None:
         """Close the sink and perform cleanup operations."""
         if self._conn:
             try:
-                self._conn.commit()
                 # Run optimization and WAL checkpoint
                 self._cleanup_on_exit()
             finally:
@@ -262,6 +331,7 @@ class SQLiteSink:
             return
 
         try:
+            self._commit_transaction()
             c = self._conn.cursor()
             # Run optimization
             c.execute("PRAGMA optimize;")
@@ -270,6 +340,8 @@ class SQLiteSink:
             if self.tuning.journal_mode == "WAL":
                 c.execute("PRAGMA wal_checkpoint(TRUNCATE);")
 
+        except sqlite3.ProgrammingError:
+            return
         except Exception as e:
             import logging
 
@@ -377,9 +449,17 @@ class SQLiteSink:
             retry_after_s INTEGER,
             retry_count INTEGER,
             error TEXT,
+            rate_limiter_role TEXT,
             FOREIGN KEY(attempt_id) REFERENCES wayback_attempts(attempt_id) ON DELETE CASCADE
         );
         """)
+
+        self._ensure_column_exists(
+            c,
+            table="wayback_discoveries",
+            column="rate_limiter_role",
+            ddl="ALTER TABLE wayback_discoveries ADD COLUMN rate_limiter_role TEXT",
+        )
 
         # Candidates evaluated
         c.execute("""
@@ -498,6 +578,9 @@ class SQLiteSink:
             "CREATE INDEX IF NOT EXISTS idx_emits_mode ON wayback_emits(source_mode, memento_ts);"
         )
         c.execute("CREATE INDEX IF NOT EXISTS idx_discovery_stage ON wayback_discoveries(stage);")
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_wayback_disc_role ON wayback_discoveries(rate_limiter_role);"
+        )
 
         # Partial index for successful attempts (SQLite >= 3.8.0)
         try:
@@ -507,6 +590,16 @@ class SQLiteSink:
         except sqlite3.OperationalError:
             # Partial indexes not supported
             pass
+
+    def _ensure_column_exists(
+        self, cur: sqlite3.Cursor, *, table: str, column: str, ddl: str
+    ) -> None:
+        """Add a column if it is missing from an existing database."""
+
+        cur.execute(f"PRAGMA table_info({table});")
+        columns = {row[1] for row in cur.fetchall()}
+        if column not in columns:
+            cur.execute(ddl)
 
     # ────────────────────────────────────────────────────────────────────────────
     # Per-event writers
@@ -573,9 +666,10 @@ class SQLiteSink:
             INSERT INTO wayback_discoveries (
                 attempt_id, ts, monotonic_ms, stage, query_url, year_window,
                 "limit", returned, first_ts, last_ts, http_status,
-                from_cache, revalidated, rate_delay_ms, retry_after_s, retry_count, error
+                from_cache, revalidated, rate_delay_ms, retry_after_s, retry_count, error,
+                rate_limiter_role
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 e["attempt_id"],
@@ -595,6 +689,7 @@ class SQLiteSink:
                 e.get("retry_after_s"),
                 e.get("retry_count"),
                 e.get("error"),
+                _normalize_role(e.get("rate_limiter_role") or e.get("role")),
             ),
         )
 
@@ -717,6 +812,14 @@ def _b(v: Optional[bool]) -> Optional[int]:
     if v is None:
         return None
     return 1 if bool(v) else 0
+
+
+def _normalize_role(role: Optional[Any]) -> Optional[str]:
+    """Normalize limiter role strings for consistent storage."""
+
+    if isinstance(role, str):
+        return role.strip().lower() or None
+    return None
 
 
 __all__ = [

@@ -50,7 +50,6 @@ import contextlib
 import inspect
 import json
 import logging
-import os
 import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
@@ -498,6 +497,9 @@ class DownloadRun:
         else:
             reset_breaker_registry()
 
+        if self.pipeline is not None:
+            self.pipeline.set_breaker_registry(breaker_registry)
+
         client = http_client or get_http_client()
         state = DownloadRunState(
             http_client=client,
@@ -729,22 +731,15 @@ class DownloadRun:
                         NetworkBreakerListener,
                         BreakerListenerConfig,
                     )
-
-                    # Load breaker configuration
-                    breaker_config = load_breaker_config(
-                        yaml_path=getattr(self.args, "breaker_config_path", None),
-                        env=os.environ,
-                        cli_host_overrides=getattr(self.args, "breaker_host_overrides", None),
-                        cli_role_overrides=getattr(self.args, "breaker_role_overrides", None),
-                        cli_resolver_overrides=getattr(
-                            self.args, "breaker_resolver_overrides", None
-                        ),
-                        cli_defaults_override=getattr(self.args, "breaker_defaults_override", None),
-                        cli_classify_override=getattr(self.args, "breaker_classify_override", None),
-                        cli_rolling_override=getattr(self.args, "breaker_rolling_override", None),
+                except ImportError:
+                    LOGGER.debug("pybreaker not available, circuit breakers disabled")
+                else:
+                    breaker_config_obj = getattr(
+                        self.resolved.resolver_config, "breaker_config", None
                     )
+                    if not isinstance(breaker_config_obj, BreakerConfig):
+                        breaker_config_obj = BreakerConfig()
 
-                    # Create listener factory
                     def listener_factory(host: str, scope: str, resolver: Optional[str]):
                         if self.attempt_logger is not None:
                             return NetworkBreakerListener(

@@ -201,14 +201,47 @@ resolvers:
         try:
             with pytest.raises(Exception):  # Should raise YAML parsing error
                 load_breaker_config(
-                    yaml_path=yaml_path,
-                    env={},
-                    cli_host_overrides=None,
-                    cli_role_overrides=None,
-                    cli_resolver_overrides=None,
-                )
+                yaml_path=yaml_path,
+                env={},
+                cli_host_overrides=None,
+                cli_role_overrides=None,
+                cli_resolver_overrides=None,
+            )
         finally:
             Path(yaml_path).unlink()
+
+    def test_base_doc_and_extra_yaml_merge(self, tmp_path: Path):
+        """Test merging base docs with extra YAML overlays."""
+
+        extra_yaml = tmp_path / "breaker-extra.yaml"
+        extra_yaml.write_text(
+            """
+hosts:
+  api.crossref.org:
+    fail_max: 2
+    reset_timeout_s: 75
+"""
+        )
+
+        base_doc = {
+            "hosts": {"Example.com": {"fail_max": 4}},
+            "resolvers": {"landing_page": {"fail_max": 3}},
+        }
+
+        config = load_breaker_config(
+            yaml_path=None,
+            env={},
+            cli_host_overrides=None,
+            cli_role_overrides=None,
+            cli_resolver_overrides=None,
+            base_doc=base_doc,
+            extra_yaml_paths=[extra_yaml],
+        )
+
+        assert config.hosts["example.com"].fail_max == 4
+        assert config.hosts["api.crossref.org"].fail_max == 2
+        assert config.hosts["api.crossref.org"].reset_timeout_s == 75
+        assert config.resolvers["landing_page"].fail_max == 3
 
     def test_missing_yaml_file(self):
         """Test handling of missing YAML file."""

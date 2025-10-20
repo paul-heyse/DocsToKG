@@ -132,6 +132,7 @@ import json
 import logging
 import math
 import os
+import re
 import threading
 import time as _time
 import warnings
@@ -157,6 +158,7 @@ from urllib.parse import urlparse, urlsplit
 
 import httpx
 
+from DocsToKG.ContentDownload.breakers import BreakerConfig
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
@@ -380,7 +382,7 @@ class ResolverConfig:
         enable_global_url_dedup: Enable global URL deduplication across works when True.
         global_url_dedup_cap: Maximum URLs hydrated into the global dedupe cache.
         domain_content_rules: Mapping of hostname to MIME allow-lists.
-        # resolver_circuit_breakers: Legacy - now handled by pybreaker-based BreakerRegistry
+        breaker_config: Fully resolved circuit breaker configuration shared with networking.
         wayback_config: Wayback-specific configuration options (year_window, max_snapshots, etc.).
 
     Notes:
@@ -418,7 +420,7 @@ class ResolverConfig:
     enable_global_url_dedup: bool = True
     global_url_dedup_cap: Optional[int] = 100_000
     domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    # resolver_circuit_breakers: Legacy - now handled by pybreaker-based BreakerRegistry
+    breaker_config: BreakerConfig = field(default_factory=BreakerConfig)
     # Wayback-specific configuration
     wayback_config: Dict[str, Any] = field(default_factory=dict)
     # Heuristic knobs (defaults preserve current CLI behaviour)
@@ -624,6 +626,25 @@ def load_resolver_config(
 
     config = ResolverConfig()
     config_paths: List[Path] = []
+    breaker_fragments: List[Mapping[str, Any]] = []
+    breaker_yaml_paths: List[Path] = []
+
+    def _collect_breaker_section(value: Any) -> None:
+        if value is None:
+            return
+        if isinstance(value, Mapping):
+            breaker_fragments.append(dict(value))
+            return
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                _collect_breaker_section(item)
+            return
+        if isinstance(value, (str, os.PathLike)):
+            breaker_yaml_paths.append(Path(value).expanduser().resolve(strict=False))
+            return
+        raise ValueError(
+            "breaker_config entries must be mappings, sequences, or filesystem paths"
+        )
 
     if DEFAULT_RESOLVER_CREDENTIALS_PATH.is_file():
         config_paths.append(DEFAULT_RESOLVER_CREDENTIALS_PATH)
@@ -634,7 +655,71 @@ def load_resolver_config(
 
     for config_path in config_paths:
         config_data = read_resolver_config(config_path)
+        for breaker_key in ("breaker_config", "breaker_policies"):
+            if breaker_key in config_data and config_data[breaker_key] not in (None, {}):
+                _collect_breaker_section(config_data[breaker_key])
         apply_config_overrides(config, config_data, resolver_names)
+
+    env_breaker_yaml = os.getenv("DOCSTOKG_BREAKERS_YAML")
+    if env_breaker_yaml:
+        _collect_breaker_section(env_breaker_yaml)
+
+    cli_breaker_path = getattr(args, "breaker_config_path", None)
+    if cli_breaker_path:
+        _collect_breaker_section(cli_breaker_path)
+
+    cli_host_overrides = list(getattr(args, "breaker_host_overrides", []) or [])
+    cli_role_overrides = list(getattr(args, "breaker_role_overrides", []) or [])
+    cli_resolver_overrides = list(getattr(args, "breaker_resolver_overrides", []) or [])
+    cli_defaults_override = getattr(args, "breaker_defaults_override", None)
+    cli_classify_override = getattr(args, "breaker_classify_override", None)
+    cli_rolling_override = getattr(args, "breaker_rolling_override", None)
+
+    env_has_breaker_overrides = any(
+        key.startswith("DOCSTOKG_BREAKER") for key in os.environ
+    )
+
+    breaker_overrides_requested = bool(
+        breaker_fragments
+        or breaker_yaml_paths
+        or cli_host_overrides
+        or cli_role_overrides
+        or cli_resolver_overrides
+        or cli_defaults_override
+        or cli_classify_override
+        or cli_rolling_override
+        or env_has_breaker_overrides
+    )
+
+    if breaker_overrides_requested:
+        try:
+            from DocsToKG.ContentDownload.breakers_loader import (
+                load_breaker_config,
+                merge_breaker_docs,
+            )
+        except (ImportError, RuntimeError) as exc:
+            raise ValueError(
+                "Breaker configuration requested but dependencies are unavailable. Install PyYAML or remove breaker overrides."
+            ) from exc
+
+        base_doc: Dict[str, Any] = {}
+        for fragment in breaker_fragments:
+            base_doc = merge_breaker_docs(base_doc, fragment)
+
+        config.breaker_config = load_breaker_config(
+            None,
+            env=os.environ,
+            cli_host_overrides=cli_host_overrides or None,
+            cli_role_overrides=cli_role_overrides or None,
+            cli_resolver_overrides=cli_resolver_overrides or None,
+            cli_defaults_override=cli_defaults_override,
+            cli_classify_override=cli_classify_override,
+            cli_rolling_override=cli_rolling_override,
+            base_doc=base_doc or None,
+            extra_yaml_paths=breaker_yaml_paths,
+        )
+    else:
+        config.breaker_config = BreakerConfig()
 
     config.unpaywall_email = (
         getattr(args, "unpaywall_email", None)
@@ -1222,6 +1307,11 @@ class ResolverPipeline:
         initial_seen_urls: Optional[Set[str]] = None,
         global_manifest_index: Optional[Dict[str, Dict[str, Any]]] = None,
         run_id: Optional[str] = None,
+        *,
+        breaker_registry: Optional[Any] = None,
+        breaker_allow: Optional[
+            Callable[[str, "RequestRole", Optional[str]], None]
+        ] = None,
     ) -> None:
         """Create a resolver pipeline with ordering, download, and metric hooks.
 
@@ -1231,6 +1321,8 @@ class ResolverPipeline:
             download_func: Callable responsible for downloading resolved URLs.
             logger: Logger that records resolver attempt metadata.
             metrics: Optional metrics collector used for resolver telemetry.
+            breaker_registry: Optional registry providing breaker allow/deny checks.
+            breaker_allow: Optional callable override for breaker allow checks.
 
         Returns:
             None
@@ -1246,11 +1338,38 @@ class ResolverPipeline:
         self._global_seen_urls: set[str] = set(initial_seen_urls or ())
         self._global_manifest_index = global_manifest_index or {}
         self._global_lock = threading.Lock()
-        # Legacy breaker code removed - now handled by pybreaker-based BreakerRegistry
+        self._breaker_registry: Optional[Any] = None
+        self._breaker_allow_override = breaker_allow
+        self._breaker_allow: Optional[
+            Callable[[str, RequestRole, Optional[str]], None]
+        ] = breaker_allow
+        if breaker_registry is not None:
+            self.set_breaker_registry(breaker_registry)
         self._download_accepts_context = _callable_accepts_argument(download_func, "context")
         self._download_accepts_head_flag = _callable_accepts_argument(
             download_func, "head_precheck_passed"
         )
+
+    def set_breaker_registry(self, breaker_registry: Optional[Any]) -> None:
+        """Attach or clear the breaker registry consulted before downloads."""
+
+        self._breaker_registry = breaker_registry
+        if breaker_registry is None:
+            self._breaker_allow = self._breaker_allow_override
+            return
+
+        allow = getattr(breaker_registry, "allow", None)
+        if not callable(allow):
+            raise TypeError("breaker_registry must provide a callable allow() method")
+
+        def _bound_allow(
+            host: str,
+            role: RequestRole,
+            resolver: Optional[str] = None,
+        ) -> None:
+            allow(host, role=role, resolver=resolver)
+
+        self._breaker_allow = _bound_allow
 
     def _emit_attempt(
         self,
@@ -1315,6 +1434,78 @@ class ResolverPipeline:
     # Legacy breaker methods removed - now handled by pybreaker-based BreakerRegistry
 
     # Legacy breaker update method removed - now handled by pybreaker-based BreakerRegistry
+
+    def _breaker_preflight(
+        self,
+        host: Optional[str],
+        resolver_name: str,
+        *,
+        role: RequestRole = RequestRole.ARTIFACT,
+    ) -> Optional[Tuple[str, str, Optional[float]]]:
+        """Consult the breaker registry and return skip metadata when blocked."""
+
+        if not host:
+            return None
+        allow = self._breaker_allow
+        if allow is None:
+            return None
+
+        host_key = host.lower()
+        try:
+            allow(host_key, role, resolver_name)
+        except BreakerOpenError as exc:
+            return self._describe_breaker_block(exc, resolver_name, host_key, role)
+        return None
+
+    @staticmethod
+    def _describe_breaker_block(
+        exc: BreakerOpenError,
+        resolver_name: str,
+        host: str,
+        role: RequestRole,
+    ) -> Tuple[str, str, Optional[float]]:
+        """Translate a breaker denial into telemetry reason/detail information."""
+
+        message = str(exc).strip()
+        if "resolver=" in message:
+            reason = "resolver_breaker_open"
+        else:
+            reason = "domain_breaker_open"
+
+        cooldown_ms: Optional[int] = None
+        match = re.search(r"(?:cooldown_)?remaining_ms=(\d+)", message)
+        if match:
+            try:
+                cooldown_ms = int(match.group(1))
+            except ValueError:  # pragma: no cover - defensive guard
+                cooldown_ms = None
+
+        retry_after: Optional[float] = None
+        if cooldown_ms is not None:
+            retry_after = max(cooldown_ms / 1000.0, 0.0)
+            detail = f"cooldown-{retry_after:.1f}s"
+        elif "half-open" in message:
+            role_match = re.search(r"role=([a-z_]+)", message)
+            role_token = role_match.group(1) if role_match else role.value
+            detail = f"half-open-{role_token}"
+        else:
+            detail = message or reason.replace("_", "-")
+
+        LOGGER.debug(
+            "breaker-blocked",
+            extra={
+                "extra_fields": {
+                    "resolver": resolver_name,
+                    "host": host,
+                    "role": role.value,
+                    "reason": reason,
+                    "detail": detail,
+                    "message": message,
+                }
+            },
+        )
+
+        return reason, detail, retry_after
 
     def _should_attempt_head_check(self, resolver_name: str, url: Optional[str]) -> bool:
         """Return ``True`` when a resolver should perform a HEAD preflight request.
@@ -1878,9 +2069,36 @@ class ResolverPipeline:
                 return None
             head_precheck_passed = True
 
-        state.attempt_counter += 1
-        # Legacy host breaker check removed - now handled by pybreaker-based BreakerRegistry
         host_value = (parsed_url.netloc or "").lower()
+        breaker_state = self._breaker_preflight(host_value, resolver_name)
+        if breaker_state is not None:
+            reason_token, detail_token, retry_after_hint = breaker_state
+            self._emit_attempt(
+                AttemptRecord(
+                    run_id=self._run_id,
+                    work_id=artifact.work_id,
+                    resolver_name=resolver_name,
+                    resolver_order=order_index,
+                    url=url,
+                    canonical_url=url,
+                    original_url=original_url,
+                    status=Classification.SKIPPED,
+                    http_status=None,
+                    content_type=None,
+                    elapsed_ms=None,
+                    reason=reason_token,
+                    reason_detail=detail_token,
+                    metadata=result.metadata,
+                    dry_run=state.dry_run,
+                    resolver_wall_time_ms=resolver_wall_time_ms,
+                    retry_after=retry_after_hint,
+                )
+            )
+            skip_reason = reason_token.replace("_", "-")
+            self._record_skip(resolver_name, skip_reason, detail_token)
+            return None
+
+        state.attempt_counter += 1
         kwargs: Dict[str, Any] = {}
         if self._download_accepts_head_flag:
             kwargs["head_precheck_passed"] = head_precheck_passed
