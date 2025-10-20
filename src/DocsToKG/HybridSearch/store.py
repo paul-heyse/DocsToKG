@@ -3366,10 +3366,23 @@ class ChunkRegistry:
             return list(self._chunks.values())
 
     def iter_all(self) -> Iterator[ChunkPayload]:
-        """Yield chunk payloads without materialising the full list."""
-        with self._lock:
-            snapshot = tuple(self._chunks.values())
-        return iter(snapshot)
+        """Yield chunk payloads without materialising the full list.
+
+        The iterator acquires the registry lock while streaming results so writers
+        cannot mutate the mapping during iteration. The lock is released as soon as
+        the iterator exhausts or is closed, avoiding the additional allocation cost
+        of snapshotting all payloads eagerly.
+        """
+
+        def _stream() -> Iterator[ChunkPayload]:
+            self._lock.acquire()
+            try:
+                for chunk in self._chunks.values():
+                    yield chunk
+            finally:
+                self._lock.release()
+
+        return _stream()
 
     def count(self) -> int:
         """Return the number of chunks tracked by the registry."""
