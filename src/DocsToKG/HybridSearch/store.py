@@ -3138,6 +3138,7 @@ class ChunkRegistry:
         self._chunks: Dict[str, ChunkPayload] = {}
         self._bridge: Dict[int, str] = {}
         self._embedding_store: Optional[DenseVectorStore] = None
+        self._doc_namespace_index: Dict[str, Dict[str, set[str]]] = {}
 
     @staticmethod
     def to_faiss_id(vector_id: str) -> int:
@@ -3159,16 +3160,52 @@ class ChunkRegistry:
         """
 
         for chunk in chunks:
+            existing = self._chunks.get(chunk.vector_id)
+            if existing is not None:
+                self._remove_from_index(chunk.vector_id, chunk=existing)
             chunk.features.embedding = EmbeddingProxy(chunk.vector_id)
             self._chunks[chunk.vector_id] = chunk
             self._bridge[self.to_faiss_id(chunk.vector_id)] = chunk.vector_id
+            namespace_index = self._doc_namespace_index.setdefault(chunk.doc_id, {})
+            namespace_index.setdefault(chunk.namespace, set()).add(chunk.vector_id)
 
     def delete(self, vector_ids: Sequence[str]) -> None:
         """Remove registry entries for the supplied vector identifiers."""
 
         for vector_id in vector_ids:
-            self._chunks.pop(vector_id, None)
+            chunk = self._chunks.pop(vector_id, None)
             self._bridge.pop(self.to_faiss_id(vector_id), None)
+            self._remove_from_index(vector_id, chunk=chunk)
+
+    def _remove_from_index(
+        self, vector_id: str, *, chunk: Optional[ChunkPayload] = None
+    ) -> None:
+        if chunk is None:
+            chunk = self._chunks.get(vector_id)
+        if chunk is None:
+            return
+        namespace_index = self._doc_namespace_index.get(chunk.doc_id)
+        if not namespace_index:
+            return
+        vector_set = namespace_index.get(chunk.namespace)
+        if not vector_set:
+            return
+        vector_set.discard(vector_id)
+        if not vector_set:
+            namespace_index.pop(chunk.namespace, None)
+        if not namespace_index:
+            self._doc_namespace_index.pop(chunk.doc_id, None)
+
+    def vector_ids_for(self, doc_id: str, namespace: str) -> Iterator[str]:
+        """Yield vector identifiers for a document/namespace pair."""
+
+        namespace_index = self._doc_namespace_index.get(doc_id)
+        if not namespace_index:
+            return iter(())
+        vector_set = namespace_index.get(namespace)
+        if not vector_set:
+            return iter(())
+        return iter(tuple(vector_set))
 
     def get(self, vector_id: str) -> Optional[ChunkPayload]:
         """Return the chunk payload for ``vector_id`` when available."""
