@@ -10,6 +10,12 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "wayback-override-http",
+#       "name": "_override_wayback_http",
+#       "anchor": "function-wayback-override-http",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "wayback-discovery",
 #       "name": "_discover_snapshots",
 #       "anchor": "function-wayback-discovery",
@@ -46,16 +52,17 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
-import re
+from contextlib import contextmanager
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
 import httpx
 
 from DocsToKG.ContentDownload.networking import request_with_retries
-from DocsToKG.ContentDownload.urls import canonical_for_index
+from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 
 from .base import (
     RegisteredResolver,
@@ -67,6 +74,15 @@ from .base import (
     find_pdf_via_meta,
 )
 
+try:  # pragma: no cover - optional dependency
+    from waybackpy import WaybackMachineAvailabilityAPI, WaybackMachineCDXServerAPI
+    from waybackpy.exceptions import ArchiveNotInAvailabilityAPIResponse, WaybackError
+except ImportError:  # pragma: no cover - handled gracefully at runtime
+    WaybackMachineAvailabilityAPI = None  # type: ignore[assignment]
+    WaybackMachineCDXServerAPI = None  # type: ignore[assignment]
+    ArchiveNotInAvailabilityAPIResponse = None  # type: ignore[assignment]
+    WaybackError = Exception  # type: ignore[assignment]
+
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
     from DocsToKG.ContentDownload.pipeline import ResolverConfig
@@ -75,21 +91,34 @@ if TYPE_CHECKING:  # pragma: no cover
 LOGGER = logging.getLogger(__name__)
 
 
+class _HTTPXResponseAdapter:
+    """Adapter that mimics the subset of ``requests.Response`` used by waybackpy."""
+
+    __slots__ = ("_response", "status_code", "headers", "text", "content", "url")
+
+    def __init__(self, response: httpx.Response) -> None:
+        self._response = response
+        self.status_code = response.status_code
+        self.headers = dict(response.headers)
+        self.text = response.text
+        self.content = response.content
+        self.url = str(response.url)
+
+    def json(self) -> Any:
+        return self._response.json()
+
+    def close(self) -> None:
+        self._response.close()
+
+
 class WaybackResolver(RegisteredResolver):
-    """Fallback resolver that queries the Internet Archive Wayback Machine with CDX-first discovery."""
+    """Fallback resolver that queries the Internet Archive Wayback Machine."""
 
     name = "wayback"
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when prior resolver attempts have failed.
+        """Return ``True`` when prior resolver attempts have failed."""
 
-        Args:
-            config: Resolver configuration (unused for enablement).
-            artifact: Work record containing failed PDF URLs.
-
-        Returns:
-            bool: Whether the Wayback resolver should run.
-        """
         return bool(artifact.failed_pdf_urls)
 
     def iter_urls(
@@ -98,43 +127,36 @@ class WaybackResolver(RegisteredResolver):
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Query the Wayback Machine for archived versions of failed URLs using CDX-first discovery.
+        """Yield archived URLs discovered via availability/CDX lookups."""
 
-        Args:
-            client: HTTPX client for HTTP calls.
-            config: Resolver configuration providing timeouts and headers.
-            artifact: Work metadata listing failed PDF URLs to retry.
-
-        Yields:
-            ResolverResult: Archived download URLs or diagnostic events.
-        """
         if not artifact.failed_pdf_urls:
             yield ResolverResult(
                 url=None,
                 event=ResolverEvent.SKIPPED,
                 event_reason=ResolverEventReason.NO_FAILED_URLS,
+                metadata={"reason": "no-failed-urls"},
             )
             return
 
-        # Get Wayback-specific configuration
         wayback_config = getattr(config, "wayback_config", {})
-        year_window = wayback_config.get("year_window", 2)
-        max_snapshots = wayback_config.get("max_snapshots", 8)
-        min_pdf_bytes = wayback_config.get("min_pdf_bytes", 4096)
-        html_parse_enabled = wayback_config.get("html_parse", True)
+        year_window = int(wayback_config.get("year_window", 2))
+        max_snapshots = int(wayback_config.get("max_snapshots", 8))
+        min_pdf_bytes = int(wayback_config.get("min_pdf_bytes", 4096))
+        html_parse_enabled = bool(wayback_config.get("html_parse", True))
+        availability_first = bool(wayback_config.get("availability_first", True))
 
         for original_url in artifact.failed_pdf_urls:
             try:
                 canonical_url = canonical_for_index(original_url)
                 publication_year = getattr(artifact, "publication_year", None)
 
-                # Discover snapshots using CDX-first approach
                 snapshot_url, metadata = self._discover_snapshots(
                     client,
                     config,
                     original_url,
                     canonical_url,
                     publication_year,
+                    availability_first,
                     year_window,
                     max_snapshots,
                     min_pdf_bytes,
@@ -142,12 +164,14 @@ class WaybackResolver(RegisteredResolver):
                 )
 
                 if snapshot_url:
+                    # When coming from HTML parsing we may need to canonicalise the URL again.
+                    resolved_url = canonical_for_request(snapshot_url, role="artifact")
                     yield ResolverResult(
-                        url=snapshot_url,
+                        url=resolved_url,
                         metadata={
+                            "source": "wayback",
                             "original": original_url,
                             "canonical": canonical_url,
-                            "source": "wayback",
                             **metadata,
                         },
                     )
@@ -155,21 +179,28 @@ class WaybackResolver(RegisteredResolver):
                     yield ResolverResult(
                         url=None,
                         event=ResolverEvent.SKIPPED,
-                        event_reason=ResolverEventReason.NO_FAILED_URLS,
+<<<<<<< HEAD
+                        event_reason=ResolverEventReason.NOT_APPLICABLE,
+=======
+                        event_reason=ResolverEventReason.NO_WAYBACK_SNAPSHOT,
+>>>>>>> a57342e0748bf3b2588065c3260c4b500f98ea4e
                         metadata={
+                            "source": "wayback",
                             "original": original_url,
                             "canonical": canonical_url,
                             "reason": "no_snapshot",
+                            **metadata,
                         },
                     )
 
-            except Exception as exc:
+            except Exception as exc:  # pragma: no cover - defensive logging
                 LOGGER.exception("Unexpected Wayback resolver error for %s", original_url)
                 yield ResolverResult(
                     url=None,
                     event=ResolverEvent.ERROR,
                     event_reason=ResolverEventReason.UNEXPECTED_ERROR,
                     metadata={
+                        "source": "wayback",
                         "original": original_url,
                         "error": str(exc),
                         "error_type": type(exc).__name__,
@@ -183,116 +214,133 @@ class WaybackResolver(RegisteredResolver):
         original_url: str,
         canonical_url: str,
         publication_year: Optional[int],
+        availability_first: bool,
         year_window: int,
         max_snapshots: int,
         min_pdf_bytes: int,
         html_parse_enabled: bool,
     ) -> Tuple[Optional[str], Dict[str, Any]]:
-        """Discover the best PDF snapshot using CDX-first approach.
+        """Discover a suitable snapshot using availability followed by CDX search."""
 
-        Returns:
-            Tuple of (snapshot_url, metadata) or (None, metadata) if no suitable snapshot found.
-        """
-        metadata = {"discovery_method": "none"}
+        metadata: Dict[str, Any] = {
+            "discovery_method": "none",
+            "original": original_url,
+        }
 
-        # Step 1: Try Availability API as fast-path
-        availability_url, availability_metadata = self._check_availability(
-            client, config, original_url
-        )
-        metadata.update(availability_metadata)
+        if availability_first:
+            availability_url, availability_metadata = self._check_availability(
+                client, config, original_url, min_pdf_bytes
+            )
+            metadata.update(availability_metadata)
+            if availability_url:
+                ok, pdf_metadata = self._verify_pdf_snapshot(
+                    client, config, availability_url, min_pdf_bytes
+                )
+                metadata.update(pdf_metadata)
+                if ok:
+                    metadata["discovery_method"] = "availability"
+                    return availability_url, metadata
 
-        if availability_url:
-            # Verify the availability result is a PDF
-            if self._verify_pdf_snapshot(client, config, availability_url, min_pdf_bytes):
-                metadata["discovery_method"] = "availability"
-                return availability_url, metadata
-
-        # Step 2: Use CDX API for comprehensive search
         cdx_snapshots = self._query_cdx(
-            client, config, original_url, publication_year, year_window, max_snapshots
+            client,
+            config,
+            original_url,
+            publication_year,
+            year_window,
+            max_snapshots,
         )
 
-        # Step 3: Evaluate CDX snapshots
         for snapshot in cdx_snapshots:
             snapshot_url = snapshot.get("archive_url")
             if not snapshot_url:
                 continue
 
-            # Check if it's a direct PDF snapshot
-            if snapshot.get("mimetype") == "application/pdf" and snapshot.get("statuscode") == 200:
-                if self._verify_pdf_snapshot(client, config, snapshot_url, min_pdf_bytes):
-                    metadata.update(
-                        {
-                            "discovery_method": "cdx_pdf_direct",
-                            "memento_ts": str(snapshot.get("timestamp", "")),
-                            "statuscode": str(snapshot.get("statuscode", "")),
-                            "mimetype": str(snapshot.get("mimetype", "")),
-                        }
+            snapshot_mimetype = (snapshot.get("mimetype") or "").lower()
+            snapshot_status = snapshot.get("statuscode")
+            snapshot_timestamp = snapshot.get("timestamp")
+            metadata.update(
+                {
+                    "memento_ts": snapshot_timestamp,
+                    "statuscode": snapshot_status,
+                    "mimetype": snapshot_mimetype,
+                }
+            )
+
+            if snapshot_timestamp and publication_year:
+                try:
+                    metadata["distance_years"] = abs(
+                        int(snapshot_timestamp[:4]) - int(publication_year)
                     )
+                except ValueError:
+                    metadata["distance_years"] = None
+
+            if snapshot_mimetype == "application/pdf" and snapshot_status == "200":
+                ok, pdf_metadata = self._verify_pdf_snapshot(
+                    client, config, snapshot_url, min_pdf_bytes
+                )
+                metadata.update(pdf_metadata)
+                if ok:
+                    metadata["discovery_method"] = "cdx_pdf_direct"
                     return snapshot_url, metadata
 
-            # Step 4: If HTML parse is enabled, try parsing archived HTML for PDF links
-            if html_parse_enabled and snapshot.get("mimetype") in [
-                "text/html",
-                "application/xhtml+xml",
-            ]:
-                pdf_url = self._parse_html_for_pdf(client, config, snapshot_url)
-                if pdf_url and self._verify_pdf_snapshot(client, config, pdf_url, min_pdf_bytes):
-                    metadata.update(
-                        {
-                            "discovery_method": "cdx_html_parse",
-                            "html_snapshot_ts": str(snapshot.get("timestamp", "")),
-                            "discovered_pdf_url": pdf_url,
-                        }
+            if html_parse_enabled and snapshot_mimetype in {"text/html", "application/xhtml+xml"}:
+                pdf_url, html_metadata = self._parse_html_for_pdf(client, config, snapshot_url)
+                metadata.update(html_metadata)
+                if pdf_url:
+                    ok, pdf_metadata = self._verify_pdf_snapshot(
+                        client, config, pdf_url, min_pdf_bytes
                     )
-                    return pdf_url, metadata
+                    metadata.update(pdf_metadata)
+                    if ok:
+                        metadata["discovery_method"] = "cdx_html_parse"
+                        metadata["discovered_pdf_url"] = pdf_url
+                        return pdf_url, metadata
 
-        metadata["discovery_method"] = "none"
         return None, metadata
 
     def _check_availability(
-        self, client: httpx.Client, config: "ResolverConfig", url: str
+        self,
+        client: httpx.Client,
+        config: "ResolverConfig",
+        url: str,
+        min_pdf_bytes: int,
     ) -> Tuple[Optional[str], Dict[str, Any]]:
-        """Check Wayback Availability API for a quick snapshot.
+        """Use the Wayback availability API as a fast-path for direct PDFs."""
 
-        Returns:
-            Tuple of (snapshot_url, metadata) or (None, metadata) if not available.
-        """
-        metadata: Dict[str, Any] = {"availability_checked": True, "availability_available": False}
+        metadata: Dict[str, Any] = {
+            "availability_checked": True,
+            "availability_available": False,
+        }
+
+        if WaybackMachineAvailabilityAPI is None:  # pragma: no cover - optional dependency
+            metadata["availability_error"] = "waybackpy-unavailable"
+            return None, metadata
 
         try:
-            resp = request_with_retries(
-                client,
-                "get",
-                "https://archive.org/wayback/available",
-                role="metadata",
-                params={"url": url},
-                timeout=config.get_timeout(self.name),
-                headers=config.polite_headers,
-                retry_after_cap=config.retry_after_cap,
-            )
-            resp.raise_for_status()
-
-            data = resp.json()
-            closest = (data.get("archived_snapshots") or {}).get("closest") or {}
-
-            if closest.get("available") and closest.get("url"):
-                metadata.update(
-                    {
-                        "availability_available": True,
-                        "availability_timestamp": closest.get("timestamp"),
-                        "availability_status": closest.get("status"),
-                    }
+            with self._override_wayback_http(client, config):
+                api = WaybackMachineAvailabilityAPI(
+                    url,
+                    user_agent=self._user_agent(config),
+                    max_tries=1,
                 )
-                return closest["url"], metadata
+                api.api_call_time_gap = 0
+                availability_url = api.archive_url
+                timestamp = api.timestamp()
 
+                if availability_url:
+                    metadata.update(
+                        {
+                            "availability_available": True,
+                            "availability_timestamp": timestamp.strftime("%Y%m%d%H%M%S"),
+                        }
+                    )
+                    return availability_url, metadata
+
+        except ArchiveNotInAvailabilityAPIResponse as exc:  # pragma: no cover - defensive
+            metadata["availability_error"] = str(exc)
         except Exception as exc:
             LOGGER.debug("Availability check failed for %s: %s", url, exc)
             metadata["availability_error"] = str(exc)
-
-        finally:
-            if "resp" in locals():
-                resp.close()
 
         return None, metadata
 
@@ -305,72 +353,62 @@ class WaybackResolver(RegisteredResolver):
         year_window: int,
         max_snapshots: int,
     ) -> List[Dict[str, Any]]:
-        """Query CDX API for snapshots.
+        """Query the Wayback CDX API for snapshot metadata."""
 
-        Returns:
-            List of snapshot dictionaries sorted by relevance.
-        """
+        if WaybackMachineCDXServerAPI is None:  # pragma: no cover - optional dependency
+            LOGGER.debug("waybackpy not available; skipping CDX query for %s", url)
+            return []
+
         snapshots: List[Dict[str, Any]] = []
 
         try:
-            # Build CDX query parameters
-            params = {
-                "url": url,
-                "output": "json",
-                "limit": max_snapshots,
-                "filter": "statuscode:200",
-            }
-
-            # Add year window if publication year is available
+            start_ts: Optional[str] = None
+            end_ts: Optional[str] = None
             if publication_year:
-                start_year = publication_year - year_window
+                start_year = max(1994, publication_year - year_window)
                 end_year = publication_year + year_window
-                params["from"] = f"{start_year}0101000000"
-                params["to"] = f"{end_year}1231235959"
+                start_ts = f"{start_year:04d}0101000000"
+                end_ts = f"{end_year:04d}1231235959"
 
-            resp = request_with_retries(
-                client,
-                "get",
-                "https://web.archive.org/cdx/search/cdx",
-                role="metadata",
-                params=params,
-                timeout=config.get_timeout(self.name),
-                headers=config.polite_headers,
-                retry_after_cap=config.retry_after_cap,
-            )
-            resp.raise_for_status()
+            with self._override_wayback_http(client, config):
+                cdx_api = WaybackMachineCDXServerAPI(
+                    url,
+                    user_agent=self._user_agent(config),
+                    start_timestamp=start_ts,
+                    end_timestamp=end_ts,
+                    filters=["statuscode:200"],
+                    limit=str(max(1, max_snapshots)),
+                )
+                for snapshot in itertools.islice(cdx_api.snapshots(), max_snapshots):
+                    snapshots.append(
+                        {
+                            "archive_url": getattr(snapshot, "archive_url", ""),
+                            "timestamp": getattr(snapshot, "timestamp", ""),
+                            "mimetype": getattr(snapshot, "mimetype", ""),
+                            "statuscode": getattr(snapshot, "statuscode", ""),
+                        }
+                    )
 
-            # Parse CDX response (JSON format)
-            data = resp.json()
-            if not data or len(data) < 2:  # Empty or header-only response
-                return snapshots
-
-            # CDX JSON format: first row is headers, rest are data
-            headers = data[0]
-            for row in data[1:]:
-                snapshot = dict(zip(headers, row))
-                snapshots.append(snapshot)
-
-            # Sort by timestamp (newest first) and filter for relevant content types
-            snapshots.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-
+        except WaybackError as exc:  # pragma: no cover - defensive logging
+            LOGGER.debug("CDX query returned an error for %s: %s", url, exc)
         except Exception as exc:
             LOGGER.debug("CDX query failed for %s: %s", url, exc)
 
-        finally:
-            if "resp" in locals():
-                resp.close()
-
+        snapshots.sort(key=lambda snap: snap.get("timestamp", ""), reverse=True)
         return snapshots
 
     def _parse_html_for_pdf(
-        self, client: httpx.Client, config: "ResolverConfig", html_url: str
-    ) -> Optional[str]:
-        """Parse archived HTML page to find PDF links.
+        self,
+        client: httpx.Client,
+        config: "ResolverConfig",
+        html_url: str,
+    ) -> Tuple[Optional[str], Dict[str, Any]]:
+        """Fetch an archived HTML page and attempt to recover a PDF link from it."""
 
-        Returns:
-            PDF URL if found, None otherwise.
-        """
+        metadata: Dict[str, Any] = {
+            "html_snapshot_url": html_url,
+        }
+
         try:
             resp = request_with_retries(
                 client,
@@ -383,54 +421,69 @@ class WaybackResolver(RegisteredResolver):
             )
             resp.raise_for_status()
 
-            # Check if response is HTML
+            metadata.update(
+                {
+                    "html_http_status": resp.status_code,
+                    "html_content_type": resp.headers.get("content-type"),
+                    "html_bytes": len(resp.content),
+                    "from_cache": bool(
+                        resp.extensions.get("docs_network_meta", {}).get("from_cache")
+                    ),
+                }
+            )
+
             content_type = resp.headers.get("content-type", "").lower()
             if "text/html" not in content_type and "application/xhtml" not in content_type:
-                return None
+                return None, metadata
 
             html_content = resp.text
 
-            # Try to import BeautifulSoup
             try:
                 from bs4 import BeautifulSoup
-            except ImportError:
-                LOGGER.debug("BeautifulSoup not available for HTML parsing")
-                return None
+            except ImportError:  # pragma: no cover - optional dependency
+                metadata["html_parse_error"] = "beautifulsoup-unavailable"
+                return None, metadata
 
             soup = BeautifulSoup(html_content, "html.parser")
 
-            # Try different PDF discovery methods
             pdf_url = find_pdf_via_meta(soup, html_url)
             if pdf_url:
-                return pdf_url
+                metadata["pdf_discovery_method"] = "meta"
+                return canonical_for_request(pdf_url, role="artifact"), metadata
 
             pdf_url = find_pdf_via_link(soup, html_url)
             if pdf_url:
-                return pdf_url
+                metadata["pdf_discovery_method"] = "link"
+                return canonical_for_request(pdf_url, role="artifact"), metadata
 
             pdf_url = find_pdf_via_anchor(soup, html_url)
             if pdf_url:
-                return pdf_url
+                metadata["pdf_discovery_method"] = "anchor"
+                return canonical_for_request(pdf_url, role="artifact"), metadata
 
         except Exception as exc:
             LOGGER.debug("HTML parsing failed for %s: %s", html_url, exc)
-
+            metadata["html_parse_error"] = str(exc)
         finally:
             if "resp" in locals():
                 resp.close()
 
-        return None
+        return None, metadata
 
     def _verify_pdf_snapshot(
-        self, client: httpx.Client, config: "ResolverConfig", url: str, min_bytes: int
-    ) -> bool:
-        """Verify that a snapshot URL points to a valid PDF.
+        self,
+        client: httpx.Client,
+        config: "ResolverConfig",
+        url: str,
+        min_bytes: int,
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """Sanity-check that an archived URL points to a plausible PDF."""
 
-        Returns:
-            True if the snapshot is a valid PDF, False otherwise.
-        """
+        metadata: Dict[str, Any] = {
+            "candidate_url": url,
+        }
+
         try:
-            # Use HEAD request to check content type and size
             resp = request_with_retries(
                 client,
                 "head",
@@ -442,25 +495,27 @@ class WaybackResolver(RegisteredResolver):
             )
             resp.raise_for_status()
 
-            # Check content type
-            content_type = resp.headers.get("content-type", "").lower()
+            metadata["head_status"] = resp.status_code
+            metadata["content_type"] = resp.headers.get("content-type")
+            metadata["content_length"] = resp.headers.get("content-length")
+
+            content_type = (resp.headers.get("content-type") or "").lower()
             if "application/pdf" not in content_type:
-                return False
+                return False, metadata
 
-            # Check content length
-            content_length = resp.headers.get("content-length")
-            if content_length:
+            if metadata["content_length"]:
                 try:
-                    size = int(content_length)
+                    size = int(metadata["content_length"])
+                    metadata["min_bytes_pass"] = size >= min_bytes
                     if size < min_bytes:
-                        return False
+                        return False, metadata
                 except ValueError:
-                    pass
+                    metadata["min_bytes_pass"] = None
 
-            # For small files, do a GET to check PDF signature
-            if content_length and int(content_length) < min_bytes * 2:
-                try:
-                    get_resp = request_with_retries(
+            if metadata["content_length"] and metadata["content_length"].isdigit():
+                size = int(metadata["content_length"])
+                if size < max(min_bytes * 2, 8192):
+                    pdf_resp = request_with_retries(
                         client,
                         "get",
                         url,
@@ -469,23 +524,88 @@ class WaybackResolver(RegisteredResolver):
                         headers=config.polite_headers,
                         retry_after_cap=config.retry_after_cap,
                     )
-                    get_resp.raise_for_status()
+                    pdf_resp.raise_for_status()
+                    metadata["pdf_signature"] = pdf_resp.content[:8].startswith(b"%PDF-")
+                    pdf_resp.close()
+                    if not metadata["pdf_signature"]:
+                        return False, metadata
 
-                    # Check first few bytes for PDF signature
-                    chunk = get_resp.content[:8]
-                    if not chunk.startswith(b"%PDF-"):
-                        return False
-
-                finally:
-                    if "get_resp" in locals():
-                        get_resp.close()
-
-            return True
+            metadata.setdefault("pdf_signature", True)
+            return True, metadata
 
         except Exception as exc:
             LOGGER.debug("PDF verification failed for %s: %s", url, exc)
-            return False
-
+            metadata["verification_error"] = str(exc)
+            return False, metadata
         finally:
             if "resp" in locals():
                 resp.close()
+
+    def _user_agent(self, config: "ResolverConfig") -> str:
+        header = config.polite_headers.get("User-Agent")
+        if header:
+            return header
+        return "DocsToKG-WaybackResolver/1.0"
+
+    @contextmanager
+    def _override_wayback_http(
+        self,
+        client: httpx.Client,
+        config: "ResolverConfig",
+    ) -> Iterator[None]:
+        """Monkeypatch waybackpy HTTP helpers so they use our shared HTTPX client."""
+
+        if WaybackMachineAvailabilityAPI is None or WaybackMachineCDXServerAPI is None:
+            yield
+            return
+
+        from waybackpy import availability_api, cdx_utils  # type: ignore
+
+        timeout = config.get_timeout(self.name)
+        retry_after_cap = config.retry_after_cap
+        default_headers = dict(config.polite_headers)
+
+        original_cdx_get = cdx_utils.get_response
+        original_availability_get = availability_api.requests.get
+
+        def _fetch(
+            target_url: str,
+            *,
+            params: Optional[Dict[str, Any]] = None,
+            req_headers: Optional[Dict[str, str]] = None,
+        ) -> _HTTPXResponseAdapter:
+            response = request_with_retries(
+                client,
+                "get",
+                target_url,
+                role="metadata",
+                params=params,
+                headers=req_headers if req_headers is not None else default_headers,
+                timeout=timeout,
+                retry_after_cap=retry_after_cap,
+            )
+            return _HTTPXResponseAdapter(response)
+
+        def _cdx_get_response(
+            target_url: str,
+            req_headers: Optional[Dict[str, str]] = None,
+            retries: int = 5,  # noqa: D417 - signature required by waybackpy
+            backoff_factor: float = 0.5,
+        ) -> _HTTPXResponseAdapter:
+            del retries, backoff_factor
+            return _fetch(target_url, req_headers=req_headers)
+
+        def _availability_get(
+            target_url: str,
+            params: Optional[Dict[str, Any]] = None,
+            req_headers: Optional[Dict[str, str]] = None,
+        ) -> _HTTPXResponseAdapter:
+            return _fetch(target_url, params=params, req_headers=req_headers)
+
+        cdx_utils.get_response = _cdx_get_response  # type: ignore[assignment]
+        availability_api.requests.get = _availability_get  # type: ignore[assignment]
+        try:
+            yield
+        finally:
+            cdx_utils.get_response = original_cdx_get  # type: ignore[assignment]
+            availability_api.requests.get = original_availability_get  # type: ignore[assignment]

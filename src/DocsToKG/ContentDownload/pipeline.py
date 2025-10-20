@@ -168,7 +168,7 @@ from DocsToKG.ContentDownload.core import (
     normalize_classification,
     normalize_reason,
 )
-from DocsToKG.ContentDownload.networking import CircuitBreaker, head_precheck
+from DocsToKG.ContentDownload.networking import head_precheck
 from DocsToKG.ContentDownload.resolvers import (
     DEFAULT_RESOLVER_ORDER,
     DEFAULT_RESOLVER_TOGGLES,
@@ -380,7 +380,7 @@ class ResolverConfig:
         enable_global_url_dedup: Enable global URL deduplication across works when True.
         global_url_dedup_cap: Maximum URLs hydrated into the global dedupe cache.
         domain_content_rules: Mapping of hostname to MIME allow-lists.
-        resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
+        # resolver_circuit_breakers: Legacy - now handled by pybreaker-based BreakerRegistry
         wayback_config: Wayback-specific configuration options (year_window, max_snapshots, etc.).
 
     Notes:
@@ -418,7 +418,7 @@ class ResolverConfig:
     enable_global_url_dedup: bool = True
     global_url_dedup_cap: Optional[int] = 100_000
     domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    resolver_circuit_breakers: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    # resolver_circuit_breakers: Legacy - now handled by pybreaker-based BreakerRegistry
     # Wayback-specific configuration
     wayback_config: Dict[str, Any] = field(default_factory=dict)
     # Heuristic knobs (defaults preserve current CLI behaviour)
@@ -511,30 +511,7 @@ class ResolverConfig:
                 overrides[host.lower()] = str(header)
             self.host_accept_overrides = overrides
 
-        if self.resolver_circuit_breakers:
-            breakers: Dict[str, Dict[str, float]] = {}
-            for resolver_name, spec in self.resolver_circuit_breakers.items():
-                if not resolver_name or not isinstance(spec, dict):
-                    continue
-                threshold = int(spec.get("failure_threshold", spec.get("threshold", 5)))
-                cooldown = float(spec.get("cooldown_seconds", spec.get("cooldown", 60.0)))
-                if threshold < 1:
-                    raise ValueError(
-                        (
-                            "resolver_circuit_breakers['{name}'] failure_threshold must be >= 1, got {value}"
-                        ).format(name=resolver_name, value=threshold)
-                    )
-                if cooldown < 0:
-                    raise ValueError(
-                        (
-                            "resolver_circuit_breakers['{name}'] cooldown_seconds must be >= 0, got {value}"
-                        ).format(name=resolver_name, value=cooldown)
-                    )
-                breakers[resolver_name] = {
-                    "failure_threshold": threshold,
-                    "cooldown_seconds": cooldown,
-                }
-            self.resolver_circuit_breakers = breakers
+        # Legacy resolver_circuit_breakers validation removed - now handled by pybreaker-based BreakerRegistry
 
 
 def read_resolver_config(path: Path) -> Dict[str, Any]:
@@ -615,7 +592,7 @@ def apply_config_overrides(
         "resolver_head_precheck",
         "head_precheck_host_overrides",
         "host_accept_overrides",
-        "resolver_circuit_breakers",
+        # "resolver_circuit_breakers",  # Legacy - now handled by pybreaker-based BreakerRegistry
         "max_concurrent_resolvers",
         "enable_global_url_dedup",
         "domain_content_rules",
@@ -695,8 +672,10 @@ def load_resolver_config(
         wayback_config["max_snapshots"] = args.wayback_max_snapshots
     if hasattr(args, "wayback_min_pdf_bytes"):
         wayback_config["min_pdf_bytes"] = args.wayback_min_pdf_bytes
-    if hasattr(args, "wayback_html_parse"):
+    if hasattr(args, "wayback_html_parse") and args.wayback_html_parse is not None:
         wayback_config["html_parse"] = args.wayback_html_parse
+    if hasattr(args, "wayback_availability_first") and args.wayback_availability_first is not None:
+        wayback_config["availability_first"] = args.wayback_availability_first
     config.wayback_config = wayback_config
 
     if resolver_order_override:
@@ -811,6 +790,11 @@ class AttemptRecord:
     rate_limiter_role: Optional[str] = None
     from_cache: Optional[bool] = None
     run_id: Optional[str] = None
+    # Breaker state fields
+    breaker_host_state: Optional[str] = None
+    breaker_resolver_state: Optional[str] = None
+    breaker_open_remaining_ms: Optional[int] = None
+    breaker_recorded: Optional[str] = None
 
     def __post_init__(self) -> None:
         normalized_status = normalize_classification(self.status)
@@ -869,6 +853,11 @@ class DownloadOutcome:
     canonical_url: Optional[str] = None
     canonical_index: Optional[str] = None
     original_url: Optional[str] = None
+    # Circuit breaker state information
+    breaker_host_state: Optional[str] = None
+    breaker_resolver_state: Optional[str] = None
+    breaker_open_remaining_ms: Optional[int] = None
+    breaker_recorded: Optional[str] = None
 
     @property
     def is_pdf(self) -> bool:
@@ -1257,18 +1246,7 @@ class ResolverPipeline:
         self._global_seen_urls: set[str] = set(initial_seen_urls or ())
         self._global_manifest_index = global_manifest_index or {}
         self._global_lock = threading.Lock()
-        self._host_breakers: Dict[str, CircuitBreaker] = {}
-        self._host_breaker_lock = threading.Lock()
-        self._resolver_breakers: Dict[str, CircuitBreaker] = {}
-        circuit_breakers = getattr(self.config, "resolver_circuit_breakers", {}) or {}
-        for name, spec in circuit_breakers.items():
-            threshold = int(spec.get("failure_threshold", 5))
-            cooldown = float(spec.get("cooldown_seconds", 60.0))
-            self._resolver_breakers[name] = CircuitBreaker(
-                failure_threshold=max(threshold, 1),
-                cooldown_seconds=max(cooldown, 0.0),
-                name=f"resolver:{name}",
-            )
+        # Legacy breaker code removed - now handled by pybreaker-based BreakerRegistry
         self._download_accepts_context = _callable_accepts_argument(download_func, "context")
         self._download_accepts_head_flag = _callable_accepts_argument(
             download_func, "head_precheck_passed"
@@ -1332,68 +1310,11 @@ class ResolverPipeline:
         if detail_text and detail_text != reason_text:
             self.metrics.record_skip(resolver_name, detail_text)
 
-    def _get_existing_host_breaker(self, host: str) -> Optional[CircuitBreaker]:
-        with self._host_breaker_lock:
-            return self._host_breakers.get(host)
+    # Legacy breaker methods removed - now handled by pybreaker-based BreakerRegistry
 
-    def _ensure_host_breaker(self, host: str) -> CircuitBreaker:
-        with self._host_breaker_lock:
-            breaker = self._host_breakers.get(host)
-            if breaker is None:
-                threshold = 5
-                cooldown = 120.0
-                breaker = CircuitBreaker(
-                    failure_threshold=max(threshold, 1),
-                    cooldown_seconds=max(cooldown, 0.0),
-                    name=f"host:{host}",
-                )
-                self._host_breakers[host] = breaker
-            return breaker
+    # Legacy breaker methods removed - now handled by pybreaker-based BreakerRegistry
 
-    def _host_breaker_allows(self, host: str) -> Tuple[bool, float]:
-        breaker = self._get_existing_host_breaker(host)
-        if breaker is None:
-            return True, 0.0
-        allowed = breaker.allow()
-        remaining = breaker.cooldown_remaining() if not allowed else 0.0
-        return allowed, remaining
-
-    def _update_breakers(
-        self,
-        resolver_name: str,
-        host: Optional[str],
-        outcome: DownloadOutcome,
-    ) -> None:
-        breaker = self._resolver_breakers.get(resolver_name)
-        if breaker:
-            success_classes = {
-                Classification.PDF,
-                Classification.HTML,
-                Classification.CACHED,
-                Classification.SKIPPED,
-            }
-            if outcome.classification in success_classes:
-                breaker.record_success()
-            else:
-                breaker.record_failure(retry_after=outcome.retry_after)
-
-        if not host:
-            return
-        host_key = host.lower()
-        status = outcome.http_status or 0
-        should_record_failure = status in {429, 500, 502, 503, 504}
-        if not should_record_failure and outcome.reason is ReasonCode.REQUEST_EXCEPTION:
-            should_record_failure = True
-
-        if should_record_failure:
-            breaker = self._ensure_host_breaker(host_key)
-            breaker.record_failure(retry_after=outcome.retry_after)
-            return
-
-        if outcome.classification in PDF_LIKE or outcome.classification is Classification.HTML:
-            breaker = self._get_existing_host_breaker(host_key)
-            if breaker:
-                breaker.record_success()
+    # Legacy breaker update method removed - now handled by pybreaker-based BreakerRegistry
 
     def _should_attempt_head_check(self, resolver_name: str, url: Optional[str]) -> bool:
         """Return ``True`` when a resolver should perform a HEAD preflight request.
@@ -1726,29 +1647,7 @@ class ResolverPipeline:
             self._record_skip(resolver_name, "not-applicable")
             return None
 
-        breaker = self._resolver_breakers.get(resolver_name)
-        if breaker and not breaker.allow():
-            remaining = breaker.cooldown_remaining()
-            self._emit_attempt(
-                AttemptRecord(
-                    run_id=self._run_id,
-                    work_id=artifact.work_id,
-                    resolver_name=resolver_name,
-                    resolver_order=order_index,
-                    url=None,
-                    status=Classification.SKIPPED,
-                    http_status=None,
-                    content_type=None,
-                    elapsed_ms=None,
-                    reason=ReasonCode.RESOLVER_BREAKER_OPEN,
-                    reason_detail=f"cooldown-{remaining:.1f}s",
-                    dry_run=state.dry_run,
-                    resolver_wall_time_ms=0.0,
-                    retry_after=remaining if remaining > 0 else None,
-                )
-            )
-            self._record_skip(resolver_name, "breaker-open")
-            return None
+        # Legacy resolver breaker check removed - now handled by pybreaker-based BreakerRegistry
 
         return resolver
 
@@ -1980,36 +1879,8 @@ class ResolverPipeline:
             head_precheck_passed = True
 
         state.attempt_counter += 1
+        # Legacy host breaker check removed - now handled by pybreaker-based BreakerRegistry
         host_value = (parsed_url.netloc or "").lower()
-        if host_value:
-            allowed, remaining = self._host_breaker_allows(host_value)
-            if not allowed:
-                detail = f"cooldown-{remaining:.1f}s"
-                self._emit_attempt(
-                    AttemptRecord(
-                        run_id=self._run_id,
-                        work_id=artifact.work_id,
-                        resolver_name=resolver_name,
-                        resolver_order=order_index,
-                        url=url,
-                        canonical_url=url,
-                        original_url=original_url,
-                        status=Classification.SKIPPED,
-                        http_status=None,
-                        content_type=None,
-                        elapsed_ms=None,
-                        reason=ReasonCode.DOMAIN_BREAKER_OPEN,
-                        reason_detail=detail,
-                        metadata=result.metadata,
-                        dry_run=state.dry_run,
-                        resolver_wall_time_ms=resolver_wall_time_ms,
-                        retry_after=remaining if remaining > 0 else None,
-                    )
-                )
-                self._record_skip(resolver_name, "domain-breaker-open", detail)
-                state.last_reason = ReasonCode.DOMAIN_BREAKER_OPEN
-                state.last_reason_detail = detail
-                return None
         kwargs: Dict[str, Any] = {}
         if self._download_accepts_head_flag:
             kwargs["head_precheck_passed"] = head_precheck_passed
@@ -2093,11 +1964,16 @@ class ResolverPipeline:
             rate_limiter_mode=rate_limiter_info.get("mode"),
             rate_limiter_role=rate_limiter_role,
             from_cache=network_info.get("from_cache"),
+            # Circuit breaker state from DownloadOutcome
+            breaker_host_state=outcome.breaker_host_state,
+            breaker_resolver_state=outcome.breaker_resolver_state,
+            breaker_open_remaining_ms=outcome.breaker_open_remaining_ms,
+            breaker_recorded=outcome.breaker_recorded,
         )
 
         self._emit_attempt(attempt_record)
         self.metrics.record_attempt(resolver_name, outcome)
-        self._update_breakers(resolver_name, host_value, outcome)
+        # Legacy breaker update removed - now handled by pybreaker-based BreakerRegistry
 
         classification = outcome.classification
         if classification is Classification.HTML and outcome.path:

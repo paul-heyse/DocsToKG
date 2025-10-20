@@ -7,6 +7,7 @@ last_updated: 2025-10-21
 > _Metadata backlog_: owning_team, stability, versioning, codeowners, related_adrs, slos, data_handling, and sbom will be populated in a future revision.
 
 ## Table of Contents
+
 - [DocsToKG • ContentDownload](#docstokg--contentdownload)
   - [Quickstart](#quickstart)
   - [CLI Quick Reference](#cli-quick-reference)
@@ -216,7 +217,7 @@ flowchart LR
 ### ResolverPipeline
 
 - `ResolverPipeline` stores resolvers by name, applies ordering overrides, and coordinates execution through per-resolver locks and global URL dedupe sets.
-- Resolver throttling is enforced via the centralized rate limiter; legacy options (`domain_min_interval_s`, `domain_token_buckets`) now raise validation errors. `resolver_circuit_breakers` and host breakers still shed load after repeated failures.
+- Resolver throttling is enforced via the centralized rate limiter; legacy options (`domain_min_interval_s`, `domain_token_buckets`) now raise validation errors. Circuit breakers are now handled by pybreaker-based BreakerRegistry.
 - Attempt logging uses `AttemptRecord` to include resolver order, status, HTTP status, elapsed time, retry hints, and reason codes. Metrics track attempts, successes, skips, failures, latency percentiles, and error reasons per resolver.
 - Global dedupe consults `ManifestUrlIndex` first, then updates in-memory sets under thread locks to prevent duplicate downloads across workers.
 

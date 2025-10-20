@@ -5,7 +5,9 @@ This module tests the performance optimizations and new features
 added to the Wayback telemetry system.
 """
 
+import logging
 import os
+import sqlite3
 import tempfile
 import time
 from pathlib import Path
@@ -19,6 +21,7 @@ from DocsToKG.ContentDownload.telemetry_wayback import (
     CandidateDecision,
     DiscoveryStage,
     ModeSelected,
+    SkipReason,
     TelemetryWayback,
     create_telemetry_with_failsafe,
 )
@@ -77,6 +80,140 @@ class TestSQLiteOptimizations:
             metrics = sink.get_metrics()
             assert metrics["events_total"] == 6
             assert metrics["commits_total"] == 2  # After 3 and 6 events
+
+    def test_transaction_batching_commit_metrics(self):
+        """Ensure batched writes share a transaction and metrics track commits."""
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.sqlite"
+
+            original_connect = sqlite3.connect
+
+            class TrackingConnection(sqlite3.Connection):
+                def __init__(self, *args, **kwargs):
+                    super().__init__(*args, **kwargs)
+                    self.commit_calls = 0
+
+                def commit(self):
+                    self.commit_calls += 1
+                    return super().commit()
+
+            def connect_with_tracking(*args, **kwargs):
+                kwargs["factory"] = TrackingConnection
+                return original_connect(*args, **kwargs)
+
+            with patch("sqlite3.connect", side_effect=connect_with_tracking):
+                sink = SQLiteSink(db_path, auto_commit_every=3)
+                conn = sink._conn
+                assert isinstance(conn, TrackingConnection)
+
+                baseline_commits = conn.commit_calls
+
+                attempt_event = {
+                    "event_type": "wayback_attempt",
+                    "attempt_id": "attempt-001",
+                    "run_id": "run-001",
+                    "work_id": "work-001",
+                    "artifact_id": "artifact-001",
+                    "resolver": "wayback",
+                    "schema": "1",
+                    "original_url": "https://example.com/paper.pdf",
+                    "canonical_url": "https://example.com/paper.pdf",
+                    "publication_year": 2024,
+                    "ts": "2024-01-01T00:00:00Z",
+                    "monotonic_ms": 0,
+                    "event": "start",
+                }
+
+                discovery_event = {
+                    "event_type": "wayback_discovery",
+                    "attempt_id": "attempt-001",
+                    "ts": "2024-01-01T00:00:01Z",
+                    "monotonic_ms": 1,
+                    "stage": "availability",
+                    "query_url": "https://web.archive.org/",
+                    "year_window": None,
+                    "limit": 10,
+                    "returned": 1,
+                    "first_ts": "2024-01-01T00:00:01Z",
+                    "last_ts": "2024-01-01T00:00:01Z",
+                    "http_status": 200,
+                    "from_cache": False,
+                    "revalidated": False,
+                    "rate_delay_ms": 0,
+                    "retry_after_s": None,
+                    "retry_count": 0,
+                    "error": None,
+                }
+
+                candidate_event = {
+                    "event_type": "wayback_candidate",
+                    "attempt_id": "attempt-001",
+                    "ts": "2024-01-01T00:00:02Z",
+                    "monotonic_ms": 2,
+                    "archive_url": "https://web.archive.org/a1",
+                    "memento_ts": "20240101000002",
+                    "statuscode": 200,
+                    "mimetype": "text/html",
+                    "source_stage": "availability",
+                    "decision": "accepted",
+                    "distance_to_pub_year": 0,
+                }
+
+                candidate_event_2 = {
+                    "event_type": "wayback_candidate",
+                    "attempt_id": "attempt-001",
+                    "ts": "2024-01-01T00:00:03Z",
+                    "monotonic_ms": 3,
+                    "archive_url": "https://web.archive.org/a2",
+                    "memento_ts": "20240101000003",
+                    "statuscode": 200,
+                    "mimetype": "text/html",
+                    "source_stage": "availability",
+                    "decision": "accepted",
+                    "distance_to_pub_year": 1,
+                }
+
+                candidate_event_3 = {
+                    "event_type": "wayback_candidate",
+                    "attempt_id": "attempt-001",
+                    "ts": "2024-01-01T00:00:04Z",
+                    "monotonic_ms": 4,
+                    "archive_url": "https://web.archive.org/a3",
+                    "memento_ts": "20240101000004",
+                    "statuscode": 200,
+                    "mimetype": "text/html",
+                    "source_stage": "availability",
+                    "decision": "accepted",
+                    "distance_to_pub_year": 2,
+                }
+
+                sink.emit(attempt_event)
+                assert sink._pending == 1
+                assert conn.commit_calls == baseline_commits
+
+                sink.emit(discovery_event)
+                assert sink._pending == 2
+                assert conn.commit_calls == baseline_commits
+
+                sink.emit(candidate_event)
+                assert sink._pending == 0
+                assert not sink._transaction_open
+                assert conn.commit_calls == baseline_commits + 1
+                assert sink.get_metrics()["commits_total"] == 1
+
+                sink.emit(candidate_event_2)
+                sink.emit(candidate_event_3)
+                assert sink._pending == 2
+                assert sink._transaction_open
+                assert conn.commit_calls == baseline_commits + 1
+                assert sink.get_metrics()["commits_total"] == 1
+
+                sink.close()
+                assert sink._pending == 0
+                assert not sink._transaction_open
+                assert conn.commit_calls == baseline_commits + 2
+                assert sink.get_metrics()["commits_total"] == 2
 
     def test_backpressure_monitoring(self):
         """Test backpressure monitoring and warnings."""
@@ -504,3 +641,129 @@ class TestFailsafeDualSink:
             with jsonl_path.open() as f:
                 lines = f.readlines()
                 assert len(lines) == 2  # start and end events
+
+    def test_failsafe_disables_primary_sink_after_threshold(self, caplog):
+        """Primary sink failures trigger disablement while fallback continues."""
+
+        class FlakySink:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def emit(self, event):
+                self.calls += 1
+                raise RuntimeError("boom")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            jsonl_path = Path(tmpdir) / "fallback.jsonl"
+            flaky = FlakySink()
+            caplog.set_level(logging.WARNING)
+
+            tele = create_telemetry_with_failsafe(
+                "test-run",
+                [flaky],
+                jsonl_fallback_path=jsonl_path,
+                sink_failure_threshold=2,
+            )
+
+            ctx = tele.emit_attempt_start(
+                work_id="work-1",
+                artifact_id="artifact-1",
+                original_url="https://example.com/1",
+                canonical_url="https://example.com/1",
+            )
+            tele.emit_skip(ctx, reason=SkipReason.NO_SNAPSHOT)
+            tele.emit_attempt_end(
+                ctx,
+                mode_selected=ModeSelected.NONE,
+                result=AttemptResult.SKIPPED_NO_SNAPSHOT,
+                candidates_scanned=0,
+            )
+
+            # The flaky sink should only be invoked until it is disabled.
+            assert flaky.calls == 2
+
+            with jsonl_path.open() as f:
+                lines = f.readlines()
+                assert len(lines) == 3
+
+            disable_records = [
+                record
+                for record in caplog.records
+                if "Disabling telemetry sink" in record.message
+            ]
+            assert disable_records
+
+            metrics = tele.failover_metrics_snapshot()
+            assert metrics
+            assert metrics[0]["disabled"] is True
+            assert metrics[0]["failures_total"] == 2
+
+    def test_failsafe_resets_after_successful_emit(self, caplog):
+        """Successful emits reset failure counters to avoid premature disablement."""
+
+        class FlakyOnceSink:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def emit(self, event):
+                self.calls += 1
+                if self.calls == 1:
+                    raise RuntimeError("boom once")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            jsonl_path = Path(tmpdir) / "fallback.jsonl"
+            flaky = FlakyOnceSink()
+            caplog.set_level(logging.WARNING)
+
+            tele = create_telemetry_with_failsafe(
+                "test-run",
+                [flaky],
+                jsonl_fallback_path=jsonl_path,
+                sink_failure_threshold=2,
+            )
+
+            ctx1 = tele.emit_attempt_start(
+                work_id="work-1",
+                artifact_id="artifact-1",
+                original_url="https://example.com/1",
+                canonical_url="https://example.com/1",
+            )
+            tele.emit_attempt_end(
+                ctx1,
+                mode_selected=ModeSelected.PDF_DIRECT,
+                result=AttemptResult.EMITTED_PDF,
+                candidates_scanned=1,
+            )
+
+            ctx2 = tele.emit_attempt_start(
+                work_id="work-2",
+                artifact_id="artifact-2",
+                original_url="https://example.com/2",
+                canonical_url="https://example.com/2",
+            )
+            tele.emit_attempt_end(
+                ctx2,
+                mode_selected=ModeSelected.PDF_DIRECT,
+                result=AttemptResult.EMITTED_PDF,
+                candidates_scanned=1,
+            )
+
+            # All events should be forwarded after the initial failure.
+            assert flaky.calls == 4
+
+            with jsonl_path.open() as f:
+                lines = f.readlines()
+                assert len(lines) == 4
+
+            disable_records = [
+                record
+                for record in caplog.records
+                if "Disabling telemetry sink" in record.message
+            ]
+            assert not disable_records
+
+            metrics = tele.failover_metrics_snapshot()
+            assert metrics
+            assert metrics[0]["disabled"] is False
+            assert metrics[0]["failures_total"] == 1
+            assert metrics[0]["consecutive_failures"] == 0

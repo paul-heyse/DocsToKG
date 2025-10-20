@@ -676,7 +676,6 @@ def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_pat
                 url TEXT,
                 canonical_url TEXT,
                 original_url TEXT,
-                normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
                 classification TEXT,
@@ -704,7 +703,6 @@ def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_pat
             "url",
             "canonical_url",
             "original_url",
-            "normalized_url",
             "path",
             "path_mtime_ns",
             "classification",
@@ -730,7 +728,6 @@ def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_pat
             "https://example.org/W-SQLITE.pdf",
             "https://example.org/w-sqlite.pdf",
             "https://example.org/W-SQLITE.pdf",
-            "https://example.org/w-sqlite.pdf",
             str(resolved.pdf_dir / "stored.pdf"),
             None,
             "pdf",
@@ -794,7 +791,6 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
                 url TEXT,
                 canonical_url TEXT,
                 original_url TEXT,
-                normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
                 classification TEXT,
@@ -815,10 +811,10 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
             """
             INSERT INTO manifests (
                 timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, canonical_url, original_url, normalized_url, path, path_mtime_ns, classification,
+                resolver, url, canonical_url, original_url, path, path_mtime_ns, classification,
                 content_type, reason, reason_detail, html_paths, sha256,
                 content_length, etag, last_modified, extracted_text_path, dry_run
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "2025-01-01T00:00:00Z",
@@ -828,10 +824,9 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
                 "SQLite Resume",
                 2024,
                 "openalex",
-                "https://example.org/W-HANDLES.pdf",
-                "https://example.org/w-handles.pdf",
-                "https://example.org/W-HANDLES.pdf",
-                "https://example.org/w-handles.pdf",
+                    "https://example.org/W-HANDLES.pdf",
+                    "https://example.org/w-handles.pdf",
+                    "https://example.org/W-HANDLES.pdf",
                 str(resolved.pdf_dir / "stored.pdf"),
                 None,
                 "pdf",
@@ -1001,7 +996,6 @@ def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
                 url TEXT,
                 canonical_url TEXT,
                 original_url TEXT,
-                normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
                 classification TEXT,
@@ -1022,10 +1016,10 @@ def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
             """
             INSERT INTO manifests (
                 timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, canonical_url, original_url, normalized_url, path, path_mtime_ns, classification,
+                resolver, url, canonical_url, original_url, path, path_mtime_ns, classification,
                 content_type, reason, reason_detail, html_paths, sha256,
                 content_length, etag, last_modified, extracted_text_path, dry_run
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "2025-01-03T00:00:00Z",
@@ -1038,7 +1032,6 @@ def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
                 "https://example.org/W-CSV.pdf",
                 "https://example.org/w-csv.pdf",
                 "https://example.org/W-CSV.pdf",
-                "https://example.org/w-csv.pdf",
                 str(resolved.pdf_dir / "stored.pdf"),
                 None,
                 "pdf",
@@ -1105,7 +1098,6 @@ def test_setup_download_state_accepts_explicit_csv_resume(tmp_path):
                 url TEXT,
                 canonical_url TEXT,
                 original_url TEXT,
-                normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
                 classification TEXT,
@@ -1126,10 +1118,10 @@ def test_setup_download_state_accepts_explicit_csv_resume(tmp_path):
             """
             INSERT INTO manifests (
                 timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, canonical_url, original_url, normalized_url, path, path_mtime_ns, classification,
+                resolver, url, canonical_url, original_url, path, path_mtime_ns, classification,
                 content_type, reason, reason_detail, html_paths, sha256,
                 content_length, etag, last_modified, extracted_text_path, dry_run
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "2025-01-04T00:00:00Z",
@@ -1142,7 +1134,6 @@ def test_setup_download_state_accepts_explicit_csv_resume(tmp_path):
                 "https://example.org/W-CSV.pdf",
                 "https://example.org/w-csv.pdf",
                 "https://example.org/W-CSV.pdf",
-                "https://example.org/w-csv.pdf",
                 str(resolved.pdf_dir / "stored.pdf"),
                 None,
                 "pdf",
@@ -1213,7 +1204,6 @@ def test_setup_download_state_prefers_adjacent_sqlite_for_external_csv(tmp_path)
                 url TEXT,
                 canonical_url TEXT,
                 original_url TEXT,
-                normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
                 classification TEXT,
@@ -1241,7 +1231,6 @@ def test_setup_download_state_prefers_adjacent_sqlite_for_external_csv(tmp_path)
             "url",
             "canonical_url",
             "original_url",
-            "normalized_url",
             "path",
             "path_mtime_ns",
             "classification",
@@ -1264,11 +1253,10 @@ def test_setup_download_state_prefers_adjacent_sqlite_for_external_csv(tmp_path)
             "External CSV Resume",
             2024,
             "openalex",
-            "https://example.org/W-EXTERNAL.pdf",
-            "https://example.org/w-external.pdf",
-            "https://example.org/W-EXTERNAL.pdf",
-            "https://example.org/w-external.pdf",
-            str(resolved.pdf_dir / "external.pdf"),
+                "https://example.org/W-EXTERNAL.pdf",
+                "https://example.org/w-external.pdf",
+                "https://example.org/W-EXTERNAL.pdf",
+                str(resolved.pdf_dir / "external.pdf"),
             None,
             "pdf",
             "application/pdf",
@@ -1335,8 +1323,7 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, p
         "url": "https://example.org/w-abs.pdf",
         "canonical_url": "https://example.org/w-abs.pdf",
         "original_url": "https://example.org/w-abs.pdf",
-        "normalized_url": "https://example.org/w-abs.pdf",
-        "classification": "pdf",
+                "classification": "pdf",
         "path": "pdfs/w-abs.pdf",
     }
     manifest_path.write_text(json.dumps(manifest_entry) + "\n", encoding="utf-8")
@@ -1438,7 +1425,6 @@ def test_manifest_url_index_resolves_relative_paths(tmp_path, patcher):
                 url TEXT,
                 canonical_url TEXT,
                 original_url TEXT,
-                normalized_url TEXT,
                 path TEXT,
                 sha256 TEXT,
                 classification TEXT,
@@ -1456,7 +1442,6 @@ def test_manifest_url_index_resolves_relative_paths(tmp_path, patcher):
                 url,
                 canonical_url,
                 original_url,
-                normalized_url,
                 path,
                 sha256,
                 classification,
@@ -1464,11 +1449,10 @@ def test_manifest_url_index_resolves_relative_paths(tmp_path, patcher):
                 last_modified,
                 content_length,
                 path_mtime_ns
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "2025-01-01T00:00:00Z",
-                "https://example.org/cached.pdf",
                 "https://example.org/cached.pdf",
                 "https://example.org/cached.pdf",
                 "https://example.org/cached.pdf",
