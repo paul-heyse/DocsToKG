@@ -600,7 +600,9 @@ class ChunkIngestionPipeline:
                     loaded = self._load_precomputed_chunks(document)
                 if not loaded:
                     continue
-                self._delete_existing_for_doc(document.doc_id, document.namespace)
+                staged_vector_ids: Tuple[str, ...] = tuple(
+                    self._registry.vector_ids_for(document.doc_id, document.namespace)
+                )
                 batch = self._commit_batch(
                     loaded, collect_vector_ids=collect_vector_ids
                 )
@@ -608,6 +610,8 @@ class ChunkIngestionPipeline:
                 namespaces.update(batch.namespaces)
                 if vector_ids is not None and batch.vector_ids:
                     vector_ids.extend(batch.vector_ids)
+                if staged_vector_ids:
+                    self.delete_chunks(staged_vector_ids)
         except RetryableIngestError:
             raise
         except IngestError:
