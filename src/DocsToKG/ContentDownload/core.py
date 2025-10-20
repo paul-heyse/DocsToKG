@@ -58,7 +58,6 @@ __all__ = (
     "normalize_pmid",
     "normalize_arxiv",
     "slugify",
-    "normalize_url",
     "normalize_classification",
     "normalize_reason",
     "parse_size",
@@ -793,7 +792,3 @@ def slugify(text: str, keep: int = 80) -> str:
     return text[:keep] or "untitled"
 
 
-def normalize_url(url: str) -> str:
-    """Deprecated alias for :func:`DocsToKG.ContentDownload.urls.canonical_for_index`."""
-
-    return canonical_for_index(url)

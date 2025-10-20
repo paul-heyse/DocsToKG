@@ -114,10 +114,9 @@ import tracemalloc
 import unicodedata
 import uuid
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import fields
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
 
 # Third-party imports
 try:
@@ -177,14 +176,24 @@ from DocsToKG.DocParsing.core import (
     Batcher,
     BM25Stats,
     ChunkDiscovery,
+    ItemFingerprint,
+    ItemOutcome,
     QwenCfg,
     ResumeController,
     SpladeCfg,
+    StageContext,
+    StageError,
+    StageHooks,
+    StageOptions,
+    StageOutcome,
+    StagePlan,
+    WorkItem,
     acquire_lock,
     compute_relative_doc_id,
     compute_stable_shard,
     derive_doc_id_and_vectors_path,
     iter_chunks,
+    run_stage,
     should_skip_output,
 )
 from DocsToKG.DocParsing.embedding.backends import (
@@ -240,6 +249,7 @@ from DocsToKG.DocParsing.io import (
     quarantine_artifact,
     relative_path,
     resolve_attempts_path,
+    resolve_hash_algorithm,
     resolve_manifest_path,
 )
 from DocsToKG.DocParsing.io import manifest_append as _manifest_append

@@ -93,7 +93,6 @@ from DocsToKG.ContentDownload.core import (
     atomic_write_text,
     normalize_classification,
     normalize_reason,
-    normalize_url,
 )
 from DocsToKG.ContentDownload.urls import canonical_for_index
 
@@ -260,15 +259,9 @@ class ManifestEntry:
             base_original = base_original.strip() or None
         canonical_value = self.canonical_url
         if canonical_value is None and base_original:
-            try:
-                canonical_value = canonical_for_index(base_original)
-            except Exception:
-                canonical_value = normalize_url(base_original)
+            canonical_value = _canonical_key_or_fallback(base_original)
         if canonical_value is None and self.url:
-            try:
-                canonical_value = canonical_for_index(self.url)
-            except Exception:
-                canonical_value = normalize_url(self.url)
+            canonical_value = _canonical_key_or_fallback(self.url)
         normalized_value = self.normalized_url or canonical_value
         object.__setattr__(self, "canonical_url", canonical_value)
         object.__setattr__(self, "normalized_url", normalized_value)
@@ -278,14 +271,17 @@ class ManifestEntry:
 
 
 def _canonical_key_or_fallback(value: Optional[str]) -> Optional[str]:
-    """Return canonical manifest key for ``value``, falling back to legacy normalisation."""
+    """Return canonical manifest key for ``value``, falling back to trimmed text."""
 
-    if not value:
+    if value is None:
+        return None
+    stripped = str(value).strip()
+    if not stripped:
         return None
     try:
-        return canonical_for_index(value)
+        return canonical_for_index(stripped)
     except Exception:
-        return normalize_url(value)
+        return stripped
 
 
 class ManifestUrlIndex:
@@ -1744,11 +1740,11 @@ class SqliteSink:
         for row_id, url, stored_original, stored_canonical, stored_normalized in rows:
             if not url:
                 continue
-            original_value = stored_original or url
-            try:
-                normalized = stored_normalized or canonical_for_index(original_value)
-            except Exception:
-                normalized = normalize_url(original_value)
+            original_value = (stored_original or url) or ""
+            original_value = str(original_value).strip()
+            if not original_value:
+                continue
+            normalized = stored_normalized or _canonical_key_or_fallback(original_value) or original_value
             canonical_value = stored_canonical or normalized
             self._conn.execute(
                 "UPDATE manifests SET normalized_url = ?, canonical_url = ?, original_url = ? WHERE id = ?",
@@ -1780,7 +1776,10 @@ def _manifest_entry_from_sqlite_row(
     if not work_id or not url:
         return None
 
-    normalized = normalized_url or (canonical_url or normalize_url(str(url)))
+    url_text = str(url)
+    canonical_value = canonical_url or normalized_url
+    normalized = normalized_url or canonical_value or _canonical_key_or_fallback(url_text) or url_text.strip()
+    canonical_value = canonical_value or normalized
     try:
         schema_version_int = int(schema_version)
     except (TypeError, ValueError):
@@ -1823,7 +1822,7 @@ def _manifest_entry_from_sqlite_row(
         "run_id": run_id,
         "work_id": work_id,
         "url": url,
-        "canonical_url": canonical_url,
+        "canonical_url": canonical_value,
         "original_url": original_url,
         "normalized_url": normalized,
         "classification": classification_value or str(classification or ""),
@@ -2060,12 +2059,10 @@ def iter_previous_manifest_entries(
                     if not work_id or not url:
                         raise ValueError("Manifest entries must include work_id and url fields.")
                     original_value = data.get("original_url") or url
-                    try:
-                        canonical_value = data.get("canonical_url") or canonical_for_index(
-                            original_value
-                        )
-                    except Exception:
-                        canonical_value = normalize_url(original_value)
+                    original_value = str(original_value).strip()
+                    if not original_value:
+                        raise ValueError("Manifest entries must include a non-empty original_url.")
+                    canonical_value = data.get("canonical_url") or _canonical_key_or_fallback(original_value) or original_value
                     normalized_value = data.get("normalized_url") or canonical_value
                     data["original_url"] = original_value
                     data["canonical_url"] = canonical_value
@@ -2629,7 +2626,10 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
         ) in cursor:
             if not url:
                 continue
-            canonical_value = canonical_url or (normalized_url or normalize_url(url))
+            url_text = str(url).strip()
+            if not url_text:
+                continue
+            canonical_value = canonical_url or normalized_url or _canonical_key_or_fallback(url_text) or url_text
             normalized_path = normalize_manifest_path(stored_path, base=base_dir)
             mapping[canonical_value] = {
                 "url": url,
@@ -2719,16 +2719,12 @@ def build_manifest_entry(
     original_hint = original_url or (getattr(outcome, "original_url", None) if outcome else None)
     if original_hint is None and url is not None:
         original_hint = url
+    if original_hint is not None:
+        original_hint = str(original_hint).strip() or None
     if canonical_hint is None and original_hint:
-        try:
-            canonical_hint = canonical_for_index(original_hint)
-        except Exception:
-            canonical_hint = normalize_url(original_hint)
+        canonical_hint = _canonical_key_or_fallback(original_hint)
     if canonical_hint is None and url is not None:
-        try:
-            canonical_hint = canonical_for_index(url)
-        except Exception:
-            canonical_hint = normalize_url(url)
+        canonical_hint = _canonical_key_or_fallback(url)
 
     return ManifestEntry(
         schema_version=MANIFEST_SCHEMA_VERSION,
