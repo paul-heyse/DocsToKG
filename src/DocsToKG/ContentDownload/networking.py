@@ -189,10 +189,6 @@ __all__ = (
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
-<<<<<<< HEAD
-# Global breaker registry (set by runner)
-_breaker_registry: Optional[Any] = None
-=======
 DEFAULT_RETRYABLE_STATUSES: Set[int] = {429, 500, 502, 503, 504}
 _TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
 
@@ -206,10 +202,6 @@ DEFAULT_BREAKER_FAILURE_EXCEPTIONS = (
     httpx.TransportError,
     httpx.ProtocolError,
 )
->>>>>>> 189d6fdb953631209634e5b45865d81689068ee6
-
-DEFAULT_RETRYABLE_STATUSES: Set[int] = {429, 500, 502, 503, 504}
-_TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
 
 _DEPRECATED_ATTR_ERRORS: Dict[str, str] = {
     "ThreadLocalSessionFactory": (
@@ -781,6 +773,31 @@ def request_with_retries(
     extensions.setdefault("docs_canonical_index", canonical_index)
     kwargs["extensions"] = extensions
 
+    # URL normalization instrumentation (Phase 3A integration)
+    from DocsToKG.ContentDownload.urls_networking import (
+        record_url_normalization,
+        log_url_change_once,
+        apply_role_headers,
+    )
+
+    try:
+        record_url_normalization(source_url, request_url, url_role)
+    except ValueError as e:
+        LOGGER.error(f"URL normalization failed in strict mode: {e}")
+        raise
+
+    # Apply role-based headers (metadata/landing/artifact)
+    if "headers" not in kwargs:
+        kwargs["headers"] = {}
+    kwargs["headers"] = apply_role_headers(kwargs.get("headers"), url_role)
+
+    # Log URL changes once per host to avoid spam
+    if request_url != source_url:
+        log_url_change_once(source_url, request_url, host_hint)
+
+    # Track in extensions for downstream access
+    extensions.setdefault("docs_url_changed", request_url != source_url)
+
     network_meta_raw = extensions.get("docs_network_meta")
     if isinstance(network_meta_raw, MutableMapping):
         network_meta = network_meta_raw
@@ -792,7 +809,9 @@ def request_with_retries(
         if breaker_meta:
             network_meta["breaker"] = dict(breaker_meta)
 
-    def _snapshot_breaker_state(*, recorded: Optional[str] = None, retry_after: Optional[float] = None) -> None:
+    def _snapshot_breaker_state(
+        *, recorded: Optional[str] = None, retry_after: Optional[float] = None
+    ) -> None:
         if recorded is not None:
             breaker_meta["recorded"] = recorded
         if retry_after is not None:
@@ -824,7 +843,9 @@ def request_with_retries(
                 breaker_meta["resolver_state"] = resolver_state_value
             else:
                 try:
-                    resolver_snapshot = breaker_registry.current_state(request_host, resolver=resolver)
+                    resolver_snapshot = breaker_registry.current_state(
+                        request_host, resolver=resolver
+                    )
                 except Exception:  # pragma: no cover - defensive
                     resolver_snapshot = None
                 if isinstance(resolver_snapshot, Mapping):

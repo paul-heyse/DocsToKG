@@ -3,6 +3,7 @@
 # Compatible with: pyarrow >= 9 (recommended >= 12)
 
 from __future__ import annotations
+
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -10,7 +11,6 @@ from typing import Dict, Mapping, Optional, Tuple
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-
 
 # ============================================================
 # Version tags (SemVer) – bump only with spec changes
@@ -537,3 +537,64 @@ def recommended_parquet_writer_options(dataset: str) -> Dict[str, object]:
         }
     else:
         raise ValueError("dataset must be one of: 'chunks', 'dense', 'sparse', 'lexical'")
+
+
+# ============================================================
+# Legacy Vector Schema (for backward compatibility)
+# ============================================================
+
+
+def _legacy_vector_schema() -> pa.Schema:
+    """
+    Arrow schema for legacy vector rows (all families in one row).
+
+    This maintains compatibility with existing JSONL vector export format
+    when transitioning to Parquet. Contains dense (Qwen), sparse (SPLADE),
+    and lexical (BM25) vectors in a single row.
+
+    Returns:
+        PyArrow schema matching the legacy vector row structure.
+    """
+    string_list = pa.list_(pa.string())
+    float_list = pa.list_(pa.float32())
+
+    return pa.schema(
+        [
+            pa.field("UUID", pa.string(), nullable=False),
+            pa.field(
+                "BM25",
+                pa.struct(
+                    [
+                        pa.field("terms", string_list, nullable=True),
+                        pa.field("weights", float_list, nullable=True),
+                        pa.field("avgdl", pa.float64(), nullable=True),
+                        pa.field("N", pa.int64(), nullable=True),
+                    ]
+                ),
+                nullable=False,
+            ),
+            pa.field(
+                "SPLADEv3",
+                pa.struct(
+                    [
+                        pa.field("tokens", string_list, nullable=True),
+                        pa.field("weights", float_list, nullable=True),
+                    ]
+                ),
+                nullable=False,
+            ),
+            pa.field(
+                "Qwen3-4B",
+                pa.struct(
+                    [
+                        pa.field("model_id", pa.string(), nullable=False),
+                        pa.field("vector", float_list, nullable=False),
+                        pa.field("dimension", pa.int32(), nullable=True),
+                    ]
+                ),
+                nullable=False,
+            ),
+            pa.field("model_metadata", pa.string(), nullable=True),
+            pa.field("schema_version", pa.string(), nullable=False),
+        ]
+    )

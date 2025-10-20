@@ -197,6 +197,7 @@ def _root_callback(
     if data_root is not None:
         state.data_root = data_root
 
+
 __all__ = [
     "CLI_DESCRIPTION",
     "app",
@@ -598,7 +599,12 @@ def _build_embed_cli_args(
     _append_option(argv, "--qwen-model-dir", qwen_model_dir, formatter=str)
     _append_option(argv, "--qwen-dim", qwen_dim, default=2560)
     _append_option(argv, "--tp", tensor_parallel, default=1)
-    _append_option(argv, "--sparsity-warn-threshold-pct", sparsity_warn_threshold_pct, default=SPLADE_SPARSITY_WARN_THRESHOLD_PCT)
+    _append_option(
+        argv,
+        "--sparsity-warn-threshold-pct",
+        sparsity_warn_threshold_pct,
+        default=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+    )
     _append_option(argv, "--sparsity-report-top-n", sparsity_report_top_n, default=10)
     _append_option(argv, "--files-parallel", files_parallel, default=1)
     _append_flag(argv, "--validate-only", validate_only)
@@ -1908,7 +1914,7 @@ def _embed_cli(
             help="Vector output format.",
             show_default=True,
         ),
-    ] = "jsonl",
+    ] = "parquet",
     bm25_k1: Annotated[
         float,
         typer.Option("--bm25-k1", help="BM25 k1 parameter.", show_default=True, min=0.0),
@@ -1919,9 +1925,7 @@ def _embed_cli(
     ] = 0.75,
     batch_size_splade: Annotated[
         int,
-        typer.Option(
-            "--batch-size-splade", help="SPLADE batch size.", show_default=True, min=1
-        ),
+        typer.Option("--batch-size-splade", help="SPLADE batch size.", show_default=True, min=1),
     ] = 32,
     batch_size_qwen: Annotated[
         int,
@@ -1977,7 +1981,9 @@ def _embed_cli(
     ] = 2560,
     tensor_parallel: Annotated[
         int,
-        typer.Option("--tp", "--tensor-parallel", help="Tensor parallel degree.", show_default=True, min=1),
+        typer.Option(
+            "--tp", "--tensor-parallel", help="Tensor parallel degree.", show_default=True, min=1
+        ),
     ] = 1,
     sparsity_warn_threshold_pct: Annotated[
         float,

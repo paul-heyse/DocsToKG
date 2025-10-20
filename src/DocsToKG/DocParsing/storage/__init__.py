@@ -1,24 +1,18 @@
 """
 DocParsing Storage Layer
 
-This package encapsulates Parquet/Arrow schemas, partitioning layouts, and writers
-for Chunks and Vectors (Dense, Sparse, Lexical). It replaces ad-hoc JSONL writers
-with schema-enforced, provenance-rich columnar output.
+Provides columnar (Parquet) and streaming (JSONL) writers and readers for
+Chunks and Vectors (Dense, Sparse, Lexical) with:
+- Explicit Arrow/Parquet schemas with semantic versioning
+- Atomic writes with footer metadata for provenance
+- Lazy dataset readers with DuckDB/Polars integration
+- Partition-aware path construction
 
-Key modules:
-- `parquet_schemas.py`: Arrow/Parquet schema declarations and footer contracts
-- `paths.py`: Dataset layout builders (partitions, rel_id normalization)
-- `writers.py`: Unified writer abstraction for Chunks and Vectors
-- `readers.py`: Dataset view helpers (lazy scans via Polars/DuckDB/Arrow)
-- `validation.py`: Schema and data quality checks
-
-Usage:
-    from DocsToKG.DocParsing.storage import schemas, paths, writers
-
-    schema = schemas.chunks_schema()
-    output_dir = paths.chunks_output_path("Data", doc_id="papers/physics/123")
-    writer = writers.ChunksParquetWriter(output_dir)
-    writer.write(chunk_rows)
+Modules:
+- schemas: Arrow schema declarations and Parquet footer contracts
+- paths: Dataset layout and path builders
+- writers: Atomic Parquet writers for all artifact types
+- readers: Lazy dataset scans and analytics integration
 """
 
 from __future__ import annotations
@@ -28,5 +22,4 @@ __all__ = [
     "paths",
     "writers",
     "readers",
-    "validation",
 ]

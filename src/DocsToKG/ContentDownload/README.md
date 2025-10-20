@@ -205,6 +205,73 @@ flowchart LR
 - **postgres** — distributed backend backed by PostgreSQL via `psycopg3`. Use for deployments that already maintain PostgreSQL and want transactional limiter state.
 - Switching backends resets the in-memory limiter cache; `DownloadRun` logs the resolved backend/options table at startup so operators can confirm the active configuration.
 
+## URL Canonicalization & Request Shaping
+
+ContentDownload enforces consistent URL handling across dedupe, caching, rate limiting, and storage via centralized canonicalization policies defined in `urls.py`:
+
+### Canonicalization Surfaces
+
+**`canonical_for_index(url)`** – used in deduplication, resume hydration, and manifest keys.
+
+- Returns RFC 3986/3987 normalized URL: lowercase scheme/host, uppercase hex escapes, dot-segment removal, default port dropping, IDN→punycode, fragment removal.
+- **No query filtering**; all parameters are preserved for deduplication accuracy.
+- **Gotcha**: With default scheme `https`, URLs like `www.example.com:80` **keep** `:80` (port 80 is not default for HTTPS).
+
+**`canonical_for_request(url, role=...)`** – used just before sending HTTP requests (shapes headers, params).
+
+- Applies same normalization as `canonical_for_index` **plus** role-specific param filtering.
+- Three roles control param handling:
+  - `metadata` (JSON/REST APIs): preserve all params; authenticate/CDN signatures untouched.
+  - `landing` (HTML discovery): drop known trackers (`utm_*`, `gclid`, `fbclid`, etc.) unless protected by per-domain allowlist.
+  - `artifact` (direct PDF/XML downloads): preserve all params; treat URLs as immutable.
+- Allowlists configured via `--accept` CLI option or `DOCSTOKG_URL_PARAM_ALLOWLIST` environment variable (format: `domain:param1,param2;other.com:id`).
+
+**`canonical_host(url)`** – extracts lowercase, punycode hostname (no port) for limiter/breaker keys and HTTPX transport routing.
+
+### Request Shaping by Role
+
+The networking hub (`networking.py`) applies stable headers per role before sending:
+
+| Role | Accept | Cache-Control | Head Support | Notes |
+|------|--------|---------------|--------------|-------|
+| `metadata` | `application/json, text/javascript;q=0.9, */*;q=0.1` | default (RFC 9111) | preferred | Supports signed APIs; preserves all params |
+| `landing` | `text/html,application/xhtml+xml,...` | default | no | Filters trackers unless allowed; GET only |
+| `artifact` | `application/pdf, */*;q=0.1` | no-cache (raw) | no; Range support | Raw client; conditional headers for resume |
+
+### Integrating Canonicalization into Resolvers
+
+Resolvers should:
+
+1. Call `canonical_url = canonical_for_index(original_url)` and persist **both** original and canonical in candidate records.
+2. Forward `canonical_url` to the networking hub via `request_with_retries(..., url=canonical_url, role="metadata"|"landing"|"artifact")`.
+3. For relative links discovered in landing HTML, pass `origin_host` parameter so the hub can construct absolute URLs before canonicalizing.
+
+Example:
+
+```python
+from DocsToKG.ContentDownload.urls import canonical_for_index
+
+original = "HTTP://Example.ORG/path?utm=x"
+canonical = canonical_for_index(original)  # "https://example.org/path?utm=x"
+# Store both; use canonical downstream
+```
+
+### Policy Configuration
+
+Policies are defined once at module import and can be overridden via:
+
+- **CLI**: `--accept application/json` sets default Accept header; parameter allowlists configured via resolver configuration files.
+- **Environment**: `DOCSTOKG_URL_DEFAULT_SCHEME=http`, `DOCSTOKG_URL_FILTER_LANDING=false`, `DOCSTOKG_URL_PARAM_ALLOWLIST="page,id;api.example.com:token,secret"`.
+- **Runtime** (tests only): `configure_url_policy()` and `reset_url_policy_for_tests()`.
+
+Policies are frozen after initialization; tests should reset them between cases to avoid cross-contamination.
+
+### Cache & Limiter Alignment
+
+- **Hishel** receives the canonical URL and builds cache keys from it, ensuring identical logical requests hit the cache regardless of input casing/escapes/port representation.
+- **Limiter/Breaker** both use `canonical_host(url)` to derive consistent host keys; this prevents rate-limit quota splitting across case variants or port representations.
+- **Resume hydration** (`ManifestUrlIndex`) indexes by canonical URL, so resumes correctly skip already-downloaded items even if source provides URLs with different casing/params.
+
 ## Interactions with Other Packages
 
 - Downstream ingestion relies on `manifest.jsonl`, `manifest.sqlite3`, and artifact directories under `runs/content/**`; avoid manual edits that desynchronise these surfaces.

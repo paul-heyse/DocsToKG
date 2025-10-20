@@ -39,7 +39,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import zipfile
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
@@ -74,7 +73,9 @@ else:
         _PROCESS = None
 
 from . import plugins as _plugins
+from .errors import ConfigError
 from .io import log_memory_usage
+from .io.filesystem import extract_archive_safe
 from .settings import ResolvedConfig, get_owlready2, get_pronto, get_rdflib
 
 metadata = _plugins.metadata
@@ -732,7 +733,11 @@ def _run_with_timeout(func, timeout_sec: int) -> None:
 def _prepare_xbrl_package(
     request: ValidationRequest, logger: logging.Logger
 ) -> tuple[Path, List[str]]:
-    """Extract XBRL taxonomy ZIP archives for downstream validation.
+    """Extract XBRL taxonomy archives for downstream validation.
+
+    Supports ZIP and other libarchive-supported formats (tar, tar.gz, etc.).
+    Uses extract_archive_safe for robust security validation and portable
+    format handling.
 
     Args:
         request: Validation request describing the ontology package under test.
@@ -742,57 +747,58 @@ def _prepare_xbrl_package(
         Tuple containing the entrypoint path passed to Arelle and a list of artifacts.
 
     Raises:
-        ValueError: If the archive is malformed or contains unsafe paths.
+        ValueError: If extraction fails or archive is malformed.
     """
     package_path = request.file_path
-    if package_path.suffix.lower() != ".zip":
+
+    # Non-archive files pass through as-is
+    if package_path.suffix.lower() not in {".zip", ".tar", ".gz", ".tar.gz", ".tgz"}:
         return package_path, []
-    if not zipfile.is_zipfile(package_path):
-        raise ValueError("XBRL package is not a valid ZIP archive")
 
-    with zipfile.ZipFile(package_path) as archive:
-        for member in archive.infolist():
-            member_path = Path(member.filename)
-            if member_path.is_absolute() or ".." in member_path.parts:
-                raise ValueError(f"Unsafe path detected in archive: {member.filename}")
-            if member.compress_size == 0 and member.file_size > 0:
-                raise ValueError(f"Zip entry {member.filename} has invalid compression size")
-            ratio = member.file_size / max(member.compress_size, 1)
-            if ratio > 10:
-                raise ValueError(
-                    f"Zip entry {member.filename} exceeds compression ratio limit (ratio={ratio:.1f})"
-                )
-
-    temp_dir = Path(tempfile.mkdtemp(prefix="ontofetch-xbrl-"))
     try:
-        with zipfile.ZipFile(package_path) as archive:
-            for member in archive.infolist():
-                member_path = Path(member.filename)
-                target_path = temp_dir / member_path
-                if member.is_dir():
-                    target_path.mkdir(parents=True, exist_ok=True)
-                    continue
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                with archive.open(member, "r") as source, target_path.open("wb") as destination:
-                    shutil.copyfileobj(source, destination)
-    except Exception:
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        raise
+        # Extract using libarchive with comprehensive security policies
+        final_dir = request.validation_dir / "arelle" / package_path.stem
 
-    final_dir = request.validation_dir / "arelle" / package_path.stem
-    if final_dir.exists():
-        shutil.rmtree(final_dir)
-    final_dir.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(temp_dir), final_dir)
-    logger.info(
-        "extracted xbrl package",
-        extra={"stage": "validate", "validator": "arelle", "destination": str(final_dir)},
-    )
+        # Remove any stale extraction
+        if final_dir.exists():
+            shutil.rmtree(final_dir)
+        final_dir.parent.mkdir(parents=True, exist_ok=True)
 
-    entrypoint_candidates = sorted(final_dir.rglob("*.xsd")) or sorted(final_dir.rglob("*.xml"))
-    entrypoint = entrypoint_candidates[0] if entrypoint_candidates else package_path
-    artifacts = [str(path) for path in final_dir.rglob("*") if path.is_file()]
-    return entrypoint, artifacts
+        # Use extract_archive_safe with encapsulation disabled
+        # (we control the destination, so we don't need the extra subdirectory)
+        from .io.extraction_policy import safe_defaults
+
+        policy = safe_defaults()
+        policy.encapsulate = False  # We manage the extraction directory ourselves
+        policy.use_dirfd = False  # Simplify for local validation use
+
+        extracted_files = extract_archive_safe(
+            package_path, final_dir, logger=logger, extraction_policy=policy
+        )
+
+        logger.info(
+            "extracted xbrl package",
+            extra={
+                "stage": "validate",
+                "validator": "arelle",
+                "destination": str(final_dir),
+                "files": len(extracted_files),
+            },
+        )
+
+        # Find entrypoint (XSD or XML)
+        entrypoint_candidates = sorted(final_dir.rglob("*.xsd")) or sorted(final_dir.rglob("*.xml"))
+        entrypoint = entrypoint_candidates[0] if entrypoint_candidates else package_path
+
+        # Collect all extracted files as artifacts
+        artifacts = [str(path) for path in final_dir.rglob("*") if path.is_file()]
+
+        return entrypoint, artifacts
+
+    except ConfigError as exc:
+        raise ValueError(f"Archive extraction failed: {exc}") from exc
+    except Exception as exc:
+        raise ValueError(f"Archive preparation failed: {exc}") from exc
 
 
 def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:

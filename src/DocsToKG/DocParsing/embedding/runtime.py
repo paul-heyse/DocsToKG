@@ -94,15 +94,15 @@ if __name__ == "__main__" and __package__ is None:
         sys.path.insert(0, str(package_root))
 
 import argparse
-import inspect
 import hashlib
-import threading
+import inspect
 import json
 import logging
 import math
 import os
 import re
 import statistics
+import threading
 import time
 import tracemalloc
 import unicodedata
@@ -110,7 +110,7 @@ import uuid
 from collections import Counter
 from dataclasses import fields
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
 # Third-party imports
 try:
@@ -159,15 +159,14 @@ except Exception:  # pragma: no cover - fallback when tqdm is unavailable
         return _TqdmFallback(iterable, **kwargs)
 
 
+from contextlib import ExitStack
+
 from DocsToKG.DocParsing.cli_errors import EmbeddingCLIValidationError, format_cli_error
 from DocsToKG.DocParsing.config import annotate_cli_overrides, parse_args_with_overrides
 from DocsToKG.DocParsing.context import ParsingContext
-from contextlib import ExitStack
-
 from DocsToKG.DocParsing.core import (
     DEFAULT_TOKENIZER,
     UUID_NAMESPACE,
-    Batcher,
     BM25Stats,
     ChunkDiscovery,
     ItemFingerprint,
@@ -186,10 +185,10 @@ from DocsToKG.DocParsing.core import (
     compute_relative_doc_id,
     compute_stable_shard,
     derive_doc_id_and_vectors_path,
-    iter_chunks,
     run_stage,
     should_skip_output,
 )
+from DocsToKG.DocParsing.core.discovery import iter_chunks
 from DocsToKG.DocParsing.embedding.backends import (
     ProviderBundle,
     ProviderContext,
@@ -214,9 +213,7 @@ from DocsToKG.DocParsing.env import (
 )
 from DocsToKG.DocParsing.formats import (
     VECTOR_SCHEMA_VERSION,
-    SchemaKind,
     ensure_chunk_schema,
-    validate_schema_version,
 )
 from DocsToKG.DocParsing.formats import (
     BM25Vector as _BM25Vector,
@@ -260,6 +257,10 @@ from DocsToKG.DocParsing.logging import (
 )
 from DocsToKG.DocParsing.logging import (
     manifest_log_success as _logging_manifest_log_success,
+)
+from DocsToKG.DocParsing.storage.embedding_integration import (
+    create_unified_vector_writer,
+    iter_vector_rows,
 )
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
@@ -424,7 +425,6 @@ __all__ = (
     "bm25_vector",
     "ensure_chunk_schema",
     "ensure_uuid",
-    "iter_chunk_files",
     "iter_rows_in_batches",
     "main",
     "print_bm25_summary",
@@ -441,7 +441,6 @@ __all__ = (
 
 
 # --- Public Functions ---
-
 
 
 # --- Cache Utilities ---
@@ -552,7 +551,7 @@ def _compute_embed_cfg_hash(cfg: "EmbedCfg", vector_format: str) -> str:
     """Return a stable hash representing embedding configuration impacting resume."""
 
     payload = {
-        "vector_format": str(vector_format or "jsonl").lower(),
+        "vector_format": str(vector_format or "parquet").lower(),
         "splade_model_dir": str(cfg.splade_model_dir or ""),
         "qwen_model_dir": str(cfg.qwen_model_dir or ""),
         "batch_size_splade": int(cfg.batch_size_splade),
@@ -624,7 +623,9 @@ def _process_stub_vectors(
             rows.append(json.loads(line))
 
     vectors_path.parent.mkdir(parents=True, exist_ok=True)
-    writer = create_vector_writer(vectors_path, str(getattr(cfg, "vector_format", vector_format)))
+    writer = create_unified_vector_writer(
+        vectors_path, fmt=str(getattr(cfg, "vector_format", vector_format))
+    )
     vector_rows = []
     for row in rows:
         vector_rows.append(
@@ -1073,106 +1074,22 @@ def iter_rows_in_batches(
         buf.append(record)
         if len(buf) >= batch_size:
             yield buf
-    """Return ``(pyarrow, pyarrow.parquet)`` or raise a CLI validation error."""
-
-    global _PYARROW_MODULE, _PYARROW_PARQUET
-    if _PYARROW_MODULE is not None and _PYARROW_PARQUET is not None:
-        return _PYARROW_MODULE, _PYARROW_PARQUET
-    try:
-        import pyarrow as pa  # type: ignore
-        import pyarrow.parquet as pq  # type: ignore
-    except ImportError as exc:  # pragma: no cover - exercised via CLI error path
-        raise EmbeddingCLIValidationError(
-            option="--format",
-            message=(
-                "parquet vector output requires the optional dependency 'pyarrow'. "
-                "Install DocsToKG[docparse-parquet] or add pyarrow to the environment."
-            ),
-        ) from exc
-    _PYARROW_MODULE = pa
-    _PYARROW_PARQUET = pq
-    return pa, pq
+            buf = []
+    if buf:
+        yield buf
 
 
-
-def _prepare_vector_row_for_arrow(row: dict) -> dict:
-    """Normalise a vector row dictionary for Arrow conversion."""
-
-    bm25 = dict(row.get("BM25") or {})
-    splade = dict(row.get("SPLADEv3") or {})
-    qwen = dict(row.get("Qwen3-4B") or row.get("Qwen3_4B") or {})
-    metadata = row.get("model_metadata") or {}
-    if not isinstance(metadata, dict):
-        metadata = {}
-
-    def _to_float_list(values: Any) -> list[float]:
-        """Return ``values`` coerced into a list of floats."""
-        if not isinstance(values, (list, tuple)):
-            return []
-        return [float(value) for value in values]
-
-    prepared = {
-        "UUID": str(row.get("UUID", "")),
-        "BM25": {
-            "terms": list(bm25.get("terms") or []),
-            "weights": _to_float_list(bm25.get("weights")),
-            "avgdl": float(bm25["avgdl"]) if bm25.get("avgdl") is not None else None,
-            "N": int(bm25["N"]) if bm25.get("N") is not None else None,
-        },
-        "SPLADEv3": {
-            "tokens": list(splade.get("tokens") or []),
-            "weights": _to_float_list(splade.get("weights")),
-        },
-        "Qwen3-4B": {
-            "model_id": str(qwen.get("model_id") or ""),
-            "vector": _to_float_list(qwen.get("vector")),
-            "dimension": int(qwen["dimension"]) if qwen.get("dimension") is not None else None,
-        },
-        "model_metadata": (
-            json.dumps(metadata, ensure_ascii=False, sort_keys=True) if metadata else None
-        ),
-        "schema_version": str(row.get("schema_version") or VECTOR_SCHEMA_VERSION),
-    }
-    return prepared
-
-
-def _rows_to_arrow_table(rows: Sequence[dict]) -> Any:
-    """Convert ``rows`` into an Arrow table suitable for parquet writes."""
-
-    if not rows:
-        raise ValueError("rows must contain at least one vector payload")
-    pa, _pq = _ensure_pyarrow_vectors()
-    schema = _vector_arrow_schema(pa)
-    prepared = [_prepare_vector_row_for_arrow(row) for row in rows]
-    return pa.Table.from_pylist(prepared, schema=schema)
-
-
-    """Yield batches of vector rows for ``path`` respecting the selected format."""
-
-    fmt_normalized = str(fmt or "jsonl").lower()
-    if fmt_normalized == "jsonl":
-        yield from iter_rows_in_batches(path, batch_size)
+def _iter_chunks_or_empty(chunks_dir: Path) -> Iterator[ChunkDiscovery]:
+    """Yield ChunkDiscovery records from a directory, or return empty if directory doesn't exist."""
+    if not chunks_dir.is_dir():
         return
-    if fmt_normalized != "parquet":
-        raise ValueError(f"Unsupported vector format: {fmt}")
+    yield from iter_chunks(chunks_dir)
 
-    _, pq = _ensure_pyarrow_vectors()
-    parquet_file = pq.ParquetFile(path)
-    for record_batch in parquet_file.iter_batches(batch_size=batch_size):
-        rows = record_batch.to_pylist()
-        normalised: List[dict] = []
-        for entry in rows:
-            metadata = entry.get("model_metadata")
-            if isinstance(metadata, str) and metadata:
-                try:
-                    entry["model_metadata"] = json.loads(metadata)
-                except json.JSONDecodeError:
-                    entry["model_metadata"] = {}
-            elif metadata in (None, ""):
-                entry["model_metadata"] = {}
-            normalised.append(entry)
-        if normalised:
-            yield normalised
+
+def _validate_chunk_file_schema(chunk_file: Path) -> None:
+    """Validate that all rows in a chunk file conform to the schema."""
+    for line_no, row in enumerate(iter_jsonl(chunk_file), start=1):
+        ensure_chunk_schema(row, context=f"{chunk_file}:{line_no}")
 
 
 def process_chunk_file_vectors(
@@ -1185,7 +1102,7 @@ def process_chunk_file_vectors(
     logger,
     *,
     content_hasher: Optional[StreamingContentHasher] = None,
-    vector_format: str = "jsonl",
+    vector_format: str = "parquet",
 ) -> Tuple[int, List[int], List[float]]:
     """Generate vectors for a single chunk file and persist them to disk."""
 
@@ -1193,7 +1110,7 @@ def process_chunk_file_vectors(
         raise TypeError("out_path must be a Path")
     resolved_out_path = out_path
     resolved_out_path.parent.mkdir(parents=True, exist_ok=True)
-    vector_format = str(vector_format or "jsonl").lower()
+    vector_format = str(vector_format or "parquet").lower()
 
     dense_provider = bundle.dense
     sparse_provider = bundle.sparse
@@ -1213,15 +1130,11 @@ def process_chunk_file_vectors(
     nnz_all: List[int] = []
     norms_all: List[float] = []
 
-    with create_vector_writer(resolved_out_path, vector_format) as writer:
+    with create_unified_vector_writer(resolved_out_path, fmt=vector_format) as writer:
         if content_hasher is None:
             row_batches: Iterator[List[dict]] = iter_rows_in_batches(chunk_file, row_batch_size)
         else:
-            row_batches = iter_rows_in_batches_with_hash(
-                chunk_file,
-                row_batch_size,
-                content_hasher=content_hasher,
-            )
+            row_batches = iter_rows_in_batches(chunk_file, row_batch_size)
 
         for rows in row_batches:
             if not rows:
@@ -1231,6 +1144,10 @@ def process_chunk_file_vectors(
             texts: List[str] = []
             for index, row in enumerate(rows, start=1):
                 ensure_chunk_schema(row, context=f"{chunk_file}:{index}")
+                # Update hasher if provided
+                if content_hasher is not None:
+                    row_str = json.dumps(row, ensure_ascii=False, sort_keys=True)
+                    content_hasher.update(row_str)
                 uuid_value = row.get("uuid")
                 if not uuid_value:
                     raise ValueError(f"Chunk row missing UUID in {chunk_file}")
@@ -1292,7 +1209,7 @@ def process_chunk_file_vectors(
 
 
 def write_vectors(
-    writer: VectorWriter,
+    writer: Any,  # UnifiedVectorWriter or compatible writer interface
     uuids: Sequence[str],
     texts: Sequence[str],
     lexical_results: Sequence[Tuple[Sequence[str], Sequence[float]]],
@@ -1306,7 +1223,7 @@ def write_vectors(
     logger,
     provider_identities: Dict[str, ProviderIdentity],
     output_path: Optional[Path] = None,
-    vector_format: str = "jsonl",
+    vector_format: str = "parquet",
 ) -> Tuple[int, List[int], List[float]]:
     """Write validated vector rows to disk with schema enforcement."""
 
@@ -1494,7 +1411,7 @@ def _handle_embedding_quarantine(
     reason: str,
     logger,
     data_root: Optional[Path] = None,
-    vector_format: str = "jsonl",
+    vector_format: str = "parquet",
 ) -> None:
     """Quarantine a problematic chunk or vector artefact and log manifest state."""
 
@@ -1524,7 +1441,7 @@ def _handle_embedding_quarantine(
         input_path=input_path,
         input_hash=input_hash_value,
         output_path=quarantine_path,
-        vector_format=str(vector_format or "jsonl").lower(),
+        vector_format=str(vector_format or "parquet").lower(),
         error=reason,
         quarantine=True,
     )
@@ -1539,7 +1456,7 @@ def _handle_embedding_quarantine(
         output_relpath=relative_path(quarantine_path, data_root),
         error_class="ValueError",
         reason=reason,
-        vector_format=str(vector_format or "jsonl").lower(),
+        vector_format=str(vector_format or "parquet").lower(),
     )
 
 
@@ -1553,14 +1470,14 @@ def _validate_vectors_for_chunks(
     *,
     data_root: Optional[Path] = None,
     expected_dimension: Optional[int] = None,
-    vector_format: str = "jsonl",
+    vector_format: str = "parquet",
 ) -> tuple[int, int]:
     """Validate vectors associated with chunk files without recomputing models.
 
     Returns:
         (files_checked, rows_validated)
     """
-    fmt_normalised = str(vector_format or "jsonl").lower()
+    fmt_normalised = str(vector_format or "parquet").lower()
     files_checked = 0
     rows_validated = 0
     missing: List[tuple[str, Path]] = []
@@ -1578,7 +1495,7 @@ def _validate_vectors_for_chunks(
             continue
         file_rows = 0
         try:
-            for batch in _iter_vector_rows(vector_path, fmt_normalised, batch_size=4096):
+            for batch in iter_vector_rows(vector_path, fmt_normalised, batch_size=4096):
                 for row in batch:
                     _validate_vector_row(row, expected_dimension=expected_dimension)
                     rows_validated += 1
@@ -1707,7 +1624,7 @@ def _build_embedding_plan(
 ) -> Tuple[StagePlan, Dict[str, Any]]:
     """Build a StagePlan for vector generation with resume awareness."""
 
-    fmt = str(vector_format or "jsonl").lower()
+    fmt = str(vector_format or "parquet").lower()
     planned_ids: List[str] = []
     skipped_ids: List[str] = []
     work_items: List[WorkItem] = []
@@ -1724,9 +1641,7 @@ def _build_embedding_plan(
         manifest_entry = resume_controller.entry(doc_id) if resume_controller.resume else None
         vectors_exist = vector_path.exists()
         entry_format = (
-            str(manifest_entry.get("vector_format") or "jsonl").lower()
-            if manifest_entry
-            else None
+            str(manifest_entry.get("vector_format") or "jsonl").lower() if manifest_entry else None
         )
         format_mismatch = bool(manifest_entry) and entry_format != fmt
 
@@ -2139,7 +2054,9 @@ def _make_embedding_stage_hooks(
                     status="success",
                     stage=EMBED_STAGE,
                     doc_id=item.item_id,
-                    input_relpath=item.metadata.get("input_relpath", relative_path(input_path, root)),
+                    input_relpath=item.metadata.get(
+                        "input_relpath", relative_path(input_path, root)
+                    ),
                     output_relpath=item.metadata.get(
                         "output_relpath", relative_path(output_path, root)
                     ),
@@ -2245,9 +2162,7 @@ def _make_embedding_stage_hooks(
             input_hash="",
             output_path=vectors_dir_state,
             warnings=(
-                validator.zero_nnz_chunks[: validator.top_n]
-                if validator.zero_nnz_chunks
-                else []
+                validator.zero_nnz_chunks[: validator.top_n] if validator.zero_nnz_chunks else []
             ),
             total_vectors=total_vectors,
             splade_avg_nnz=avg_nnz,
@@ -2291,6 +2206,20 @@ def _make_embedding_stage_hooks(
         after_item=after_item,
         after_stage=after_stage,
     )
+
+
+def _ensure_pyarrow_vectors() -> None:
+    """Validate that pyarrow is available for parquet vector output."""
+    try:
+        import pyarrow  # noqa: F401
+    except ImportError as exc:
+        raise EmbeddingCLIValidationError(
+            option="--format",
+            message=(
+                "parquet vector output requires the optional dependency 'pyarrow'. "
+                "Install DocsToKG[docparse-parquet] or add pyarrow to the environment."
+            ),
+        ) from exc
 
 
 def _main_inner(args: argparse.Namespace | None = None) -> int:
@@ -2396,7 +2325,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
     args.shard_count = shard_count
     args.shard_index = shard_index
 
-    vector_format = str(cfg.vector_format or "jsonl").lower()
+    vector_format = str(cfg.vector_format or "parquet").lower()
     if vector_format not in {"jsonl", "parquet"}:
         raise EmbeddingCLIValidationError(
             option="--format",

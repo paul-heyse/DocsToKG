@@ -152,6 +152,38 @@ class LoggingConfiguration(BaseModel):
     model_config = {"validate_assignment": True}
 
 
+class DatabaseConfiguration(BaseModel):
+    """DuckDB catalog configuration for ontology metadata tracking."""
+
+    db_path: Optional[Path] = Field(
+        default=None,
+        description="Path to DuckDB file; defaults to ~/.data/ontology-fetcher/.catalog/ontofetch.duckdb",
+    )
+    readonly: bool = Field(default=False, description="Open database in read-only mode")
+    enable_locks: bool = Field(
+        default=True,
+        description="Enable file-based locks to serialize writers; readers bypass locks",
+    )
+    threads: Optional[int] = Field(
+        default=None,
+        description="Number of threads for query execution; None uses CPU count",
+    )
+    memory_limit: Optional[str] = Field(
+        default=None,
+        description="Memory limit as string (e.g., '8GB'); None uses auto",
+    )
+    enable_object_cache: bool = Field(
+        default=True,
+        description="Enable object cache for repeated remote file metadata scans",
+    )
+    parquet_events: bool = Field(
+        default=False,
+        description="Store events as Parquet files instead of table; attach on demand",
+    )
+
+    model_config = {"validate_assignment": True}
+
+
 class ValidationConfig(BaseModel):
     """Settings controlling ontology validation throughput and limits."""
 

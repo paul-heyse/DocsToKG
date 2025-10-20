@@ -43,7 +43,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Dict, List, Optional, Sequence, Union, Tuple
 
 import httpx
 import yaml
@@ -53,6 +53,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from . import net
 from .api import _collect_plugin_details
+from .database import Database, DatabaseConfiguration, close_database, get_database
 from .errors import ConfigError, ConfigurationError, OntologyDownloadError, UnsupportedPythonError
 from .formatters import (
     PLAN_TABLE_HEADERS,
@@ -415,6 +416,80 @@ def _build_parser() -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         help="Emit pruning summary as JSON",
+    )
+
+    # Database query subcommands
+    db = subparsers.add_parser(
+        "db",
+        help="Query the ontology metadata catalog",
+        description="Query and inspect the DuckDB ontology catalog for versions, files, and validation results.",
+    )
+    db_subs = db.add_subparsers(dest="db_cmd", required=True)
+
+    # db latest
+    db_latest = db_subs.add_parser("latest", help="Show latest version")
+    db_latest.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON",
+    )
+
+    # db versions
+    db_versions = db_subs.add_parser("versions", help="List all versions")
+    db_versions.add_argument(
+        "--service",
+        help="Filter by service (OLS, BioPortal, etc.)",
+    )
+    db_versions.add_argument(
+        "--limit",
+        type=int,
+        default=50,
+        help="Maximum versions to list (default: 50)",
+    )
+    db_versions.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON",
+    )
+
+    # db stats
+    db_stats = db_subs.add_parser("stats", help="Get version statistics")
+    db_stats.add_argument(
+        "version_id",
+        help="Version ID to get statistics for",
+    )
+    db_stats.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON",
+    )
+
+    # db files
+    db_files = db_subs.add_parser("files", help="List extracted files")
+    db_files.add_argument(
+        "version_id",
+        help="Version ID to list files for",
+    )
+    db_files.add_argument(
+        "--format",
+        help="Filter by file format (ttl, rdf, owl, obo, etc.)",
+    )
+    db_files.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON",
+    )
+
+    # db validations
+    db_validations = db_subs.add_parser("validations", help="Show validation failures")
+    db_validations.add_argument(
+        "version_id",
+        help="Version ID to get validation failures for",
+    )
+    db_validations.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON",
     )
 
     return parser
@@ -907,6 +982,37 @@ def _handle_plugins(args) -> Dict[str, Dict[str, Dict[str, str]]]:
     return {args.kind: dict(_collect_plugin_details(args.kind))}
 
 
+def _scan_filesystem_for_orphans(root_dir: Path) -> List[Tuple[str, int]]:
+    """Scan filesystem to find orphaned files not referenced in database.
+
+    Args:
+        root_dir: Root directory to scan (typically ontologies/)
+
+    Returns:
+        List of (relpath, size_bytes) tuples for files found on disk
+    """
+    from pathlib import PurePath
+
+    entries: List[Tuple[str, int]] = []
+
+    if not root_dir.exists():
+        return entries
+
+    for file_path in root_dir.rglob("*"):
+        if not file_path.is_file():
+            continue
+
+        try:
+            relpath = str(PurePath(file_path.relative_to(root_dir)))
+            size_bytes = file_path.stat().st_size
+            entries.append((relpath, size_bytes))
+        except (OSError, ValueError):
+            # Skip files we can't access or whose paths we can't compute
+            continue
+
+    return entries
+
+
 def _handle_prune(args, logger) -> Dict[str, object]:
     """Delete surplus ontology versions based on ``--keep`` and age filters."""
 
@@ -1041,10 +1147,96 @@ def _handle_prune(args, logger) -> Dict[str, object]:
                 f"Deleted {len(deleted_versions)} versions for {ontology_id} (freed {format_bytes(reclaimed)}; kept {keep_summary})"
             )
 
+    # Phase 3: Orphan Detection
+    orphans_section: Dict[str, object] = {
+        "orphans_found": 0,
+        "orphans_bytes": 0,
+        "details": [],
+    }
+
+    try:
+        from .database import DatabaseConfiguration, get_database, close_database
+
+        db_config = DatabaseConfiguration()
+        db = get_database(db_config)
+
+        # Scan filesystem for all files
+        ontologies_dir = LOCAL_ONTOLOGY_DIR
+        fs_entries = _scan_filesystem_for_orphans(ontologies_dir)
+
+        if fs_entries:
+            # Stage the filesystem entries in database
+            staged_entries = [(relpath, size, None) for relpath, size in fs_entries]
+            db.stage_filesystem_listing("version", staged_entries)
+
+            # Get orphaned files from database
+            orphaned = db.get_orphaned_files("version")
+
+            if orphaned:
+                orphans_section["orphans_found"] = len(orphaned)
+                orphans_section["orphans_bytes"] = sum(size for _, size in orphaned)
+
+                if args.dry_run:
+                    messages.append(
+                        f"[DRY-RUN] Found {len(orphaned)} orphaned file(s) "
+                        f"totaling {format_bytes(sum(size for _, size in orphaned))}"
+                    )
+                    orphans_section["details"] = [
+                        {"path": relpath, "size_bytes": size} for relpath, size in orphaned[:10]
+                    ]
+                else:
+                    # Apply mode: delete orphaned files
+                    deleted_orphans = 0
+                    freed_orphan_bytes = 0
+                    for relpath, size_bytes in orphaned:
+                        orphan_path = ontologies_dir / relpath
+                        try:
+                            if orphan_path.exists():
+                                orphan_path.unlink()
+                                deleted_orphans += 1
+                                freed_orphan_bytes += size_bytes
+                                if logger is not None:
+                                    logger.info(
+                                        "deleted orphaned file",
+                                        extra={
+                                            "path": relpath,
+                                            "size_bytes": size_bytes,
+                                        },
+                                    )
+                        except OSError as exc:
+                            if logger is not None:
+                                logger.warning(
+                                    "failed to delete orphaned file",
+                                    extra={
+                                        "path": relpath,
+                                        "error": str(exc),
+                                    },
+                                )
+
+                    if deleted_orphans > 0:
+                        orphans_section["deleted_orphans"] = deleted_orphans
+                        orphans_section["freed_orphan_bytes"] = freed_orphan_bytes
+                        messages.append(
+                            f"Deleted {deleted_orphans} orphaned file(s) "
+                            f"(freed {format_bytes(freed_orphan_bytes)})"
+                        )
+
+        close_database()
+
+    except Exception as exc:  # pylint: disable=broad-except
+        orphans_section["error"] = str(exc)
+        if logger is not None:
+            logger.warning("orphan detection failed", extra={"error": str(exc)})
+        try:
+            close_database()
+        except Exception:  # pylint: disable=broad-except
+            pass  # Ensure we don't mask the original exception
+
     return {
         "ontologies": summary,
         "total_deleted": total_deleted,
         "total_reclaimed_bytes": total_reclaimed,
+        "orphans": orphans_section,
         "dry_run": bool(args.dry_run),
         "messages": messages,
     }
@@ -1071,6 +1263,93 @@ def _read_api_key_status(path: Path) -> Dict[str, object]:
         info["error"] = f"{exc.__class__.__name__}: {exc}"
 
     return info
+
+
+def _database_health_check() -> Dict[str, object]:
+    """Check DuckDB catalog health and return diagnostic information."""
+
+    from .database import DatabaseConfiguration
+
+    db_config = DatabaseConfiguration()
+    db_path = db_config.db_path or (
+        Path.home() / ".data" / "ontology-fetcher" / ".catalog" / "ontofetch.duckdb"
+    )
+
+    report: Dict[str, object] = {"db_path": str(db_path)}
+
+    if not db_path.exists():
+        report.update(
+            {
+                "ok": True,
+                "initialized": False,
+                "message": "Database not yet created",
+            }
+        )
+        return report
+
+    try:
+        db = get_database(db_config)
+
+        if db._connection is None:
+            report.update(
+                {
+                    "ok": False,
+                    "error": "Database connection is None",
+                    "initialized": True,
+                }
+            )
+            return report
+
+        # Try to check schema version
+        schema_version_result = db._connection.execute(
+            "SELECT COUNT(*) FROM schema_version"
+        ).fetchone()
+        schema_version_count = schema_version_result[0] if schema_version_result else 0
+
+        # Count versions
+        versions_result = db._connection.execute("SELECT COUNT(*) FROM versions").fetchone()
+        versions_count = versions_result[0] if versions_result else 0
+
+        # Count artifacts
+        artifacts_result = db._connection.execute("SELECT COUNT(*) FROM artifacts").fetchone()
+        artifacts_count = artifacts_result[0] if artifacts_result else 0
+
+        # Count files
+        files_result = db._connection.execute("SELECT COUNT(*) FROM extracted_files").fetchone()
+        files_count = files_result[0] if files_result else 0
+
+        # Count validations
+        validations_result = db._connection.execute("SELECT COUNT(*) FROM validations").fetchone()
+        validations_count = validations_result[0] if validations_result else 0
+
+        db.close()
+
+        report.update(
+            {
+                "ok": True,
+                "initialized": True,
+                "schema_migrations": schema_version_count,
+                "versions": versions_count,
+                "artifacts": artifacts_count,
+                "files": files_count,
+                "validations": validations_count,
+            }
+        )
+
+    except Exception as exc:
+        report.update(
+            {
+                "ok": False,
+                "error": str(exc),
+                "initialized": True,  # DB file exists but there's an issue
+            }
+        )
+        try:
+            close_database()
+        except Exception:
+            pass
+
+    return report
 
 
 def _doctor_report() -> Dict[str, object]:
@@ -1203,6 +1482,8 @@ def _doctor_report() -> Dict[str, object]:
             result.update({"ok": ok, "status": status})
             if not ok:
                 result["detail"] = response.reason_phrase
+        except httpx.HTTPStatusError as exc:  # pragma: no cover - network variability
+            result.update({"ok": False, "detail": str(exc.response.reason_phrase or str(exc))})
         except httpx.RequestError as exc:  # pragma: no cover - network variability
             result.update({"ok": False, "detail": str(exc)})
         network[name] = result
@@ -1224,7 +1505,9 @@ def _doctor_report() -> Dict[str, object]:
             rate_limit_errors.append(f"Failed to parse {config_path}: {exc}")
         else:
             http_section = raw.get("defaults", {}).get("http") if isinstance(raw, dict) else None
-            configured_mode = http_section.get("rate_limiter") if isinstance(http_section, dict) else None
+            configured_mode = (
+                http_section.get("rate_limiter") if isinstance(http_section, dict) else None
+            )
             if configured_mode is not None and str(configured_mode).strip():
                 rate_limits["configured_mode"] = str(configured_mode).strip()
             configured = http_section.get("rate_limits") if isinstance(http_section, dict) else None
@@ -1298,6 +1581,16 @@ def _doctor_report() -> Dict[str, object]:
         "remote": hasattr(STORAGE, "fs"),
     }
 
+    # Safely collect database diagnostic without breaking doctor command
+    db_diagnostic: Dict[str, object] = {}
+    try:
+        db_diagnostic = _database_health_check()
+    except Exception as exc:  # pylint: disable=broad-except
+        db_diagnostic = {
+            "ok": False,
+            "error": f"Failed to get database diagnostics: {exc}",
+        }
+
     report: Dict[str, object] = {
         "directories": directories,
         "disk": disk_report,
@@ -1308,6 +1601,7 @@ def _doctor_report() -> Dict[str, object]:
         "rate_limits": rate_limits,
         "manifest_schema": schema_report,
         "storage": storage_backend,
+        "database": db_diagnostic,
     }
     return report
 
@@ -1526,6 +1820,22 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
     else:
         backend_desc += " (local)"
     print(f"Storage backend: {backend_desc}")
+
+    db = report.get("database", {})
+    db_status = "healthy" if db.get("ok") else "error"
+    if db.get("initialized"):
+        print(f"Database: {db_status} ({db.get('db_path')})")
+        print(f"  - Schema migrations: {db.get('schema_migrations', 0)}")
+        print(f"  - Versions: {db.get('versions', 0)}")
+        print(f"  - Artifacts: {db.get('artifacts', 0)}")
+        print(f"  - Files: {db.get('files', 0)}")
+        print(f"  - Validations: {db.get('validations', 0)}")
+        if not db.get("ok"):
+            error_msg = db.get("error", "Unknown error")
+            print(f"  Error: {error_msg}")
+    else:
+        print(f"Database: not initialized ({db.get('db_path')})")
+        print(f"  - {db.get('message', 'Database file does not exist yet')}")
 
 
 def _handle_show(args) -> None:
@@ -1781,6 +2091,180 @@ def _emit_batch_failure(exc: Union[BatchPlanningError, BatchFetchError], args) -
     sys.stdout.write("\n")
 
 
+# --- Database Query Handlers ---
+
+
+def _handle_db_latest(args) -> Dict[str, object]:
+    """Show the latest ontology version from the catalog."""
+
+    db = get_database()
+    try:
+        latest = db.get_latest_version()
+        if latest:
+            result = {
+                "ok": True,
+                "version_id": latest.version_id,
+                "service": latest.service,
+                "created_at": latest.created_at.isoformat(),
+            }
+        else:
+            result = {"ok": True, "version_id": None, "message": "No versions recorded."}
+        return result
+    finally:
+        close_database()
+
+
+def _handle_db_versions(args) -> Dict[str, object]:
+    """List ontology versions from the catalog."""
+
+    db = get_database()
+    try:
+        versions = db.list_versions(service=args.service, limit=args.limit)
+        return {
+            "ok": True,
+            "count": len(versions),
+            "versions": [
+                {
+                    "version_id": v.version_id,
+                    "service": v.service,
+                    "created_at": v.created_at.isoformat(),
+                }
+                for v in versions
+            ],
+        }
+    finally:
+        close_database()
+
+
+def _handle_db_stats(args) -> Dict[str, object]:
+    """Get statistics for a specific version."""
+
+    db = get_database()
+    try:
+        stats = db.get_version_stats(args.version_id)
+        if stats:
+            return {
+                "ok": True,
+                "version_id": stats.version_id,
+                "service": stats.service,
+                "created_at": stats.created_at.isoformat(),
+                "statistics": {
+                    "files": stats.files,
+                    "bytes": stats.bytes,
+                    "validations_passed": stats.validations_passed,
+                    "validations_failed": stats.validations_failed,
+                },
+            }
+        else:
+            return {"ok": False, "error": f"Version not found: {args.version_id}"}
+    finally:
+        close_database()
+
+
+def _handle_db_files(args) -> Dict[str, object]:
+    """List extracted files for a version."""
+
+    db = get_database()
+    try:
+        files = db.list_extracted_files(args.version_id, format_filter=args.format)
+        return {
+            "ok": True,
+            "version_id": args.version_id,
+            "format_filter": args.format,
+            "count": len(files),
+            "files": [
+                {
+                    "file_id": f.file_id,
+                    "relpath": f.relpath_in_version,
+                    "format": f.format,
+                    "size_bytes": f.size_bytes,
+                }
+                for f in files
+            ],
+        }
+    finally:
+        close_database()
+
+
+def _handle_db_validations(args) -> Dict[str, object]:
+    """Show validation failures for a version."""
+
+    db = get_database()
+    try:
+        failures = db.get_validation_failures(args.version_id)
+        return {
+            "ok": True,
+            "version_id": args.version_id,
+            "failure_count": len(failures),
+            "failures": [
+                {
+                    "file_id": f.file_id,
+                    "validator": f.validator,
+                    "details": f.details_json,
+                    "run_at": f.run_at.isoformat(),
+                }
+                for f in failures
+            ],
+        }
+    finally:
+        close_database()
+
+
+def _print_db_result(result: Dict[str, object], args) -> None:
+    """Print database query result as JSON or table."""
+
+    if args.json:
+        json.dump(result, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+    else:
+        # Human-readable format
+        if not result.get("ok"):
+            print(f"Error: {result.get('error', 'Unknown error')}", file=sys.stderr)
+            return
+
+        cmd = args.db_cmd
+        if cmd == "latest":
+            if result.get("version_id"):
+                print(f"Latest: {result.get('version_id')} ({result.get('service')})")
+                print(f"Created: {result.get('created_at')}")
+            else:
+                print(result.get("message", "No versions recorded."))
+
+        elif cmd == "versions":
+            count = result.get("count", 0)
+            print(f"Versions ({count} total):")
+            for v in result.get("versions", []):
+                print(f"  {v['version_id']:30} {v['service']:15} {v['created_at']}")
+
+        elif cmd == "stats":
+            stats = result.get("statistics", {})
+            print(f"Version: {result.get('version_id')}")
+            print(f"Service: {result.get('service')}")
+            print(f"Created: {result.get('created_at')}")
+            print(f"Files: {stats.get('files', 0)}")
+            print(f"Total size: {stats.get('bytes', 0) / (1024**3):.2f} GB")
+            print(f"Validations passed: {stats.get('validations_passed', 0)}")
+            print(f"Validations failed: {stats.get('validations_failed', 0)}")
+
+        elif cmd == "files":
+            count = result.get("count", 0)
+            print(f"Files for {result.get('version_id')} ({count} total):")
+            if result.get("format_filter"):
+                print(f"  Format filter: {result.get('format_filter')}")
+            for f in result.get("files", []):
+                print(f"  {f['relpath']:50} {f['format']:10} {f['size_bytes']:>10} bytes")
+
+        elif cmd == "validations":
+            failures = result.get("failure_count", 0)
+            print(f"Validation failures for {result.get('version_id')}: {failures} total")
+            for f in result.get("failures", []):
+                print(f"  {f['file_id']}")
+                print(f"    validator: {f['validator']}")
+                print(f"    run_at: {f['run_at']}")
+                if f.get("details"):
+                    print(f"    details: {json.dumps(f['details'], indent=6)}")
+
+
 # --- Module Entry Points ---
 
 
@@ -1908,6 +2392,18 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                 deleted = summary.get("total_deleted", 0)
                 label = "Dry-run" if summary.get("dry_run") else "Pruned"
                 print(f"{label}: reclaimed {format_bytes(total)} across {deleted} versions")
+
+                # Display orphan detection results
+                orphans = summary.get("orphans", {})
+                if orphans.get("orphans_found", 0) > 0:
+                    print(
+                        f"Orphans: found {orphans['orphans_found']} file(s) "
+                        f"totaling {format_bytes(orphans['orphans_bytes'])}"
+                    )
+                    if orphans.get("deleted_orphans", 0) > 0:
+                        print(f"  Deleted {orphans['deleted_orphans']} orphaned file(s)")
+                elif orphans.get("error"):
+                    print(f"Orphan detection skipped: {orphans['error']}")
         elif args.command == "show":
             _handle_show(args)
         elif args.command == "validate":
@@ -1956,6 +2452,22 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                     print("\nApplied fixes:")
                     for action in fixes:
                         print(f"  - {action}")
+        elif args.command == "db":
+            if args.db_cmd == "latest":
+                result = _handle_db_latest(args)
+                _print_db_result(result, args)
+            elif args.db_cmd == "versions":
+                result = _handle_db_versions(args)
+                _print_db_result(result, args)
+            elif args.db_cmd == "stats":
+                result = _handle_db_stats(args)
+                _print_db_result(result, args)
+            elif args.db_cmd == "files":
+                result = _handle_db_files(args)
+                _print_db_result(result, args)
+            elif args.db_cmd == "validations":
+                result = _handle_db_validations(args)
+                _print_db_result(result, args)
         else:  # pragma: no cover - argparse should prevent unknown commands
             parser.error(f"Unsupported command: {args.command}")
 

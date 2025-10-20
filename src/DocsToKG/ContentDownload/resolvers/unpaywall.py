@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Tuple
 import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
+from DocsToKG.ContentDownload.urls import canonical_for_index
 
 from .base import (
     RegisteredResolver,
@@ -151,5 +152,14 @@ class UnpaywallResolver(RegisteredResolver):
         for unique_url in unique_urls:
             for candidate_url, metadata in candidates:
                 if candidate_url == unique_url:
-                    yield ResolverResult(url=unique_url, metadata=metadata)
+                    # Explicitly compute canonical URL for RFC 3986 compliance and deduplication
+                    try:
+                        canonical_url = canonical_for_index(unique_url)
+                    except Exception:
+                        canonical_url = unique_url
+                    yield ResolverResult(
+                        url=unique_url,
+                        canonical_url=canonical_url,
+                        metadata=metadata,
+                    )
                     break

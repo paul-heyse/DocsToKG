@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Iterable
 import httpx
 
 from DocsToKG.ContentDownload.core import dedupe
+from DocsToKG.ContentDownload.urls import canonical_for_index
 
 from .base import RegisteredResolver, ResolverEvent, ResolverEventReason, ResolverResult
 
@@ -63,8 +64,9 @@ class OpenAlexResolver(RegisteredResolver):
             ResolverResult: Candidate download URLs or skip events.
         """
         candidates = list(dedupe(artifact.pdf_urls))
-        if getattr(artifact, "open_access_url", None):
-            candidates.append(artifact.open_access_url)
+        open_access_url = getattr(artifact, "open_access_url", None)
+        if open_access_url:
+            candidates.append(open_access_url)
 
         if not candidates:
             yield ResolverResult(
@@ -77,4 +79,13 @@ class OpenAlexResolver(RegisteredResolver):
         for url in dedupe(candidates):
             if not url:
                 continue
-            yield ResolverResult(url=url, metadata={"source": "openalex_metadata"})
+            # Explicitly compute canonical URL for RFC 3986 compliance and deduplication
+            try:
+                canonical_url = canonical_for_index(url)
+            except Exception:
+                canonical_url = url
+            yield ResolverResult(
+                url=url,
+                canonical_url=canonical_url,
+                metadata={"source": "openalex_metadata"},
+            )

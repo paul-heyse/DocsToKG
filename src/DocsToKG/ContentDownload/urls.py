@@ -22,26 +22,97 @@ Responsibilities
   :func:`configure_url_policy`, honouring CLI and environment overrides.
 - Provide test hooks (:func:`reset_url_policy_for_tests`) so fixtures can tweak
   canonicalisation in isolation.
+- Derive standardized host keys for limiter, breaker, and HTTPX transport routing
+  via :func:`canonical_host`.
 
-Environment overrides
+Policy & Canonicalization Rules
+--------------------------------
+URL normalization follows RFC 3986/3987 best practices:
+
+1. **Scheme and host casing**: lowercase scheme and host (e.g., `HTTP://Example.COM` → `http://example.com`).
+2. **Percent-encoding**: uppercase hex escapes and decode unreserved characters (e.g., `%2a` → `%2A`).
+3. **Dot-segment removal**: normalize paths with `.` and `..` (e.g., `/a/./b/../c` → `/a/c`).
+4. **Path defaults**: add `/` for empty paths on http/https (e.g., `http://example.com` → `http://example.com/`).
+5. **Default port dropping**: remove port **only if it matches the scheme default** (80 for http, 443 for https).
+   **Gotcha**: with `DEFAULT_SCHEME="https"`, a URL like `www.example.com:80/foo` will keep `:80` because
+   80 is not the default for https; only drop when input scheme matches or defaults to http.
+6. **IDN normalization**: convert international domain names to ASCII punycode (e.g., `münchen.example` → `xn--mnich-kva.example`).
+7. **Fragment removal**: strip URL fragments (client-side only; not sent to origin).
+8. **Query parameter handling**:
+   - **No reordering**: parameter order may be semantically meaningful; never sort or shuffle.
+   - **Filtering** (landing role only): optionally drop known trackers (`utm_*`, `gclid`, etc.) if enabled.
+   - **Allowlists** (per-domain): preserve only specified params when filtering is active.
+
+Role-Based Behavior
+-------------------
+Three roles control request shaping and filtering:
+
+- `metadata`: REST/JSON API calls. No param filtering; preserve all query strings.
+  Suitable for signed/authenticated requests; CDN signatures must remain untouched.
+- `landing`: HTML discovery from landing pages. Param filtering enabled; drop trackers.
+  Remove noise (`utm_*`, `fbclid`, `gclid`, etc.) but preserve application params (e.g., `page`, `id`).
+- `artifact`: Direct downloads (PDF, XML). No param filtering; preserve all semantics.
+  Treat as immutable; never remove parts of authenticated/CDN URLs.
+
+Gotchas & Constraints
+---------------------
+- **Signature/Auth preservation**: If a URL includes signed parameters (`X-Amz-Signature`, tokens, expires),
+  never use `landing` role; use `artifact` or create a custom role. The default drop list omits known
+  sig param names intentionally.
+- **Scheme inference**: default scheme is `https` (v2.0+ behavior). Relative URLs and scheme-less inputs
+  will be upgraded to https unless explicitly overridden.
+- **Port gotcha**: only the scheme-default port (80→http, 443→https) gets dropped. Explicit non-default
+  ports (e.g., 8080, 9000) are preserved.
+- **CDN & shortlinks**: shortlink params like `?download=1`, `?pdf=1` are **preserved** for `artifact` role,
+  but dropped for `landing` if not in the allowlist. Always verify before deploying if a provider uses
+  shortlink parameters.
+
+Environment Overrides
 ---------------------
 The following environment variables are honoured during module import:
 
 ``DOCSTOKG_URL_DEFAULT_SCHEME`` – override the default scheme (default: https).
-``DOCSTOKG_URL_FILTER_LANDING`` – toggle landing-page query filtering.
+``DOCSTOKG_URL_FILTER_LANDING`` – toggle landing-page query filtering (default: True).
 ``DOCSTOKG_URL_PARAM_ALLOWLIST`` – allowlist specification
     (e.g., ``site.com:page,id;example.org:id`` or ``page,id`` for a global list).
 
 Call :func:`configure_url_policy` at runtime (CLI bootstrap) to apply parsed
 configuration. Tests may call :func:`reset_url_policy_for_tests` to revert to
 defaults.
+
+Typical Integration
+-------------------
+1. **Resolvers** compute `canonical_url = canonical_for_index(original_url)` and forward it to the pipeline.
+2. **Networking hub** calls `canonical_for_request(url, role=<role>)` just before sending to HTTPX.
+3. **Limiter/Breaker** use `canonical_host(url)` to derive consistent keys.
+4. **Hishel cache** receives the canonical URL from HTTPX, ensuring cache hits are stable.
+5. **Manifest** persists both `original_url` and `canonical_url` for audit/debug.
+
+Example Usage
+-------------
+    from DocsToKG.ContentDownload.urls import (
+        canonical_for_index,
+        canonical_for_request,
+        canonical_host,
+    )
+
+    # For deduplication
+    orig_url = "HTTP://EXAMPLE.COM:443/path?utm_source=x&id=1"
+    index_url = canonical_for_index(orig_url)  # "https://example.com/path?utm_source=x&id=1"
+
+    # For sending (landing role strips trackers)
+    request_url = canonical_for_request(orig_url, role="landing")
+    # "https://example.com/path?id=1"
+
+    # For limiter key
+    host_key = canonical_host(orig_url)  # "example.com"
 """
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 from urllib.parse import urlsplit, urlunsplit
 
 from typing_extensions import Literal
@@ -53,6 +124,32 @@ DEFAULT_SCHEME = "https"
 FILTER_FOR: Mapping[Role, bool] = {"landing": True, "metadata": False, "artifact": False}
 PARAM_ALLOWLIST: Mapping[str, Sequence[str]] = {}
 DEFAULT_DOMAIN_PER_HOST: Mapping[str, str] = {}
+
+# Conservative set of tracker/marketing parameters to drop when filtering landing pages.
+# Excludes known authentication, CDN signature, and semantic shortlink parameters.
+DROP_PARAMS_DEFAULT = frozenset(
+    {
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "gclid",  # Google Ads
+        "fbclid",  # Facebook Ads
+        "yclid",  # Yandex Ads
+        "mc_eid",  # Mailchimp Email ID
+        "mc_cid",  # Mailchimp Campaign ID
+        "ref",
+        "ref_",
+        "referrer",  # Referrer tracking
+        "spm",  # Alibaba tracking
+        "igshid",  # Instagram share ID
+        "mkt_tok",  # Marketo token
+        "msclkid",  # Microsoft Click ID
+        "_hsenc",
+        "_hsmi",  # HubSpot
+    }
+)
 
 
 @dataclass
@@ -124,11 +221,7 @@ def parse_param_allowlist_spec(
             domain_key = domain.strip().lower()
             if not domain_key:
                 continue
-            params = [
-                param.strip()
-                for param in params_text.split(",")
-                if param.strip()
-            ]
+            params = [param.strip() for param in params_text.split(",") if param.strip()]
             if not params:
                 continue
             unique_params = []
@@ -232,11 +325,7 @@ def _select_param_allowlist() -> Optional[Union[List[str], Dict[str, List[str]]]
     domain_map = _POLICY.param_allowlist_per_domain
 
     if domain_map:
-        return {
-            domain: list(values)
-            for domain, values in domain_map.items()
-            if values
-        }
+        return {domain: list(values) for domain, values in domain_map.items() if values}
     if global_allowlist:
         return list(global_allowlist)
     return None
@@ -262,22 +351,65 @@ def canonical_for_request(
     if url is None:
         raise TypeError("canonical_for_request expected a URL string, received None.")
 
-    kwargs: MutableMapping[str, object] = {"default_scheme": _POLICY.default_scheme}
+    # Build kwargs dict with proper typing for url_normalize
+    kwargs_dict: Dict[str, Any] = {"default_scheme": _POLICY.default_scheme}
     default_domain: Optional[str] = None
     if origin_host:
         host_key = origin_host.strip().lower()
         default_domain = _POLICY.default_domain_per_host.get(host_key, host_key)
     if default_domain:
-        kwargs["default_domain"] = default_domain
+        kwargs_dict["default_domain"] = default_domain
 
     if _POLICY.filter_for.get(role, False):
-        kwargs["filter_params"] = True
+        kwargs_dict["filter_params"] = True
         allowlist = _select_param_allowlist()
         if allowlist:
-            kwargs["param_allowlist"] = allowlist
+            kwargs_dict["param_allowlist"] = allowlist
 
-    canonical = url_normalize(url, **kwargs)
+    canonical = url_normalize(url, **kwargs_dict)  # type: ignore[arg-type]
     return _strip_fragment(canonical or "")
+
+
+def canonical_host(url: str) -> str:
+    """Extract the canonical hostname from a URL for limiter/breaker/mount keys.
+
+    Returns the lowercase, IDN-normalized (punycode) hostname without port,
+    suitable for use as a key in rate limiters, circuit breakers, and HTTPX
+    transport mounts.
+
+    Raises
+    ------
+    TypeError
+        If ``url`` is None or not a string.
+    ValueError
+        If the URL has no extractable hostname.
+
+    Examples
+    --------
+    >>> canonical_host("HTTP://EXAMPLE.COM:443/path")
+    'example.com'
+    >>> canonical_host("https://münchen.example/test")
+    'xn--mnich-kva.example'
+    """
+
+    if url is None:
+        raise TypeError("canonical_host expected a URL string, received None.")
+    if not isinstance(url, str):
+        raise TypeError(f"canonical_host expected a string, got {type(url).__name__}")
+
+    # Canonicalize to ensure IDN normalization, then extract host
+    canonical = canonical_for_index(url)
+    if not canonical:
+        raise ValueError(f"Could not extract hostname from URL: {url}")
+
+    try:
+        parts = urlsplit(canonical)
+        hostname = parts.hostname or parts.netloc.split(":")[0]
+        if not hostname:
+            raise ValueError(f"URL has no hostname: {canonical}")
+        return hostname.lower()
+    except Exception as e:
+        raise ValueError(f"Could not extract hostname from canonical URL {canonical}: {e}") from e
 
 
 _apply_environment_overrides()
@@ -285,12 +417,14 @@ _apply_environment_overrides()
 __all__ = [
     "DEFAULT_SCHEME",
     "DEFAULT_DOMAIN_PER_HOST",
+    "DROP_PARAMS_DEFAULT",
     "FILTER_FOR",
     "PARAM_ALLOWLIST",
-    "UrlPolicy",
     "Role",
+    "UrlPolicy",
     "canonical_for_index",
     "canonical_for_request",
+    "canonical_host",
     "configure_url_policy",
     "get_url_policy",
     "parse_param_allowlist_spec",
