@@ -89,6 +89,7 @@ from .settings import (
     get_default_config,
     load_config,
     parse_rate_limit_to_rps,
+    normalize_config_path,
     validate_config,
 )
 from .validation import (
@@ -1482,19 +1483,14 @@ def _handle_init(path: Path) -> None:
 
 
 def _handle_config_validate(path: Path) -> dict:
-    """Validate a configuration file and return a summary report.
+    """Validate a configuration file and return a summary report."""
 
-    Args:
-        path: Filesystem path to the configuration file under validation.
-
-    Returns:
-        Dictionary describing validation status, ontology count, and file path.
-    """
-    config = validate_config(path)
+    normalized_path = normalize_config_path(path)
+    config = validate_config(normalized_path)
     return {
         "ok": True,
         "ontologies": len(config.specs),
-        "path": str(path),
+        "path": str(normalized_path),
     }
 
 
