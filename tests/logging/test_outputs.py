@@ -75,6 +75,7 @@
 
 import csv
 import json
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List
@@ -86,6 +87,7 @@ pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.core import ReasonCode  # noqa: E402
 from DocsToKG.ContentDownload.pipeline import AttemptRecord  # noqa: E402
+from DocsToKG.ContentDownload import locks  # noqa: E402
 from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
     MANIFEST_SCHEMA_VERSION,
     CsvSink,
@@ -277,6 +279,8 @@ def test_jsonl_sink_writes_valid_records(tmp_path: Path) -> None:
         publication_year=2024,
         resolver="unpaywall",
         url="https://example.org/pdf",
+        canonical_url="https://example.org/pdf",
+        original_url="https://example.org/pdf",
         path="/tmp/example.pdf",
         classification="pdf",
         content_type="application/pdf",
@@ -303,8 +307,12 @@ def test_jsonl_sink_writes_valid_records(tmp_path: Path) -> None:
     assert attempt_record["sha256"] == "deadbeef"
     assert attempt_record["resolver_wall_time_ms"] == 321.0
     assert attempt_record["run_id"] == "run-2"
+    assert attempt_record["canonical_url"] == "https://example.org/pdf"
+    assert attempt_record["original_url"] == "https://example.org/pdf"
     assert parsed[1]["run_id"] == "run-2"
     assert parsed[1]["schema_version"] == MANIFEST_SCHEMA_VERSION
+    assert parsed[1]["canonical_url"] == "https://example.org/pdf"
+    assert parsed[1]["original_url"] == "https://example.org/pdf"
 
 
 def test_export_attempts_csv(tmp_path: Path) -> None:
@@ -345,6 +353,8 @@ def test_export_attempts_csv(tmp_path: Path) -> None:
     assert row["dry_run"] == "True"
     assert row["metadata"] == json.dumps({"status": 404}, sort_keys=True)
     assert row["run_id"] == "run-3"
+    assert row["canonical_url"] == "https://example.org/crossref"
+    assert row["original_url"] == "https://example.org/crossref"
 
 
 # --- Helper Functions ---
@@ -759,3 +769,29 @@ def test_run_telemetry_tracks_rate_limiter_metrics() -> None:
         summary_payload["rate_limiter_attempts"]["example.org"]["metadata"]["blocked_total"]
         == 1
     )
+
+
+def test_run_telemetry_includes_lock_metrics(tmp_path: Path) -> None:
+    run_root = tmp_path / "smoke-locks"
+    run_root.mkdir()
+    target = run_root / "manifest.jsonl"
+    target.touch()
+
+    os.environ["DOCSTOKG_LOCK_ROOT"] = str(run_root)
+    locks.reset_lock_root()
+    locks.configure_lock_root(run_root)
+
+    try:
+        with locks.manifest_lock(target):
+            pass
+
+        sink = _StubAttemptSink()
+        telemetry = RunTelemetry(sink)
+        summary_payload: Dict[str, Any] = {}
+        telemetry.log_summary(summary_payload)
+
+        assert "lock_metrics" in summary_payload
+        assert summary_payload["lock_metrics"]["manifest"]["acquire_total"] >= 1
+    finally:
+        locks.reset_lock_root()
+        os.environ.pop("DOCSTOKG_LOCK_ROOT", None)

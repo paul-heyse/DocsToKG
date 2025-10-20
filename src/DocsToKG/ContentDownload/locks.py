@@ -1,8 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.locks",
+#   "purpose": "File locking helpers for manifests, telemetry, and artifacts",
+#   "sections": [
+#     {"id": "configure-lock-root", "name": "configure_lock_root", "anchor": "function-configure-lock-root", "kind": "function"},
+#     {"id": "manifest-lock", "name": "manifest_lock", "anchor": "function-manifest-lock", "kind": "function"},
+#     {"id": "telemetry-lock", "name": "telemetry_lock", "anchor": "function-telemetry-lock", "kind": "function"},
+#     {"id": "lock-metrics-snapshot", "name": "lock_metrics_snapshot", "anchor": "function-lock-metrics-snapshot", "kind": "function"},
+#     {"id": "reset-lock-root", "name": "reset_lock_root", "anchor": "function-reset-lock-root", "kind": "function"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Centralised file-based locking utilities for DocsToKG content downloads.
 
-This module wraps :mod:`filelock` primitives with project-specific defaults
-and instrumentation so that all manifest, telemetry, artifact, and summary
-writers coordinate through a single interface.
+Responsibilities
+----------------
+- Provide opinionated helpers (:func:`manifest_lock`, :func:`telemetry_lock`,
+  :func:`summary_lock`, etc.) that map logical resources to well-known lock
+  files under the run root.
+- Expose configuration hooks (:func:`configure_lock_root`,
+  :func:`reset_lock_root`) so runners and tests can isolate lock directories.
+- Capture acquisition/hold timing via :func:`lock_metrics_snapshot` to feed
+  telemetry and troubleshoot contention.
+
+Design Notes
+------------
+- Locks are implemented with :mod:`filelock` and default to hard locks; set
+  ``DOCSTOKG_LOCK_USE_SOFT`` or per-lock environment variables to opt into soft
+  locks or custom timeouts.
+- All helpers acquire the module-level guard before mutating lock configuration
+  to remain thread-safe across runner workers.
 """
 
 from __future__ import annotations
@@ -28,6 +56,7 @@ __all__ = [
     "artifact_lock",
     "summary_lock",
     "lock_metrics_snapshot",
+    "reset_lock_root",
 ]
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.locks")
@@ -89,6 +118,15 @@ def configure_lock_root(run_root: Path) -> Path:
         _lock_root = resolved
         _lock_dir = lock_dir
     return lock_dir
+
+
+def reset_lock_root() -> None:
+    """Reset the configured lock root so future calls recompute directories."""
+
+    with _lock_config_guard:
+        global _lock_root, _lock_dir
+        _lock_root = None
+        _lock_dir = None
 
 
 def _get_lock_dir() -> Path:

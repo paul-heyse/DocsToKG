@@ -1,3 +1,17 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.args",
+#   "purpose": "CLI option parsing and configuration bootstrap for content downloads",
+#   "sections": [
+#     {"id": "resolved-config", "name": "ResolvedConfig", "anchor": "class-resolved-config", "kind": "class"},
+#     {"id": "bootstrap-run-environment", "name": "bootstrap_run_environment", "anchor": "function-bootstrap-run-environment", "kind": "function"},
+#     {"id": "resolve-config", "name": "resolve_config", "anchor": "function-resolve-config", "kind": "function"},
+#     {"id": "build-query", "name": "build_query", "anchor": "function-build-query", "kind": "function"},
+#     {"id": "resolve-topic-id-if-needed", "name": "resolve_topic_id_if_needed", "anchor": "function-resolve-topic-id-if-needed", "kind": "function"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI argument resolution and run bootstrap for DocsToKG content downloads.
 
 Responsibilities
@@ -65,6 +79,7 @@ from DocsToKG.ContentDownload.ratelimit import (
     DEFAULT_ROLE,
     ROLE_ORDER,
 )
+from DocsToKG.ContentDownload.urls import configure_url_policy, parse_param_allowlist_spec
 from pyrate_limiter import Duration, Rate
 
 __all__ = [
@@ -238,6 +253,31 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="HOST.ROLE=MS",
         help="Override maximum wait milliseconds for a specific host role (e.g., host.artifact=5000).",
     )
+
+    url_group = parser.add_argument_group("URL normalization")
+    url_group.add_argument(
+        "--url-default-scheme",
+        type=str,
+        default=None,
+        metavar="SCHEME",
+        help="Override the default scheme applied to URLs without an explicit scheme (default: https).",
+    )
+    url_group.add_argument(
+        "--url-param-allowlist",
+        type=str,
+        default=None,
+        metavar="SPEC",
+        help=(
+            "Query parameter allowlist specification (e.g., 'page,id' or 'example.com:id,token;site.org:page')."
+        ),
+    )
+    url_group.add_argument(
+        "--url-filter-landing",
+        dest="url_filter_landing",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable (or disable with --no-url-filter-landing) landing-page parameter filtering.",
+    )
     rate_group.add_argument(
         "--rate-backend",
         dest="rate_backend_spec",
@@ -400,24 +440,6 @@ def build_parser() -> argparse.ArgumentParser:
             "Maximum number of URLs hydrated from prior manifests into the persistent dedupe "
             "set (default: 100000). Set to 0 to disable the cap."
         ),
-    )
-    resolver_group.add_argument(
-        "--domain-min-interval",
-        dest="domain_min_interval",
-        type=_parse_domain_interval,
-        action="append",
-        default=[],
-        metavar="DOMAIN=SECONDS",
-        help="Enforce a minimum interval between requests to a domain. Repeat to configure multiple domains.",
-    )
-    resolver_group.add_argument(
-        "--domain-token-bucket",
-        dest="domain_token_bucket",
-        type=_parse_domain_token_bucket,
-        action="append",
-        default=[],
-        metavar="DOMAIN=RPS[:capacity=N]",
-        help="Configure per-domain token buckets (e.g., example.org=0.5:capacity=2).",
     )
     resolver_group.add_argument(
         "--head-precheck",
@@ -797,8 +819,6 @@ def resolve_config(
         parser.error("--workers must be >= 1")
     if args.concurrent_resolvers is not None and args.concurrent_resolvers < 1:
         parser.error("--concurrent-resolvers must be >= 1")
-    if args.max_concurrent_per_host is not None and args.max_concurrent_per_host < 0:
-        parser.error("--max-concurrent-per-host must be >= 0")
     if not 1 <= args.per_page <= 200:
         parser.error("--per-page must be between 1 and 200")
     if args.sleep < 0:
@@ -826,6 +846,20 @@ def resolve_config(
 
     if args.mailto:
         apply_mailto(args.mailto)
+
+    allowlist_global: Optional[Tuple[str, ...]] = None
+    allowlist_per_domain: Optional[Dict[str, Tuple[str, ...]]] = None
+    if args.url_param_allowlist:
+        allowlist_global, allowlist_per_domain = parse_param_allowlist_spec(
+            args.url_param_allowlist
+        )
+
+    configure_url_policy(
+        default_scheme=args.url_default_scheme,
+        filter_landing=args.url_filter_landing,
+        param_allowlist_global=allowlist_global,
+        param_allowlist_per_domain=allowlist_per_domain,
+    )
 
     topic_id = topic_id_input
     if not topic_id and topic:
@@ -931,21 +965,6 @@ def resolve_config(
     if mailto_value:
         apply_mailto(mailto_value)
 
-    explicit_max_host = getattr(args, "max_concurrent_per_host", None)
-    if explicit_max_host is None:
-        if config.max_concurrent_per_host > 0:
-            LOGGER.warning(
-                "Disabling max_concurrent_per_host=%s in favour of centralized limiter wait budgets.",
-                config.max_concurrent_per_host,
-            )
-        config.max_concurrent_per_host = 0
-    else:
-        config.max_concurrent_per_host = explicit_max_host
-        if explicit_max_host > 0:
-            LOGGER.warning(
-                "max_concurrent_per_host=%s remains enabled; consider relying on rate limiter wait budgets instead.",
-                explicit_max_host,
-            )
 
     concurrency_product = max(args.workers, 1) * max(config.max_concurrent_resolvers, 1)
     if concurrency_product > 32:
@@ -1013,8 +1032,6 @@ def resolve_config(
 
     rate_disabled = bool(getattr(args, "rate_disable", False))
 
-    legacy_notice_emitted = False
-
     if rate_disabled:
         conflicting_flags: List[str] = []
         if rate_override_specs:
@@ -1025,14 +1042,6 @@ def resolve_config(
             conflicting_flags.append("--rate-max-delay")
         if getattr(args, "rate_backend_spec", None):
             conflicting_flags.append("--rate-backend")
-        if getattr(args, "domain_min_interval", None):
-            conflicting_flags.append("--domain-min-interval")
-        if getattr(args, "domain_token_bucket", None):
-            conflicting_flags.append("--domain-token-bucket")
-        if getattr(config, "domain_min_interval_s", None):
-            conflicting_flags.append("resolver_config.domain_min_interval_s")
-        if getattr(config, "domain_token_buckets", None):
-            conflicting_flags.append("resolver_config.domain_token_buckets")
         if conflicting_flags:
             parser.error(
                 "--rate-disable cannot be combined with rate override options (%s)."
@@ -1049,55 +1058,6 @@ def resolve_config(
         configured_policies: Dict[str, RolePolicy] = {}
         backend_config = BackendConfig(backend="disabled", options={})
     else:
-        if getattr(args, "domain_min_interval", None):
-            for domain, interval in args.domain_min_interval:
-                if interval > 0:
-                    interval_ms = int(math.ceil(interval * Duration.SECOND))
-                    rate_override_specs.append((domain, "artifact", [Rate(1, interval_ms)]))
-                    legacy_notice_emitted = True
-            args.domain_min_interval = []
-
-        if getattr(args, "domain_token_bucket", None):
-            for domain, spec in args.domain_token_bucket:
-                rate = max(spec.get("rate_per_second", 0.0), 0.0)
-                capacity = max(spec.get("capacity", 0.0), 0.0)
-                rates: List[Rate] = []
-                if rate > 0:
-                    rates.append(Rate(int(math.ceil(rate)), Duration.SECOND))
-                if capacity > rate and capacity > 0:
-                    rates.append(Rate(int(math.ceil(capacity)), Duration.MINUTE))
-                if rates:
-                    rate_override_specs.append((domain, "artifact", rates))
-                    legacy_notice_emitted = True
-            args.domain_token_bucket = []
-
-        if getattr(config, "domain_min_interval_s", None):
-            for domain, interval in list(config.domain_min_interval_s.items()):
-                if interval > 0:
-                    interval_ms = int(math.ceil(interval * Duration.SECOND))
-                    rate_override_specs.append((domain, "artifact", [Rate(1, interval_ms)]))
-                    legacy_notice_emitted = True
-            config.domain_min_interval_s = {}
-
-        if getattr(config, "domain_token_buckets", None):
-            for domain, spec in list(config.domain_token_buckets.items()):
-                rate = max(spec.get("rate_per_second", 0.0), 0.0)
-                capacity = max(spec.get("capacity", 0.0), 0.0)
-                rates: List[Rate] = []
-                if rate > 0:
-                    rates.append(Rate(int(math.ceil(rate)), Duration.SECOND))
-                if capacity > rate and capacity > 0:
-                    rates.append(Rate(int(math.ceil(capacity)), Duration.MINUTE))
-                if rates:
-                    rate_override_specs.append((domain, "artifact", rates))
-                    legacy_notice_emitted = True
-            config.domain_token_buckets = {}
-
-        if legacy_notice_emitted:
-            LOGGER.warning(
-                "Legacy domain throttling options detected; converted to centralized rate limiter policies."
-            )
-
         policies = merge_rate_overrides(
             manager.policies(),
             rate_overrides=rate_override_specs,
@@ -1169,87 +1129,6 @@ def _parse_size(value: str) -> int:
         return parse_size(value)
     except ValueError as exc:
         raise argparse.ArgumentTypeError(str(exc)) from exc
-
-
-def _parse_domain_interval(value: str) -> Tuple[str, float]:
-    """Parse ``DOMAIN=SECONDS`` CLI arguments for domain throttling.
-
-    Args:
-        value: Argument provided via ``--domain-min-interval``.
-
-    Returns:
-        Tuple containing the normalized domain name and interval seconds.
-
-    Raises:
-        argparse.ArgumentTypeError: If the argument is malformed or negative.
-    """
-
-    if "=" not in value:
-        raise argparse.ArgumentTypeError("domain interval must use the format domain=seconds")
-    domain, interval = value.split("=", 1)
-    domain = domain.strip().lower()
-    if not domain:
-        raise argparse.ArgumentTypeError("domain component cannot be empty")
-    try:
-        seconds = float(interval)
-    except ValueError as exc:  # pragma: no cover - defensive parsing guard
-        raise argparse.ArgumentTypeError(
-            f"invalid interval for domain '{domain}': {interval}"
-        ) from exc
-    if seconds < 0:
-        raise argparse.ArgumentTypeError(f"interval for domain '{domain}' must be non-negative")
-    return domain, seconds
-
-
-def _parse_domain_token_bucket(value: str) -> Tuple[str, Dict[str, float]]:
-    """Parse ``DOMAIN=RPS[:capacity=X]`` specifications into bucket configs."""
-
-    if "=" not in value:
-        raise argparse.ArgumentTypeError(
-            "domain token bucket must use the format domain=rate[:capacity=N]"
-        )
-    domain, spec = value.split("=", 1)
-    domain = domain.strip().lower()
-    if not domain:
-        raise argparse.ArgumentTypeError("domain component cannot be empty")
-    rate: Optional[float] = None
-    capacity: Optional[float] = None
-    parts = [segment.strip() for segment in spec.split(":") if segment.strip()]
-    for index, part in enumerate(parts):
-        if "=" in part:
-            key, raw = part.split("=", 1)
-            key = key.strip().lower()
-            raw = raw.strip()
-            try:
-                value_float = float(raw)
-            except ValueError as exc:
-                raise argparse.ArgumentTypeError(
-                    f"invalid numeric value '{raw}' in token bucket spec"
-                ) from exc
-            if key in {"rate", "rps", "rate_per_second"}:
-                rate = value_float
-            elif key in {"capacity", "burst"}:
-                capacity = value_float
-            else:
-                raise argparse.ArgumentTypeError(f"unknown token bucket key '{key}'")
-        else:
-            try:
-                value_float = float(part)
-            except ValueError as exc:
-                raise argparse.ArgumentTypeError(f"invalid token bucket value '{part}'") from exc
-            if rate is None:
-                rate = value_float
-            elif capacity is None:
-                capacity = value_float
-            else:
-                raise argparse.ArgumentTypeError("unexpected extra token bucket value")
-
-    if rate is None or rate <= 0:
-        raise argparse.ArgumentTypeError("token bucket rate must be a positive number")
-    if capacity is None or capacity <= 0:
-        capacity = 1.0
-
-    return domain, {"rate_per_second": float(rate), "capacity": float(capacity)}
 
 
 def build_query(args: argparse.Namespace) -> Works:

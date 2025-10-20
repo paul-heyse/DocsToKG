@@ -1,3 +1,16 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.runner",
+#   "purpose": "Run orchestration for the content download CLI and scripting APIs",
+#   "sections": [
+#     {"id": "downloadrunstate", "name": "DownloadRunState", "anchor": "class-downloadrunstate", "kind": "class"},
+#     {"id": "downloadrun", "name": "DownloadRun", "anchor": "class-downloadrun", "kind": "class"},
+#     {"id": "iterate-openalex", "name": "iterate_openalex", "anchor": "function-iterate-openalex", "kind": "function"},
+#     {"id": "run-helper", "name": "run", "anchor": "function-run", "kind": "function"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Execution harness coordinating DocsToKG content download runs end-to-end.
 
 Responsibilities

@@ -1,14 +1,27 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.urls",
+#   "purpose": "URL canonicalization policies for content downloads",
+#   "sections": [
+#     {"id": "urlpolicy", "name": "UrlPolicy", "anchor": "class-urlpolicy", "kind": "class"},
+#     {"id": "configure-url-policy", "name": "configure_url_policy", "anchor": "function-configure-url-policy", "kind": "function"},
+#     {"id": "canonical-for-index", "name": "canonical_for_index", "anchor": "function-canonical-for-index", "kind": "function"},
+#     {"id": "canonical-for-request", "name": "canonical_for_request", "anchor": "function-canonical-for-request", "kind": "function"},
+#     {"id": "reset-url-policy", "name": "reset_url_policy_for_tests", "anchor": "function-reset-url-policy-for-tests", "kind": "function"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Centralized URL canonicalization helpers for ContentDownload.
 
-This module owns the policy surface for how URLs are normalized before they
-enter dedupe indices, Hishel cache keys, rate limiters, and download workers.
-It wraps :func:`url_normalize.url_normalize` with project defaults and exposes
-two narrow entry points that other modules should consume:
-
-``canonical_for_index`` – produce deterministic keys for manifests and global
-dedupe state without mutating query parameters.
-``canonical_for_request`` – normalize right before an HTTP request, optionally
-filtering tracking parameters for landing pages while preserving semantic ones.
+Responsibilities
+----------------
+- Normalise URLs before they enter dedupe indices, cache keys, or rate limiter
+  lookups via :func:`canonical_for_index` and :func:`canonical_for_request`.
+- Parse and apply allowlist / default-domain policy through
+  :func:`configure_url_policy`, honouring CLI and environment overrides.
+- Provide test hooks (:func:`reset_url_policy_for_tests`) so fixtures can tweak
+  canonicalisation in isolation.
 
 Environment overrides
 ---------------------
@@ -29,6 +42,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
+from urllib.parse import urlsplit, urlunsplit
 
 from typing_extensions import Literal
 from url_normalize import url_normalize
@@ -66,6 +80,15 @@ class UrlPolicy:
 
 
 _POLICY = UrlPolicy()
+
+
+def _strip_fragment(value: str) -> str:
+    """Return ``value`` without a URL fragment."""
+
+    parts = urlsplit(value)
+    if not parts.fragment:
+        return value
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, ""))
 
 
 def _parse_bool(value: Optional[str]) -> Optional[bool]:
@@ -224,7 +247,8 @@ def canonical_for_index(url: str) -> str:
 
     if url is None:
         raise TypeError("canonical_for_index expected a URL string, received None.")
-    return url_normalize(url, default_scheme=_POLICY.default_scheme)
+    canonical = url_normalize(url, default_scheme=_POLICY.default_scheme)
+    return _strip_fragment(canonical or "")
 
 
 def canonical_for_request(
@@ -252,7 +276,8 @@ def canonical_for_request(
         if allowlist:
             kwargs["param_allowlist"] = allowlist
 
-    return url_normalize(url, **kwargs)
+    canonical = url_normalize(url, **kwargs)
+    return _strip_fragment(canonical or "")
 
 
 _apply_environment_overrides()

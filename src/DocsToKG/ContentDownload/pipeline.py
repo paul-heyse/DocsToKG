@@ -367,7 +367,6 @@ class ResolverConfig:
         max_attempts_per_work: Maximum number of resolver attempts per work item.
         timeout: Default HTTP timeout applied to resolvers.
         retry_after_cap: Ceiling (seconds) applied to ``Retry-After`` hints when retrying HTTP calls.
-        sleep_jitter: Random jitter added between retries.
         polite_headers: HTTP headers to apply for polite crawling.
         unpaywall_email: Contact email registered with Unpaywall.
         core_api_key: API key used for the CORE resolver.
@@ -375,7 +374,6 @@ class ResolverConfig:
         doaj_api_key: API key for DOAJ resolver.
         resolver_timeouts: Resolver-specific timeout overrides.
         resolver_min_interval_s: Minimum interval between resolver HTTP requests.
-        domain_min_interval_s: Optional per-domain rate limits overriding resolver settings.
         enable_head_precheck: Toggle applying HEAD filtering before downloads.
         resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
         host_accept_overrides: Mapping of hostname to Accept header override.
@@ -384,7 +382,6 @@ class ResolverConfig:
         max_concurrent_per_host: Upper bound on simultaneous downloads per hostname.
         enable_global_url_dedup: Enable global URL deduplication across works when True.
         global_url_dedup_cap: Maximum URLs hydrated into the global dedupe cache.
-        domain_token_buckets: Mapping of hostname to token bucket parameters.
         domain_content_rules: Mapping of hostname to MIME allow-lists.
         resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
 
@@ -409,7 +406,6 @@ class ResolverConfig:
     max_attempts_per_work: int = 25
     timeout: float = 30.0
     retry_after_cap: float = 120.0
-    sleep_jitter: float = 0.35
     polite_headers: Dict[str, str] = field(default_factory=dict)
     unpaywall_email: Optional[str] = None
     core_api_key: Optional[str] = None
@@ -417,7 +413,6 @@ class ResolverConfig:
     doaj_api_key: Optional[str] = None
     resolver_timeouts: Dict[str, float] = field(default_factory=dict)
     resolver_min_interval_s: Dict[str, float] = field(default_factory=dict)
-    domain_min_interval_s: Dict[str, float] = field(default_factory=dict)
     enable_head_precheck: bool = True
     resolver_head_precheck: Dict[str, bool] = field(default_factory=dict)
     head_precheck_host_overrides: Dict[str, bool] = field(default_factory=dict)
@@ -427,7 +422,6 @@ class ResolverConfig:
     max_concurrent_per_host: int = 3
     enable_global_url_dedup: bool = True
     global_url_dedup_cap: Optional[int] = 100_000
-    domain_token_buckets: Dict[str, Dict[str, float]] = field(default_factory=dict)
     domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     resolver_circuit_breakers: Dict[str, Dict[str, float]] = field(default_factory=dict)
     # Heuristic knobs (defaults preserve current CLI behaviour)
@@ -517,18 +511,6 @@ class ResolverConfig:
                     )
                 )
 
-        normalized_domain_limits: Dict[str, float] = {}
-        for host, interval in self.domain_min_interval_s.items():
-            if interval < 0:
-                raise ValueError(
-                    ("domain_min_interval_s['{name}'] must be non-negative, got {value}").format(
-                        name=host, value=interval
-                    )
-                )
-            normalized_domain_limits[host.lower()] = interval
-        if normalized_domain_limits:
-            self.domain_min_interval_s = normalized_domain_limits
-
         if self.domain_content_rules:
             self.domain_content_rules = _normalise_domain_content_rules(self.domain_content_rules)
 
@@ -544,47 +526,6 @@ class ResolverConfig:
                     continue
                 overrides[host.lower()] = str(header)
             self.host_accept_overrides = overrides
-
-        if self.domain_token_buckets:
-            buckets: Dict[str, Dict[str, float]] = {}
-            for host, spec in self.domain_token_buckets.items():
-                if not host or not isinstance(spec, dict):
-                    continue
-                rate = float(spec.get("rate_per_second", spec.get("rate", 1.0)))
-                capacity = float(spec.get("capacity", spec.get("burst", 1.0)))
-                if rate <= 0 or capacity <= 0:
-                    raise ValueError(
-                        (
-                            "domain_token_buckets['{host}'] requires positive rate and capacity,"
-                            " got rate={rate} capacity={capacity}"
-                        ).format(host=host, rate=rate, capacity=capacity)
-                    )
-                payload: Dict[str, float] = {
-                    "rate_per_second": rate,
-                    "capacity": capacity,
-                }
-                if "breaker_threshold" in spec or "failure_threshold" in spec:
-                    threshold = int(spec.get("breaker_threshold", spec.get("failure_threshold", 5)))
-                    if threshold < 1:
-                        raise ValueError(
-                            (
-                                "domain_token_buckets['{host}'] breaker_threshold must be >= 1, got {value}"
-                            ).format(host=host, value=threshold)
-                        )
-                    payload["breaker_threshold"] = threshold
-                if "breaker_cooldown" in spec or "cooldown_seconds" in spec:
-                    cooldown = float(
-                        spec.get("breaker_cooldown", spec.get("cooldown_seconds", 60.0))
-                    )
-                    if cooldown < 0:
-                        raise ValueError(
-                            (
-                                "domain_token_buckets['{host}'] breaker_cooldown must be >= 0, got {value}"
-                            ).format(host=host, value=cooldown)
-                        )
-                    payload["breaker_cooldown"] = cooldown
-                buckets[host.lower()] = payload
-            self.domain_token_buckets = buckets
 
         if self.resolver_circuit_breakers:
             breakers: Dict[str, Dict[str, float]] = {}
@@ -661,6 +602,15 @@ def apply_config_overrides(
         "enable_global_url_dedup": _validate_enable_global_url_dedup,
     }
 
+    if "domain_min_interval_s" in data and data["domain_min_interval_s"] not in (None, {}):
+        raise ValueError(
+            "domain_min_interval_s is no longer supported. Configure host policies via centralized rate limiter overrides."
+        )
+    if "domain_token_buckets" in data and data["domain_token_buckets"] not in (None, {}):
+        raise ValueError(
+            "domain_token_buckets is no longer supported. Configure host policies via centralized rate limiter overrides."
+        )
+
     for field_name in (
         "resolver_order",
         "resolver_toggles",
@@ -679,7 +629,6 @@ def apply_config_overrides(
         "resolver_head_precheck",
         "head_precheck_host_overrides",
         "host_accept_overrides",
-        "domain_token_buckets",
         "resolver_circuit_breakers",
         "max_concurrent_resolvers",
         "max_concurrent_per_host",
@@ -777,17 +726,6 @@ def load_resolver_config(
 
     if hasattr(args, "global_url_dedup_cap") and args.global_url_dedup_cap is not None:
         config.global_url_dedup_cap = args.global_url_dedup_cap
-
-    if getattr(args, "domain_min_interval", None):
-        domain_limits = dict(config.domain_min_interval_s)
-        for domain, interval in args.domain_min_interval:
-            domain_limits[domain] = interval
-        config.domain_min_interval_s = domain_limits
-    if getattr(args, "domain_token_bucket", None):
-        bucket_map: Dict[str, Dict[str, float]] = dict(config.domain_token_buckets)
-        for domain, spec in args.domain_token_bucket:
-            bucket_map[domain] = dict(spec)
-        config.domain_token_buckets = bucket_map
 
     if config.retry_after_cap <= 0:
         raise ValueError("retry_after_cap must be positive")
@@ -1437,9 +1375,8 @@ class ResolverPipeline:
         with self._host_breaker_lock:
             breaker = self._host_breakers.get(host)
             if breaker is None:
-                spec = self.config.domain_token_buckets.get(host) or {}
-                threshold = int(spec.get("breaker_threshold", 5))
-                cooldown = float(spec.get("breaker_cooldown", 120.0))
+                threshold = 5
+                cooldown = 120.0
                 breaker = CircuitBreaker(
                     failure_threshold=max(threshold, 1),
                     cooldown_seconds=max(cooldown, 0.0),
@@ -1493,22 +1430,6 @@ class ResolverPipeline:
             if breaker:
                 breaker.record_success()
 
-    def _jitter_sleep(self) -> None:
-        """Introduce a small delay to avoid stampeding downstream services.
-
-        Args:
-            self: Pipeline instance executing resolver scheduling logic.
-
-        Returns:
-            None
-        """
-
-        base_jitter = self.config.sleep_jitter
-        if base_jitter <= 0:
-            return
-        concurrency = max(self.config.max_concurrent_resolvers, 1)
-        effective = base_jitter if concurrency == 1 else base_jitter / concurrency
-        _time.sleep(effective + random.random() * 0.1)
 
     def _should_attempt_head_check(self, resolver_name: str, url: Optional[str]) -> bool:
         """Return ``True`` when a resolver should perform a HEAD preflight request.
@@ -2262,5 +2183,4 @@ class ResolverPipeline:
                     reason_detail="max-attempts-reached",
                 )
 
-            self._jitter_sleep()
             return None

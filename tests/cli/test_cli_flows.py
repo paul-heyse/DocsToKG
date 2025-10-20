@@ -235,7 +235,6 @@ def test_load_resolver_config_applies_mailto(download_modules):
         accept=None,
         enable_resolver=[],
         global_url_dedup=None,
-        domain_min_interval=[],
     )
     config = downloader.load_resolver_config(args, ["alpha", "beta", "gamma"], ["beta"])
     assert config.mailto == "team@example.org"
@@ -1841,8 +1840,8 @@ def test_cli_workers_apply_domain_jitter(download_modules, patcher, tmp_path):
             str(manifest_path),
             "--workers",
             "3",
-            "--domain-min-interval",
-            "example.org=0.1",
+            "--rate",
+            "example.org.artifact=1/100ms",
         ],
     )
 

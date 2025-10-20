@@ -1,316 +1,349 @@
-Here’s a surgical, narrative-only **implementation plan** for **PR-5: Collapse stage runners; remove duplicated concurrency/manifest code**. It’s written so an AI programming agent can execute it step-by-step—no guessing, no source edits outside the described seams, and **no code included**.
+Here’s a best-in-class, AI-agent-ready deep dive for **PR-5 — Collapse stage runners; remove duplicated concurrency/manifest code**. It spells out *exact* responsibilities, data contracts, invariants, tuning knobs, and optional “gold tier” optimizations so your team can implement confidently and systematically.
 
 ---
 
-# Scope & intent
+# High-level goal
 
-**Goals**
+Replace three bespoke loops (Doctags → Chunking → Embedding) with **one generic, stage-agnostic runner**. Each stage then contributes only:
 
-1. Replace the three near-duplicate stage loops (doctags → chunk → embed) with **one generic runner** that handles: discovery, filtering (resume/force), parallel execution, error budgeting, telemetry, and manifest writes.
-2. Make the **“work per item”** function the only stage-specific code.
-3. Centralize **timeouts, cancellation, logging, and progress**.
-4. Keep all user-visible behavior (CLI flags, file layouts, manifests) unchanged.
+1. a **Plan** (what to do),
+2. a **Worker** (how to do 1 item),
+3. optional **Hooks** (stage-specific setup/teardown & lightweight per-item tap-ins).
 
-**Non-goals**
-
-* No change to file formats or schema fields (handled in PR-1/2).
-* No change to CLI shape (already unified in PR-3) other than pointing subcommands to the new runner.
+Everything else—parallelism, retries/timeouts, resume/force, error budgets, manifests, telemetry, progress—is **centralized**.
 
 ---
 
-# Why this is needed (duplication & risk)
+# Core architecture (exact contracts)
 
-* Each stage currently re-implements some mix of: executor creation, per-file try/except, resume/force checks, progress reporting, and manifest writing. That causes drift (e.g., one stage might treat timeouts or partial outputs differently than another).
-* The embed stage additionally mixes GPU/HTTP considerations (handled in PR-4). After PR-4, **all stages are “pure functions over inputs”** and ready to be run by a single runner.
+## `StagePlan`
 
----
+* **Purpose:** Pure description of work, no side effects.
+* **Fields (required):**
 
-# Target design (the “after” picture)
+  * `stage_name`: `"doctags" | "chunk" | "embed"`.
+  * `items: Iterable[WorkItem]` — stable order (determinism).
+  * `total_items: int` — for progress & budgeting.
+* **Invariants:**
 
-## A single generic runner (core/executors)
+  * Iteration is repeatable & pure (no lazy randomization).
+  * Items reference **paths**, not loaded data, to keep IPC cheap.
 
-Introduce one **public** function:
+## `WorkItem`
 
-* **`run_stage(plan, worker, options, hooks) -> StageOutcome`**
+* **Purpose:** Immutable unit of work the runner schedules.
+* **Fields (required):**
 
-…and three tiny data contracts:
+  * `item_id`: stable, file-path-derived identifier (e.g., relative path without extension).
+  * `inputs: Dict[str, Path]` — e.g., `{"pdf": ..., "html": ...}` (stage-specific keys).
+  * `outputs: Dict[str, Path]` — expected final artifacts (e.g., `{"doctags_jsonl": ...}`).
+  * `cfg_hash: str` — SHA256 of the **stage-relevant** config (ensures resume correctness when config changes).
+  * `cost_hint: float` — heuristic runtime cost (e.g., PDF pages; chunk count; bytes); used for smarter scheduling.
+* **Optional:**
 
-* **`StagePlan`**: iterable of immutable **`WorkItem`** objects (one item per input unit; e.g., a file).
-* **`StageOptions`**: runtime knobs (degree of parallelism, policy = cpu|io|gpu, timeouts, resume/force, error budget, retry).
-* **`StageHooks`** (optional): callouts for before/after stage and before/after item (for per-stage extras like setting provider context or enriching telemetry).
+  * `meta: Dict[str, Any]` — small hints (mime, bytes, page_count).
+  * `satisfies(): bool` — callable to check resume/force condition for this item (see below).
 
-**Responsibilities of `run_stage`:**
+## `StageOptions`
 
-* Build the queue of `WorkItem`s from the plan.
-* Apply **resume/force** rules to skip items that are already satisfied.
-* Schedule items on the correct executor (thread/process) based on policy.
-* Enforce **per-item timeout**, a **global error budget**, and **cancellation** (e.g., stop after N failures).
-* Capture standardized **success/failure events** and write **manifests** via the injected writer (from PR-2).
-* Emit **progress** and **timing metrics**.
-* Return a **StageOutcome** summary: counts (scheduled/skipped/succeeded/failed), durations, and selected percentiles (p50, p95 per item).
+* **Purpose:** Uniform knobs (all stages).
+* **Fields:**
 
-> **Invariant:** The runner is **stage-agnostic**. It knows nothing about PDFs or vectors. It receives a `worker(item, ctx)` callable and handles everything around it.
+  * `policy: "io" | "cpu" | "gpu"` — maps to ThreadPool / ProcessPool(spawn) / ThreadPool.
+  * `workers: int` — pool size.
+  * `per_item_timeout_s: float` — `0` disables.
+  * `retries: int` — bounded retry attempts for **retryable** errors.
+  * `retry_backoff_s: float` — base backoff; consider jitter.
+  * `error_budget: int` — fail-fast stop after N failures (0 = stop on first failure).
+  * `max_queue: int` — cap pending submissions for backpressure.
+  * `resume: bool`, `force: bool`.
+  * `diagnostics_interval_s: float` — progress/throughput report cadence.
+  * `seed: int` — for deterministic shuffling if enabled (defaults to no shuffle).
+* **Derived (internal):**
 
----
+  * `start_method="spawn"` when using ProcessPool (safety w/ C libs, tokenizers).
 
-# Stage mapping (what becomes the “work”)
+## `StageHooks` (all optional; must not throw)
 
-* **Doctags**: `worker(item) → DocTagsResult`
+* `before_stage(ctx) -> None` — allocate stage-wide resources (e.g., embedding providers).
+* `after_stage(outcome) -> None` — close resources; flush telemetry.
+* `before_item(item, ctx) -> None` — cheap side-effects (attach precomputed file stats).
+* `after_item(item, result_or_error, ctx) -> None` — per-item enrichment (e.g., attach provider tags).
 
-  * Input: raw doc path (PDF/HTML), output paths (doctags jsonl/md), conversion config.
-  * Output counters: blocks/tables/figures extracted, bytes in/out, content hash.
-* **Chunking**: `worker(item) → ChunkingResult`
+> **Rule:** Hooks may log/annotate, never alter scheduling, and exceptions in hooks are *downgraded to warnings*.
 
-  * Input: doctags path, chunk config (tokenizers, min/max tokens).
-  * Output counters: chunks produced, tokens per chunk stats.
-* **Embedding**: `worker(item) → EmbeddingResult`
+## `StageOutcome`
 
-  * Input: chunks path, provider configs (dense/sparse/lexical) from PR-4.
-  * Output counters: vectors written per family, embedding dims, batches.
+* `scheduled, skipped, succeeded, failed, cancelled: int`
+* `wall_ms, queue_p50_ms, exec_p50_ms, exec_p95_ms, items_per_s`
+* `errors: List[StageErrorSummary]` (first/most frequent)
+* `manifest_path, telemetry_counters`: pointers & totals
 
-> Each `Result` is a **small Pydantic model** that the runner will serialize into success manifests. (You already have manifest helpers from PR-2; keep using them.)
+## `StageError`
 
----
-
-# Concurrency policies (one knob for all stages)
-
-Inside `StageOptions`, define a **policy** that the runner translates to the right executor:
-
-* **`policy="io"`** → **ThreadPool** (ideal for doctags I/O & network).
-* **`policy="cpu"`** → **ProcessPool** with **spawn** start method (for CPU-only heavy parse or tokenization).
-* **`policy="gpu"`** → **ThreadPool** (GPU libraries are typically not fork-safe; the provider owns in-GPU parallelism).
-
-**Other options (shared across stages):**
-
-* **`workers`**: max workers (default from CLI flag you already have).
-* **`per_item_timeout_s`**: hard timeout per item (0 = disabled).
-* **`error_budget`**: max failures before early cancel (0 = stop on first error).
-* **`retries`**: simple bounded retry with backoff for transient cases (applies to network-ish work; set to 0 for pure deterministic work).
-* **`max_queue`**: bounded producer queue to avoid memory spikes on huge plans.
-* **`diagnostics_interval_s`**: how often to emit progress/throughput snapshots.
-
----
-
-# Resume/force contract (exact behavior)
-
-* **Force**: always run the worker, even if all expected outputs exist. The runner still backs up/quarantines any pre-existing files the stage would overwrite (same logic you already use; keep using the atomic writer from PR-2).
-* **Resume**: skip an item if **all** of its declared outputs already exist and are **non-empty** (and optionally match an expected suffix/pattern).
-
-  * For doctags: JSONL (or chosen format) exists and has ≥1 row.
-  * For chunking: chunk JSONL/Parquet exists and has ≥1 row.
-  * For embedding: vector JSONL/Parquet exists and has ≥1 row **for each enabled family** (dense/sparse/lexical).
-* **Changed inputs** (optional enhancement): If a **fingerprint** file exists (hash of input + config), recompute only when the fingerprint differs. If not present, resume uses existence/size checks only.
-
-**Implementation detail:** The `WorkItem` can carry a `satisfies()` method (or a tiny predicate) so each stage declares its own “done” condition. The runner just calls it.
+* `stage, item_id, category, message, retryable, detail`
+* `category ∈ {input, config, runtime, timeout, io, provider, unknown}`
 
 ---
 
-# Error taxonomy (one language across stages)
+# Single entry point
 
-Standardize a small error model emitted by the runner:
+## `run_stage(plan, worker, options, hooks) -> StageOutcome`
 
-* **`StageError`**: `{stage, item_id, category, message, retryable, detail}`
+**What it does (and you must do nowhere else):**
 
-  * `category`: `input` (bad file), `config` (bad flags), `runtime` (exception), `timeout`, `io`, `provider` (from PR-4), `unknown`.
-  * `retryable`: boolean (the runner uses it when `retries > 0`).
-* **Failure paths**:
+1. **Discovery/Filtering:** Iterate `plan.items`, skip with `resume` logic via `WorkItem.satisfies()` unless `force`.
+2. **Scheduling:** Submit `worker(item)` to the right executor:
 
-  * Write a **failure manifest row** with the error payload.
-  * If `error_budget` exceeded: cancel remaining work and leave a **stage outcome** with a `cancelled=true` flag.
-
-> The stage worker should raise *domain* exceptions (e.g., `ProviderError` or `DocConvertError`); the runner maps them to `StageError` categories and also preserves the original class in `detail`.
-
----
-
-# Telemetry & manifests (one place, one shape)
-
-* **Manifests**: Use the PR-2 **writer dependency** (FileLock + atomic append).
-
-  * **Success row**: `{stage, item_id, outputs, counts, timings, cfg_hash, provider_tags?}`
-  * **Failure row**: `{stage, item_id, error, timings, cfg_hash}`
-* **Telemetry**: The runner emits **stage-level** metrics (items/s, active workers, p50/p95 item duration) and **per-item** spans/metrics:
-
-  * `stage_name`, `policy`, `workers`, `batch_hint`
-  * `time_submit_ms`, `time_start_ms`, `time_end_ms`, `time_queue_ms`, `time_exec_ms`
-  * `status` = success|failure|skipped
-* **Progress**: a single progress line with: done/total, succeeded, skipped, failed, ETA, and current throughput.
+   * `policy="io" | "gpu"` → **ThreadPool** (library C-extensions release GIL or GPU handles concurrency).
+   * `policy="cpu"` → **ProcessPool** with **spawn** (pickle item only; pass file paths).
+3. **Timeouts:** Enforce per-item deadlines (wrap future wait).
+4. **Retries:** For `retryable=True`, resubmit with backoff ≤ `retries`.
+5. **Error budget:** If `failed > error_budget`, set cancel flag, stop new submissions, drain/completion or cancel futures (configurable).
+6. **Progress:** Print 1-line status (done/total, succ/skip/fail, ETA, items/s).
+7. **Manifests:** Append **success/failure rows** via the PR-2 writer (FileLock + atomic append).
+8. **Telemetry:** Emit standardized counters/histograms/traces.
+9. **Outcome:** Return `StageOutcome` with stats & percentiles.
 
 ---
 
-# Hooks (escape hatches without forking the runner)
+# Resume/force (precise semantics)
 
-`StageHooks` gives optional lifecycle events:
+* **Resume**: An item is **skipped** iff *all* declared `outputs` exist, are **non-empty**, and (if present) the `fingerprint` file matches `cfg_hash + input_hash`.
 
-* `before_stage(ctx)` / `after_stage(outcome)`
-* `before_item(item, ctx)` / `after_item(item, result|error, ctx)`
+  * If no fingerprint file is present, fallback to existence + non-empty size checks.
+  * For embedding, “all outputs” means **each enabled vector family** (dense/sparse/lexical) has non-empty data.
+* **Force**: Ignore resume checks; run worker and **atomically replace** outputs (PR-2).
+* **Change detection** (recommended): Write a tiny sidecar `*.fp.json` per item: `{input_sha256, cfg_hash, created_at}`. On resume, skip only when both match.
 
-Use cases:
-
-* **Embedding**: attach provider metadata (model id, dim) to the stage context once; reuse in success manifests.
-* **Doctags**: attach file-size or mimetype precomputed during discovery to save work.
-* **Chunking**: emit per-item token counts upstream to tune chunk sizes.
-
-> Hooks must be **fast**, **side-effect-free** (aside from logging), and **exception-safe** (exceptions in hooks are converted to warnings and do not fail the item).
+**Gotcha:** Always compute `input_sha256` on the **bytes that the stage consumes**, not upstream source, to avoid subtle mismatches (e.g., doctags hashing PDF/HTML; chunking hashing doctags JSONL; embedding hashing chunk JSONL/Parquet).
 
 ---
 
-# Planning & discovery (small, deterministic)
+# Worker contract per stage (no business logic in runner)
 
-Create (or keep) minimalist **plan builders** per stage that create `WorkItem`s:
+## Doctags worker
 
-* **DoctagsPlan**: scan input dirs for PDF/HTML; map to output doctags paths (consistent with current layout).
-* **ChunkPlan**: scan doctags dir for doctags files; map to chunk outputs; skip partial temp files.
-* **EmbedPlan**: scan chunks dir for chunk files; map to vector outputs (JSONL/Parquet) per family.
+* **Input:** `WorkItem.inputs["pdf"|"html"]`
+* **Output artifacts:** `outputs["doctags_jsonl"|"doctags_md" (optional)] + fingerprint`.
+* **Result payload:** `{blocks, tables, figures, pages, bytes_in, bytes_out}`
+* **Error mapping:** parse failures → `category="input"`; library errors → `runtime`; OOM/timeouts → `timeout`.
 
-**Rule:** A `WorkItem` includes:
+## Chunking worker
 
-* `item_id` (stable; typically the relative path without extension)
-* `input_paths` (1..n)
-* `output_paths` (1..n)
-* `cfg_hash` (hash of relevant config keys for reproducibility)
-* `meta` (small dict: size hints, mime, provider tags)
+* **Input:** `inputs["doctags_jsonl"]`
+* **Output artifacts:** `outputs["chunks_jsonl" or "chunks_parquet"] + fingerprint`.
+* **Result payload:** `{chunks, tokens_p50, tokens_p95, empty_chunks}`
+* **Error mapping:** malformed doctags → `input`; tokenizer errors → `runtime`; resource issues → `runtime/timeout`.
 
-Plans are **pure** (no I/O beyond filesystem walk) and **ordered** (stable order for reproducible scheduling).
+## Embedding worker
 
----
+* **Input:** `inputs["chunks_jsonl|parquet"]`
+* **Output artifacts:** up to three outputs `{dense, sparse, lexical} + fingerprint` depending on enabled families.
+* **Result payload:** `{vectors_dense, vectors_sparse, vectors_lexical, dim_dense, batches_dense, elapsed_ms_dense, ...}`
+* **Error mapping:** provider error taxonomy → mapped to `provider` (retryable depends on provider category); GPU OOM → `runtime` (retryable=False unless provider can transparently down-batch).
 
-# Timeouts, cancellation & retries (uniform semantics)
-
-* **Per-item timeout**: If `per_item_timeout_s > 0`, wrap the worker execution and raise `StageError{category="timeout"}` on expiry. The runner cancels the item’s future and proceeds based on policy.
-* **Global cancellation**: Maintain a shared flag set when:
-
-  * SIGINT/SIGTERM received, or
-  * `error_budget` exceeded, or
-  * `cancel_on_first_failure=true` and a failure occurs.
-* **Retries**: If `retries>0` and `StageError.retryable`, reschedule the item with exponential backoff (cap total tries). The manifest captures each attempt with `attempt_no`.
+> **StageHooks**: For embedding, call `dense/sparse/lexical provider.open(cfg)` **once** in `before_stage`, stash in `ctx`, and `close()` in `after_stage`.
 
 ---
 
-# Choosing the executor (correct by default)
+# Scheduling & concurrency (best-in-class)
 
-* **Doctags**: `policy="io"` (ThreadPool).
-* **Chunking**: `policy="cpu"` (ProcessPool with `spawn`).
-* **Embedding**: `policy="gpu"` (ThreadPool); **providers** (PR-4) handle internal batching/queues.
+## Executor policy (default per stage)
 
-> You can make `policy` overrideable via CLI or config, but keep these as **defaults**.
+* Doctags → `io` (ThreadPool)
+* Chunking → `cpu` (ProcessPool, spawn)
+* Embedding → `gpu` (ThreadPool)
 
----
+## Queue discipline
 
-# Integration with CLI (PR-3)
+* **Submission cap:** `max_queue` prevents RAM blow-ups on very large plans.
+* **Adaptive concurrency (optional gold tier):**
 
-* Subcommands `doctags`, `chunk`, `embed`, and `all` now call:
+  * Track rolling p50 item time; if p50 falls, consider increasing `workers` (bounded).
+  * If p95 rises or failure rate increases, decrease `workers`.
+  * Stabilize with hysteresis to avoid oscillations.
 
-  * Plan builder → `StageOptions` builder → `run_stage(plan, worker, options, hooks)`
-* Keep all current flags; only change **the call path** from per-stage loops to the runner.
+## Job ordering (optional gold tier)
 
----
+* **Shortest-job-first:** Sort items by `cost_hint` ascending for faster time-to-green and lower p95.
+* **Stratified batching:** For embedding, group items by **chunk count buckets** so providers see steadier batch sizes.
 
-# Testing strategy
+## Backpressure & provider interplay
 
-## Unit (runner)
+* If the embedding provider exposes `max_inflight_requests` / `queue_depth`, set it ≤ runner’s `workers` to avoid overload.
+* If the provider returns a **backpressure signal** (e.g., queue full), the worker should **block briefly** or **retry with backoff**, not spin.
 
-* **Happy path**: N items succeed; counts match; outcome p50/p95 computed.
-* **Resume/force**: pre-create outputs; ensure resume skips; ensure force executes.
-* **Timeout**: inject a slow worker; assert timeout error and manifest entry.
-* **Error budget**: set budget=1; inject two failures; assert early cancel.
-* **Retries**: make worker fail once retryable, then succeed; attempts recorded.
-* **Cancellation**: simulate SIGINT; ensure clean shutdown and summary reported.
+## ProcessPool rules of thumb (chunking)
 
-## Stage adapters
-
-* **Doctags/Chunk/Embed worker**: tiny smoke tests verifying the worker contracts under the runner (no bespoke loops).
-* **Hooks**: ensure exceptions in hooks don’t crash the stage; warnings logged.
-
-## Performance sanity
-
-* Measure **throughput** on a micro corpus; store p50/p95 baselines (not hard assertions, but logs to compare between commits).
+* Use **spawn** (never fork) to avoid CUDA/Python C-ext weirdness.
+* **Pass paths**, not large in-memory objects; load inside worker.
+* Keep `WorkItem` pickle-friendly (no callables/dataframes/handles inside).
 
 ---
 
-# Migration plan (minimize blast radius)
+# Timeouts, retries, error budget (uniform semantics)
 
-**Commit A — Core runner scaffolding**
+* **Timeout:** Wrap each future; on expiry mark `StageError(category="timeout", retryable=False)`. Do *not* kill the whole run—just the item—unless `cancel_on_timeout=true` (rare).
+* **Retries:** Only if `error.retryable=True`. Strategy: `sleep = retry_backoff_s × 2^attempt + jitter`. Hard cap attempts via `retries`.
+* **Error budget:** When `failed > error_budget`, raise the **cancel flag**:
 
-* Add `core/executors.py` with the runner, options, hooks, and outcome models.
-* Add plan builders for doctags/chunk/embed (or adapt existing discoverers to emit `WorkItem`s).
-
-**Commit B — Manifests & telemetry integration**
-
-* Inject the PR-2 writer into the runner; wire success/failure manifest rows.
-* Add standardized telemetry counters and progress.
-
-**Commit C — Doctags refactor**
-
-* Replace doctags’ local loop with the runner; add a `doctags_worker(item, ctx)` and a trivial `DoctagsPlan`.
-* Keep CLI behavior identical.
-
-**Commit D — Chunking refactor**
-
-* Replace chunking’s loop with the runner; add `chunk_worker` and `ChunkPlan`.
-* Honour min/max tokens; return chunk counts.
-
-**Commit E — Embedding refactor**
-
-* Replace embedding’s loop with the runner; add `embed_worker` using **providers** from PR-4 via a `StageHook.before_stage` that instantiates providers once and stores them in `ctx`, and `StageHook.after_stage` that calls `provider.close()`.
-* Confirm JSONL/Parquet writers unchanged.
-
-**Commit F — Delete dead code**
-
-* Remove stage-local executors, progress code, and bespoke manifest logging paths.
-* Ensure there are **no** remaining imports of old loops.
-
-**Commit G — Tests & docs**
-
-* Add runner unit tests; adapt stage tests to the new runner.
-* Update internal docs: “Stage authoring guide” (how to write a `worker` and `plan`, how hooks work).
+  * **New submissions stop.**
+  * In-flight items complete (default) or are cancelled if `cancel_inflight=true`.
+  * **Outcome.cancelled = true** with reason “budget exceeded”.
 
 ---
 
-# Acceptance criteria (“done”)
+# Manifests & telemetry (single, shared path)
 
-* All three subcommands run through **the same runner**; no stage contains its own pool or bespoke manifest code.
-* **Resume/force** work identically across stages and match previous behavior.
-* **Timeouts, retries, error budget** are available to all stages with the same semantics.
-* Manifests show **uniform** success/failure rows; telemetry includes the same fields across stages.
-* **Embedding providers** are created once per stage via hooks and closed after; the runner does not import heavy model libraries.
-* CI passes unit + integration tests; performance sanity checks do not regress materially.
+## Manifests (PR-2 writer)
 
----
+* **Success row**:
+  `{stage, item_id, outputs: {...}, result: {...}, attempt, cfg_hash, input_sha256, timings: {queue_ms, exec_ms}, ts}`
+* **Failure row**:
+  `{stage, item_id, error: {category, message, retryable}, attempt, cfg_hash, input_sha256, timings, ts}`
+* **Rotation (optional):** roll daily or per 100k rows: `.../manifests/{stage}-{YYYYMMDD}.jsonl`.
 
-# Risks & mitigations
+## Telemetry
 
-* **GPU/fork safety**: Accidentally running embedding on a ProcessPool can crash GPU libs.
-  ⇒ Default embedding `policy="gpu"` (ThreadPool), ignore any ProcessPool override unless explicitly forced with a “dangerous” flag.
-* **Pickling limits**: ProcessPool needs pickleable `WorkItem`s and worker closures.
-  ⇒ Keep `WorkItem` small & immutable; stage workers top-level functions only (no lambdas/closures).
-* **Partial output corruption** on worker crash.
-  ⇒ Continue using **atomic writes** and temporary files that promote only on success (already in PR-2).
-* **Inconsistent resume semantics** between stages.
-  ⇒ Stage-specific `satisfies()` predicate lives on `WorkItem` so semantics are declarative, reviewed, and unit-tested.
+* **Counters:** `stage_items_total`, `stage_items_succeeded`, `stage_items_failed`, `stage_items_skipped`.
+* **Histograms:** `item_exec_ms`, `item_queue_ms`, `items_per_s` (computed).
+* **Gauges:** `active_workers`, `pool_queue_depth`, **GPU mem** (embedding; optional).
+* **Traces:** one span per item; child spans for provider calls (embedding).
 
 ---
 
-# Operational playbook
+# Plan builders (per stage; small, deterministic)
 
-1. Land the runner behind an **env feature flag** (`DOCSTOKG_RUNNER=on`) for one release; keep legacy loops in the repo but disabled by default.
-2. Dogfood on a small corpus; compare manifests and throughputs vs. baseline.
-3. Flip the default to the new runner; keep the old one for one minor release with a deprecation warning.
-4. Delete the old loops once telemetry shows comparable or better performance and no error-rate increase.
+## DoctagsPlan
+
+* Walk `input_root` for `*.pdf|*.html`.
+* Compute `item_id = relpath_no_ext`, `cost_hint = pages_or_bytes`.
+* Compute outputs (consistent, deterministic paths) and `cfg_hash` for doctags config.
+* Optionally pre-compute `input_sha256` (fast streaming hash).
+
+## ChunkPlan
+
+* Walk doctags directory for `*.jsonl` (or doctags parquet if you support it).
+* Cost hint = rows or bytes.
+* Map outputs (`*.chunks.jsonl|parquet`).
+* `cfg_hash` from chunker settings.
+
+## EmbedPlan
+
+* Walk chunks directory for `*.chunks.jsonl|parquet`.
+* Cost hint = expected chunk count (read header/meta) or bytes.
+* Outputs: choose per enabled family; `cfg_hash` from provider configs (dense/sparse/lexical).
+
+> Plans must **not** touch the manifests; they are pure mappings.
 
 ---
 
-# Engineer’s checklist (quick)
+# Progress & diagnostics
 
-* [ ] `core/executors.run_stage` exists; documented, pure, and stage-agnostic.
-* [ ] `StagePlan/WorkItem/StageOptions/StageHooks/StageOutcome` defined and used.
-* [ ] Doctags/Chunk/Embed now **only** provide a plan + worker (+ optional hooks).
-* [ ] Resume/force implemented **once**; identical across stages.
-* [ ] Timeouts, retries, error budget implemented **once**; identical across stages.
-* [ ] Manifests and telemetry go through the **PR-2 writer** and standardized fields.
-* [ ] Old stage loops deleted; no pools or bespoke progress code remain in stage modules.
-* [ ] Tests cover runner semantics; stage integration passes.
-* [ ] Docs updated (“How to add a new stage” using the runner template).
+* One **single-line** progress updated every `diagnostics_interval_s` with:
+
+  * `done/total`, `succ`, `skip`, `fail`, `ETA`, `items/s`, and **last minute’s** items/s.
+* Optional **verbose** pane (when `-vv`): top 3 error categories and the slowest 3 items so far.
+* “Dry run” mode: print plan summary (N items, predicted cost sum) without execution.
 
 ---
 
-If helpful next, I can produce a **worker contract spec** (inputs/outputs per stage, exact manifest fields, suggested error categories) so your agent can patch each stage file with minimal diff.
+# Optional gold-tier optimizations
+
+1. **SJF + bucketing** (noted above) to reduce tail latency.
+2. **Speculative retry**: If a long-running item exceeds p95×X, trigger a parallel attempt on another worker and take first successful result (enable only for idempotent, read-only stages like embedding; throttle count).
+3. **Read-ahead & double buffering**:
+
+   * Stage-specific: pre-open PDFs (mmap) for doctags, pre-load chunk file headers for embedding.
+   * Keep within memory budget; expose `read_ahead_files` knob.
+4. **Adaptive worker pool**: slowly scale `workers` between `[min,max]` based on moving average throughput and memory/GPU pressure.
+5. **Failure triage**: On repeated failures of the same `category` within a time window, pause submissions and surface a **single “actionable” banner** (e.g., “TEI rate-limited—consider lowering max inflight or switching backend”).
+6. **Per-directory batching**: Group items by directory to improve FS locality (HDDs/NFS benefit); optional for SSDs.
+7. **Provider-aware pacing**: Let embedding provider expose preferred micro-batch sizes; runner aggregates items accordingly, reducing tiny batches.
+
+---
+
+# Best practices & invariants checklist
+
+* **Determinism:** Ordered plan; stable `item_id`; fixed seeds; pinned model/tokenizer revisions.
+* **Isolation:** No heavy imports at runner top-level; stage workers import only what they need.
+* **Pickle-safe:** Workers are **top-level** functions; `WorkItem` holds only primitives/paths.
+* **Atomicity:** All writes go through PR-2 writer; partial files never visible.
+* **Backwards-compat:** Same output shapes/paths; same CLI flags; same manifest schema keys (you may add fields, not remove/rename).
+* **Uniform semantics:** Timeouts/retries/resume/force/error budget apply identically to all stages.
+* **No shared global singletons:** Pass context via `ctx` (from root Typer callback) to runner hooks.
+
+---
+
+# Test plan (exhaustive)
+
+## Unit — Runner
+
+* **Resume/force parity:** Pre-create outputs → resume skips; force re-executes with replace.
+* **Timeout path:** Simulated slow worker times out; manifest has failure row; outcome counts ok.
+* **Retry path:** Failing-once worker then succeeds with `retries=1`; attempts counted; success manifest only once.
+* **Error budget:** Two failing workers with budget=1 → outcome `cancelled=true`; second not scheduled (or cancelled).
+* **Cancellation signal:** Inject SIGINT → graceful stop; outcome marks `cancelled=true`.
+* **SJF ordering** (if enabled): large `cost_hint` items start later; check ordering of started times.
+
+## Integration — Per stage
+
+* Doctags/Chunk/Embed each run via **same runner**; outputs match baseline (bit-for-bit or FP tolerance).
+* **Hooks**: Provider open/close invoked exactly once per stage; per-item hooks do not alter results or crash stage.
+* **Large plan**: 10k items test: memory usage bounded; throughput acceptable; no deadlocks.
+
+## Property tests (selective)
+
+* **Idempotence**: Running resume twice produces 0 work with same manifests (aside from timestamps).
+* **Parallel safety**: Two concurrent runs on **different** output roots do not interfere.
+
+---
+
+# Migration & rollout
+
+1. **Commit A — Core runner + models**
+
+   * Add `core/executors.py` (runner + contracts).
+   * No stage wired yet; unit tests for runner.
+
+2. **Commit B — Manifest/telemetry plumbing**
+
+   * Integrate PR-2 writer; standardize success/failure payloads.
+   * Add shared metrics/tracing.
+
+3. **Commit C — Doctags on runner**
+
+   * Replace doctags loop with plan + worker + simple hooks.
+
+4. **Commit D — Chunking on runner**
+
+   * Same pattern; ProcessPool(spawn); pass only paths.
+
+5. **Commit E — Embedding on runner**
+
+   * Use PR-4 providers in hooks; ensure GPU/thread safety.
+
+6. **Commit F — Delete dead code**
+
+   * Remove old per-stage loops, bespoke progress/manifests; keep import shims if needed for one release.
+
+7. **Commit G — CI & docs**
+
+   * Add stress tests & p95 thresholds (soft assertions); update “How to add a stage” docs with runner template.
+
+**Feature flag rollout:** Allow `DOCSTOKG_RUNNER=legacy|new`; default to `new` after 1–2 internal cycles, then drop legacy.
+
+---
+
+# Reference “done” criteria
+
+* All three subcommands call `run_stage(...)`.
+* Resume/force/timeout/retry/error-budget **work identically across stages**.
+* Per-stage code shrinks to: plan builder + worker (+ optional hooks).
+* Manifests & telemetry unified; progress uniform; no bespoke loops left.
+* Embedding providers created/closed exactly once per stage; no heavy ML imports in runner.
+
+---
+
+If you want, I can also produce a **field-accurate manifest specification** (key names, allowed types, and example rows per stage) and a **runner behaviors matrix** (what happens under every combination of `resume/force/retries/timeout/error_budget`) that your team can turn into tests 1:1.

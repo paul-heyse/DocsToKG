@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.telemetry",
+#   "purpose": "Telemetry sinks, schemas, and resume helpers for content downloads",
+#   "sections": [
+#     {"id": "manifest-entry", "name": "ManifestEntry", "anchor": "class-manifestentry", "kind": "class"},
+#     {"id": "attempt-sink-protocol", "name": "AttemptSink", "anchor": "class-attemptsink", "kind": "class"},
+#     {"id": "jsonl-resume-lookup", "name": "JsonlResumeLookup", "anchor": "class-jsonlresumelookup", "kind": "class"},
+#     {"id": "sqlite-resume-lookup", "name": "SqliteResumeLookup", "anchor": "class-sqliteresumelookup", "kind": "class"},
+#     {"id": "run-telemetry", "name": "RunTelemetry", "anchor": "class-runtelemetry", "kind": "class"},
+#     {"id": "load-resume-completed", "name": "load_resume_completed_from_sqlite", "anchor": "function-load-resume-completed-from-sqlite", "kind": "function"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Telemetry schemas, sink implementations, and resume helpers.
 
 Responsibilities
@@ -70,6 +85,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
     from DocsToKG.ContentDownload.pipeline import AttemptRecord, DownloadOutcome, PipelineResult
 
+from DocsToKG.ContentDownload import locks
 from DocsToKG.ContentDownload.core import (
     PDF_LIKE,
     Classification,
@@ -79,9 +95,10 @@ from DocsToKG.ContentDownload.core import (
     normalize_reason,
     normalize_url,
 )
+from DocsToKG.ContentDownload.urls import canonical_for_index
 
-MANIFEST_SCHEMA_VERSION = 3
-SQLITE_SCHEMA_VERSION = 4
+MANIFEST_SCHEMA_VERSION = 4
+SQLITE_SCHEMA_VERSION = 5
 CSV_HEADER_TOKENS = {"run_id", "work_id"}
 
 
@@ -180,6 +197,9 @@ class ManifestEntry:
     classification: str
     content_type: Optional[str]
     reason: Optional[str]
+    canonical_url: Optional[str] = None
+    original_url: Optional[str] = None
+    normalized_url: Optional[str] = None
     reason_detail: Optional[str] = None
     html_paths: List[str] = field(default_factory=list)
     sha256: Optional[str] = None
@@ -234,6 +254,27 @@ class ManifestEntry:
                 if coerced_mtime < 0:
                     coerced_mtime = None
             object.__setattr__(self, "path_mtime_ns", coerced_mtime)
+
+        base_original = self.original_url or self.url
+        if base_original is not None:
+            base_original = base_original.strip() or None
+        canonical_value = self.canonical_url
+        if canonical_value is None and base_original:
+            try:
+                canonical_value = canonical_for_index(base_original)
+            except Exception:
+                canonical_value = normalize_url(base_original)
+        if canonical_value is None and self.url:
+            try:
+                canonical_value = canonical_for_index(self.url)
+            except Exception:
+                canonical_value = normalize_url(self.url)
+        normalized_value = self.normalized_url or canonical_value
+        object.__setattr__(self, "canonical_url", canonical_value)
+        object.__setattr__(self, "normalized_url", normalized_value)
+        if base_original is None and self.url is not None:
+            base_original = self.url
+        object.__setattr__(self, "original_url", base_original)
 
 
 class ManifestUrlIndex:
@@ -602,6 +643,9 @@ class RunTelemetry(AttemptSink):
         rate_snapshot = self._rate_metrics_snapshot()
         if rate_snapshot and "rate_limiter_attempts" not in summary:
             summary["rate_limiter_attempts"] = rate_snapshot
+        lock_snapshot = locks.lock_metrics_snapshot(reset=True)
+        if lock_snapshot:
+            summary.setdefault("lock_metrics", lock_snapshot)
         self._sink.log_summary(summary)
 
     def __enter__(self) -> "RunTelemetry":
@@ -659,6 +703,8 @@ class RunTelemetry(AttemptSink):
         Returns:
             ManifestEntry: Structured manifest entry persisted via the sink.
         """
+        canonical_hint = getattr(outcome, "canonical_url", None) if outcome else None
+        original_hint = getattr(outcome, "original_url", None) if outcome else None
         entry = build_manifest_entry(
             artifact,
             resolver=resolver,
@@ -669,6 +715,8 @@ class RunTelemetry(AttemptSink):
             run_id=run_id,
             reason=reason,
             reason_detail=reason_detail,
+            canonical_url=canonical_hint,
+            original_url=original_hint,
         )
         self.log_manifest(entry)
         return entry
@@ -701,6 +749,9 @@ class RunTelemetry(AttemptSink):
         if detail_token is None and outcome is not None:
             detail_token = normalize_reason(getattr(outcome, "reason_detail", None))
 
+        canonical_hint = result.canonical_url or (getattr(outcome, "canonical_url", None) if outcome else None)
+        original_hint = result.original_url or (getattr(outcome, "original_url", None) if outcome else None)
+
         return self.record_manifest(
             artifact,
             resolver=result.resolver_name,
@@ -711,6 +762,8 @@ class RunTelemetry(AttemptSink):
             run_id=run_id,
             reason=reason_token,
             reason_detail=detail_token,
+            canonical_url=canonical_hint,
+            original_url=original_hint,
         )
 
 
@@ -726,9 +779,10 @@ class JsonlSink:
     def _write(self, payload: Dict[str, Any]) -> None:
         payload.setdefault("timestamp", _utc_timestamp())
         line = json.dumps(payload, sort_keys=True) + "\n"
-        with self._lock:
-            self._file.write(line)
-            self._file.flush()
+        with locks.manifest_lock(self._path):
+            with self._lock:
+                self._file.write(line)
+                self._file.flush()
 
     def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
         """Append an attempt record to the JSONL log.
@@ -750,6 +804,8 @@ class JsonlSink:
                 "resolver_name": record.resolver_name,
                 "resolver_order": record.resolver_order,
                 "url": record.url,
+                "canonical_url": getattr(record, "canonical_url", None) or record.url,
+                "original_url": getattr(record, "original_url", None) or record.url,
                 "status": status_text,
                 "http_status": record.http_status,
                 "content_type": record.content_type,
@@ -791,6 +847,9 @@ class JsonlSink:
                 "publication_year": entry.publication_year,
                 "resolver": entry.resolver,
                 "url": entry.url,
+                "canonical_url": entry.canonical_url,
+                "original_url": entry.original_url,
+                "normalized_url": entry.normalized_url,
                 "path": entry.path,
                 "classification": str(entry.classification),
                 "content_type": entry.content_type,
@@ -877,16 +936,17 @@ class RotatingJsonlSink(JsonlSink):
         payload.setdefault("timestamp", _utc_timestamp())
         line = json.dumps(payload, sort_keys=True) + "\n"
         encoded = line.encode("utf-8")
-        with self._lock:
-            try:
-                if self._path.exists() and self._path.stat().st_size >= self._max_bytes:
+        with locks.manifest_lock(self._path):
+            with self._lock:
+                try:
+                    if self._path.exists() and self._path.stat().st_size >= self._max_bytes:
+                        self._rotate()
+                except OSError:  # pragma: no cover - defensive
+                    pass
+                if self._should_rotate(len(encoded)):
                     self._rotate()
-            except OSError:  # pragma: no cover - defensive
-                pass
-            if self._should_rotate(len(encoded)):
-                self._rotate()
-            self._file.write(line)
-            self._file.flush()
+                self._file.write(line)
+                self._file.flush()
 
 
 class CsvSink:
@@ -899,6 +959,8 @@ class CsvSink:
         "resolver_name",
         "resolver_order",
         "url",
+        "canonical_url",
+        "original_url",
         "status",
         "http_status",
         "content_type",
@@ -920,6 +982,7 @@ class CsvSink:
 
     def __init__(self, path: Path) -> None:
         _ensure_parent_exists(path)
+        self._path = path
         exists = path.exists()
         self._file = path.open("a", newline="", encoding="utf-8")
         self._writer = csv.DictWriter(self._file, fieldnames=self.HEADER)
@@ -942,6 +1005,8 @@ class CsvSink:
             "resolver_name": record.resolver_name,
             "resolver_order": record.resolver_order,
             "url": record.url,
+            "canonical_url": getattr(record, "canonical_url", None) or record.url,
+            "original_url": getattr(record, "original_url", None) or record.url,
             "status": (
                 record.status.value
                 if isinstance(record.status, Classification)
@@ -968,9 +1033,10 @@ class CsvSink:
             "from_cache": record.from_cache,
             "metadata": json.dumps(record.metadata, sort_keys=True) if record.metadata else "",
         }
-        with self._lock:
-            self._writer.writerow(row)
-            self._file.flush()
+        with locks.telemetry_lock(self._path):
+            with self._lock:
+                self._writer.writerow(row)
+                self._file.flush()
 
     def log_manifest(self, entry: ManifestEntry) -> None:  # pragma: no cover
         """Ignore manifest writes for CSV sinks (interface compatibility)."""
@@ -985,9 +1051,10 @@ class CsvSink:
     def close(self) -> None:
         """Flush buffered data and close the CSV file handle."""
 
-        with self._lock:
-            if not self._file.closed:
-                self._file.close()
+        with locks.telemetry_lock(self._path):
+            with self._lock:
+                if not self._file.closed:
+                    self._file.close()
 
     def __enter__(self) -> "CsvSink":
         return self
@@ -1079,6 +1146,8 @@ class ManifestIndexSink:
             "classification": classification.value,
             "pdf_path": pdf_path,
             "sha256": sha256,
+            "canonical_url": entry.canonical_url,
+            "original_url": entry.original_url,
         }
         with self._lock:
             self._index[entry.work_id] = payload
@@ -1091,7 +1160,8 @@ class ManifestIndexSink:
                 return
             ordered = dict(sorted(self._index.items(), key=lambda item: item[0]))
             self._closed = True
-        atomic_write_text(self._path, json.dumps(ordered, indent=2))
+        with locks.summary_lock(self._path):
+            atomic_write_text(self._path, json.dumps(ordered, indent=2))
 
     def __enter__(self) -> "ManifestIndexSink":
         return self
@@ -1110,6 +1180,8 @@ class LastAttemptCsvSink:
         "publication_year",
         "resolver",
         "url",
+        "canonical_url",
+        "original_url",
         "classification",
         "path",
         "sha256",
@@ -1154,6 +1226,8 @@ class LastAttemptCsvSink:
             "publication_year": self._normalise(entry.publication_year),
             "resolver": self._normalise(entry.resolver),
             "url": self._normalise(entry.url),
+            "canonical_url": self._normalise(entry.canonical_url),
+            "original_url": self._normalise(entry.original_url),
             "classification": classification.value,
             "path": self._normalise(entry.path),
             "sha256": self._normalise(entry.sha256),
@@ -1178,7 +1252,8 @@ class LastAttemptCsvSink:
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
-        atomic_write_text(self._path, buffer.getvalue())
+        with locks.summary_lock(self._path):
+            atomic_write_text(self._path, buffer.getvalue())
 
     def __enter__(self) -> "LastAttemptCsvSink":
         return self
@@ -1235,7 +1310,8 @@ class SummarySink:
                 return
             payload = dict(self._summary or {})
             self._closed = True
-        atomic_write_text(self._path, json.dumps(payload, indent=2, sort_keys=True))
+        with locks.summary_lock(self._path):
+            atomic_write_text(self._path, json.dumps(payload, indent=2, sort_keys=True))
 
     def __enter__(self) -> "SummarySink":
         return self
@@ -1253,15 +1329,16 @@ class SqliteSink:
         alias_candidate = path.with_suffix(".sqlite")
         self._legacy_alias_path = alias_candidate if alias_candidate != path else None
         self._conn = sqlite3.connect(path, check_same_thread=False)
-        self._conn.execute("PRAGMA journal_mode=WAL;")
-        self._conn.execute("PRAGMA synchronous=NORMAL;")
-        try:
-            current_version = int(self._conn.execute("PRAGMA user_version").fetchone()[0])
-        except Exception:
-            current_version = 0
-        self._initialise_schema(current_version)
         self._lock = threading.Lock()
         self._closed = False
+        with locks.sqlite_lock(self._path):
+            self._conn.execute("PRAGMA journal_mode=WAL;")
+            self._conn.execute("PRAGMA synchronous=NORMAL;")
+            try:
+                current_version = int(self._conn.execute("PRAGMA user_version").fetchone()[0])
+            except Exception:
+                current_version = 0
+            self._initialise_schema(current_version)
 
     def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
         """Persist a resolver attempt event for downstream document analytics.
@@ -1275,8 +1352,9 @@ class SqliteSink:
         """
         ts = timestamp or _utc_timestamp()
         metadata_json = json.dumps(record.metadata, sort_keys=True) if record.metadata else None
-        with self._lock:
-            self._conn.execute(
+        with locks.sqlite_lock(self._path):
+            with self._lock:
+                self._conn.execute(
                 """
                 INSERT INTO attempts (
                     timestamp,
@@ -1285,6 +1363,8 @@ class SqliteSink:
                     resolver_name,
                     resolver_order,
                     url,
+                    canonical_url,
+                    original_url,
                     status,
                     http_status,
                     content_type,
@@ -1297,7 +1377,7 @@ class SqliteSink:
                     content_length,
                     dry_run,
                     retry_after
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     ts,
@@ -1306,6 +1386,8 @@ class SqliteSink:
                     record.resolver_name,
                     record.resolver_order,
                     record.url,
+                    getattr(record, "canonical_url", None) or record.url,
+                    getattr(record, "original_url", None) or record.url,
                     (
                         record.status.value
                         if isinstance(record.status, Classification)
@@ -1327,8 +1409,8 @@ class SqliteSink:
                     1 if record.dry_run else 0,
                     record.retry_after,
                 ),
-            )
-            self._conn.commit()
+                )
+                self._conn.commit()
 
     def log_manifest(self, entry: ManifestEntry) -> None:
         """Record manifest outcomes for the processed document artifact.
@@ -1340,8 +1422,9 @@ class SqliteSink:
             None
         """
         html_paths_json = json.dumps(entry.html_paths, sort_keys=True) if entry.html_paths else None
-        with self._lock:
-            self._conn.execute(
+        with locks.sqlite_lock(self._path):
+            with self._lock:
+                self._conn.execute(
                 """
                 INSERT INTO manifests (
                     timestamp,
@@ -1352,6 +1435,8 @@ class SqliteSink:
                     publication_year,
                     resolver,
                     url,
+                    canonical_url,
+                    original_url,
                     normalized_url,
                     path,
                     path_mtime_ns,
@@ -1377,7 +1462,9 @@ class SqliteSink:
                     entry.publication_year,
                     entry.resolver,
                     entry.url,
-                    normalize_url(entry.url) if entry.url else None,
+                    entry.canonical_url,
+                    entry.original_url or entry.url,
+                    entry.normalized_url,
                     entry.path,
                     entry.path_mtime_ns,
                     entry.classification,
@@ -1392,8 +1479,8 @@ class SqliteSink:
                     entry.extracted_text_path,
                     1 if entry.dry_run else 0,
                 ),
-            )
-            self._conn.commit()
+                )
+                self._conn.commit()
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
         """Store the aggregated run summary in the summaries table.
@@ -1408,26 +1495,28 @@ class SqliteSink:
         if not run_id:
             raise ValueError("summary payload must include run_id")
         payload = json.dumps(summary, indent=2, sort_keys=True)
-        with self._lock:
-            self._conn.execute(
+        with locks.sqlite_lock(self._path):
+            with self._lock:
+                self._conn.execute(
                 """
                 INSERT INTO summaries (run_id, timestamp, payload)
                 VALUES (?, ?, ?)
                 ON CONFLICT(run_id) DO UPDATE SET timestamp=excluded.timestamp, payload=excluded.payload
                 """,
                 (run_id, _utc_timestamp(), payload),
-            )
-            self._conn.commit()
+                )
+                self._conn.commit()
 
     def close(self) -> None:
         """Commit outstanding changes and dispose of the SQLite connection."""
-        with self._lock:
-            if self._closed:
-                return
-            self._closed = True
-            self._conn.commit()
-            self._conn.close()
-        self._ensure_legacy_alias()
+        with locks.sqlite_lock(self._path):
+            with self._lock:
+                if self._closed:
+                    return
+                self._closed = True
+                self._conn.commit()
+                self._conn.close()
+            self._ensure_legacy_alias()
 
     def __enter__(self) -> "SqliteSink":
         return self
@@ -1484,6 +1573,8 @@ class SqliteSink:
                 resolver_name TEXT,
                 resolver_order INTEGER,
                 url TEXT,
+                canonical_url TEXT,
+                original_url TEXT,
                 status TEXT,
                 http_status INTEGER,
                 content_type TEXT,
@@ -1511,6 +1602,8 @@ class SqliteSink:
                 publication_year INTEGER,
                 resolver TEXT,
                 url TEXT,
+                canonical_url TEXT,
+                original_url TEXT,
                 normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
@@ -1557,6 +1650,12 @@ class SqliteSink:
         if current_version < 4:
             self._safe_add_column("manifests", "normalized_url", "TEXT")
             self._populate_normalized_urls()
+        if current_version < 5:
+            self._safe_add_column("manifests", "canonical_url", "TEXT")
+            self._safe_add_column("manifests", "original_url", "TEXT")
+            self._safe_add_column("attempts", "canonical_url", "TEXT")
+            self._safe_add_column("attempts", "original_url", "TEXT")
+            self._populate_normalized_urls()
 
     def _safe_add_column(self, table: str, column: str, declaration: str) -> None:
         try:
@@ -1590,17 +1689,25 @@ class SqliteSink:
     def _populate_normalized_urls(self) -> None:
         try:
             rows = list(
-                self._conn.execute("SELECT id, url FROM manifests WHERE normalized_url IS NULL")
+                self._conn.execute(
+                    "SELECT id, url, original_url, canonical_url, normalized_url "
+                    "FROM manifests WHERE normalized_url IS NULL OR canonical_url IS NULL OR original_url IS NULL"
+                )
             )
         except sqlite3.OperationalError:
             return
-        for row_id, url in rows:
+        for row_id, url, stored_original, stored_canonical, stored_normalized in rows:
             if not url:
                 continue
-            normalized = normalize_url(url)
+            original_value = stored_original or url
+            try:
+                normalized = stored_normalized or canonical_for_index(original_value)
+            except Exception:
+                normalized = normalize_url(original_value)
+            canonical_value = stored_canonical or normalized
             self._conn.execute(
-                "UPDATE manifests SET normalized_url = ? WHERE id = ?",
-                (normalized, row_id),
+                "UPDATE manifests SET normalized_url = ?, canonical_url = ?, original_url = ? WHERE id = ?",
+                (normalized, canonical_value, original_value, row_id),
             )
         self._conn.commit()
 
@@ -1610,6 +1717,8 @@ def _manifest_entry_from_sqlite_row(
     work_id: Any,
     url: Any,
     normalized_url: Any,
+    canonical_url: Any,
+    original_url: Any,
     schema_version: Any,
     classification: Any,
     reason: Any,
@@ -1626,7 +1735,7 @@ def _manifest_entry_from_sqlite_row(
     if not work_id or not url:
         return None
 
-    normalized = normalized_url or normalize_url(str(url))
+    normalized = normalized_url or (canonical_url or normalize_url(str(url)))
     try:
         schema_version_int = int(schema_version)
     except (TypeError, ValueError):
@@ -1669,6 +1778,8 @@ def _manifest_entry_from_sqlite_row(
         "run_id": run_id,
         "work_id": work_id,
         "url": url,
+        "canonical_url": canonical_url,
+        "original_url": original_url,
         "normalized_url": normalized,
         "classification": classification_value or str(classification or ""),
         "reason": reason_value,
@@ -1702,7 +1813,7 @@ def _iter_resume_rows_from_sqlite(
         try:
             cursor = conn.execute(
                 (
-                    "SELECT run_id, work_id, url, normalized_url, schema_version, "
+                    "SELECT run_id, work_id, url, normalized_url, canonical_url, original_url, schema_version, "
                     "classification, reason, reason_detail, path, path_mtime_ns, sha256, "
                     "content_length, etag, last_modified "
                     "FROM manifests ORDER BY work_id, normalized_url"
@@ -1903,7 +2014,17 @@ def iter_previous_manifest_entries(
                     url = data.get("url")
                     if not work_id or not url:
                         raise ValueError("Manifest entries must include work_id and url fields.")
-                    data["normalized_url"] = normalize_url(url)
+                    original_value = data.get("original_url") or url
+                    try:
+                        canonical_value = data.get("canonical_url") or canonical_for_index(
+                            original_value
+                        )
+                    except Exception:
+                        canonical_value = normalize_url(original_value)
+                    normalized_value = data.get("normalized_url") or canonical_value
+                    data["original_url"] = original_value
+                    data["canonical_url"] = canonical_value
+                    data["normalized_url"] = normalized_value
 
                     content_length = data.get("content_length")
                     if isinstance(content_length, str):
@@ -2319,7 +2440,7 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
             try:
                 cursor = self._conn.execute(
                     (
-                        "SELECT run_id, work_id, url, normalized_url, schema_version, classification, "
+                        "SELECT run_id, work_id, url, normalized_url, canonical_url, original_url, schema_version, classification, "
                         "reason, reason_detail, path, path_mtime_ns, sha256, content_length, etag, last_modified "
                         "FROM manifests WHERE work_id = ? ORDER BY normalized_url"
                     ),
@@ -2349,7 +2470,7 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
         try:
             cursor = self._conn.execute(
                 (
-                    "SELECT run_id, work_id, url, normalized_url, schema_version, classification, "
+                    "SELECT run_id, work_id, url, normalized_url, canonical_url, original_url, schema_version, classification, "
                     "reason, reason_detail, path, path_mtime_ns, sha256, content_length, etag, last_modified "
                     "FROM manifests WHERE work_id = ? ORDER BY normalized_url"
                 ),
@@ -2441,7 +2562,7 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
     try:
         try:
             cursor = conn.execute(
-                "SELECT url, normalized_url, path, sha256, classification, etag, last_modified, content_length, path_mtime_ns "
+                "SELECT url, normalized_url, canonical_url, original_url, path, sha256, classification, etag, last_modified, content_length, path_mtime_ns "
                 "FROM manifests ORDER BY timestamp"
             )
         except sqlite3.OperationalError:
@@ -2451,6 +2572,8 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
         for (
             url,
             normalized_url,
+            canonical_url,
+            original_url,
             stored_path,
             sha256,
             classification,
@@ -2461,10 +2584,12 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
         ) in cursor:
             if not url:
                 continue
-            normalized_value = normalized_url or normalize_url(url)
+            canonical_value = canonical_url or (normalized_url or normalize_url(url))
             normalized_path = normalize_manifest_path(stored_path, base=base_dir)
-            mapping[normalized_value] = {
+            mapping[canonical_value] = {
                 "url": url,
+                "canonical_url": canonical_value,
+                "original_url": original_url or url,
                 "path": normalized_path,
                 "sha256": sha256,
                 "classification": classification,
@@ -2489,6 +2614,8 @@ def build_manifest_entry(
     run_id: Optional[str] = None,
     reason: Optional[ReasonCode | str] = None,
     reason_detail: Optional[str] = None,
+    canonical_url: Optional[str] = None,
+    original_url: Optional[str] = None,
 ) -> ManifestEntry:
     """Create a manifest entry summarising a download attempt."""
 
@@ -2542,6 +2669,21 @@ def build_manifest_entry(
 
     normalized_text_path = normalize_manifest_path(extracted_text_path)
 
+    canonical_hint = canonical_url or (getattr(outcome, "canonical_url", None) if outcome else None)
+    original_hint = original_url or (getattr(outcome, "original_url", None) if outcome else None)
+    if original_hint is None and url is not None:
+        original_hint = url
+    if canonical_hint is None and original_hint:
+        try:
+            canonical_hint = canonical_for_index(original_hint)
+        except Exception:
+            canonical_hint = normalize_url(original_hint)
+    if canonical_hint is None and url is not None:
+        try:
+            canonical_hint = canonical_for_index(url)
+        except Exception:
+            canonical_hint = normalize_url(url)
+
     return ManifestEntry(
         schema_version=MANIFEST_SCHEMA_VERSION,
         timestamp=timestamp,
@@ -2551,6 +2693,9 @@ def build_manifest_entry(
         publication_year=getattr(artifact, "publication_year"),
         resolver=resolver,
         url=url,
+        canonical_url=canonical_hint,
+        original_url=original_hint,
+        normalized_url=canonical_hint,
         path=normalized_path,
         path_mtime_ns=path_mtime_ns,
         classification=classification,

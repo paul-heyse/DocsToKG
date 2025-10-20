@@ -64,10 +64,7 @@ def test_canonical_for_request_filters_tracking_on_landing():
     landing = canonical_for_request(url, role="landing")
     landing_parts = urlsplit(landing)
     assert landing_parts.netloc == "example.com"
-    assert parse_qsl(landing_parts.query, keep_blank_values=True) == [
-        ("ref", "tw"),
-        ("q", "test"),
-    ]
+    assert parse_qsl(landing_parts.query, keep_blank_values=True) == []
 
     metadata = canonical_for_request(url, role="metadata")
     metadata_parts = urlsplit(metadata)

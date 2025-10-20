@@ -90,6 +90,8 @@ def _seed_sqlite_resume(sqlite_path: Path) -> None:
                 publication_year INTEGER,
                 resolver TEXT,
                 url TEXT,
+                canonical_url TEXT,
+                original_url TEXT,
                 normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
@@ -111,7 +113,7 @@ def _seed_sqlite_resume(sqlite_path: Path) -> None:
             """
             INSERT INTO manifests (
                 timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                resolver, url, canonical_url, original_url, normalized_url, path, path_mtime_ns, classification,
                 content_type, reason, reason_detail, html_paths, sha256,
                 content_length, etag, last_modified, extracted_text_path, dry_run
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -124,6 +126,8 @@ def _seed_sqlite_resume(sqlite_path: Path) -> None:
                 "SQLite Resume",
                 2024,
                 "openalex",
+                "https://example.org/W-SQLITE.pdf",
+                "https://example.org/w-sqlite.pdf",
                 "https://example.org/W-SQLITE.pdf",
                 "https://example.org/w-sqlite.pdf",
                 "/data/stored.pdf",
@@ -203,6 +207,9 @@ def test_manifest_entry_schema_backward_compatible(tmp_path: Path):
         "publication_year",
         "resolver",
         "url",
+        "canonical_url",
+        "original_url",
+        "normalized_url",
         "path",
         "path_mtime_ns",
         "classification",
@@ -382,7 +389,6 @@ def test_load_resolver_config_rejects_legacy_rate_limits(tmp_path: Path):
         accept=None,
         mailto=None,
         global_url_dedup=None,
-        domain_min_interval=[],
     )
 
     resolver_names: List[str] = ["alpha", "beta", "gamma"]
@@ -416,8 +422,6 @@ def test_load_resolver_config_applies_concurrency_and_dedup_overrides(tmp_path: 
         accept=None,
         mailto=None,
         global_url_dedup=None,
-        domain_min_interval=[],
-        domain_token_bucket=[],
     )
 
     config = downloader.load_resolver_config(args, ["alpha", "beta"])
@@ -449,9 +453,69 @@ def test_load_resolver_config_rejects_invalid_concurrency_override(tmp_path: Pat
         accept=None,
         mailto=None,
         global_url_dedup=None,
-        domain_min_interval=[],
-        domain_token_bucket=[],
     )
 
     with pytest.raises(ValueError, match="max_concurrent_resolvers"):
         downloader.load_resolver_config(args, ["alpha", "beta"])
+
+
+def test_load_resolver_config_rejects_legacy_domain_limits(tmp_path: Path) -> None:
+    config_payload: Dict[str, object] = {
+        "domain_min_interval_s": {"example.org": 1.0},
+    }
+    config_path = tmp_path / "resolvers.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+
+    args = SimpleNamespace(
+        resolver_config=str(config_path),
+        unpaywall_email=None,
+        core_api_key=None,
+        semantic_scholar_api_key=None,
+        doaj_api_key=None,
+        max_resolver_attempts=None,
+        resolver_timeout=None,
+        retry_after_cap=None,
+        concurrent_resolvers=None,
+        max_concurrent_per_host=None,
+        disable_resolver=[],
+        enable_resolver=[],
+        resolver_order=None,
+        head_precheck=None,
+        accept=None,
+        mailto=None,
+        global_url_dedup=None,
+    )
+
+    with pytest.raises(ValueError, match="domain_min_interval_s"):
+        downloader.load_resolver_config(args, ["alpha"])
+
+
+def test_load_resolver_config_rejects_legacy_domain_token_buckets(tmp_path: Path) -> None:
+    config_payload: Dict[str, object] = {
+        "domain_token_buckets": {"example.org": {"rate_per_second": 1.0}},
+    }
+    config_path = tmp_path / "resolvers.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+
+    args = SimpleNamespace(
+        resolver_config=str(config_path),
+        unpaywall_email=None,
+        core_api_key=None,
+        semantic_scholar_api_key=None,
+        doaj_api_key=None,
+        max_resolver_attempts=None,
+        resolver_timeout=None,
+        retry_after_cap=None,
+        concurrent_resolvers=None,
+        max_concurrent_per_host=None,
+        disable_resolver=[],
+        enable_resolver=[],
+        resolver_order=None,
+        head_precheck=None,
+        accept=None,
+        mailto=None,
+        global_url_dedup=None,
+    )
+
+    with pytest.raises(ValueError, match="domain_token_buckets"):
+        downloader.load_resolver_config(args, ["alpha"])
