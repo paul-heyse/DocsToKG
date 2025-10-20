@@ -845,8 +845,7 @@ def load_raw_yaml(config_path: Path) -> Mapping[str, object]:
     normalized_path = normalize_config_path(config_path)
 
     if not normalized_path.exists():
-        print(f"Configuration file not found: {normalized_path}", file=sys.stderr)
-        raise SystemExit(2)
+        raise ConfigError(f"Configuration file not found: {normalized_path}")
 
     try:
         with normalized_path.open("r", encoding="utf-8") as handle:

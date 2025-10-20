@@ -193,11 +193,10 @@ compatibility helpers. Ensures the CLI and API receive well-formed
 
 """Tests for ontology downloader configuration models and helpers."""
 
-import io
 import logging
 import os
 import textwrap
-from contextlib import contextmanager, redirect_stderr
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
@@ -587,16 +586,13 @@ def test_validate_config_rejects_non_mapping_extras(tmp_path: Path) -> None:
     assert "extras" in str(exc_info.value)
 
 
-def test_load_raw_yaml_missing_file_exits(tmp_path: Path) -> None:
-    """Missing YAML files should exit with status code 2 and helpful message."""
+def test_load_raw_yaml_missing_file_raises_config_error(tmp_path: Path) -> None:
+    """Missing YAML files should raise ConfigError instead of exiting."""
 
     path = tmp_path / "missing.yaml"
-    stderr = io.StringIO()
-    with redirect_stderr(stderr):
-        with pytest.raises(SystemExit) as exc_info:
-            load_raw_yaml(path)
-    assert exc_info.value.code == 2
-    assert "Configuration file not found" in stderr.getvalue()
+    with pytest.raises(ConfigError) as exc_info:
+        load_raw_yaml(path)
+    assert "Configuration file not found" in str(exc_info.value)
 
 
 def test_load_config_invalid_yaml(tmp_path: Path) -> None:

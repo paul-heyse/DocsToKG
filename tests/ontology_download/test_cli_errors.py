@@ -78,3 +78,14 @@ def test_cli_main_returns_non_zero_for_batch_fetch_error(ontology_env, capsys):
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "Download aborted" in captured.err
+
+
+def test_cli_main_surfaces_missing_config_file(tmp_path, capsys):
+    """Missing --spec files should bubble up as ConfigError with stderr messaging."""
+
+    missing = tmp_path / "missing.yaml"
+    exit_code = cli_module.cli_main(["plan", "--spec", str(missing)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Configuration file not found" in captured.err
