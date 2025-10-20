@@ -585,6 +585,80 @@ def _write_document_artifacts(
 # --- test_hybrid_search.py ---
 
 
+def test_commit_batch_handles_empty_document(
+    stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
+    tmp_path: Path,
+) -> None:
+    ingestion, _, _, _, _, _ = stack()
+    artifacts_dir = tmp_path / "empty_document"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    chunk_path = artifacts_dir / "doc-0.chunks.jsonl"
+    chunk_path.write_text("", encoding="utf-8")
+    vector_path = artifacts_dir / "doc-0.vectors.jsonl"
+    vector_path.write_text("", encoding="utf-8")
+    document = DocumentInput(
+        doc_id="doc-0",
+        namespace="research",
+        chunk_path=chunk_path,
+        vector_path=vector_path,
+        metadata={},
+    )
+
+    loaded = ingestion._load_precomputed_chunks(document)
+    assert isinstance(loaded, list)
+    assert loaded == []
+
+    result = ingestion._commit_batch(loaded, collect_vector_ids=True)
+    assert result.chunk_count == 0
+    assert result.namespaces == ()
+    assert result.vector_ids == ()
+
+
+def test_commit_batch_handles_populated_document(
+    stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
+    tmp_path: Path,
+) -> None:
+    ingestion, _, _, _, feature_generator, _ = stack()
+    artifacts_dir = tmp_path / "populated_document"
+    document = _write_document_artifacts(
+        artifacts_dir,
+        doc_id="doc-1",
+        namespace="research",
+        text="FAISS ingestion smoke test.",
+        metadata={"author": "Test"},
+        feature_generator=feature_generator,
+    )
+
+    loaded = ingestion._load_precomputed_chunks(document)
+    assert isinstance(loaded, list)
+    assert len(loaded) == 1
+
+    result = ingestion._commit_batch(loaded, collect_vector_ids=True)
+    assert result.chunk_count == 1
+    assert result.namespaces == ("research",)
+    assert result.vector_ids == (loaded[0].vector_id,)
+
+
 @pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
 def test_hybrid_retrieval_end_to_end(
     stack: Callable[
