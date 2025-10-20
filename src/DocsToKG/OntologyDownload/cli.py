@@ -422,25 +422,30 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-EXAMPLE_SOURCES_YAML = """# Example configuration for ontology downloader\ndefaults:
+EXAMPLE_SOURCES_YAML = """# Example configuration for the ontology downloader
+defaults:
   accept_licenses: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"]
   normalize_to: ["ttl"]
   prefer_source: ["obo", "ols", "bioportal", "direct"]
   http:
     max_retries: 5
     timeout_sec: 30
+    download_timeout_sec: 300
     backoff_factor: 0.5
     per_host_rate_limit: "4/second"
-    max_uncompressed_size_gb: 10
+    rate_limits:
+      ols: "5/second"
+      bioportal: "1/second"
     validate_media_type: true
   validation:
-    skip_reasoning_if_size_mb: 500
     parser_timeout_sec: 60
+    max_memory_mb: 2048
+    skip_reasoning_if_size_mb: 500
   logging:
     level: "INFO"
     max_log_size_mb: 100
     retention_days: 30
-  enable_cas_mirror: false
+  continue_on_error: true
 
 ontologies:
   - id: hp
