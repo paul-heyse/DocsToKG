@@ -302,18 +302,13 @@ class DenseSearchStrategy:
             return (min(target, self._MAX_K), oversample, overfetch)
 
     def observe_pass_rate(
-        self, signature: Tuple[object, ...], observed: float, *, update_global: bool = True
+        self,
+        signature: Tuple[object, ...],
+        observed: float,
+        *,
+        update_global: bool = True,
     ) -> float:
-        """Blend ``observed`` into the running EMA and return the updated value.
-
-        Args:
-            signature: Unique signature for the dense request whose pass rate is being
-                tracked.
-            observed: Measured pass rate for the request (0.0–1.0).
-            update_global: When ``True`` blend the observation into the global planner
-                pass rate; when ``False`` the global planner state remains unchanged and
-                only the per-signature EMA is updated.
-        """
+        """Blend ``observed`` into the running EMA and return the updated value."""
 
         with self._lock:
             bounded = max(0.0, min(1.0, float(observed)))
@@ -1529,7 +1524,8 @@ class HybridSearchService:
 
         score_floor = float(getattr(config.retrieval, "dense_score_floor", 0.0))
         use_score_floor = score_floor > 0.0
-        use_range = bool(getattr(request, "recall_first", False)) or use_score_floor
+        recall_first = bool(getattr(request, "recall_first", False))
+        use_range = recall_first or use_score_floor
         if use_range:
             budget = max(1, int(initial_k))
             hits = list(store.range_search(queries[0], score_floor, limit=budget))
@@ -1537,6 +1533,9 @@ class HybridSearchService:
             filtered, payloads = self._filter_dense_hits(hits, filters, score_floor)
             observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
             blended_pass = strategy.observe_pass_rate(
+                signature,
+                observed,
+                update_global=not recall_first,
                 signature, observed, update_global=not bool(getattr(request, "recall_first", False))
             )
             strategy.remember(signature, max(len(filtered), len(hits)))
