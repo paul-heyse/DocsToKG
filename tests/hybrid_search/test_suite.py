@@ -920,6 +920,43 @@ def test_api_post_hybrid_search_success_and_validation(
 
 
 @pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
+def test_api_post_hybrid_search_allows_null_filters(
+    stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
+    dataset: Sequence[Mapping[str, object]],
+    vector_format: str,
+) -> None:
+    ingestion, service, _, _, _, _ = stack()
+    documents = _to_documents(dataset, vector_format)
+    ingestion.upsert_documents(documents)
+    api = HybridSearchAPI(service)
+
+    status, body = api.post_hybrid_search(
+        {
+            "query": "hybrid retrieval faiss",
+            "namespace": "research",
+            "page_size": 3,
+            "filters": None,
+        }
+    )
+
+    assert status == HTTPStatus.OK
+    assert body["results"]
+
+
+# --- test_hybrid_search.py ---
+
+
+@pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
 def test_operations_snapshot_and_restore_roundtrip(
     stack: Callable[
         ...,
