@@ -48,7 +48,13 @@ def resolve_hf_home() -> Path:
 
 
 def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
-    """Resolve the DocsToKG model root honouring ``DOCSTOKG_MODEL_ROOT``."""
+    """Resolve the DocsToKG model root honouring ``DOCSTOKG_MODEL_ROOT``.
+
+    When the Hugging Face cache sits inside a ``huggingface`` directory the
+    model root is anchored beside that directory (matching the historic
+    behaviour). Otherwise the model root is created directly beneath the cache
+    path so that custom ``HF_HOME`` values remain self-contained.
+    """
 
     env = os.getenv("DOCSTOKG_MODEL_ROOT")
     if env:
@@ -58,7 +64,7 @@ def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
         if hf_home is not None
         else resolve_hf_home()
     )
-    cache_root = resolved_hf.parent
+    cache_root = resolved_hf.parent if resolved_hf.name == "huggingface" else resolved_hf
     default_root = cache_root / "docs-to-kg" / "models"
     return expand_path(default_root)
 
