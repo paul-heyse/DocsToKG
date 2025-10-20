@@ -332,7 +332,7 @@ flowchart LR
 - CLI selectors & pagination: `--topic`, `--topic-id`, `--year-start`, `--year-end`, `--per-page`, `--oa-only`.
 - Output & lifecycle controls: `--out`, `--html-out`, `--xml-out`, `--staging`, `--content-addressed`, `--manifest`, `--log-format {jsonl,csv}`, `--log-csv`, `--log-rotate`, `--warm-manifest-cache`, `--resume-from`, `--verify-cache-digest`.
 - Runtime controls: `--mailto`, `--max`, `--workers`, `--sleep` (defaults to 0.05 for sequential runs and is ignored when `--workers > 1` unless explicitly supplied), `--dry-run`, `--list-only`, `--ignore-robots`, `--openalex-retry-attempts`, `--openalex-retry-backoff`, `--openalex-retry-max-delay`.
-- Resolver knobs & credentials: `--resolver-config`, `--resolver-order`, `--resolver-preset {fast,broad}`, `--enable-resolver`, `--disable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--retry-after-cap`, `--concurrent-resolvers`, `--max-concurrent-per-host`, `--domain-min-interval`, `--domain-token-bucket`, `--global-url-dedup`/`--no-global-url-dedup`, `--global-url-dedup-cap`, `--head-precheck`/`--no-head-precheck`, `--accept`, `--unpaywall-email`, `--core-api-key`, `--semantic-scholar-api-key`, `--doaj-api-key`. The CLI threads `--retry-after-cap` into `DownloadConfig.extra` so downloader retries honour the ceiling even outside resolver config files.
+- Resolver knobs & credentials: `--resolver-config`, `--resolver-order`, `--resolver-preset {fast,broad}`, `--enable-resolver`, `--disable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--retry-after-cap`, `--concurrent-resolvers`, `--global-url-dedup`/`--no-global-url-dedup`, `--global-url-dedup-cap`, `--head-precheck`/`--no-head-precheck`, `--accept`, `--unpaywall-email`, `--core-api-key`, `--semantic-scholar-api-key`, `--doaj-api-key`, and centralized limiter overrides (`--rate`, `--rate-mode`, `--rate-max-delay`, `--rate-backend`). The CLI threads `--retry-after-cap` into `DownloadConfig.extra` so downloader retries honour the ceiling even outside resolver config files.
 - Classifier & extraction tuning: `--sniff-bytes`, `--min-pdf-bytes`, `--tail-check-bytes`, `--extract-text`.
 
 **Resolver configuration excerpt**
@@ -344,14 +344,11 @@ resolver_order:
   - unpaywall
   - crossref
 max_concurrent_resolvers: 8
-max_concurrent_per_host: 4
 polite_headers:
   User-Agent: "DocsToKG-Downloader/1.0 (+mailto:you@example.org)"
   Accept: "application/pdf, text/html;q=0.9, */*;q=0.7"
 resolver_toggles:
   wayback: false
-resolver_min_interval_s:
-  unpaywall: 0.5
 rate_overrides:
   - "api.crossref.org=10/s,1000/h"
   - "export.arxiv.org.artifact=1/3s"

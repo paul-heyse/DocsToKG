@@ -23,7 +23,7 @@ This guide summarises the key operational updates introduced by the
 - ``--resume-from``: skips works already logged in an existing manifest JSONL.
 - ``--extract-text=html``: extracts plaintext from HTML fallbacks (requires
   ``trafilatura``).
-- HTTP range resume flags (`enable_range_resume`) are now ignored. Telemetry will record `resume_disabled=true` when the flag is supplied; remove the option from automation to avoid confusion.
+- HTTP range resume flags (`enable_range_resume`) are no longer accepted. Remove the option from automation to avoid confusion.
 
 ## 5. Ontology Downloader API Migration (``harden-ontology-downloader-core``)
 

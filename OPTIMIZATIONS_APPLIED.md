@@ -122,15 +122,15 @@ This document summarizes the performance and efficiency optimizations applied to
 
 **Changes**:
 
-- `enable_range_resume` flag remains in the context model for backward compatibility but is forced to `False` inside the downloader.
+- Range resume support has been removed; contexts must no longer supply an `enable_range_resume` flag.
 - Resolver metadata advertising resume capability is stripped before telemetry emission so downstream systems are not misled.
 - Operators are instructed to re-fetch interrupted downloads instead of relying on partial file recovery.
 
 **Status**:
 
 - Range requests are no longer issued even if callers specify the flag.
-- Telemetry annotates runs with `resume_disabled=true` when a resume request is ignored.
-- Resume will remain disabled until append-safe writes are implemented in a future change.
+- Telemetry no longer emits `resume_disabled` because resume requests are rejected upfront.
+- Resume will remain unsupported until append-safe writes are implemented in a future change.
 
 ---
 

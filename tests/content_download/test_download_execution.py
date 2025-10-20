@@ -144,44 +144,6 @@ def test_prepare_candidate_download_skip_head_precheck(
         client.close()
     assert not calls
     assert not plan.head_precheck_passed
-
-
-def test_range_resume_warning_emitted_once(
-    caplog: pytest.LogCaptureFixture, artifact: WorkArtifact
-) -> None:
-    config = DownloadConfig(run_id="run", enable_range_resume=True)
-    base_ctx = config.to_context({})
-    client = _build_mock_client()
-    url = "https://example.com/foo.pdf"
-
-    with caplog.at_level(logging.WARNING):
-        prepare_candidate_download(
-            client,
-            artifact,
-            url,
-            None,
-            5.0,
-            base_ctx.clone_for_download(),
-        )
-        prepare_candidate_download(
-            client,
-            artifact,
-            url,
-            None,
-            5.0,
-            base_ctx.clone_for_download(),
-        )
-    client.close()
-
-    warning_messages = [
-        record.getMessage()
-        for record in caplog.records
-        if "Range resume requested" in record.getMessage()
-    ]
-    assert len(warning_messages) == 1
-    assert config.extra.get("range_resume_warning_emitted") is True
-
-
 def test_stream_candidate_payload_returns_cached(
     patcher: PatchManager, artifact: WorkArtifact, tmp_path: Path
 ) -> None:
@@ -337,9 +299,7 @@ def test_download_candidate_retries_and_cleans_partial(
     assert not Path(str(outcome.path) + ".part").exists()
     assert progress
     assert request_calls == [("GET", True), ("GET", True)]
-
-
-def test_cleanup_sidecar_files_retains_partial_for_resume(
+def test_cleanup_sidecar_files_removes_partial_pdf(
     tmp_path: Path, artifact: WorkArtifact
 ) -> None:
     target = artifact.pdf_dir / "example.pdf"
@@ -348,21 +308,14 @@ def test_cleanup_sidecar_files_retains_partial_for_resume(
     target.write_bytes(b"data")
     part_path.write_bytes(b"temp")
 
-    config = DownloadConfig(run_id="run", enable_range_resume=True)
+    config = DownloadConfig(run_id="run")
     downloader.cleanup_sidecar_files(
         artifact,
         Classification.PDF,
         config,
-        resume_supported=True,
-    )
-    assert part_path.exists()
-    downloader.cleanup_sidecar_files(
-        artifact,
-        Classification.PDF,
-        config,
-        resume_supported=False,
     )
     assert not part_path.exists()
+    assert not target.exists()
 
 
 def test_cleanup_sidecar_files_removes_html(tmp_path: Path, artifact: WorkArtifact) -> None:
@@ -388,14 +341,12 @@ def test_download_config_round_trip() -> None:
         host_accept_overrides={"example.com": "application/pdf"},
         progress_callback=lambda transferred, total, url: progress_calls.append(transferred),
         skip_head_precheck=True,
-        enable_range_resume=True,
         head_precheck_passed=True,
     )
     ctx = config.to_context({"previous": {}})
     assert ctx.domain_content_rules == config.domain_content_rules
     assert ctx.host_accept_overrides == config.host_accept_overrides
     assert ctx.skip_head_precheck
-    assert ctx.enable_range_resume
     assert ctx.progress_callback is config.progress_callback
 
     round_trip = DownloadConfig.from_options(ctx)

@@ -206,7 +206,6 @@ class DownloadContext:
     domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     host_accept_overrides: Dict[str, Any] = field(default_factory=dict)
     progress_callback: Optional[Callable[[int, Optional[int], str], None]] = None
-    enable_range_resume: bool = False
     robots_checker: Optional["RobotsCache"] = None
     skip_head_precheck: bool = False
     head_precheck_passed: bool = False
@@ -231,7 +230,6 @@ class DownloadContext:
         self.dry_run = bool(self.dry_run)
         self.list_only = bool(self.list_only)
         self.extract_html_text = bool(self.extract_html_text)
-        self.enable_range_resume = bool(self.enable_range_resume)
         self.skip_head_precheck = bool(self.skip_head_precheck)
         self.head_precheck_passed = bool(self.head_precheck_passed)
         self.content_addressed = bool(self.content_addressed)
@@ -287,7 +285,6 @@ class DownloadContext:
             domain_content_rules=_pop("domain_content_rules", {}),
             host_accept_overrides=_pop("host_accept_overrides", {}),
             progress_callback=_pop("progress_callback", None),
-            enable_range_resume=_pop("enable_range_resume", False),
             robots_checker=_pop("robots_checker", None),
             skip_head_precheck=_pop("skip_head_precheck", False),
             head_precheck_passed=_pop("head_precheck_passed", False),
@@ -328,7 +325,6 @@ class DownloadContext:
             "domain_content_rules": self.domain_content_rules,
             "host_accept_overrides": self.host_accept_overrides,
             "progress_callback": self.progress_callback,
-            "enable_range_resume": self.enable_range_resume,
             "robots_checker": self.robots_checker,
             "skip_head_precheck": self.skip_head_precheck,
             "head_precheck_passed": self.head_precheck_passed,

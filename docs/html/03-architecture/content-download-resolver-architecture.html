@@ -150,9 +150,8 @@ keys as zero.</p></li>
 <li><p>Files are indented and sorted for readability and deterministic diffs.</p></li>
 <li><p>Voluntary skips now emit <code class="docutils literal notranslate"><span class="pre">reason=&quot;skip_large_download&quot;</span></code> so dashboards can
 separate operator-driven limits from domain budget enforcement.</p></li>
-<li><p>When a caller requests HTTP range resume, the downloader annotates attempts
-with <code class="docutils literal notranslate"><span class="pre">metadata.resume_disabled=true</span></code> to signal that the legacy flag was
-ignored for safety.</p></li>
+<li><p>HTTP range resume support has been removed, so attempts no longer emit any
+<code class="docutils literal notranslate"><span class="pre">resume_disabled</span></code> metadata tag.</p></li>
 </ul>
 </section>
 <section id="streaming-hash-performance-benefits">

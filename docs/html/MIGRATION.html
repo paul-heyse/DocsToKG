@@ -105,7 +105,7 @@ or run <code class="docutils literal notranslate"><span class="pre">jq</span></c
 <li><p><code class="docutils literal notranslate"><span class="pre">--resume-from</span></code>: skips works already logged in an existing manifest JSONL.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">--extract-text=html</span></code>: extracts plaintext from HTML fallbacks (requires
 <code class="docutils literal notranslate"><span class="pre">trafilatura</span></code>).</p></li>
-<li><p>HTTP range resume flags (<code class="docutils literal notranslate"><span class="pre">enable_range_resume</span></code>) are now ignored. Telemetry will record <code class="docutils literal notranslate"><span class="pre">resume_disabled=true</span></code> when the flag is supplied; remove the option from automation to avoid confusion.</p></li>
+<li><p>HTTP range resume flags (<code class="docutils literal notranslate"><span class="pre">enable_range_resume</span></code>) are no longer accepted. Remove the option from automation to avoid confusion.</p></li>
 </ul>
 </section>
 <section id="ontology-downloader-api-migration-harden-ontology-downloader-core">

@@ -127,7 +127,6 @@
 <h3>Content Download Telemetry<a class="headerlink" href="#content-download-telemetry" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>Aggregate reason codes from manifest/attempt logs to distinguish conditional hits (<code class="docutils literal notranslate"><span class="pre">conditional_not_modified</span></code>) and voluntary skips (<code class="docutils literal notranslate"><span class="pre">skip_large_download</span></code>).</p></li>
-<li><p>Surface the <code class="docutils literal notranslate"><span class="pre">resume_disabled</span></code> flag emitted in attempt metadata when callers still request HTTP range resume—the downloader ignores the flag but the tag helps spot outdated automation.</p></li>
 <li><p>Treat missing reason codes as successful downloads in dashboards and notebooks.</p></li>
 </ul>
 </section>

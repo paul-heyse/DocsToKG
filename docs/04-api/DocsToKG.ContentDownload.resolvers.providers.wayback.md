@@ -4,19 +4,22 @@ This reference describes the ``WaybackResolver`` class provided by the consolida
 
 Wayback Machine Resolver Provider
 
-This module queries the Internet Archive Wayback Machine to retrieve archived
-snapshots of PDF URLs that previously failed during resolver execution.
+This module queries the Internet Archive Wayback Machine using CDX-first discovery
+to retrieve archived snapshots of PDF URLs that previously failed during resolver execution.
 
 Key Features:
-- Recovery of archived snapshots for failed HTTP URLs.
-- Structured error reporting for network and HTTP issues.
-- Graceful handling when no snapshots are available or when failures persist.
+
+- CDX-first discovery algorithm for comprehensive snapshot search
+- Availability API fast-path for quick snapshot detection
+- HTML parsing fallback to extract PDF links from archived landing pages
+- PDF verification with HEAD requests and signature checking
+- Structured telemetry for monitoring resolver effectiveness
 
 Usage:
     from DocsToKG.ContentDownload.pipeline.providers import WaybackResolver
 
     resolver = WaybackResolver()
-    results = list(resolver.iter_urls(session, config, artifact))
+    results = list(resolver.iter_urls(client, config, artifact))
 
 ## 1. Functions
 
@@ -31,13 +34,13 @@ artifact: Work artifact containing details of failed downloads.
 Returns:
 Boolean indicating whether the Wayback resolver should run.
 
-### `iter_urls(self, session, config, artifact)`
+### `iter_urls(self, client, config, artifact)`
 
-Yield archived URLs from the Internet Archive when available.
+Yield archived URLs from the Internet Archive when available using CDX-first discovery.
 
 Args:
-session: HTTP session used to contact the Wayback API.
-config: Resolver configuration exposing headers and timeouts.
+client: HTTPX client with caching and rate limiting for Wayback API calls.
+config: Resolver configuration exposing headers, timeouts, and Wayback-specific options.
 artifact: Work artifact describing failed PDF URLs to recover.
 
 Returns:
@@ -47,7 +50,7 @@ Iterable of resolver results referencing archived snapshots.
 
 ### `WaybackResolver`
 
-Fallback resolver that queries the Internet Archive Wayback Machine.
+Fallback resolver that queries the Internet Archive Wayback Machine with CDX-first discovery algorithm.
 
 Attributes:
 name: Resolver identifier surfaced to the pipeline.

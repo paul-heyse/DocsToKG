@@ -398,6 +398,39 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Default timeout (seconds) for resolver HTTP requests.",
     )
+
+    # Wayback-specific options
+    wayback_group = parser.add_argument_group("Wayback Machine settings")
+    wayback_group.add_argument(
+        "--wayback-year-window",
+        type=int,
+        default=2,
+        help="Search window around publication year for Wayback snapshots (default: 2).",
+    )
+    wayback_group.add_argument(
+        "--wayback-max-snapshots",
+        type=int,
+        default=8,
+        help="Maximum CDX snapshots to evaluate per URL (default: 8).",
+    )
+    wayback_group.add_argument(
+        "--wayback-min-pdf-bytes",
+        type=int,
+        default=4096,
+        help="Minimum PDF size in bytes to accept (default: 4096).",
+    )
+    wayback_group.add_argument(
+        "--wayback-html-parse",
+        action="store_true",
+        default=True,
+        help="Enable HTML parsing to find PDF links in archived pages (default: True).",
+    )
+    wayback_group.add_argument(
+        "--no-wayback-html-parse",
+        action="store_false",
+        dest="wayback_html_parse",
+        help="Disable HTML parsing for Wayback resolver.",
+    )
     resolver_group.add_argument(
         "--retry-after-cap",
         type=float,
@@ -654,7 +687,9 @@ def _parse_rate_max_delay_spec(value: str) -> Tuple[str, str, int]:
     target, delay_text = value.split("=", 1)
     host, role = _split_host_role(target)
     if role is None:
-        raise argparse.ArgumentTypeError("rate max delay requires explicit role (e.g., host.metadata=250).")
+        raise argparse.ArgumentTypeError(
+            "rate max delay requires explicit role (e.g., host.metadata=250)."
+        )
     return host, role, _parse_delay_ms(delay_text.strip())
 
 
@@ -995,7 +1030,6 @@ def resolve_config(
     mailto_value = getattr(config, "mailto", None)
     if mailto_value:
         apply_mailto(mailto_value)
-
 
     concurrency_product = max(args.workers, 1) * max(config.max_concurrent_resolvers, 1)
     if concurrency_product > 32:

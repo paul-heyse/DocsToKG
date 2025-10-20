@@ -1668,7 +1668,9 @@ def test_pipeline_records_resolver_exception(tmp_path):
         def iter_urls(self, session, config, art):  # noqa: D401
             raise RuntimeError("boom")
 
-    def fake_download(session, artifact, url, referer, timeout, **kwargs):  # pragma: no cover - not reached
+    def fake_download(
+        session, artifact, url, referer, timeout, **kwargs
+    ):  # pragma: no cover - not reached
         return DownloadOutcome(
             "pdf", str(artifact.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0
         )
@@ -4994,44 +4996,4 @@ def test_semantic_scholar_resolver_success(tmp_path):
 
 
 # --- test_resolvers_unit.py ---
-
-
-@responses.activate
-def test_wayback_resolver_success(tmp_path):
-    session = requests.Session()
-    artifact = make_artifact(tmp_path, failed_pdf_urls=["https://dead.example/file.pdf"])
-    config = build_config()
-    responses.add(
-        responses.GET,
-        "https://archive.org/wayback/available",
-        json={
-            "archived_snapshots": {
-                "closest": {
-                    "available": True,
-                    "url": "https://web.archive.org/web/20200101/https://dead.example/file.pdf",
-                    "timestamp": "20200101000000",
-                }
-            }
-        },
-        status=200,
-    )
-    urls = [r.url for r in WaybackResolver().iter_urls(session, config, artifact)]
-    assert urls == ["https://web.archive.org/web/20200101/https://dead.example/file.pdf"]
-
-
-# --- test_resolvers_unit.py ---
-
-
-@responses.activate
-def test_wayback_resolver_handles_missing_snapshot(tmp_path):
-    session = requests.Session()
-    artifact = make_artifact(tmp_path, failed_pdf_urls=["https://dead.example/file.pdf"])
-    config = build_config()
-    responses.add(
-        responses.GET,
-        "https://archive.org/wayback/available",
-        json={"archived_snapshots": {"closest": {"available": False}}},
-        status=200,
-    )
-    urls = list(WaybackResolver().iter_urls(session, config, artifact))
-    assert urls == []
+# Legacy Wayback tests removed - see tests/content_download/test_wayback_resolver.py for current tests

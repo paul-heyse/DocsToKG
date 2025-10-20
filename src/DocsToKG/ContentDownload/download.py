@@ -421,10 +421,6 @@ class DownloadPreflightPlan:
     origin_host: Optional[str]
     cond_helper: ConditionalRequestHelper
     attempt_conditional: bool = True
-    resume_bytes_offset: Optional[int] = None
-    enable_resume: bool = False
-    existing_path: Optional[str] = None
-    previous_length: Optional[int] = None
     head_precheck_passed: bool = False
     extract_html_text: bool = False
     sniff_limit: int = DEFAULT_SNIFF_BYTES
@@ -498,42 +494,6 @@ def prepare_candidate_download(
                 accept_value = accept_overrides.get(host_for_accept[4:])
     if accept_value:
         headers["Accept"] = str(accept_value)
-
-    resume_requested = bool(getattr(ctx, "enable_range_resume", False))
-    ctx_extra = getattr(ctx, "extra", {})
-    run_extra: Optional[Dict[str, Any]] = None
-    if isinstance(ctx_extra, dict):
-        candidate = ctx_extra.get(_RUN_EXTRA_REF_KEY)
-        if isinstance(candidate, dict):
-            run_extra = candidate
-        else:
-            nested = ctx_extra.get("extra")
-            if isinstance(nested, dict):
-                run_extra = nested
-    if run_extra is None and isinstance(ctx_extra, dict):
-        run_extra = ctx_extra
-
-    if resume_requested:
-        if isinstance(ctx_extra, dict):
-            ctx_extra["resume_disabled"] = True
-        if isinstance(run_extra, dict) and not run_extra.get(_RANGE_RESUME_WARNING_KEY):
-            LOGGER.warning(
-                "Range resume requested for %s; feature is deprecated and will be ignored.",
-                url,
-                extra={
-                    "reason": "resume-disabled",
-                    "extra_fields": {
-                        "url": url,
-                        "work_id": artifact.work_id,
-                    },
-                },
-            )
-            run_extra[_RANGE_RESUME_WARNING_KEY] = True
-    else:
-        if isinstance(ctx_extra, dict):
-            ctx_extra.pop("resume_disabled", None)
-    ctx.enable_range_resume = False
-    enable_resume = False
 
     http_client = client or get_http_client()
 
@@ -617,10 +577,6 @@ def prepare_candidate_download(
         origin_host=plan_origin_host,
         cond_helper=cond_helper,
         attempt_conditional=True,
-        resume_bytes_offset=None,
-        enable_resume=enable_resume,
-        existing_path=existing_path,
-        previous_length=previous_length,
         head_precheck_passed=head_precheck_state,
         extract_html_text=extract_html_text,
         sniff_limit=sniff_limit,
@@ -639,9 +595,6 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
     ctx = plan.context
     attempt_conditional = plan.attempt_conditional
     cond_helper = plan.cond_helper
-    resume_bytes_offset = plan.resume_bytes_offset
-    enable_resume = plan.enable_resume
-    existing_path = plan.existing_path
     content_policy = plan.content_policy
     base_headers = plan.base_headers
     content_type_hint = plan.content_type_hint
@@ -664,43 +617,10 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
 
     try:
         while True:
-            if (
-                enable_resume
-                and existing_path
-                and not attempt_conditional
-                and resume_bytes_offset is None
-            ):
-                try:
-                    existing_file = Path(existing_path)
-                    candidate_file = existing_file
-                    if not candidate_file.exists():
-                        candidate_part = existing_file.with_suffix(existing_file.suffix + ".part")
-                        if candidate_part.exists():
-                            candidate_file = candidate_part
-                    if candidate_file.exists() and candidate_file.is_file():
-                        file_size = candidate_file.stat().st_size
-                        if (
-                            file_size > 0
-                            and isinstance(plan.previous_length, int)
-                            and file_size < plan.previous_length
-                        ):
-                            resume_bytes_offset = file_size
-                            LOGGER.debug(
-                                "Resuming partial download from byte %d for %s (source=%s)",
-                                resume_bytes_offset,
-                                url,
-                                candidate_file,
-                            )
-                except (OSError, ValueError) as exc:
-                    LOGGER.debug("Could not check for partial download resume: %s", exc)
-                    resume_bytes_offset = None
-
             retry_after_hint: Optional[float] = None
             headers = dict(base_headers)
             if attempt_conditional:
                 headers.update(cond_helper.build_headers())
-            elif resume_bytes_offset is not None and resume_bytes_offset > 0:
-                headers["Range"] = f"bytes={resume_bytes_offset}-"
 
             start_request = time.monotonic()
             try:
@@ -901,68 +821,34 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                         original_url=plan.original_url,
                     )
                     outcome.metadata["cache_validation_mode"] = validation_mode
-                    if ctx.extra.get("resume_disabled"):
-                        outcome.metadata.setdefault("resume_disabled", True)
                     return DownloadStreamResult(outcome=outcome)
 
                 if response.status_code == 206:
-                    if resume_bytes_offset is None or resume_bytes_offset <= 0:
-                        LOGGER.warning(
-                            "Received HTTP 206 for %s without Range request; treating as error.",
-                            url,
-                        )
-                        return DownloadStreamResult(
-                            outcome=DownloadOutcome(
-                                classification=Classification.HTTP_ERROR,
-                                path=None,
-                                http_status=response.status_code,
-                                content_type=response.headers.get("Content-Type")
-                                or content_type_hint,
-                                elapsed_ms=elapsed_ms,
-                                reason=ReasonCode.UNKNOWN,
-                                reason_detail="unexpected-206-partial-content",
-                                sha256=None,
-                                content_length=None,
-                                etag=None,
-                                last_modified=None,
-                                extracted_text_path=None,
-                                retry_after=retry_after_hint,
-                                canonical_url=plan.canonical_url,
-                                canonical_index=plan.canonical_index,
-                                original_url=plan.original_url,
-                            )
-                        )
-                    LOGGER.info(
-                        "Resuming download from byte %d for %s",
-                        resume_bytes_offset,
+                    LOGGER.warning(
+                        "Received HTTP 206 for %s without Range request; treating as error.",
                         url,
-                        extra={
-                            "reason": "resume-complete",
-                            "url": url,
-                            "work_id": artifact.work_id,
-                            "resume_offset": resume_bytes_offset,
-                        },
                     )
-
-                elif response.status_code == 416:
-                    if resume_bytes_offset:
-                        LOGGER.warning(
-                            "Server rejected resume Range request for %s at offset %d; retrying full download.",
-                            url,
-                            resume_bytes_offset,
-                            extra={
-                                "reason": "resume-range-not-satisfiable",
-                                "url": url,
-                                "work_id": artifact.work_id,
-                                "resume_offset": resume_bytes_offset,
-                            },
+                    return DownloadStreamResult(
+                        outcome=DownloadOutcome(
+                            classification=Classification.HTTP_ERROR,
+                            path=None,
+                            http_status=response.status_code,
+                            content_type=response.headers.get("Content-Type")
+                            or content_type_hint,
+                            elapsed_ms=elapsed_ms,
+                            reason=ReasonCode.UNKNOWN,
+                            reason_detail="unexpected-206-partial-content",
+                            sha256=None,
+                            content_length=None,
+                            etag=None,
+                            last_modified=None,
+                            extracted_text_path=None,
+                            retry_after=retry_after_hint,
+                            canonical_url=plan.canonical_url,
+                            canonical_index=plan.canonical_index,
+                            original_url=plan.original_url,
                         )
-                    cleanup_sidecar_files(artifact, Classification.PDF, ctx)
-                    existing_path = None
-                    resume_bytes_offset = None
-                    attempt_conditional = False
-                    cond_helper = ConditionalRequestHelper()
-                    continue
+                    )
 
                 elif response.status_code != 200:
                     return DownloadStreamResult(
@@ -1282,14 +1168,10 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                             in {Classification.PDF, Classification.HTML, Classification.XML}
                             else Classification.PDF
                         )
-                        resume_supported_flag = bool(resume_bytes_offset) or bool(
-                            getattr(ctx, "enable_range_resume", False)
-                        )
                         cleanup_sidecar_files(
                             artifact,
                             classification_hint,
                             ctx,
-                            resume_supported=resume_supported_flag,
                         )
                         seen_attempts = ctx.stream_retry_attempts
                         if seen_attempts < 1:
@@ -2051,18 +1933,8 @@ def cleanup_sidecar_files(
     artifact: WorkArtifact,
     classification: Classification,
     options: Union[DownloadConfig, DownloadOptions, DownloadContext],
-    *,
-    resume_supported: bool = False,
-    preserve_partial: bool = False,
 ) -> None:
-    """Remove temporary sidecar files for the given artifact classification.
-
-    When resume is explicitly enabled *and* the remote endpoint confirmed support
-    (``resume_supported=True``), the partial artifact is preserved so the caller
-    can retry with a ``Range`` request. This behaviour is documented to avoid
-    surprising cleanups in the rare deployments that still experiment with
-    resumable transfers.
-    """
+    """Remove temporary sidecar files for the given artifact classification."""
 
     if classification in PDF_LIKE:
         dest_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
@@ -2073,25 +1945,11 @@ def cleanup_sidecar_files(
     else:
         return
 
-    resume_requested = getattr(options, "enable_range_resume", False)
-    resume_disabled = False
-    extra = getattr(options, "extra", {})
-    if isinstance(extra, Mapping):
-        resume_disabled = bool(extra.get("resume_disabled"))
-
-    preserve_part = preserve_partial or (
-        resume_supported and resume_requested and not resume_disabled
-    )
-    if preserve_part:
-        # Preserve partial files so a follow-up Range request can continue.
-        return
-
     part_path = dest_path.with_suffix(dest_path.suffix + ".part")
     with contextlib.suppress(FileNotFoundError):
         part_path.unlink()
 
-    dry_run = getattr(options, "dry_run", False)
-    if dry_run:
+    if getattr(options, "dry_run", False):
         return
 
     with contextlib.suppress(FileNotFoundError):

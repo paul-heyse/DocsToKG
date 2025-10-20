@@ -36,7 +36,7 @@ All notable changes to DocsToKG are documented in this file.
   ontology index writes via an ontology-scoped lock with wait-time logging.
 - Ontology download networking now streams directly from HTTPX via `io.network.download_stream`, removing the legacy `StreamingDownloader` and `pooch` dependency. Conditional requests honour ETag/Last-Modified validators, cached artefacts short-circuit with `status="cached"`, and tests exercise progress telemetry using `httpx.MockTransport`.
 - Content download outcomes now leave `reason` unset for fresh downloads, retain `conditional_not_modified` for genuine 304s, and tag voluntary skips with the dedicated `skip_large_download` code.
-- HTTP range resume is hard-disabled; resolver hints prefixed with `resume_` are stripped and telemetry annotates ignored requests via `resume_disabled=true`.
+- HTTP range resume support has been removed; resolver hints prefixed with `resume_` are rejected and callers must retry full downloads.
 - Manifest warm-up defaults to a lazy `ManifestUrlIndex`, with `--warm-manifest-cache` offered solely for small datasets.
 - Raised the documented Python interpreter minimum to 3.13 to align with packaging metadata and deployment tooling.
 - Content download networking now consolidates on a shared HTTPX client wrapped in Hishel caching (`DocsToKG.ContentDownload.httpx_transport`), removing the legacy `ThreadLocalSessionFactory`/`create_session` helpers. Transport overrides use `configure_http_client()` and `purge_http_cache()`, Tenacity sleeps are patched via `DocsToKG.ContentDownload.networking.time.sleep`, and all retries operate on `httpx.Response` semantics.
@@ -54,7 +54,7 @@ All notable changes to DocsToKG are documented in this file.
 - Operations runbook and configuration reference now call out planner URL
   validation, polite probe telemetry, ontology index locking, and the
   `defaults.planner.probing_enabled` opt-out flag.
-- Migration and observability guides document the new reason code taxonomy, resume deprecation, lazy manifest warm-up behaviour, and updated dashboard expectations (`skip_large_download`, `resume_disabled`).
+- Migration and observability guides document the new reason code taxonomy, range-resume removal, lazy manifest warm-up behaviour, and updated dashboard expectations (`skip_large_download`).
 
 ### Changed
 - Refactored `DocsToKG.OntologyDownload` into modular submodules (`config`, `io_safe`,

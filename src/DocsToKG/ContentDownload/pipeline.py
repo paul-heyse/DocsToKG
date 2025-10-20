@@ -381,6 +381,7 @@ class ResolverConfig:
         global_url_dedup_cap: Maximum URLs hydrated into the global dedupe cache.
         domain_content_rules: Mapping of hostname to MIME allow-lists.
         resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
+        wayback_config: Wayback-specific configuration options (year_window, max_snapshots, etc.).
 
     Notes:
         ``enable_head_precheck`` toggles inexpensive HEAD lookups before downloads
@@ -418,6 +419,8 @@ class ResolverConfig:
     global_url_dedup_cap: Optional[int] = 100_000
     domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     resolver_circuit_breakers: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    # Wayback-specific configuration
+    wayback_config: Dict[str, Any] = field(default_factory=dict)
     # Heuristic knobs (defaults preserve current CLI behaviour)
     sniff_bytes: int = DEFAULT_SNIFF_BYTES
     min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
@@ -684,6 +687,18 @@ def load_resolver_config(
     if hasattr(args, "concurrent_resolvers") and args.concurrent_resolvers is not None:
         config.max_concurrent_resolvers = args.concurrent_resolvers
 
+    # Wayback-specific configuration
+    wayback_config = {}
+    if hasattr(args, "wayback_year_window"):
+        wayback_config["year_window"] = args.wayback_year_window
+    if hasattr(args, "wayback_max_snapshots"):
+        wayback_config["max_snapshots"] = args.wayback_max_snapshots
+    if hasattr(args, "wayback_min_pdf_bytes"):
+        wayback_config["min_pdf_bytes"] = args.wayback_min_pdf_bytes
+    if hasattr(args, "wayback_html_parse"):
+        wayback_config["html_parse"] = args.wayback_html_parse
+    config.wayback_config = wayback_config
+
     if resolver_order_override:
         ordered: List[str] = []
         for name in resolver_order_override:
@@ -732,7 +747,6 @@ def load_resolver_config(
 
     if hasattr(args, "head_precheck") and args.head_precheck is not None:
         config.enable_head_precheck = args.head_precheck
-
 
     return config
 
@@ -1380,7 +1394,6 @@ class ResolverPipeline:
             breaker = self._get_existing_host_breaker(host_key)
             if breaker:
                 breaker.record_success()
-
 
     def _should_attempt_head_check(self, resolver_name: str, url: Optional[str]) -> bool:
         """Return ``True`` when a resolver should perform a HEAD preflight request.

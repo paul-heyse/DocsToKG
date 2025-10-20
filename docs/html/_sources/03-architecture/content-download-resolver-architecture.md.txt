@@ -70,9 +70,8 @@ integration:
 - Files are indented and sorted for readability and deterministic diffs.
 - Voluntary skips now emit `reason="skip_large_download"` so dashboards can
   separate operator-driven limits from domain budget enforcement.
-- When a caller requests HTTP range resume, the downloader annotates attempts
-  with `metadata.resume_disabled=true` to signal that the legacy flag was
-  ignored for safety.
+- HTTP range resume support has been removed, so attempts no longer emit any
+  `resume_disabled` metadata tag.
 
 ## 4. Streaming Hash Performance Benefits
 

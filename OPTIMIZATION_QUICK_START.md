@@ -57,7 +57,7 @@ session = create_session(
 
 ### 4. HTTP Range Resume (Deprecated)
 
-Range resume previously relied on partially-written `.part` files. The feature is now hard-disabled to prevent data loss—setting `enable_range_resume` has no effect beyond emitting a warning in telemetry. Remove the option from custom contexts and rerun downloads from the beginning to guarantee integrity.
+Range resume previously relied on partially-written `.part` files. The feature has now been removed entirely to prevent data loss—any `enable_range_resume` flag will raise an error. Delete the option from custom contexts and rerun downloads from the beginning to guarantee integrity.
 
 ---
 

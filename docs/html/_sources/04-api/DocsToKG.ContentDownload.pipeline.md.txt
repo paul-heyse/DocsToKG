@@ -397,15 +397,12 @@ semantic_scholar_api_key: API key for Semantic Scholar resolver.
 doaj_api_key: API key for DOAJ resolver.
 resolver_timeouts: Resolver-specific timeout overrides.
 resolver_min_interval_s: Minimum interval between resolver _requests.
-domain_min_interval_s: Optional per-domain rate limits overriding resolver settings.
 enable_head_precheck: Toggle applying HEAD filtering before downloads.
 resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
 host_accept_overrides: Mapping of hostname to Accept header override.
 mailto: Contact email appended to polite headers and user agent string.
 max_concurrent_resolvers: Upper bound on concurrent resolver threads per work.
-max_concurrent_per_host: Upper bound on simultaneous downloads per hostname.
 enable_global_url_dedup: Enable global URL deduplication across works when True.
-domain_token_buckets: Mapping of hostname to token bucket parameters.
 domain_content_rules: Mapping of hostname to MIME allow-lists.
 resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
 
@@ -414,8 +411,7 @@ Notes:
 to filter obvious HTML responses. ``resolver_head_precheck`` allows
 per-resolver overrides when specific providers reject HEAD _requests.
 ``max_concurrent_resolvers`` bounds the number of resolver threads used
-per work while still respecting configured rate limits. ``max_concurrent_per_host``
-limits simultaneous downloads hitting the same hostname across workers.
+per work while still respecting centralized rate limits.
 
 Examples:
 >>> config = ResolverConfig()

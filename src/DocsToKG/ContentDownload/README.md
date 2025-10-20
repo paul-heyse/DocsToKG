@@ -216,7 +216,7 @@ flowchart LR
 ### ResolverPipeline
 
 - `ResolverPipeline` stores resolvers by name, applies ordering overrides, and coordinates execution through per-resolver locks and global URL dedupe sets.
-- Resolver throttling is enforced via the centralized rate limiter; legacy options (`domain_min_interval_s`, `domain_token_buckets`) are translated into limiter policies and will be removed in a future release. `resolver_circuit_breakers` and host breakers still shed load after repeated failures.
+- Resolver throttling is enforced via the centralized rate limiter; legacy options (`domain_min_interval_s`, `domain_token_buckets`) now raise validation errors. `resolver_circuit_breakers` and host breakers still shed load after repeated failures.
 - Attempt logging uses `AttemptRecord` to include resolver order, status, HTTP status, elapsed time, retry hints, and reason codes. Metrics track attempts, successes, skips, failures, latency percentiles, and error reasons per resolver.
 - Global dedupe consults `ManifestUrlIndex` first, then updates in-memory sets under thread locks to prevent duplicate downloads across workers.
 

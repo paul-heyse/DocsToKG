@@ -528,6 +528,59 @@ def _percentile(data: Sequence[float], pct: float) -> float:
 
 MANIFEST_STAGE = "embeddings"
 
+_EMBED_WORKER_STATE: Dict[str, Any] = {}
+
+
+def _write_fingerprint(path: Path, *, input_sha256: str, cfg_hash: str) -> None:
+    """Write a fingerprint describing the processed chunk and configuration."""
+
+    payload = {
+        "input_sha256": input_sha256,
+        "cfg_hash": cfg_hash,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with atomic_write(path) as handle:
+        json.dump(payload, handle, sort_keys=True)
+        handle.write("\n")
+
+
+def _compute_embed_cfg_hash(cfg: "EmbedCfg", vector_format: str) -> str:
+    """Return a stable hash representing embedding configuration impacting resume."""
+
+    payload = {
+        "vector_format": str(vector_format or "jsonl").lower(),
+        "splade_model_dir": str(cfg.splade_model_dir or ""),
+        "qwen_model_dir": str(cfg.qwen_model_dir or ""),
+        "batch_size_splade": int(cfg.batch_size_splade),
+        "batch_size_qwen": int(cfg.batch_size_qwen),
+        "dense_qwen_vllm_batch_size": int(cfg.dense_qwen_vllm_batch_size or 0),
+        "dense_qwen_vllm_dimension": int(cfg.dense_qwen_vllm_dimension or 0),
+        "dense_qwen_vllm_quantization": cfg.dense_qwen_vllm_quantization or "",
+        "qwen_dtype": cfg.qwen_dtype,
+        "tp": int(cfg.tp),
+        "sparse_splade_st_max_active_dims": int(cfg.sparse_splade_st_max_active_dims or 0),
+        "sparse_splade_st_attn_backend": cfg.sparse_splade_st_attn_backend or "",
+        "offline": bool(cfg.offline),
+        "no_cache": bool(cfg.no_cache),
+    }
+    text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _set_embed_worker_state(state: Dict[str, Any]) -> None:
+    """Install the worker state dictionary used by embedding worker processes."""
+
+    global _EMBED_WORKER_STATE
+    _EMBED_WORKER_STATE = state
+
+
+def _get_embed_worker_state() -> Dict[str, Any]:
+    """Return the worker state configured in :func:`_set_embed_worker_state`."""
+
+    if not _EMBED_WORKER_STATE:
+        raise RuntimeError("Embedding worker state accessed before initialisation")
+    return _EMBED_WORKER_STATE
+
 
 # --- BM25 Tokenizer ---
 
@@ -1802,6 +1855,521 @@ def _validate_vectors_for_chunks(
         f"Validated {rows_validated} rows across {files_checked} vector files under {vectors_dir}"
     )
     return files_checked, rows_validated
+
+
+def _build_embedding_plan(
+    *,
+    chunk_entries: Sequence[ChunkDiscovery],
+    chunks_dir: Path,
+    vectors_dir: Path,
+    resolved_root: Path,
+    resume_controller: ResumeController,
+    vector_format: str,
+    cfg_hash: str,
+    hash_alg: str,
+    logger,
+    plan_only: bool,
+) -> Tuple[StagePlan, Dict[str, Any]]:
+    """Build a StagePlan for vector generation with resume awareness."""
+
+    fmt = str(vector_format or "jsonl").lower()
+    planned_ids: List[str] = []
+    skipped_ids: List[str] = []
+    work_items: List[WorkItem] = []
+    resume_skipped = 0
+
+    for entry in chunk_entries:
+        chunk_file = entry.resolved_path
+        doc_id, vector_path = derive_doc_id_and_vectors_path(
+            entry,
+            chunks_dir,
+            vectors_dir,
+            vector_format=fmt,
+        )
+        manifest_entry = resume_controller.entry(doc_id) if resume_controller.resume else None
+        vectors_exist = vector_path.exists()
+        entry_format = (
+            str(manifest_entry.get("vector_format") or "jsonl").lower()
+            if manifest_entry
+            else None
+        )
+        format_mismatch = bool(manifest_entry) and entry_format != fmt
+
+        input_hash = ""
+        should_hash = (
+            resume_controller.resume
+            and not resume_controller.force
+            and manifest_entry is not None
+            and vectors_exist
+            and not format_mismatch
+        )
+        if should_hash:
+            input_hash = compute_content_hash(chunk_file, hash_alg)
+
+        skip_doc = False
+        if resume_controller.resume and not format_mismatch:
+            skip_doc = should_skip_output(
+                vector_path,
+                manifest_entry,
+                input_hash,
+                resume_controller.resume,
+                resume_controller.force,
+            )
+
+        if skip_doc:
+            resume_skipped += 1
+            skipped_ids.append(doc_id)
+            if not plan_only:
+                log_event(
+                    logger,
+                    "info",
+                    "Skipping chunk file: output exists and input unchanged",
+                    status="skip",
+                    stage=EMBED_STAGE,
+                    doc_id=doc_id,
+                    input_relpath=relative_path(chunk_file, resolved_root),
+                    output_relpath=relative_path(vector_path, resolved_root),
+                    vector_format=fmt,
+                )
+                manifest_log_skip(
+                    stage=MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    input_path=chunk_file,
+                    input_hash=input_hash,
+                    output_path=vector_path,
+                    schema_version=VECTOR_SCHEMA_VERSION,
+                    vector_format=fmt,
+                )
+            continue
+
+        planned_ids.append(doc_id)
+        if format_mismatch and not plan_only:
+            log_event(
+                logger,
+                "info",
+                "Regenerating vectors due to format mismatch",
+                status="process",
+                stage=EMBED_STAGE,
+                doc_id=doc_id,
+                previous_format=entry_format,
+                requested_format=fmt,
+                input_relpath=relative_path(chunk_file, resolved_root),
+                output_relpath=relative_path(vector_path, resolved_root),
+                vector_format=fmt,
+            )
+
+        if plan_only:
+            continue
+
+        fingerprint_path = vector_path.with_suffix(vector_path.suffix + ".fp.json")
+        metadata = {
+            "chunk_path": str(chunk_file),
+            "output_path": str(vector_path),
+            "input_hash": input_hash,
+            "vector_format": fmt,
+            "input_relpath": relative_path(chunk_file, resolved_root),
+            "output_relpath": relative_path(vector_path, resolved_root),
+            "fingerprint_path": str(fingerprint_path),
+        }
+        try:
+            cost_hint = max(1.0, float(chunk_file.stat().st_size))
+        except OSError:
+            cost_hint = 1.0
+
+        work_items.append(
+            WorkItem(
+                item_id=doc_id,
+                inputs={"chunk": chunk_file},
+                outputs={"vectors": vector_path},
+                cfg_hash=cfg_hash,
+                cost_hint=cost_hint,
+                metadata=metadata,
+                fingerprint=ItemFingerprint(
+                    path=fingerprint_path,
+                    input_sha256=input_hash,
+                    cfg_hash=cfg_hash,
+                ),
+            )
+        )
+
+    plan = StagePlan(
+        stage_name=MANIFEST_STAGE,
+        items=tuple(work_items),
+        total_items=len(work_items),
+    )
+    return plan, {
+        "planned_ids": planned_ids,
+        "skipped_ids": skipped_ids,
+        "resume_skipped": resume_skipped,
+    }
+
+
+def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
+    """Worker executed by the stage runner to encode vectors for a chunk file."""
+
+    state = _get_embed_worker_state()
+    bundle: ProviderBundle = state["bundle"]
+    cfg: EmbedCfg = state["cfg"]
+    stats: BM25Stats = state["stats"]
+    validator: SPLADEValidator = state["validator"]
+    logger = state["logger"]
+    vector_format: str = state["vector_format"]
+    chunk_path = Path(item.metadata["chunk_path"])
+    vectors_path = Path(item.metadata["output_path"])
+    input_hash = item.metadata.get("input_hash", "")
+    resolved_root: Path = state["resolved_root"]
+    cfg_hash: str = state["cfg_hash"]
+
+    hasher: Optional[StreamingContentHasher] = None
+    if not input_hash:
+        hasher = StreamingContentHasher()
+    start = time.perf_counter()
+    try:
+        with acquire_lock(vectors_path):
+            count, nnz, norms = process_chunk_file_vectors(
+                chunk_path,
+                vectors_path,
+                bundle,
+                cfg,
+                stats,
+                validator,
+                logger,
+                content_hasher=hasher,
+                vector_format=vector_format,
+            )
+    except ValueError as exc:
+        duration = time.perf_counter() - start
+        resolved_hash = input_hash or (hasher.hexdigest() if hasher else "")
+        _handle_embedding_quarantine(
+            chunk_path=chunk_path,
+            vector_path=vectors_path,
+            doc_id=item.item_id,
+            input_hash=resolved_hash,
+            reason=str(exc),
+            logger=logger,
+            data_root=resolved_root,
+            vector_format=vector_format,
+        )
+        return ItemOutcome(
+            status="skip",
+            duration_s=duration,
+            manifest={"quarantined": True, "error": str(exc), "resolved_hash": resolved_hash},
+            result={"quarantined": True},
+        )
+    except EmbeddingProcessingError as exc:
+        duration = exc.duration
+        manifest_log_failure(
+            stage=MANIFEST_STAGE,
+            doc_id=item.item_id,
+            duration_s=round(duration, 3),
+            schema_version=VECTOR_SCHEMA_VERSION,
+            input_path=chunk_path,
+            input_hash=exc.input_hash,
+            output_path=vectors_path,
+            vector_format=vector_format,
+            error=str(exc.original),
+        )
+        raise StageError(
+            stage=EMBED_STAGE,
+            item_id=item.item_id,
+            category="runtime",
+            message=str(exc.original),
+            retryable=False,
+        ) from exc.original
+    except Exception as exc:
+        duration = time.perf_counter() - start
+        resolved_hash = input_hash or (hasher.hexdigest() if hasher else "")
+        manifest_log_failure(
+            stage=MANIFEST_STAGE,
+            doc_id=item.item_id,
+            duration_s=round(duration, 3),
+            schema_version=VECTOR_SCHEMA_VERSION,
+            input_path=chunk_path,
+            input_hash=resolved_hash,
+            output_path=vectors_path,
+            vector_format=vector_format,
+            error=str(exc),
+        )
+        raise StageError(
+            stage=EMBED_STAGE,
+            item_id=item.item_id,
+            category="runtime",
+            message=str(exc),
+            retryable=False,
+        ) from exc
+
+    duration = time.perf_counter() - start
+    resolved_hash = input_hash or (hasher.hexdigest() if hasher else "")
+    _write_fingerprint(
+        Path(item.metadata["fingerprint_path"]),
+        input_sha256=resolved_hash,
+        cfg_hash=cfg_hash,
+    )
+    return ItemOutcome(
+        status="success",
+        duration_s=duration,
+        manifest={
+            "vector_count": count,
+            "nnz": nnz,
+            "norms": norms,
+            "resolved_hash": resolved_hash,
+        },
+        result={"quarantined": False},
+    )
+
+
+def _make_embedding_stage_hooks(
+    *,
+    logger,
+    resolved_root: Path,
+    vector_format: str,
+    cfg: EmbedCfg,
+    stats: BM25Stats,
+    validator: SPLADEValidator,
+    bundle: ProviderBundle,
+    exit_stack: Optional[ExitStack],
+    overall_start: float,
+    pass_b_start: float,
+    files_parallel: int,
+    resume_skipped: int,
+    cfg_hash: str,
+    vectors_dir: Path,
+) -> StageHooks:
+    """Return stage hooks that manage shared embedding resources and summaries."""
+
+    def before_stage(context: StageContext) -> None:
+        _set_embed_worker_state(
+            {
+                "bundle": bundle,
+                "cfg": cfg,
+                "stats": stats,
+                "validator": validator,
+                "logger": logger,
+                "vector_format": vector_format,
+                "resolved_root": resolved_root,
+                "cfg_hash": cfg_hash,
+            }
+        )
+        if not tracemalloc.is_tracing():
+            tracemalloc.start()
+        state = context.metadata.setdefault(
+            "embedding_state",
+            {
+                "logger": logger,
+                "resolved_root": resolved_root,
+                "vector_format": vector_format,
+                "cfg": cfg,
+                "validator": validator,
+                "bundle": bundle,
+                "exit_stack": exit_stack,
+                "overall_start": overall_start,
+                "pass_b_start": pass_b_start,
+                "files_parallel": files_parallel,
+                "resume_skipped": resume_skipped,
+                "cfg_hash": cfg_hash,
+                "total_vectors": 0,
+                "splade_nnz_all": [],
+                "dense_norms_all": [],
+                "quarantined_files": 0,
+                "skipped_runtime": 0,
+                "vectors_dir": vectors_dir,
+            },
+        )
+        state["validator_zero_chunks"] = validator.zero_nnz_chunks if validator else []
+
+    def after_item(
+        item: WorkItem,
+        outcome_or_error: Union[ItemOutcome, StageError],
+        context: StageContext,
+    ) -> None:
+        state = context.metadata.get("embedding_state", {})
+        stage_logger = state.get("logger", logger)
+        root = state.get("resolved_root", resolved_root)
+        schema_version = VECTOR_SCHEMA_VERSION
+        input_path = Path(item.metadata["chunk_path"])
+        output_path = Path(item.metadata["output_path"])
+
+        if isinstance(outcome_or_error, ItemOutcome):
+            if outcome_or_error.status == "success":
+                vector_count = int(outcome_or_error.manifest.get("vector_count", 0))
+                nnz = list(outcome_or_error.manifest.get("nnz", []))
+                norms = list(outcome_or_error.manifest.get("norms", []))
+                resolved_hash = str(outcome_or_error.manifest.get("resolved_hash", ""))
+                state["total_vectors"] = state.get("total_vectors", 0) + vector_count
+                state.setdefault("splade_nnz_all", []).extend(nnz)
+                state.setdefault("dense_norms_all", []).extend(norms)
+                manifest_log_success(
+                    stage=MANIFEST_STAGE,
+                    doc_id=item.item_id,
+                    duration_s=round(outcome_or_error.duration_s, 3),
+                    schema_version=schema_version,
+                    input_path=input_path,
+                    input_hash=resolved_hash,
+                    output_path=output_path,
+                    vector_format=vector_format,
+                    vector_count=vector_count,
+                )
+                avg_nnz_file = statistics.mean(nnz) if nnz else 0.0
+                avg_norm_file = statistics.mean(norms) if norms else 0.0
+                log_event(
+                    stage_logger,
+                    "info",
+                    "Embedding file written",
+                    status="success",
+                    stage=EMBED_STAGE,
+                    doc_id=item.item_id,
+                    input_relpath=item.metadata.get("input_relpath", relative_path(input_path, root)),
+                    output_relpath=item.metadata.get(
+                        "output_relpath", relative_path(output_path, root)
+                    ),
+                    elapsed_ms=int(outcome_or_error.duration_s * 1000),
+                    vectors=vector_count,
+                    splade_avg_nnz=round(avg_nnz_file, 3),
+                    qwen_avg_norm=round(avg_norm_file, 4),
+                    vector_format=vector_format,
+                )
+                return
+
+            if outcome_or_error.status == "skip":
+                if outcome_or_error.manifest.get("quarantined"):
+                    state["quarantined_files"] = state.get("quarantined_files", 0) + 1
+                else:
+                    state["skipped_runtime"] = state.get("skipped_runtime", 0) + 1
+                return
+
+        else:
+            state["failures"] = state.get("failures", 0) + 1
+
+    def after_stage(outcome: StageOutcome, context: StageContext) -> None:
+        state = context.metadata.get("embedding_state", {})
+        total_vectors = state.get("total_vectors", 0)
+        splade_nnz_all = state.get("splade_nnz_all", [])
+        dense_norms_all = state.get("dense_norms_all", [])
+        skipped_total = state.get("resume_skipped", 0) + state.get("skipped_runtime", 0)
+        quarantined_files = state.get("quarantined_files", 0)
+        files_parallel_effective = state.get("files_parallel", files_parallel)
+        vectors_dir_state: Path = state.get("vectors_dir", vectors_dir)
+        bundle_summary: Dict[str, ProviderIdentity] = {}
+        bundle_ref = state.get("bundle")
+        if bundle_ref is not None:
+            try:
+                bundle_summary = bundle_ref.identities()
+            except Exception:
+                bundle_summary = {}
+
+        current, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        elapsed_b = time.perf_counter() - state.get("pass_b_start", pass_b_start)
+
+        validator.report(logger)
+
+        zero_pct = (
+            100.0 * len([n for n in splade_nnz_all if n == 0]) / total_vectors
+            if total_vectors
+            else 0.0
+        )
+        avg_nnz = statistics.mean(splade_nnz_all) if splade_nnz_all else 0.0
+        median_nnz = statistics.median(splade_nnz_all) if splade_nnz_all else 0.0
+        splade_p95 = _percentile(splade_nnz_all, 95.0)
+        splade_p99 = _percentile(splade_nnz_all, 99.0)
+        avg_norm = statistics.mean(dense_norms_all) if dense_norms_all else 0.0
+        std_norm = statistics.pstdev(dense_norms_all) if len(dense_norms_all) > 1 else 0.0
+        norm_p95 = _percentile(dense_norms_all, 95.0)
+        norm_p99 = _percentile(dense_norms_all, 99.0)
+        norm_low_threshold = 0.9
+        norm_high_threshold = 1.1
+        norm_low_outliers = len([n for n in dense_norms_all if n < norm_low_threshold])
+        norm_high_outliers = len([n for n in dense_norms_all if n > norm_high_threshold])
+
+        sparse_identity = bundle_summary.get("sparse")
+        dense_identity = bundle_summary.get("dense")
+        lexical_identity = bundle_summary.get("lexical")
+
+        log_event(
+            logger,
+            "info",
+            "Embedding summary",
+            stage=EMBED_STAGE,
+            total_vectors=total_vectors,
+            splade_avg_nnz=round(avg_nnz, 3),
+            splade_median_nnz=round(median_nnz, 3),
+            splade_p95_nnz=round(splade_p95, 3),
+            splade_p99_nnz=round(splade_p99, 3),
+            splade_zero_pct=round(zero_pct, 2),
+            qwen_avg_norm=round(avg_norm, 4),
+            qwen_std_norm=round(std_norm, 4),
+            qwen_norm_p95=round(norm_p95, 4),
+            qwen_norm_p99=round(norm_p99, 4),
+            qwen_norm_low_outliers=norm_low_outliers,
+            qwen_norm_high_outliers=norm_high_outliers,
+            pass_b_seconds=round(elapsed_b, 3),
+            skipped_files=skipped_total,
+            quarantined_files=quarantined_files,
+            files_parallel=files_parallel_effective,
+            splade_attn_backend_used=cfg.sparse_splade_st_attn_backend or "auto",
+            sparsity_warn_threshold_pct=float(cfg.sparsity_warn_threshold_pct),
+            dense_provider=dense_identity.name if dense_identity else None,
+            dense_provider_version=dense_identity.version if dense_identity else None,
+            sparse_provider=sparse_identity.name if sparse_identity else None,
+            lexical_provider=lexical_identity.name if lexical_identity else None,
+        )
+        logger.info("Peak memory: %.2f GB", peak / 1024**3)
+
+        manifest_log_success(
+            stage=MANIFEST_STAGE,
+            doc_id="__corpus__",
+            duration_s=round(time.perf_counter() - state.get("overall_start", overall_start), 3),
+            schema_version=VECTOR_SCHEMA_VERSION,
+            input_path="__corpus__",
+            input_hash="",
+            output_path=vectors_dir_state,
+            warnings=(
+                validator.zero_nnz_chunks[: validator.top_n]
+                if validator.zero_nnz_chunks
+                else []
+            ),
+            total_vectors=total_vectors,
+            splade_avg_nnz=avg_nnz,
+            splade_median_nnz=round(median_nnz, 3),
+            splade_p95_nnz=splade_p95,
+            splade_p99_nnz=splade_p99,
+            splade_zero_pct=zero_pct,
+            qwen_avg_norm=avg_norm,
+            qwen_std_norm=std_norm,
+            qwen_norm_p95=norm_p95,
+            qwen_norm_p99=norm_p99,
+            qwen_norm_low_outliers=norm_low_outliers,
+            qwen_norm_high_outliers=norm_high_outliers,
+            peak_memory_gb=peak / 1024**3,
+            skipped_files=skipped_total,
+            quarantined_files=quarantined_files,
+            files_parallel=files_parallel_effective,
+            splade_attn_backend_used=cfg.sparse_splade_st_attn_backend or "auto",
+            sparsity_warn_threshold_pct=float(cfg.sparsity_warn_threshold_pct),
+        )
+
+        log_event(
+            logger,
+            "info",
+            "[DONE] Saved vectors",
+            status="complete",
+            stage=EMBED_STAGE,
+            embeddings_dir=str(vectors_dir_state),
+            processed_files=outcome.succeeded,
+            skipped_files=skipped_total,
+            quarantined_files=quarantined_files,
+            total_vectors=total_vectors,
+        )
+
+        if exit_stack is not None:
+            exit_stack.close()
+        _set_embed_worker_state({})
+
+    return StageHooks(
+        before_stage=before_stage,
+        after_item=after_item,
+        after_stage=after_stage,
+    )
 
 
 def _main_inner(args: argparse.Namespace | None = None) -> int:
