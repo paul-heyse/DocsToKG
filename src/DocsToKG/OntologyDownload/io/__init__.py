@@ -8,6 +8,7 @@ codebase.
 """
 
 from ..errors import DownloadFailure
+from ..net import configure_http_client, get_http_client, reset_http_client
 from .filesystem import (
     extract_archive_safe,
     extract_tar_safe,
@@ -52,6 +53,8 @@ __all__ = [
     "sha256_file",
     "DownloadFailure",
     "DownloadResult",
+    "configure_http_client",
+    "get_http_client",
     "RDF_MIME_ALIASES",
     "RDF_MIME_FORMAT_LABELS",
     "SessionPool",
@@ -69,4 +72,5 @@ __all__ = [
     "apply_retry_after",
     "get_bucket",
     "reset",
+    "reset_http_client",
 ]

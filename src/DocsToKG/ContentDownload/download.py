@@ -54,7 +54,7 @@ from typing import (
 from urllib.parse import urlparse, urlsplit
 from urllib.robotparser import RobotFileParser
 
-import requests
+import httpx
 
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
@@ -93,6 +93,7 @@ from DocsToKG.ContentDownload.networking import (
     parse_retry_after_header,
     request_with_retries,
 )
+from DocsToKG.ContentDownload.httpx_transport import get_http_client
 from DocsToKG.ContentDownload.pipeline import (
     AttemptRecord,
     DownloadOutcome,
@@ -397,7 +398,7 @@ class DownloadStrategyContext:
     tail_check_bytes: int = DEFAULT_TAIL_CHECK_BYTES
     retry_after: Optional[float] = None
     classification_hint: Optional[Classification] = None
-    response: Optional[requests.Response] = None
+    response: Optional[httpx.Response] = None
     skip_outcome: Optional[DownloadOutcome] = None
 
 
@@ -405,7 +406,7 @@ class DownloadStrategyContext:
 class DownloadPreflightPlan:
     """Prepared inputs required to stream a candidate download."""
 
-    session: requests.Session
+    client: httpx.Client
     artifact: WorkArtifact
     url: str
     timeout: float
@@ -434,7 +435,7 @@ class DownloadStreamResult:
     """Structured payload returned by :func:`stream_candidate_payload`."""
 
     outcome: Optional[DownloadOutcome] = None
-    response: Optional[requests.Response] = None
+    response: Optional[httpx.Response] = None
     classification: Optional[Classification] = None
     strategy: Optional[DownloadStrategy] = None
     strategy_context: Optional[DownloadStrategyContext] = None
@@ -443,7 +444,7 @@ class DownloadStreamResult:
 
 
 def prepare_candidate_download(
-    session: requests.Session,
+    client: Optional[httpx.Client],
     artifact: WorkArtifact,
     url: str,
     referer: Optional[str],
@@ -454,6 +455,7 @@ def prepare_candidate_download(
 ) -> DownloadPreflightPlan:
     """Prepare request metadata prior to streaming the download."""
 
+    http_client = client or get_http_client()
     sniff_limit = ctx.sniff_bytes
     min_pdf_bytes = ctx.min_pdf_bytes
     tail_window_bytes = ctx.tail_check_bytes
@@ -520,10 +522,12 @@ def prepare_candidate_download(
     ctx.enable_range_resume = False
     enable_resume = False
 
+    http_client = client or get_http_client()
+
     robots_checker: Optional[RobotsCache] = ctx.robots_checker
     skip_outcome: Optional[DownloadOutcome] = None
     if robots_checker is not None:
-        robots_allowed = robots_checker.is_allowed(session, url, timeout)
+        robots_allowed = robots_checker.is_allowed(http_client, url, timeout)
         if not robots_allowed:
             LOGGER.info(
                 "robots-disallowed",
@@ -546,7 +550,7 @@ def prepare_candidate_download(
 
     head_precheck_state = head_precheck_passed or ctx.head_precheck_passed
     if skip_outcome is None and not head_precheck_state and not ctx.skip_head_precheck:
-        head_precheck_state = head_precheck(session, url, timeout, content_policy=content_policy)
+        head_precheck_state = head_precheck(http_client, url, timeout, content_policy=content_policy)
         ctx.head_precheck_passed = head_precheck_state
 
     extract_html_text = ctx.extract_html_text
@@ -581,7 +585,7 @@ def prepare_candidate_download(
     )
 
     return DownloadPreflightPlan(
-        session=session,
+        client=http_client,
         artifact=artifact,
         url=url,
         timeout=timeout,
@@ -626,7 +630,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
     progress_callback = plan.progress_callback
     progress_update_interval = plan.progress_update_interval
 
-    session = plan.session
+    client = plan.client
     artifact = plan.artifact
     url = plan.url
     timeout = plan.timeout
@@ -684,7 +688,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                     if isinstance(raw_cap, (int, float)):
                         retry_after_cap = float(raw_cap)
                 response_cm = request_with_retries(
-                    session,
+                    client,
                     "GET",
                     url,
                     stream=True,
@@ -1646,14 +1650,14 @@ class RobotsCache:
         self._ttl = float(ttl_seconds)
         self._lock = threading.Lock()
 
-    def is_allowed(self, session: requests.Session, url: str, timeout: float) -> bool:
+    def is_allowed(self, client: httpx.Client, url: str, timeout: float) -> bool:
         """Return ``False`` when robots.txt forbids fetching ``url``."""
 
         parsed = urlparse(url)
         if not parsed.scheme or not parsed.netloc:
             return True
         origin = f"{parsed.scheme}://{parsed.netloc}"
-        parser = self._lookup_parser(session, origin, timeout)
+        parser = self._lookup_parser(client, origin, timeout)
 
         path = parsed.path or "/"
         if parsed.params:
@@ -1667,7 +1671,7 @@ class RobotsCache:
 
     def _lookup_parser(
         self,
-        session: requests.Session,
+        client: httpx.Client,
         origin: str,
         timeout: float,
     ) -> RobotFileParser:
@@ -1677,14 +1681,14 @@ class RobotsCache:
             fetched_at = self._fetched_at.get(origin, 0.0)
 
         if parser is None or (self._ttl > 0 and (now - fetched_at) >= self._ttl):
-            parser = self._fetch(session, origin, timeout)
+            parser = self._fetch(client, origin, timeout)
             with self._lock:
                 self._parsers[origin] = parser
                 self._fetched_at[origin] = now
 
         return parser
 
-    def _fetch(self, session: requests.Session, origin: str, timeout: float) -> RobotFileParser:
+    def _fetch(self, client: httpx.Client, origin: str, timeout: float) -> RobotFileParser:
         """Fetch and parse the robots.txt policy for ``origin``."""
 
         robots_url = origin.rstrip("/") + "/robots.txt"
@@ -1692,7 +1696,7 @@ class RobotsCache:
         parser.set_url(robots_url)
         try:
             with request_with_retries(
-                session,
+                client,
                 "GET",
                 robots_url,
                 timeout=min(timeout, 5.0),
@@ -2256,7 +2260,7 @@ def create_artifact(
 
 
 def download_candidate(
-    session: requests.Session,
+    client: Optional[httpx.Client],
     artifact: WorkArtifact,
     url: str,
     referer: Optional[str],
@@ -2283,7 +2287,7 @@ def download_candidate(
 
     ctx = DownloadContext.from_mapping(context)
     plan = prepare_candidate_download(
-        session,
+        client,
         artifact,
         url,
         referer,
@@ -2300,7 +2304,7 @@ def download_candidate(
 
 def process_one_work(
     work: Union[WorkArtifact, Dict[str, Any]],
-    session: requests.Session,
+    client: Optional[httpx.Client],
     pdf_dir: Path,
     html_dir: Path,
     xml_dir: Path,
@@ -2309,7 +2313,6 @@ def process_one_work(
     metrics: ResolverMetrics,
     *,
     options: DownloadConfig,
-    session_factory: Optional[Callable[[], requests.Session]] = None,
     strategy_selector: Callable[
         [Classification], DownloadStrategy
     ] = get_strategy_for_classification,
@@ -2319,7 +2322,8 @@ def process_one_work(
     Args:
         work: Either a preconstructed :class:`WorkArtifact` or a raw OpenAlex
             work payload. Raw payloads are normalised via :func:`create_artifact`.
-        session: Requests session configured for resolver usage.
+        client: Optional HTTPX client to use for resolver/download operations. When
+            ``None``, the shared client is used.
         pdf_dir: Directory where PDF artefacts are written.
         html_dir: Directory where HTML artefacts are written.
         xml_dir: Directory where XML artefacts are written.
@@ -2327,14 +2331,12 @@ def process_one_work(
         logger: Structured attempt logger capturing manifest records.
         metrics: Resolver metrics collector.
         options: :class:`DownloadConfig` describing download behaviour for the work.
-        session_factory: Optional callable returning a thread-local session for
-            resolver execution when concurrency is enabled.
 
     Returns:
         Dictionary summarizing the outcome (saved/html_only/skipped flags).
 
     Raises:
-        requests.RequestException: Propagated if resolver HTTP requests fail
+        httpx.HTTPError: Propagated if resolver HTTP requests fail
             unexpectedly outside guarded sections.
         Exception: Bubbling from resolver pipeline internals when not handled.
     """

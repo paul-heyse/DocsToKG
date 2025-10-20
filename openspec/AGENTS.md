@@ -149,6 +149,7 @@ PY
 
 # 2) Package presence WITHOUT installing (examples)
 ./.venv/bin/python -c "import DocsToKG, pkgutil; print('DocsToKG OK');"
+./.venv/bin/python -c "import httpx, hishel; print('HTTPX', httpx.__version__, 'Hishel', getattr(hishel, '__version__', 'unknown'))"
 ./.venv/bin/python -c "import faiss; print('FAISS OK')"
 ./.venv/bin/python -c "import cupy; import numpy; print('CuPy OK', cupy.__version__)"
 ```

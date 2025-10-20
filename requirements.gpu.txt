@@ -2,3 +2,5 @@
 pytest
 pytest-cov
 pytest-logging
+httpx[http2]>=0.28.1
+hishel>=0.1.0

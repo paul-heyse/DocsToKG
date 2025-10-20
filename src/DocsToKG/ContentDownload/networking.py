@@ -107,9 +107,9 @@
 
 Responsibilities
 ----------------
-- Construct thread-safe, pooled :class:`requests.Session` instances with
-  consistent timeout, adapter, and header defaults via
-  :func:`create_session` and :class:`ThreadLocalSessionFactory`.
+- Provide a shared, cached :class:`httpx.Client` (via
+  :mod:`DocsToKG.ContentDownload.httpx_transport`) for all ContentDownload
+  networking.
 - Implement resilient request execution through
   :func:`request_with_retries`, delegating to a Tenacity controller that
   combines exponential backoff with jitter, honours ``Retry-After``
@@ -124,12 +124,6 @@ Responsibilities
   rely on to avoid overwhelming upstream services.
 - Expose diagnostic helpers such as :func:`head_precheck` (with GET fallback)
   and :func:`parse_retry_after_header` to keep request policy decisions
-  centralised.
-
-Key Components
---------------
-- ``ThreadLocalSessionFactory`` – manages per-thread session reuse.
-- ``create_session`` / ``get_thread_session`` – standardise session creation.
 - ``request_with_retries`` – wraps HTTP verbs with Tenacity-backed retry,
   backoff, and logging.
 - ``ConditionalRequestHelper`` – produces ``If-None-Match``/``If-Modified-Since`` headers.
@@ -140,12 +134,10 @@ Typical Usage
 -------------
     from DocsToKG.ContentDownload.networking import (
         ConditionalRequestHelper,
-        create_session,
         request_with_retries,
     )
 
-    session = create_session({"User-Agent": "DocsToKG/1.0"})
-    response = request_with_retries(session, "GET", "https://example.org")
+    response = request_with_retries(None, "GET", "https://example.org")
     helper = ConditionalRequestHelper(prior_etag="abc123")
     headers = helper.build_headers()
 """
@@ -161,10 +153,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Mapping, MutableMapping, Optional, Set, Union
+from typing import Any, Callable, Dict, Mapping, Optional, Set, Union
 
-import requests
-from requests.adapters import HTTPAdapter
+import httpx
 from tenacity import (
     RetryCallState,
     RetryError,
@@ -177,6 +168,11 @@ from tenacity import (
     wait_random_exponential,
 )
 from tenacity.wait import wait_base
+from DocsToKG.ContentDownload.httpx_transport import (
+    configure_http_client,
+    get_http_client,
+    purge_http_cache,
+)
 
 # --- Globals ---
 
@@ -187,9 +183,12 @@ __all__ = (
     "ContentPolicyViolation",
     "CircuitBreaker",
     "TokenBucket",
+    "configure_http_client",
     "ThreadLocalSessionFactory",
     "create_session",
     "get_thread_session",
+    "get_http_client",
+    "purge_http_cache",
     "head_precheck",
     "parse_retry_after_header",
     "request_with_retries",
@@ -197,7 +196,6 @@ __all__ = (
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
-TENACITY_SLEEP = time.sleep  # Patchable in tests
 DEFAULT_RETRYABLE_STATUSES: Set[int] = {429, 500, 502, 503, 504}
 _TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
 
@@ -206,160 +204,38 @@ _TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
 
 
 class ThreadLocalSessionFactory:
-    """Create or reuse :class:`requests.Session` instances per thread.
+    """Compatibility shim for the removed requests-based session factory."""
 
-    The factory caches sessions keyed by thread identifier so worker pools can
-    retain warm connection pools while avoiding cross-thread sharing. Callers
-    should invoke :meth:`close_all` when tearing down the pool to release open
-    sockets promptly.
-    """
-
-    def __init__(self, builder: Callable[[], requests.Session]) -> None:
-        self._builder = builder
-        self._local = threading.local()
-        self._lock = threading.Lock()
-        self._thread_sessions: Dict[int, requests.Session] = {}
-
-    def get_thread_session(self) -> requests.Session:
-        """Return a session scoped to the current thread."""
-
-        thread_id = threading.get_ident()
-        session = getattr(self._local, "session", None)
-        if session is not None:
-            with self._lock:
-                if self._thread_sessions.get(thread_id) is session:
-                    return session
-            setattr(self._local, "session", None)
-            session = None
-
-        if session is None:
-            with self._lock:
-                session = self._thread_sessions.get(thread_id)
-            if session is None:
-                session = self._builder()
-                with self._lock:
-                    self._thread_sessions[thread_id] = session
-            setattr(self._local, "session", session)
-        return session
-
-    def __call__(self) -> requests.Session:
-        """Allow instances to be used as session factories callable."""
-
-        return self.get_thread_session()
-
-    def close_current(self) -> None:
-        """Close and remove the session bound to the current thread."""
-
-        thread_id = threading.get_ident()
-        setattr(self._local, "session", None)
-        self.close_for_thread(thread_id)
-
-    def close_for_thread(self, thread_id: int) -> None:
-        """Close and discard the session bound to ``thread_id`` if present."""
-
-        with self._lock:
-            session = self._thread_sessions.pop(thread_id, None)
-        if session is None:
-            return
-        with contextlib.suppress(Exception):
-            session.close()
-
-    def close_all(self) -> None:
-        """Close all cached sessions and reset thread-local state."""
-
-        with self._lock:
-            sessions = list(self._thread_sessions.values())
-            self._thread_sessions.clear()
-        setattr(self._local, "session", None)
-        for session in sessions:
-            with contextlib.suppress(Exception):
-                session.close()
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        raise RuntimeError(
+            "ThreadLocalSessionFactory has been removed. Use "
+            "`DocsToKG.ContentDownload.httpx_transport.get_http_client()` instead."
+        )
 
 
-_DEFAULT_THREAD_SESSION_FACTORY: Optional[ThreadLocalSessionFactory] = None
+def get_thread_session() -> None:
+    """Compatibility shim indicating the requests session helper was removed."""
 
-
-def get_thread_session() -> requests.Session:
-    """Return a default thread-local session using :func:`create_session`."""
-
-    global _DEFAULT_THREAD_SESSION_FACTORY
-    if _DEFAULT_THREAD_SESSION_FACTORY is None:
-        _DEFAULT_THREAD_SESSION_FACTORY = ThreadLocalSessionFactory(create_session)
-    return _DEFAULT_THREAD_SESSION_FACTORY.get_thread_session()
-
-
-def create_session(
-    headers: Optional[Mapping[str, str]] = None,
-    *,
-    adapter_max_retries: int = 0,
-    pool_connections: int = 64,
-    pool_maxsize: int = 128,
-    enable_compression: bool = True,
-) -> requests.Session:
-    """Return a ``requests.Session`` configured for DocsToKG network requests.
-
-    Args:
-        headers: Optional mapping of HTTP headers applied to the session. The mapping
-            is copied into the session's header store so caller-owned dictionaries remain
-            unchanged.
-        adapter_max_retries: Retry count configured on mounted HTTP adapters. Defaults to
-            ``0`` so :func:`request_with_retries` governs retry behaviour.
-        pool_connections: Lower bound of connection pools shared across the session's adapters.
-        pool_maxsize: Maximum number of connections kept per host in the adapter pool.
-        enable_compression: Whether to request gzip/deflate compression. Defaults to ``True``.
-
-    Returns:
-        requests.Session: Session instance with HTTP/HTTPS adapters mounted and ready for pipeline usage.
-
-    Raises:
-        None.
-
-    Notes:
-        The returned session uses ``HTTPAdapter`` for connection pooling. When executing
-        concurrently, prefer wrapping :func:`create_session` with
-        :class:`ThreadLocalSessionFactory` so each worker maintains its own connection
-        pool without sharing mutable session state across threads.
-
-        When ``enable_compression`` is ``True``, the session automatically requests gzip
-        and deflate compression, which can reduce bandwidth usage by 60-80% for text-heavy
-        HTML/XML content.
-    """
-
-    session = requests.Session()
-
-    # Enable compression by default for bandwidth savings
-    if enable_compression and hasattr(session, "headers"):
-        session_headers = session.headers
-        if isinstance(session_headers, MutableMapping):
-            session_headers["Accept-Encoding"] = "gzip, deflate"
-
-    if headers and hasattr(session, "headers"):
-        session_headers = session.headers
-        if isinstance(session_headers, MutableMapping):
-            session_headers.update(dict(headers))
-        else:  # pragma: no cover - defensive guard for non-mapping implementations
-            LOGGER.debug(
-                "Session.headers is not a mutable mapping; skipping header injection on %r",
-                session_headers,
-            )
-
-    adapter = HTTPAdapter(
-        max_retries=adapter_max_retries,
-        pool_connections=pool_connections,
-        pool_maxsize=pool_maxsize,
+    raise RuntimeError(
+        "get_thread_session has been removed. Use "
+        "`DocsToKG.ContentDownload.httpx_transport.get_http_client()` instead."
     )
-    if hasattr(session, "mount"):
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-
-    return session
 
 
-def parse_retry_after_header(response: requests.Response) -> Optional[float]:
+def create_session(*args: Any, **kwargs: Any) -> None:
+    """Compatibility shim indicating the requests session helper was removed."""
+
+    raise RuntimeError(
+        "create_session has been removed. Use "
+        "`DocsToKG.ContentDownload.httpx_transport.get_http_client()` instead."
+    )
+
+
+def parse_retry_after_header(response: httpx.Response) -> Optional[float]:
     """Parse ``Retry-After`` header and return wait time in seconds.
 
     Args:
-        response (requests.Response): HTTP response potentially containing a
+        response (httpx.Response): HTTP response potentially containing a
             ``Retry-After`` header.
 
     Returns:
@@ -371,14 +247,11 @@ def parse_retry_after_header(response: requests.Response) -> Optional[float]:
 
     Examples:
         >>> # Integer format
-        >>> response = requests.Response()
-        >>> response.headers = {"Retry-After": "5"}
-        >>> parse_retry_after_header(response)
+        >>> parse_retry_after_header(httpx.Response(503, headers={"Retry-After": "5"}))
         5.0
 
         >>> # HTTP-date format
-        >>> response.headers = {"Retry-After": "Wed, 21 Oct 2025 07:28:00 GMT"}
-        >>> isinstance(parse_retry_after_header(response), float)
+        >>> isinstance(parse_retry_after_header(httpx.Response(503, headers={"Retry-After": "Wed, 21 Oct 2025 07:28:00 GMT"})), float)
         True
     """
 
@@ -411,7 +284,7 @@ def parse_retry_after_header(response: requests.Response) -> Optional[float]:
     return None
 
 
-class ContentPolicyViolation(requests.RequestException):
+class ContentPolicyViolation(httpx.HTTPError):
     """Raised when a response violates configured content policies."""
 
     def __init__(
@@ -441,7 +314,7 @@ def _normalise_content_type(value: str) -> str:
 
 
 def _enforce_content_policy(
-    response: requests.Response,
+    response: httpx.Response,
     content_policy: Optional[Mapping[str, Any]],
     *,
     method: str,
@@ -489,7 +362,7 @@ class RetryAfterJitterWait(wait_base):
         self._retry_statuses = set(retry_statuses)
         self._fallback_wait = fallback_wait
 
-    def _compute_retry_after(self, response: requests.Response) -> Optional[float]:
+    def _compute_retry_after(self, response: httpx.Response) -> Optional[float]:
         if not self._respect_retry_after:
             return None
 
@@ -514,7 +387,7 @@ class RetryAfterJitterWait(wait_base):
             return max(0.0, fallback_delay)
 
         response = outcome.result()
-        if not isinstance(response, requests.Response):
+        if not isinstance(response, httpx.Response):
             return max(0.0, fallback_delay)
 
         status = getattr(response, "status_code", None)
@@ -528,7 +401,7 @@ class RetryAfterJitterWait(wait_base):
         return max(0.0, retry_after_delay)
 
 
-def _close_response_safely(response: Optional[requests.Response]) -> None:
+def _close_response_safely(response: Optional[httpx.Response]) -> None:
     if response is None:
         return
     with contextlib.suppress(Exception):
@@ -594,7 +467,7 @@ def _before_sleep_handler(retry_state: RetryCallState) -> None:
 
 
 def _is_retryable_response(response: Any, retry_statuses: Set[int]) -> bool:
-    if not isinstance(response, requests.Response):
+    if not isinstance(response, httpx.Response):
         return False
     status_code = getattr(response, "status_code", None)
     return bool(status_code in retry_statuses)
@@ -622,7 +495,7 @@ def _build_retrying_controller(
     )
 
     retry_condition = retry_if_exception_type(
-        (requests.Timeout, requests.ConnectionError, requests.RequestException)
+        (httpx.TimeoutException, httpx.TransportError, httpx.ProtocolError)
     ) | retry_if_result(lambda result: _is_retryable_response(result, retry_statuses))
 
     stop_strategy = stop_after_attempt(max_retries + 1)
@@ -676,7 +549,7 @@ def _build_retrying_controller(
         retry=retry_condition,
         wait=wait_strategy,
         stop=stop_strategy,
-        sleep=TENACITY_SLEEP,
+        sleep=time.sleep,
         reraise=True,
         before_sleep=_before_sleep_handler,
         retry_error_callback=_retry_error_callback,
@@ -696,7 +569,7 @@ def _build_retrying_controller(
 
 
 def request_with_retries(
-    session: requests.Session,
+    client: Optional[httpx.Client],
     method: str,
     url: str,
     *,
@@ -709,17 +582,11 @@ def request_with_retries(
     max_retry_duration: Optional[float] = None,
     backoff_max: float = 60.0,
     **kwargs: Any,
-) -> requests.Response:
-    """Execute an HTTP request using a Tenacity-backed retry controller.
+) -> httpx.Response:
+    """Execute an HTTP request using a Tenacity-backed retry controller."""
 
-    The helper validates inputs, coerces timeout values, and delegates retry
-    behaviour to :class:`tenacity.Retrying`. Retry decisions cover both
-    ``requests`` exceptions and retryable HTTP statuses while respecting
-    ``Retry-After`` headers, attempt budgets, and deadline ceilings.
-    """
+    http_client = client or get_http_client()
 
-    if session is None:
-        raise ValueError("session must be provided")
     if not method:
         raise ValueError("HTTP method must be provided")
     if not url:
@@ -748,45 +615,38 @@ def request_with_retries(
         if retry_statuses is not None
         else set(DEFAULT_RETRYABLE_STATUSES)
     )
+    retry_statuses = set(retry_statuses)
 
-    timeout = kwargs.get("timeout")
-    if isinstance(timeout, (int, float)):
-        timeout_value = float(timeout)
-        if timeout_value <= 0:
-            raise ValueError("timeout must be positive when provided as a float")
-        kwargs["timeout"] = (timeout_value, timeout_value * 2)
-    elif isinstance(timeout, tuple) and len(timeout) == 2:
-        connect_timeout, read_timeout = timeout
-        if connect_timeout is not None and connect_timeout <= 0:
-            raise ValueError("connect timeout must be positive")
-        if read_timeout is not None and read_timeout <= 0:
-            raise ValueError("read timeout must be positive")
-    elif timeout is not None:
-        raise TypeError(
-            "timeout must be a float/int or a (connect, read) tuple when provided"
-        )
+    timeout = kwargs.pop("timeout", None)
+    if timeout is not None:
+        if isinstance(timeout, httpx.Timeout):
+            http_timeout = timeout
+        elif isinstance(timeout, (int, float)):
+            timeout_value = float(timeout)
+            if timeout_value <= 0:
+                raise ValueError("timeout must be positive when provided as a float")
+            http_timeout = httpx.Timeout(timeout_value)
+        elif isinstance(timeout, tuple) and len(timeout) == 2:
+            connect_timeout, read_timeout = timeout
+            if connect_timeout is not None and connect_timeout <= 0:
+                raise ValueError("connect timeout must be positive")
+            if read_timeout is not None and read_timeout <= 0:
+                raise ValueError("read timeout must be positive")
+            http_timeout = httpx.Timeout(connect=connect_timeout, read=read_timeout)
+        elif isinstance(timeout, Mapping):
+            http_timeout = httpx.Timeout(**timeout)
+        else:
+            raise TypeError(
+                "timeout must be a float/int, mapping, httpx.Timeout, or a (connect, read) tuple when provided"
+            )
+        kwargs["timeout"] = http_timeout
 
-    request_method = getattr(session, "request", None)
-    fallback_method = getattr(session, method.lower(), None)
+    allow_redirects = kwargs.pop("allow_redirects", None)
+    if allow_redirects is not None:
+        kwargs["follow_redirects"] = bool(allow_redirects)
 
-    if not callable(request_method) and not callable(fallback_method):
-        raise AttributeError(
-            f"Session object of type {type(session)!r} lacks callable 'request'."
-        )
-
-    def request_func(
-        *,
-        method: str,
-        url: str,
-        **call_kwargs: Any,
-    ) -> requests.Response:
-        if callable(request_method):
-            return request_method(method=method, url=url, **call_kwargs)
-        if callable(fallback_method):
-            return fallback_method(url, **call_kwargs)
-        raise AttributeError(
-            f"Session object of type {type(session)!r} lacks usable HTTP callables."
-        )
+    def request_func(*, method: str, url: str, **call_kwargs: Any) -> httpx.Response:
+        return http_client.request(method=method, url=url, **call_kwargs)
 
     controller = _build_retrying_controller(
         method=method,
@@ -824,7 +684,7 @@ def request_with_retries(
         total_sleep,
     )
 
-    if not isinstance(response, requests.Response):
+    if not isinstance(response, httpx.Response):
         LOGGER.debug(
             "Response object of type %s lacks status_code; treating as success for %s %s.",
             type(response).__name__,
@@ -838,7 +698,7 @@ def request_with_retries(
 
 
 def head_precheck(
-    session: requests.Session,
+    client: Optional[httpx.Client],
     url: str,
     timeout: float,
     *,
@@ -852,7 +712,7 @@ def head_precheck(
     chunk to infer the payload type without downloading the entire resource.
 
     Args:
-        session: HTTP session used for outbound requests.
+        client: Optional HTTPX client override. When ``None``, the shared client is used.
         url: Candidate download URL.
         timeout: Maximum time budget in seconds for the probe.
         content_policy: Optional domain-specific content policy to enforce.
@@ -866,7 +726,7 @@ def head_precheck(
 
     try:
         response = request_with_retries(
-            session,
+            client,
             "HEAD",
             url,
             max_retries=1,
@@ -886,7 +746,7 @@ def head_precheck(
         if response.status_code in {200, 302, 304}:
             return _looks_like_pdf(response.headers)
         if response.status_code in {405, 501}:
-            return _head_precheck_via_get(session, url, timeout, content_policy=content_policy)
+            return _head_precheck_via_get(client, url, timeout, content_policy=content_policy)
         return False
     finally:
         response.close()
@@ -912,7 +772,7 @@ def _looks_like_pdf(headers: Mapping[str, str]) -> bool:
 
 
 def _head_precheck_via_get(
-    session: requests.Session,
+    client: Optional[httpx.Client],
     url: str,
     timeout: float,
     *,
@@ -922,7 +782,7 @@ def _head_precheck_via_get(
 
     try:
         with request_with_retries(
-            session,
+            client,
             "GET",
             url,
             max_retries=1,
@@ -936,11 +796,10 @@ def _head_precheck_via_get(
         ) as response:
             # Consume at most one chunk to avoid downloading the entire body.
             try:
-                next(response.iter_content(chunk_size=1024))
+                next(response.iter_bytes(chunk_size=1024))
             except StopIteration:
                 pass
             except Exception:
-                # If iter_content raises, treat as inconclusive and allow download.
                 return True
 
             if response.status_code not in {200, 302, 304}:
@@ -1062,7 +921,7 @@ class ConditionalRequestHelper:
             None
 
         Returns:
-            Mapping[str, str]: Headers suitable for ``requests`` invocations.
+            Mapping[str, str]: Headers suitable for HTTPX invocations.
         """
 
         headers: dict[str, str] = {}
@@ -1094,12 +953,12 @@ class ConditionalRequestHelper:
 
     def interpret_response(
         self,
-        response: requests.Response,
+        response: httpx.Response,
     ) -> Union[CachedResult, ModifiedResult]:
         """Classify origin responses as cached or modified results.
 
         Args:
-            response (requests.Response): HTTP response returned from the
+            response (httpx.Response): HTTP response returned from the
                 conditional request.
 
         Returns:
