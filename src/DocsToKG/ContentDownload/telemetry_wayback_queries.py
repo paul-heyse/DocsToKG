@@ -189,15 +189,18 @@ def rate_smoothing_p95(db_path: Path, run_id: str, role: str) -> Optional[int]:
 
     try:
         cur = conn.cursor()
+        normalized_role = role.strip().lower()
         cur.execute(
             """
             SELECT d.rate_delay_ms
             FROM wayback_discoveries d
             JOIN wayback_attempts a ON d.attempt_id = a.attempt_id
-            WHERE a.run_id = ? AND d.rate_delay_ms IS NOT NULL
+            WHERE a.run_id = ?
+              AND d.rate_delay_ms IS NOT NULL
+              AND LOWER(COALESCE(d.rate_limiter_role, '')) = LOWER(?)
             ORDER BY d.rate_delay_ms
         """,
-            (run_id,),
+            (run_id, normalized_role),
         )
 
         delays = [row["rate_delay_ms"] for row in cur.fetchall()]
@@ -205,7 +208,7 @@ def rate_smoothing_p95(db_path: Path, run_id: str, role: str) -> Optional[int]:
             return None
 
         # Calculate P95
-        p95_index = int(len(delays) * 0.95)
+        p95_index = min(len(delays) - 1, max(0, int(len(delays) * 0.95)))
         return delays[p95_index]
     finally:
         conn.close()

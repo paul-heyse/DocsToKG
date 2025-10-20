@@ -493,6 +493,9 @@ class DownloadRun:
         if breaker_registry is not None:
             set_breaker_registry(breaker_registry)
 
+        if self.pipeline is not None:
+            self.pipeline.set_breaker_registry(breaker_registry)
+
         client = http_client or get_http_client()
         state = DownloadRunState(
             http_client=client,
