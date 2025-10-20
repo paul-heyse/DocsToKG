@@ -828,7 +828,12 @@ class FaissVectorStore(DenseVectorStore):
 
         index_desc = self._describe_index(getattr(self, "_index", None))
         requested_cuvs = getattr(self._config, "use_cuvs", None)
+        applied_cuvs = self._last_applied_cuvs
         cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(requested_cuvs)
+        if applied_cuvs is not None:
+            cuvs_enabled = bool(applied_cuvs)
+            cuvs_available = bool(applied_cuvs)
+            cuvs_reported = bool(applied_cuvs)
         return AdapterStats(
             device=self.device,
             ntotal=self.ntotal,
@@ -842,7 +847,7 @@ class FaissVectorStore(DenseVectorStore):
             cuvs_available=cuvs_available,
             cuvs_reported=cuvs_reported,
             cuvs_requested=requested_cuvs,
-            cuvs_applied=self._last_applied_cuvs,
+            cuvs_applied=applied_cuvs,
         )
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
