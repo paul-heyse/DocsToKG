@@ -2049,19 +2049,36 @@ def verify_pagination(
     page_limit = max_pages
     if page_limit is None:
         try:
-            config = service._config_manager.get()  # type: ignore[attr-defined]
+            page_size = max(1, int(getattr(request, "page_size", 1)))
+        except Exception:
+            page_size = 1
+
+        mmr_pool_size: Optional[float] = None
+        try:
+            config_manager = getattr(service, "_config_manager")
+            config = config_manager.get() if config_manager is not None else None  # type: ignore[attr-defined]
         except Exception:
             config = None
+
         if config is not None:
-            try:
-                mmr_pool = getattr(config.retrieval, "mmr_pool_size", None)
-                page_size = max(1, int(getattr(request, "page_size", 1)))
-            except Exception:
-                mmr_pool = None
-                page_size = 1
-            else:
-                if isinstance(mmr_pool, (int, float)) and mmr_pool > 0:
-                    page_limit = max(1, math.ceil(mmr_pool / page_size))
+            for section_name in ("fusion", "retrieval"):
+                try:
+                    section = getattr(config, section_name)
+                except Exception:
+                    section = None
+                if section is None:
+                    continue
+                try:
+                    candidate = getattr(section, "mmr_pool_size")
+                except Exception:
+                    continue
+                if isinstance(candidate, (int, float)) and candidate > 0:
+                    mmr_pool_size = float(candidate)
+                    break
+
+        if mmr_pool_size is not None:
+            page_limit = max(1, math.ceil(mmr_pool_size / page_size))
+
     if page_limit is None:
         page_limit = _DEFAULT_PAGINATION_PAGE_LIMIT
 
