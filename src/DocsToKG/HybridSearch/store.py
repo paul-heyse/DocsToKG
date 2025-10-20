@@ -344,21 +344,22 @@ def resolve_cuvs_state(requested: Optional[bool]) -> tuple[bool, bool, Optional[
     should_use = getattr(faiss, "should_use_cuvs", None)
     if callable(should_use):
         try:
-            reported_available = bool(should_use())
+            reported = should_use()
         except Exception:  # pragma: no cover - defensive best effort
             reported_available = None
+        else:
+            reported_available = bool(reported) if reported is not None else None
     else:
         reported_available = None
 
+    cuvs_possible = reported_available is True
     if requested is None:
-        enabled = bool(reported_available)
+        requested_enabled = cuvs_possible
     else:
-        enabled = bool(requested)
+        requested_enabled = bool(requested)
 
-    enabled = bool(knn_runner) and enabled
-    available = bool(knn_runner) and (
-        bool(reported_available) if reported_available is not None else False
-    )
+    enabled = bool(knn_runner) and cuvs_possible and requested_enabled
+    available = bool(knn_runner) and cuvs_possible
     return enabled, available, reported_available
 
 
@@ -2289,10 +2290,7 @@ class FaissVectorStore(DenseVectorStore):
             self._last_applied_cuvs = None
             return
         requested = getattr(self._config, "use_cuvs", None)
-        cuvs_enabled, cuvs_available, _ = resolve_cuvs_state(requested)
-        if not cuvs_available and requested is False:
-            # Respect explicit opt-out even when FAISS reports no availability.
-            cuvs_enabled = False
+        cuvs_enabled, _, _ = resolve_cuvs_state(requested)
         if not hasattr(faiss, "GpuParameterSpace"):
             self._last_applied_cuvs = cuvs_enabled if requested is not None else None
             return
