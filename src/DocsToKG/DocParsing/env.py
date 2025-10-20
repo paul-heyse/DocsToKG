@@ -12,9 +12,15 @@ from __future__ import annotations
 import importlib
 import os
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Sequence, Tuple
 
 PDF_MODEL_SUBDIR = Path("granite-docling-258M")
+EXPECTED_DATA_SUBDIRS: Sequence[str] = (
+    "PDFs",
+    "HTML",
+    "DocTagsFiles",
+    "ChunkedDocTagFiles",
+)
 
 SPLADE_DEPENDENCY_MESSAGE = (
     "Optional dependency 'sentence-transformers' is required for SPLADE embeddings. "
@@ -221,6 +227,14 @@ def ensure_qwen_environment(
     return env_info
 
 
+def _looks_like_data_root(candidate: Path, expected_dirs: Sequence[str]) -> bool:
+    """Return ``True`` when ``candidate`` resembles the DocsToKG data root."""
+
+    if candidate.name == "Data":
+        return True
+    return any((candidate / directory).is_dir() for directory in expected_dirs)
+
+
 def detect_data_root(start: Optional[Path] = None) -> Path:
     """Locate the DocsToKG Data directory via env var or ancestor scan."""
 
@@ -229,11 +243,16 @@ def detect_data_root(start: Optional[Path] = None) -> Path:
         env_path = Path(env_root).expanduser().resolve()
         return env_path
 
-    start_path = Path.cwd() if start is None else Path(start).resolve()
-    expected_dirs = ["PDFs", "HTML", "DocTagsFiles", "ChunkedDocTagFiles"]
-    for ancestor in [start_path, *start_path.parents]:
+    start_path = Path.cwd() if start is None else Path(start).expanduser().resolve()
+    search_space = [start_path, *start_path.parents]
+
+    for candidate in search_space:
+        if _looks_like_data_root(candidate, EXPECTED_DATA_SUBDIRS):
+            return candidate.resolve()
+
+    for ancestor in search_space:
         candidate = ancestor / "Data"
-        if any((candidate / directory).is_dir() for directory in expected_dirs):
+        if _looks_like_data_root(candidate, EXPECTED_DATA_SUBDIRS):
             return candidate.resolve()
 
     return (start_path / "Data").resolve()
