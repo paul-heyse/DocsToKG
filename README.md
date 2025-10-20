@@ -122,6 +122,20 @@ for result in response.results:
     print(result.doc_id, round(result.score, 3), result.highlights)
 ```
 
+#### Thread pool sizing
+
+`HybridSearchService` runs BM25, SPLADE, and dense lookups concurrently using a
+`ThreadPoolExecutor`. Override the default worker count (3) via
+`RetrievalConfig.executor_max_workers` when tuning throughput or resource usage:
+
+```python
+HybridSearchConfig(
+    retrieval=RetrievalConfig(executor_max_workers=6),
+)
+```
+
+Set the field to `None` (or omit it) to fall back to the built-in default.
+
 #### CPU snapshot refresh throttling
 
 Dense FAISS indexes now throttle CPU snapshot refreshes to reduce excessive
