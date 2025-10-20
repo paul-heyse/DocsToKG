@@ -5,7 +5,7 @@
 #   "sections": [
 #     {"id": "infrastructure", "name": "Networking Infrastructure & Constants", "anchor": "INF", "kind": "infra"},
 #     {"id": "dns", "name": "DNS & Host Validation", "anchor": "DNS", "kind": "helpers"},
-#     {"id": "session", "name": "Session Pools & Rate Limiting", "anchor": "SES", "kind": "api"},
+#     {"id": "httpx", "name": "HTTPX Client & Rate Limiting", "anchor": "HTX", "kind": "api"},
 #     {"id": "streaming", "name": "Streaming Downloader", "anchor": "STR", "kind": "api"},
 #     {"id": "helpers", "name": "Download Helpers & Security Checks", "anchor": "HLP", "kind": "helpers"}
 #   ]
@@ -14,11 +14,11 @@
 
 """Networking utilities for ontology downloads.
 
-This module manages resilient HTTP downloads: DNS caching, session pooling,
-range resume, provenance logging, retry-after aware throttling, and security
-guards around redirects, content types, and host allowlists.  It provides the
-streaming helpers consumed by resolvers and the planner when fetching ontology
-artefacts.
+This module manages resilient HTTP downloads: DNS caching, a shared HTTPX
+client with RFC-9111 caching, range resume, provenance logging, retry-after
+aware throttling, and security guards around redirects, content types, and
+host allowlists. It provides the streaming helpers consumed by resolvers and
+the planner when fetching ontology artefacts.
 """
 
 from __future__ import annotations
@@ -650,9 +650,9 @@ def request_with_redirect_audit(
 class StreamingDownloader(pooch.HTTPDownloader):
     """Custom downloader supporting HEAD validation, conditional requests, resume, and caching.
 
-    The downloader shares a :mod:`requests` session so it can issue a HEAD probe
-    prior to streaming content, verifies Content-Type and Content-Length against
-    expectations, and persists ETag/Last-Modified headers for cache-friendly
+    The downloader reuses the shared :mod:`httpx` client so it can issue a HEAD
+    probe prior to streaming content, verifies Content-Type and Content-Length
+    against expectations, and persists ETag/Last-Modified headers for cache-friendly
     revalidation.
 
     Attributes:
@@ -865,7 +865,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
         Args:
             url: Fully qualified download URL resolved by the planner.
-            session: Prepared requests session used for outbound calls.
             headers: Headers to include with the HEAD probe. When omitted the
                 downloader will send the polite header set merged with any
                 resolver-supplied headers.
@@ -1393,7 +1392,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     part_path.parent.mkdir(parents=True, exist_ok=True)
                     try:
                         with part_path.open(mode) as fh:
-                            for chunk in response.iter_content(chunk_size=1 << 20):
+                            for chunk in response.iter_bytes(1 << 20):
                                 _enforce_timeout()
                                 if not chunk:
                                     continue
@@ -1710,7 +1709,7 @@ def download_stream(
                     progressbar=False,
                 )
             )
-        except requests.HTTPError as exc:
+        except (requests.HTTPError, httpx.HTTPStatusError) as exc:
             status_code = getattr(getattr(exc, "response", None), "status_code", None)
             message = f"HTTP error while downloading {secure_url}: {exc}"
             retryable = _is_retryable_status(status_code)
@@ -1728,6 +1727,7 @@ def download_stream(
             requests.ConnectionError,
             requests.Timeout,
             requests.exceptions.SSLError,
+            httpx.RequestError,
         ) as exc:
             logger.error(
                 "download request failed",

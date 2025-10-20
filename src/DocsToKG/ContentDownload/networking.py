@@ -675,7 +675,7 @@ def request_with_retries(
     )
 
     try:
-        response = controller.call(
+        response = controller(
             request_func,
             method=method,
             url=url,
@@ -698,6 +698,14 @@ def request_with_retries(
         total_sleep,
     )
 
+    try:
+        _enforce_content_policy(response, content_policy, method=method, url=url)
+    except AttributeError:  # response lacks headers/status
+        LOGGER.debug(
+            "Response object %s lacks headers for content policy evaluation.",
+            type(response).__name__,
+        )
+
     if not isinstance(response, httpx.Response):
         LOGGER.debug(
             "Response object of type %s lacks status_code; treating as success for %s %s.",
@@ -707,7 +715,6 @@ def request_with_retries(
         )
         return response
 
-    _enforce_content_policy(response, content_policy, method=method, url=url)
     return response
 
 
