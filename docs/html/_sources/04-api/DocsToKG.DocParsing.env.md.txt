@@ -59,7 +59,7 @@ Validate that Qwen/vLLM optional dependencies are importable.
 
 ### `ensure_splade_environment()`
 
-Bootstrap SPLADE-related environment defaults and return resolved settings.
+Bootstrap SPLADE-related environment defaults and return resolved settings. When a cache directory is provided the helper seeds both ``DOCSTOKG_SPLADE_DIR`` and the legacy ``DOCSTOKG_SPLADE_MODEL_DIR`` variables with the resolved path.
 
 ### `ensure_qwen_environment()`
 

@@ -12,9 +12,15 @@ from __future__ import annotations
 import importlib
 import os
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Sequence, Tuple
 
 PDF_MODEL_SUBDIR = Path("granite-docling-258M")
+EXPECTED_DATA_SUBDIRS: Sequence[str] = (
+    "PDFs",
+    "HTML",
+    "DocTagsFiles",
+    "ChunkedDocTagFiles",
+)
 
 SPLADE_DEPENDENCY_MESSAGE = (
     "Optional dependency 'sentence-transformers' is required for SPLADE embeddings. "
@@ -47,8 +53,14 @@ def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
     env = os.getenv("DOCSTOKG_MODEL_ROOT")
     if env:
         return expand_path(env)
-    base = hf_home if hf_home is not None else resolve_hf_home()
-    return expand_path(base)
+    resolved_hf = (
+        expand_path(hf_home)
+        if hf_home is not None
+        else resolve_hf_home()
+    )
+    cache_root = resolved_hf.parent
+    default_root = cache_root / "docs-to-kg" / "models"
+    return expand_path(default_root)
 
 
 def looks_like_filesystem_path(candidate: str) -> bool:
@@ -70,7 +82,12 @@ def looks_like_filesystem_path(candidate: str) -> bool:
 
 
 def resolve_pdf_model_path(cli_value: str | None = None) -> str:
-    """Determine PDF model path using CLI and environment precedence."""
+    """Determine PDF model path using CLI and environment precedence.
+
+    Values that resemble filesystem paths are expanded to absolute paths while
+    other identifiers (for example Hugging Face repository IDs) are returned
+    verbatim so remote downloads continue to function.
+    """
 
     if cli_value:
         if looks_like_filesystem_path(cli_value):
@@ -78,7 +95,9 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
         return cli_value
     env_model = os.getenv("DOCLING_PDF_MODEL")
     if env_model:
-        return str(expand_path(env_model))
+        if looks_like_filesystem_path(env_model):
+            return str(expand_path(env_model))
+        return env_model
     model_root = resolve_model_root()
     return str(expand_path(model_root / PDF_MODEL_SUBDIR))
 
@@ -159,7 +178,12 @@ def ensure_qwen_dependencies(import_error: Exception | None = None) -> None:
 def ensure_splade_environment(
     *, device: Optional[str] = None, cache_dir: Optional[Path] = None
 ) -> Dict[str, str]:
-    """Bootstrap SPLADE-related environment defaults and return resolved settings."""
+    """Bootstrap SPLADE defaults and persist the resolved environment settings.
+
+    When ``cache_dir`` is supplied the resolved path seeds both
+    ``DOCSTOKG_SPLADE_DIR`` and the legacy ``DOCSTOKG_SPLADE_MODEL_DIR`` for
+    backwards compatibility.
+    """
 
     resolved_device = (
         device
@@ -224,6 +248,14 @@ def ensure_qwen_environment(
     return env_info
 
 
+def _looks_like_data_root(candidate: Path, expected_dirs: Sequence[str]) -> bool:
+    """Return ``True`` when ``candidate`` resembles the DocsToKG data root."""
+
+    if candidate.name == "Data":
+        return True
+    return any((candidate / directory).is_dir() for directory in expected_dirs)
+
+
 def detect_data_root(start: Optional[Path] = None) -> Path:
     """Locate the DocsToKG Data directory via env var or ancestor scan."""
 
@@ -232,11 +264,16 @@ def detect_data_root(start: Optional[Path] = None) -> Path:
         env_path = Path(env_root).expanduser().resolve()
         return env_path
 
-    start_path = Path.cwd() if start is None else Path(start).resolve()
-    expected_dirs = ["PDFs", "HTML", "DocTagsFiles", "ChunkedDocTagFiles"]
-    for ancestor in [start_path, *start_path.parents]:
+    start_path = Path.cwd() if start is None else Path(start).expanduser().resolve()
+    search_space = [start_path, *start_path.parents]
+
+    for candidate in search_space:
+        if _looks_like_data_root(candidate, EXPECTED_DATA_SUBDIRS):
+            return candidate.resolve()
+
+    for ancestor in search_space:
         candidate = ancestor / "Data"
-        if any((candidate / directory).is_dir() for directory in expected_dirs):
+        if _looks_like_data_root(candidate, EXPECTED_DATA_SUBDIRS):
             return candidate.resolve()
 
     return (start_path / "Data").resolve()

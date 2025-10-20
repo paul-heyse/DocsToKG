@@ -59,6 +59,7 @@ from DocsToKG.DocParsing.doctags import (
     resolve_model_root,
     resolve_pdf_model_path,
 )
+from DocsToKG.DocParsing.env import init_hf_env
 from DocsToKG.DocParsing.embedding.config import EmbedCfg
 
 # --- Test Cases ---
@@ -92,11 +93,23 @@ def test_resolve_model_root():
             result = resolve_model_root()
             assert result == tmp_path
 
-        # Test without DOCSTOKG_MODEL_ROOT (should fallback to HF home)
+        # Test without DOCSTOKG_MODEL_ROOT using default HF home fallback
         with patch.dict(os.environ, {}, clear=True):
+            expected = resolve_hf_home().parent / "docs-to-kg" / "models"
             result = resolve_model_root()
-            # Should return HF home or its subdirectory
-            assert isinstance(result, Path)
+            assert result == expected
+
+        # Test fallback derived from a custom HF_HOME
+        custom_hf = tmp_path / "alt-cache" / "huggingface"
+        custom_hf.mkdir(parents=True, exist_ok=True)
+
+        with patch.dict(os.environ, {"HF_HOME": str(custom_hf)}):
+            expected = custom_hf.parent / "docs-to-kg" / "models"
+            result = resolve_model_root()
+            assert result == expected.resolve()
+
+        direct = resolve_model_root(hf_home=custom_hf)
+        assert direct == (custom_hf.parent / "docs-to-kg" / "models").resolve()
 
 
 def test_resolve_pdf_model_path():
@@ -116,6 +129,12 @@ def test_resolve_pdf_model_path():
         with patch.dict(os.environ, {"DOCLING_PDF_MODEL": str(model_dir)}):
             result = resolve_pdf_model_path()
             assert result == str(model_dir)
+
+        # Test with DOCLING_PDF_MODEL pointing at a Hugging Face repo ID
+        hf_repo = "ibm-granite/test-docling"
+        with patch.dict(os.environ, {"DOCLING_PDF_MODEL": hf_repo}):
+            result = resolve_pdf_model_path()
+            assert result == hf_repo
 
         # Test with DOCSTOKG_MODEL_ROOT environment variable
         with patch.dict(os.environ, {"DOCSTOKG_MODEL_ROOT": str(tmp_path)}):
@@ -182,6 +201,23 @@ def test_environment_variable_precedence():
             assert isinstance(result, str)
 
 
+def test_init_hf_env_default_model_root():
+    """Ensure init_hf_env derives the default model root from the HF cache."""
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        hf_home = tmp_path / "hf-cache"
+        hf_home.mkdir()
+
+        with patch.dict(os.environ, {}, clear=True):
+            resolved_hf, resolved_model_root = init_hf_env(hf_home=hf_home)
+
+        expected_model_root = hf_home.parent / "docs-to-kg" / "models"
+        assert resolved_hf == hf_home.resolve()
+        assert resolved_model_root == expected_model_root.resolve()
+        assert os.environ["DOCSTOKG_MODEL_ROOT"] == str(expected_model_root.resolve())
+
+
 def test_path_resolution_edge_cases():
     """Test edge cases in path resolution."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -191,6 +227,13 @@ def test_path_resolution_edge_cases():
         non_existent = tmp_path / "non_existent"
         result = resolve_pdf_model_path(cli_value=str(non_existent))
         assert result == str(non_existent)
+
+        # Test DOCLING_PDF_MODEL with filesystem-like value expands to absolute path
+        env_path = tmp_path / "env_model"
+        env_path.mkdir()
+        with patch.dict(os.environ, {"DOCLING_PDF_MODEL": str(env_path)}):
+            result = resolve_pdf_model_path()
+            assert result == str(env_path.resolve())
 
         # Test with relative path
         relative_path = "relative/path"
