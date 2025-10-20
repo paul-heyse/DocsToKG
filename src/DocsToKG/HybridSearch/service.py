@@ -212,6 +212,7 @@ from .types import (
 
 __all__ = (
     "ChannelResults",
+    "DenseSearchStrategy",
     "ReciprocalRankFusion",
     "ResultShaper",
     "HybridSearchAPI",
@@ -225,6 +226,7 @@ __all__ = (
     "build_stats_snapshot",
     "should_rebuild_index",
     "verify_pagination",
+    "AdaptiveDensePlanner",
 )
 
 
@@ -446,6 +448,13 @@ class DenseSearchStrategy:
             self._dirty = False
 
 
+class AdaptiveDensePlanner(DenseSearchStrategy):
+    """Backward-compatible alias that preserves the old planner name."""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+
+
 @dataclass(slots=True)
 class ChannelResults:
     """Results from a single retrieval channel (BM25, SPLADE, or dense).
@@ -581,9 +590,7 @@ class ResultShaper:
                     bm25_score=score_lookup.get("bm25", {}).get(chunk.vector_id),
                     splade_score=score_lookup.get("splade", {}).get(chunk.vector_id),
                     dense_score=score_lookup.get("dense", {}).get(chunk.vector_id),
-                    fusion_weights=(
-                        dict(self._channel_weights) if self._channel_weights else None
-                    ),
+                    fusion_weights=(dict(self._channel_weights) if self._channel_weights else None),
                 )
             else:
                 diagnostics = None
@@ -1018,9 +1025,7 @@ class HybridSearchService:
                 cached = embedding_cache.get(vector_id)
                 if cached is not None:
                     return cached
-                embedding = self._registry.resolve_embedding(
-                    vector_id, cache=embedding_cache
-                )
+                embedding = self._registry.resolve_embedding(vector_id, cache=embedding_cache)
                 return embedding
 
             raw_weights = getattr(config.fusion, "channel_weights", None)
@@ -1536,7 +1541,6 @@ class HybridSearchService:
                 signature,
                 observed,
                 update_global=not recall_first,
-                signature, observed, update_global=not bool(getattr(request, "recall_first", False))
             )
             strategy.remember(signature, max(len(filtered), len(hits)))
             filtered.sort(key=lambda hit: (-hit.score, hit.vector_id))
@@ -1707,9 +1711,7 @@ class HybridSearchService:
             )
             scores[hit.vector_id] = hit.score
             embedding_rows.append(
-                self._registry.resolve_embedding(
-                    chunk.vector_id, cache=embedding_cache_local
-                )
+                self._registry.resolve_embedding(chunk.vector_id, cache=embedding_cache_local)
             )
         embedding_matrix: Optional[np.ndarray]
         if embedding_rows:
@@ -1908,9 +1910,7 @@ class HybridSearchAPI:
             recall_first=recall_first,
         )
 
-    def _normalize_filters(
-        self, payload: Optional[Mapping[str, Any]]
-    ) -> MutableMapping[str, Any]:
+    def _normalize_filters(self, payload: Optional[Mapping[str, Any]]) -> MutableMapping[str, Any]:
         normalized: MutableMapping[str, Any] = {}
         if not payload:
             return normalized
@@ -2284,9 +2284,7 @@ class HybridSearchValidator:
         embedding_cache: Dict[str, np.ndarray] = {}
         for chunk in self._registry.all():
             total += 1
-            query_vector = self._registry.resolve_embedding(
-                chunk.vector_id, cache=embedding_cache
-            )
+            query_vector = self._registry.resolve_embedding(chunk.vector_id, cache=embedding_cache)
             hits = self._ingestion.faiss_index.search(query_vector, 1)
             if hits and hits[0].vector_id == chunk.vector_id:
                 hits_met += 1
@@ -2572,9 +2570,7 @@ class HybridSearchValidator:
         invalid_vectors = 0
         embedding_cache: Dict[str, np.ndarray] = {}
         for chunk in self._registry.all():
-            vector = self._registry.resolve_embedding(
-                chunk.vector_id, cache=embedding_cache
-            )
+            vector = self._registry.resolve_embedding(chunk.vector_id, cache=embedding_cache)
             dims.add(vector.shape[0])
             if not np.isfinite(vector).all():
                 invalid_vectors += 1
@@ -2710,10 +2706,7 @@ class HybridSearchValidator:
         # Precompute matrix for brute-force recall estimates.
         vector_ids = [chunk.vector_id for chunk in all_chunks]
         vector_matrix = self._registry.resolve_embeddings(vector_ids)
-        vector_lookup = {
-            vector_id: vector_matrix[idx]
-            for idx, vector_id in enumerate(vector_ids)
-        }
+        vector_lookup = {vector_id: vector_matrix[idx] for idx, vector_id in enumerate(vector_ids)}
         try:
             adapter_stats = self._ingestion.faiss_index.adapter_stats  # type: ignore[attr-defined]
         except AttributeError:
@@ -2725,7 +2718,9 @@ class HybridSearchValidator:
         except Exception:
             ingestion_device = 0
         try:
-            device = int(adapter_stats.device) if adapter_stats is not None else int(ingestion_device)
+            device = (
+                int(adapter_stats.device) if adapter_stats is not None else int(ingestion_device)
+            )
         except Exception:
             device = 0
 
@@ -2746,20 +2741,14 @@ class HybridSearchValidator:
             except Exception:
                 gpu_resources = None
 
-        if (
-            faiss is not None
-            and gpu_resources is not None
-            and hasattr(faiss, "GpuIndexFlatIP")
-        ):
+        if faiss is not None and gpu_resources is not None and hasattr(faiss, "GpuIndexFlatIP"):
             try:
                 gpu_config_cls = getattr(faiss, "GpuIndexFlatConfig", None)
                 if gpu_config_cls is not None:
                     gpu_config = gpu_config_cls()
                     gpu_config.device = int(device)
                     if adapter_stats is not None and hasattr(gpu_config, "useFloat16"):
-                        gpu_config.useFloat16 = bool(
-                            getattr(adapter_stats, "fp16_enabled", False)
-                        )
+                        gpu_config.useFloat16 = bool(getattr(adapter_stats, "fp16_enabled", False))
                     scratch_index = faiss.GpuIndexFlatIP(gpu_resources, embedding_dim, gpu_config)
                 else:
                     scratch_index = faiss.index_cpu_to_gpu(
@@ -3159,9 +3148,7 @@ class HybridSearchValidator:
                 chunk = chunk_lookup.get((result.doc_id, result.chunk_id))
                 if chunk is not None:
                     embeddings.append(
-                        self._registry.resolve_embedding(
-                            chunk.vector_id, cache=embedding_cache
-                        )
+                        self._registry.resolve_embedding(chunk.vector_id, cache=embedding_cache)
                     )
                 if not result.highlights:
                     highlight_missing += 1
@@ -3435,9 +3422,7 @@ class HybridSearchValidator:
             chunk = chunk_lookup.get((result.doc_id, result.chunk_id))
             if chunk is None:
                 continue
-            embeddings.append(
-                self._registry.resolve_embedding(chunk.vector_id, cache=cache)
-            )
+            embeddings.append(self._registry.resolve_embedding(chunk.vector_id, cache=cache))
         return embeddings
 
     def _average_pairwise_cos(self, embeddings: Sequence[np.ndarray]) -> float:
@@ -3786,7 +3771,7 @@ def infer_embedding_dim(dataset: Sequence[Mapping[str, object]]) -> int:
             except ImportError as exc:  # pragma: no cover - dependency guard
                 raise RuntimeError(
                     "Parquet vector ingestion requires the optional dependency 'pyarrow'. "
-                    'Install DocsToKG[docparse-parquet] or add pyarrow to the environment.'
+                    "Install DocsToKG[docparse-parquet] or add pyarrow to the environment."
                 ) from exc
             try:
                 parquet_file = pq.ParquetFile(path)
@@ -3812,11 +3797,7 @@ def infer_embedding_dim(dataset: Sequence[Mapping[str, object]]) -> int:
                     if not line:
                         continue
                     payload = json.loads(line)
-                    vector_payload = (
-                        payload.get("Qwen3-4B")
-                        or payload.get("Qwen3_4B")
-                        or {}
-                    )
+                    vector_payload = payload.get("Qwen3-4B") or payload.get("Qwen3_4B") or {}
                     vector = vector_payload.get("vector")
                     if isinstance(vector, list) and vector:
                         return len(vector)

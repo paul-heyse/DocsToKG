@@ -498,10 +498,10 @@ class DownloadRun:
             raise RuntimeError("Download state not initialised.")
 
         session_factory = self.state.session_factory
-        active_session = session or session_factory()
+        active_client = session or session_factory()
         result = self.process_one_work_func(
             work,
-            active_session,
+            active_client,
             self.resolved.pdf_dir,
             self.resolved.html_dir,
             self.resolved.xml_dir,

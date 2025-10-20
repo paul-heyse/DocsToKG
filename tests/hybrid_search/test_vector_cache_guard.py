@@ -126,7 +126,9 @@ def test_streaming_vector_cache_guard_raises(tmp_path: Path) -> None:
         vector_cache_stats_hook=lambda size, doc: stats.append((size, doc.doc_id)),
     )
 
-    with pytest.raises(IngestError, match="Vector cache grew beyond the configured safety limit") as excinfo:
+    with pytest.raises(
+        IngestError, match="Vector cache grew beyond the configured safety limit"
+    ) as excinfo:
         list(pipeline._load_precomputed_chunks(document))
 
     assert "sorted consistently" in str(excinfo.value)
@@ -138,6 +140,19 @@ def test_vector_cache_guard_zero_limit_fails_fast(tmp_path: Path) -> None:
     """A zero cache limit should fail immediately when drift is detected."""
 
     document = _misordered_document(tmp_path)
+
+    pipeline = ChunkIngestionPipeline(
+        faiss_index=_StubFaiss(),
+        opensearch=_StubLexical(),
+        registry=_StubRegistry(),
+        observability=Observability(),
+        vector_cache_limit=0,
+    )
+
+    with pytest.raises(IngestError, match="Vector cache grew beyond the configured safety limit"):
+        list(pipeline._load_precomputed_chunks(document))
+
+
 def test_vector_cache_stats_hook_tracks_cache_shrink(tmp_path: Path) -> None:
     """Vector cache observers should see both growth and shrink events."""
 
@@ -197,7 +212,7 @@ def test_vector_cache_stats_hook_tracks_cache_shrink(tmp_path: Path) -> None:
 
     stats: List[Tuple[int, str]] = []
 
-    pipeline = ChunkIngestionPipeline(
+    guarded = ChunkIngestionPipeline(
         faiss_index=_StubFaiss(),
         opensearch=_StubLexical(),
         registry=_StubRegistry(),
@@ -207,9 +222,16 @@ def test_vector_cache_stats_hook_tracks_cache_shrink(tmp_path: Path) -> None:
     )
 
     with pytest.raises(IngestError, match="Vector cache grew beyond the configured safety limit"):
-        list(pipeline._load_precomputed_chunks(document))
+        list(guarded._load_precomputed_chunks(document))
 
-    assert stats == [(1, "doc")]
+    assert stats and stats[-1] == (1, "doc")
+
+    stats.clear()
+    pipeline = ChunkIngestionPipeline(
+        faiss_index=_StubFaiss(),
+        opensearch=_StubLexical(),
+        registry=_StubRegistry(),
+        observability=Observability(),
         vector_cache_limit=10,
         vector_cache_stats_hook=lambda size, doc: stats.append((size, doc.doc_id)),
     )

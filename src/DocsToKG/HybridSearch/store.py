@@ -2172,7 +2172,9 @@ class FaissVectorStore(DenseVectorStore):
             per_device_reserve = max(1, (reserve_total + participants - 1) // participants)
 
         reserve_attr_value = (
-            per_device_reserve if scale_with_participants and participant_count > 0 else reserve_total
+            per_device_reserve
+            if scale_with_participants and participant_count > 0
+            else reserve_total
         )
 
         applied = False
@@ -3176,9 +3178,7 @@ class ChunkRegistry:
             self._bridge.pop(self.to_faiss_id(vector_id), None)
             self._remove_from_index(vector_id, chunk=chunk)
 
-    def _remove_from_index(
-        self, vector_id: str, *, chunk: Optional[ChunkPayload] = None
-    ) -> None:
+    def _remove_from_index(self, vector_id: str, *, chunk: Optional[ChunkPayload] = None) -> None:
         if chunk is None:
             chunk = self._chunks.get(vector_id)
         if chunk is None:
@@ -3254,7 +3254,9 @@ class ChunkRegistry:
             dim = getattr(self._embedding_store, "dim", 0) if self._embedding_store else 0
             return np.empty((0, dim), dtype=dtype)
         if self._embedding_store is None:
-            raise RuntimeError("ChunkRegistry requires an attached dense store to resolve embeddings")
+            raise RuntimeError(
+                "ChunkRegistry requires an attached dense store to resolve embeddings"
+            )
 
         dtype = np.dtype(dtype)
         results: list[Optional[np.ndarray]] = [None] * len(vector_ids)

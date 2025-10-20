@@ -54,12 +54,14 @@ from urllib.parse import ParseResult, urljoin, urlparse, urlunparse
 
 import pooch
 import requests
+import httpx
 
 from tenacity import Retrying, retry_if_exception, stop_after_attempt
 from tenacity.wait import wait_base
 
 from ..cancellation import CancellationToken
 from ..errors import ConfigError, DownloadFailure, OntologyDownloadError, PolicyError
+from ..net import get_http_client
 from ..settings import DownloadConfiguration
 from .filesystem import _compute_file_hash, _materialize_cached_file, sanitize_filename
 from .rate_limit import TokenBucket, apply_retry_after, get_bucket
@@ -118,7 +120,6 @@ for canonical, aliases in _RDF_ALIAS_GROUPS.items():
         RDF_MIME_ALIASES.add(alias)
         RDF_MIME_FORMAT_LABELS[alias] = label
 
-SESSION_POOL_CACHE_DEFAULT = 2
 _RETRYABLE_HTTP_STATUSES = {408, 409, 416, 425, 429, 500, 502, 503, 504}
 
 T = TypeVar("T")
@@ -362,77 +363,6 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
     return urlunparse(parsed)
 
 
-class SessionPool:
-    """Lightweight pool that reuses requests sessions per (service, host)."""
-
-    def __init__(self, max_per_key: int = 2) -> None:
-        self._lock = threading.Lock()
-        self._pool: Dict[Tuple[str, str], List[requests.Session]] = {}
-        self._max_per_key = max_per_key
-
-    def _normalize(self, service: Optional[str], host: Optional[str]) -> Tuple[str, str]:
-        service_key = (service or "_").lower()
-        host_key = (host or "default").lower()
-        return service_key, host_key
-
-    @contextmanager
-    def lease(
-        self,
-        *,
-        service: Optional[str],
-        host: Optional[str],
-        http_config: Optional["DownloadConfiguration"] = None,
-    ) -> Iterator[requests.Session]:
-        """Yield a session associated with ``service``/``host`` and return it to the pool."""
-
-        key = self._normalize(service, host)
-        factory: Optional[Callable[[], requests.Session]] = None
-        if http_config is not None:
-            getter = getattr(http_config, "get_session_factory", None)
-            if callable(getter):
-                candidate = getter()
-                if candidate is not None and not callable(candidate):
-                    raise TypeError("session_factory getter must return a callable or None")
-                factory = candidate
-
-        with self._lock:
-            stack = self._pool.get(key)
-            if stack:
-                session = stack.pop()
-                if not stack:
-                    self._pool.pop(key, None)
-            else:
-                if factory is not None:
-                    session = factory()
-                    if session is None:
-                        session = requests.Session()
-                    elif not isinstance(session, requests.Session):
-                        raise TypeError(
-                            "session_factory must return a requests.Session instance or None"
-                        )
-                else:
-                    session = requests.Session()
-        try:
-            yield session
-        finally:
-            with self._lock:
-                stack = self._pool.setdefault(key, [])
-                if len(stack) < self._max_per_key:
-                    stack.append(session)
-                else:
-                    session.close()
-                    if not stack:
-                        self._pool.pop(key, None)
-
-    def clear(self) -> None:
-        """Close and forget all pooled sessions (testing helper)."""
-
-        with self._lock:
-            for stack in self._pool.values():
-                for session in stack:
-                    session.close()
-            self._pool.clear()
-
 
 def retry_with_backoff(
     func: Callable[[], T],
@@ -613,28 +543,42 @@ def is_retryable_error(exc: BaseException) -> bool:
         return _is_retryable_status(status)
     if isinstance(exc, requests.RequestException):
         return True
+    if isinstance(
+        exc,
+        (
+            httpx.ConnectError,
+            httpx.ReadTimeout,
+            httpx.WriteTimeout,
+            httpx.PoolTimeout,
+            httpx.TransportError,
+        ),
+    ):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = getattr(exc.response, "status_code", None)
+        return _is_retryable_status(status)
+    if isinstance(exc, httpx.RequestError):
+        return True
     return False
-
-
-SESSION_POOL = SessionPool()
 
 
 @contextmanager
 def request_with_redirect_audit(
     *,
-    session: requests.Session,
+    client: httpx.Client,
     method: str,
     url: str,
-    headers: Dict[str, str],
+    headers: Mapping[str, str],
     timeout: float,
     stream: bool,
     http_config: DownloadConfiguration,
     assume_url_validated: bool = False,
-) -> Iterator[requests.Response]:
+    extensions: Optional[Mapping[str, object]] = None,
+) -> Iterator[httpx.Response]:
     """Issue an HTTP request while validating every redirect target."""
 
     redirects = 0
-    response: Optional[requests.Response] = None
+    response: Optional[httpx.Response] = None
     current_url = url
     last_validated_url: Optional[str] = None
     assume_validated_flag = assume_url_validated
@@ -648,22 +592,22 @@ def request_with_redirect_audit(
 
     try:
         while True:
-            if assume_validated_flag:
-                secure_url = current_url
-            else:
-                secure_url = validate_url_security(current_url, http_config)
+            secure_url = current_url if assume_validated_flag else validate_url_security(current_url, http_config)
             assume_validated_flag = False
             last_validated_url = secure_url
+
+            request = client.build_request(
+                method,
+                secure_url,
+                headers=headers,
+                timeout=timeout,
+            )
+            if extensions:
+                request.extensions["ontology_headers"] = dict(extensions)
+
             try:
-                response = session.request(
-                    method,
-                    secure_url,
-                    headers=headers,
-                    timeout=timeout,
-                    stream=stream,
-                    allow_redirects=False,
-                )
-            except requests.RequestException:
+                response = client.send(request, stream=stream)
+            except httpx.RequestError:
                 raise
 
             if response.is_redirect:
@@ -671,10 +615,12 @@ def request_with_redirect_audit(
                 if redirects > max_redirects:
                     response.close()
                     raise PolicyError("Too many redirects during download")
+
                 location = response.headers.get("Location")
                 if not location:
                     response.close()
                     raise PolicyError("Redirect response missing Location header")
+
                 next_url = urljoin(secure_url, location)
                 try:
                     current_url = validate_url_security(next_url, http_config)
@@ -686,8 +632,9 @@ def request_with_redirect_audit(
                 continue
 
             try:
-                if response.url != last_validated_url:
-                    last_validated_url = validate_url_security(response.url, http_config)
+                response_url = str(response.url)
+                if response_url != last_validated_url:
+                    last_validated_url = validate_url_security(response_url, http_config)
             except Exception:
                 response.close()
                 raise
@@ -749,6 +696,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         hash_algorithms: Optional[Iterable[str]] = None,
         cancellation_token: Optional[CancellationToken] = None,
         url_already_validated: bool = False,
+        client: Optional[httpx.Client] = None,
     ) -> None:
         super().__init__(headers={}, progressbar=False, timeout=http_config.timeout_sec)
         self.destination = destination
@@ -782,6 +730,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self._reset_hashers()
         self._reuse_head_token = False
         self._assume_url_validated = url_already_validated
+        self.client = client or get_http_client(http_config)
 
     def _reset_hashers(self) -> None:
         """Initialise hashlib objects for all supported algorithms."""
@@ -826,17 +775,22 @@ class StreamingDownloader(pooch.HTTPDownloader):
     def _request_with_redirect_audit(
         self,
         *,
-        session: requests.Session,
         method: str,
         url: str,
         headers: Dict[str, str],
         timeout: float,
         stream: bool,
-    ) -> Iterator[requests.Response]:
+    ) -> Iterator[httpx.Response]:
         """Issue an HTTP request while validating every redirect target."""
 
+        extensions = {
+            "config": self.http_config,
+            "headers": headers,
+            "correlation_id": _extract_correlation_id(self.logger),
+        }
+
         with request_with_redirect_audit(
-            session=session,
+            client=self.client,
             method=method,
             url=url,
             headers=headers,
@@ -844,6 +798,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
             stream=stream,
             http_config=self.http_config,
             assume_url_validated=self._assume_url_validated,
+            extensions=extensions,
         ) as response:
             yield response
 
@@ -896,7 +851,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
     def _preliminary_head_check(
         self,
         url: str,
-        session: requests.Session,
         *,
         headers: Optional[Mapping[str, str]] = None,
         token_consumed: bool = False,
@@ -967,7 +921,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
         try:
             with self._request_with_redirect_audit(
-                session=session,
                 method="HEAD",
                 url=url,
                 headers=request_headers,
@@ -1028,11 +981,10 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     try:
                         content_length = int(content_length_header)
                     except (TypeError, ValueError):
-                        # Invalid Content-Length header, ignore it
                         content_length = None
 
                 return content_type, content_length
-        except requests.RequestException as exc:
+        except httpx.RequestError as exc:
             self.logger.debug(
                 "HEAD request exception, proceeding with GET",
                 extra={
@@ -1172,22 +1124,17 @@ class StreamingDownloader(pooch.HTTPDownloader):
         overall_start = time.monotonic()
         timeout_limit = float(self.http_config.download_timeout_sec)
 
-        with SESSION_POOL.lease(
-            service=self.service,
-            host=self.origin_host,
-            http_config=self.http_config,
-        ) as session:
-            head_token_consumed = False
-            if self.bucket is not None:
-                self.bucket.consume()
-                head_token_consumed = True
+        head_token_consumed = False
+        if self.bucket is not None:
+            self.bucket.consume()
+            head_token_consumed = True
 
-            def _clear_partial_files() -> None:
-                for candidate in (part_path, destination_part_path):
-                    try:
-                        candidate.unlink(missing_ok=True)
-                    except OSError:
-                        pass
+        def _clear_partial_files() -> None:
+            for candidate in (part_path, destination_part_path):
+                try:
+                    candidate.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
             def _raise_timeout(elapsed: float) -> None:
                 _clear_partial_files()
@@ -1217,18 +1164,17 @@ class StreamingDownloader(pooch.HTTPDownloader):
             def _fail_for_timeout() -> None:
                 _raise_timeout(time.monotonic() - overall_start)
 
-            head_content_type, head_content_length = self._preliminary_head_check(
-                url,
-                session,
-                headers=base_headers,
-                token_consumed=head_token_consumed,
-                remaining_budget=_remaining_budget,
-                timeout_callback=_fail_for_timeout,
-            )
-            self.head_content_type = head_content_type
-            self.head_content_length = head_content_length
-            if head_content_type:
-                self._validate_media_type(head_content_type, self.expected_media_type, url)
+        head_content_type, head_content_length = self._preliminary_head_check(
+            url,
+            headers=base_headers,
+            token_consumed=head_token_consumed,
+            remaining_budget=_remaining_budget,
+            timeout_callback=_fail_for_timeout,
+        )
+        self.head_content_type = head_content_type
+        self.head_content_length = head_content_length
+        if head_content_type:
+            self._validate_media_type(head_content_type, self.expected_media_type, url)
 
             resume_position = part_path.stat().st_size if part_path.exists() else 0
 
@@ -1293,7 +1239,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     )
 
                 with self._request_with_redirect_audit(
-                    session=session,
                     method="GET",
                     url=url,
                     headers=request_headers,
@@ -1609,6 +1554,7 @@ def download_stream(
     parsed = urlparse(secure_url)
     host = parsed.hostname
     bucket = get_bucket(http_config=http_config, host=host, service=service)
+    http_client = get_http_client(http_config)
 
     log_memory_usage(logger, stage="download", event="before")
     polite_headers = http_config.polite_http_headers(correlation_id=_extract_correlation_id(logger))
@@ -1750,6 +1696,7 @@ def download_stream(
             hash_algorithms=[expected_algorithm] if expected_algorithm else None,
             cancellation_token=cancellation_token,
             url_already_validated=True,
+            client=http_client,
         )
         attempt_start = time.monotonic()
         try:

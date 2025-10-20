@@ -156,7 +156,7 @@ from typing import (
 )
 from urllib.parse import urlparse, urlsplit
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
@@ -379,7 +379,7 @@ class ResolverConfig:
         semantic_scholar_api_key: API key for Semantic Scholar resolver.
         doaj_api_key: API key for DOAJ resolver.
         resolver_timeouts: Resolver-specific timeout overrides.
-        resolver_min_interval_s: Minimum interval between resolver _requests.
+        resolver_min_interval_s: Minimum interval between resolver HTTP requests.
         domain_min_interval_s: Optional per-domain rate limits overriding resolver settings.
         enable_head_precheck: Toggle applying HEAD filtering before downloads.
         resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
@@ -396,7 +396,7 @@ class ResolverConfig:
     Notes:
         ``enable_head_precheck`` toggles inexpensive HEAD lookups before downloads
         to filter obvious HTML responses. ``resolver_head_precheck`` allows
-        per-resolver overrides when specific providers reject HEAD _requests.
+        per-resolver overrides when specific providers reject HEAD requests.
         ``max_concurrent_resolvers`` bounds the number of resolver threads used
         per work while still respecting configured rate limits. ``max_concurrent_per_host``
         limits simultaneous downloads hitting the same hostname across workers.
@@ -1601,7 +1601,7 @@ class ResolverPipeline:
 
     def _head_precheck_url(
         self,
-        session: _requests.Session,
+        session: httpx.Client,
         url: str,
         timeout: float,
         content_policy: Optional[Dict[str, Any]] = None,
@@ -1621,11 +1621,11 @@ class ResolverPipeline:
 
     def run(
         self,
-        session: _requests.Session,
+        session: httpx.Client,
         artifact: "WorkArtifact",
         context: Optional[Union["DownloadConfig", DownloadContext, Mapping[str, Any]]] = None,
         *,
-        session_factory: Optional[Callable[[], _requests.Session]] = None,
+        session_factory: Optional[Callable[[], httpx.Client]] = None,
     ) -> PipelineResult:
         """Execute resolvers until a PDF is obtained or resolvers are exhausted.
 
@@ -1644,7 +1644,7 @@ class ResolverPipeline:
         state = _RunState(dry_run=context_obj.dry_run)
         if session_factory is None:
 
-            def session_provider() -> _requests.Session:
+            def session_provider() -> httpx.Client:
                 """Return the shared HTTP session when no factory override is provided."""
                 return session
 
@@ -1658,8 +1658,8 @@ class ResolverPipeline:
 
     def _run_sequential(
         self,
-        session: _requests.Session,
-        session_provider: Callable[[], _requests.Session],
+        session: httpx.Client,
+        session_provider: Callable[[], httpx.Client],
         artifact: "WorkArtifact",
         context: DownloadContext,
         state: _RunState,
@@ -1722,8 +1722,8 @@ class ResolverPipeline:
 
     def _run_concurrent(
         self,
-        session: _requests.Session,
-        session_provider: Callable[[], _requests.Session],
+        session: httpx.Client,
+        session_provider: Callable[[], httpx.Client],
         artifact: "WorkArtifact",
         context: DownloadContext,
         state: _RunState,
@@ -1938,7 +1938,7 @@ class ResolverPipeline:
         self,
         resolver_name: str,
         resolver: Resolver,
-        session_provider: Callable[[], _requests.Session],
+        session_provider: Callable[[], httpx.Client],
         artifact: "WorkArtifact",
     ) -> Tuple[List[ResolverResult], float]:
         """Collect resolver results while applying rate limits and error handling.
@@ -1975,7 +1975,7 @@ class ResolverPipeline:
 
     def _process_result(
         self,
-        session: _requests.Session,
+        session: httpx.Client,
         artifact: "WorkArtifact",
         resolver_name: str,
         order_index: int,

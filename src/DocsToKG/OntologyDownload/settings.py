@@ -180,13 +180,7 @@ class DownloadConfiguration(BaseModel):
     max_retries: int = Field(default=5, ge=0, le=20)
     timeout_sec: int = Field(default=30, gt=0, le=300)
     download_timeout_sec: int = Field(default=300, gt=0, le=3600)
-    connect_timeout_sec: float = Field(default=5.0, gt=0.0, le=60.0)
-    pool_timeout_sec: float = Field(default=5.0, gt=0.0, le=60.0)
     backoff_factor: float = Field(default=0.5, ge=0.1, le=10.0)
-    max_httpx_connections: int = Field(default=128, ge=1, le=1024)
-    max_keepalive_connections: int = Field(default=32, ge=0, le=1024)
-    keepalive_expiry_sec: float = Field(default=30.0, gt=0.0, le=600.0)
-    http2_enabled: bool = Field(default=True)
     per_host_rate_limit: str = Field(
         default="4/second",
         pattern=_RATE_LIMIT_PATTERN.pattern,
@@ -433,14 +427,12 @@ class DownloadConfiguration(BaseModel):
         return headers
 
     def set_session_factory(self, factory: Optional[Callable[[], Any]]) -> None:
-        """Set a custom factory used to construct HTTPX clients."""
+        """Set a custom factory used to construct HTTP sessions."""
 
-        if factory is not None and not callable(factory):
-            raise TypeError("session_factory must be callable returning an httpx.Client or None")
         self._session_factory = factory
 
     def get_session_factory(self) -> Optional[Callable[[], Any]]:
-        """Return the custom HTTPX client factory, if one has been configured."""
+        """Return the custom session factory, if one has been configured."""
 
         return self._session_factory
 

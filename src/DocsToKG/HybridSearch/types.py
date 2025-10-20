@@ -165,7 +165,9 @@ class EmbeddingProxy:
 
     vector_id: str
 
-    def __array__(self, dtype: Optional[np.dtype] = None) -> np.ndarray:  # pragma: no cover - defensive
+    def __array__(
+        self, dtype: Optional[np.dtype] = None
+    ) -> np.ndarray:  # pragma: no cover - defensive
         raise TypeError(
             "EmbeddingProxy does not expose array semantics; request reconstructions "
             "via ChunkRegistry.resolve_embedding"

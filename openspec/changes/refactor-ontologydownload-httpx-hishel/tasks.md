@@ -1,30 +1,30 @@
 ## 1. Establish HTTPX + Hishel transport layer (`src/DocsToKG/OntologyDownload/net.py`)
-- [ ] 1.1 Create a new module `net.py` containing:
+- [x] 1.1 Create a new module `net.py` containing:
   - Module-level constants for `HTTP_CACHE_DIR = CACHE_DIR / "http"` and `_CLIENT_LOCK = threading.RLock()`.
   - Private slot `_HTTP_CLIENT: httpx.Client | None = None`.
   - Public helpers `get_http_client()`, `configure_http_client(client: httpx.Client | None = None, *, factory: Callable[[], httpx.Client | None] | None = None)`, and `reset_http_client()` that all synchronise on `_CLIENT_LOCK`.
-- [ ] 1.2 Implement `_build_http_client(cache_root: Path, config: DownloadConfiguration | None) -> httpx.Client` with explicit settings:
+- [x] 1.2 Implement `_build_http_client(cache_root: Path, config: DownloadConfiguration | None) -> httpx.Client` with explicit settings:
   - Use `httpx.Timeout(connect=config.connect_timeout_sec, read=config.timeout_sec, write=config.timeout_sec, pool=config.pool_timeout_sec)`; fall back to sane defaults (e.g., 5/30 seconds) when fields are absent.
   - Use `httpx.Limits(max_connections=config.max_httpx_connections, max_keepalive_connections=config.max_keepalive_connections, keepalive_expiry=config.keepalive_expiry_sec)`.
   - Instantiate `ssl.create_default_context(cafile=certifi.where())` and pass as `verify=ssl_context`.
   - Set `http2=config.http2_enabled`, `trust_env=True`, `follow_redirects=False`.
-- [ ] 1.3 Construct a Hishel cache transport:
+- [x] 1.3 Construct a Hishel cache transport:
   - Import `hishel.CacheOptions` and `hishel.CacheTransport`.
   - Ensure `cache_root` exists (`mkdir(parents=True, exist_ok=True)`).
   - Configure cache options with `cacheable_methods={"GET", "HEAD"}`, `cacheable_status_codes={200, 203, 300, 301, 308, 404, 410, 416}`, `allow_incomplete=False`, `heuristic=None`, `respect_cache_headers=True`, and `allow_mutable_headers={"Date"}`.
   - Wrap the base transport using `CacheTransport(base_transport=httpx.HTTPTransport(retries=0), cache_options=options, storage=hishel.FileStorage(cache_root))` and pass it to `httpx.Client(transport=CacheTransport(...))`.
-- [ ] 1.4 Register event hooks on the client:
+- [x] 1.4 Register event hooks on the client:
   - `event_hooks["request"]` should merge polite headers. Allow callers to place override headers in `request.extensions["ontology_headers"]` and reapply `DownloadConfiguration.polite_http_headers(correlation_id=...)`.
   - `event_hooks["response"]` should call `response.raise_for_status()`, log cache metadata (`response.extensions.get("hishel", {})`), and attach `response.extensions["ontology_cache_status"]` for downstream consumers.
-- [ ] 1.5 Update `configure_http_client` logic:
+- [x] 1.5 Update `configure_http_client` logic:
   - Accept either a concrete `httpx.Client` or a `factory` callable. Only one may be provided; raise `ValueError` when both are set.
   - If neither is provided, rebuild using `_build_http_client`.
   - Persist the installed factory on `DownloadConfiguration` so `DownloadConfiguration.get_session_factory()` invokes it and returns the HTTPX client; ensure legacy factories returning `requests.Session` raise a descriptive error.
-- [ ] 1.6 Re-export `get_http_client`, `configure_http_client`, and `reset_http_client` from `DocsToKG.OntologyDownload.io.__init__` (and optionally the package `__init__`) so existing imports adopt the new API.
+- [x] 1.6 Re-export `get_http_client`, `configure_http_client`, and `reset_http_client` from `DocsToKG.OntologyDownload.io.__init__` (and optionally the package `__init__`) so existing imports adopt the new API.
 
 ## 2. Migrate networking helpers off `SessionPool` (`io/network.py`)
 - [ ] 2.1 Delete the `SessionPool` class definition, the module-level `SESSION_POOL`, and any references to `requests`. Replace them with `from ..net import get_http_client` and `import httpx`.
-- [ ] 2.2 Extend `is_retryable_error` to treat `httpx.ConnectError`, `httpx.ReadTimeout`, `httpx.WriteTimeout`, `httpx.PoolTimeout`, `httpx.HTTPStatusError`, and generic `httpx.TransportError` as retryable according to status code (`exc.response.status_code`) and to surface `DownloadFailure.retryable` unchanged.
+- [x] 2.2 Extend `is_retryable_error` to treat `httpx.ConnectError`, `httpx.ReadTimeout`, `httpx.WriteTimeout`, `httpx.PoolTimeout`, `httpx.HTTPStatusError`, and generic `httpx.TransportError` as retryable according to status code (`exc.response.status_code`) and to surface `DownloadFailure.retryable` unchanged.
 - [ ] 2.3 Rewrite `request_with_redirect_audit`:
   - Accept an `httpx.Client` parameter rather than a `requests.Session`.
   - Build requests with `client.build_request(method, url, headers=headers, timeout=httpx.Timeout(...), follow_redirects=False, stream=stream)`.

@@ -184,6 +184,7 @@ __all__ = (
     "CircuitBreaker",
     "TokenBucket",
     "configure_http_client",
+    "TENACITY_SLEEP",
     "ThreadLocalSessionFactory",
     "create_session",
     "get_thread_session",
@@ -196,6 +197,8 @@ __all__ = (
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
+TENACITY_SLEEP = time.sleep
+
 DEFAULT_RETRYABLE_STATUSES: Set[int] = {429, 500, 502, 503, 504}
 _TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
 
@@ -204,31 +207,42 @@ _TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
 
 
 class ThreadLocalSessionFactory:
-    """Compatibility shim for the removed requests-based session factory."""
+    """Legacy compatibility wrapper returning the shared HTTPX client."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        raise RuntimeError(
-            "ThreadLocalSessionFactory has been removed. Use "
-            "`DocsToKG.ContentDownload.httpx_transport.get_http_client()` instead."
-        )
+    def __init__(self, builder: Optional[Callable[[], httpx.Client]] = None) -> None:
+        self._builder = builder
+
+    def get_thread_session(self) -> httpx.Client:
+        if callable(self._builder):
+            try:
+                return self._builder()
+            except Exception:  # pragma: no cover - defensive legacy path
+                LOGGER.debug("Custom session builder failed; falling back to shared client", exc_info=True)
+        return get_http_client()
+
+    def __call__(self) -> httpx.Client:
+        return self.get_thread_session()
+
+    def close_current(self) -> None:
+        return None
+
+    def close_for_thread(self, thread_id: int) -> None:  # pylint: disable=unused-argument
+        return None
+
+    def close_all(self) -> None:
+        return None
 
 
-def get_thread_session() -> None:
-    """Compatibility shim indicating the requests session helper was removed."""
+def get_thread_session() -> httpx.Client:
+    """Return the shared HTTPX client for compatibility with legacy callers."""
 
-    raise RuntimeError(
-        "get_thread_session has been removed. Use "
-        "`DocsToKG.ContentDownload.httpx_transport.get_http_client()` instead."
-    )
+    return get_http_client()
 
 
-def create_session(*args: Any, **kwargs: Any) -> None:
-    """Compatibility shim indicating the requests session helper was removed."""
+def create_session(*args: Any, **kwargs: Any) -> httpx.Client:  # pylint: disable=unused-argument
+    """Return the shared HTTPX client for compatibility with legacy callers."""
 
-    raise RuntimeError(
-        "create_session has been removed. Use "
-        "`DocsToKG.ContentDownload.httpx_transport.get_http_client()` instead."
-    )
+    return get_http_client()
 
 
 def parse_retry_after_header(response: httpx.Response) -> Optional[float]:
@@ -549,7 +563,7 @@ def _build_retrying_controller(
         retry=retry_condition,
         wait=wait_strategy,
         stop=stop_strategy,
-        sleep=time.sleep,
+        sleep=TENACITY_SLEEP,
         reraise=True,
         before_sleep=_before_sleep_handler,
         retry_error_callback=_retry_error_callback,
@@ -1134,8 +1148,11 @@ __all__ = [
     "ContentPolicyViolation",
     "CircuitBreaker",
     "TokenBucket",
+    "configure_http_client",
+    "get_http_client",
+    "purge_http_cache",
+    "TENACITY_SLEEP",
     "head_precheck",
-    "create_session",
     "parse_retry_after_header",
     "request_with_retries",
 ]

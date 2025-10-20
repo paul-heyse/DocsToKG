@@ -1178,7 +1178,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                         hasher=hasher,
                         keep_partial_on_error=True,
                     )
-                except (requests.exceptions.ChunkedEncodingError, AttributeError) as exc:
+                except (httpx.HTTPError, AttributeError) as exc:
                     LOGGER.warning(
                         "Streaming download failed for %s: %s",
                         url,
@@ -1281,7 +1281,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                     elapsed_ms=elapsed_ms,
                     retry_after=retry_after_hint,
                 )
-    except requests.RequestException as exc:
+    except httpx.HTTPError as exc:
         elapsed_ms = (time.monotonic() - start) * 1000.0
         http_status = (
             getattr(exc.response, "status_code", None) if hasattr(exc, "response") else None
@@ -1355,7 +1355,7 @@ class DownloadStrategy(Protocol):
 
     def process_response(
         self,
-        response: requests.Response,
+        response: httpx.Response,
         artifact: WorkArtifact,
         context: DownloadStrategyContext,
     ) -> Classification:
@@ -1422,7 +1422,7 @@ class _BaseDownloadStrategy:
 
     def process_response(
         self,
-        response: requests.Response,
+        response: httpx.Response,
         artifact: WorkArtifact,
         context: DownloadStrategyContext,
     ) -> Classification:
@@ -1461,7 +1461,7 @@ class _BaseDownloadStrategy:
             artifact=artifact,
             classification=classification,
             dest_path=context.dest_path,
-            response=context.response or requests.Response(),
+            response=context.response,
             elapsed_ms=context.elapsed_ms,
             flagged_unknown=context.flagged_unknown,
             sha256=context.sha256,
@@ -1942,7 +1942,7 @@ def build_download_outcome(
     artifact: WorkArtifact,
     classification: Optional[Classification | str],
     dest_path: Optional[Path],
-    response: requests.Response,
+    response: Optional[httpx.Response],
     elapsed_ms: float,
     flagged_unknown: bool,
     sha256: Optional[str],
@@ -1959,6 +1959,9 @@ def build_download_outcome(
     options: Optional[Union[DownloadConfig, DownloadOptions, DownloadContext]] = None,
 ) -> DownloadOutcome:
     """Compose a :class:`DownloadOutcome` with shared validation logic."""
+
+    status_code = response.status_code if response is not None else None
+    headers = response.headers if response is not None else httpx.Headers()
 
     classification_code = (
         classification
@@ -1982,8 +1985,8 @@ def build_download_outcome(
             return DownloadOutcome(
                 classification=Classification.MISS,
                 path=None,
-                http_status=response.status_code,
-                content_type=response.headers.get("Content-Type"),
+                http_status=status_code,
+                content_type=headers.get("Content-Type"),
                 elapsed_ms=elapsed_ms,
                 reason=ReasonCode.PDF_TOO_SMALL,
                 reason_detail="pdf-too-small",
@@ -2001,8 +2004,8 @@ def build_download_outcome(
             return DownloadOutcome(
                 classification=Classification.MISS,
                 path=None,
-                http_status=response.status_code,
-                content_type=response.headers.get("Content-Type"),
+                http_status=status_code,
+                content_type=headers.get("Content-Type"),
                 elapsed_ms=elapsed_ms,
                 reason=ReasonCode.HTML_TAIL_DETECTED,
                 reason_detail="html-tail-detected",
@@ -2020,8 +2023,8 @@ def build_download_outcome(
             return DownloadOutcome(
                 classification=Classification.MISS,
                 path=None,
-                http_status=response.status_code,
-                content_type=response.headers.get("Content-Type"),
+                http_status=status_code,
+                content_type=headers.get("Content-Type"),
                 elapsed_ms=elapsed_ms,
                 reason=ReasonCode.PDF_EOF_MISSING,
                 reason_detail="pdf-eof-missing",
@@ -2044,8 +2047,8 @@ def build_download_outcome(
         return DownloadOutcome(
             classification=Classification.MISS,
             path=None,
-            http_status=response.status_code,
-            content_type=response.headers.get("Content-Type"),
+            http_status=status_code,
+            content_type=headers.get("Content-Type"),
             elapsed_ms=elapsed_ms,
             reason=ReasonCode.UNKNOWN,
             reason_detail=detail,
@@ -2057,7 +2060,6 @@ def build_download_outcome(
             retry_after=retry_after,
         )
 
-    status_code = getattr(response, "status_code", None)
     try:
         normalized_status = int(status_code) if status_code is not None else None
     except (TypeError, ValueError):
@@ -2083,8 +2085,8 @@ def build_download_outcome(
     return DownloadOutcome(
         classification=classification_code,
         path=path_str,
-        http_status=response.status_code,
-        content_type=response.headers.get("Content-Type"),
+        http_status=status_code,
+        content_type=headers.get("Content-Type"),
         elapsed_ms=elapsed_ms,
         reason=reason_code,
         reason_detail=reason_detail,
@@ -2313,6 +2315,7 @@ def process_one_work(
     metrics: ResolverMetrics,
     *,
     options: DownloadConfig,
+    session_factory: Optional[Callable[[], httpx.Client]] = None,
     strategy_selector: Callable[
         [Classification], DownloadStrategy
     ] = get_strategy_for_classification,
@@ -2331,6 +2334,8 @@ def process_one_work(
         logger: Structured attempt logger capturing manifest records.
         metrics: Resolver metrics collector.
         options: :class:`DownloadConfig` describing download behaviour for the work.
+        session_factory: Optional factory used to supply resolver-specific clients when
+            concurrency is enabled. Defaults to the shared HTTPX client.
 
     Returns:
         Dictionary summarizing the outcome (saved/html_only/skipped flags).
@@ -2413,6 +2418,17 @@ def process_one_work(
         result["skipped"] = True
         return result
 
+    active_client = client
+    if active_client is None:
+        if session_factory is not None:
+            try:
+                active_client = session_factory()
+            except Exception:  # pragma: no cover - defensive guard
+                LOGGER.debug("Custom session factory failed; falling back to shared client", exc_info=True)
+                active_client = None
+        if active_client is None:
+            active_client = get_http_client()
+
     existing_pdf = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
     existing_xml = artifact.xml_dir / f"{artifact.base_stem}.xml"
     if not dry_run and (existing_pdf.exists() or existing_xml.exists()):
@@ -2441,7 +2457,7 @@ def process_one_work(
         return result
 
     pipeline_result = pipeline.run(
-        session,
+        active_client,
         artifact,
         context=download_context,
         session_factory=session_factory,

@@ -42,7 +42,14 @@ def _write_jsonl(path: Path, entries: list[dict]) -> None:
 
 
 def _write_parquet(path: Path, entries: list[dict]) -> None:
-    table = pa.Table.from_pylist(entries)
+    normalized: list[dict] = []
+    for entry in entries:
+        clone = dict(entry)
+        metadata = clone.get("model_metadata")
+        if isinstance(metadata, dict) and not metadata:
+            clone["model_metadata"] = {"__hybrid_dummy__": None}
+        normalized.append(clone)
+    table = pa.Table.from_pylist(normalized)
     pq.write_table(table, path)
 
 

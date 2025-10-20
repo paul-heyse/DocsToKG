@@ -574,9 +574,7 @@ class ChunkIngestionPipeline:
         """
 
         formats = {
-            document.vector_path.suffix.lower()
-            for document in documents
-            if document.vector_path
+            document.vector_path.suffix.lower() for document in documents if document.vector_path
         }
         if formats:
             unsupported = formats - {".jsonl", ".parquet"}
@@ -603,18 +601,14 @@ class ChunkIngestionPipeline:
 
         try:
             for document in documents:
-                with self._observability.trace(
-                    "ingest_document", namespace=document.namespace
-                ):
+                with self._observability.trace("ingest_document", namespace=document.namespace):
                     loaded = self._load_precomputed_chunks(document)
                 if not loaded:
                     continue
                 staged_deletions = self._delete_existing_for_doc(
                     document.doc_id, document.namespace
                 )
-                batch = self._commit_batch(
-                    loaded, collect_vector_ids=collect_vector_ids
-                )
+                batch = self._commit_batch(loaded, collect_vector_ids=collect_vector_ids)
                 total_chunks += batch.chunk_count
                 namespaces.update(batch.namespaces)
                 if vector_ids is not None and batch.vector_ids:
@@ -725,11 +719,7 @@ class ChunkIngestionPipeline:
             extra={"event": {"count": count, "namespaces": list(namespaces)}},
         )
 
-        vector_ids_result = (
-            tuple(vector_ids)
-            if collect_vector_ids
-            else None
-        )
+        vector_ids_result = tuple(vector_ids) if collect_vector_ids else None
 
         return BatchCommitResult(
             chunk_count=count,
@@ -917,9 +907,7 @@ class ChunkIngestionPipeline:
             raise IngestError(message)
         return payloads
 
-    def _resolve_char_offset(
-        self, entry: Mapping[str, object], text: str
-    ) -> Tuple[int, int]:
+    def _resolve_char_offset(self, entry: Mapping[str, object], text: str) -> Tuple[int, int]:
         """Determine the character span for ``entry`` if metadata is present."""
 
         span_fields = (
@@ -1086,6 +1074,8 @@ class ChunkIngestionPipeline:
                     except json.JSONDecodeError:
                         entry["model_metadata"] = {}
                 elif metadata in (None, ""):
+                    entry["model_metadata"] = {}
+                elif isinstance(metadata, dict) and metadata.keys() == {"__hybrid_dummy__"}:
                     entry["model_metadata"] = {}
                 yield entry
 
