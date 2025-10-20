@@ -88,10 +88,10 @@ from .discovery import (
     derive_doc_id_and_chunks_path,
     derive_doc_id_and_doctags_path,
     derive_doc_id_and_vectors_path,
-    vector_artifact_name,
     iter_chunks,
     load_structural_marker_config,
     load_structural_marker_profile,
+    vector_artifact_name,
 )
 from .http import DEFAULT_HTTP_TIMEOUT, get_http_session, normalize_http_timeout
 from .manifest import ResumeController, should_skip_output

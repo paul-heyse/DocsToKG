@@ -25,8 +25,6 @@ from __future__ import annotations
 import logging
 from typing import Optional, Sequence
 
-import requests
-
 from DocsToKG.ContentDownload import pipeline as resolvers
 from DocsToKG.ContentDownload.args import (
     bootstrap_run_environment,
@@ -63,6 +61,7 @@ from DocsToKG.ContentDownload.pipeline import (
     read_resolver_config,
 )
 from DocsToKG.ContentDownload.providers import OpenAlexWorkProvider, WorkProvider
+from DocsToKG.ContentDownload.pyalex_shim import ConfigProxy
 from DocsToKG.ContentDownload.runner import DownloadRun, iterate_openalex
 from DocsToKG.ContentDownload.summary import RunResult, emit_console_summary
 from DocsToKG.ContentDownload.telemetry import (
@@ -80,7 +79,6 @@ from DocsToKG.ContentDownload.telemetry import (
     SummarySink,
     load_previous_manifest,
 )
-from DocsToKG.ContentDownload.pyalex_shim import ConfigProxy
 
 __all__ = (
     "AttemptSink",

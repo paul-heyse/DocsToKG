@@ -1,11 +1,25 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.validation",
+#   "purpose": "Coordinate ontology validation budgets, plugin loading, execution, and CLI entrypoints",
+#   "sections": [
+#     {"id": "infrastructure", "name": "Validation Infrastructure", "anchor": "INF", "kind": "infra"},
+#     {"id": "dataclasses", "name": "Validation Models", "anchor": "MOD", "kind": "api"},
+#     {"id": "plugin-management", "name": "Validator Plugin Management", "anchor": "PLG", "kind": "helpers"},
+#     {"id": "execution", "name": "Validation Execution Pipeline", "anchor": "EXE", "kind": "api"},
+#     {"id": "cli", "name": "CLI Utilities & Entrypoint", "anchor": "CLI", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Validation, normalisation, and resource budgeting for ontology downloads.
 
 After ontologies are fetched they must be unpacked, converted, and sanity
 checked.  This module orchestrates the validator pool, manages cross-process
-concurrency budgets, streams artefacts through rdflib/pronto/owlready2, and
-produces machine-readable validation summaries.  It powers the ``validate``
-CLI command as well as programmatic callers that need to vet ontologies before
-promotion.
+concurrency budgets, toggles process pools per configuration, streams artefacts
+through rdflib/pronto/owlready2/ROBOT/Arelle, and produces machine-readable
+validation summaries.  Cached plugin registries and cooperative cancellation
+keep CLI and programmatic callers responsive while promoting ontologies.
 """
 
 from __future__ import annotations

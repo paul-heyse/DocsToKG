@@ -1,3 +1,16 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.io.rate_limit",
+#   "purpose": "Implement token bucket primitives and shared registries for ontology download rate limiting",
+#   "sections": [
+#     {"id": "token-buckets", "name": "Token Bucket Primitives", "anchor": "TBK", "kind": "api"},
+#     {"id": "shared-buckets", "name": "Shared Token Buckets", "anchor": "SHR", "kind": "api"},
+#     {"id": "registry", "name": "Rate Limiter Registry", "anchor": "REG", "kind": "api"},
+#     {"id": "public-api", "name": "Registry Helpers & Exports", "anchor": "API", "kind": "helpers"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Rate limiting primitives for ontology downloads.
 
 Resolvers often talk to public APIs with strict quotas.  This module implements

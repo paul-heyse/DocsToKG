@@ -1,15 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.cli",
+#   "purpose": "Expose the ontofetch CLI for planning, pulling, validating, and maintaining ontologies",
+#   "sections": [
+#     {"id": "parser", "name": "Parser Construction", "anchor": "PAR", "kind": "api"},
+#     {"id": "constants", "name": "CLI Constants", "anchor": "CON", "kind": "constants"},
+#     {"id": "arg-helpers", "name": "Argument Helpers", "anchor": "ARG", "kind": "helpers"},
+#     {"id": "dispatch", "name": "Subcommand Dispatch", "anchor": "DSP", "kind": "api"},
+#     {"id": "handlers", "name": "Command Handlers", "anchor": "HND", "kind": "api"},
+#     {"id": "entrypoint", "name": "CLI Entrypoint", "anchor": "ENT", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Command-line orchestration for DocsToKG ontology lifecycle management.
 
-The CLI is the operational surface for planning, pulling, validating, and
-pruning ontology collections.  It wires argument parsing to the planner,
+The CLI is the operational surface for planning, pulling, validating, pruning,
+and inspecting ontology collections.  It wires argument parsing to the planner,
 resolver, formatter, and manifest layers so operators can:
 
 - inspect fetch plans and diff them against previous lockfiles,
-- execute downloads with retry, checksum, and security enforcement,
-- run syntax/semantic validators in parallel with resource budgeting,
-- rotate manifests, logs, and cached artefacts for repeatable deployments.
+- execute downloads with retry, checksum, allowlist, and rate-limit enforcement,
+- run syntax/semantic validators in parallel with configurable budgets,
+- rotate manifests, logs, cached artefacts, and CAS mirrors for repeatable deployments.
 
-Every sub-command ultimately delegates to the functions exposed in
+Every subcommand ultimately delegates to the functions exposed in
 :mod:`DocsToKG.OntologyDownload.api`, keeping parity between scripted and
 programmatic usage.
 """
@@ -89,15 +104,14 @@ from .settings import (
     get_default_config,
     get_env_overrides,
     load_config,
-    parse_rate_limit_to_rps,
     normalize_config_path,
+    parse_rate_limit_to_rps,
     validate_config,
 )
 from .validation import (
     ValidationRequest,
     run_validators,
 )
-
 
 _SENSITIVE_KEY_PATTERN = re.compile(r"(token|key|secret|password|credential)", re.IGNORECASE)
 
@@ -1515,7 +1529,7 @@ def _handle_init(path: Path) -> None:
 
 
 def _handle_config_validate(path: Path) -> dict:
-    """Validate a configuration file and return a summary report."""
+    """Validate a configuration file and return a summary report.
 
     Args:
         path: Filesystem path to the configuration file under validation.
@@ -1638,13 +1652,11 @@ def _print_config_report(report: Dict[str, object]) -> None:
 
     config_payload = report.get("config") or {}
     if config_payload:
-        print("
-Resolved configuration:")
+        print("\nResolved configuration:")
         config_yaml = yaml.safe_dump(config_payload, sort_keys=False)
         print(config_yaml.rstrip())
     else:
-        print("
-Resolved configuration: {}")
+        print("\nResolved configuration: {}")
 
 
 # --- Error handling helpers ---

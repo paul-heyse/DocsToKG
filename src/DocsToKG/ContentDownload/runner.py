@@ -10,6 +10,8 @@ Responsibilities
   :class:`DownloadRun` context management.
 - Provide resumable execution by hydrating prior manifest/index snapshots and
   skipping already-processed works before dispatching to the resolver pipeline.
+- Hydrate global URL dedupe sets, robots caches, and thread-local HTTP sessions
+  so per-run policies (token buckets, retry caps) are honoured across workers.
 - Surface convenience helpers (:func:`run`, :func:`iterate_openalex`) that are
   reused by tests, smoke scripts, and the CLI while returning a
   :class:`~DocsToKG.ContentDownload.summary.RunResult`.
@@ -18,6 +20,8 @@ Key Components
 --------------
 - ``DownloadRun`` – encapsulates setup, execution, and teardown for a single run.
 - ``DownloadRunState`` – aggregates counters thread-safely for telemetry output.
+- ``ThreadLocalSessionFactory`` – provides pooled HTTP sessions scoped to
+  worker threads and cleaned up at the end of a run.
 - ``iterate_openalex`` – generator that pages through OpenAlex Works queries,
   respecting CLI throttles and polite headers.
 - ``run`` – top-level helper that owns the context-manager lifetime of
@@ -27,18 +31,16 @@ Key Components
 from __future__ import annotations
 
 import contextlib
-import random
 import inspect
 import json
 import logging
 import random
-import sqlite3
 import threading
 import time
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
@@ -47,12 +49,10 @@ from pyalex import Works
 
 from DocsToKG.ContentDownload.args import ResolvedConfig
 from DocsToKG.ContentDownload.core import (
-    PDF_LIKE,
     Classification,
     ReasonCode,
     WorkArtifact,
     atomic_write_text,
-    normalize_url,
 )
 from DocsToKG.ContentDownload.download import (
     DownloadConfig,
@@ -71,7 +71,6 @@ from DocsToKG.ContentDownload.pipeline import (
 from DocsToKG.ContentDownload.providers import OpenAlexWorkProvider, WorkProvider
 from DocsToKG.ContentDownload.summary import RunResult, build_summary_record
 from DocsToKG.ContentDownload.telemetry import (
-    MANIFEST_SCHEMA_VERSION,
     AttemptSink,
     CsvSink,
     JsonlResumeLookup,
@@ -81,12 +80,12 @@ from DocsToKG.ContentDownload.telemetry import (
     MultiSink,
     RotatingJsonlSink,
     RunTelemetry,
+    SqliteResumeLookup,
     SqliteSink,
     SummarySink,
     load_resume_completed_from_sqlite,
     looks_like_csv_resume_target,
     looks_like_sqlite_resume_target,
-    SqliteResumeLookup,
 )
 
 __all__ = ["DownloadRun", "iterate_openalex", "run"]
@@ -796,7 +795,6 @@ def iterate_openalex(
 
     max_retries = max(0, int(retry_attempts))
     retry_backoff = max(0.0, float(retry_backoff))
-    base_backoff = retry_backoff
     max_delay = max(0.0, float(retry_max_delay)) if retry_max_delay is not None else 0.0
 
     pager = query.paginate(

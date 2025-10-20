@@ -48,10 +48,10 @@
 The suite locks down resolver ordering, manifest schema invariants, resume
 behaviour when legacy JSONL segments are missing, and configuration migrations.
 It acts as an early warning when schema bumps or default toggles risk breaking
-downstream tooling that depends on stable manifests and config semantics.
+downstream tooling that depends on stable manifests and config semantics. The
+tests guard the refactor against regressions that would violate public
+contracts.
 """
-
-"""Regression compatibility tests for the ContentDownload refactor."""
 
 from __future__ import annotations
 

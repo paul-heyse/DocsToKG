@@ -344,10 +344,17 @@ def test_path_derivation_helpers(tmp_path: Path) -> None:
     assert doc_id == "report.doctags"
     assert chunk_out.name == "report.chunks.jsonl"
 
-    doc_id, vector_out = derive_doc_id_and_vectors_path(chunk_path, chunks_root, vectors_root)
+    doc_id, vector_out = derive_doc_id_and_vectors_path(
+        chunk_path, chunks_root, vectors_root, vector_format="jsonl"
+    )
     assert doc_id == "report.doctags"
     assert vector_out.name == "report.vectors.jsonl"
     assert compute_relative_doc_id(vector_out, vectors_root) == "report.vectors.jsonl"
+
+    _, parquet_out = derive_doc_id_and_vectors_path(
+        chunk_path, chunks_root, vectors_root, vector_format="parquet"
+    )
+    assert parquet_out.name == "report.vectors.parquet"
 
 
 def test_compute_stable_shard_distribution() -> None:

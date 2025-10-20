@@ -162,6 +162,10 @@ If any import fails: **do not install**. Go to Troubleshooting.
 ```bash
 # CLIs (module form)
 ./.venv/bin/python -m DocsToKG.ContentDownload.cli --help
+# DocParsing embeddings (JSONL by default; pass --format parquet when pyarrow is available)
+./.venv/bin/python -m DocsToKG.DocParsing.core.cli embed --chunks-dir Data/ChunkedDocTagFiles --out-dir Data/Embeddings --validate-only
+# Optional parquet run (requires DocsToKG[docparse-parquet] extra for pyarrow; or export DOCSTOKG_EMBED_VECTOR_FORMAT=parquet)
+# ./.venv/bin/python -m DocsToKG.DocParsing.core.cli embed --format parquet --validate-only --chunks-dir … --out-dir …
 
 # Tests
 ./.venv/bin/pytest -q
@@ -184,6 +188,8 @@ If any import fails: **do not install**. Go to Troubleshooting.
 
 - **`ModuleNotFoundError`**
   You’re not using the project interpreter. Re-run via one of §2 methods, then re-check `sys.executable`.
+- **`EmbeddingCLIValidationError: parquet vector output requires pyarrow`**
+  Install the DocsToKG `docparse-parquet` extra in environments where parquet vectors are needed. Without that extra, stick to the default JSONL format or coordinate with owners before modifying dependencies.
 
 - **GPU/FAISS/CuPy errors** (e.g., missing `.so`/DLL)
   Do **not** build or fetch wheels. Report the exact error. These packages are customized; replacing them may break GPU paths.

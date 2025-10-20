@@ -53,6 +53,13 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="JSONL dataset describing documents and example queries.",
     )
     parser.add_argument(
+        "--vector-format",
+        "--format",
+        default="auto",
+        choices=["auto", "jsonl", "parquet"],
+        help="Override dataset vector format (default: %(default)s).",
+    )
+    parser.add_argument(
         "--query",
         default="hybrid retrieval faiss",
         help="Query string to issue once ingestion completes.",
@@ -88,18 +95,40 @@ def _ensure_config(path: Path) -> None:
     print(f"[hybrid-quickstart] wrote default config -> {path}")
 
 
-def _build_documents(dataset: Sequence[dict]) -> List[DocumentInput]:
+def _build_documents(dataset: Sequence[dict], vector_format: str) -> List[DocumentInput]:
     """Materialise ``DocumentInput`` instances from dataset rows."""
 
+    format_override = str(vector_format or "auto").lower()
     documents: List[DocumentInput] = []
     for entry in dataset:
         document = entry.get("document", {})
+        entry_format = str(document.get("vector_format") or "").lower()
+        vector_files = document.get("vector_files")
+        if format_override in {"jsonl", "parquet"}:
+            effective_format = format_override
+        elif entry_format in {"jsonl", "parquet"}:
+            effective_format = entry_format
+        else:
+            effective_format = ""
+        vector_value = document.get("vector_file")
+        if isinstance(vector_files, dict):
+            candidate = vector_files.get(effective_format) or (
+                vector_files.get("jsonl") if effective_format == "" else None
+            )
+            if candidate is not None:
+                vector_value = candidate
+        vector_path = Path(str(vector_value))
+        if not isinstance(vector_files, dict):
+            if effective_format == "jsonl":
+                vector_path = vector_path.with_suffix(".jsonl")
+            elif effective_format == "parquet":
+                vector_path = vector_path.with_suffix(".parquet")
         documents.append(
             DocumentInput(
                 doc_id=str(document.get("doc_id")),
                 namespace=str(document.get("namespace", "default")),
                 chunk_path=Path(str(document.get("chunk_file"))),
-                vector_path=Path(str(document.get("vector_file"))),
+                vector_path=vector_path,
                 metadata=document.get("metadata", {}),
             )
         )
@@ -151,7 +180,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         registry=registry,
         observability=observability,
     )
-    documents = _build_documents(dataset)
+    documents = _build_documents(dataset, args.vector_format)
     pipeline.upsert_documents(documents)
     namespaces = sorted({doc.namespace for doc in documents})
     print(

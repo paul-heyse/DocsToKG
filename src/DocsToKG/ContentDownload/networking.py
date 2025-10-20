@@ -1,6 +1,6 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.ContentDownload.network",
+#   "module": "DocsToKG.ContentDownload.networking",
 #   "purpose": "HTTP session, retry, and conditional request helpers",
 #   "sections": [
 #     {
@@ -112,15 +112,17 @@ Responsibilities
   :func:`create_session` and :class:`ThreadLocalSessionFactory`.
 - Implement resilient request execution through
   :func:`request_with_retries`, combining exponential backoff, equal jitter,
-  ``Retry-After`` handling, and content-type enforcement.
+  CLI-provided retry ceilings (``retry_after_cap``), and content-type
+  enforcement.
 - Provide conditional request tooling (:class:`ConditionalRequestHelper`,
   :class:`CachedResult`, :class:`ModifiedResult`) so resolvers can revalidate
   cached artifacts without redownloading payloads unnecessarily.
 - Offer rate-limit and failure-suppression primitives
   (:class:`TokenBucket`, :class:`CircuitBreaker`) that the pipeline threads
   rely on to avoid overwhelming upstream services.
-- Expose diagnostic helpers such as :func:`head_precheck` and
-  :func:`parse_retry_after_header` to keep request policy decisions centralised.
+- Expose diagnostic helpers such as :func:`head_precheck` (with GET fallback)
+  and :func:`parse_retry_after_header` to keep request policy decisions
+  centralised.
 
 Key Components
 --------------

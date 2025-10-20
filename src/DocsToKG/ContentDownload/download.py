@@ -3,11 +3,15 @@
 Responsibilities
 ----------------
 - Translate resolver candidates into persisted artifacts by enforcing robots
-  policies, executing conditional requests, and classifying payloads.
+  policies, executing conditional requests, classifying payloads, and routing
+  them through strategy-specific handlers (PDF/HTML/XML).
 - Maintain the :class:`DownloadState` lifecycle, including cache reuse,
-  duplicate suppression, digest verification, and directory preparation.
+  duplicate suppression, digest verification, content-addressed promotion, and
+  directory preparation.
 - Provide hooks into telemetry (:mod:`DocsToKG.ContentDownload.telemetry`) so
   every attempt captures consistent manifest records and retry metadata.
+- Coordinate resume-aware behaviour (JSONL, CSV, SQLite) and global URL dedupe
+  decisions before the pipeline emits additional resolver traffic.
 - Surface helpers such as :func:`download_candidate` and
   :func:`process_one_work` that the runner and tests can call directly.
 
@@ -17,6 +21,8 @@ Design Notes
   can be unit-tested with fake responses and file systems.
 - Robots handling is encapsulated by :class:`RobotsCache`, allowing callers to
   flip behaviour (respect/ignore) without touching networking code.
+- Resume and dedupe heuristics operate on normalised manifest metadata so runs
+  remain idempotent even when log rotation or CSV-only logging is enabled.
 """
 
 from __future__ import annotations

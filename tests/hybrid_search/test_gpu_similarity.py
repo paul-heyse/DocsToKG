@@ -3,11 +3,7 @@
 Covers dense batch cosine, blockwise top-k retrieval, buffer reuse, and failure
 modes when GPU primitives (`pairwise_distance_gpu`, `knn_gpu`) are unavailable.
 Protects the dense reranking hot path and verifies we honour cuVS toggles and
-memory limits documented in `faiss-gpu-wheel-reference.md`."""
-
-Covers dense batch cosine, blockwise top-k retrieval, buffer reuse, and error
-handling when FAISS GPU support is not compiled. Guards the hot path used by
-hybrid search during dense reranking.
+memory limits documented in `faiss-gpu-wheel-reference.md`.
 """
 
 from __future__ import annotations

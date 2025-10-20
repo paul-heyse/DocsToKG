@@ -136,6 +136,8 @@ from typing import Dict, Iterable, List, Mapping, Sequence
 
 import numpy as np
 
+from DocsToKG.DocParsing.embedding.runtime import create_vector_writer, _iter_vector_rows
+
 # --- Globals ---
 
 DEFAULT_CHUNKS_DIR = Path("Data/ChunkedDocTagFiles")
@@ -147,6 +149,8 @@ DEFAULT_SAMPLE_SIZE = 3
 DEFAULT_SEED = 1337
 REDACTED_FIELDS = ("source_path",)
 DEFAULT_MAX_CHUNKS_PER_DOC = 0
+SUPPORTED_VECTOR_FORMATS = ("jsonl", "parquet")
+DEFAULT_VECTOR_FORMAT = "jsonl"
 
 
 @dataclass(frozen=True)
@@ -201,6 +205,13 @@ def parse_args() -> argparse.Namespace:
         help="Maximum chunks to retain per sampled document (0 disables the limit)",
     )
     parser.add_argument(
+        "--vector-format",
+        "--format",
+        default=DEFAULT_VECTOR_FORMAT,
+        choices=SUPPORTED_VECTOR_FORMATS,
+        help="Vector artifact format to sample (default: %(default)s).",
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Allow overwriting existing fixture directory",
@@ -208,7 +219,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def list_candidate_docs(chunks_dir: Path, vectors_dir: Path) -> List[str]:
+def _vector_suffix(fmt: str) -> str:
+    fmt_normalized = str(fmt or DEFAULT_VECTOR_FORMAT).lower()
+    if fmt_normalized == "jsonl":
+        return ".vectors.jsonl"
+    if fmt_normalized == "parquet":
+        return ".vectors.parquet"
+    raise ValueError(f"Unsupported vector format: {fmt}")
+
+
+def list_candidate_docs(chunks_dir: Path, vectors_dir: Path, vector_format: str) -> List[str]:
     def chunk_id(path: Path, suffix: str) -> str:
         name = path.name
         if name.endswith(suffix):
@@ -216,13 +236,12 @@ def list_candidate_docs(chunks_dir: Path, vectors_dir: Path) -> List[str]:
         return path.stem
 
     chunk_files = {chunk_id(path, ".chunks.jsonl") for path in chunks_dir.glob("*.chunks.jsonl")}
-    vector_files = {
-        chunk_id(path, ".vectors.jsonl") for path in vectors_dir.glob("*.vectors.jsonl")
-    }
+    vector_suffix = _vector_suffix(vector_format)
+    vector_files = {chunk_id(path, vector_suffix) for path in vectors_dir.glob(f"*{vector_suffix}")}
     candidates = []
     for doc_id in sorted(chunk_files & vector_files):
         chunk_path = chunks_dir / f"{doc_id}.chunks.jsonl"
-        vector_path = vectors_dir / f"{doc_id}.vectors.jsonl"
+        vector_path = vectors_dir / f"{doc_id}{vector_suffix}"
         if not chunk_path.exists() or not vector_path.exists():
             continue
         if chunk_path.stat().st_size == 0 or vector_path.stat().st_size == 0:
@@ -247,6 +266,31 @@ def write_jsonl(path: Path, entries: Iterable[Mapping[str, object]]) -> None:
         for entry in entries:
             handle.write(json.dumps(entry, ensure_ascii=True))
             handle.write("\n")
+
+
+def load_vectors(path: Path, vector_format: str) -> List[Dict[str, object]]:
+    fmt = str(vector_format or DEFAULT_VECTOR_FORMAT).lower()
+    if fmt == "jsonl":
+        return load_jsonl(path)
+    if fmt != "parquet":
+        raise ValueError(f"Unsupported vector format: {vector_format}")
+    records: List[Dict[str, object]] = []
+    for batch in _iter_vector_rows(path, fmt, batch_size=4096):
+        records.extend(batch)
+    return records
+
+
+def write_vectors(path: Path, entries: Iterable[Mapping[str, object]], vector_format: str) -> None:
+    fmt = str(vector_format or DEFAULT_VECTOR_FORMAT).lower()
+    if fmt == "jsonl":
+        write_jsonl(path, entries)
+        return
+    if fmt != "parquet":
+        raise ValueError(f"Unsupported vector format: {vector_format}")
+    payload = [dict(entry) for entry in entries]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with create_vector_writer(path, fmt) as writer:
+        writer.write_rows(payload)
 
 
 def sha256_digest(path: Path) -> str:
@@ -315,12 +359,16 @@ def build_fixture_document(
     source_vector: Path,
     output_dir: Path,
     max_chunks: int,
+    vector_format: str,
 ) -> FixtureDocument:
     chunk_records = load_jsonl(source_chunk)
     cleaned_chunks = clean_chunk_records(chunk_records)
     if max_chunks and len(cleaned_chunks) > max_chunks:
         cleaned_chunks = cleaned_chunks[:max_chunks]
-    vector_entries = {entry["UUID"]: entry for entry in load_jsonl(source_vector)}
+    vector_entries = {
+        str(entry.get("UUID") or entry.get("uuid")): entry
+        for entry in load_vectors(source_vector, vector_format)
+    }
     vector_records: List[Dict[str, object]] = []
     for record in cleaned_chunks:
         vector_id = str(record.get("uuid"))
@@ -344,7 +392,7 @@ def build_fixture_document(
     vector_output = output_dir / "vectors" / source_vector.name
 
     write_jsonl(chunk_output, cleaned_chunks)
-    write_jsonl(vector_output, vector_records)
+    write_vectors(vector_output, vector_records, vector_format)
 
     title = derive_title(doc_id, cleaned_chunks)
     query = derive_query(doc_id, title)
@@ -384,6 +432,7 @@ def write_manifest(
     seed: int,
     chunks_dir: Path,
     vectors_dir: Path,
+    vector_format: str,
     documents: Sequence[FixtureDocument],
 ) -> None:
     manifest = {
@@ -391,6 +440,7 @@ def write_manifest(
         "source": {
             "chunks_dir": str(chunks_dir),
             "vectors_dir": str(vectors_dir),
+            "vector_format": vector_format,
         },
         "documents": [
             {
@@ -405,6 +455,7 @@ def write_manifest(
                 "queries": list(doc.queries),
                 "metadata": doc.metadata,
                 "chunk_count": doc.chunk_count,
+                "vector_format": vector_format,
             }
             for doc in documents
         ],
@@ -433,7 +484,9 @@ def write_queries(output_dir: Path, documents: Sequence[FixtureDocument]) -> Non
     (output_dir / "queries.json").write_text(json.dumps(queries, indent=2), encoding="utf-8")
 
 
-def write_dataset_jsonl(output_dir: Path, documents: Sequence[FixtureDocument]) -> None:
+def write_dataset_jsonl(
+    output_dir: Path, documents: Sequence[FixtureDocument], vector_format: str
+) -> None:
     dataset_path = output_dir / "dataset.jsonl"
     dataset_entries = []
     for doc in documents:
@@ -446,6 +499,7 @@ def write_dataset_jsonl(output_dir: Path, documents: Sequence[FixtureDocument]) 
                 "chunk_file": chunk_rel,
                 "vector_file": vector_rel,
                 "metadata": dict(doc.metadata),
+                "vector_format": vector_format,
             },
             "queries": list(doc.queries),
         }
@@ -463,6 +517,7 @@ def write_readme(
     namespaces: Sequence[str],
     sample_size: int,
     max_chunks: int,
+    vector_format: str,
 ) -> None:
     readme_path = output_dir / "README.md"
     namespace_text = ", ".join(namespaces) if namespaces else DEFAULT_NAMESPACE
@@ -471,6 +526,7 @@ def write_readme(
         if namespaces
         else f" --namespace {DEFAULT_NAMESPACE}"
     )
+    format_flag = "" if vector_format == DEFAULT_VECTOR_FORMAT else f" --vector-format {vector_format}"
     content = f"""# Real Hybrid Search Fixture
 
 This directory contains a deterministic sample of chunk/vector artifacts used for
@@ -480,11 +536,12 @@ real-vector regression tests. The fixture was generated with the following param
 - Sample size: `{sample_size}`
 - Seed: `{seed}`
 - Max chunks per document: `{max_chunks}`
+- Vector format: `{vector_format}`
 
 To regenerate the fixture, run:
 
 ```bash
-python scripts/build_real_hybrid_fixture.py --seed {seed} --sample-size {sample_size}{namespace_flag} --max-chunks-per-doc {max_chunks}
+python scripts/build_real_hybrid_fixture.py --seed {seed} --sample-size {sample_size}{namespace_flag} --max-chunks-per-doc {max_chunks}{format_flag}
 ```
 
 Ensure the `Data/ChunkedDocTagFiles` and `Data/Vectors` directories are populated
@@ -518,7 +575,8 @@ def ensure_output_dir(path: Path, overwrite: bool) -> None:
 
 def main() -> None:
     args = parse_args()
-    candidates = list_candidate_docs(args.chunks_dir, args.vectors_dir)
+    vector_format = str(args.vector_format or DEFAULT_VECTOR_FORMAT).lower()
+    candidates = list_candidate_docs(args.chunks_dir, args.vectors_dir, vector_format)
     if not candidates:
         raise SystemExit("No matching chunk/vector artifact pairs found.")
     if args.sample_size < 1:
@@ -537,9 +595,10 @@ def main() -> None:
 
     documents: List[FixtureDocument] = []
     total_chunks = 0
+    vector_suffix = _vector_suffix(vector_format)
     for idx, doc_id in enumerate(selection):
         chunk_source = args.chunks_dir / f"{doc_id}.chunks.jsonl"
-        vector_source = args.vectors_dir / f"{doc_id}.vectors.jsonl"
+        vector_source = args.vectors_dir / f"{doc_id}{vector_suffix}"
         namespace = namespaces[idx % len(namespaces)]
         acl_tag = f"acl::{namespace}"
         document = build_fixture_document(
@@ -550,6 +609,7 @@ def main() -> None:
             source_vector=vector_source,
             output_dir=args.output_dir,
             max_chunks=args.max_chunks_per_doc,
+            vector_format=vector_format,
         )
         documents.append(document)
         total_chunks += document.chunk_count
@@ -570,16 +630,18 @@ def main() -> None:
         seed=args.seed,
         chunks_dir=args.chunks_dir,
         vectors_dir=args.vectors_dir,
+        vector_format=vector_format,
         documents=documents,
     )
     write_queries(args.output_dir, documents)
-    write_dataset_jsonl(args.output_dir, documents)
+    write_dataset_jsonl(args.output_dir, documents, vector_format)
     write_readme(
         args.output_dir,
         seed=args.seed,
         namespaces=namespaces_used,
         sample_size=sample_size,
         max_chunks=args.max_chunks_per_doc,
+        vector_format=vector_format,
     )
 
     print(

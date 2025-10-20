@@ -1,10 +1,25 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.settings",
+#   "purpose": "Define configuration models, environment overrides, optional dependency shims, and storage backends",
+#   "sections": [
+#     {"id": "config-models", "name": "Configuration Models", "anchor": "CFG", "kind": "api"},
+#     {"id": "env-overrides", "name": "Environment Overrides", "anchor": "ENV", "kind": "helpers"},
+#     {"id": "config-loading", "name": "Configuration Loading & Validation", "anchor": "LOD", "kind": "api"},
+#     {"id": "opt-deps", "name": "Optional Dependency Shims", "anchor": "OPT", "kind": "helpers"},
+#     {"id": "storage", "name": "Storage Backends", "anchor": "STO", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Configuration, optional dependency, and storage utilities for ontology downloads.
 
 This module defines the typed settings models used by the CLI, environment
-variable loading, rate-limit parsing, local cache layout, and optional
-dependency wiring.  It also exposes helpers for validating interpreter support
-and coercing user-provided configuration into strongly-typed structures that
-downstream planners and resolvers can consume safely.
+overrides that surface as ``ONTOFETCH_*`` variables, rate-limit parsing, local
+cache layout, and optional dependency wiring.  It also exposes helpers for
+validating interpreter support, selecting local or fsspec storage (including CAS
+mirrors), and coercing user-provided configuration into strongly typed
+structures that downstream planners and resolvers can consume safely.
 """
 
 from __future__ import annotations

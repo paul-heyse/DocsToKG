@@ -266,26 +266,44 @@ def test_preliminary_head_check_cancels_retry_sleep(ontology_env, tmp_path):
     """Cancellation during Retry-After backoff should abort promptly."""
 
     config = ontology_env.build_download_config()
+    url = ontology_env.register_fixture(
+        "cancelled.owl",
+        b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n",
+        media_type="application/rdf+xml",
+    )
+    ontology_env.queue_response(
+        "fixtures/cancelled.owl",
+        ResponseSpec(
+            method="HEAD",
+            status=429,
+            headers={"Retry-After": "3"},
+        ),
+    )
     destination = tmp_path / "cancelled.owl"
+    expected_headers = config.polite_http_headers()
+    previous_manifest = {
+        "etag": 'W/"conditional-etag"',
+        "last_modified": "Wed, 21 Oct 2015 07:28:00 GMT",
+    }
+    request_headers = dict(expected_headers)
+    request_headers.update(
+        {
+            "If-None-Match": previous_manifest["etag"],
+            "If-Modified-Since": previous_manifest["last_modified"],
+        }
+    )
     token = CancellationToken()
+    parsed_url = urlparse(url)
     downloader = network_mod.StreamingDownloader(
         destination=destination,
-        headers={},
+        headers=expected_headers,
         http_config=config,
-        previous_manifest=None,
+        previous_manifest=previous_manifest,
         logger=_logger(),
         service="obo",
-        origin_host="example.org",
+        origin_host=parsed_url.hostname,
         cancellation_token=token,
     )
-
-    response = mock.Mock()
-    response.status_code = 429
-    response.headers = {"Retry-After": "3"}
-
-    context = mock.MagicMock()
-    context.__enter__.return_value = response
-    context.__exit__.return_value = None
 
     remaining_budget = mock.Mock(return_value=10.0)
     timeout_callback = mock.Mock()
@@ -295,14 +313,18 @@ def test_preliminary_head_check_cancels_retry_sleep(ontology_env, tmp_path):
         sleep_calls.append(duration)
         token.cancel()
 
-    with mock.patch.object(downloader, "_request_with_redirect_audit", return_value=context), mock.patch(
-        "DocsToKG.OntologyDownload.io.network.time.sleep",
-        side_effect=fake_sleep,
+    with network_mod.SESSION_POOL.lease(
+        service="obo",
+        host=parsed_url.hostname,
+        http_config=config,
+    ) as session, mock.patch(
+        "DocsToKG.OntologyDownload.io.network.time.sleep", side_effect=fake_sleep
     ):
         with pytest.raises(DownloadFailure):
             downloader._preliminary_head_check(
-                "https://example.org/resource.owl",
-                mock.Mock(),
+                url,
+                session,
+                headers=request_headers,
                 remaining_budget=remaining_budget,
                 timeout_callback=timeout_callback,
             )

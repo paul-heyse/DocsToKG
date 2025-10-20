@@ -300,12 +300,14 @@ class HybridSearchDiagnostics:
         bm25_score: BM25 lexical similarity score (None if not used)
         splade_score: SPLADE sparse embedding score (None if not used)
         dense_score: Dense vector similarity score (None if not used)
+        fusion_weights: Optional per-channel weights applied during fusion
 
     Examples:
         >>> diagnostics = HybridSearchDiagnostics(
         ...     bm25_score=0.85,
         ...     splade_score=0.92,
-        ...     dense_score=0.78
+        ...     dense_score=0.78,
+        ...     fusion_weights={"bm25": 0.35, "dense": 0.65}
         ... )
     """
 
@@ -409,13 +411,17 @@ class HybridSearchResponse:
         next_cursor: Optional cursor for pagination continuation
         total_candidates: Total number of candidates before filtering
         timings_ms: Performance timing information by operation
+        fusion_weights: Final channel weights applied during fusion
+        stats: Snapshot of adapter/registry statistics collected for the response
 
     Examples:
         >>> response = HybridSearchResponse(
         ...     results=[result1, result2],
         ...     next_cursor="cursor_123",
         ...     total_candidates=150,
-        ...     timings_ms={"bm25": 45, "fusion": 12}
+        ...     timings_ms={"bm25": 45, "fusion": 12},
+        ...     fusion_weights={"bm25": 0.35, "dense": 0.65},
+        ...     stats={"faiss": {"ntotal": 2048}}
         ... )
     """
 

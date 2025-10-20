@@ -276,11 +276,16 @@ def test_plan_embed_streams_chunks(patcher: PatchManager, tmp_path: Path) -> Non
                 tracker["active"] -= 1
 
     def fake_derive(
-        chunk_entry: ChunkDiscovery, _chunks_dir: Path, vectors_dir: Path
+        chunk_entry: ChunkDiscovery,
+        _chunks_dir: Path,
+        vectors_dir: Path,
+        *,
+        vector_format: str = "jsonl",
     ) -> tuple[str, Path]:
         idx = index_lookup[chunk_entry.resolved_path]
         doc_id = f"doc-{idx}"
-        vector_path = vectors_dir / f"{doc_id}.vectors.jsonl"
+        suffix = "parquet" if vector_format == "parquet" else "jsonl"
+        vector_path = vectors_dir / f"{doc_id}.vectors.{suffix}"
         if idx in skips:
             vector_path.write_text("{}", encoding="utf-8")
         elif vector_path.exists():
@@ -342,7 +347,7 @@ def test_plan_chunk_missing_output_skips_hash(patcher: PatchManager, tmp_path: P
         lambda _path, _in_dir, _out_dir: (doc_id, out_path),
     )
 
-    manifest = {doc_id: {"input_hash": "previous"}}
+    manifest = {doc_id: {"input_hash": "previous", "vector_format": "jsonl"}}
     patcher.setattr(planning, "load_manifest_index", lambda *_args, **_kwargs: manifest)
 
     calls = {"count": 0}
@@ -372,7 +377,9 @@ def test_plan_embed_missing_output_skips_hash(patcher: PatchManager, tmp_path: P
     chunk_entry = ChunkDiscovery(chunk_path.relative_to(chunks_dir), chunk_path)
 
     doc_id = "doc-1"
-    vector_path = vectors_dir / f"{doc_id}.vectors.jsonl"
+    def _vector_path_for(format_name: str) -> Path:
+        suffix = "parquet" if format_name == "parquet" else "jsonl"
+        return vectors_dir / f"{doc_id}.vectors.{suffix}"
 
     import DocsToKG.DocParsing.embedding as embedding_module
 
@@ -385,7 +392,10 @@ def test_plan_embed_missing_output_skips_hash(patcher: PatchManager, tmp_path: P
     patcher.setattr(
         planning,
         "derive_doc_id_and_vectors_path",
-        lambda _path, _chunks_dir, _vectors_dir: (doc_id, vector_path),
+        lambda _path, _chunks_dir, _vectors_dir, *, vector_format="jsonl": (
+            doc_id,
+            _vector_path_for(vector_format),
+        ),
     )
 
     manifest = {doc_id: {"input_hash": "previous"}}
@@ -404,6 +414,7 @@ def test_plan_embed_missing_output_skips_hash(patcher: PatchManager, tmp_path: P
     assert result["process"]["count"] == 1
     assert result["skip"]["count"] == 0
     assert calls["count"] == 0
+    assert result["vector_format"] == "jsonl"
 
 
 def test_plan_chunk_handles_symlinked_doctags(tmp_path: Path, patcher: PatchManager) -> None:

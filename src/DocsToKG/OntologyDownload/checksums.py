@@ -1,3 +1,17 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.checksums",
+#   "purpose": "Normalise and enforce expected checksum metadata for ontology downloads",
+#   "sections": [
+#     {"id": "constants", "name": "Checksum Constants & Patterns", "anchor": "CON", "kind": "constants"},
+#     {"id": "models", "name": "Checksum Models", "anchor": "MOD", "kind": "api"},
+#     {"id": "parsing", "name": "Checksum Parsing Helpers", "anchor": "PRS", "kind": "helpers"},
+#     {"id": "fetching", "name": "Remote Checksum Fetching", "anchor": "FET", "kind": "api"},
+#     {"id": "verification", "name": "Verification Utilities", "anchor": "VER", "kind": "helpers"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Checksum parsing, normalisation, and verification helpers.
 
 Configuration files and resolver payloads may describe expected digests in a

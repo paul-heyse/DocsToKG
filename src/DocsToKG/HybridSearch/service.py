@@ -138,7 +138,18 @@ from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
 from threading import RLock
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 import numpy as np
 
@@ -3707,13 +3718,40 @@ def infer_embedding_dim(dataset: Sequence[Mapping[str, object]]) -> int:
         path = Path(str(vector_file))
         if not path.exists():
             continue
-        with path.open(encoding="utf-8") as stream:
-            for raw_line in stream:
-                line = raw_line.strip()
-                if not line:
-                    continue
-                payload = json.loads(line)
-                vector = payload.get("Qwen3-4B", {}).get("vector")
-                if isinstance(vector, list) and vector:
-                    return len(vector)
+        suffix = path.suffix.lower()
+        if suffix == ".parquet":
+            try:
+                import pyarrow.parquet as pq  # type: ignore
+            except ImportError as exc:  # pragma: no cover - dependency guard
+                raise RuntimeError(
+                    "Parquet vector ingestion requires the optional dependency 'pyarrow'. "
+                    'Install DocsToKG[docparse-parquet] or add pyarrow to the environment.'
+                ) from exc
+            try:
+                parquet_file = pq.ParquetFile(path)
+            except Exception:  # pragma: no cover - IO errors
+                continue
+            for record_batch in parquet_file.iter_batches(batch_size=1):
+                for payload in record_batch.to_pylist():
+                    metadata = payload.get("model_metadata")
+                    if isinstance(metadata, str) and metadata:
+                        try:
+                            payload["model_metadata"] = json.loads(metadata)
+                        except json.JSONDecodeError:
+                            payload["model_metadata"] = {}
+                    vector = (payload.get("Qwen3-4B") or payload.get("Qwen3_4B") or {}).get(
+                        "vector"
+                    )
+                    if isinstance(vector, list) and vector:
+                        return len(vector)
+        else:
+            with path.open(encoding="utf-8") as stream:
+                for raw_line in stream:
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    payload = json.loads(line)
+                    vector = payload.get("Qwen3-4B", {}).get("vector")
+                    if isinstance(vector, list) and vector:
+                        return len(vector)
     return 2560

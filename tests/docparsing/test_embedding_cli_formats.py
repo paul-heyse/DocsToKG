@@ -35,7 +35,7 @@ def test_embedding_cli_accepts_advertised_formats() -> None:
         assert args.vector_format == fmt
 
 
-@pytest.mark.parametrize("unsupported", ["parquet", "csv", "yaml"])
+@pytest.mark.parametrize("unsupported", ["csv", "yaml", "xml"])
 def test_embedding_cli_rejects_unsupported_formats(unsupported: str) -> None:
     """Unsupported formats should trigger ``SystemExit`` from argparse choices."""
 

@@ -41,6 +41,7 @@ Scope boundary: Handles conversion, chunking, embedding, and telemetry; does not
   - PDF DocTags (vLLM + Docling PDF extras): `pip install "DocsToKG[docparse-pdf]"`.
   - SPLADE sparse embeddings: `pip install sentence-transformers`.
   - Qwen dense embeddings: `pip install vllm` plus CUDA 12 runtime libraries (`libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, `libgomp.so.1`).
+  - Parquet vector export & validation: `pip install "DocsToKG[docparse-parquet]"` (installs `pyarrow`).
 - **Model caches**:
   - DocTags PDF model `granite-docling-258M` stored beneath `${DOCSTOKG_MODEL_ROOT}` (defaults to `~/.cache/docs-to-kg/models`).
   - SPLADE/Qwen weights downloaded to `${DOCSTOKG_SPLADE_DIR}` / `${DOCSTOKG_QWEN_DIR}` (defaults resolved by `env.py`).
@@ -48,7 +49,7 @@ Scope boundary: Handles conversion, chunking, embedding, and telemetry; does not
   - `Data/PDFs`, `Data/HTML` – raw corpora.
   - `Data/DocTagsFiles` – `*.doctags.jsonl`.
   - `Data/ChunkedDocTagFiles` – `*.chunk.jsonl`.
-  - `Data/Embeddings` – `*.vectors.jsonl`.
+  - `Data/Embeddings` – `*.vectors.jsonl` (default) or `*.vectors.parquet` when `--format parquet` is selected.
   - `Data/Manifests` – `docparse.*.manifest.jsonl`.
 - **Environment overrides**: `DOCSTOKG_*` variables configure stage-specific defaults (`DOCSTOKG_DOCTAGS_INPUT`, `DOCSTOKG_CHUNK_MIN_TOKENS`, `DOCSTOKG_EMBED_QWEN_DIR`, etc.); see “Configuration” below for details.
 
@@ -79,6 +80,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli chunk \
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed \
   --chunks-dir Data/ChunkedDocTagFiles \
   --out-dir Data/Embeddings
+#   --format parquet  # optional: emit columnar parquet vectors when pyarrow is installed
 ```
 
 ## Common commands
@@ -196,6 +198,7 @@ sequenceDiagram
   - DocTags: `DOCSTOKG_DOCTAGS_*` family (`_INPUT`, `_OUTPUT`, `_MODEL`, `_WORKERS`, `_VLLM_WAIT_TIMEOUT`, etc.).
 - Chunking: `DOCSTOKG_CHUNK_*` toggles for tokenizer, shard count, and validation.
 - Embedding: `DOCSTOKG_EMBED_*` flags plus `DOCSTOKG_QWEN_DIR`, `DOCSTOKG_SPLADE_DIR` for model caches.
+- Vector format negotiation: `DOCSTOKG_EMBED_VECTOR_FORMAT` overrides the default (`jsonl`) for runs launched without an explicit `--format` CLI flag.
 - Validate configuration: run `python -m DocsToKG.DocParsing.core.cli chunk --validate-only` or `... embed --validate-only` before production runs.
 
 ### Content hashing defaults

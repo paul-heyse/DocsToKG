@@ -58,6 +58,18 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "batchcommitresult",
+#       "name": "BatchCommitResult",
+#       "anchor": "class-batchcommitresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ingestsummary",
+#       "name": "IngestSummary",
+#       "anchor": "class-ingestsummary",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "chunkingestionpipeline",
 #       "name": "ChunkIngestionPipeline",
 #       "anchor": "class-chunkingestionpipeline",
@@ -152,6 +164,9 @@ __all__ = (
 )
 
 TRAINING_SAMPLE_RNG = np.random.default_rng(13)
+
+_PYARROW_MODULE = None
+_PYARROW_PARQUET = None
 
 
 # --- Public Classes ---
@@ -397,6 +412,25 @@ class IngestMetrics:
     chunks_deleted: int = 0
 
 
+def _ensure_pyarrow_vectors() -> Tuple[object, object]:
+    """Return the pyarrow modules required for parquet ingestion."""
+
+    global _PYARROW_MODULE, _PYARROW_PARQUET
+    if _PYARROW_MODULE is not None and _PYARROW_PARQUET is not None:
+        return _PYARROW_MODULE, _PYARROW_PARQUET
+    try:
+        import pyarrow as pa  # type: ignore
+        import pyarrow.parquet as pq  # type: ignore
+    except ImportError as exc:  # pragma: no cover - exercised via ingestion error path
+        raise IngestError(
+            "Parquet vector ingestion requires the optional dependency 'pyarrow'. "
+            "Install DocsToKG[docparse-parquet] or add pyarrow to the environment."
+        ) from exc
+    _PYARROW_MODULE = pa
+    _PYARROW_PARQUET = pq
+    return pa, pq
+
+
 @dataclass(slots=True)
 class BatchCommitResult:
     """Summary describing a single committed ingestion batch."""
@@ -511,6 +545,30 @@ class ChunkIngestionPipeline:
             RetryableIngestError: When transformation fails due to transient issues.
         """
 
+        formats = {
+            document.vector_path.suffix.lower()
+            for document in documents
+            if document.vector_path
+        }
+        if formats:
+            unsupported = formats - {".jsonl", ".parquet"}
+            if unsupported:
+                raise IngestError(
+                    "Unsupported DocParsing vector formats: " + ", ".join(sorted(unsupported))
+                )
+            if len(formats) > 1:
+                examples = {}
+                for fmt in sorted(formats):
+                    for document in documents:
+                        if document.vector_path.suffix.lower() == fmt:
+                            examples[fmt] = document.vector_path
+                            break
+                detail = ", ".join(f"{fmt}: {path}" for fmt, path in examples.items())
+                raise IngestError(
+                    "Mixed DocParsing vector formats detected; normalise the corpus before ingestion. "
+                    + detail
+                )
+
         total_chunks = 0
         namespaces: Set[str] = set()
         vector_ids: List[str] | None = [] if collect_vector_ids else None
@@ -541,31 +599,6 @@ class ChunkIngestionPipeline:
             chunk_count=total_chunks,
             namespaces=tuple(sorted(namespaces)),
             vector_ids=tuple(vector_ids) if vector_ids is not None else None,
-        flush_batch()
-        return ingested
-
-    def _commit_batch(self, batch: Sequence[ChunkPayload]) -> None:
-        """Persist a batch of chunk payloads across dense and sparse stores."""
-
-        if not batch:
-            return
-        with self._observability.trace("ingest_dual_write", count=str(len(batch))):
-            self._prepare_faiss(batch)
-            embeddings = [chunk.features.embedding for chunk in batch]
-            vector_ids = [chunk.vector_id for chunk in batch]
-            self._faiss.add(embeddings, vector_ids)
-            self._opensearch.bulk_upsert(batch)
-            self._registry.upsert(batch)
-        self._metrics.chunks_upserted += len(batch)
-        self._observability.metrics.increment("ingest_chunks", len(batch))
-        self._observability.logger.info(
-            "chunk-upsert",
-            extra={
-                "event": {
-                    "count": len(batch),
-                    "namespaces": sorted({chunk.namespace for chunk in batch}),
-                }
-            },
         )
 
     def delete_chunks(self, vector_ids: Sequence[str]) -> None:
@@ -710,7 +743,7 @@ class ChunkIngestionPipeline:
         chunk_entries = self._read_jsonl(document.chunk_path)
         vector_entries = {
             str(entry.get("UUID") or entry.get("uuid")): entry
-            for entry in self._read_jsonl(document.vector_path)
+            for entry in self._read_vector_file(document.vector_path)
         }
         payloads: List[ChunkPayload] = []
         missing: List[str] = []
@@ -782,9 +815,9 @@ class ChunkIngestionPipeline:
         """
         bm25 = payload.get("BM25", {})
         bm25_terms = self._weights_from_payload(bm25)
-        splade = payload.get("SpladeV3", {})
+        splade = payload.get("SpladeV3") or payload.get("SPLADEv3") or {}
         splade_weights = self._weights_from_payload(splade)
-        dense = payload.get("Qwen3-4B", {})
+        dense = payload.get("Qwen3-4B") or payload.get("Qwen3_4B") or {}
         vector = np.asarray(dense.get("vector", []), dtype=np.float32)
         if vector.ndim != 1:
             raise IngestError("Dense vector must be one-dimensional")
@@ -812,6 +845,45 @@ class ChunkIngestionPipeline:
         weights = payload.get("weights") or []
         return {str(term): float(weight) for term, weight in zip(terms, weights)}
 
+    def _read_vector_file(self, path: Path) -> List[Dict[str, object]]:
+        """Eagerly load vector records from JSONL or Parquet."""
+
+        return list(self._iter_vector_file(path))
+
+    def _iter_vector_file(self, path: Path) -> Iterator[Dict[str, object]]:
+        """Stream vector records from ``path`` regardless of format."""
+
+        suffix = path.suffix.lower()
+        if suffix == ".jsonl":
+            yield from self._iter_jsonl(path)
+            return
+        if suffix == ".parquet":
+            yield from self._iter_parquet(path)
+            return
+        raise IngestError(f"Unsupported vector artifact format for {path}")
+
+    def _iter_parquet(self, path: Path) -> Iterator[Dict[str, object]]:
+        """Yield rows from a parquet vectors artifact lazily."""
+
+        if not path.exists():
+            raise IngestError(f"Artifact file {path} not found")
+        _, pq = _ensure_pyarrow_vectors()
+        try:
+            parquet_file = pq.ParquetFile(path)
+        except Exception as exc:  # pragma: no cover - IO errors
+            raise IngestError(f"Unable to read parquet vectors from {path}: {exc}") from exc
+        for record_batch in parquet_file.iter_batches():
+            for entry in record_batch.to_pylist():
+                metadata = entry.get("model_metadata")
+                if isinstance(metadata, str) and metadata:
+                    try:
+                        entry["model_metadata"] = json.loads(metadata)
+                    except json.JSONDecodeError:
+                        entry["model_metadata"] = {}
+                elif metadata in (None, ""):
+                    entry["model_metadata"] = {}
+                yield entry
+
     def _iter_jsonl(self, path: Path) -> Iterator[Dict[str, object]]:
         """Yield parsed JSON objects from a JSONL artifact lazily."""
 
@@ -823,11 +895,16 @@ class ChunkIngestionPipeline:
                     continue
                 yield json.loads(line)
 
+    def _read_jsonl(self, path: Path) -> List[Dict[str, object]]:
+        """Return the contents of a JSONL artifact eagerly."""
+
+        return list(self._iter_jsonl(path))
+
     def _load_precomputed_chunks(self, document: DocumentInput) -> Iterator[ChunkPayload]:
         """Stream chunk and vector artifacts from disk for ``document``."""
 
         chunk_iter = self._iter_jsonl(document.chunk_path)
-        vector_iter = self._iter_jsonl(document.vector_path)
+        vector_iter = self._iter_vector_file(document.vector_path)
         vector_cache: Dict[str, Mapping[str, object]] = {}
 
         def pop_vector(vector_id: str) -> Optional[Mapping[str, object]]:

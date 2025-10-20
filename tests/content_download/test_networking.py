@@ -577,10 +577,10 @@ This module stress-tests `request_with_retries`, conditional request helpers,
 cached/modified result handling, manifest URL indices, and the download pipeline
 under a wide array of HTTP behaviours. It combines in-memory servers, property
 tests, and stubs to ensure token buckets, retry-after parsing, cache validation,
-and manifest bookkeeping all behave consistently across regressions.
+and manifest bookkeeping all behave consistently across regressions. These
+regression checks consolidate coverage across the content download networking
+stack.
 """
-
-"""Consolidated content download networking tests."""
 
 from __future__ import annotations
 

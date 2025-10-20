@@ -1,3 +1,17 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.plugins",
+#   "purpose": "Manage resolver and validator plugin registries for the ontology downloader",
+#   "sections": [
+#     {"id": "protocols", "name": "Plugin Protocols", "anchor": "PRT", "kind": "api"},
+#     {"id": "registry", "name": "Registry State & Helpers", "anchor": "REG", "kind": "helpers"},
+#     {"id": "resolver-plugins", "name": "Resolver Plugin Loading", "anchor": "RES", "kind": "api"},
+#     {"id": "validator-plugins", "name": "Validator Plugin Loading", "anchor": "VAL", "kind": "api"},
+#     {"id": "public-api", "name": "Public Registry API", "anchor": "API", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Plugin discovery helpers for ontology downloader components.
 
 Resolvers and validators can be extended via entry points or test fixtures.

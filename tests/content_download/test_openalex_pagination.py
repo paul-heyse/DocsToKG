@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
+import typing
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
-import typing
-
-import requests
 from types import TracebackType as _TypesTracebackType
 from typing import Dict, Iterable, List, Optional
 

@@ -249,7 +249,7 @@ def test_fetch_all_batch_failure_cancels_blocking_workers(ontology_env):
         def plan(
             self, spec, config, logger, *, cancellation_token=None
         ):  # noqa: D401 - simple failure plan
-            time.sleep(0.1)
+            time.sleep(0.01)
             return FetchPlan(
                 url=failing_url,
                 headers={"Accept": "application/rdf+xml"},

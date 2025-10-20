@@ -454,6 +454,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+docparse-parquet = [
+    "pyarrow>=16.1.0",
+]
 gpu12x = [
     "nvidia-cublas-cu12>=12.9.1.4",
     "nvidia-cuda-cupti-cu12>=12.9.79",

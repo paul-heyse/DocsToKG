@@ -115,10 +115,9 @@ By wiring stub chunkers, embedding workers, and fake HTTP sessions, these tests
 assert that partial downloads are cleaned up on failure, digests are recorded on
 success, concurrent writes remain isolated, and resume metadata is respected.
 They model the higher-level DocParsing pipeline interactions that rely on the
-ContentDownload atomic write guarantees.
+ContentDownload atomic write guarantees. The suite also documents behaviour
+expectations for downstream doc parsing workflows that consume the outputs.
 """
-
-"""Atomic write behaviour tests for downloader and doc parsing pipelines."""
 
 from __future__ import annotations
 

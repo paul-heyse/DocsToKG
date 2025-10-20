@@ -1880,6 +1880,7 @@ def process_chunk_file_vectors(
         raise TypeError("out_path must be a Path")
     resolved_out_path = out_path
     resolved_out_path.parent.mkdir(parents=True, exist_ok=True)
+    vector_format = str(getattr(args, "vector_format", "jsonl")).lower()
 
     # Determine batch size for streaming
     batch_size = max(args.batch_size_qwen, args.batch_size_splade)
@@ -1888,9 +1889,7 @@ def process_chunk_file_vectors(
     nnz_all: List[int] = []
     norms_all: List[float] = []
 
-    with create_vector_writer(
-        resolved_out_path, str(getattr(args, "vector_format", "jsonl"))
-    ) as writer:
+    with create_vector_writer(resolved_out_path, vector_format) as writer:
         if content_hasher is None:
             row_batches: Iterator[List[dict]] = iter_rows_in_batches(
                 chunk_file,
@@ -1979,6 +1978,7 @@ def process_chunk_file_vectors(
                 validator=validator,
                 logger=logger,
                 output_path=resolved_out_path,
+                vector_format=vector_format,
             )
 
             total_count += count
@@ -2011,6 +2011,7 @@ def write_vectors(
     validator: SPLADEValidator,
     logger,
     output_path: Optional[Path] = None,
+    vector_format: str = "jsonl",
 ) -> Tuple[int, List[int], List[float]]:
     """Write validated vector rows to disk with schema enforcement.
 
@@ -2141,6 +2142,7 @@ def write_vectors(
                 input_path=row.get("source_path", "unknown"),
                 input_hash=row.get("input_hash", ""),
                 output_path=output_ref,
+                vector_format=vector_format,
                 error=str(exc),
             )
             raise
@@ -2164,6 +2166,7 @@ def write_vectors(
                 ),
                 input_hash=row.get("input_hash", "") if isinstance(row, dict) else "",
                 output_path=output_ref,
+                vector_format=vector_format,
                 error=str(exc),
             )
         raise
@@ -2464,16 +2467,8 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
             option="--format",
             message="must be one of: jsonl, parquet",
         )
-    if vector_format != "jsonl":
-        log_event(
-            logger,
-            "error",
-            "Vector format not implemented",
-            vector_format=vector_format,
-        )
-        raise NotImplementedError(
-            "Parquet vector output is not yet implemented; use --format jsonl."
-        )
+    if vector_format == "parquet":
+        _ensure_pyarrow_vectors()
     cfg.vector_format = vector_format
     args.vector_format = vector_format
 
@@ -2619,6 +2614,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         sparsity_warn_threshold_pct=float(cfg.sparsity_warn_threshold_pct),
         sparsity_report_top_n=int(cfg.sparsity_report_top_n),
         no_cache=bool(cfg.no_cache),
+        vector_format=vector_format,
     )
 
     if validate_only:
@@ -2658,6 +2654,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
             input_hash="",
             output_path=out_dir,
             config=context_payload,
+            vector_format=vector_format,
         )
 
         if validate_only:
@@ -2667,6 +2664,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                 logger,
                 data_root=resolved_root,
                 expected_dimension=int(cfg.qwen_dim),
+                vector_format=vector_format,
             )
             logger.info(
                 "Validation-only mode complete",
@@ -3162,21 +3160,21 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                     )
                     avg_nnz_file = statistics.mean(nnz) if nnz else 0.0
                     avg_norm_file = statistics.mean(norms) if norms else 0.0
-                        log_event(
-                            logger,
-                            "info",
-                            "Embedding file written",
-                            status="success",
-                            stage=EMBED_STAGE,
-                            doc_id=doc_id,
-                            input_relpath=relative_path(chunk_file, resolved_root),
-                            output_relpath=relative_path(out_path, resolved_root),
-                            elapsed_ms=int(duration * 1000),
-                            vectors=count,
-                            splade_avg_nnz=round(avg_nnz_file, 3),
-                            qwen_avg_norm=round(avg_norm_file, 4),
-                            vector_format=vector_format,
-                        )
+                    log_event(
+                        logger,
+                        "info",
+                        "Embedding file written",
+                        status="success",
+                        stage=EMBED_STAGE,
+                        doc_id=doc_id,
+                        input_relpath=relative_path(chunk_file, resolved_root),
+                        output_relpath=relative_path(out_path, resolved_root),
+                        elapsed_ms=int(duration * 1000),
+                        vectors=count,
+                        splade_avg_nnz=round(avg_nnz_file, 3),
+                        qwen_avg_norm=round(avg_norm_file, 4),
+                        vector_format=vector_format,
+                    )
         finally:
             args.qwen_queue = None
             if qwen_queue is not None:

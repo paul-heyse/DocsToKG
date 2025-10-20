@@ -1306,10 +1306,16 @@ def test_derive_doc_id_and_vectors_path(tmp_path: Path) -> None:
     chunk_file.write_text("{}\n", encoding="utf-8")
     vectors_root = tmp_path / "vectors"
 
-    doc_id, out_path = derive_doc_id_and_vectors_path(chunk_file, chunks_root, vectors_root)
-
+    doc_id, out_path = derive_doc_id_and_vectors_path(
+        chunk_file, chunks_root, vectors_root, vector_format="jsonl"
+    )
     assert doc_id == "teamA/report.doctags"
     assert out_path == vectors_root / "teamA" / "report.vectors.jsonl"
+
+    _, parquet_path = derive_doc_id_and_vectors_path(
+        chunk_file, chunks_root, vectors_root, vector_format="parquet"
+    )
+    assert parquet_path == vectors_root / "teamA" / "report.vectors.parquet"
 
 
 def test_chunk_row_fields_unique() -> None:

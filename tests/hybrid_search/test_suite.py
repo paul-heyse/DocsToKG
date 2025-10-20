@@ -299,6 +299,10 @@ import numpy as np
 import pytest
 
 import DocsToKG.HybridSearch.service as service_module
+from DocsToKG.DocParsing.embedding.runtime import (
+    VECTOR_SCHEMA_VERSION,
+    create_vector_writer,
+)
 from DocsToKG.HybridSearch import (
     ChunkIngestionPipeline,
     DocumentInput,
@@ -459,10 +463,33 @@ def stack(
 # --- test_hybrid_search.py ---
 
 
-def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput]:
+def _to_documents(
+    entries: Sequence[Mapping[str, object]], vector_format: str | None = None
+) -> List[DocumentInput]:
     documents: List[DocumentInput] = []
+    format_override = str(vector_format or "").lower()
     for entry in entries:
         doc = entry["document"]
+        entry_format = str(doc.get("vector_format") or "").lower()
+        vector_files = doc.get("vector_files")
+        effective_format = (
+            format_override
+            if format_override in {"jsonl", "parquet"}
+            else entry_format if entry_format in {"jsonl", "parquet"} else ""
+        )
+        vector_value = doc.get("vector_file")
+        if isinstance(vector_files, Mapping):
+            candidate = vector_files.get(effective_format) or (
+                vector_files.get("jsonl") if effective_format == "" else None
+            )
+            if candidate is not None:
+                vector_value = candidate
+        vector_path = Path(str(vector_value))
+        if not isinstance(vector_files, Mapping):
+            if effective_format == "jsonl":
+                vector_path = vector_path.with_suffix(".jsonl")
+            elif effective_format == "parquet":
+                vector_path = vector_path.with_suffix(".parquet")
         documents.append(
             DocumentInput(
                 doc_id=str(doc["doc_id"]),
@@ -486,6 +513,7 @@ def _write_document_artifacts(
     text: str,
     metadata: Mapping[str, object],
     feature_generator: FeatureGenerator,
+    vector_format: str = "jsonl",
 ) -> DocumentInput:
     if not hasattr(feature_generator, "compute_features"):
         feature_generator = FeatureGenerator()
@@ -523,7 +551,7 @@ def _write_document_artifacts(
             "avgdl": 120.0,
             "N": 1,
         },
-        "SpladeV3": {
+        "SPLADEv3": {
             "model_id": "naver/splade-v3",
             "tokens": [token for token, _ in sorted_splade],
             "weights": [float(weight) for _, weight in sorted_splade],
@@ -531,11 +559,19 @@ def _write_document_artifacts(
         "Qwen3-4B": {
             "model_id": "Qwen/Qwen3-Embedding-4B",
             "vector": [float(x) for x in features.embedding.tolist()],
+            "dimension": len(features.embedding.tolist()),
         },
-        "schema_version": "embeddings/1.0.0",
+        "model_metadata": {},
+        "schema_version": VECTOR_SCHEMA_VERSION,
     }
-    vector_path = vector_dir / f"{doc_id}.vectors.jsonl"
-    vector_path.write_text(json.dumps(vector_entry) + "\n", encoding="utf-8")
+    suffix = "parquet" if vector_format == "parquet" else "jsonl"
+    vector_path = vector_dir / f"{doc_id}.vectors.{suffix}"
+    if vector_format == "parquet":
+        writer = create_vector_writer(vector_path, vector_format)
+        with writer:
+            writer.write_rows([vector_entry])
+    else:
+        vector_path.write_text(json.dumps(vector_entry) + "\n", encoding="utf-8")
 
     return DocumentInput(
         doc_id=doc_id,
@@ -549,6 +585,7 @@ def _write_document_artifacts(
 # --- test_hybrid_search.py ---
 
 
+@pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
 def test_hybrid_retrieval_end_to_end(
     stack: Callable[
         ...,
@@ -562,9 +599,10 @@ def test_hybrid_retrieval_end_to_end(
         ],
     ],
     dataset: Sequence[Mapping[str, object]],
+    vector_format: str,
 ) -> None:
     ingestion, service, registry, _, _, _ = stack()
-    documents = _to_documents(dataset)
+    documents = _to_documents(dataset, vector_format)
     ingestion.upsert_documents(documents)
 
     request = HybridSearchRequest(
@@ -754,6 +792,7 @@ def test_schema_manager_bootstrap_and_registration() -> None:
 # --- test_hybrid_search.py ---
 
 
+@pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
 def test_api_post_hybrid_search_success_and_validation(
     stack: Callable[
         ...,
@@ -767,9 +806,10 @@ def test_api_post_hybrid_search_success_and_validation(
         ],
     ],
     dataset: Sequence[Mapping[str, object]],
+    vector_format: str,
 ) -> None:
     ingestion, service, _, _, _, _ = stack()
-    documents = _to_documents(dataset)
+    documents = _to_documents(dataset, vector_format)
     ingestion.upsert_documents(documents)
     api = HybridSearchAPI(service)
 
@@ -792,6 +832,7 @@ def test_api_post_hybrid_search_success_and_validation(
 # --- test_hybrid_search.py ---
 
 
+@pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
 def test_operations_snapshot_and_restore_roundtrip(
     stack: Callable[
         ...,
@@ -805,9 +846,10 @@ def test_operations_snapshot_and_restore_roundtrip(
         ],
     ],
     dataset: Sequence[Mapping[str, object]],
+    vector_format: str,
 ) -> None:
     ingestion, service, registry, _, _, opensearch = stack()
-    documents = _to_documents(dataset)
+    documents = _to_documents(dataset, vector_format)
     ingestion.upsert_documents(documents)
 
     stats = build_stats_snapshot(ingestion.faiss_index, opensearch, registry)
@@ -828,6 +870,7 @@ def test_operations_snapshot_and_restore_roundtrip(
 # --- test_hybrid_search.py ---
 
 
+@pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
 def test_ingest_missing_vector_raises(
     stack: Callable[
         ...,
@@ -841,6 +884,7 @@ def test_ingest_missing_vector_raises(
         ],
     ],
     tmp_path: Path,
+    vector_format: str,
 ) -> None:
     ingestion, _, _, _, feature_generator, _ = stack()
     artifacts_dir = tmp_path / "docs"
@@ -851,6 +895,7 @@ def test_ingest_missing_vector_raises(
         text="Chunk without matching vector entry",
         metadata={},
         feature_generator=feature_generator,
+        vector_format=vector_format,
     )
     vector_entries = [
         json.loads(line)
@@ -867,6 +912,47 @@ def test_ingest_missing_vector_raises(
 
 
 # --- test_hybrid_search.py ---
+
+
+def test_ingest_mixed_vector_formats_error(
+    stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
+    tmp_path: Path,
+) -> None:
+    ingestion, _, _, _, feature_generator, _ = stack()
+    artifacts_dir = tmp_path / "mixed"
+    doc_jsonl = _write_document_artifacts(
+        artifacts_dir,
+        doc_id="doc-jsonl",
+        namespace="research",
+        text="JSONL vector entry",
+        metadata={},
+        feature_generator=feature_generator,
+        vector_format="jsonl",
+    )
+    doc_parquet = _write_document_artifacts(
+        artifacts_dir,
+        doc_id="doc-parquet",
+        namespace="research",
+        text="Parquet vector entry",
+        metadata={},
+        feature_generator=feature_generator,
+        vector_format="parquet",
+    )
+
+    with pytest.raises(IngestError) as exc:
+        ingestion.upsert_documents([doc_jsonl, doc_parquet])
+
+    assert "Mixed DocParsing vector formats" in str(exc.value)
 
 
 def test_managed_adapter_supports_ingestion_training_sample() -> None:
@@ -1149,16 +1235,39 @@ def real_dataset() -> Sequence[Mapping[str, object]]:
 # --- test_hybrid_search_real_vectors.py ---
 
 
-def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput]:
+def _to_documents(
+    entries: Sequence[Mapping[str, object]], vector_format: str | None = None
+) -> List[DocumentInput]:
     documents: List[DocumentInput] = []
+    format_override = str(vector_format or "").lower()
     for entry in entries:
         document = entry["document"]
+        entry_format = str(document.get("vector_format") or "").lower()
+        vector_files = document.get("vector_files")
+        effective_format = (
+            format_override
+            if format_override in {"jsonl", "parquet"}
+            else entry_format if entry_format in {"jsonl", "parquet"} else ""
+        )
+        vector_value = document.get("vector_file")
+        if isinstance(vector_files, Mapping):
+            candidate = vector_files.get(effective_format) or (
+                vector_files.get("jsonl") if effective_format == "" else None
+            )
+            if candidate is not None:
+                vector_value = candidate
+        vector_path = Path(str(vector_value))
+        if not isinstance(vector_files, Mapping):
+            if effective_format == "jsonl":
+                vector_path = vector_path.with_suffix(".jsonl")
+            elif effective_format == "parquet":
+                vector_path = vector_path.with_suffix(".parquet")
         documents.append(
             DocumentInput(
                 doc_id=str(document["doc_id"]),
                 namespace=str(document["namespace"]),
                 chunk_path=Path(str(document["chunk_file"])),
-                vector_path=Path(str(document["vector_file"])),
+                vector_path=vector_path,
                 metadata=dict(document.get("metadata", {})),
             )
         )

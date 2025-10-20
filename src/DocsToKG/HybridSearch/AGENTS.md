@@ -147,6 +147,8 @@ If any import fails: **do not install**. Go to Troubleshooting.
 ```bash
 # CLIs (module form)
 ./.venv/bin/python -m DocsToKG.ContentDownload.cli --help
+# HybridSearch quickstart (JSONL by default; add --vector-format parquet when DocParsing emitted parquet vectors)
+./.venv/bin/python examples/hybrid_search_quickstart.py --query "hybrid retrieval faiss"
 
 # Tests
 ./.venv/bin/pytest -q
@@ -175,6 +177,8 @@ If any import fails: **do not install**. Go to Troubleshooting.
 
 - **`pip` tries to fetch**
   You forgot the guard rails. Ensure `PIP_REQUIRE_VIRTUALENV=1` and `PIP_NO_INDEX=1` are set. Never pass `-U/--upgrade`.
+- **`IngestError: parquet vector ingestion requires pyarrow`**
+  Install the DocsToKG `docparse-parquet` extra (adds `pyarrow`) or run DocParsing in JSONL mode. HybridSearch cannot ingest parquet vectors without that dependency.
 
 ---
 
@@ -264,17 +268,18 @@ Last updated: 2025-02-15
 
 - Linux with CUDA‑12 capable NVIDIA GPUs plus the custom FAISS 1.12 GPU wheel. Required shared libraries: `libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, `libgomp.so.1`, compatible `GLIBC_2.38`/`GLIBCXX_3.4.32`.
 - Environment variables: `DOCSTOKG_DATA_ROOT` (defaults to `./Data`), optional `DOCSTOKG_HYBRID_CONFIG`, `TEMP_DIR`/`TMPDIR` for snapshot staging, `FAISS_OPT_LEVEL` / `FAISS_DISABLE_CPU_FEATURES` for loader overrides.
-- Inputs: DocParsing chunk JSONL + embedding JSONL (aligned via `chunk_id`) and their manifests; ingestion trusts DocParsing for ID consistency.
+- Inputs: DocParsing chunk JSONL + embedding JSONL (aligned via `uuid`/`UUID`) and their manifests; ingestion trusts DocParsing for ID consistency.
 
 ## Module architecture
 
-- `config.py` – Dataclass configs (`ChunkingConfig`, `DenseIndexConfig`, `FusionConfig`, `RetrievalConfig`, `HybridSearchConfig`) plus `HybridSearchConfigManager` for thread-safe JSON/YAML loading and legacy key normalisation. `DenseIndexConfig` maps directly to FAISS GPU options (`GpuMultipleClonerOptions`, `StandardGpuResources`, FP16/cuVS toggles, tiling limits).
-- `pipeline.py` – `ChunkIngestionPipeline` streams DocParsing artifacts, normalises BM25/SPLADE/dense features into contiguous `float32` tensors, drives lexical + FAISS adapters, and emits metrics through `Observability`.
-- `store.py` – `FaissVectorStore` / `ManagedFaissAdapter` manage CPU training, `index_cpu_to_gpu(_multiple)` cloning, multi-GPU replication/sharding, `StandardGpuResources` pools, cuVS/FP16 overrides, cosine/inner-product helpers built on `knn_gpu` / `pairwise_distance_gpu`, plus snapshot/restore and the `ChunkRegistry`.
-- `router.py` – `FaissRouter` provisions namespace-scoped adapters, caches serialized payloads for evicted stores, rehydrates snapshots lazily, and reports per-namespace stats/last-used timestamps.
-- `service.py` – Validates `HybridSearchRequest`, launches concurrent lexical (`LexicalIndex`) and dense (`DenseVectorStore`) searches, applies reciprocal-rank fusion with optional MMR diversification, shapes `HybridSearchResponse`, and records diagnostics.
-- `types.py` & `interfaces.py` – Shared dataclasses and protocols that define tensor shapes, adapter contracts, and response structures so ingestion, storage, and service layers interoperate.
-- `devtools/` – Deterministic `FeatureGenerator` plus the in-memory `OpenSearchSimulator` for regression tests and notebooks without external services.
+- `config.py` – Dataclass configs (`ChunkingConfig`, `DenseIndexConfig`, `FusionConfig`, `RetrievalConfig`, `HybridSearchConfig`) and the thread-safe `HybridSearchConfigManager`. The config layer now covers snapshot refresh throttles (`snapshot_refresh_interval_seconds` / `_writes`), persistence policies (`persist_mode`), forced ID removal fallbacks, and cuVS/FP16 toggles that map 1:1 onto FAISS GPU options (`GpuMultipleClonerOptions`, `StandardGpuResources`, tiling limits).
+- `features.py` – Canonical deterministic tokeniser, sliding-window chunker, and `FeatureGenerator` used by ingestion, validation, and fixtures. `devtools.features` re-exports these symbols for backwards compatibility.
+- `pipeline.py` – `ChunkIngestionPipeline`, `Observability`, and `IngestMetrics` stream DocParsing artefacts, normalise BM25/SPLADE/dense payloads into contiguous `float32` tensors, keep lexical + FAISS stores in lockstep, and surface structured telemetry.
+- `store.py` – `FaissVectorStore` and `ManagedFaissAdapter` own CPU training, `index_cpu_to_gpu(_multiple)` cloning, multi-GPU replication/sharding, `StandardGpuResources` pools, cuVS negotiation (`resolve_cuvs_state`), cosine/inner-product helpers (`cosine_topk_blockwise`, `pairwise_inner_products`), snapshot utilities (`serialize_state`, `restore_state`), the `ChunkRegistry`, and rich `AdapterStats`.
+- `router.py` – `FaissRouter` provisions namespace-scoped adapters, caches serialized payloads for evicted stores, rehydrates snapshots lazily, propagates ID resolvers, and reports per-namespace stats/last-used timestamps.
+- `service.py` – Houses `HybridSearchValidator`, `HybridSearchService`, and `HybridSearchAPI`; validates requests, enforces pagination (`verify_pagination`), schedules concurrent lexical/dense searches, applies RRF + optional MMR diversification via `ResultShaper`, emits diagnostics, and exposes `build_stats_snapshot` for health checks.
+- `types.py` & `interfaces.py` – Shared dataclasses (`ChunkPayload`, `ChunkFeatures`, `HybridSearchRequest/Response`, diagnostics) and protocols (`DenseVectorStore`, `LexicalIndex`) that keep ingestion, storage, and service layers interoperable.
+- `devtools/` – Re-exports deterministic feature utilities and the in-memory `OpenSearchSimulator` (plus schema helpers) so notebooks and regression harnesses can import from a single namespace without external services.
 
 ## Core capabilities
 
@@ -288,16 +293,16 @@ Last updated: 2025-02-15
 ## Ingestion workflow
 
 1. **Source artifacts** – Place chunk and embedding JSONL (plus manifests) under `${DOCSTOKG_DATA_ROOT}`.
-2. **Load configuration** – Build a `HybridSearchConfig` via `HybridSearchConfigManager.from_path(...)` to define namespaces, budgets, GPU settings, and snapshot directories.
+2. **Load configuration** – Instantiate `HybridSearchConfigManager(Path(...))` and call `manager.get()` to obtain the current `HybridSearchConfig` (namespaces, budgets, GPU settings, snapshot directories).
 3. **Initialise indexes** – Instantiate `ManagedFaissAdapter` (and optional lexical indexes) using the loaded config; ensure `ChunkRegistry` is ready.
-4. **Stream ingestion** – Call `ChunkIngestionPipeline.ingest()` to normalise features, upsert lexical payloads, add dense vectors to FAISS, and emit telemetry.
+4. **Stream ingestion** – Call `ChunkIngestionPipeline.upsert_documents(...)` to normalise features, upsert lexical payloads, add dense vectors to FAISS, and emit telemetry.
 5. **Snapshot & persist** – Use `FaissRouter.serialize_all()` or per-adapter `serialize()`/`snapshot_meta()` to capture FAISS bytes + metadata; store in durable storage for fast restore.
 6. **Serve queries** – Wire `HybridSearchService` / `HybridSearchAPI` into your runtime, load snapshots on start-up, then serve hybrid queries with deterministic fusion.
 
 ## Search API quick reference
 
-- **Request** – `HybridSearchRequest` includes query text, namespace, channel weights/top-k/filters, and optional MMR diversifier settings.
-- **Response** – `HybridSearchResponse` returns fused results with per-channel scores, highlights, metadata, plus diagnostics (`dense_latency_ms`, `lexical_latency_ms`, fusion parameters).
+- **Request** – `HybridSearchRequest` carries the query string, optional namespace, filter mapping, pagination (`page_size`, `cursor`), and toggles for `diversification`, `diagnostics`, and `recall_first`. Channel weights and top-k budgets come from `HybridSearchConfig`.
+- **Response** – `HybridSearchResponse` bundles ranked chunks with `doc_id`, `chunk_id`, `vector_id`, `fused_rank`, highlights, metadata, and per-result diagnostics (`bm25`, `splade`, `dense`, optional `fusion_weights`). Top-level fields include `next_cursor`, `total_candidates`, `timings_ms`, `fusion_weights`, and `stats` (including `AdapterStats` snapshots).
 - **Validation errors** – Surface as `RequestValidationError` with JSON payload; pagination guards reject out-of-budget requests.
 
 ## Key invariants

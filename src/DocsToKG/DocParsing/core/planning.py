@@ -337,6 +337,8 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         resolver=lambda root: data_vectors(root, ensure=False),
     ).resolve()
 
+    vector_format = str(getattr(args, "vector_format", "jsonl") or "jsonl").lower()
+
     chunks_missing = not chunks_dir.exists()
     vectors_missing = not vectors_dir.exists()
 
@@ -357,9 +359,15 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
                 "validate": validate_bucket,
                 "missing": missing_bucket,
                 "notes": notes,
+                "vector_format": vector_format,
             }
         for chunk in iter_chunks(chunks_dir):
-            doc_id, vector_path = derive_doc_id_and_vectors_path(chunk, chunks_dir, vectors_dir)
+            doc_id, vector_path = derive_doc_id_and_vectors_path(
+                chunk,
+                chunks_dir,
+                vectors_dir,
+                vector_format=vector_format,
+            )
             if vector_path.exists():
                 _record_bucket(validate_bucket, doc_id)
             else:
@@ -372,6 +380,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
             "validate": validate_bucket,
             "missing": missing_bucket,
             "notes": [],
+            "vector_format": vector_format,
         }
 
     manifest_index = (
@@ -391,6 +400,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
             "process": _new_bucket(),
             "skip": _new_bucket(),
             "notes": ["Chunks directory missing"],
+            "vector_format": vector_format,
         }
     if vectors_missing:
         notes.append("Vectors directory not found; outputs will be created during generation")
@@ -399,11 +409,22 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
 
     files = iter_chunks(chunks_dir)
     for chunk in files:
-        doc_id, vector_path = derive_doc_id_and_vectors_path(chunk, chunks_dir, vectors_dir)
+        doc_id, vector_path = derive_doc_id_and_vectors_path(
+            chunk,
+            chunks_dir,
+            vectors_dir,
+            vector_format=vector_format,
+        )
         fast_skip, manifest_entry = resume_controller.can_skip_without_hash(doc_id, vector_path)
         stored_hash, hash_algorithm = _manifest_hash_requirements(manifest_entry)
         should_verify = bool(verify_hash and stored_hash)
         skip = False
+        entry_format = (
+            str(manifest_entry.get("vector_format") or "jsonl").lower()
+            if manifest_entry
+            else None
+        )
+        format_mismatch = bool(manifest_entry) and entry_format != vector_format
         if should_verify:
             if not vector_path.exists():
                 _record_bucket(planned, doc_id)
@@ -412,14 +433,14 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
                 input_hash = compute_content_hash(chunk.resolved_path, hash_algorithm)
             else:
                 input_hash = compute_content_hash(chunk.resolved_path)
-            skip = should_skip_output(
+            skip = not format_mismatch and should_skip_output(
                 vector_path,
                 manifest_entry,
                 input_hash,
                 resume_controller.resume,
                 resume_controller.force,
             )
-        elif fast_skip:
+        elif fast_skip and not format_mismatch:
             skip = True
         if skip:
             _record_bucket(skipped, doc_id)
@@ -434,6 +455,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         "process": planned,
         "skip": skipped,
         "notes": notes,
+        "vector_format": vector_format,
     }
 
 

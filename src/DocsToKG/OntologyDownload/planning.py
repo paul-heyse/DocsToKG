@@ -1,11 +1,28 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.planning",
+#   "purpose": "Plan ontology downloads, coordinate execution, and emit manifests and lockfiles",
+#   "sections": [
+#     {"id": "infrastructure", "name": "Planning Infrastructure", "anchor": "INF", "kind": "infra"},
+#     {"id": "models", "name": "Planner Data Models", "anchor": "MOD", "kind": "api"},
+#     {"id": "spec-builders", "name": "Specification Builders", "anchor": "SPC", "kind": "helpers"},
+#     {"id": "execution", "name": "Planning & Download Execution", "anchor": "EXE", "kind": "api"},
+#     {"id": "manifests", "name": "Manifest & Lockfile Helpers", "anchor": "MAN", "kind": "helpers"},
+#     {"id": "public-api", "name": "Public Planner API", "anchor": "API", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Download planning, execution orchestration, and manifest production.
 
 The planner converts configuration and resolver metadata into concrete fetch
 plans, executes parallel downloads with retry/backoff controls, and records the
 outcomes into manifests.  It also enforces security policies (checksum
-verification, allowed hosts, archive sanity checks) and coordinates validator
-invocations once artefacts land on disk.  The CLI and public API both rely on
-these routines to produce deterministic results.
+verification, allowed hosts, archive sanity checks), cooperates with the storage
+backend for CAS mirroring, and records streaming hash fingerprints alongside
+traditional provenance fields.  Once artefacts land on disk the planner
+coordinates validator execution and writes lockfiles so CLI and API callers can
+replay deterministic runs.
 """
 
 from __future__ import annotations

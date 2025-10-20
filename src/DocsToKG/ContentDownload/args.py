@@ -9,6 +9,9 @@ Responsibilities
 - Provision output directories, manifest destinations, and resolver instances
   via helpers such as :func:`bootstrap_run_environment` and
   :func:`resolve_config`.
+- Hydrate manifest indexes and global URL dedupe sets (via
+  :class:`ManifestUrlIndex`) so runs can reuse cached artifacts before
+  contacting resolvers.
 - Expose compatibility shims (``build_query()``, ``resolve_topic_id_if_needed``)
   that tests and automation can exercise without pulling in the full CLI stack.
 
@@ -26,10 +29,10 @@ from __future__ import annotations
 import argparse
 import logging
 import uuid
-from itertools import islice
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
+from itertools import islice
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
@@ -44,9 +47,9 @@ from DocsToKG.ContentDownload.core import (
 )
 from DocsToKG.ContentDownload.download import RobotsCache, ensure_dir
 from DocsToKG.ContentDownload.pipeline import load_resolver_config
+from DocsToKG.ContentDownload.pyalex_shim import apply_mailto
 from DocsToKG.ContentDownload.resolvers import DEFAULT_RESOLVER_ORDER, default_resolvers
 from DocsToKG.ContentDownload.telemetry import ManifestUrlIndex
-from DocsToKG.ContentDownload.pyalex_shim import apply_mailto
 
 __all__ = [
     "ResolvedConfig",

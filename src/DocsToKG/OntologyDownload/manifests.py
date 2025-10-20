@@ -1,10 +1,25 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.manifests",
+#   "purpose": "Manage ontology manifest serialisation, lockfiles, and plan diff helpers",
+#   "sections": [
+#     {"id": "constants", "name": "Manifest Constants", "anchor": "CON", "kind": "constants"},
+#     {"id": "serialization", "name": "Serialisation Helpers", "anchor": "SER", "kind": "helpers"},
+#     {"id": "lockfiles", "name": "Lockfile Utilities", "anchor": "LOC", "kind": "api"},
+#     {"id": "plan-diff", "name": "Plan Diff Utilities", "anchor": "DIF", "kind": "helpers"},
+#     {"id": "resolution", "name": "Manifest Resolution Helpers", "anchor": "RES", "kind": "helpers"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Manifest, lockfile, and plan-diff utilities for the ontology downloader.
 
-Download runs emit manifests that track resolver provenance, versions, and
-checksums.  This module provides helpers to write those manifests atomically,
-load historic runs, compute plan diffs for review, and materialise lockfiles
-that pin future executions to the same artefacts.  They are used extensively by
-the CLI to guarantee reproducible ingestion.
+Download runs emit manifests that track resolver provenance, versions, checksum
+expectations, streaming hash fingerprints, and validator summaries.  This module
+provides helpers to write those manifests atomically, load historic runs, compute
+plan diffs for review, and materialise lockfiles that pin future executions to
+the same artefacts.  They are used extensively by the CLI to guarantee
+reproducible ingestion.
 """
 
 from __future__ import annotations

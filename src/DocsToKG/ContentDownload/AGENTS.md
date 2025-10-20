@@ -249,12 +249,21 @@ Last updated: 2025-10-19
 ## Quickstart (same as README)
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install -e ".[dev]"
-export UNPAYWALL_EMAIL=you@example.org  # polite OpenAlex/Unpaywall contact (optional)
-python -m DocsToKG.ContentDownload.cli \
+# Guard rails (safe to repeat)
+export PIP_REQUIRE_VIRTUALENV=1 PIP_NO_INDEX=1 PYTHONNOUSERSITE=1
+
+# Ensure the project virtualenv exists (never install)
+test -x .venv/bin/python || { echo "Missing .venv — STOP (no installs)."; exit 1; }
+
+# Optional polite contact for resolver credentials
+export UNPAYWALL_EMAIL=you@example.org
+
+# Wrapper workflow (preferred)
+./scripts/dev.sh doctor
+./scripts/dev.sh python -m DocsToKG.ContentDownload.cli --help
+
+# Direct invocation without activation
+./.venv/bin/python -m DocsToKG.ContentDownload.cli \
   --topic "machine learning" \
   --year-start 2023 \
   --year-end 2024 \
@@ -262,10 +271,11 @@ python -m DocsToKG.ContentDownload.cli \
   --out runs/content \
   --staging \
   --resolver-preset fast \
-  --workers 4
+  --workers 4 \
+  --dry-run
 ```
 
-- Toggle `--dry-run` to exercise resolver coverage without writes; use `--list-only` for manifest logging only.
+- Drop `--dry-run` once configuration looks correct; combine with `--list-only` for manifest logging only.
 
 ## Architecture & Flow
 
@@ -285,16 +295,20 @@ flowchart LR
   class OA,Resolvers ext;
 ```
 
-- `cli.main()` wires frozen `ResolvedConfig` into `DownloadRun`.
-- `DownloadRun.run()` initialises telemetry sinks, resolver pipeline, OpenAlex provider, then iterates works either sequentially or via `ThreadPoolExecutor`.
-- `ResolverPipeline.run()` enforces resolver ordering, token buckets, circuit breakers, global URL dedupe, and manifests attempt metadata through `AttemptRecord`.
-- Telemetry fan-out (`RunTelemetry`, `MultiSink`) writes JSONL/CSV/SQLite manifests plus summaries used for resume and analytics.
+- `cli.main()` wires the frozen `ResolvedConfig` into `DownloadRun`, seeding resolver instances, telemetry factories, and configurable hooks (`download_candidate_func`, sink factories) for tests.
+- `DownloadRun.run()` stages the lifecycle in order: `setup_sinks()` → `setup_resolver_pipeline()` → `setup_work_provider()` → `setup_download_state()` → work execution (sequential or `ThreadPoolExecutor`). A `ThreadLocalSessionFactory` provides per-thread `requests.Session` objects and is closed during teardown.
+- `DownloadRun.setup_download_state()` hydrates resume metadata from JSONL/CSV manifests or SQLite caches, seeds `DownloadConfig` (robots cache, content-addressed toggle, digest verification, global dedupe sets), and registers cleanup callbacks on the exit stack.
+- `ResolverPipeline.run()` enforces resolver ordering, per-resolver spacing, domain token buckets, circuit breakers, global URL dedupe, and emits structured `AttemptRecord` telemetry while updating `ResolverMetrics`.
+- `download.process_one_work()` normalises work payloads, evaluates resume decisions, coordinates download strategies (PDF/HTML/XML), finalises artifacts atomically, and logs manifest + summary records via `RunTelemetry`.
+- Telemetry fan-out (`RunTelemetry`, `MultiSink`) writes JSONL, optional CSV, SQLite, manifest index, summary, metrics, and last-attempt outputs, keeping rotation and resume surfaces consistent.
+- `providers.OpenAlexWorkProvider` streams `WorkArtifact` objects either from live `pyalex` queries or supplied iterables, reusing `iterate_openalex()` with equal-jitter backoff, optional `Retry-After` cap, per-page bounds, and `--max` truncation for dry-run testing.
 
 ## Storage Layout & Run Outputs
 
 - **Run identifiers**: Each invocation issues a UUID `run_id` stamped onto manifests/summaries and staging directories when `--staging` is used.
 - **Content roots**: `DownloadConfig` coordinates sibling `PDF/`, `HTML/`, `XML/` directories. `--content-addressed` adds hashed payload paths + symlinks.
 - **Resume caches**: `manifest.jsonl` (+ rotations), `manifest.index.json`, and `manifest.sqlite3` function as a unit; keep them together for resumes.
+- **Global dedupe**: `ManifestUrlIndex` hydrates up to `global_url_dedup_cap` successful URLs into in-memory sets so subsequent works skip resolver execution; only PDF/CACHED/XML classifications are considered.
 - **Scratch space**: Streaming writes create `*.part` temp files beside the target until `finalize_candidate_download` promotes them atomically.
 - **Artifacts emitted**:
   - `manifest.jsonl` / rotated segments (`--log-rotate`) with `record_type`.
@@ -306,11 +320,11 @@ flowchart LR
 
 ## CLI & Configuration Surfaces
 
-- CLI selectors: `--topic`/`--topic-id`, `--year-start`, `--year-end`.
-- Run controls: `--max`, `--dry-run`, `--list-only`, `--workers`, `--sleep`, `--resume-from`, `--verify-cache-digest`, OpenAlex retry knobs (`--openalex-retry-attempts`, `--openalex-retry-backoff`, `--openalex-max-retry-delay`).
-- Resolver controls: `--resolver-config`, `--resolver-order`, `--resolver-preset {fast,broad}`, `--enable-resolver`, `--disable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--concurrent-resolvers`, `--max-concurrent-per-host`, `--domain-min-interval`, `--domain-token-bucket`, `--global-url-dedup`, `--global-url-dedup-cap`, `--head-precheck`, `--accept`.
-- Telemetry flags: `--manifest`, `--log-format {jsonl,csv}`, `--log-csv`, `--log-rotate`, `--warm-manifest-cache`.
-- Classifier tuning: `--sniff-bytes`, `--min-pdf-bytes`, `--tail-check-bytes`, `--extract-text`.
+- CLI selectors & pagination: `--topic`, `--topic-id`, `--year-start`, `--year-end`, `--per-page`, `--oa-only`.
+- Output & lifecycle controls: `--out`, `--html-out`, `--xml-out`, `--staging`, `--content-addressed`, `--manifest`, `--log-format {jsonl,csv}`, `--log-csv`, `--log-rotate`, `--warm-manifest-cache`, `--resume-from`, `--verify-cache-digest`.
+- Runtime controls: `--mailto`, `--max`, `--workers`, `--sleep`, `--dry-run`, `--list-only`, `--ignore-robots`, `--openalex-retry-attempts`, `--openalex-retry-backoff`, `--openalex-retry-max-delay`.
+- Resolver knobs & credentials: `--resolver-config`, `--resolver-order`, `--resolver-preset {fast,broad}`, `--enable-resolver`, `--disable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--retry-after-cap`, `--concurrent-resolvers`, `--max-concurrent-per-host`, `--domain-min-interval`, `--domain-token-bucket`, `--global-url-dedup`/`--no-global-url-dedup`, `--global-url-dedup-cap`, `--head-precheck`/`--no-head-precheck`, `--accept`, `--unpaywall-email`, `--core-api-key`, `--semantic-scholar-api-key`, `--doaj-api-key`. The CLI threads `--retry-after-cap` into `DownloadConfig.extra` so downloader retries honour the ceiling even outside resolver config files.
+- Classifier & extraction tuning: `--sniff-bytes`, `--min-pdf-bytes`, `--tail-check-bytes`, `--extract-text`.
 
 **Resolver configuration excerpt**
 
@@ -351,6 +365,8 @@ resolver_circuit_breakers:
 ## Telemetry, Data Contracts & Error Handling
 
 - Manifest/attempt schemas defined in `telemetry.py` (`MANIFEST_SCHEMA_VERSION = 3`, `SQLITE_SCHEMA_VERSION = 4`); keep `record_type`, `run_id`, classification/reason fields stable.
+- `RunTelemetry` + `MultiSink` coordinate JSONL (`JsonlSink`/`RotatingJsonlSink`), `CsvSink`, `LastAttemptCsvSink`, `ManifestIndexSink`, `SqliteSink`, and `SummarySink` ensuring manifest/index/summary/metrics files stay in sync even when rotation is active.
+- Resume helpers (`JsonlResumeLookup`, `SqliteResumeLookup`, `ManifestUrlIndex`, `load_resume_completed_from_sqlite`) hydrate completed work IDs and normalized URLs; JSONL absence triggers a warning when resuming purely from SQLite caches.
 - `statistics.DownloadStatistics` + `ResolverStats` feed aggregated metrics into `summary.build_summary_record()` (`manifest.metrics.json`).
 - Error taxonomy from `errors.py` (`DownloadError`, `NetworkError`, `ContentPolicyError`, `RateLimitError`) surfaces remediation suggestions through `log_download_failure`.
 - Reason codes (`core.ReasonCode` e.g. `robots_blocked`, `content_policy_violation`) drive analytics; extend only with coordination.
@@ -358,11 +374,11 @@ resolver_circuit_breakers:
 
 ## Networking, Rate Limiting & Politeness
 
-- `networking.ThreadLocalSessionFactory` maintains per-thread sessions; call `close_all()` during teardown.
-- `request_with_retries()` implements exponential backoff + equal jitter, respecting `Retry-After` and CLI caps.
-- Token buckets/circuit breakers defined in `ResolverConfig` throttle host+resolver concurrency; prefer adjusting configs to hard sleeps.
+- `networking.ThreadLocalSessionFactory` + `create_session()` maintain per-thread sessions with shared adapter pools, polite defaults, and consistent timeouts; call `close_all()` during teardown.
+- `request_with_retries()` implements exponential backoff + equal jitter, respecting `Retry-After`, `--retry-after-cap`, and emitting `CachedResult` / `ModifiedResult` wrappers for conditional requests.
+- Token buckets/circuit breakers defined in `ResolverConfig` throttle host+resolver concurrency; host semaphores and `CircuitBreaker` instances (`resolver_circuit_breakers`, domain breakers) share telemetry and enforce cooldowns.
 - `download.RobotsCache` enforces robots.txt unless `--ignore-robots`; override only with explicit approval.
-- `ConditionalRequestHelper` builds `If-None-Match` / `If-Modified-Since` headers for cache-conscious downloads.
+- `ConditionalRequestHelper` builds `If-None-Match` / `If-Modified-Since` headers; `head_precheck` downgrades to conditional GETs when HEAD is unsupported.
 - `statistics.BandwidthTracker` (opt-in) can expose throughput for tuning `--workers`.
 
 ## Operational Playbooks

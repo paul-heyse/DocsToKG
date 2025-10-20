@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 from typing import Dict, Tuple
 
+import pytest
+
 from DocsToKG.DocParsing.core import BM25Stats
 from DocsToKG.DocParsing.io import compute_content_hash, resolve_manifest_path
 from tests.conftest import PatchManager
@@ -38,7 +40,7 @@ def _write_chunk_file(path: Path) -> None:
 
 
 def _configure_runtime(
-    patcher: PatchManager, tmp_path: Path
+    patcher: PatchManager, tmp_path: Path, vector_format: str
 ) -> Tuple[object, Path, Path, Path, Path, Dict[str, int]]:
     import DocsToKG.DocParsing.embedding.runtime as runtime
 
@@ -117,18 +119,34 @@ def _configure_runtime(
                     continue
                 rows.append(json.loads(line))
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        with out_path.open("w", encoding="utf-8") as handle:
-            for row in rows:
-                handle.write(
-                    json.dumps(
-                        {
-                            "uuid": row.get("uuid", ""),
-                            "vector": [0.0, 0.0],
-                        },
-                        ensure_ascii=False,
-                    )
-                    + "\n"
-                )
+        vector_rows = [
+            {
+                "UUID": row.get("uuid", ""),
+                "BM25": {
+                    "terms": ["hello", "world"],
+                    "weights": [1.0, 1.0],
+                    "avgdl": 1.0,
+                    "N": 1,
+                },
+                "SPLADEv3": {
+                    "tokens": ["hello", "world"],
+                    "weights": [0.5, 0.4],
+                },
+                "Qwen3-4B": {
+                    "model_id": "stub",
+                    "vector": [0.0, 0.0],
+                    "dimension": 2,
+                },
+                "model_metadata": {},
+                "schema_version": runtime.VECTOR_SCHEMA_VERSION,
+            }
+            for row in rows
+        ]
+        writer = runtime.create_vector_writer(
+            out_path, str(getattr(args, "vector_format", vector_format))
+        )
+        with writer:
+            writer.write_rows(vector_rows)
         count = len(rows)
         return count, [0] * count, [1.0] * count
 
@@ -150,47 +168,12 @@ def _read_manifest_entries(stage: str, root: Path) -> list[dict]:
     return entries
 
 
-def test_embed_without_resume_streams_hash(patcher: PatchManager, tmp_path: Path) -> None:
+@pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
+def test_embed_without_resume_streams_hash(
+    patcher: PatchManager, tmp_path: Path, vector_format: str
+) -> None:
     runtime, data_root, chunks_dir, vectors_dir, chunk_file, counters = _configure_runtime(
-        patcher, tmp_path
-    )
-
-    exit_code = runtime.main(
-        [
-            "--data-root",
-            str(data_root),
-            "--chunks-dir",
-            str(chunks_dir),
-            "--out-dir",
-            str(vectors_dir),
-            "--qwen-dim",
-            "2",
-            "--batch-size-qwen",
-            "1",
-            "--batch-size-splade",
-            "1",
-        ]
-    )
-
-    assert exit_code == 0
-    assert counters["process"] == 1
-    assert counters["hash"] == 0
-
-    entries = _read_manifest_entries(runtime.MANIFEST_STAGE, data_root)
-    success_entries = [
-        entry
-        for entry in entries
-        if entry.get("doc_id") == _DOC_ID and entry.get("status") == "success"
-    ]
-    assert success_entries, "Expected a success manifest entry for doc-1"
-    recorded_hash = success_entries[-1]["input_hash"]
-    expected_hash = compute_content_hash(chunk_file)
-    assert recorded_hash == expected_hash
-
-
-def test_embed_resume_skips_unchanged(patcher: PatchManager, tmp_path: Path) -> None:
-    runtime, data_root, chunks_dir, vectors_dir, chunk_file, counters = _configure_runtime(
-        patcher, tmp_path
+        patcher, tmp_path, vector_format
     )
 
     base_args = [
@@ -206,6 +189,55 @@ def test_embed_resume_skips_unchanged(patcher: PatchManager, tmp_path: Path) -> 
         "1",
         "--batch-size-splade",
         "1",
+        "--format",
+        vector_format,
+    ]
+
+    exit_code = runtime.main(base_args)
+
+    assert exit_code == 0
+    assert counters["process"] == 1
+    assert counters["hash"] == 0
+
+    entries = _read_manifest_entries(runtime.MANIFEST_STAGE, data_root)
+    success_entries = [
+        entry
+        for entry in entries
+        if entry.get("doc_id") == _DOC_ID and entry.get("status") == "success"
+    ]
+    assert success_entries, "Expected a success manifest entry for doc-1"
+    recorded_hash = success_entries[-1]["input_hash"]
+    expected_hash = compute_content_hash(chunk_file)
+    assert recorded_hash == expected_hash
+    assert success_entries[-1]["vector_format"] == vector_format
+    suffix = ".vectors.parquet" if vector_format == "parquet" else ".vectors.jsonl"
+    vector_path = vectors_dir / f"doc-1{suffix}"
+    assert vector_path.exists()
+
+
+@pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
+def test_embed_resume_skips_unchanged(
+    patcher: PatchManager, tmp_path: Path, vector_format: str
+) -> None:
+    runtime, data_root, chunks_dir, vectors_dir, chunk_file, counters = _configure_runtime(
+        patcher, tmp_path, vector_format
+    )
+
+    base_args = [
+        "--data-root",
+        str(data_root),
+        "--chunks-dir",
+        str(chunks_dir),
+        "--out-dir",
+        str(vectors_dir),
+        "--qwen-dim",
+        "2",
+        "--batch-size-qwen",
+        "1",
+        "--batch-size-splade",
+        "1",
+        "--format",
+        vector_format,
     ]
     assert runtime.main(base_args) == 0
 
@@ -225,3 +257,54 @@ def test_embed_resume_skips_unchanged(patcher: PatchManager, tmp_path: Path) -> 
     assert skip_entries, "Expected a skip manifest entry after resume"
     expected_hash = compute_content_hash(chunk_file)
     assert skip_entries[-1]["input_hash"] == expected_hash
+    assert skip_entries[-1]["vector_format"] == vector_format
+
+
+@pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
+def test_embed_validate_only_respects_format(
+    patcher: PatchManager, tmp_path: Path, vector_format: str
+) -> None:
+    runtime, data_root, chunks_dir, vectors_dir, _chunk_file, _ = _configure_runtime(
+        patcher, tmp_path, vector_format
+    )
+
+    base_args = [
+        "--data-root",
+        str(data_root),
+        "--chunks-dir",
+        str(chunks_dir),
+        "--out-dir",
+        str(vectors_dir),
+        "--qwen-dim",
+        "2",
+        "--batch-size-qwen",
+        "1",
+        "--batch-size-splade",
+        "1",
+        "--format",
+        vector_format,
+    ]
+    assert runtime.main(base_args) == 0
+
+    validate_args = [
+        "--data-root",
+        str(data_root),
+        "--chunks-dir",
+        str(chunks_dir),
+        "--out-dir",
+        str(vectors_dir),
+        "--validate-only",
+        "--format",
+        vector_format,
+    ]
+
+    exit_code = runtime.main(validate_args)
+    assert exit_code == 0
+
+    entries = _read_manifest_entries(runtime.MANIFEST_STAGE, data_root)
+    validate_entries = [
+        entry
+        for entry in entries
+        if entry.get("status") == "validate-only" and entry.get("vector_format") == vector_format
+    ]
+    assert validate_entries, "Expected validate-only manifest entry recording vector format"

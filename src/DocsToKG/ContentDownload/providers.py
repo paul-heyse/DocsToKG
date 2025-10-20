@@ -7,7 +7,7 @@ Responsibilities
   objects for the resolver pipeline.
 - Ship a production-ready :class:`OpenAlexWorkProvider` implementation that
   wraps pyalex pagination, converts responses into artefact directories, and
-  honours CLI limits (per-page, ``--max``).
+  honours CLI limits (per-page, ``--max``) alongside retry/backoff settings.
 - Provide extension points via ``ArtifactFactory`` so tests and future data
   sources (Crossref, arXiv, institutional APIs) can reuse the same orchestration
   without touching the download logic.
@@ -18,10 +18,14 @@ Design Notes
   large result sets do not load into memory.
 - The OpenAlex provider accepts either a live pyalex query or an iterable of
   pre-fetched works, simplifying unit tests and dry-run tooling.
+- Pagination delegates to :func:`iterate_openalex`, inheriting equal-jitter
+  retry behaviour and CLI-provided ``retry_after_cap`` settings.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable as IterableABC
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Protocol, runtime_checkable
 
@@ -106,12 +110,26 @@ class OpenAlexWorkProvider:
             return
 
         yielded = 0
-        for work in self._iter_source():
-            artifact = self._artifact_factory(work, self._pdf_dir, self._html_dir, self._xml_dir)
-            yield artifact
-            yielded += 1
-            if self._max_results is not None and yielded >= self._max_results:
-                break
+        for item in self._iter_source():
+            if isinstance(item, Mapping):
+                works_iterable = (item,)
+            elif isinstance(item, IterableABC):
+                works_iterable = item
+            else:
+                raise TypeError(
+                    f"OpenAlexWorkProvider expected a mapping or iterable of mappings, got {type(item)!r}"
+                )
+
+            for work in works_iterable:
+                if not isinstance(work, Mapping):
+                    raise TypeError(
+                        "OpenAlexWorkProvider expected works to be mapping-like objects."
+                    )
+                artifact = self._artifact_factory(work, self._pdf_dir, self._html_dir, self._xml_dir)
+                yield artifact
+                yielded += 1
+                if self._max_results is not None and yielded >= self._max_results:
+                    return
 
     def __iter__(self) -> Iterator[WorkArtifact]:
         return self.iter_artifacts()

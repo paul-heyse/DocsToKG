@@ -1,9 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.io.network",
+#   "purpose": "Provide secure streaming downloads, DNS validation, and retry-aware HTTP helpers",
+#   "sections": [
+#     {"id": "infrastructure", "name": "Networking Infrastructure & Constants", "anchor": "INF", "kind": "infra"},
+#     {"id": "dns", "name": "DNS & Host Validation", "anchor": "DNS", "kind": "helpers"},
+#     {"id": "session", "name": "Session Pools & Rate Limiting", "anchor": "SES", "kind": "api"},
+#     {"id": "streaming", "name": "Streaming Downloader", "anchor": "STR", "kind": "api"},
+#     {"id": "helpers", "name": "Download Helpers & Security Checks", "anchor": "HLP", "kind": "helpers"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Networking utilities for ontology downloads.
 
 This module manages resilient HTTP downloads: DNS caching, session pooling,
-range resume, provenance logging, rate limiting integration, and security
-guards around redirects and content types.  It provides the streaming helpers
-consumed by resolvers and the planner when fetching ontology artefacts.
+range resume, provenance logging, retry-after aware throttling, and security
+guards around redirects, content types, and host allowlists.  It provides the
+streaming helpers consumed by resolvers and the planner when fetching ontology
+artefacts.
 """
 
 from __future__ import annotations

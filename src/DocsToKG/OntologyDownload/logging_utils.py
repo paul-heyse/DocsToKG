@@ -1,3 +1,15 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.logging_utils",
+#   "purpose": "Provide structured logging formatters and rotation helpers for ontology downloads",
+#   "sections": [
+#     {"id": "formatter", "name": "JSON Formatter", "anchor": "FMT", "kind": "api"},
+#     {"id": "rotation", "name": "Log Rotation Helpers", "anchor": "ROT", "kind": "helpers"},
+#     {"id": "setup", "name": "Logging Setup", "anchor": "SET", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Structured logging helpers shared across ontology download components.
 
 Ontology downloads can span multiple resolvers, retries, and validators, so

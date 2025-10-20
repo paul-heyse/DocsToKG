@@ -1,9 +1,25 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.io.filesystem",
+#   "purpose": "Provide filesystem utilities for sanitisation, hashing, masking, and archive extraction",
+#   "sections": [
+#     {"id": "limits", "name": "Archive Limits & Helpers", "anchor": "LIM", "kind": "helpers"},
+#     {"id": "sanitisation", "name": "Filename Sanitisation & Identifiers", "anchor": "SAN", "kind": "helpers"},
+#     {"id": "masking", "name": "Sensitive Data Masking", "anchor": "MSK", "kind": "helpers"},
+#     {"id": "hashing", "name": "Hashing Utilities", "anchor": "HAS", "kind": "helpers"},
+#     {"id": "archives", "name": "Archive Extraction Utilities", "anchor": "ARC", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Filesystem helpers for ontology downloads.
 
 Responsibilities include sanitising filenames, generating correlation IDs for
-log entries, computing file hashes, and safely extracting archives while
-enforcing expansion limits.  These utilities are shared by both the planner and
-validator stages to ensure consistent handling of artefacts on disk.
+log entries, masking sensitive payloads, computing file hashes, and safely
+extracting archives while enforcing expansion limits.  These utilities are
+shared by both the planner and validator stages to ensure consistent handling of
+artefacts on disk and to support content-addressable mirroring via the storage
+backend.
 """
 
 from __future__ import annotations
@@ -112,6 +128,8 @@ def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
             if "apikey" in lowered:
                 return "***masked***"
             if "bearer " in lowered:
+                return "***masked***"
+            if token_pattern.fullmatch(value):
                 return "***masked***"
         return value
 

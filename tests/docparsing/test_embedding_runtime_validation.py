@@ -23,7 +23,8 @@ def _get_runtime():
     return importlib.import_module("DocsToKG.DocParsing.embedding.runtime")
 
 
-def test_validate_vectors_missing_logs_capped(tmp_path, patcher):
+@pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
+def test_validate_vectors_missing_logs_capped(tmp_path, patcher, vector_format):
     """Missing vectors should log capped metadata and raise a helpful error."""
 
     chunks_dir = tmp_path / "chunks"
@@ -44,7 +45,12 @@ def test_validate_vectors_missing_logs_capped(tmp_path, patcher):
     patcher.setattr(runtime, "log_event", fake_log_event)
 
     with pytest.raises(FileNotFoundError) as exc:
-        runtime._validate_vectors_for_chunks(chunks_dir, vectors_dir, logger=object())
+        runtime._validate_vectors_for_chunks(
+            chunks_dir,
+            vectors_dir,
+            logger=object(),
+            vector_format=vector_format,
+        )
 
     message = str(exc.value)
     assert "doc-0.doctags" in message
@@ -68,17 +74,19 @@ def test_validate_vectors_missing_logs_capped(tmp_path, patcher):
         "doc-3.doctags",
         "doc-4.doctags",
     ]
+    suffix = ".vectors.parquet" if vector_format == "parquet" else ".vectors.jsonl"
     assert missing_call_fields["missing_paths_sample"] == [
-        str(vectors_dir / "doc-0.vectors.jsonl"),
-        str(vectors_dir / "doc-1.vectors.jsonl"),
-        str(vectors_dir / "doc-2.vectors.jsonl"),
-        str(vectors_dir / "doc-3.vectors.jsonl"),
-        str(vectors_dir / "doc-4.vectors.jsonl"),
+        str(vectors_dir / f"doc-0{suffix}"),
+        str(vectors_dir / f"doc-1{suffix}"),
+        str(vectors_dir / f"doc-2{suffix}"),
+        str(vectors_dir / f"doc-3{suffix}"),
+        str(vectors_dir / f"doc-4{suffix}"),
     ]
     assert "missing" not in missing_call_fields
 
 
-def test_docparse_embed_missing_chunks_warns_and_exits(tmp_path, patcher):
+@pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
+def test_docparse_embed_missing_chunks_warns_and_exits(tmp_path, patcher, vector_format):
     """`docparse embed` exits cleanly with a warning when chunks are absent."""
 
     import DocsToKG.DocParsing.embedding as embedding_module
@@ -114,6 +122,7 @@ def test_docparse_embed_missing_chunks_warns_and_exits(tmp_path, patcher):
     )
     patcher.setattr(runtime, "_ensure_splade_dependencies", lambda: None)
     patcher.setattr(runtime, "_ensure_qwen_dependencies", lambda: None)
+    patcher.setattr(runtime, "_ensure_pyarrow_vectors", lambda: (object(), object()))
 
     def _prepare_data_root(override, detected):
         if override is not None:
@@ -135,17 +144,18 @@ def test_docparse_embed_missing_chunks_warns_and_exits(tmp_path, patcher):
 
     patcher.setattr(runtime, "log_event", fake_log_event)
 
-    exit_code = core_cli._run_stage(
-        core_cli.embed,
-        [
+    args = [
             "--data-root",
             str(data_root),
             "--chunks-dir",
             str(missing_chunks),
             "--out-dir",
             str(vectors_dir),
-        ],
-    )
+        ]
+    if vector_format != "jsonl":
+        args.extend(["--format", vector_format])
+
+    exit_code = core_cli._run_stage(core_cli.embed, args)
 
     assert exit_code == 0
     warning_fields = [fields for _, message, fields in events if message == "No chunk files found"]
