@@ -24,6 +24,20 @@ from DocsToKG.ContentDownload.telemetry_wayback import (
 from DocsToKG.ContentDownload.telemetry_wayback_sqlite import SQLiteSink, SQLiteTuning
 
 
+class MonotonicStub:
+    """Deterministic monotonic clock for tests."""
+
+    def __init__(self, start: float = 100.0, step: float = 1.0) -> None:
+        self.start = start
+        self.step = step
+        self.calls = 0
+
+    def __call__(self) -> float:
+        value = self.start + self.step * (self.calls // 2)
+        self.calls += 1
+        return value
+
+
 class TestTelemetryWayback:
     """Test cases for TelemetryWayback."""
 
@@ -38,9 +52,14 @@ class TestTelemetryWayback:
         return []
 
     @pytest.fixture
-    def telemetry(self, run_id, sinks):
+    def monotonic_stub(self):
+        """Provide a deterministic monotonic clock stub."""
+        return MonotonicStub(start=200.0, step=1.5)
+
+    @pytest.fixture
+    def telemetry(self, run_id, sinks, monotonic_stub):
         """Create a TelemetryWayback instance."""
-        return TelemetryWayback(run_id, sinks)
+        return TelemetryWayback(run_id, sinks, monotonic_fn=monotonic_stub)
 
     def test_emit_attempt_start(self, telemetry):
         """Test starting an attempt."""
@@ -67,6 +86,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_attempt_end(
@@ -79,12 +99,50 @@ class TestTelemetryWayback:
         # Verify context was updated
         assert ctx.monotonic_ms_since_start() >= 0
 
+    def test_attempt_duration_uses_monotonic_stub(self, run_id):
+        """Durations should reflect the injected monotonic function."""
+
+        events = []
+
+        class CollectSink:
+            def emit(self, event):
+                events.append(event)
+
+        monotonic_stub = MonotonicStub(start=42.0, step=2.0)
+        telemetry = TelemetryWayback(
+            run_id,
+            [CollectSink()],
+            monotonic_fn=monotonic_stub,
+        )
+
+        ctx = telemetry.emit_attempt_start(
+            work_id="work-123",
+            artifact_id="artifact-456",
+            original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
+        )
+
+        telemetry.emit_attempt_end(
+            ctx,
+            mode_selected=ModeSelected.PDF_DIRECT,
+            result=AttemptResult.EMITTED_PDF,
+            candidates_scanned=3,
+        )
+
+        assert len(events) == 2
+        start_event, end_event = events
+        assert start_event["monotonic_ms"] == 0
+        expected_ms = int(monotonic_stub.step * 1000)
+        assert end_event["total_duration_ms"] == expected_ms
+        assert end_event["monotonic_ms"] == expected_ms
+
     def test_emit_discovery_availability(self, telemetry):
         """Test emitting availability discovery."""
         ctx = telemetry.emit_attempt_start(
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_discovery_availability(
@@ -105,6 +163,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_discovery_cdx(
@@ -129,6 +188,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_candidate(
@@ -148,6 +208,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_html_parse(
@@ -168,6 +229,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_pdf_check(
@@ -187,6 +249,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_emit(
@@ -202,6 +265,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_skip(
@@ -651,9 +715,16 @@ class TestAttemptContext:
 
     def test_monotonic_ms_since_start(self):
         """Test monotonic time calculation."""
-        ctx = AttemptContext(run_id="test-run", work_id="work-123", artifact_id="artifact-456")
+        mono = MonotonicStub(start=10.0, step=0.5)
+        ctx = AttemptContext(
+            run_id="test-run",
+            work_id="work-123",
+            artifact_id="artifact-456",
+            monotonic=mono,
+        )
 
-        # Should be 0 or very small initially
-        ms = ctx.monotonic_ms_since_start()
-        assert ms >= 0
-        assert ms < 100  # Should be very small for immediate call
+        # First call should be zero because the clock hasn't advanced.
+        assert ctx.monotonic_ms_since_start() == 0
+
+        # Next call should advance by the stubbed step (0.5s -> 500ms).
+        assert ctx.monotonic_ms_since_start() == int(mono.step * 1000)
