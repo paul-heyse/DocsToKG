@@ -66,6 +66,34 @@ def test_cli_doctor_reports_disk_error(capsys):
         assert "total_bytes" not in disk
 
 
+def test_cli_doctor_reports_invalid_rate_limit_override_json(monkeypatch, capsys):
+    """Invalid rate-limit overrides should surface as doctor JSON errors."""
+
+    with TestingEnvironment():
+        monkeypatch.setenv("ONTOFETCH_PER_HOST_RATE_LIMIT", "not-a-limit")
+        exit_code = cli_module.cli_main(["doctor", "--json"])
+
+    assert exit_code == 0
+
+    output = json.loads(capsys.readouterr().out)
+    rate_limits = output["rate_limits"]
+    error_message = rate_limits.get("error", "")
+    assert "Failed to load default rate limits" in error_message
+    assert "not-a-limit" in error_message
+
+
+def test_cli_doctor_reports_invalid_rate_limit_override_tty(monkeypatch, capsys):
+    """TTY rendering should include invalid rate-limit override errors."""
+
+    with TestingEnvironment():
+        monkeypatch.setenv("ONTOFETCH_PER_HOST_RATE_LIMIT", "not-a-limit")
+        exit_code = cli_module.cli_main(["doctor"])
+
+    assert exit_code == 0
+
+    stdout = capsys.readouterr().out
+    assert "Rate limit check error" in stdout
+    assert "not-a-limit" in stdout
 @pytest.mark.skipif(os.name == "nt", reason="POSIX-style permissions required")
 def test_cli_doctor_reports_missing_execute_permission_in_json(capsys):
     """The JSON report should surface directories lacking execute permissions."""

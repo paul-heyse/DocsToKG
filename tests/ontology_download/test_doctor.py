@@ -12,6 +12,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from DocsToKG.OntologyDownload import cli as cli_module
+from DocsToKG.OntologyDownload.testing import TestingEnvironment
 
 
 def test_doctor_fix_rotates_jsonl(ontology_env, capsys):
@@ -33,3 +34,19 @@ def test_doctor_fix_rotates_jsonl(ontology_env, capsys):
     assert not stale_log.exists(), "stale JSONL log should be rotated"
     compressed = log_dir / "ontofetch-20240101.jsonl.gz"
     assert compressed.exists(), "compressed JSONL log should exist after rotation"
+
+
+def test_doctor_fix_reports_invalid_rate_limit_override(monkeypatch, capsys):
+    """``doctor --fix`` should continue when defaults are invalid."""
+
+    with TestingEnvironment():
+        monkeypatch.setenv("ONTOFETCH_PER_HOST_RATE_LIMIT", "not-a-limit")
+        exit_code = cli_module.cli_main(["doctor", "--fix", "--json"])
+
+    assert exit_code == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    fixes = payload.get("fixes", [])
+    assert any("Skipped log rotation" in fix for fix in fixes), fixes
+    combined_errors = payload.get("rate_limits", {}).get("error", "")
+    assert "Failed to load default rate limits" in combined_errors
