@@ -554,7 +554,9 @@ def request_with_retries(
 ) -> httpx.Response:
     """Execute an HTTP request using a Tenacity-backed retry controller."""
 
-    http_client = client or get_http_client()
+    http_client = client if isinstance(client, httpx.Client) else None
+    if http_client is None:
+        http_client = get_http_client()
 
     if not method:
         raise ValueError("HTTP method must be provided")

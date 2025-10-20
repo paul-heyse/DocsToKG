@@ -180,13 +180,9 @@ if DOWNLOAD_DEPS_AVAILABLE:
     def _download_with_handler(
         handler: Any,
         tmp_path: Path,
-        *,
-        enable_resume: bool = False,
     ) -> tuple[WorkArtifact, Path, Dict[str, Dict[str, Any]], DownloadOutcome]:
         artifact = _make_artifact(tmp_path)
         context: Dict[str, Dict[str, Any]] = {"previous": {}}
-        if enable_resume:
-            context["enable_range_resume"] = True
         client = httpx.Client(transport=httpx.MockTransport(handler))
         try:
             outcome = download_candidate(

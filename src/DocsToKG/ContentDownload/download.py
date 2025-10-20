@@ -172,7 +172,6 @@ class DownloadConfig:
     domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     host_accept_overrides: Dict[str, Any] = field(default_factory=dict)
     progress_callback: Optional[Callable[[int, Optional[int], str], None]] = None
-    enable_range_resume: bool = False
     skip_head_precheck: bool = False
     head_precheck_passed: bool = False
     global_manifest_index: Dict[str, Dict[str, Any]] = field(default_factory=dict)
@@ -187,7 +186,6 @@ class DownloadConfig:
         self.extract_html_text = bool(self.extract_html_text)
         self.content_addressed = bool(self.content_addressed)
         self.verify_cache_digest = bool(self.verify_cache_digest)
-        self.enable_range_resume = bool(self.enable_range_resume)
         self.skip_head_precheck = bool(self.skip_head_precheck)
         self.head_precheck_passed = bool(self.head_precheck_passed)
 
@@ -266,7 +264,6 @@ class DownloadConfig:
             "domain_content_rules": self.domain_content_rules,
             "host_accept_overrides": self.host_accept_overrides,
             "progress_callback": self.progress_callback,
-            "enable_range_resume": self.enable_range_resume,
             "skip_head_precheck": self.skip_head_precheck,
             "head_precheck_passed": self.head_precheck_passed,
             "global_manifest_index": self.global_manifest_index,
@@ -315,7 +312,6 @@ class DownloadConfig:
                 domain_content_rules=options.domain_content_rules,
                 host_accept_overrides=options.host_accept_overrides,
                 progress_callback=options.progress_callback,
-                enable_range_resume=options.enable_range_resume,
                 skip_head_precheck=options.skip_head_precheck,
                 head_precheck_passed=options.head_precheck_passed,
                 global_manifest_index=options.global_manifest_index,

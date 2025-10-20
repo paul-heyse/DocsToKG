@@ -2034,13 +2034,6 @@ class ResolverPipeline:
         outcome_metadata = getattr(outcome, "metadata", None)
         if isinstance(outcome_metadata, dict):
             metadata_payload.update(outcome_metadata)
-        extra_context = getattr(download_context, "extra", None)
-        if isinstance(extra_context, dict) and extra_context.get("resume_disabled"):
-            metadata_payload["resume_disabled"] = True
-        # Strip any legacy resume hints to avoid re-enabling deprecated range flows.
-        for key in list(metadata_payload):
-            if key.startswith("resume_") and key != "resume_disabled":
-                metadata_payload.pop(key, None)
 
         rate_limiter_info = metadata_payload.get("rate_limiter")
         if not isinstance(rate_limiter_info, Mapping):
