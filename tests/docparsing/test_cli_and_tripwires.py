@@ -359,6 +359,44 @@ def test_scripts_respect_data_root(tmp_path: Path) -> None:
         assert doc_env.detect_data_root() == data_root.resolve()
 
 
+def test_plan_command_omits_all_starting_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """docparse plan should not emit the docparse-all start telemetry."""
+
+    dependency_stubs()
+
+    data_root = tmp_path / "Data"
+    html_dir = data_root / "HTML"
+    doctags_dir = data_root / "DocTagsFiles"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    vectors_dir = data_root / "Embeddings"
+
+    html_dir.mkdir(parents=True, exist_ok=True)
+    doctags_dir.mkdir(parents=True, exist_ok=True)
+    chunks_dir.mkdir(parents=True, exist_ok=True)
+    vectors_dir.mkdir(parents=True, exist_ok=True)
+
+    (html_dir / "sample.html").write_text("<html><body>sample</body></html>", encoding="utf-8")
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+
+    caplog.set_level("INFO", logger="DocsToKG.DocParsing.core.cli")
+    caplog.clear()
+
+    core_module = _reload_core_cli()
+
+    exit_code = core_module.plan([])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "docparse all plan" in captured.out
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert "docparse all starting" not in messages
+    assert any("docparse plan" in message for message in messages)
+
+
 # --- Trip-wire regression checks ---
 
 
