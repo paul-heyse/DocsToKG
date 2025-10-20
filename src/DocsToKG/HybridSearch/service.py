@@ -2400,6 +2400,7 @@ class HybridSearchValidator:
             cursor=None,
             diversification=bool(query.get("diversification", False)),
             diagnostics=True,
+            recall_first=bool(query.get("recall_first", False)),
         )
 
     def _persist_reports(

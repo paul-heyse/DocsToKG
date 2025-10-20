@@ -103,3 +103,18 @@ def test_validation_resources_apply_dense_config(caplog, recording_faiss):
 
     # Ensure cached resource is reused
     assert validator._ensure_validation_resources() is resource
+
+
+def test_request_for_query_respects_recall_first_flag():
+    validator = HybridSearchValidator(
+        ingestion=SimpleNamespace(),
+        service=SimpleNamespace(),
+        registry=SimpleNamespace(),
+        opensearch=SimpleNamespace(),
+    )
+
+    payload = {"query": "example", "recall_first": True}
+    request = validator._request_for_query(payload)
+
+    assert request.recall_first is True
+    assert request.diagnostics is True
