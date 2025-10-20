@@ -292,7 +292,7 @@ from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Mapping, MutableMapping, Sequence, Tuple
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import numpy as np
@@ -1049,6 +1049,52 @@ def test_verify_pagination_preserves_recall_first() -> None:
     assert all(call.recall_first for call in service.requests)
 
 
+def test_recall_first_dense_signature_isolated(
+    stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
+    dataset: Sequence[Mapping[str, object]],
+) -> None:
+    ingestion, service, _, _, _, _ = stack()
+    documents = _to_documents(dataset)
+    ingestion.upsert_documents(documents)
+
+    base_request = HybridSearchRequest(
+        query="hybrid retrieval",
+        namespace="research",
+        filters={},
+        page_size=3,
+    )
+    recall_request = replace(base_request, recall_first=True)
+
+    def signature_for(request: HybridSearchRequest) -> tuple[object, ...]:
+        active_filters: MutableMapping[str, object] = dict(request.filters)
+        if request.namespace:
+            active_filters["namespace"] = request.namespace
+        return service._dense_request_signature(request, active_filters)
+
+    service.search(recall_request)
+
+    recall_signature = signature_for(recall_request)
+    normal_signature = signature_for(base_request)
+
+    assert service._dense_strategy.has_cache(recall_signature)
+    assert not service._dense_strategy.has_cache(normal_signature)
+    assert normal_signature not in service._dense_strategy._signature_pass
+
+    service.search(base_request)
+
+    assert service._dense_strategy.has_cache(normal_signature)
+    assert normal_signature in service._dense_strategy._signature_pass
+    assert normal_signature != recall_signature
 def test_cursor_rejects_when_recall_first_mismatch() -> None:
     service = object.__new__(HybridSearchService)
     page_size = 2
