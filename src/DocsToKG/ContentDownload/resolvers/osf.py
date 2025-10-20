@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterable, List
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 
@@ -48,14 +48,14 @@ class OsfResolver(ApiResolverBase):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield OSF download URLs corresponding to ``artifact``.
 
         Args:
-            session: Requests session for HTTP operations.
+            client: HTTPX client for HTTP operations.
             config: Resolver configuration managing limits.
             artifact: Work metadata providing DOI information.
 
@@ -71,7 +71,7 @@ class OsfResolver(ApiResolverBase):
             )
             return
         data, error = self._request_json(
-            session,
+            client,
             "GET",
             "https://api.osf.io/v2/preprints/",
             config=config,

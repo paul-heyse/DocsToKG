@@ -23,7 +23,7 @@ from DocsToKG.ContentDownload.core import strip_prefix
 from .base import RegisteredResolver, ResolverEvent, ResolverEventReason, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
-    import requests as _requests
+    import httpx
 
     from DocsToKG.ContentDownload.core import WorkArtifact
     from DocsToKG.ContentDownload.pipeline import ResolverConfig
@@ -48,7 +48,7 @@ class ArxivResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: "_requests.Session",
+        client: "httpx.Client",  # noqa: ARG002 - unused, kept for signature parity
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:

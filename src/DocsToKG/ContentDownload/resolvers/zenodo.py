@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Iterable
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import normalize_doi
 
@@ -53,14 +53,14 @@ class ZenodoResolver(ApiResolverBase):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield Zenodo hosted PDFs for the supplied work.
 
         Args:
-            session: Requests session for issuing HTTP calls.
+            client: HTTPX client for issuing HTTP calls.
             config: Resolver configuration providing retry policies.
             artifact: Work metadata containing DOI information.
 
@@ -77,7 +77,7 @@ class ZenodoResolver(ApiResolverBase):
             return
 
         data, error = self._request_json(
-            session,
+            client,
             "GET",
             "https://zenodo.org/api/records/",
             config=config,

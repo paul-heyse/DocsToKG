@@ -19,7 +19,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple
 from urllib.parse import quote
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import normalize_doi, normalize_url
 
@@ -50,14 +50,14 @@ class CrossrefResolver(ApiResolverBase):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield PDF URLs referenced by Crossref metadata for ``artifact``.
 
         Args:
-            session: Requests session for outbound HTTP calls.
+            client: HTTPX client for outbound HTTP calls.
             config: Resolver configuration controlling behaviour.
             artifact: Work record containing DOI and other metadata.
 
@@ -75,7 +75,7 @@ class CrossrefResolver(ApiResolverBase):
         email = config.mailto or config.unpaywall_email
         params: Optional[Dict[str, str]] = {"mailto": email} if email else None
         data, error = self._request_json(
-            session,
+            client,
             "GET",
             f"https://api.crossref.org/works/{quote(doi)}",
             config=config,

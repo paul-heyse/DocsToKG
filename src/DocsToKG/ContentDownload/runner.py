@@ -46,7 +46,7 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
-import requests
+import httpx
 from pyalex import Works
 
 from DocsToKG.ContentDownload.args import ResolvedConfig
@@ -64,7 +64,7 @@ from DocsToKG.ContentDownload.download import (
     ensure_dir,
     process_one_work,
 )
-from DocsToKG.ContentDownload.networking import ThreadLocalSessionFactory, create_session
+from DocsToKG.ContentDownload.httpx_transport import get_http_client
 from DocsToKG.ContentDownload.pipeline import (
     DownloadOutcome,
     ResolverMetrics,
@@ -99,7 +99,7 @@ LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 class DownloadRunState:
     """Mutable run-time state shared across the runner lifecycle."""
 
-    session_factory: ThreadLocalSessionFactory
+    http_client: httpx.Client
     options: DownloadConfig
     resume_lookup: Mapping[str, Dict[str, Any]]
     resume_completed: Set[str]
@@ -189,9 +189,6 @@ class DownloadRun:
 
         resume_cleanup = state.resume_cleanup
         state.resume_cleanup = None
-
-        with contextlib.suppress(Exception):
-            state.session_factory.close_all()
 
         if resume_cleanup is not None:
             with contextlib.suppress(Exception):
@@ -328,7 +325,7 @@ class DownloadRun:
 
     def setup_download_state(
         self,
-        session_factory: ThreadLocalSessionFactory,
+        http_client: Optional[httpx.Client] = None,
         robots_cache: Optional[RobotsCache] = None,
     ) -> DownloadRunState:
         """Initialise download options and counters for the run."""
@@ -374,8 +371,9 @@ class DownloadRun:
         if retry_after_cap is not None:
             options.extra["retry_after_cap"] = retry_after_cap
         options.previous_lookup = resume_lookup
+        client = http_client or get_http_client()
         state = DownloadRunState(
-            session_factory=session_factory,
+            http_client=client,
             options=options,
             resume_lookup=resume_lookup,
             resume_completed=resume_completed,
@@ -488,7 +486,8 @@ class DownloadRun:
         self,
         work: WorkArtifact,
         options: DownloadConfig,
-        session: Optional[requests.Session] = None,
+        *,
+        client: Optional[httpx.Client] = None,
     ) -> Dict[str, Any]:
         """Process a single work artefact and update aggregate counters."""
 
@@ -497,8 +496,7 @@ class DownloadRun:
         if self.state is None:
             raise RuntimeError("Download state not initialised.")
 
-        session_factory = self.state.session_factory
-        active_client = session or session_factory()
+        active_client = client or get_http_client()
         result = self.process_one_work_func(
             work,
             active_client,
@@ -509,7 +507,6 @@ class DownloadRun:
             self.attempt_logger,
             self.metrics,
             options=options,
-            session_factory=session_factory,
         )
         self.state.update_from_result(result)
         return result
@@ -585,29 +582,15 @@ class DownloadRun:
                 self.setup_resolver_pipeline()
                 provider = self.setup_work_provider()
 
-                concurrency_product = self.resolved.concurrency_product
-                pool_connections = min(max(64, concurrency_product * 4), 512)
-                pool_maxsize = min(max(128, concurrency_product * 8), 1024)
-
-                def _build_thread_session() -> requests.Session:
-                    return create_session(
-                        self.resolved.resolver_config.polite_headers,
-                        pool_connections=pool_connections,
-                        pool_maxsize=pool_maxsize,
-                    )
-
-                session_factory = ThreadLocalSessionFactory(_build_thread_session)
-                state = self.setup_download_state(session_factory, self.resolved.robots_checker)
+                http_client = get_http_client()
+                state = self.setup_download_state(http_client, self.resolved.robots_checker)
 
                 if self.args.workers == 1:
-                    session = state.session_factory()
+                    client = state.http_client
                     for artifact in provider.iter_artifacts():
-                        if session is None:
-                            session = state.session_factory()
                         try:
-                            self.process_work_item(artifact, state.options, session=session)
+                            self.process_work_item(artifact, state.options, client=client)
                         except Exception as exc:
-                            state.session_factory.close_current()
                             self._handle_worker_exception(
                                 state,
                                 exc,
@@ -618,7 +601,6 @@ class DownloadRun:
                                     state.options.run_id or self.resolved.run_id,
                                 ),
                             )
-                            session = None
                         if self.args.sleep > 0:
                             time.sleep(self.args.sleep)
                 else:
@@ -630,10 +612,6 @@ class DownloadRun:
                         future_context: Dict[
                             Future[Dict[str, Any]],
                             Tuple[WorkArtifact, bool, Optional[str]],
-                        ] = {}
-                        future_thread_ids: Dict[
-                            Future[Dict[str, Any]],
-                            Dict[str, int],
                         ] = {}
                         raw_sleep = getattr(self.args, "sleep", 0.0)
                         sleep_interval = float(raw_sleep or 0.0)
@@ -653,15 +631,12 @@ class DownloadRun:
                                 time.sleep(target_time - now)
 
                         def _submit(work_item: WorkArtifact) -> Future[Dict[str, Any]]:
-                            thread_info: Dict[str, int] = {}
-
                             def _runner() -> Dict[str, Any]:
-                                thread_info["thread_id"] = threading.get_ident()
-                                try:
-                                    return self.process_work_item(work_item, state.options)
-                                except Exception:
-                                    state.session_factory.close_current()
-                                    raise
+                                return self.process_work_item(
+                                    work_item,
+                                    state.options,
+                                    client=state.http_client,
+                                )
 
                             future = executor.submit(_runner)
                             future_work_ids[future] = getattr(work_item, "work_id", None)
@@ -670,16 +645,11 @@ class DownloadRun:
                                 bool(state.options.dry_run),
                                 state.options.run_id or self.resolved.run_id,
                             )
-                            future_thread_ids[future] = thread_info
                             return future
 
                         def _handle_future(completed_future: Future[Dict[str, Any]]) -> None:
                             work_id = future_work_ids.pop(completed_future, None)
                             artifact_context = future_context.pop(completed_future, None)
-                            thread_info = future_thread_ids.pop(completed_future, None)
-                            thread_id = (
-                                thread_info.get("thread_id") if thread_info is not None else None
-                            )
                             try:
                                 completed_future.result()
                             except Exception as exc:
@@ -689,8 +659,6 @@ class DownloadRun:
                                     work_id=work_id,
                                     artifact_context=artifact_context,
                                 )
-                                if thread_id is not None:
-                                    state.session_factory.close_for_thread(thread_id)
                                 return
 
                         for artifact in provider.iter_artifacts():
@@ -840,7 +808,11 @@ def iterate_openalex(
                 page = next(pager_iter)
             except StopIteration:
                 return
-            except (requests.HTTPError, requests.RequestException) as exc:
+            except Exception as exc:
+                is_httpx_error = isinstance(exc, httpx.HTTPError)
+                is_requests_like = exc.__class__.__name__ in {"HTTPError", "RequestException"}
+                if not (is_httpx_error or is_requests_like):
+                    raise
                 if attempt >= max_retries:
                     LOGGER.error(
                         "OpenAlex pagination failed with no retries remaining (allowed=%s).",

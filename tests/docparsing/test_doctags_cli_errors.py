@@ -23,30 +23,32 @@ def _create_cli_stubs(tmp_path: Path) -> Path:
     stub_dir.mkdir(parents=True, exist_ok=True)
     (stub_dir / "yaml.py").write_text("def safe_load(raw):\n    return {}\n", encoding="utf-8")
 
-    pydantic_core_dir = stub_dir / "pydantic_core"
-    pydantic_core_dir.mkdir(parents=True, exist_ok=True)
-    (pydantic_core_dir / "__init__.py").write_text(
-        "class ValidationError(Exception):\n    pass\n",
-        encoding="utf-8",
-    )
-
-    pydantic_settings_dir = stub_dir / "pydantic_settings"
-    pydantic_settings_dir.mkdir(parents=True, exist_ok=True)
-    (pydantic_settings_dir / "__init__.py").write_text(
-        "class BaseSettings:\n    def __init__(self, **kwargs):\n        for key, value in kwargs.items():\n"
-        "            setattr(self, key, value)\n\n"
-        "class SettingsConfigDict(dict):\n    pass\n",
-        encoding="utf-8",
-    )
-
     return stub_dir
 
 
 def _prepare_runtime(tmp_path: Path, patcher: PatchManager) -> None:
     stub_dir = _create_cli_stubs(tmp_path)
     fake_deps = Path(__file__).resolve().parent / "fake_deps"
+
     patcher.syspath_prepend(str(fake_deps))
     patcher.syspath_prepend(str(stub_dir))
+
+    ontology_io_module = types.ModuleType("DocsToKG.OntologyDownload.io")
+    ontology_io_module.mask_sensitive_data = lambda value: value
+    ontology_io_module.sanitize_filename = lambda path: str(path)
+    patcher.setitem(sys.modules, "DocsToKG.OntologyDownload.io", ontology_io_module)
+
+    logging_utils_module = types.ModuleType("DocsToKG.OntologyDownload.logging_utils")
+
+    class _StubJSONFormatter:
+        def format(self, record):  # pragma: no cover - simple passthrough
+            return getattr(record, "message", "")
+
+    logging_utils_module.JSONFormatter = _StubJSONFormatter
+    logging_utils_module.mask_sensitive_data = ontology_io_module.mask_sensitive_data
+    logging_utils_module.sanitize_filename = ontology_io_module.sanitize_filename
+    patcher.setitem(sys.modules, "DocsToKG.OntologyDownload.logging_utils", logging_utils_module)
+
     patcher.setitem(
         sys.modules,
         "pooch",

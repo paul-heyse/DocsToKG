@@ -329,7 +329,7 @@ flowchart LR
 ## Data Contracts & Schemas
 
 - Manifests: `docparse.doctags|chunk|embeddings.manifest.jsonl` (append-only, idempotent).
-- Schemas: `formats.CHUNK_ROW_SCHEMA`, `formats.VECTOR_ROW_SCHEMA`, manifest payloads in `telemetry.ManifestEntry`.
+- Schemas: `DocsToKG.DocParsing.formats` exports `ChunkRow`, `VectorRow`, and schema version helpers; `DocsToKG.DocParsing.schemas` is a deprecated shim scheduled for removal in DocsToKG 0.3.0.
 - Outputs use consistent doc IDs/hashes across stages so resume + downstream ingestion remain deterministic.
 - Advisory locks in `telemetry.StageTelemetry` prevent concurrent writers from corrupting manifests.
 

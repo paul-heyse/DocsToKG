@@ -17,9 +17,9 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable, Optional
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.networking import request_with_retries
 from .base import (
@@ -54,14 +54,14 @@ class WaybackResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Query the Wayback Machine for archived versions of failed URLs.
 
         Args:
-            session: Requests session for HTTP calls.
+            client: HTTPX client for HTTP calls.
             config: Resolver configuration providing timeouts and headers.
             artifact: Work metadata listing failed PDF URLs to retry.
 
@@ -77,9 +77,10 @@ class WaybackResolver(RegisteredResolver):
             return
 
         for original in artifact.failed_pdf_urls:
+            resp: Optional[httpx.Response] = None
             try:
                 resp = request_with_retries(
-                    session,
+                    client,
                     "get",
                     "https://archive.org/wayback/available",
                     params={"url": original},
@@ -87,7 +88,8 @@ class WaybackResolver(RegisteredResolver):
                     headers=config.polite_headers,
                     retry_after_cap=config.retry_after_cap,
                 )
-            except _requests.Timeout as exc:
+                resp.raise_for_status()
+            except httpx.TimeoutException as exc:
                 yield ResolverResult(
                     url=None,
                     event=ResolverEvent.ERROR,
@@ -99,7 +101,7 @@ class WaybackResolver(RegisteredResolver):
                     },
                 )
                 continue
-            except _requests.ConnectionError as exc:
+            except httpx.TransportError as exc:
                 yield ResolverResult(
                     url=None,
                     event=ResolverEvent.ERROR,
@@ -107,7 +109,20 @@ class WaybackResolver(RegisteredResolver):
                     metadata={"original": original, "error": str(exc)},
                 )
                 continue
-            except _requests.RequestException as exc:
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                yield ResolverResult(
+                    url=None,
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.HTTP_ERROR,
+                    http_status=status,
+                    metadata={
+                        "original": original,
+                        "error_detail": str(exc),
+                    },
+                )
+                continue
+            except httpx.RequestError as exc:
                 yield ResolverResult(
                     url=None,
                     event=ResolverEvent.ERROR,
@@ -128,31 +143,23 @@ class WaybackResolver(RegisteredResolver):
                     },
                 )
                 continue
-            if resp.status_code != 200:
-                yield ResolverResult(
-                    url=None,
-                    event=ResolverEvent.ERROR,
-                    event_reason=ResolverEventReason.HTTP_ERROR,
-                    http_status=resp.status_code,
-                    metadata={
-                        "original": original,
-                        "error_detail": f"Wayback returned {resp.status_code}",
-                    },
-                )
-                continue
             try:
-                data = resp.json()
-            except ValueError as json_err:
-                yield ResolverResult(
-                    url=None,
-                    event=ResolverEvent.ERROR,
-                    event_reason=ResolverEventReason.JSON_ERROR,
-                    metadata={"original": original, "error_detail": str(json_err)},
-                )
-                continue
-            closest = (data.get("archived_snapshots") or {}).get("closest") or {}
-            if closest.get("available") and closest.get("url"):
-                metadata = {"original": original}
-                if closest.get("timestamp"):
-                    metadata["timestamp"] = closest["timestamp"]
-                yield ResolverResult(url=closest["url"], metadata=metadata)
+                try:
+                    data = resp.json()
+                except ValueError as json_err:
+                    yield ResolverResult(
+                        url=None,
+                        event=ResolverEvent.ERROR,
+                        event_reason=ResolverEventReason.JSON_ERROR,
+                        metadata={"original": original, "error_detail": str(json_err)},
+                    )
+                    continue
+                closest = (data.get("archived_snapshots") or {}).get("closest") or {}
+                if closest.get("available") and closest.get("url"):
+                    metadata = {"original": original}
+                    if closest.get("timestamp"):
+                        metadata["timestamp"] = closest["timestamp"]
+                    yield ResolverResult(url=closest["url"], metadata=metadata)
+            finally:
+                if resp is not None:
+                    resp.close()

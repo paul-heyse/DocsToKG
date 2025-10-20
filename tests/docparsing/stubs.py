@@ -37,7 +37,6 @@ _FAKE_MODULES: Tuple[Tuple[str, str, bool], ...] = (
     ("sentence_transformers", "tests.docparsing.fake_deps.sentence_transformers", True),
     ("vllm", "tests.docparsing.fake_deps.vllm", True),
     ("tqdm", "tests.docparsing.fake_deps.tqdm", True),
-    ("pydantic", "tests.docparsing.fake_deps.pydantic", False),
     ("transformers", "tests.docparsing.fake_deps.transformers", True),
     ("docling_core", "tests.docparsing.fake_deps.docling_core", True),
     ("docling_core.transforms", "tests.docparsing.fake_deps.docling_core.transforms", True),

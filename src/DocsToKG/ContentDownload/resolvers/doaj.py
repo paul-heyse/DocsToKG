@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Iterable, List
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 
@@ -49,14 +49,14 @@ class DoajResolver(ApiResolverBase):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield PDF links surfaced by the DOAJ search API.
 
         Args:
-            session: Requests session for outbound HTTP calls.
+            client: HTTPX client for outbound HTTP calls.
             config: Resolver configuration containing optional API key.
             artifact: Work record supplying DOI metadata.
 
@@ -75,7 +75,7 @@ class DoajResolver(ApiResolverBase):
         if config.doaj_api_key:
             extra_headers["X-API-KEY"] = config.doaj_api_key
         data, error = self._request_json(
-            session,
+            client,
             "GET",
             "https://doaj.org/api/v2/search/articles/",
             config=config,

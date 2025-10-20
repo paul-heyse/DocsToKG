@@ -26,7 +26,6 @@ def _reset_fake_modules():
         "sentence_transformers",
         "vllm",
         "tqdm",
-        "pydantic",
         "transformers",
         "docling_core",
         "docling_core.transforms",

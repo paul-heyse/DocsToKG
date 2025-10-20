@@ -4,10 +4,10 @@
 #   "purpose": "Data models and validators for DocParsing artifact formats",
 #   "sections": [
 #     {
-#       "id": "missing-pydantic-message",
-#       "name": "_missing_pydantic_message",
-#       "anchor": "function-missing-pydantic-message",
-#       "kind": "function"
+#       "id": "schemakind",
+#       "name": "SchemaKind",
+#       "anchor": "class-schemakind",
+#       "kind": "class"
 #     },
 #     {
 #       "id": "provenancemetadata",
@@ -52,12 +52,6 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "pydantic-validate-vector-row",
-#       "name": "_pydantic_validate_vector_row",
-#       "anchor": "function-pydantic-validate-vector-row",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "validate-vector-row",
 #       "name": "validate_vector_row",
 #       "anchor": "function-validate-vector-row",
@@ -91,12 +85,13 @@ DocParsing Formats
 This module defines Pydantic models, validation helpers, and Docling serializer
 providers used throughout the DocParsing pipeline. By gathering schema
 definitions alongside the Markdown-aware serializers, downstream stages can
-import one module for all data contract needs.
+import one module for all data contract needs without relying on auxiliary
+schema packages.
 
 Key Features:
 - Strict schemas for chunk JSONL rows and embedding vector rows
-- Optional dependency stubs for environments without Pydantic installed
-- Convenience validators for schema versions and provenance metadata
+- Canonical schema-version helpers co-located with the models
+- Convenience validators for provenance metadata and serializer utilities
 
 Usage:
     from DocsToKG.DocParsing import formats
@@ -105,14 +100,15 @@ Usage:
     provider = formats.RichSerializerProvider()
 
 Dependencies:
-- pydantic (optional): Offers model validation when available; graceful fallbacks
-  raise informative errors otherwise.
+- pydantic>=2,<3: Required for schema validation and model parsing.
 - docling_core: Supplies serializer base classes consumed by DocsToKG.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+from enum import Enum
 
 from docling_core.transforms.chunker.hierarchical_chunker import (
     ChunkingDocSerializer,
@@ -135,185 +131,113 @@ from docling_core.types.doc.document import (
 from docling_core.types.doc.document import DoclingDocument as _Doc
 from typing_extensions import override
 
-from DocsToKG.DocParsing.schemas import (
-    CHUNK_SCHEMA_VERSION,
-    COMPATIBLE_CHUNK_VERSIONS,
-    COMPATIBLE_VECTOR_VERSIONS,
-    VECTOR_SCHEMA_VERSION,
-    SchemaKind,
-    validate_schema_version,
-)
-
-# --- Globals ---
-
-PYDANTIC_AVAILABLE = True
-
-try:  # Optional dependency
+try:
     from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
-    _PYDANTIC_IMPORT_ERROR: Exception | None = None
-except Exception as exc:  # pragma: no cover - exercised via tests with stubs
-    PYDANTIC_AVAILABLE = False
-    _PYDANTIC_IMPORT_ERROR = exc
-
-    class _PydanticStubBase:
-        """Minimal stub that raises an actionable error on instantiation.
-
-        Attributes:
-            None: This stub purposely exposes no attributes to mimic the BaseModel API.
-
-        Examples:
-            >>> _PydanticStubBase()  # doctest: +IGNORE_EXCEPTION_DETAIL
-            Traceback (most recent call last):
-            ...
-            RuntimeError: Optional dependency 'pydantic' is required ...
-        """
-
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            """Prevent instantiation when Pydantic is unavailable.
-
-            Args:
-                *args: Positional arguments forwarded by callers expecting Pydantic.
-                **kwargs: Keyword arguments forwarded by callers expecting Pydantic.
-
-            Returns:
-                None
-
-            Raises:
-                RuntimeError: Always raised instructing users to install Pydantic.
-            """
-
-            raise RuntimeError(_missing_pydantic_message()) from _PYDANTIC_IMPORT_ERROR
-
-        def model_dump(self, *args: Any, **kwargs: Any) -> Any:  # pragma: no cover - stub
-            """Mirror :meth:`pydantic.BaseModel.model_dump` error semantics.
-
-            Args:
-                *args: Positional arguments passed through from callers.
-                **kwargs: Keyword arguments passed through from callers.
-
-            Returns:
-                Never returns; the method always raises to signal missing dependency.
-
-            Raises:
-                RuntimeError: Always raised to indicate Pydantic is unavailable.
-            """
-
-            raise RuntimeError(_missing_pydantic_message()) from _PYDANTIC_IMPORT_ERROR
-
-    class BaseModel(_PydanticStubBase):  # type: ignore[no-redef]
-        """Fallback BaseModel that raises informative errors when used.
-
-        Attributes:
-            model_config: Dictionary mirroring the ``model_config`` contract from Pydantic.
-
-        Examples:
-            >>> BaseModel()  # doctest: +IGNORE_EXCEPTION_DETAIL
-            Traceback (most recent call last):
-            ...
-            RuntimeError: Optional dependency 'pydantic' is required ...
-        """
-
-        model_config: Dict[str, Any] = {}
-
-    def Field(*args: Any, **kwargs: Any) -> Any:  # type: ignore[override]
-        """Return default values in place of real Pydantic field descriptors.
-
-        Args:
-            *args: Positional arguments supplied to mimic :func:`pydantic.Field`.
-            **kwargs: Keyword arguments mirroring :func:`pydantic.Field` parameters.
-
-        Returns:
-            The provided default value or ``None`` when unspecified.
-        """
-
-        return kwargs.get("default", args[0] if args else None)
-
-    def field_validator(*_args: Any, **_kwargs: Any):  # type: ignore[override]
-        """Provide a decorator shim compatible with Pydantic field validators.
-
-        Args:
-            *_args: Positional decorator arguments (ignored in stub mode).
-            **_kwargs: Keyword decorator arguments (ignored in stub mode).
-
-        Returns:
-            Callable[[Callable[..., Any]], Callable[..., Any]]: Decorator passthrough.
-        """
-
-        def decorator(func):
-            """Return the wrapped function unchanged when validation is stubbed.
-
-            Args:
-                func: Function being decorated.
-
-            Returns:
-                The original function without modification.
-            """
-
-            return func
-
-        return decorator
-
-    def model_validator(*_args: Any, **_kwargs: Any):  # type: ignore[override]
-        """Provide a decorator shim compatible with model-level validators.
-
-        Args:
-            *_args: Positional decorator arguments (ignored in stub mode).
-            **_kwargs: Keyword decorator arguments (ignored in stub mode).
-
-        Returns:
-            Callable[[Callable[..., Any]], Callable[..., Any]]: Decorator passthrough.
-        """
-
-        def decorator(func):
-            """Return the wrapped function unchanged when validation is stubbed.
-
-            Args:
-                func: Function being decorated.
-
-            Returns:
-                The original function without modification.
-            """
-
-            return func
-
-        return decorator
-
-    def ConfigDict(**kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
-        """Return a dictionary mimicking Pydantic's ``ConfigDict`` helper.
-
-        Args:
-            **kwargs: Configuration keyword arguments.
-
-        Returns:
-            Dictionary containing the supplied configuration data.
-        """
-
-        return dict(kwargs)
+except ImportError as exc:  # pragma: no cover - hard dependency guard
+    raise RuntimeError(
+        "DocsToKG.DocParsing requires pydantic>=2,<3; install it via "
+        '`pip install "pydantic>=2,<3"`.'
+    ) from exc
 
 
-# --- Private Helpers ---
+# --- Schema Metadata ---
+
+SchemaVersion = str
 
 
-def _missing_pydantic_message() -> str:
-    """Return a consistent optional dependency warning message."""
+class SchemaKind(str, Enum):
+    """Enumerate schema families handled by DocParsing pipelines."""
 
-    return (
-        "Optional dependency 'pydantic' is required for DocParsing schema "
-        "validation. Install it with `pip install 'pydantic>=2,<3'` to enable "
-        "the validation helpers."
+    CHUNK = "chunk"
+    VECTOR = "vector"
+
+
+_DEFAULT_VERSIONS: Dict[SchemaKind, SchemaVersion] = {
+    SchemaKind.CHUNK: "docparse/1.1.0",
+    SchemaKind.VECTOR: "embeddings/1.0.0",
+}
+
+_COMPATIBLE_VERSIONS: Dict[SchemaKind, Tuple[SchemaVersion, ...]] = {
+    SchemaKind.CHUNK: ("docparse/1.0.0", "docparse/1.1.0"),
+    SchemaKind.VECTOR: ("embeddings/1.0.0",),
+}
+
+CHUNK_SCHEMA_VERSION: SchemaVersion = _DEFAULT_VERSIONS[SchemaKind.CHUNK]
+VECTOR_SCHEMA_VERSION: SchemaVersion = _DEFAULT_VERSIONS[SchemaKind.VECTOR]
+COMPATIBLE_CHUNK_VERSIONS: Tuple[SchemaVersion, ...] = _COMPATIBLE_VERSIONS[SchemaKind.CHUNK]
+COMPATIBLE_VECTOR_VERSIONS: Tuple[SchemaVersion, ...] = _COMPATIBLE_VERSIONS[SchemaKind.VECTOR]
+
+
+def _coerce_kind(kind: SchemaKind | str) -> SchemaKind:
+    """Normalise raw schema identifiers to ``SchemaKind`` enums."""
+
+    if isinstance(kind, SchemaKind):
+        return kind
+    try:
+        return SchemaKind(kind)
+    except ValueError as exc:  # pragma: no cover - defensive guard
+        raise ValueError(f"Unknown schema kind: {kind!r}") from exc
+
+
+def get_default_schema_version(kind: SchemaKind | str) -> SchemaVersion:
+    """Return the canonical schema version for ``kind``."""
+
+    return _DEFAULT_VERSIONS[_coerce_kind(kind)]
+
+
+def get_compatible_versions(kind: SchemaKind | str) -> Tuple[SchemaVersion, ...]:
+    """Return the tuple of compatible versions for ``kind``."""
+
+    return _COMPATIBLE_VERSIONS[_coerce_kind(kind)]
+
+
+def validate_schema_version(
+    version: SchemaVersion,
+    kind: SchemaKind | str,
+    *,
+    compatible_versions: Optional[Iterable[SchemaVersion]] = None,
+    context: Optional[str] = None,
+) -> SchemaVersion:
+    """Validate that ``version`` is compatible for ``kind``."""
+
+    schema_kind = _coerce_kind(kind)
+    compatible = tuple(compatible_versions or get_compatible_versions(schema_kind))
+    if version not in compatible:
+        suffix = f" ({context})" if context else ""
+        raise ValueError(
+            f"Unsupported {schema_kind.value} schema version {version!r}{suffix}; "
+            f"supported versions: {', '.join(compatible)}"
+        )
+    return version
+
+
+def ensure_chunk_schema(
+    rec: dict,
+    *,
+    default_version: Optional[SchemaVersion] = None,
+    context: Optional[str] = None,
+) -> dict:
+    """Ensure ``rec`` declares a compatible chunk schema version."""
+
+    version = rec.get("schema_version")
+    if not version:
+        rec["schema_version"] = default_version or CHUNK_SCHEMA_VERSION
+        return rec
+
+    coerced = str(version)
+    validate_schema_version(
+        coerced,
+        SchemaKind.CHUNK,
+        context=context,
     )
-
-
-# isort: off
-
-
-# isort: on
+    rec["schema_version"] = coerced
+    return rec
 
 # --- Globals ---
 
 __all__ = [
-    "PYDANTIC_AVAILABLE",
+    "SchemaKind",
+    "SchemaVersion",
     "CHUNK_SCHEMA_VERSION",
     "VECTOR_SCHEMA_VERSION",
     "COMPATIBLE_CHUNK_VERSIONS",
@@ -328,6 +252,9 @@ __all__ = [
     "validate_vector_row",
     "get_docling_version",
     "validate_schema_version",
+    "get_default_schema_version",
+    "get_compatible_versions",
+    "ensure_chunk_schema",
     "CaptionPlusAnnotationPictureSerializer",
     "RichSerializerProvider",
 ]
@@ -740,9 +667,6 @@ def validate_chunk_row(row: dict) -> ChunkRow:
         'docparse/1.1.0'
     """
 
-    if not PYDANTIC_AVAILABLE:
-        raise RuntimeError(_missing_pydantic_message()) from _PYDANTIC_IMPORT_ERROR
-
     try:
         return ChunkRow(**row)
     except Exception as exc:  # pragma: no cover - exercised by tests raising ValueError
@@ -773,9 +697,6 @@ def _pydantic_validate_vector_row(row: dict) -> VectorRow:
         'uuid'
     """
 
-    if not PYDANTIC_AVAILABLE:
-        raise RuntimeError(_missing_pydantic_message()) from _PYDANTIC_IMPORT_ERROR
-
     try:
         return VectorRow(**row)
     except Exception as exc:  # pragma: no cover - exercised by tests raising ValueError
@@ -784,11 +705,16 @@ def _pydantic_validate_vector_row(row: dict) -> VectorRow:
 
 
 def validate_vector_row(row: dict, *, expected_dimension: Optional[int] = None) -> VectorRow:
-    """Wrap :func:`DocParsing.schemas.validate_vector_row` for backward compatibility."""
+    """Validate a vector JSONL row and optionally enforce the dense dimension."""
 
-    from DocsToKG.DocParsing.schemas import validate_vector_row as _schema_validate_vector_row
-
-    return _schema_validate_vector_row(row, expected_dimension=expected_dimension)
+    vector_row = _pydantic_validate_vector_row(row)
+    qwen_vector = vector_row.Qwen3_4B
+    actual_dim = qwen_vector.dimension or len(qwen_vector.vector)
+    if expected_dimension is not None and actual_dim != expected_dimension:
+        raise ValueError(
+            f"Qwen vector dimension {actual_dim} does not match expected {expected_dimension}"
+        )
+    return vector_row
 
 
 def get_docling_version() -> str:
@@ -1047,6 +973,5 @@ class RichSerializerProvider(ChunkingSerializerProvider):
         return serializer
 
 
-if PYDANTIC_AVAILABLE:
-    ChunkRow.model_rebuild()
-    VectorRow.model_rebuild()
+ChunkRow.model_rebuild()
+VectorRow.model_rebuild()

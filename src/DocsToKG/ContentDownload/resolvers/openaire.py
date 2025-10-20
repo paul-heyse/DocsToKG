@@ -20,7 +20,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Iterable, List
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 
@@ -60,14 +60,14 @@ class OpenAireResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield OpenAIRE URLs that point to downloadable PDFs.
 
         Args:
-            session: Requests session for issuing HTTP requests.
+            client: HTTPX client for issuing HTTP requests.
             config: Resolver configuration providing timeouts and headers.
             artifact: Work metadata containing the DOI lookup.
 
@@ -84,7 +84,7 @@ class OpenAireResolver(RegisteredResolver):
             return
         try:
             resp = request_with_retries(
-                session,
+                client,
                 "get",
                 "https://api.openaire.eu/search/publications",
                 params={"doi": doi},
@@ -92,7 +92,8 @@ class OpenAireResolver(RegisteredResolver):
                 timeout=config.get_timeout(self.name),
                 retry_after_cap=config.retry_after_cap,
             )
-        except _requests.Timeout as exc:
+            resp.raise_for_status()
+        except httpx.TimeoutException as exc:
             yield ResolverResult(
                 url=None,
                 event=ResolverEvent.ERROR,
@@ -100,7 +101,7 @@ class OpenAireResolver(RegisteredResolver):
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
-        except _requests.ConnectionError as exc:
+        except httpx.TransportError as exc:
             yield ResolverResult(
                 url=None,
                 event=ResolverEvent.ERROR,
@@ -108,7 +109,17 @@ class OpenAireResolver(RegisteredResolver):
                 metadata={"error": str(exc)},
             )
             return
-        except _requests.RequestException as exc:
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            yield ResolverResult(
+                url=None,
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.HTTP_ERROR,
+                http_status=status,
+                metadata={"error_detail": str(exc)},
+            )
+            return
+        except httpx.RequestError as exc:
             yield ResolverResult(
                 url=None,
                 event=ResolverEvent.ERROR,
@@ -125,40 +136,34 @@ class OpenAireResolver(RegisteredResolver):
                 metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
-        if resp.status_code != 200:
-            yield ResolverResult(
-                url=None,
-                event=ResolverEvent.ERROR,
-                event_reason=ResolverEventReason.HTTP_ERROR,
-                http_status=resp.status_code,
-                metadata={"error_detail": f"OpenAIRE API returned {resp.status_code}"},
-            )
-            return
         try:
-            data = resp.json()
-        except ValueError:
             try:
-                data = json.loads(resp.text)
-            except ValueError as json_err:
-                preview = resp.text[:200] if hasattr(resp, "text") else ""
+                data = resp.json()
+            except ValueError:
+                try:
+                    data = json.loads(resp.text)
+                except ValueError as json_err:
+                    preview = resp.text[:200] if hasattr(resp, "text") else ""
+                    yield ResolverResult(
+                        url=None,
+                        event=ResolverEvent.ERROR,
+                        event_reason=ResolverEventReason.JSON_ERROR,
+                        metadata={"error_detail": str(json_err), "content_preview": preview},
+                    )
+                    return
+            except Exception as exc:  # pragma: no cover
+                LOGGER.exception("Unexpected JSON error in OpenAIRE resolver")
                 yield ResolverResult(
                     url=None,
                     event=ResolverEvent.ERROR,
-                    event_reason=ResolverEventReason.JSON_ERROR,
-                    metadata={"error_detail": str(json_err), "content_preview": preview},
+                    event_reason=ResolverEventReason.UNEXPECTED_ERROR,
+                    metadata={"error": str(exc), "error_type": type(exc).__name__},
                 )
                 return
-        except Exception as exc:  # pragma: no cover
-            LOGGER.exception("Unexpected JSON error in OpenAIRE resolver")
-            yield ResolverResult(
-                url=None,
-                event=ResolverEvent.ERROR,
-                event_reason=ResolverEventReason.UNEXPECTED_ERROR,
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
-            )
-            return
-        results: List[str] = []
-        _collect_candidate_urls(data, results)
-        for url in dedupe(results):
-            if url.lower().endswith(".pdf"):
-                yield ResolverResult(url=url, metadata={"source": "openaire"})
+            results: List[str] = []
+            _collect_candidate_urls(data, results)
+            for url in dedupe(results):
+                if url.lower().endswith(".pdf"):
+                    yield ResolverResult(url=url, metadata={"source": "openaire"})
+        finally:
+            resp.close()

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterable
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import normalize_doi
 
@@ -50,14 +50,14 @@ class CoreResolver(ApiResolverBase):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield download URLs discovered via the CORE search API.
 
         Args:
-            session: Requests session to execute HTTP calls.
+            client: HTTPX client to execute HTTP calls.
             config: Resolver configuration with credentials and limits.
             artifact: Work record providing identifiers.
 
@@ -75,7 +75,7 @@ class CoreResolver(ApiResolverBase):
             return
         headers = {"Authorization": f"Bearer {config.core_api_key}"}
         data, error = self._request_json(
-            session,
+            client,
             "GET",
             "https://api.core.ac.uk/v3/search/works",
             config=config,

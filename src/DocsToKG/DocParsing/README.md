@@ -270,7 +270,8 @@ direnv exec . pytest tests/docparsing -q
 direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # optional perf check
 ```
 - Format / lint: `direnv exec . ruff format src/DocsToKG/DocParsing tests/docparsing`.
-- Fixtures: `tests/docparsing/fakes` hosts Docling, vLLM, and pydantic stubs for offline testing; sample corpora live under `tests/data/docparsing`.
+- Fixtures: `tests/docparsing/fakes` hosts Docling and vLLM stubs for offline testing (Pydantic now uses the real package); sample corpora live under `tests/data/docparsing`.
+- Schema helpers: import `ChunkRow`, `VectorRow`, and validators from `DocsToKG.DocParsing.formats`. `DocsToKG.DocParsing.schemas` remains as a warning-emitting shim until DocsToKG 0.3.0.
 - Use dependency stubs in tests (`tests.docparsing.stubs`) to run without GPUs.
 
 ## Agent guardrails

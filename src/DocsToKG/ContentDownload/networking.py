@@ -184,10 +184,6 @@ __all__ = (
     "CircuitBreaker",
     "TokenBucket",
     "configure_http_client",
-    "TENACITY_SLEEP",
-    "ThreadLocalSessionFactory",
-    "create_session",
-    "get_thread_session",
     "get_http_client",
     "purge_http_cache",
     "head_precheck",
@@ -197,52 +193,27 @@ __all__ = (
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
-TENACITY_SLEEP = time.sleep
-
 DEFAULT_RETRYABLE_STATUSES: Set[int] = {429, 500, 502, 503, 504}
 _TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
 
-
-# --- Public Functions ---
-
-
-class ThreadLocalSessionFactory:
-    """Legacy compatibility wrapper returning the shared HTTPX client."""
-
-    def __init__(self, builder: Optional[Callable[[], httpx.Client]] = None) -> None:
-        self._builder = builder
-
-    def get_thread_session(self) -> httpx.Client:
-        if callable(self._builder):
-            try:
-                return self._builder()
-            except Exception:  # pragma: no cover - defensive legacy path
-                LOGGER.debug("Custom session builder failed; falling back to shared client", exc_info=True)
-        return get_http_client()
-
-    def __call__(self) -> httpx.Client:
-        return self.get_thread_session()
-
-    def close_current(self) -> None:
-        return None
-
-    def close_for_thread(self, thread_id: int) -> None:  # pylint: disable=unused-argument
-        return None
-
-    def close_all(self) -> None:
-        return None
+_DEPRECATED_ATTR_ERRORS: Dict[str, str] = {
+    "ThreadLocalSessionFactory": (
+        "ThreadLocalSessionFactory has been removed; ContentDownload now shares a singleton "
+        "HTTPX client. Patch DocsToKG.ContentDownload.httpx_transport.get_http_client() instead."
+    ),
+    "create_session": (
+        "create_session() has been removed; configure or patch the HTTPX client via "
+        "DocsToKG.ContentDownload.httpx_transport instead."
+    ),
+}
 
 
-def get_thread_session() -> httpx.Client:
-    """Return the shared HTTPX client for compatibility with legacy callers."""
+def __getattr__(name: str) -> Any:
+    """Provide explicit errors for legacy session factory access."""
 
-    return get_http_client()
-
-
-def create_session(*args: Any, **kwargs: Any) -> httpx.Client:  # pylint: disable=unused-argument
-    """Return the shared HTTPX client for compatibility with legacy callers."""
-
-    return get_http_client()
+    if name in _DEPRECATED_ATTR_ERRORS:
+        raise RuntimeError(_DEPRECATED_ATTR_ERRORS[name])
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def parse_retry_after_header(response: httpx.Response) -> Optional[float]:
@@ -563,7 +534,7 @@ def _build_retrying_controller(
         retry=retry_condition,
         wait=wait_strategy,
         stop=stop_strategy,
-        sleep=TENACITY_SLEEP,
+        sleep=time.sleep,
         reraise=True,
         before_sleep=_before_sleep_handler,
         retry_error_callback=_retry_error_callback,

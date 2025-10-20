@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterable
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import dedupe
 
@@ -48,14 +48,14 @@ class OpenAlexResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,  # noqa: ARG002 - unused, kept for signature parity
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield URLs surfaced directly from OpenAlex metadata.
 
         Args:
-            session: Requests session (unused; signature parity).
+            client: HTTPX client (unused; retained for signature parity).
             config: Resolver configuration controlling policy headers.
             artifact: Work metadata containing PDF candidates.
 

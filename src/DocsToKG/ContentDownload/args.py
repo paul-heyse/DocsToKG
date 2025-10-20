@@ -37,8 +37,6 @@ from functools import lru_cache
 from itertools import islice
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
-
-import requests
 from pyalex import Topics, Works
 
 from DocsToKG.ContentDownload.core import (
@@ -812,7 +810,7 @@ def _lookup_topic_id(topic_text: str) -> Optional[str]:
     try:
         query = Topics().search(topic_text).select(["id"]).per_page(1)
         hits = query.get()
-    except requests.RequestException as exc:  # pragma: no cover - network guard
+    except Exception as exc:  # pragma: no cover - network guard
         LOGGER.warning("Topic lookup failed for %s: %s", topic_text, exc)
         return None
     if not hits:

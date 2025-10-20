@@ -1601,7 +1601,7 @@ class ResolverPipeline:
 
     def _head_precheck_url(
         self,
-        session: httpx.Client,
+        client: httpx.Client,
         url: str,
         timeout: float,
         content_policy: Optional[Dict[str, Any]] = None,
@@ -1609,7 +1609,7 @@ class ResolverPipeline:
         """Delegate to the shared network-layer preflight helper.
 
         Args:
-            session: Requests session used to issue the HEAD preflight.
+            client: HTTPX client used to issue the HEAD preflight.
             url: Candidate URL that may host a downloadable document.
             timeout: Maximum duration in seconds to wait for the HEAD response.
 
@@ -1617,24 +1617,24 @@ class ResolverPipeline:
             bool: ``True`` when the URL passes preflight checks, ``False`` otherwise.
         """
 
-        return head_precheck(session, url, timeout, content_policy=content_policy)
+        return head_precheck(client, url, timeout, content_policy=content_policy)
 
     def run(
         self,
-        session: httpx.Client,
+        client: httpx.Client,
         artifact: "WorkArtifact",
         context: Optional[Union["DownloadConfig", DownloadContext, Mapping[str, Any]]] = None,
         *,
-        session_factory: Optional[Callable[[], httpx.Client]] = None,
+        client_provider: Optional[Callable[[], httpx.Client]] = None,
     ) -> PipelineResult:
         """Execute resolvers until a PDF is obtained or resolvers are exhausted.
 
         Args:
-            session: Requests session used for resolver HTTP calls.
+            client: HTTPX client used for resolver HTTP calls.
             artifact: Work artifact describing the document to resolve.
             context: Optional :class:`DownloadContext` (or mapping) containing execution flags.
-            session_factory: Optional callable returning a thread-local session for
-                resolver execution. When omitted, the provided ``session`` is reused.
+            client_provider: Optional callable returning a client for resolver execution.
+                When omitted, the provided ``client`` is reused.
 
         Returns:
             PipelineResult capturing resolver attempts and successful downloads.
@@ -1642,24 +1642,23 @@ class ResolverPipeline:
 
         context_obj = _coerce_download_context(context)
         state = _RunState(dry_run=context_obj.dry_run)
-        if session_factory is None:
+        if client_provider is None:
 
-            def session_provider() -> httpx.Client:
-                """Return the shared HTTP session when no factory override is provided."""
-                return session
+            def client_provider_fn() -> httpx.Client:
+                return client
 
         else:
-            session_provider = session_factory
+            client_provider_fn = client_provider
 
         if self.config.max_concurrent_resolvers == 1:
-            return self._run_sequential(session, session_provider, artifact, context_obj, state)
+            return self._run_sequential(client, client_provider_fn, artifact, context_obj, state)
 
-        return self._run_concurrent(session, session_provider, artifact, context_obj, state)
+        return self._run_concurrent(client, client_provider_fn, artifact, context_obj, state)
 
     def _run_sequential(
         self,
-        session: httpx.Client,
-        session_provider: Callable[[], httpx.Client],
+        client: httpx.Client,
+        client_provider: Callable[[], httpx.Client],
         artifact: "WorkArtifact",
         context: DownloadContext,
         state: _RunState,
@@ -1667,8 +1666,8 @@ class ResolverPipeline:
         """Execute resolvers in order using the current thread.
 
         Args:
-            session: Shared requests session for resolver HTTP calls.
-            session_provider: Callable returning the session for the active thread.
+            client: Shared HTTPX client for resolver HTTP calls.
+            client_provider: Callable returning the client for the active thread.
             artifact: Work artifact describing the document being processed.
             context: Execution context object.
             state: Mutable run state tracking attempts and duplicates.
@@ -1694,13 +1693,13 @@ class ResolverPipeline:
             results, wall_ms = self._collect_resolver_results(
                 resolver_name,
                 resolver,
-                session_provider,
+                client_provider,
                 artifact,
             )
 
             for result in results:
                 pipeline_result = self._process_result(
-                    session,
+                    client,
                     artifact,
                     resolver_name,
                     order_index,
@@ -1722,8 +1721,8 @@ class ResolverPipeline:
 
     def _run_concurrent(
         self,
-        session: httpx.Client,
-        session_provider: Callable[[], httpx.Client],
+        client: httpx.Client,
+        client_provider: Callable[[], httpx.Client],
         artifact: "WorkArtifact",
         context: DownloadContext,
         state: _RunState,
@@ -1731,8 +1730,8 @@ class ResolverPipeline:
         """Execute resolvers concurrently using a thread pool.
 
         Args:
-            session: Shared requests session for resolver HTTP calls.
-            session_provider: Callable returning the session for the active thread.
+            client: Shared HTTPX client for resolver HTTP calls.
+            client_provider: Callable returning the client for the active thread.
             artifact: Work artifact describing the document being processed.
             context: Execution context object.
             state: Mutable run state tracking attempts and duplicates.
@@ -1778,7 +1777,7 @@ class ResolverPipeline:
                     self._collect_resolver_results,
                     resolver_name,
                     resolver,
-                    session_provider,
+                    client_provider,
                     artifact,
                 )
                 active_futures[future] = (resolver_name, order_index)
@@ -1807,7 +1806,7 @@ class ResolverPipeline:
 
                     for result in results:
                         pipeline_result = self._process_result(
-                            session,
+                        client,
                             artifact,
                             resolver_name,
                             order_index,
@@ -1938,7 +1937,7 @@ class ResolverPipeline:
         self,
         resolver_name: str,
         resolver: Resolver,
-        session_provider: Callable[[], httpx.Client],
+        client_provider: Callable[[], httpx.Client],
         artifact: "WorkArtifact",
     ) -> Tuple[List[ResolverResult], float]:
         """Collect resolver results while applying rate limits and error handling.
@@ -1946,14 +1945,14 @@ class ResolverPipeline:
         Args:
             resolver_name: Name of the resolver being executed (for logging and limits).
             resolver: Resolver instance that will generate candidate URLs.
-            session_provider: Callable returning the requests session for the current thread.
+            client_provider: Callable returning the HTTPX client for the current thread.
             artifact: Work artifact describing the current document.
 
         Returns:
             Tuple of resolver results and the resolver wall time (ms).
         """
 
-        session = session_provider()
+        session = client_provider()
         results: List[ResolverResult] = []
         self._respect_rate_limit(resolver_name)
         start = _time.monotonic()
@@ -1975,7 +1974,7 @@ class ResolverPipeline:
 
     def _process_result(
         self,
-        session: httpx.Client,
+        client: httpx.Client,
         artifact: "WorkArtifact",
         resolver_name: str,
         order_index: int,
@@ -1988,7 +1987,7 @@ class ResolverPipeline:
         """Process a single resolver result and return a terminal pipeline outcome.
 
         Args:
-            session: Requests session used for follow-up download calls.
+            client: HTTPX client used for follow-up download calls.
             artifact: Work artifact describing the document being processed.
             resolver_name: Name of the resolver that produced the result.
             order_index: 1-based index of the resolver in the execution order.
@@ -2127,7 +2126,7 @@ class ResolverPipeline:
         head_precheck_passed = False
         if self._should_attempt_head_check(resolver_name, url):
             head_precheck_passed = self._head_precheck_url(
-                session,
+                client,
                 url,
                 self.config.get_timeout(resolver_name),
                 self.config.get_content_policy(host_for_policy),
@@ -2193,7 +2192,7 @@ class ResolverPipeline:
 
             if self._download_accepts_context:
                 outcome = self.download_func(
-                    session,
+                    client,
                     artifact,
                     url,
                     result.referer,
@@ -2203,7 +2202,7 @@ class ResolverPipeline:
                 )
             else:
                 outcome = self.download_func(
-                    session,
+                    client,
                     artifact,
                     url,
                     result.referer,

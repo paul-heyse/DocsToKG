@@ -17,10 +17,9 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Tuple
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 
@@ -59,14 +58,14 @@ class UnpaywallResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield Unpaywall-sourced PDF URLs for ``artifact``.
 
         Args:
-            session: Requests session for outbound HTTP calls.
+            client: HTTPX client for outbound HTTP calls.
             config: Resolver configuration with API parameters.
             artifact: Work metadata used to build the lookup.
 
@@ -82,8 +81,8 @@ class UnpaywallResolver(RegisteredResolver):
             )
             return
         try:
-            data = _fetch_unpaywall_data(session, config, doi)
-        except _requests.Timeout as exc:
+            data = _fetch_unpaywall_data(client, config, doi)
+        except httpx.TimeoutException as exc:
             yield ResolverResult(
                 url=None,
                 event=ResolverEvent.ERROR,
@@ -91,7 +90,7 @@ class UnpaywallResolver(RegisteredResolver):
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
-        except _requests.ConnectionError as exc:
+        except httpx.TransportError as exc:
             yield ResolverResult(
                 url=None,
                 event=ResolverEvent.ERROR,
@@ -99,15 +98,8 @@ class UnpaywallResolver(RegisteredResolver):
                 metadata={"error": str(exc)},
             )
             return
-        except _requests.HTTPError as exc:
-            status = None
-            response_obj = getattr(exc, "response", None)
-            if response_obj is not None and hasattr(response_obj, "status_code"):
-                status = response_obj.status_code
-            if status is None:
-                match = re.search(r"(\d{3})", str(exc))
-                if match:
-                    status = int(match.group(1))
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code if exc.response is not None else None
             yield ResolverResult(
                 url=None,
                 event=ResolverEvent.ERROR,
@@ -116,7 +108,7 @@ class UnpaywallResolver(RegisteredResolver):
                 metadata={"error_detail": str(exc)},
             )
             return
-        except _requests.RequestException as exc:
+        except httpx.RequestError as exc:
             yield ResolverResult(
                 url=None,
                 event=ResolverEvent.ERROR,

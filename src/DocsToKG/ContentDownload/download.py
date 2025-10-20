@@ -55,7 +55,7 @@ from urllib.parse import urlparse, urlsplit
 from urllib.robotparser import RobotFileParser
 
 import httpx
-import requests
+import httpcore
 
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
@@ -1200,7 +1200,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                         hasher=hasher,
                         keep_partial_on_error=True,
                     )
-                except (httpx.HTTPError, requests.exceptions.ChunkedEncodingError, AttributeError) as exc:
+                except (httpx.HTTPError, httpcore.ProtocolError, AttributeError) as exc:
                     LOGGER.warning(
                         "Streaming download failed for %s: %s",
                         url,
@@ -2337,7 +2337,6 @@ def process_one_work(
     metrics: ResolverMetrics,
     *,
     options: DownloadConfig,
-    session_factory: Optional[Callable[[], httpx.Client]] = None,
     strategy_selector: Callable[
         [Classification], DownloadStrategy
     ] = get_strategy_for_classification,
@@ -2356,8 +2355,6 @@ def process_one_work(
         logger: Structured attempt logger capturing manifest records.
         metrics: Resolver metrics collector.
         options: :class:`DownloadConfig` describing download behaviour for the work.
-        session_factory: Optional factory used to supply resolver-specific clients when
-            concurrency is enabled. Defaults to the shared HTTPX client.
 
     Returns:
         Dictionary summarizing the outcome (saved/html_only/skipped flags).
@@ -2440,16 +2437,7 @@ def process_one_work(
         result["skipped"] = True
         return result
 
-    active_client = client
-    if active_client is None:
-        if session_factory is not None:
-            try:
-                active_client = session_factory()
-            except Exception:  # pragma: no cover - defensive guard
-                LOGGER.debug("Custom session factory failed; falling back to shared client", exc_info=True)
-                active_client = None
-        if active_client is None:
-            active_client = get_http_client()
+    active_client = client or get_http_client()
 
     existing_pdf = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
     existing_xml = artifact.xml_dir / f"{artifact.base_stem}.xml"
@@ -2482,7 +2470,6 @@ def process_one_work(
         active_client,
         artifact,
         context=download_context,
-        session_factory=session_factory,
     )
     html_paths_total = list(pipeline_result.html_paths)
 

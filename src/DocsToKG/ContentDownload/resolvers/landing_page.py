@@ -20,7 +20,7 @@ import logging
 import warnings
 from typing import TYPE_CHECKING, Iterable
 
-import requests as _requests
+import httpx
 
 from .base import (
     BeautifulSoup,
@@ -62,14 +62,14 @@ class LandingPageResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Scrape landing pages for PDF links and yield matching results.
 
         Args:
-            session: Requests session for HTTP interactions.
+            client: HTTPX client for HTTP interactions.
             config: Resolver configuration providing timeouts and headers.
             artifact: Work metadata containing landing URLs.
 
@@ -86,14 +86,15 @@ class LandingPageResolver(RegisteredResolver):
         for landing in artifact.landing_urls:
             try:
                 resp = request_with_retries(
-                    session,
+                    client,
                     "get",
                     landing,
                     headers=config.polite_headers,
                     timeout=config.get_timeout(self.name),
                     retry_after_cap=config.retry_after_cap,
                 )
-            except _requests.Timeout as exc:
+                resp.raise_for_status()
+            except httpx.TimeoutException as exc:
                 yield ResolverResult(
                     url=None,
                     event=ResolverEvent.ERROR,
@@ -105,7 +106,7 @@ class LandingPageResolver(RegisteredResolver):
                     },
                 )
                 continue
-            except _requests.ConnectionError as exc:
+            except httpx.TransportError as exc:
                 yield ResolverResult(
                     url=None,
                     event=ResolverEvent.ERROR,
@@ -113,7 +114,20 @@ class LandingPageResolver(RegisteredResolver):
                     metadata={"landing": landing, "error": str(exc)},
                 )
                 continue
-            except _requests.RequestException as exc:  # pragma: no cover
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                yield ResolverResult(
+                    url=None,
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.HTTP_ERROR,
+                    http_status=status,
+                    metadata={
+                        "landing": landing,
+                        "error_detail": str(exc),
+                    },
+                )
+                continue
+            except httpx.RequestError as exc:  # pragma: no cover
                 yield ResolverResult(
                     url=None,
                     event=ResolverEvent.ERROR,
@@ -135,39 +149,29 @@ class LandingPageResolver(RegisteredResolver):
                 )
                 continue
 
-            if resp.status_code != 200:
-                yield ResolverResult(
-                    url=None,
-                    event=ResolverEvent.ERROR,
-                    event_reason=ResolverEventReason.HTTP_ERROR,
-                    http_status=resp.status_code,
-                    metadata={
-                        "landing": landing,
-                        "error_detail": f"Landing page returned {resp.status_code}",
-                    },
-                )
-                continue
-
-            parser_name = "lxml"
-            content_type = (resp.headers.get("Content-Type") or "").lower()
-            if "xml" in content_type:
-                parser_name = "lxml-xml"
-            if XMLParsedAsHTMLWarning is not None:
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+            try:
+                parser_name = "lxml"
+                content_type = (resp.headers.get("Content-Type") or "").lower()
+                if "xml" in content_type:
+                    parser_name = "lxml-xml"
+                if XMLParsedAsHTMLWarning is not None:
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+                        soup = BeautifulSoup(resp.text, parser_name)
+                else:
                     soup = BeautifulSoup(resp.text, parser_name)
-            else:
-                soup = BeautifulSoup(resp.text, parser_name)
-            for pattern, finder in (
-                ("meta", find_pdf_via_meta),
-                ("link", find_pdf_via_link),
-                ("anchor", find_pdf_via_anchor),
-            ):
-                candidate = finder(soup, landing)
-                if candidate:
-                    yield ResolverResult(
-                        url=candidate,
-                        referer=landing,
-                        metadata={"pattern": pattern},
-                    )
-                    break
+                for pattern, finder in (
+                    ("meta", find_pdf_via_meta),
+                    ("link", find_pdf_via_link),
+                    ("anchor", find_pdf_via_anchor),
+                ):
+                    candidate = finder(soup, landing)
+                    if candidate:
+                        yield ResolverResult(
+                            url=candidate,
+                            referer=landing,
+                            metadata={"pattern": pattern},
+                        )
+                        break
+            finally:
+                resp.close()

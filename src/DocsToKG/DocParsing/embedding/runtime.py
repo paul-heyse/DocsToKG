@@ -447,18 +447,14 @@ from DocsToKG.DocParsing.env import (
 )
 from DocsToKG.DocParsing.formats import (
     VECTOR_SCHEMA_VERSION,
-)
-from DocsToKG.DocParsing.formats import (
     BM25Vector as _BM25Vector,
-)
-from DocsToKG.DocParsing.formats import (
     DenseVector as _DenseVector,
-)
-from DocsToKG.DocParsing.formats import (
     SPLADEVector as _SPLADEVector,
-)
-from DocsToKG.DocParsing.formats import (
     VectorRow as _VectorRow,
+    SchemaKind,
+    ensure_chunk_schema,
+    validate_schema_version,
+    validate_vector_row as _validate_vector_row,
 )
 from DocsToKG.DocParsing.io import (
     StreamingContentHasher,
@@ -486,14 +482,6 @@ from DocsToKG.DocParsing.logging import (
 )
 from DocsToKG.DocParsing.logging import (
     manifest_log_success as _logging_manifest_log_success,
-)
-from DocsToKG.DocParsing.schemas import (
-    SchemaKind,
-    ensure_chunk_schema,
-    validate_schema_version,
-)
-from DocsToKG.DocParsing.schemas import (
-    validate_vector_row as schema_validate_vector_row,
 )
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
@@ -2273,7 +2261,7 @@ def _validate_vectors_for_chunks(
         try:
             for batch in _iter_vector_rows(vector_path, fmt_normalised, batch_size=4096):
                 for row in batch:
-                    schema_validate_vector_row(row, expected_dimension=expected_dimension)
+                    _validate_vector_row(row, expected_dimension=expected_dimension)
                     rows_validated += 1
                     file_rows += 1
         except ValueError as exc:

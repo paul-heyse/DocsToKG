@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterable, List
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 
@@ -48,14 +48,14 @@ class EuropePmcResolver(ApiResolverBase):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield PDF URLs announced by the Europe PMC REST API.
 
         Args:
-            session: Requests session for HTTP calls.
+            client: HTTPX client for HTTP calls.
             config: Resolver configuration controlling limits.
             artifact: Work record that triggered this resolver.
 
@@ -72,7 +72,7 @@ class EuropePmcResolver(ApiResolverBase):
             )
             return
         data, error = self._request_json(
-            session,
+            client,
             "GET",
             "https://www.ebi.ac.uk/europepmc/webservices/rest/search",
             config=config,

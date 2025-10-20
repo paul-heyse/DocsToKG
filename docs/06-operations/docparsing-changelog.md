@@ -1,5 +1,23 @@
 # 1. DocParsing Pipeline Changelog
 
+## 2. 2025-03-15 — make-pydantic-required-collapse-schemas
+
+### 2.1 Summary
+* Made `pydantic>=2,<3` a hard dependency for DocParsing schema helpers by removing optional-import stubs.
+* Consolidated chunk/vector schema metadata into `DocsToKG.DocParsing.formats` and introduced a temporary shim that warns on `DocsToKG.DocParsing.schemas` imports (removal planned for DocsToKG 0.3.0).
+* Deleted fake Pydantic test packages, added regression coverage to prevent legacy imports, and documented the new canonical module across runbooks.
+
+### 2.2 Migration Guide
+1. Update any remaining imports to pull `ChunkRow`, `VectorRow`, and schema helpers from `DocsToKG.DocParsing.formats`.
+2. Ensure deployment environments install `pydantic>=2,<3`; the runtime now raises immediately if the dependency is missing.
+3. Treat `DocsToKG.DocParsing.schemas` as deprecated and schedule its removal in alignment with the 0.3.0 release.
+
+### 2.3 Validation Checklist
+* `pytest tests/docparsing/test_import_shim.py`
+* `pytest tests/docparsing -k "not synthetic"`
+* `python scripts/enforce_no_legacy_schema_imports.py`
+
+
 ## 1. 2025-03-09 — refactor-docparsing-pipeline implementation
 
 ### 1.1 Summary

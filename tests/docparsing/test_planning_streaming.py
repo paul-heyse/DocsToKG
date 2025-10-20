@@ -4,7 +4,8 @@ Planning must scan large DocTags inventories without materialising everything in
 memory. These tests stub configuration loaders and confirm that the generators
 returned by `plan_doctags`, `plan_chunk`, and related helpers maintain streaming
 behaviour, drop references promptly, and honour skip/force flags even when YAML
-or Pydantic dependencies are faked out.
+dependencies are faked out. Pydantic and its companion packages are now treated
+as hard requirements and imported directly at module scope.
 """
 
 from __future__ import annotations
@@ -17,6 +18,11 @@ from typing import Dict
 
 from tests.conftest import PatchManager
 
+# Hard dependency checks: importing at module scope ensures required packages
+# exist and surfaces actionable errors if the environment is misconfigured.
+import pydantic_core  # noqa: F401
+import pydantic_settings  # noqa: F401
+
 if "yaml" not in sys.modules:
     yaml_stub = types.ModuleType("yaml")
     yaml_stub.safe_load = lambda *args, **kwargs: {}
@@ -28,37 +34,6 @@ if "yaml" not in sys.modules:
     yaml_stub.Dumper = object
     sys.modules["yaml"] = yaml_stub
 
-if "pydantic_core" not in sys.modules:
-    try:  # pragma: no cover - exercised in environments without pydantic-core
-        import pydantic_core as _pydantic_core  # type: ignore
-    except ImportError:
-        pydantic_core_stub = types.ModuleType("pydantic_core")
-
-        class _StubValidationError(Exception):
-            """Lightweight placeholder mirroring pydantic-core's ValidationError."""
-
-            pass
-
-        pydantic_core_stub.ValidationError = _StubValidationError
-        pydantic_core_stub.__version__ = "2.41.4"
-        sys.modules["pydantic_core"] = pydantic_core_stub
-    else:  # pragma: no cover - when real pydantic-core is installed
-        sys.modules["pydantic_core"] = _pydantic_core
-
-if "pydantic_settings" not in sys.modules:
-    pydantic_settings_stub = types.ModuleType("pydantic_settings")
-
-    class _StubBaseSettings:
-        """Minimal stand-in for ``pydantic_settings.BaseSettings``."""
-
-        model_config: dict[str, object] | None = None
-
-    def _settings_config_dict(**kwargs):
-        return kwargs
-
-    pydantic_settings_stub.BaseSettings = _StubBaseSettings
-    pydantic_settings_stub.SettingsConfigDict = _settings_config_dict
-    sys.modules["pydantic_settings"] = pydantic_settings_stub
 
 if "pooch" not in sys.modules:
     pooch_stub = types.ModuleType("pooch")

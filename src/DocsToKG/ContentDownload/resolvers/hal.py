@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterable, List
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 
@@ -48,14 +48,14 @@ class HalResolver(ApiResolverBase):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield HAL download URLs referencing ``artifact``.
 
         Args:
-            session: Requests session to execute HTTP calls.
+            client: HTTPX client to execute HTTP calls.
             config: Resolver configuration with request limits.
             artifact: Work metadata that supplies the DOI.
 
@@ -71,7 +71,7 @@ class HalResolver(ApiResolverBase):
             )
             return
         data, error = self._request_json(
-            session,
+            client,
             "GET",
             "https://api.archives-ouvertes.fr/search/",
             config=config,

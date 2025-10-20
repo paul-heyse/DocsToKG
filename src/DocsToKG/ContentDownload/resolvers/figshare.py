@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Iterable, List, Optional
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.core import normalize_doi
 
@@ -53,14 +53,14 @@ class FigshareResolver(ApiResolverBase):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield Figshare file download URLs associated with ``artifact``.
 
         Args:
-            session: Requests session for issuing HTTP requests.
+            client: HTTPX client for issuing HTTP requests.
             config: Resolver configuration controlling Figshare access.
             artifact: Work metadata used to seed the query.
 
@@ -78,7 +78,7 @@ class FigshareResolver(ApiResolverBase):
 
         extra_headers = {"Content-Type": "application/json"}
         data, error = self._request_json(
-            session,
+            client,
             "POST",
             "https://api.figshare.com/v2/articles/search",
             config=config,

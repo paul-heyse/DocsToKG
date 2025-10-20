@@ -112,7 +112,7 @@ from typing import (
 )
 from urllib.parse import quote, urljoin, urlparse
 
-import requests as _requests
+import httpx
 
 from DocsToKG.ContentDownload.networking import request_with_retries
 
@@ -252,7 +252,7 @@ class Resolver(Protocol):
 
     def iter_urls(
         self,
-        session: _requests.Session,
+        session: httpx.Client,
         config: "ResolverConfig",
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -305,7 +305,7 @@ class ApiResolverBase(RegisteredResolver, register=False):
 
     def _request_json(
         self,
-        session: _requests.Session,
+        client: httpx.Client,
         method: str,
         url: str,
         *,
@@ -325,7 +325,7 @@ class ApiResolverBase(RegisteredResolver, register=False):
 
         try:
             response = request_with_retries(
-                session,
+                client,
                 method,
                 url,
                 params=params,
@@ -335,7 +335,7 @@ class ApiResolverBase(RegisteredResolver, register=False):
                 retry_after_cap=config.retry_after_cap,
                 **kwargs,
             )
-        except _requests.Timeout as exc:
+        except httpx.TimeoutException as exc:
             return (
                 None,
                 ResolverResult(
@@ -349,7 +349,7 @@ class ApiResolverBase(RegisteredResolver, register=False):
                     },
                 ),
             )
-        except _requests.ConnectionError as exc:
+        except httpx.RequestError as exc:
             return (
                 None,
                 ResolverResult(
@@ -359,7 +359,7 @@ class ApiResolverBase(RegisteredResolver, register=False):
                     metadata={"url": url, "error": str(exc)},
                 ),
             )
-        except _requests.RequestException as exc:
+        except httpx.HTTPError as exc:
             return (
                 None,
                 ResolverResult(
@@ -488,7 +488,7 @@ def find_pdf_via_anchor(soup: "BeautifulSoup", base_url: str) -> Optional[str]:
 
 
 def _fetch_semantic_scholar_data(
-    session: _requests.Session,
+    client: httpx.Client,
     config: "ResolverConfig",
     doi: str,
 ) -> Dict[str, Any]:
@@ -498,7 +498,7 @@ def _fetch_semantic_scholar_data(
     if getattr(config, "semantic_scholar_api_key", None):
         headers["x-api-key"] = config.semantic_scholar_api_key
     response = request_with_retries(
-        session,
+        client,
         "GET",
         f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(doi)}",
         params={"fields": "title,openAccessPdf"},
@@ -507,10 +507,7 @@ def _fetch_semantic_scholar_data(
         retry_after_cap=config.retry_after_cap,
     )
     try:
-        if response.status_code != 200:
-            error = _requests.HTTPError(f"Semantic Scholar HTTPError: {response.status_code}")
-            error.response = response
-            raise error
+        response.raise_for_status()
         return response.json()
     finally:
         close = getattr(response, "close", None)
@@ -519,7 +516,7 @@ def _fetch_semantic_scholar_data(
 
 
 def _fetch_unpaywall_data(
-    session: _requests.Session,
+    client: httpx.Client,
     config: "ResolverConfig",
     doi: str,
 ) -> Dict[str, Any]:
@@ -529,7 +526,7 @@ def _fetch_unpaywall_data(
     headers = dict(config.polite_headers)
     params = {"email": config.unpaywall_email} if getattr(config, "unpaywall_email", None) else None
     response = request_with_retries(
-        session,
+        client,
         "GET",
         endpoint,
         params=params,
@@ -538,10 +535,7 @@ def _fetch_unpaywall_data(
         retry_after_cap=config.retry_after_cap,
     )
     try:
-        if response.status_code != 200:
-            error = _requests.HTTPError(f"Unpaywall HTTPError: {response.status_code}")
-            error.response = response
-            raise error
+        response.raise_for_status()
         return response.json()
     finally:
         close = getattr(response, "close", None)
