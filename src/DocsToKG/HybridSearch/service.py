@@ -3381,18 +3381,46 @@ class HybridSearchValidator:
         """
         oversamples = [1, 2, 3]
         results: List[Mapping[str, object]] = []
-        total_chunks = max(1, self._registry.count())
+        chunks = list(self._registry.all())
+        total_chunks = max(1, len(chunks))
+        config_manager = getattr(self._service, "_config_manager", None)
+        retrieval_cfg = None
+        if config_manager is not None:
+            config = config_manager.get()
+            retrieval_cfg = getattr(config, "retrieval", None)
+        batch_size_raw = (
+            getattr(retrieval_cfg, "dense_calibration_batch_size", None)
+            if retrieval_cfg is not None
+            else None
+        )
+        try:
+            batch_size = int(batch_size_raw) if batch_size_raw is not None else None
+        except (TypeError, ValueError):
+            batch_size = None
+        if batch_size is None or batch_size <= 0:
+            batch_size = max(1, len(chunks))
         for oversample in oversamples:
             hits = 0
             embedding_cache: Dict[str, np.ndarray] = {}
-            for chunk in self._registry.all():
-                top_k = max(1, oversample * 3)
-                query_vector = self._registry.resolve_embedding(
-                    chunk.vector_id, cache=embedding_cache
-                )
-                search_hits = self._ingestion.faiss_index.search(query_vector, top_k)
-                if search_hits and search_hits[0].vector_id == chunk.vector_id:
-                    hits += 1
+            top_k = max(1, oversample * 3)
+            if chunks:
+                for start in range(0, len(chunks), batch_size):
+                    batch_chunks = chunks[start : start + batch_size]
+                    vector_ids = [chunk.vector_id for chunk in batch_chunks]
+                    if not vector_ids:
+                        continue
+                    embedding_matrix = self._registry.resolve_embeddings(
+                        vector_ids, cache=embedding_cache
+                    )
+                    if embedding_matrix.size == 0:
+                        continue
+                    queries = np.ascontiguousarray(embedding_matrix, dtype=np.float32)
+                    batch_hits = self._ingestion.faiss_index.search_batch(queries, top_k)
+                    if not batch_hits:
+                        continue
+                    for chunk, hits_list in zip(batch_chunks, batch_hits):
+                        if hits_list and hits_list[0].vector_id == chunk.vector_id:
+                            hits += 1
             accuracy = hits / total_chunks
             results.append({"oversample": oversample, "self_hit_accuracy": accuracy})
         passed = all(
