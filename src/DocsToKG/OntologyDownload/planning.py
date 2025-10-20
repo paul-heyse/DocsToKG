@@ -1918,6 +1918,29 @@ def fetch_one(
                             ) from exc
 
                 validation_results = run_validators(validation_requests, adapter)
+                failed_validators = [
+                    name
+                    for name, result in validation_results.items()
+                    if not getattr(result, "ok", False)
+                ]
+                if failed_validators:
+                    log_payload = {
+                        "stage": "validate",
+                        "validators": failed_validators,
+                        "strict": not active_config.defaults.continue_on_error,
+                    }
+                    if active_config.defaults.continue_on_error:
+                        adapter.warning(
+                            "validation failures ignored", extra=log_payload
+                        )
+                    else:
+                        adapter.error(
+                            "validation failures detected", extra=log_payload
+                        )
+                        raise OntologyDownloadError(
+                            "Validation failed for "
+                            f"'{effective_spec.id}' via {', '.join(failed_validators)}"
+                        )
 
                 normalized_hash = None
                 streaming_content_hash = None
