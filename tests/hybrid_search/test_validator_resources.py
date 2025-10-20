@@ -336,7 +336,7 @@ def test_embeddings_for_results_respect_namespace(duplicate_namespace_registry):
 
     report = validator._run_calibration([])
 
-    expected_accuracy = sum(1 for flag in matches.values() if flag) / max(1, len(matches))
+    expected_accuracy = sum(1 for flag in matches.values() if flag) / len(matches)
     dense_results = report.details["dense"]
     assert all(math.isclose(entry["self_hit_accuracy"], expected_accuracy) for entry in dense_results)
     assert registry.all_calls == 1
