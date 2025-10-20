@@ -57,12 +57,6 @@
 #       "anchor": "class-circuitbreaker",
 #       "kind": "class"
 #     },
-#     {
-#       "id": "tokenbucket",
-#       "name": "TokenBucket",
-#       "anchor": "class-tokenbucket",
-#       "kind": "class"
-#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -148,7 +142,6 @@ __all__ = (
     "ModifiedResult",
     "ContentPolicyViolation",
     "CircuitBreaker",
-    "TokenBucket",
     "configure_http_client",
     "get_http_client",
     "purge_http_cache",

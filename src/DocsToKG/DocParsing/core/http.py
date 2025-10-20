@@ -2,8 +2,8 @@
 
 Certain DocParsing stages—particularly DocTags conversion when downloading
 checkpoint models—perform lightweight HTTP calls. This module wraps the
-``requests`` session setup with retry/backoff defaults, timeout normalisation,
-and thread-safe caching so callers can use a hardened client without duplicating
+``httpx`` client setup with retry/backoff defaults, timeout normalisation, and
+thread-safe caching so callers can use a hardened client without duplicating
 connection pooling logic.
 """
 
@@ -13,13 +13,12 @@ import logging
 import re
 import threading
 import time
+from contextlib import suppress
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from contextlib import suppress
 from typing import Mapping, Optional, Sequence, Tuple
 
-import requests
-from requests.adapters import HTTPAdapter
+import httpx
 from tenacity import (
     Retrying,
     retry_if_exception_type,
@@ -32,7 +31,7 @@ from tenacity.wait import wait_base
 DEFAULT_HTTP_TIMEOUT: Tuple[float, float] = (5.0, 30.0)
 
 _HTTP_SESSION_LOCK = threading.Lock()
-_HTTP_SESSION: Optional["TenacitySession"] = None
+_HTTP_SESSION: Optional["TenacityClient"] = None
 _HTTP_SESSION_TIMEOUT: Tuple[float, float] = DEFAULT_HTTP_TIMEOUT
 
 __all__ = [
@@ -54,15 +53,15 @@ class _RetryAfterWait(wait_base):
         outcome = retry_state.outcome
         if outcome is not None and not outcome.failed:
             response = outcome.result()
-            if isinstance(response, requests.Response):
+            if isinstance(response, httpx.Response):
                 retry_after = _parse_retry_after_header(response.headers.get("Retry-After"))
                 if retry_after is not None:
                     delay = max(delay, retry_after)
         return max(delay, 0.0)
 
 
-class TenacitySession(requests.Session):
-    """`requests.Session` subclass that delegates retries to Tenacity."""
+class TenacityClient(httpx.Client):
+    """`httpx.Client` subclass that delegates retries to Tenacity."""
 
     def __init__(
         self,
@@ -72,25 +71,22 @@ class TenacitySession(requests.Session):
         status_forcelist: Sequence[int],
         allowed_methods: Sequence[str],
     ) -> None:
-        super().__init__()
-        adapter = HTTPAdapter(max_retries=0)
-        self.mount("http://", adapter)
-        self.mount("https://", adapter)
+        timeout = self._coerce_timeout(DEFAULT_HTTP_TIMEOUT)
+        super().__init__(timeout=timeout, follow_redirects=True)
         self._retry_total = max(0, int(retry_total))
         self._retry_backoff = float(retry_backoff)
         self._status_forcelist = {int(code) for code in status_forcelist}
         self._allowed_methods = {method.upper() for method in allowed_methods}
         self._retryable_exceptions = (
-            requests.Timeout,
-            requests.ConnectionError,
-            requests.RequestException,
+            httpx.TimeoutException,
+            httpx.RequestError,
         )
         self._default_timeout: Tuple[float, float] = DEFAULT_HTTP_TIMEOUT
         self._logger = logging.getLogger(__name__)
         self._wait_strategy = _RetryAfterWait(backoff_factor=self._retry_backoff)
 
-    def clone_with_headers(self, headers: Mapping[str, str]) -> "TenacitySession":
-        clone = TenacitySession(
+    def clone_with_headers(self, headers: Mapping[str, str]) -> "TenacityClient":
+        clone = TenacityClient(
             retry_total=self._retry_total,
             retry_backoff=self._retry_backoff,
             status_forcelist=tuple(self._status_forcelist),
@@ -102,18 +98,28 @@ class TenacitySession(requests.Session):
             if value is not None:
                 clone.headers[str(key)] = str(value)
         with suppress(Exception):
-            clone.cookies = self.cookies.copy()  # type: ignore[assignment]
+            clone.cookies.update(self.cookies)  # type: ignore[arg-type]
         clone.auth = self.auth
-        clone.proxies = self.proxies.copy()
-        clone.verify = self.verify
-        clone.cert = self.cert
-        clone.trust_env = self.trust_env
-        clone.params = self.params.copy()
+        with suppress(Exception):
+            clone.params.update(self.params)  # type: ignore[arg-type]
+        clone._set_default_timeout(clone._default_timeout)
         return clone
+
+    def _coerce_timeout(self, timeout: Optional[object]) -> httpx.Timeout:
+        if isinstance(timeout, httpx.Timeout):
+            return timeout
+        if isinstance(timeout, dict):
+            return httpx.Timeout(**timeout)
+        connect, read = normalize_http_timeout(timeout)
+        return httpx.Timeout(connect=connect, read=read, write=read, pool=connect)
+
+    def _set_default_timeout(self, timeout: Tuple[float, float]) -> None:
+        self._default_timeout = timeout
+        self.timeout = self._coerce_timeout(timeout)
 
     def request(self, method: str, url: str, **kwargs):
         timeout = kwargs.get("timeout", self._default_timeout)
-        kwargs["timeout"] = normalize_http_timeout(timeout)
+        kwargs["timeout"] = self._coerce_timeout(timeout)
 
         if self._retry_total <= 0 or method.upper() not in self._allowed_methods:
             return super().request(method, url, **kwargs)
@@ -130,7 +136,7 @@ class TenacitySession(requests.Session):
         retry_predicate = retry_if_exception_type(self._retryable_exceptions)
         if self._status_forcelist:
             retry_predicate = retry_predicate | retry_if_result(
-                lambda response: isinstance(response, requests.Response)
+                lambda response: isinstance(response, httpx.Response)
                 and response.status_code in self._status_forcelist
             )
 
@@ -147,7 +153,7 @@ class TenacitySession(requests.Session):
         outcome = retry_state.outcome
         if outcome is not None and not outcome.failed:
             response = outcome.result()
-            if isinstance(response, requests.Response):
+            if isinstance(response, httpx.Response):
                 with suppress(Exception):
                     response.close()
 
@@ -168,6 +174,7 @@ class TenacitySession(requests.Session):
             }
         }
         self._logger.debug("DocParsing HTTP retry", extra=extra)
+
 
 def normalize_http_timeout(timeout: Optional[object]) -> Tuple[float, float]:
     """Normalize timeout inputs into a ``(connect, read)`` tuple of floats."""
@@ -235,18 +242,18 @@ def get_http_session(
     timeout: Optional[object] = None,
     base_headers: Optional[Mapping[str, str]] = None,
     retry_total: int = 5,
-    retry_backoff: float = 0.5,
-    status_forcelist: Sequence[int] = (429, 500, 502, 503, 504),
-    allowed_methods: Sequence[str] = ("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"),
-) -> Tuple[requests.Session, Tuple[float, float]]:
-    """Return a shared :class:`requests.Session` configured with retries."""
+   retry_backoff: float = 0.5,
+   status_forcelist: Sequence[int] = (429, 500, 502, 503, 504),
+   allowed_methods: Sequence[str] = ("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"),
+) -> Tuple[TenacityClient, Tuple[float, float]]:
+    """Return a shared :class:`httpx.Client` configured with retries."""
 
     effective_timeout = normalize_http_timeout(timeout)
 
     with _HTTP_SESSION_LOCK:
         global _HTTP_SESSION, _HTTP_SESSION_TIMEOUT
         if _HTTP_SESSION is None:
-            _HTTP_SESSION = TenacitySession(
+            _HTTP_SESSION = TenacityClient(
                 retry_total=retry_total,
                 retry_backoff=retry_backoff,
                 status_forcelist=status_forcelist,
@@ -264,13 +271,13 @@ def get_http_session(
                 },
             )
 
-        session: TenacitySession = _HTTP_SESSION
-        session._default_timeout = effective_timeout
+        session: TenacityClient = _HTTP_SESSION
+        session._set_default_timeout(effective_timeout)
 
         if base_headers:
             header_map = {str(key): str(value) for key, value in base_headers.items() if value is not None}
-            session_to_return: TenacitySession = session.clone_with_headers(header_map)
-            session_to_return._default_timeout = effective_timeout
+            session_to_return: TenacityClient = session.clone_with_headers(header_map)
+            session_to_return._set_default_timeout(effective_timeout)
         else:
             session_to_return = session
 

@@ -1,4 +1,19 @@
-"""Regression suite for the `docparse all` orchestrator command.
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.docparsing.test_run_all_cli",
+#   "purpose": "Regression coverage for the Typer-backed `docparse all` orchestrator wrapper.",
+#   "sections": [
+#     {"id": "module-overview", "name": "Module Overview", "anchor": "module-overview"},
+#     {"id": "reload-helper", "name": "Module Reload Helper", "anchor": "_reload_core_cli"},
+#     {"id": "test-sparsity-forwarding", "name": "Sparsity Flag Forwarding", "anchor": "test_run_all_forwards_sparsity_warn_threshold_pct"},
+#     {"id": "test-chunk-workers-validation", "name": "Chunk Worker Validation", "anchor": "test_run_all_chunk_workers_zero_triggers_validation"},
+#     {"id": "test-doctags-forwarding", "name": "DocTags Flag Forwarding", "anchor": "test_doctags_forwards_vllm_wait_timeout"},
+#     {"id": "test-served-model-normalization", "name": "Served Model Normalisation", "anchor": "test_doctags_normalizes_served_model_names"}
+#   ]
+# }
+# === /NAVMAP ===
+
+"""Regression suite for the Typer-exposed `docparse all` orchestrator.
 
 The `run-all` CLI wires DocTags, chunking, and embedding stages together. These
 tests assert that orchestration forwards stage-specific flags, validates sparse

@@ -128,7 +128,7 @@ flowchart LR
 
 - `cli.main()` stitches parsed args to resolver instances, telemetry factories, and the run orchestration engine.
 - `DownloadRun` owns telemetry sink lifetimes, thread-pool scheduling, shared HTTPX client access, and resume bookkeeping; it exposes hook points (`download_candidate_func`, sink factories) that tests monkeypatch.
-- `ResolverPipeline` coordinates resolver execution, per-host token buckets/semaphores, circuit breakers, global URL dedupe, and manifest attempt logging before delegating to download strategies.
+- `ResolverPipeline` coordinates resolver execution, centralised rate-limiter roles (`metadata`, `landing`, `artifact`), circuit breakers, global URL dedupe, and manifest attempt logging before delegating to download strategies.
 - `RunTelemetry` multiplexes manifest writes so JSONL, CSV, SQLite, summary, metrics, and “last attempt” outputs stay consistent even when log rotation is enabled.
 - `OpenAlexWorkProvider` streams `WorkArtifact` objects generated from a live `pyalex` query or supplied iterable, respecting CLI pagination, max counts, and retry policies while deferring HTTP retries to `iterate_openalex`.
 

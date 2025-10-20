@@ -143,7 +143,7 @@ import json
 import logging
 import os
 import sqlite3
-from collections import defaultdict
+import httpx
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -990,8 +990,7 @@ def test_cli_flag_propagation_and_metrics_export(download_modules, patcher, tmp_
 
 def test_download_candidate_dry_run_does_not_create_files(download_modules, tmp_path):
     downloader = download_modules.downloader
-    requests = download_modules.requests
-    responses = pytest.importorskip("responses")
+    from DocsToKG.ContentDownload import httpx_transport
 
     artifact = downloader.WorkArtifact(
         work_id="W1",
@@ -1011,18 +1010,33 @@ def test_download_candidate_dry_run_does_not_create_files(download_modules, tmp_
         xml_dir=tmp_path / "xml",
     )
 
-    session = requests.Session()
     url = artifact.pdf_urls[0]
     call_methods: list[str] = []
-    with responses.RequestsMock(assert_all_requests_are_fired=False) as mocked:
-        mocked.add(responses.HEAD, url, status=200, headers={"Content-Type": "application/pdf"})
-        mocked.add(responses.GET, url, status=200, body=b"%PDF-1.4\n%%EOF\n")
 
+    def handler(request):
+        call_methods.append(request.method)
+        if request.method == "HEAD":
+            return httpx.Response(
+                200,
+                headers={"Content-Type": "application/pdf"},
+                request=request,
+            )
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "application/pdf"},
+            content=b"%PDF-1.4\n%%EOF\n",
+            request=request,
+        )
+
+    httpx_transport.reset_http_client_for_tests()
+    httpx_transport.configure_http_client(transport=httpx.MockTransport(handler))
+    try:
         context = {"dry_run": True, "extract_html_text": False, "previous": {}}
         outcome = downloader.download_candidate(
-            session, artifact, url, None, timeout=30.0, context=context
+            None, artifact, url, None, timeout=30.0, context=context
         )
-        call_methods = [call.request.method for call in mocked.calls]
+    finally:
+        httpx_transport.reset_http_client_for_tests()
 
     assert outcome.classification is Classification.PDF
     assert outcome.path is None
@@ -1723,24 +1737,6 @@ def test_cli_workers_apply_domain_jitter(download_modules, patcher, tmp_path):
         lambda: [SimpleNamespace(name="stub")],
     )
 
-    sleep_calls: List[float] = []
-
-    def fake_sleep(duration: float) -> None:
-        sleep_calls.append(duration)
-
-    monotonic_values = iter([0.0, 0.02, 0.02])
-
-    def fake_monotonic() -> float:
-        nonlocal monotonic_values
-        try:
-            return next(monotonic_values)
-        except StopIteration:
-            return 0.02
-
-    patcher.setattr(resolvers._time, "sleep", fake_sleep)
-    patcher.setattr(resolvers._time, "monotonic", fake_monotonic)
-    patcher.setattr(resolvers.random, "random", lambda: 0.5)
-
     executor_meta: Dict[str, Any] = {}
 
     class RecordingExecutor:
@@ -1767,28 +1763,6 @@ def test_cli_workers_apply_domain_jitter(download_modules, patcher, tmp_path):
     patcher.setattr("DocsToKG.ContentDownload.runner.ThreadPoolExecutor", RecordingExecutor)
     patcher.setattr("DocsToKG.ContentDownload.runner.as_completed", lambda futures: futures)
 
-    class DummyThrottle:
-        def __init__(self, config):
-            self.config = config
-            self._host_lock = resolvers.threading.Lock()
-            self._last_host_hit = defaultdict(float)
-            self._host_buckets = {}
-            self._host_bucket_lock = resolvers.threading.Lock()
-
-        def _ensure_host_bucket(self, host: str):  # pragma: no cover - minimal shim
-            spec = self.config.domain_token_buckets.get(host)
-            if not spec:
-                return None
-            with self._host_bucket_lock:
-                bucket = self._host_buckets.get(host)
-                if bucket is None:
-                    bucket = resolvers.TokenBucket(
-                        rate_per_second=float(spec.get("rate_per_second", 1.0)),
-                        capacity=float(spec.get("capacity", 1.0)),
-                    )
-                    self._host_buckets[host] = bucket
-                return bucket
-
     class RecordingPipeline:
         def __init__(
             self,
@@ -1804,12 +1778,8 @@ def test_cli_workers_apply_domain_jitter(download_modules, patcher, tmp_path):
             self.logger = logger
             self.metrics = metrics
             self.run_id = kwargs.get("run_id")
-            self._throttle = DummyThrottle(config)
 
         def run(self, session, artifact, context=None, session_factory=None):
-            resolvers.ResolverPipeline._respect_domain_limit(
-                self._throttle, "https://example.org/resource.pdf"
-            )
             pdf_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
             pdf_path.parent.mkdir(parents=True, exist_ok=True)
             pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
@@ -1876,12 +1846,34 @@ def test_cli_workers_apply_domain_jitter(download_modules, patcher, tmp_path):
         ],
     )
 
-    downloader.main()
+    from DocsToKG.ContentDownload.ratelimit import (
+        BackendConfig,
+        clone_policies,
+        configure_rate_limits,
+        get_rate_limiter_manager,
+    )
 
-    assert executor_meta["max_workers"] == 3
-    assert len(sleep_calls) == 1
-    expected_wait = 0.1 - 0.02 + 0.5 * 0.05
-    assert sleep_calls[0] == pytest.approx(expected_wait)
+    manager = get_rate_limiter_manager()
+    original_policies = clone_policies(manager.policies())
+    original_backend = BackendConfig(
+        backend=manager.backend.backend,
+        options=dict(manager.backend.options)
+        if isinstance(manager.backend.options, dict)
+        else dict(manager.backend.options or {}),
+    )
+
+    try:
+        downloader.main()
+        assert executor_meta["max_workers"] == 3
+        policy = manager.policies().get("example.org")
+        assert policy is not None
+        artifact_rates = policy.rates.get("artifact")
+        assert artifact_rates is not None
+        assert [(rate.limit, int(rate.interval)) for rate in artifact_rates] == [
+            (1, 100)
+        ]
+    finally:
+        configure_rate_limits(policies=original_policies, backend=original_backend)
 
 
 def test_cli_head_precheck_handles_head_hostile(download_modules, patcher, tmp_path):

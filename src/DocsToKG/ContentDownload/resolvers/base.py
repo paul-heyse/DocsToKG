@@ -110,11 +110,12 @@ from typing import (
     Type,
     Union,
 )
-from urllib.parse import quote, urljoin, urlparse
+from urllib.parse import quote, urljoin, urlparse, urlsplit
 
 import httpx
 
 from DocsToKG.ContentDownload.networking import request_with_retries
+from DocsToKG.ContentDownload.urls import canonical_for_index
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
@@ -163,12 +164,31 @@ class ResolverResult:
     event: Optional["ResolverEvent"] = None
     event_reason: Optional["ResolverEventReason"] = None
     http_status: Optional[int] = None
+    original_url: Optional[str] = None
+    canonical_url: Optional[str] = None
+    origin_host: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.event is not None and not isinstance(self.event, ResolverEvent):
             self.event = ResolverEvent.from_wire(self.event)
         if self.event_reason is not None and not isinstance(self.event_reason, ResolverEventReason):
             self.event_reason = ResolverEventReason.from_wire(self.event_reason)
+        if self.url:
+            original = self.original_url or self.url
+            canonical = self.canonical_url
+            if canonical is None:
+                try:
+                    canonical = canonical_for_index(original)
+                except Exception:
+                    canonical = original
+            object.__setattr__(self, "original_url", original)
+            object.__setattr__(self, "canonical_url", canonical)
+            object.__setattr__(self, "url", canonical)
+        if self.origin_host is None and self.referer:
+            parsed = urlsplit(self.referer)
+            host = parsed.hostname
+            if host:
+                object.__setattr__(self, "origin_host", host.lower())
 
     @property
     def is_event(self) -> bool:

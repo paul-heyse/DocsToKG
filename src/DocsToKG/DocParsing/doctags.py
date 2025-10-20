@@ -319,7 +319,7 @@ from typing import (
     TypeVar,
 )
 
-import requests
+import httpx
 from tqdm import tqdm
 
 from DocsToKG.DocParsing.config import (
@@ -1133,7 +1133,7 @@ def probe_models(
                 if mid:
                     names.append(mid)
         return names if names else [], raw, r.status_code
-    except requests.RequestException as e:
+    except httpx.RequestError as e:
         return None, str(e), None
 
 
@@ -1153,7 +1153,7 @@ def probe_metrics(port: int, timeout: Optional[object] = None) -> Tuple[bool, Op
     try:
         r = session.get(url, timeout=request_timeout)
         return (r.status_code == 200), r.status_code
-    except requests.RequestException:
+    except httpx.RequestError:
         return (False, None)
 
 

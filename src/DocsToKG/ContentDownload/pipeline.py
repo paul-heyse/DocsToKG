@@ -168,7 +168,6 @@ from DocsToKG.ContentDownload.core import (
     ReasonCode,
     normalize_classification,
     normalize_reason,
-    normalize_url,
 )
 from DocsToKG.ContentDownload.networking import CircuitBreaker, head_precheck
 from DocsToKG.ContentDownload.resolvers import (
@@ -864,6 +863,8 @@ class AttemptRecord:
     http_status: Optional[int]
     content_type: Optional[str]
     elapsed_ms: Optional[float]
+    canonical_url: Optional[str] = None
+    original_url: Optional[str] = None
     reason: Optional[ReasonCode | str] = None
     reason_detail: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -885,6 +886,13 @@ class AttemptRecord:
 
         normalized_reason = normalize_reason(self.reason)
         object.__setattr__(self, "reason", normalized_reason)
+
+        canonical = self.canonical_url or self.url
+        object.__setattr__(self, "canonical_url", canonical)
+        original = self.original_url
+        if original is None:
+            original = self.url
+        object.__setattr__(self, "original_url", original)
 
 
 @dataclass
@@ -1939,10 +1947,10 @@ class ResolverPipeline:
                 self._record_skip(resolver_name, result.event_reason.value)
             return None
 
-        url = result.url
+        url = result.canonical_url or result.url
         if not url:
             return None
-        url = normalize_url(url)
+        original_url = result.original_url or url
         if self.config.enable_global_url_dedup:
             with self._global_lock:
                 duplicate = url in self._global_seen_urls
@@ -1956,6 +1964,8 @@ class ResolverPipeline:
                         resolver_name=resolver_name,
                         resolver_order=order_index,
                         url=url,
+                        canonical_url=url,
+                        original_url=original_url,
                         status=Classification.SKIPPED,
                         http_status=None,
                         content_type=None,
@@ -1977,6 +1987,8 @@ class ResolverPipeline:
                     resolver_name=resolver_name,
                     resolver_order=order_index,
                     url=url,
+                    canonical_url=url,
+                    original_url=original_url,
                     status=Classification.SKIPPED,
                     http_status=None,
                     content_type=None,
@@ -2002,6 +2014,8 @@ class ResolverPipeline:
                     resolver_name=resolver_name,
                     resolver_order=order_index,
                     url=url,
+                    canonical_url=url,
+                    original_url=original_url,
                     status=Classification.SKIPPED,
                     http_status=None,
                     content_type=None,
@@ -2046,6 +2060,8 @@ class ResolverPipeline:
                         resolver_name=resolver_name,
                         resolver_order=order_index,
                         url=url,
+                        canonical_url=url,
+                        original_url=original_url,
                         status=Classification.SKIPPED,
                         http_status=None,
                         content_type=None,
@@ -2073,6 +2089,8 @@ class ResolverPipeline:
                         resolver_name=resolver_name,
                         resolver_order=order_index,
                         url=url,
+                        canonical_url=url,
+                        original_url=original_url,
                         status=Classification.SKIPPED,
                         http_status=None,
                         content_type=None,
@@ -2092,6 +2110,10 @@ class ResolverPipeline:
         kwargs: Dict[str, Any] = {}
         if self._download_accepts_head_flag:
             kwargs["head_precheck_passed"] = head_precheck_passed
+        if result.origin_host:
+            kwargs.setdefault("origin_host", result.origin_host)
+        if original_url is not None:
+            kwargs.setdefault("original_url", original_url)
 
         if self._download_accepts_context:
             outcome = self.download_func(
@@ -2156,6 +2178,8 @@ class ResolverPipeline:
             resolver_name=resolver_name,
             resolver_order=order_index,
             url=url,
+            canonical_url=url,
+            original_url=original_url,
             status=outcome.classification,
             http_status=outcome.http_status,
             content_type=outcome.content_type,

@@ -70,7 +70,6 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
 from DocsToKG.ContentDownload.networking import (
     CircuitBreaker,
     ConditionalRequestHelper,
-    TokenBucket,
     head_precheck,
 )
 
@@ -194,20 +193,6 @@ def test_conditional_request_helper_requires_complete_metadata(caplog):
     assert any("resume-metadata-incomplete" in rec.message for rec in caplog.records)
 
 
-def test_token_bucket_enforces_capacity():
-    current = [0.0]
-
-    def clock():
-        return current[0]
-
-    bucket = TokenBucket(rate_per_second=1.0, capacity=1.0, clock=clock)
-    assert bucket.acquire() == 0.0
-    wait = bucket.acquire()
-    assert wait > 0.0
-    current[0] += wait
-    assert bucket.acquire() == 0.0
-
-
 def test_circuit_breaker_open_and_cooldown(patcher):
     current = [0.0]
 
@@ -227,69 +212,6 @@ def test_circuit_breaker_open_and_cooldown(patcher):
     assert breaker.allow()
     breaker.record_success()
     assert breaker.allow()
-
-
-@st.composite
-def _token_bucket_scenarios(draw):
-    rate = draw(
-        st.floats(
-            min_value=0.5,
-            max_value=5.0,
-            allow_infinity=False,
-            allow_nan=False,
-        )
-    )
-    capacity = draw(
-        st.floats(
-            min_value=0.5,
-            max_value=5.0,
-            allow_infinity=False,
-            allow_nan=False,
-        )
-    )
-    steps = draw(
-        st.lists(
-            st.tuples(
-                st.floats(
-                    min_value=0.0,
-                    max_value=3.0,
-                    allow_infinity=False,
-                    allow_nan=False,
-                ),
-                st.floats(
-                    min_value=0.1,
-                    max_value=3.0,
-                    allow_infinity=False,
-                    allow_nan=False,
-                ),
-            ),
-            min_size=1,
-            max_size=8,
-        )
-    )
-    return rate, capacity, steps
-
-
-@given(_token_bucket_scenarios())
-def test_token_bucket_waits_match_deficits(scenario):
-    rate, capacity, steps = scenario
-    bucket = TokenBucket(rate_per_second=rate, capacity=capacity, clock=lambda: 0.0)
-    manual_tokens = capacity
-    last_time = 0.0
-    for delta, tokens in steps:
-        current_time = last_time + delta
-        elapsed = max(current_time - last_time, 0.0)
-        manual_tokens = min(capacity, manual_tokens + elapsed * rate)
-        if manual_tokens >= tokens:
-            expected_wait = 0.0
-            manual_tokens -= tokens
-        else:
-            deficit = tokens - manual_tokens
-            expected_wait = deficit / rate
-            manual_tokens = 0.0
-        wait = bucket.acquire(tokens=tokens, now=current_time)
-        assert wait == pytest.approx(expected_wait, rel=1e-6, abs=1e-9)
-        last_time = current_time
 
 
 @given(

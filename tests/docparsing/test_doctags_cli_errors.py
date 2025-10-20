@@ -1,3 +1,17 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.docparsing.test_doctags_cli_errors",
+#   "purpose": "Ensure DocTags Typer command surfaces the same validation messages and exit codes.",
+#   "sections": [
+#     {"id": "module-overview", "name": "Module Overview", "anchor": "module-overview"},
+#     {"id": "stubs", "name": "Runtime Stub Helpers", "anchor": "_create_cli_stubs"},
+#     {"id": "tests-missing-input", "name": "Missing Input Checks", "anchor": "test_missing_input_directory_triggers_error"},
+#     {"id": "tests-conflicting-mode", "name": "Conflicting Mode Checks", "anchor": "test_mode_auto_conflicting_sources"},
+#     {"id": "tests-arg-forwarding", "name": "Arg Forwarding", "anchor": "test_respects_legacy_option_names"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Exercise DocTags CLI validation errors and user-facing messaging.
 
 The DocTags CLI provides structured hints when operators supply bad input.

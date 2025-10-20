@@ -77,11 +77,11 @@ from DocsToKG.ContentDownload.core import (
     normalize_pmcid,
     normalize_pmid,
     normalize_reason,
-    normalize_url,
     slugify,
     tail_contains_html,
     update_tail_buffer,
 )
+from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 from DocsToKG.ContentDownload.errors import (
     RateLimitError,
     log_download_failure,
@@ -415,6 +415,10 @@ class DownloadPreflightPlan:
     context: DownloadContext
     base_headers: Dict[str, str]
     content_policy: Optional[Dict[str, Any]]
+    canonical_url: str
+    canonical_index: str
+    original_url: Optional[str]
+    origin_host: Optional[str]
     cond_helper: ConditionalRequestHelper
     attempt_conditional: bool = True
     resume_bytes_offset: Optional[int] = None
@@ -454,6 +458,8 @@ def prepare_candidate_download(
     ctx: DownloadContext,
     *,
     head_precheck_passed: bool = False,
+    original_url: Optional[str] = None,
+    origin_host: Optional[str] = None,
 ) -> DownloadPreflightPlan:
     """Prepare request metadata prior to streaming the download."""
 
@@ -463,6 +469,11 @@ def prepare_candidate_download(
     tail_window_bytes = ctx.tail_check_bytes
     progress_callback = ctx.progress_callback
     progress_update_interval = 128 * 1024
+
+    effective_original = original_url or url
+    canonical_index = canonical_for_index(effective_original)
+    request_url = canonical_for_request(url, role="artifact", origin_host=origin_host)
+    url = request_url
 
     parsed_url = urlsplit(url)
     domain_policies: Dict[str, Dict[str, Any]] = ctx.domain_content_rules
@@ -560,8 +571,7 @@ def prepare_candidate_download(
     extract_html_text = ctx.extract_html_text
     previous_map = ctx.previous
     global_index = ctx.global_manifest_index
-    normalized_url = normalize_url(url)
-    previous = previous_map.get(normalized_url) or global_index.get(normalized_url, {})
+    previous = previous_map.get(canonical_index) or global_index.get(canonical_index, {})
     previous_etag = previous.get("etag")
     previous_last_modified = previous.get("last_modified")
     existing_path = previous.get("path")
@@ -588,6 +598,8 @@ def prepare_candidate_download(
         prior_mtime_ns=previous_mtime_ns,
     )
 
+    plan_origin_host = (origin_host.lower() if origin_host else host_key) or None
+
     return DownloadPreflightPlan(
         client=http_client,
         artifact=artifact,
@@ -596,6 +608,10 @@ def prepare_candidate_download(
         context=ctx,
         base_headers=dict(headers),
         content_policy=content_policy,
+        canonical_url=url,
+        canonical_index=canonical_index,
+        original_url=effective_original,
+        origin_host=plan_origin_host,
         cond_helper=cond_helper,
         attempt_conditional=True,
         resume_bytes_offset=None,
@@ -1880,7 +1896,7 @@ def handle_resume_logic(
     for previous_url, entry in previous_index.items():
         if not isinstance(entry, dict):
             continue
-        normalized_url = normalize_url(previous_url)
+        canonical_index = canonical_for_index(previous_url)
         etag = entry.get("etag")
         last_modified = entry.get("last_modified")
         path = entry.get("path")
@@ -1916,7 +1932,7 @@ def handle_resume_logic(
                 )
                 continue
 
-        previous_map[normalized_url] = {
+        previous_map[canonical_index] = {
             "etag": etag,
             "last_modified": last_modified,
             "path": path,
@@ -2368,6 +2384,9 @@ def download_candidate(
     referer: Optional[str],
     timeout: float,
     context: Optional[Union[DownloadContext, Mapping[str, Any]]] = None,
+    *,
+    original_url: Optional[str] = None,
+    origin_host: Optional[str] = None,
     head_precheck_passed: bool = False,
 ) -> DownloadOutcome:
     """Download a single candidate URL and classify the payload.
@@ -2396,6 +2415,8 @@ def download_candidate(
         timeout,
         ctx,
         head_precheck_passed=head_precheck_passed,
+        original_url=original_url,
+        origin_host=origin_host,
     )
     if plan.skip_outcome is not None:
         return plan.skip_outcome

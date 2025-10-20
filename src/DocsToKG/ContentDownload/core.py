@@ -30,7 +30,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Union
-from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
+from urllib.parse import unquote, urlsplit
+
+from DocsToKG.ContentDownload.urls import canonical_for_index
 
 __all__ = (
     "Classification",
@@ -796,20 +798,6 @@ def slugify(text: str, keep: int = 80) -> str:
 
 
 def normalize_url(url: str) -> str:
-    """Return a canonicalised version of ``url`` suitable for deduplication."""
+    """Deprecated alias for :func:`DocsToKG.ContentDownload.urls.canonical_for_index`."""
 
-    parts = urlsplit(url)
-    query_pairs = [
-        (key, value)
-        for key, value in parse_qsl(parts.query, keep_blank_values=True)
-        if not key.lower().startswith("utm_")
-    ]
-    return urlunsplit(
-        (
-            parts.scheme.lower(),
-            parts.netloc.lower(),
-            parts.path,
-            urlencode(query_pairs, doseq=True),
-            "",
-        )
-    )
+    return canonical_for_index(url)
