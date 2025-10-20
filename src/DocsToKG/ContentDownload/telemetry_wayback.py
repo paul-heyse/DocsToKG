@@ -98,7 +98,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Protocol
 
 
 LOGGER = logging.getLogger(__name__)
@@ -254,15 +254,17 @@ class AttemptContext:
     artifact_id: str
     attempt_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     start_wall: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    start_monotonic: float = field(default_factory=time.monotonic)
     original_url: str = ""
     canonical_url: str = ""
     publication_year: Optional[int] = None
-    candidate_count: int = 0
-    discovery_count: int = 0
+    monotonic: Callable[[], float] = field(default=time.monotonic, repr=False)
+    start_monotonic: float = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.start_monotonic = self.monotonic()
 
     def monotonic_ms_since_start(self) -> int:
-        return int((time.monotonic() - self.start_monotonic) * 1000)
+        return int((self.monotonic() - self.start_monotonic) * 1000)
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -363,9 +365,11 @@ class TelemetryWayback:
             run_id=self.run_id,
             work_id=work_id,
             artifact_id=artifact_id,
+            start_wall=self._now(),
             original_url=original_url,
             canonical_url=canonical_url,
             publication_year=publication_year,
+            monotonic=self._mono,
         )
         self._emit(
             ctx,
