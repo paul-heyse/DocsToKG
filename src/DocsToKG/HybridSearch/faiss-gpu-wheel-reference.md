@@ -112,7 +112,6 @@ These classes are present in the wheel (from `swigfaiss.py`):
 - IVF family: `GpuIndexIVFFlat`, `GpuIndexIVFPQ`, `GpuIndexIVFScalarQuantizer` (+ their `*Config` classes)
 - Binary: `GpuIndexBinaryFlat` (+ `GpuIndexBinaryFlatConfig`)
 - Progressive dimension builder: `GpuProgressiveDimIndexFactory` (incrementally expand dimensionality on GPU; useful for ANN warm starts).
-- Progressive dimension builder: `GpuProgressiveDimIndexFactory` (incrementally expand dimensionality on GPU; useful for warm-starting ANN structures).
 
 **Common patterns**
 
@@ -146,7 +145,6 @@ D2, I2 = ivfpq.search(xq, 10)
 - `storeTransposed` — data layout tweak for `GpuIndexFlat*`.
 - `indicesOptions` — choose ID storage (`INDICES_32_BIT`, `INDICES_64_BIT`, `INDICES_CPU`, `INDICES_IVF`).
 - `reserveVecs` — pre-reserve inverted list capacity to reduce reallocs.
-- `flatHashed` / `directMapType` — enable hashed flat indexes or direct-map variants when mixing CPU+GPU fleets.
 - `flatHashed` / `directMapType` — enable hashed flat indexes or direct-map variants when mixing CPU/GPU fleets.
 
 Supported metrics include METRIC_GOWER, METRIC_INNER_PRODUCT, METRIC_L1, METRIC_L2.
@@ -189,7 +187,6 @@ These functions run directly on a GPU **without constructing an index** (from `g
 
 - `knn_gpu(res, xq, xb, k, D=None, I=None, metric=faiss.METRIC_L2, device=-1, use_cuvs=False, vectorsMemoryLimit=0, queriesMemoryLimit=0)`
 - `pairwise_distance_gpu(res, xq, xb, D=None, metric=faiss.METRIC_L2, device=-1)`
-- `pairwise_index_gpu_multiple(...)` — dispatch brute-force searches across multiple GPU indexes (see `gpu_wrappers.py`).
 - `pairwise_index_gpu_multiple(...)` — orchestrate multi-index brute-force queries (see `gpu_wrappers.py` for signature).
 
 **Notes for agents**
