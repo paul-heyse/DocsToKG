@@ -320,6 +320,7 @@ from DocsToKG.HybridSearch.devtools.opensearch_simulator import (
 )
 from DocsToKG.HybridSearch.pipeline import IngestError, RetryableIngestError
 from DocsToKG.HybridSearch.service import (
+    RequestValidationError,
     ResultShaper,
     build_stats_snapshot,
     infer_embedding_dim,
@@ -1045,6 +1046,68 @@ def test_verify_pagination_preserves_recall_first() -> None:
     assert not pagination.duplicate_detected
     assert len(service.requests) == 3
     assert all(call.recall_first for call in service.requests)
+
+
+def test_cursor_rejects_when_recall_first_mismatch() -> None:
+    service = object.__new__(HybridSearchService)
+    page_size = 2
+    base_results = [
+        HybridSearchResult(
+            doc_id=f"doc-{idx}",
+            chunk_id=f"chunk-{idx}",
+            vector_id=f"vec-{idx}",
+            namespace="demo",
+            score=float(10 - idx),
+            fused_rank=idx,
+            text=f"chunk {idx}",
+            highlights=(),
+            provenance_offsets=(),
+            diagnostics=HybridSearchDiagnostics(),
+            metadata={},
+        )
+        for idx in range(3)
+    ]
+
+    recall_request = HybridSearchRequest(
+        query="demo query",
+        namespace="demo",
+        filters={},
+        page_size=page_size,
+        recall_first=True,
+    )
+    filters = {"namespace": recall_request.namespace}
+    recall_fingerprint = service._cursor_fingerprint(recall_request, filters)
+    cursor = service._build_cursor(base_results, page_size, recall_fingerprint, True)
+    assert cursor is not None
+
+    sliced = service._slice_from_cursor(
+        base_results,
+        cursor,
+        page_size,
+        recall_fingerprint,
+        True,
+    )
+    assert [result.vector_id for result in sliced] == ["vec-2"]
+
+    followup_request = HybridSearchRequest(
+        query="demo query",
+        namespace="demo",
+        filters={},
+        page_size=page_size,
+        cursor=cursor,
+        recall_first=False,
+    )
+    followup_fingerprint = service._cursor_fingerprint(followup_request, filters)
+    assert followup_fingerprint != recall_fingerprint
+
+    with pytest.raises(RequestValidationError):
+        service._slice_from_cursor(
+            base_results,
+            cursor,
+            page_size,
+            followup_fingerprint,
+            False,
+        )
 
 
 # --- test_hybrid_search.py ---
