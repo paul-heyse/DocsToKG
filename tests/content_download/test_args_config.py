@@ -367,6 +367,52 @@ def test_resolve_config_applies_url_policy_overrides(tmp_path: Path) -> None:
     assert policy.param_allowlist_per_domain["example.com"] == ("id", "token")
 
 
+def test_url_env_overrides_apply_when_cli_missing(tmp_path: Path, patcher: PatchManager) -> None:
+    patcher.setenv("DOCSTOKG_URL_DEFAULT_SCHEME", "http")
+    patcher.setenv("DOCSTOKG_URL_FILTER_LANDING", "false")
+    patcher.setenv("DOCSTOKG_URL_PARAM_ALLOWLIST", "example.com:id,token")
+
+    parser, args = _build_args(tmp_path)
+    policy_before = get_url_policy()
+    assert policy_before.default_scheme == "https"
+    assert policy_before.filter_for["landing"] is True
+
+    resolve_config(args, parser)
+
+    policy = get_url_policy()
+    assert policy.default_scheme == "http"
+    assert policy.filter_for["landing"] is False
+    assert policy.param_allowlist_per_domain.get("example.com") == ("id", "token")
+
+
+def test_cli_flags_override_url_env(tmp_path: Path, patcher: PatchManager) -> None:
+    patcher.setenv("DOCSTOKG_URL_FILTER_LANDING", "false")
+    patcher.setenv("DOCSTOKG_URL_PARAM_ALLOWLIST", "example.org:id")
+
+    parser = build_parser()
+    argv = [
+        "--topic-id",
+        "https://openalex.org/T12345",
+        "--year-start",
+        "2020",
+        "--year-end",
+        "2020",
+        "--out",
+        str(tmp_path / "pdfs"),
+        "--url-filter-landing",
+        "--url-param-allowlist",
+        "example.net:page",
+    ]
+    args = parse_args(parser, argv)
+
+    resolve_config(args, parser)
+
+    policy = get_url_policy()
+    assert policy.filter_for["landing"] is True
+    assert policy.param_allowlist_per_domain.get("example.net") == ("page",)
+    assert "example.org" not in policy.param_allowlist_per_domain
+
+
 def test_lookup_topic_id_handles_empty_results(patcher, caplog) -> None:
     args_module._lookup_topic_id.cache_clear()
 

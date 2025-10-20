@@ -319,6 +319,7 @@ from typing import (
     TypeVar,
 )
 
+import hashlib
 import httpx
 from tqdm import tqdm
 
@@ -330,15 +331,24 @@ from DocsToKG.DocParsing.config import (
 from DocsToKG.DocParsing.core import (
     DEFAULT_HTTP_TIMEOUT,
     CLIOption,
+    ItemFingerprint,
+    ItemOutcome,
     ResumeController,
+    StageContext,
+    StageError,
+    StageHooks,
+    StageOptions,
+    StageOutcome,
+    StagePlan,
+    WorkItem,
     acquire_lock,
     build_subcommand,
     derive_doc_id_and_doctags_path,
     find_free_port,
     get_http_session,
     normalize_http_timeout,
+    run_stage,
     set_spawn_or_warn,
-    should_skip_output,
 )
 from DocsToKG.DocParsing.env import (
     PDF_MODEL_SUBDIR,
@@ -359,7 +369,9 @@ from DocsToKG.DocParsing.io import (
     dedupe_preserve_order,
     load_manifest_index,
     manifest_append,
+    relative_path,
     resolve_attempts_path,
+    resolve_hash_algorithm,
     resolve_manifest_path,
 )
 from DocsToKG.DocParsing.logging import (
@@ -418,6 +430,353 @@ DEFAULT_SERVED_MODEL_NAMES: Tuple[str, ...] = (
     "granite-docling-258M",
     "ibm-granite/granite-docling-258M",
 )
+
+
+def _compute_pdf_cfg_hash(cfg: "DoctagsCfg") -> str:
+    """Return a stable hash for resume fingerprinting of PDF conversions."""
+
+    payload = {
+        "model": str(cfg.model or ""),
+        "served_model_names": tuple(cfg.served_model_names),
+        "gpu_memory_utilization": float(cfg.gpu_memory_utilization),
+        "vlm_prompt": str(cfg.vlm_prompt),
+        "vlm_stop": tuple(cfg.vlm_stop or ()),
+        "http_timeout": tuple(float(t) for t in cfg.http_timeout),
+        "overwrite": False,  # PDFs never overwrite downstream outputs
+    }
+    text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _compute_html_cfg_hash(cfg: "DoctagsCfg") -> str:
+    """Return a stable hash for resume fingerprinting of HTML conversions."""
+
+    payload = {
+        "html_sanitizer": str(cfg.html_sanitizer),
+        "overwrite": bool(cfg.overwrite),
+        "http_timeout": tuple(float(t) for t in cfg.http_timeout),
+    }
+    text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _build_pdf_plan(
+    *,
+    pdf_paths: Sequence[Path],
+    input_dir: Path,
+    output_dir: Path,
+    resolved_root: Path,
+    port: int,
+    cfg_hash: str,
+    hash_alg: str,
+    resume_controller: ResumeController,
+    logger,
+    inference_model: str,
+    served_model_names: Sequence[str],
+    vllm_version: str,
+    vlm_prompt: str,
+    vlm_stop: Tuple[str, ...],
+) -> tuple[StagePlan, int]:
+    """Create a StagePlan for DocTags PDF conversion."""
+
+    plan_items: list[WorkItem] = []
+    resume_skipped = 0
+    served_models_list = list(served_model_names)
+
+    for pdf_path in pdf_paths:
+        doc_id, out_path = derive_doc_id_and_doctags_path(pdf_path, input_dir, output_dir)
+        input_hash = compute_content_hash(pdf_path, algorithm=hash_alg)
+        skip_doc, _entry = resume_controller.should_skip(doc_id, out_path, input_hash)
+        if skip_doc:
+            log_event(
+                logger,
+                "info",
+                "Skipping document: output exists and input unchanged",
+                stage=MANIFEST_STAGE,
+                doc_id=doc_id,
+                input_relpath=relative_path(pdf_path, resolved_root),
+                output_relpath=relative_path(out_path, resolved_root),
+            )
+            manifest_log_skip(
+                stage=MANIFEST_STAGE,
+                doc_id=doc_id,
+                input_path=pdf_path,
+                input_hash=input_hash,
+                output_path=out_path,
+                schema_version="docparse/1.1.0",
+                parse_engine="docling-vlm",
+                model_name=inference_model,
+                served_models=served_models_list,
+                vllm_version=vllm_version,
+                reason="resume-satisfied",
+            )
+            resume_skipped += 1
+            continue
+
+        fingerprint_path = out_path.with_suffix(out_path.suffix + ".fp.json")
+        task = PdfTask(
+            pdf_path=pdf_path,
+            output_dir=output_dir,
+            port=port,
+            input_hash=input_hash,
+            doc_id=doc_id,
+            output_path=out_path,
+            served_model_names=tuple(served_model_names),
+            inference_model=inference_model,
+            vlm_prompt=vlm_prompt,
+            vlm_stop=vlm_stop,
+        )
+        metadata: Dict[str, Any] = {
+            "task": task,
+            "doc_id": doc_id,
+            "input_path": str(pdf_path),
+            "output_path": str(out_path),
+            "input_hash": input_hash,
+            "hash_alg": hash_alg,
+            "fingerprint_path": str(fingerprint_path),
+            "parse_engine": "docling-vlm",
+            "model_name": inference_model,
+            "served_models": served_models_list,
+            "vllm_version": vllm_version,
+        }
+        try:
+            size = max(1.0, float(pdf_path.stat().st_size))
+        except OSError:
+            size = 1.0
+        plan_items.append(
+            WorkItem(
+                item_id=doc_id,
+                inputs={"pdf": pdf_path},
+                outputs={"doctags": out_path},
+                cfg_hash=cfg_hash,
+                cost_hint=size,
+                metadata=metadata,
+                fingerprint=ItemFingerprint(
+                    path=fingerprint_path,
+                    input_sha256=input_hash,
+                    cfg_hash=cfg_hash,
+                ),
+            )
+        )
+
+    plan = StagePlan(stage_name=MANIFEST_STAGE, items=tuple(plan_items), total_items=len(plan_items))
+    return plan, resume_skipped
+
+
+def _pdf_stage_worker(item: WorkItem) -> ItemOutcome:
+    """Worker entrypoint that proxies to :func:`pdf_convert_one`."""
+
+    metadata = item.metadata
+    task: PdfTask = metadata["task"]
+    result = normalize_conversion_result(pdf_convert_one(task), task)
+
+    manifest_extra = {
+        "parse_engine": metadata.get("parse_engine", "docling-vlm"),
+        "model_name": metadata.get("model_name"),
+        "served_models": metadata.get("served_models"),
+        "vllm_version": metadata.get("vllm_version"),
+    }
+
+    if result.status == "success":
+        _write_fingerprint(
+            Path(metadata["fingerprint_path"]),
+            input_sha256=result.input_hash,
+            cfg_hash=item.cfg_hash,
+        )
+        return ItemOutcome(
+            status="success",
+            duration_s=result.duration_s,
+            manifest=manifest_extra,
+            result={"status": "success"},
+            error=None,
+        )
+
+    if result.status == "skip":
+        return ItemOutcome(
+            status="skip",
+            duration_s=result.duration_s,
+            manifest=manifest_extra,
+            result={"reason": "worker-skip"},
+            error=None,
+        )
+
+    error_message = result.error or "unknown error"
+    manifest_extra["error"] = error_message
+    err = StageError(
+        stage=MANIFEST_STAGE,
+        item_id=result.doc_id,
+        category="runtime",
+        message=error_message,
+        retryable=False,
+    )
+    return ItemOutcome(
+        status="failure",
+        duration_s=result.duration_s,
+        manifest=manifest_extra,
+        result={},
+        error=err,
+    )
+
+
+def _make_pdf_stage_hooks(
+    *,
+    logger,
+    resolved_root: Path,
+    resume_skipped: int,
+) -> StageHooks:
+    """Create lifecycle hooks for the PDF stage runner."""
+
+    def before_stage(context: StageContext) -> None:
+        context.metadata["logger"] = logger
+        context.metadata["resolved_root"] = resolved_root
+        context.metadata["schema_version"] = "docparse/1.1.0"
+        context.metadata["resume_skipped"] = resume_skipped
+
+    def after_item(
+        item: WorkItem,
+        outcome_or_error: Union[ItemOutcome, StageError],
+        context: StageContext,
+    ) -> None:
+        stage_logger = context.metadata.get("logger", logger)
+        root = context.metadata.get("resolved_root", resolved_root)
+        schema_version = context.metadata.get("schema_version", "docparse/1.1.0")
+        metadata = item.metadata
+        doc_id = metadata["doc_id"]
+        input_path = Path(metadata["input_path"])
+        output_path = Path(metadata["output_path"])
+        input_hash = metadata["input_hash"]
+        hash_alg = metadata["hash_alg"]
+        rel_fields = {
+            "stage": MANIFEST_STAGE,
+            "doc_id": doc_id,
+            "input_relpath": metadata.get("input_relpath", relative_path(input_path, root)),
+            "output_relpath": metadata.get("output_relpath", relative_path(output_path, root)),
+        }
+
+        if isinstance(outcome_or_error, ItemOutcome):
+            payload = dict(outcome_or_error.manifest)
+            payload.setdefault("parse_engine", metadata.get("parse_engine", "docling-vlm"))
+            payload.setdefault("model_name", metadata.get("model_name"))
+            payload.setdefault("served_models", metadata.get("served_models"))
+            payload.setdefault("vllm_version", metadata.get("vllm_version"))
+
+            if outcome_or_error.status == "success":
+                log_event(
+                    stage_logger,
+                    "info",
+                    "DocTags PDF written",
+                    status="success",
+                    elapsed_ms=int(outcome_or_error.duration_s * 1000),
+                    **rel_fields,
+                )
+                manifest_log_success(
+                    stage=MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    duration_s=outcome_or_error.duration_s,
+                    schema_version=schema_version,
+                    input_path=input_path,
+                    input_hash=input_hash,
+                    output_path=output_path,
+                    hash_alg=hash_alg,
+                    **payload,
+                )
+                return
+
+            if outcome_or_error.status == "skip":
+                reason = outcome_or_error.result.get("reason", "resume-satisfied")
+                log_event(
+                    stage_logger,
+                    "info",
+                    "DocTags PDF skipped",
+                    status="skip",
+                    reason=reason,
+                    **rel_fields,
+                )
+                manifest_log_skip(
+                    stage=MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    input_path=input_path,
+                    input_hash=input_hash,
+                    output_path=output_path,
+                    hash_alg=hash_alg,
+                    schema_version=schema_version,
+                    reason=reason,
+                    **payload,
+                )
+                return
+
+            error_message = (
+                outcome_or_error.error.message if outcome_or_error.error else "unknown error"
+            )
+            log_event(
+                stage_logger,
+                "error",
+                "DocTags PDF conversion failed",
+                status="failure",
+                error=error_message,
+                **rel_fields,
+            )
+            failure_payload = dict(payload)
+            failure_payload["error"] = error_message
+            manifest_log_failure(
+                stage=MANIFEST_STAGE,
+                doc_id=doc_id,
+                duration_s=outcome_or_error.duration_s,
+                schema_version=schema_version,
+                input_path=input_path,
+                input_hash=input_hash,
+                output_path=output_path,
+                hash_alg=hash_alg,
+                error=error_message,
+                **failure_payload,
+            )
+            return
+
+        # Runner-surfaced error
+        error = outcome_or_error
+        log_event(
+            stage_logger,
+            "error",
+            "DocTags PDF conversion failed",
+            status="failure",
+            error=error.message,
+            **rel_fields,
+        )
+        manifest_log_failure(
+            stage=MANIFEST_STAGE,
+            doc_id=doc_id,
+            duration_s=0.0,
+            schema_version=schema_version,
+            input_path=input_path,
+            input_hash=input_hash,
+            output_path=output_path,
+            hash_alg=hash_alg,
+            error=error.message,
+        )
+
+    def after_stage(outcome: StageOutcome, context: StageContext) -> None:
+        stage_logger = context.metadata.get("logger", logger)
+        pre_skipped = int(context.metadata.get("resume_skipped", 0))
+        total_skipped = outcome.skipped + pre_skipped
+        log_event(
+            stage_logger,
+            "info",
+            "DocTags PDF summary",
+            scheduled=outcome.scheduled,
+            succeeded=outcome.succeeded,
+            failed=outcome.failed,
+            skipped=total_skipped,
+            cancelled=outcome.cancelled,
+            wall_ms=round(outcome.wall_ms, 3),
+            stage=MANIFEST_STAGE,
+            doc_id="__summary__",
+        )
+
+    return StageHooks(
+        before_stage=before_stage,
+        after_item=after_item,
+        after_stage=after_stage,
+    )
 
 
 @dataclass

@@ -170,8 +170,8 @@ if __name__ == "__main__" and __package__ is None:
         sys.path.insert(0, str(package_root))
 
 import argparse
+import hashlib
 import importlib
-import itertools
 import json
 import logging
 import statistics
@@ -179,9 +179,8 @@ import time
 import unicodedata
 import uuid
 from dataclasses import dataclass, fields
-from multiprocessing import get_context
 from types import SimpleNamespace
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
@@ -216,17 +215,25 @@ from DocsToKG.DocParsing.core import (
     DEFAULT_HEADING_MARKERS,
     DEFAULT_SERIALIZER_PROVIDER,
     DEFAULT_TOKENIZER,
+    ItemFingerprint,
+    ItemOutcome,
     ChunkResult,
     ChunkTask,
     ChunkWorkerConfig,
-    ResumeController,
+    StageContext,
+    StageError,
+    StageHooks,
+    StageOptions,
+    StageOutcome,
+    StagePlan,
+    WorkItem,
     compute_relative_doc_id,
     compute_stable_shard,
     dedupe_preserve_order,
     derive_doc_id_and_chunks_path,
     load_structural_marker_config,
     set_spawn_or_warn,
-    should_skip_output,
+    run_stage,
 )
 from DocsToKG.DocParsing.env import (
     data_chunks,
@@ -257,7 +264,14 @@ from DocsToKG.DocParsing.io import (
     resolve_hash_algorithm,
     resolve_manifest_path,
 )
-from DocsToKG.DocParsing.logging import get_logger, log_event, manifest_log_skip, telemetry_scope
+from DocsToKG.DocParsing.logging import (
+    get_logger,
+    log_event,
+    manifest_log_failure,
+    manifest_log_skip,
+    manifest_log_success,
+    telemetry_scope,
+)
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
 from .cli import build_parser, parse_args
@@ -578,6 +592,7 @@ def _chunk_worker_initializer(cfg: ChunkWorkerConfig) -> None:
         "chunker": chunker,
         "heading_markers": tuple(cfg.heading_markers),
         "caption_markers": tuple(cfg.caption_markers),
+        "config_hash": _compute_worker_cfg_hash(cfg),
     }
 
 
@@ -884,6 +899,372 @@ def _validate_chunk_files(
 # --- Defaults ---
 
 MANIFEST_STAGE = "chunks"
+_ACTIVE_CONFIG_HASH: Optional[str] = None
+
+
+def _compute_worker_cfg_hash(config: ChunkWorkerConfig) -> str:
+    """Return a stable hash representing the worker configuration."""
+
+    payload = {
+        "tokenizer_model": config.tokenizer_model,
+        "min_tokens": config.min_tokens,
+        "max_tokens": config.max_tokens,
+        "soft_barrier_margin": config.soft_barrier_margin,
+        "heading_markers": list(config.heading_markers),
+        "caption_markers": list(config.caption_markers),
+        "docling_version": config.docling_version,
+        "serializer_provider_spec": config.serializer_provider_spec,
+        "inject_anchors": bool(config.inject_anchors),
+    }
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _write_fingerprint(path: Path, *, input_sha256: str, cfg_hash: str) -> None:
+    """Persist the resume fingerprint alongside the chunk output."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "input_sha256": input_sha256,
+        "cfg_hash": cfg_hash,
+    }
+    with atomic_write(path) as handle:
+        json.dump(payload, handle, sort_keys=True)
+        handle.write("\n")
+
+
+def _ensure_worker_initialised(config: ChunkWorkerConfig, cfg_hash: str) -> None:
+    """Initialise worker state lazily per process."""
+
+    global _ACTIVE_CONFIG_HASH, _WORKER_STATE
+    if _WORKER_STATE and _ACTIVE_CONFIG_HASH == cfg_hash:
+        return
+    _chunk_worker_initializer(config)
+    _WORKER_STATE["config_hash"] = cfg_hash
+    _ACTIVE_CONFIG_HASH = cfg_hash
+
+
+def _build_chunk_plan(
+    *,
+    files: Sequence[Path],
+    in_dir: Path,
+    out_dir: Path,
+    resolved_root: Path,
+    worker_config: ChunkWorkerConfig,
+    cfg_hash: str,
+    hash_alg: str,
+    parse_engine_lookup: Mapping[str, str],
+    manifest_lookup: Mapping[str, Mapping[str, Any]],
+) -> StagePlan:
+    """Construct a StagePlan covering every DocTags file slated for chunking."""
+
+    plan_items: List[WorkItem] = []
+    for doc_path in files:
+        doc_id, output_path = derive_doc_id_and_chunks_path(doc_path, in_dir, out_dir)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fingerprint_path = output_path.with_suffix(output_path.suffix + ".fp.json")
+        input_hash = compute_content_hash(doc_path, algorithm=hash_alg)
+        entry = manifest_lookup.get(doc_id, {})
+        parse_engine = parse_engine_lookup.get(doc_id, entry.get("parse_engine", "docling-html"))
+        sanitizer_profile = entry.get("sanitizer_profile")
+        metadata: Dict[str, Any] = {
+            "doc_id": doc_id,
+            "input_path": str(doc_path),
+            "output_path": str(output_path),
+            "input_hash": input_hash,
+            "hash_alg": hash_alg,
+            "fingerprint_path": str(fingerprint_path),
+            "parse_engine": parse_engine,
+            "sanitizer_profile": sanitizer_profile,
+            "worker_config": worker_config,
+            "input_relpath": relative_path(doc_path, resolved_root),
+            "output_relpath": relative_path(output_path, resolved_root),
+        }
+        try:
+            size = doc_path.stat().st_size
+        except OSError:
+            size = 1
+        plan_items.append(
+            WorkItem(
+                item_id=doc_id,
+                inputs={"doctags": doc_path},
+                outputs={"chunks": output_path},
+                cfg_hash=cfg_hash,
+                cost_hint=max(float(size), 1.0),
+                metadata=metadata,
+                fingerprint=ItemFingerprint(
+                    path=fingerprint_path,
+                    input_sha256=input_hash,
+                    cfg_hash=cfg_hash,
+                ),
+            )
+        )
+    return StagePlan(stage_name=MANIFEST_STAGE, items=plan_items, total_items=len(plan_items))
+
+
+def _chunk_stage_worker(item: WorkItem) -> ItemOutcome:
+    """Execute chunking for a single document."""
+
+    metadata = item.metadata
+    config: ChunkWorkerConfig = metadata["worker_config"]
+    cfg_hash = item.cfg_hash
+    _ensure_worker_initialised(config, cfg_hash)
+
+    input_path = Path(metadata["input_path"])
+    output_path = Path(metadata["output_path"])
+    parse_engine = metadata.get("parse_engine", "docling-html")
+    sanitizer_profile = metadata.get("sanitizer_profile")
+    input_hash = metadata["input_hash"]
+    hash_alg = metadata["hash_alg"]
+    fingerprint_path = Path(metadata["fingerprint_path"])
+
+    task = ChunkTask(
+        doc_path=input_path,
+        output_path=output_path,
+        doc_id=metadata["doc_id"],
+        doc_stem=input_path.stem,
+        input_hash=input_hash,
+        parse_engine=parse_engine,
+        sanitizer_profile=sanitizer_profile,
+    )
+
+    try:
+        result = _process_chunk_task(task)
+    except Exception as exc:  # pragma: no cover - defensive
+        duration = 0.0
+        err = StageError(
+            stage=MANIFEST_STAGE,
+            item_id=metadata["doc_id"],
+            category="runtime",
+            message=str(exc),
+            retryable=False,
+        )
+        manifest = {
+            "input_path": str(input_path),
+            "input_hash": input_hash,
+            "hash_alg": hash_alg,
+            "output_path": str(output_path),
+            "schema_version": CHUNK_SCHEMA_VERSION,
+            "error": err.message,
+            "parse_engine": parse_engine,
+            "sanitizer_profile": sanitizer_profile,
+            "anchors_injected": bool(config.inject_anchors),
+        }
+        return ItemOutcome(status="failure", duration_s=duration, manifest=manifest, result={}, error=err)
+
+    if result.status != "success":
+        error_message = result.error or "unknown error"
+        err = StageError(
+            stage=MANIFEST_STAGE,
+            item_id=result.doc_id,
+            category="runtime",
+            message=error_message,
+            retryable=False,
+        )
+        manifest = {
+            "input_path": str(result.input_path),
+            "input_hash": result.input_hash,
+            "hash_alg": hash_alg,
+            "output_path": str(result.output_path),
+            "schema_version": CHUNK_SCHEMA_VERSION,
+            "error": error_message,
+            "parse_engine": result.parse_engine,
+            "sanitizer_profile": result.sanitizer_profile,
+            "chunk_count": result.chunk_count,
+            "anchors_injected": result.anchors_injected,
+        }
+        return ItemOutcome(status="failure", duration_s=result.duration_s, manifest=manifest, result={}, error=err)
+
+    _write_fingerprint(fingerprint_path, input_sha256=input_hash, cfg_hash=cfg_hash)
+
+    manifest = {
+        "input_path": str(result.input_path),
+        "input_hash": result.input_hash,
+        "hash_alg": hash_alg,
+        "output_path": str(result.output_path),
+        "schema_version": CHUNK_SCHEMA_VERSION,
+        "chunk_count": result.chunk_count,
+        "total_tokens": result.total_tokens,
+        "parse_engine": result.parse_engine,
+        "anchors_injected": result.anchors_injected,
+        "sanitizer_profile": result.sanitizer_profile,
+    }
+    result_payload = {
+        "chunk_count": result.chunk_count,
+        "total_tokens": result.total_tokens,
+        "anchors_injected": result.anchors_injected,
+    }
+    return ItemOutcome(status="success", duration_s=result.duration_s, manifest=manifest, result=result_payload, error=None)
+
+
+def _make_chunk_stage_hooks(
+    *,
+    logger,
+    resolved_root: Path,
+) -> StageHooks:
+    """Return StageHooks that log manifests and telemetry for chunking."""
+
+    def before_stage(context: StageContext) -> None:
+        context.metadata["logger"] = logger
+        context.metadata["resolved_root"] = resolved_root
+        context.metadata["schema_version"] = CHUNK_SCHEMA_VERSION
+
+        if context.options.workers > 1:
+            log_event(
+                logger,
+                "info",
+                "Parallel chunking enabled",
+                workers=context.options.workers,
+            )
+
+    def after_item(
+        item: WorkItem,
+        outcome_or_error: Union[ItemOutcome, StageError],
+        context: StageContext,
+    ) -> None:
+        stage_logger = context.metadata.get("logger", logger)
+        root = context.metadata.get("resolved_root", resolved_root)
+        schema_version = context.metadata.get("schema_version", CHUNK_SCHEMA_VERSION)
+        metadata = item.metadata
+        doc_id = metadata["doc_id"]
+        input_path = Path(metadata["input_path"])
+        output_path = Path(metadata["output_path"])
+        input_hash = metadata["input_hash"]
+        hash_alg = metadata["hash_alg"]
+        parse_engine = metadata.get("parse_engine", "docling-html")
+        rel_fields = {
+            "stage": MANIFEST_STAGE,
+            "doc_id": doc_id,
+            "input_relpath": metadata.get("input_relpath", relative_path(input_path, root)),
+            "output_relpath": metadata.get("output_relpath", relative_path(output_path, root)),
+        }
+
+        if isinstance(outcome_or_error, ItemOutcome):
+            if outcome_or_error.status == "success":
+                chunk_count = outcome_or_error.result.get("chunk_count")
+                log_event(
+                    stage_logger,
+                    "info",
+                    "Chunk file written",
+                    status="success",
+                    elapsed_ms=int(outcome_or_error.duration_s * 1000),
+                    chunk_count=chunk_count,
+                    parse_engine=parse_engine,
+                    **rel_fields,
+                )
+                payload = dict(outcome_or_error.manifest)
+                for key in ("input_path", "input_hash", "output_path", "schema_version", "hash_alg"):
+                    payload.pop(key, None)
+                manifest_log_success(
+                    stage=MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    duration_s=outcome_or_error.duration_s,
+                    schema_version=schema_version,
+                    input_path=input_path,
+                    input_hash=input_hash,
+                    output_path=output_path,
+                    hash_alg=hash_alg,
+                    **payload,
+                )
+                return
+
+            if outcome_or_error.status == "skip":
+                reason = outcome_or_error.result.get("reason", "resume-satisfied")
+                log_event(
+                    stage_logger,
+                    "info",
+                    "Skipping chunk file: output exists and input unchanged",
+                    status="skip",
+                    reason=reason,
+                    **rel_fields,
+                )
+                manifest_log_skip(
+                    stage=MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    input_path=input_path,
+                    input_hash=input_hash,
+                    output_path=output_path,
+                    hash_alg=hash_alg,
+                    schema_version=schema_version,
+                    reason=reason,
+                    parse_engine=parse_engine,
+                )
+                return
+
+            error_message = (
+                outcome_or_error.error.message if outcome_or_error.error else "unknown error"
+            )
+            log_event(
+                stage_logger,
+                "error",
+                "Chunking failed",
+                status="failure",
+                error=error_message,
+                elapsed_ms=int(outcome_or_error.duration_s * 1000),
+                parse_engine=parse_engine,
+                **rel_fields,
+            )
+            payload = dict(outcome_or_error.manifest)
+            for key in ("input_path", "input_hash", "output_path", "schema_version", "hash_alg", "error"):
+                payload.pop(key, None)
+            manifest_log_failure(
+                stage=MANIFEST_STAGE,
+                doc_id=doc_id,
+                duration_s=outcome_or_error.duration_s,
+                schema_version=schema_version,
+                input_path=input_path,
+                input_hash=input_hash,
+                output_path=output_path,
+                hash_alg=hash_alg,
+                error=error_message,
+                **payload,
+            )
+            return
+
+        # StageError surfaced from the runner.
+        error = outcome_or_error
+        log_event(
+            stage_logger,
+            "error",
+            "Chunking failed",
+            status="failure",
+            error=error.message,
+            **rel_fields,
+        )
+        manifest_log_failure(
+            stage=MANIFEST_STAGE,
+            doc_id=doc_id,
+            duration_s=0.0,
+            schema_version=schema_version,
+            input_path=input_path,
+            input_hash=input_hash,
+            output_path=output_path,
+            hash_alg=hash_alg,
+            error=error.message,
+        )
+
+    def after_stage(outcome: StageOutcome, context: StageContext) -> None:
+        stage_logger = context.metadata.get("logger", logger)
+        log_event(
+            stage_logger,
+            "info",
+            "Chunk stage summary",
+            scheduled=outcome.scheduled,
+            succeeded=outcome.succeeded,
+            failed=outcome.failed,
+            skipped=outcome.skipped,
+            cancelled=outcome.cancelled,
+            wall_ms=round(outcome.wall_ms, 3),
+            stage=MANIFEST_STAGE,
+            doc_id="__summary__",
+        )
+
+    return StageHooks(
+        before_stage=before_stage,
+        after_item=after_item,
+        after_stage=after_stage,
+    )
+
 
 
 def _main_inner(
@@ -1189,10 +1570,6 @@ def _main_inner(
     elif args.resume:
         logger.info("Resume mode enabled: unchanged inputs will be skipped")
 
-    chunk_manifest_index: Dict[str, Any] = {}
-    if args.resume:
-        chunk_manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_data_root)
-
     tokenizer_model = args.tokenizer_model
     logger.info(
         "Loading tokenizer",
@@ -1217,7 +1594,7 @@ def _main_inner(
                 in_dir=in_dir,
                 out_dir=out_dir,
                 telemetry=stage_telemetry,
-            )
+        )
             return 0
 
         chunk_config = ChunkWorkerConfig(
@@ -1261,6 +1638,7 @@ def _main_inner(
             )
             worker_count = 1
 
+        cfg_hash = _compute_worker_cfg_hash(chunk_config)
         context.workers = worker_count
         context.resume = bool(args.resume)
         context.force = bool(args.force)
@@ -1271,6 +1649,7 @@ def _main_inner(
             custom_heading_markers=custom_heading_markers,
             custom_caption_markers=custom_caption_markers,
         )
+        context.update_extra(worker_config_hash=cfg_hash)
         context_payload = context.to_manifest()
         log_event(
             logger,
@@ -1290,174 +1669,35 @@ def _main_inner(
             },
         )
 
-        resume_controller = ResumeController(args.resume, args.force, chunk_manifest_index)
+        set_spawn_or_warn(logger)
 
-        def iter_chunk_tasks() -> Iterator[ChunkTask]:
-            """Generate chunk tasks for processing, respecting resume/force settings."""
-            resume_enabled = bool(args.resume)
-            for path in files:
-                doc_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
-                name = path.stem
-                manifest_entry = resume_controller.entry(doc_id) if resume_enabled else None
-                should_hash = resume_enabled
-                input_hash = compute_content_hash(path) if should_hash else ""
-                parse_engine = parse_engine_lookup.get(doc_id, "docling-html")
-                if doc_id not in parse_engine_lookup:
-                    logger.debug(
-                        "Parse engine defaulted to docling-html",
-                        extra={"extra_fields": {"doc_id": doc_id}},
-                    )
+        hash_alg = resolve_hash_algorithm()
+        manifest_lookup: Dict[str, Mapping[str, Any]] = dict(html_manifest_index)
+        manifest_lookup.update(pdf_manifest_index)
+        plan = _build_chunk_plan(
+            files=files,
+            in_dir=in_dir,
+            out_dir=out_dir,
+            resolved_root=resolved_data_root,
+            worker_config=chunk_config,
+            cfg_hash=cfg_hash,
+            hash_alg=hash_alg,
+            parse_engine_lookup=parse_engine_lookup,
+            manifest_lookup=manifest_lookup,
+        )
 
-                if resume_controller.resume:
-                    skip_doc = should_skip_output(
-                        out_path,
-                        manifest_entry,
-                        input_hash,
-                        resume_controller.resume,
-                        resume_controller.force,
-                    )
-                else:
-                    skip_doc = False
-                if skip_doc:
-                    log_event(
-                        logger,
-                        "info",
-                        "Skipping chunk file: output exists and input unchanged",
-                        status="skip",
-                        stage=CHUNK_STAGE,
-                        doc_id=doc_id,
-                        input_relpath=relative_path(path, resolved_data_root),
-                        output_relpath=relative_path(out_path, resolved_data_root),
-                    )
-                    manifest_log_skip(
-                        stage=MANIFEST_STAGE,
-                        doc_id=doc_id,
-                        input_path=path,
-                        input_hash=input_hash,
-                        output_path=out_path,
-                        schema_version=CHUNK_SCHEMA_VERSION,
-                        reason="unchanged-input",
-                        parse_engine=parse_engine,
-                    )
-                    continue
+        hooks = _make_chunk_stage_hooks(logger=logger, resolved_root=resolved_data_root)
+        options = StageOptions(
+            policy="cpu",
+            workers=worker_count,
+            resume=bool(args.resume),
+            force=bool(args.force),
+            diagnostics_interval_s=15.0,
+        )
 
-                yield ChunkTask(
-                    doc_path=path,
-                    output_path=out_path,
-                    doc_id=doc_id,
-                    doc_stem=name,
-                    input_hash=input_hash,
-                    parse_engine=parse_engine,
-                )
-
-        task_iterator = iter_chunk_tasks()
-        try:
-            first_task = next(task_iterator)
-        except StopIteration:
-            return 0
-
-        def handle_result(result: ChunkResult) -> None:
-            """Persist manifest information and raise on worker failure.
-
-            Args:
-                result: Structured outcome emitted by the chunking worker.
-            """
-            duration = round(result.duration_s, 3)
-            if result.status != "success":
-                error_message = result.error or "unknown error"
-                failure_metadata = {
-                    "status": "failure",
-                    "duration_s": duration,
-                    "schema_version": CHUNK_SCHEMA_VERSION,
-                    "input_path": str(result.input_path),
-                    "input_hash": result.input_hash,
-                    "hash_alg": resolve_hash_algorithm(),
-                    "output_path": str(result.output_path),
-                    "parse_engine": result.parse_engine,
-                    "chunk_count": result.chunk_count,
-                    "anchors_injected": result.anchors_injected,
-                    "sanitizer_profile": result.sanitizer_profile,
-                    "error": error_message,
-                }
-                log_event(
-                    logger,
-                    "error",
-                    "Chunking failed",
-                    status="failure",
-                    stage=CHUNK_STAGE,
-                    doc_id=result.doc_id,
-                    input_relpath=relative_path(result.input_path, resolved_data_root),
-                    output_relpath=relative_path(result.output_path, resolved_data_root),
-                    elapsed_ms=int(result.duration_s * 1000),
-                    error_class="RuntimeError",
-                    error=error_message,
-                )
-                stage_telemetry.log_failure(
-                    doc_id=result.doc_id,
-                    input_path=result.input_path,
-                    duration_s=duration,
-                    reason=error_message,
-                    metadata=failure_metadata.copy(),
-                    manifest_metadata=failure_metadata,
-                )
-                raise RuntimeError(f"Chunking failed for {result.doc_id}: {error_message}")
-
-            log_event(
-                logger,
-                "info",
-                "Chunk file written",
-                status="success",
-                stage=CHUNK_STAGE,
-                doc_id=result.doc_id,
-                input_relpath=relative_path(result.input_path, resolved_data_root),
-                output_relpath=relative_path(result.output_path, resolved_data_root),
-                elapsed_ms=int(result.duration_s * 1000),
-                chunk_count=result.chunk_count,
-                parse_engine=result.parse_engine,
-            )
-            stage_telemetry.log_success(
-                doc_id=result.doc_id,
-                input_path=result.input_path,
-                output_path=result.output_path,
-                tokens=result.total_tokens,
-                schema_version=CHUNK_SCHEMA_VERSION,
-                duration_s=duration,
-                metadata={
-                    "status": "success",
-                    "input_path": str(result.input_path),
-                    "input_hash": result.input_hash,
-                    "chunk_count": result.chunk_count,
-                    "total_tokens": result.total_tokens,
-                    "parse_engine": result.parse_engine,
-                    "hash_alg": resolve_hash_algorithm(),
-                    "anchors_injected": result.anchors_injected,
-                    "sanitizer_profile": result.sanitizer_profile,
-                },
-            )
-
-        if worker_count == 1:
-            _chunk_worker_initializer(chunk_config)
-            for task in itertools.chain((first_task,), task_iterator):
-                handle_result(_process_chunk_task(task))
-        else:
-            logger.info(
-                "Parallel chunking enabled",
-                extra={"extra_fields": {"workers": worker_count}},
-            )
-            ctx = get_context("spawn")
-            with ctx.Pool(
-                processes=worker_count,
-                initializer=_chunk_worker_initializer,
-                initargs=(chunk_config,),
-            ) as pool:
-                indexed_results = pool.imap_unordered(
-                    _process_indexed_chunk_task,
-                    enumerate(itertools.chain((first_task,), task_iterator)),
-                    chunksize=1,
-                )
-                for result in _ordered_results(indexed_results):
-                    handle_result(result)
-
+        outcome = run_stage(plan, _chunk_stage_worker, options, hooks)
+        if outcome.failed > 0 or outcome.cancelled:
+            return 1
         return 0
 
 

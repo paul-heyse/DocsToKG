@@ -59,6 +59,13 @@ def test_canonical_for_index_lowercases_and_preserves_query():
     ]
 
 
+def test_canonical_for_index_adds_default_scheme_and_handles_ports():
+    canonical = canonical_for_index("example.org/resource")
+    assert canonical == "https://example.org/resource"
+    assert canonical_for_index("https://example.org:443/resource") == "https://example.org/resource"
+    assert canonical_for_index("https://example.org:80/resource") == "https://example.org:80/resource"
+
+
 def test_canonical_for_request_filters_tracking_on_landing():
     url = "https://example.com/p.pdf?utm_source=x&ref=tw&q=test"
     landing = canonical_for_request(url, role="landing")

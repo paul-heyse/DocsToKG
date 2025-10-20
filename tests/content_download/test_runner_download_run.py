@@ -674,6 +674,8 @@ def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_pat
                 publication_year INTEGER,
                 resolver TEXT,
                 url TEXT,
+                canonical_url TEXT,
+                original_url TEXT,
                 normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
@@ -691,39 +693,62 @@ def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_pat
             )
             """
         )
+        columns = (
+            "timestamp",
+            "run_id",
+            "schema_version",
+            "work_id",
+            "title",
+            "publication_year",
+            "resolver",
+            "url",
+            "canonical_url",
+            "original_url",
+            "normalized_url",
+            "path",
+            "path_mtime_ns",
+            "classification",
+            "content_type",
+            "reason",
+            "reason_detail",
+            "html_paths",
+            "sha256",
+            "content_length",
+            "etag",
+            "last_modified",
+            "extracted_text_path",
+            "dry_run",
+        )
+        values = (
+            "2025-01-01T00:00:00Z",
+            "resume-run",
+            MANIFEST_SCHEMA_VERSION,
+            "W-SQLITE",
+            "SQLite Resume",
+            2024,
+            "openalex",
+            "https://example.org/W-SQLITE.pdf",
+            "https://example.org/w-sqlite.pdf",
+            "https://example.org/W-SQLITE.pdf",
+            "https://example.org/w-sqlite.pdf",
+            str(resolved.pdf_dir / "stored.pdf"),
+            None,
+            "pdf",
+            "application/pdf",
+            None,
+            None,
+            None,
+            "deadbeef",
+            1024,
+            None,
+            None,
+            None,
+            0,
+        )
+        placeholders = ", ".join(["?"] * len(columns))
         conn.execute(
-            """
-            INSERT INTO manifests (
-                timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, normalized_url, path, path_mtime_ns, classification,
-                content_type, reason, reason_detail, html_paths, sha256,
-                content_length, etag, last_modified, extracted_text_path, dry_run
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                "2025-01-01T00:00:00Z",
-                "resume-run",
-                MANIFEST_SCHEMA_VERSION,
-                "W-SQLITE",
-                "SQLite Resume",
-                2024,
-                "openalex",
-                "https://example.org/W-SQLITE.pdf",
-                "https://example.org/w-sqlite.pdf",
-                str(resolved.pdf_dir / "stored.pdf"),
-                None,
-                "pdf",
-                "application/pdf",
-                None,
-                None,
-                None,
-                "deadbeef",
-                1024,
-                None,
-                None,
-                None,
-                0,
-            ),
+            f"INSERT INTO manifests ({', '.join(columns)}) VALUES ({placeholders})",
+            values,
         )
         conn.commit()
     finally:
@@ -767,6 +792,8 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
                 publication_year INTEGER,
                 resolver TEXT,
                 url TEXT,
+                canonical_url TEXT,
+                original_url TEXT,
                 normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
@@ -788,10 +815,10 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
             """
             INSERT INTO manifests (
                 timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                resolver, url, canonical_url, original_url, normalized_url, path, path_mtime_ns, classification,
                 content_type, reason, reason_detail, html_paths, sha256,
                 content_length, etag, last_modified, extracted_text_path, dry_run
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "2025-01-01T00:00:00Z",
@@ -801,6 +828,8 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
                 "SQLite Resume",
                 2024,
                 "openalex",
+                "https://example.org/W-HANDLES.pdf",
+                "https://example.org/w-handles.pdf",
                 "https://example.org/W-HANDLES.pdf",
                 "https://example.org/w-handles.pdf",
                 str(resolved.pdf_dir / "stored.pdf"),
@@ -970,6 +999,8 @@ def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
                 publication_year INTEGER,
                 resolver TEXT,
                 url TEXT,
+                canonical_url TEXT,
+                original_url TEXT,
                 normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
@@ -991,10 +1022,10 @@ def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
             """
             INSERT INTO manifests (
                 timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                resolver, url, canonical_url, original_url, normalized_url, path, path_mtime_ns, classification,
                 content_type, reason, reason_detail, html_paths, sha256,
                 content_length, etag, last_modified, extracted_text_path, dry_run
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "2025-01-03T00:00:00Z",
@@ -1004,6 +1035,8 @@ def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
                 "CSV Resume",
                 2024,
                 "openalex",
+                "https://example.org/W-CSV.pdf",
+                "https://example.org/w-csv.pdf",
                 "https://example.org/W-CSV.pdf",
                 "https://example.org/w-csv.pdf",
                 str(resolved.pdf_dir / "stored.pdf"),
@@ -1070,6 +1103,8 @@ def test_setup_download_state_accepts_explicit_csv_resume(tmp_path):
                 publication_year INTEGER,
                 resolver TEXT,
                 url TEXT,
+                canonical_url TEXT,
+                original_url TEXT,
                 normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
@@ -1091,10 +1126,10 @@ def test_setup_download_state_accepts_explicit_csv_resume(tmp_path):
             """
             INSERT INTO manifests (
                 timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                resolver, url, canonical_url, original_url, normalized_url, path, path_mtime_ns, classification,
                 content_type, reason, reason_detail, html_paths, sha256,
                 content_length, etag, last_modified, extracted_text_path, dry_run
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "2025-01-04T00:00:00Z",
@@ -1104,6 +1139,8 @@ def test_setup_download_state_accepts_explicit_csv_resume(tmp_path):
                 "CSV Resume",
                 2024,
                 "openalex",
+                "https://example.org/W-CSV.pdf",
+                "https://example.org/w-csv.pdf",
                 "https://example.org/W-CSV.pdf",
                 "https://example.org/w-csv.pdf",
                 str(resolved.pdf_dir / "stored.pdf"),
@@ -1174,6 +1211,8 @@ def test_setup_download_state_prefers_adjacent_sqlite_for_external_csv(tmp_path)
                 publication_year INTEGER,
                 resolver TEXT,
                 url TEXT,
+                canonical_url TEXT,
+                original_url TEXT,
                 normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
@@ -1397,6 +1436,8 @@ def test_manifest_url_index_resolves_relative_paths(tmp_path, patcher):
             CREATE TABLE manifests (
                 timestamp TEXT,
                 url TEXT,
+                canonical_url TEXT,
+                original_url TEXT,
                 normalized_url TEXT,
                 path TEXT,
                 sha256 TEXT,
@@ -1413,6 +1454,8 @@ def test_manifest_url_index_resolves_relative_paths(tmp_path, patcher):
             INSERT INTO manifests (
                 timestamp,
                 url,
+                canonical_url,
+                original_url,
                 normalized_url,
                 path,
                 sha256,
@@ -1421,10 +1464,12 @@ def test_manifest_url_index_resolves_relative_paths(tmp_path, patcher):
                 last_modified,
                 content_length,
                 path_mtime_ns
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "2025-01-01T00:00:00Z",
+                "https://example.org/cached.pdf",
+                "https://example.org/cached.pdf",
                 "https://example.org/cached.pdf",
                 "https://example.org/cached.pdf",
                 "pdfs/cached.pdf",
@@ -1451,6 +1496,9 @@ def test_manifest_url_index_resolves_relative_paths(tmp_path, patcher):
     assert record is not None
     assert record["path"] == str(cached_file.resolve())
     assert Path(record["path"]).exists()
+
+    alt_record = index.get("example.org/cached.pdf")
+    assert alt_record == record
 
     existing = list(index.iter_existing())
     assert existing

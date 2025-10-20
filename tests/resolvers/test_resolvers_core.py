@@ -1621,7 +1621,7 @@ def test_classify_payload_octet_stream_with_pdf_signature() -> None:
 def test_pipeline_stops_on_first_success(tmp_path):
     artifact = build_artifact(tmp_path)
 
-    def fake_download(session, artifact, url, referer, timeout):
+    def fake_download(session, artifact, url, referer, timeout, **kwargs):
         status = "pdf" if url == "https://b.example/pdf" else "http_error"
         return DownloadOutcome(
             classification=status,
@@ -1668,7 +1668,7 @@ def test_pipeline_records_resolver_exception(tmp_path):
         def iter_urls(self, session, config, art):  # noqa: D401
             raise RuntimeError("boom")
 
-    def fake_download(session, artifact, url, referer, timeout):  # pragma: no cover - not reached
+    def fake_download(session, artifact, url, referer, timeout, **kwargs):  # pragma: no cover - not reached
         return DownloadOutcome(
             "pdf", str(artifact.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0
         )
@@ -1739,7 +1739,9 @@ def test_head_precheck_allows_redirect(patcher, tmp_path):
     logger = ListLogger()
     metrics = ResolverMetrics()
 
-    def download_func(session, artifact, url, referer, timeout):  # pragma: no cover - not used
+    def download_func(
+        session, artifact, url, referer, timeout, **kwargs
+    ):  # pragma: no cover - not used
         return DownloadOutcome(classification="http_error", http_status=404, elapsed_ms=1.0)
 
     pipeline = ResolverPipeline(
@@ -1826,7 +1828,7 @@ def test_cli_integration_happy_path(patcher, tmp_path):
             elif artifact.work_id == "W3" and self.name == "unpaywall":
                 yield ResolverResult(url="resolver://html")
 
-    def fake_download(session, artifact, url, referer, timeout):
+    def fake_download(session, artifact, url, referer, timeout, **kwargs):
         if "direct" in url or "success" in url:
             path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
             ensure_dir(path.parent)
@@ -1910,7 +1912,7 @@ def test_head_precheck_skips_html(patcher, tmp_path):
     logger = ListLogger()
     download_calls: List[str] = []
 
-    def fake_download(session, art, url, referer, timeout):
+    def fake_download(session, art, url, referer, timeout, **kwargs):
         download_calls.append(url)
         return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
 
@@ -1942,7 +1944,7 @@ def test_head_precheck_skips_zero_length(patcher, tmp_path):
     logger = ListLogger()
     download_calls: List[str] = []
 
-    def fake_download(session, art, url, referer, timeout):
+    def fake_download(session, art, url, referer, timeout, **kwargs):
         download_calls.append(url)
         return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
 
@@ -1973,7 +1975,7 @@ def test_head_precheck_skips_error_status(patcher, tmp_path):
     logger = ListLogger()
     download_calls: List[str] = []
 
-    def fake_download(session, art, url, referer, timeout):
+    def fake_download(session, art, url, referer, timeout, **kwargs):
         download_calls.append(url)
         return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
 
@@ -2004,7 +2006,7 @@ def test_head_precheck_allows_pdf(patcher, tmp_path):
     logger = ListLogger()
     download_calls: List[str] = []
 
-    def fake_download(session, art, url, referer, timeout):
+    def fake_download(session, art, url, referer, timeout, **kwargs):
         download_calls.append(url)
         return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
 
@@ -2034,7 +2036,7 @@ def test_head_precheck_allows_redirect_to_pdf(patcher, tmp_path):
     logger = ListLogger()
     download_calls: List[str] = []
 
-    def fake_download(session, art, url, referer, timeout):
+    def fake_download(session, art, url, referer, timeout, **kwargs):
         download_calls.append(url)
         return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
 
@@ -2067,7 +2069,7 @@ def test_head_precheck_failure_allows_download(patcher, tmp_path):
     logger = ListLogger()
     download_calls: List[str] = []
 
-    def fake_download(session, art, url, referer, timeout):
+    def fake_download(session, art, url, referer, timeout, **kwargs):
         download_calls.append(url)
         return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
 
@@ -2111,7 +2113,7 @@ def test_head_precheck_respects_global_disable(patcher, tmp_path):
         fake_request,
     )
 
-    def fake_download(session, art, url, referer, timeout):
+    def fake_download(session, art, url, referer, timeout, **kwargs):
         download_calls.append(url)
         return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
 
@@ -2149,7 +2151,7 @@ def test_head_precheck_resolver_override(patcher, tmp_path):
         fake_request,
     )
 
-    def fake_download(session, art, url, referer, timeout):
+    def fake_download(session, art, url, referer, timeout, **kwargs):
         return DownloadOutcome("http_error", None, 500, "text/html", 1.0)
 
     pipeline = ResolverPipeline(
@@ -2305,7 +2307,7 @@ def test_pipeline_skips_duplicate_urls(tmp_path):
     logger = ListLogger()
     metrics = ResolverMetrics()
 
-    def fake_download(session, art, url, referer, timeout):
+    def fake_download(session, art, url, referer, timeout, **kwargs):
         return DownloadOutcome("html", None, 200, "text/html", 1.0)
 
     pipeline = ResolverPipeline([resolver], config, fake_download, logger, metrics)
@@ -2388,7 +2390,7 @@ def test_pipeline_respects_max_attempts(tmp_path):
     logger = ListLogger()
     metrics = ResolverMetrics()
 
-    def non_pdf_download(session, art, url, referer, timeout):
+    def non_pdf_download(session, art, url, referer, timeout, **kwargs):
         return DownloadOutcome("html", None, 200, "text/html", 1.0)
 
     pipeline = ResolverPipeline([resolver], config, non_pdf_download, logger, metrics)
@@ -2425,7 +2427,7 @@ def test_pipeline_concurrent_skips_missing_resolver(tmp_path):
     logger = ListLogger()
     metrics = ResolverMetrics()
 
-    def download(session, art, url, referer, timeout):
+    def download(session, art, url, referer, timeout, **kwargs):
         return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
 
     pipeline = ResolverPipeline([resolver], config, download, logger, metrics)
@@ -2477,7 +2479,7 @@ def test_pipeline_concurrent_execution(tmp_path):
     logger = ListLogger()
     metrics = ResolverMetrics()
 
-    def download_pdf(session, art, url, referer, timeout):
+    def download_pdf(session, art, url, referer, timeout, **kwargs):
         ensure_dir(art.pdf_dir)
         return DownloadOutcome(
             "pdf",
@@ -2522,7 +2524,7 @@ def test_pipeline_global_deduplication_skips_repeat_urls(tmp_path):
     metrics = ResolverMetrics()
     download_calls: List[str] = []
 
-    def download_pdf(session, art, url, referer, timeout):
+    def download_pdf(session, art, url, referer, timeout, **kwargs):
         ensure_dir(art.pdf_dir)
         path = art.pdf_dir / f"{art.base_stem}.pdf"
         download_calls.append(art.work_id)
@@ -2603,7 +2605,7 @@ def test_pipeline_domain_rate_limiting_enforces_interval(patcher, tmp_path):
     metrics = ResolverMetrics()
     download_calls: List[str] = []
 
-    def download_pdf(session, art, url, referer, timeout):
+    def download_pdf(session, art, url, referer, timeout, **kwargs):
         ensure_dir(art.pdf_dir)
         download_calls.append(url)
         return DownloadOutcome(

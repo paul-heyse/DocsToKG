@@ -70,6 +70,7 @@ from DocsToKG.ContentDownload import pipeline as resolvers
 from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
     build_manifest_entry,
+    load_previous_manifest,
 )
 
 
@@ -319,6 +320,88 @@ def test_load_previous_manifest_missing_file(tmp_path: Path) -> None:
     message = str(excinfo.value)
     assert str(manifest_path) in message
     assert "--resume-from" in message
+
+
+def test_load_previous_manifest_upgrades_default_scheme(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "resume-default.jsonl"
+    manifest_entry = {
+        "record_type": "manifest",
+        "schema_version": MANIFEST_SCHEMA_VERSION,
+        "timestamp": "2025-01-05T00:00:00Z",
+        "run_id": "default-scheme-run",
+        "work_id": "W-DEFAULT",
+        "title": "Default Scheme",
+        "publication_year": 2024,
+        "resolver": "test",
+        "url": "example.org/article.pdf",
+        "canonical_url": None,
+        "original_url": "example.org/article.pdf",
+        "normalized_url": None,
+        "path": "pdfs/article.pdf",
+        "classification": "pdf",
+        "content_type": "application/pdf",
+        "reason": None,
+        "reason_detail": None,
+        "html_paths": [],
+        "sha256": None,
+        "content_length": None,
+        "etag": None,
+        "last_modified": None,
+        "extracted_text_path": None,
+        "dry_run": False,
+    }
+    manifest_path.write_text(json.dumps(manifest_entry) + "\n", encoding="utf-8")
+
+    per_work, completed = load_previous_manifest(manifest_path)
+
+    assert "W-DEFAULT" in completed
+    resume_entries = per_work["W-DEFAULT"]
+    assert "https://example.org/article.pdf" in resume_entries
+    record = resume_entries["https://example.org/article.pdf"]
+    assert record["canonical_url"] == "https://example.org/article.pdf"
+    assert record["original_url"] == "example.org/article.pdf"
+    assert record["normalized_url"] == "https://example.org/article.pdf"
+
+
+def test_load_previous_manifest_retains_nondefault_port(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "resume-port.jsonl"
+    manifest_entry = {
+        "record_type": "manifest",
+        "schema_version": MANIFEST_SCHEMA_VERSION,
+        "timestamp": "2025-01-05T00:00:00Z",
+        "run_id": "port-run",
+        "work_id": "W-PORT",
+        "title": "Nondefault Port",
+        "publication_year": 2023,
+        "resolver": "test",
+        "url": "https://example.org:80/resource.pdf",
+        "canonical_url": None,
+        "original_url": "https://example.org:80/resource.pdf",
+        "normalized_url": None,
+        "path": "pdfs/resource.pdf",
+        "classification": "pdf",
+        "content_type": "application/pdf",
+        "reason": None,
+        "reason_detail": None,
+        "html_paths": [],
+        "sha256": None,
+        "content_length": None,
+        "etag": None,
+        "last_modified": None,
+        "extracted_text_path": None,
+        "dry_run": False,
+    }
+    manifest_path.write_text(json.dumps(manifest_entry) + "\n", encoding="utf-8")
+
+    per_work, completed = load_previous_manifest(manifest_path)
+
+    assert "W-PORT" in completed
+    resume_entries = per_work["W-PORT"]
+    assert "https://example.org:80/resource.pdf" in resume_entries
+    record = resume_entries["https://example.org:80/resource.pdf"]
+    assert record["canonical_url"] == "https://example.org:80/resource.pdf"
+    assert record["original_url"] == "https://example.org:80/resource.pdf"
+    assert record["normalized_url"] == "https://example.org:80/resource.pdf"
 
 
 def test_load_previous_manifest_uses_sqlite_fallback(tmp_path: Path) -> None:

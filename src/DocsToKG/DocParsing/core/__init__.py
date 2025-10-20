@@ -93,6 +93,18 @@ from .models import (
     QwenCfg,
     SpladeCfg,
 )
+from .runner import (
+    ItemFingerprint,
+    ItemOutcome,
+    StageContext,
+    StageError,
+    StageHooks,
+    StageOptions,
+    StageOutcome,
+    StagePlan,
+    WorkItem,
+    run_stage,
+)
 
 __all__ = [
     "detect_data_root",
@@ -178,4 +190,14 @@ __all__ = [
     "app",
     "build_doctags_parser",
     "main",
+    "StagePlan",
+    "WorkItem",
+    "ItemOutcome",
+    "StageOutcome",
+    "StageOptions",
+    "StageHooks",
+    "StageError",
+    "StageContext",
+    "ItemFingerprint",
+    "run_stage",
 ]

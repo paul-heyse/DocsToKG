@@ -527,6 +527,7 @@ def parse_args(
     """Parse CLI arguments using ``parser`` and optional argv override."""
     args = parser.parse_args(argv)
     _apply_rate_env_overrides(args)
+    _apply_url_env_overrides(args)
     return args
 
 
@@ -573,6 +574,42 @@ def _apply_rate_env_overrides(args: argparse.Namespace) -> None:
                 "Ignoring unrecognised DOCSTOKG_RATE_DISABLED value %r (expected true/false).",
                 env_disable,
             )
+
+
+def _apply_url_env_overrides(args: argparse.Namespace) -> None:
+    """Overlay URL policy overrides sourced from environment variables."""
+
+    def _coerce_bool(env_name: str, raw: str) -> Optional[bool]:
+        token = raw.strip().lower()
+        if not token:
+            return None
+        if token in {"1", "true", "t", "yes", "y", "on"}:
+            return True
+        if token in {"0", "false", "f", "no", "n", "off"}:
+            return False
+        LOGGER.warning(
+            "Ignoring unrecognised %s value %r (expected true/false).",
+            env_name,
+            raw,
+        )
+        return None
+
+    if getattr(args, "url_default_scheme", None) in (None, ""):
+        scheme = os.environ.get("DOCSTOKG_URL_DEFAULT_SCHEME")
+        if scheme:
+            args.url_default_scheme = scheme.strip()
+
+    if getattr(args, "url_filter_landing", None) is None:
+        raw_filter = os.environ.get("DOCSTOKG_URL_FILTER_LANDING")
+        if raw_filter is not None:
+            parsed = _coerce_bool("DOCSTOKG_URL_FILTER_LANDING", raw_filter)
+            if parsed is not None:
+                args.url_filter_landing = parsed
+
+    if not getattr(args, "url_param_allowlist", None):
+        allowlist = os.environ.get("DOCSTOKG_URL_PARAM_ALLOWLIST")
+        if allowlist:
+            args.url_param_allowlist = allowlist.strip()
 
 
 def _parse_rate_override_spec(value: str) -> Tuple[str, Optional[str], List[Rate]]:

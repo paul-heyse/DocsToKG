@@ -234,12 +234,13 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MethodType
-from typing import Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
+import httpx
 import pytest
-import requests
 
 from DocsToKG.ContentDownload import cli as downloader
+from DocsToKG.ContentDownload import httpx_transport
 from DocsToKG.ContentDownload import pipeline as resolvers
 from DocsToKG.ContentDownload.core import Classification, WorkArtifact
 from DocsToKG.ContentDownload.pipeline import (
@@ -380,13 +381,14 @@ def test_sequential_execution_when_max_concurrent_is_one(tmp_path):
     logger = RecordingLogger()
     metrics = ResolverMetrics()
 
-    def download_func(session, artifact, url, referer, timeout):
+    def download_func(session, artifact, url, referer, timeout, **kwargs):
         time.sleep(0.1)
         return _html_outcome()
 
     pipeline = ResolverPipeline(resolvers, config, download_func, logger, metrics)
     start = time.monotonic()
-    result = pipeline.run(object(), artifact)
+    with httpx.Client() as client:
+        result = pipeline.run(client, artifact)
     elapsed = time.monotonic() - start
 
     assert result.success is False
@@ -413,7 +415,7 @@ def test_concurrent_execution_with_three_workers(tmp_path):
     logger = RecordingLogger()
     metrics = ResolverMetrics()
 
-    def download_func(session, artifact, url, referer, timeout):
+    def download_func(session, artifact, url, referer, timeout, **kwargs):
         time.sleep(0.05)
         return _html_outcome()
 
@@ -425,11 +427,13 @@ def test_concurrent_execution_with_three_workers(tmp_path):
     )
 
     seq_elapsed = time.monotonic()
-    sequential_pipeline.run(object(), artifact)
+    with httpx.Client() as client:
+        sequential_pipeline.run(client, artifact)
     seq_elapsed = time.monotonic() - seq_elapsed
 
     conc_elapsed = time.monotonic()
-    conc_pipeline.run(object(), artifact)
+    with httpx.Client() as client:
+        conc_pipeline.run(client, artifact)
     conc_elapsed = time.monotonic() - conc_elapsed
 
     assert conc_elapsed < seq_elapsed * 0.8
@@ -456,7 +460,7 @@ def test_early_stop_cancels_remaining_resolvers(tmp_path):
 
     downloaded: List[str] = []
 
-    def download_func(session, artifact, url, referer, timeout):
+    def download_func(session, artifact, url, referer, timeout, **kwargs):
         downloaded.append(url)
         if "fast" in url:
             return DownloadOutcome(
@@ -470,7 +474,8 @@ def test_early_stop_cancels_remaining_resolvers(tmp_path):
         return _html_outcome()
 
     pipeline = ResolverPipeline(resolvers, config, download_func, logger, metrics)
-    result = pipeline.run(object(), artifact)
+    with httpx.Client() as client:
+        result = pipeline.run(client, artifact)
 
     assert result.success is True
     assert downloaded == ["https://fast.example/pdf"]
@@ -490,12 +495,13 @@ def test_resolver_failure_does_not_abort_concurrency(tmp_path):
 
     downloaded: List[str] = []
 
-    def download_func(session, artifact, url, referer, timeout):
+    def download_func(session, artifact, url, referer, timeout, **kwargs):
         downloaded.append(url)
         return _html_outcome()
 
     pipeline = ResolverPipeline(resolvers, config, download_func, logger, metrics)
-    result = pipeline.run(object(), artifact)
+    with httpx.Client() as client:
+        result = pipeline.run(client, artifact)
 
     assert result.success is False
     assert downloaded == ["https://healthy.example/html"]
@@ -503,10 +509,6 @@ def test_resolver_failure_does_not_abort_concurrency(tmp_path):
     assert error_records, "Expected resolver error to be logged"
     assert error_records[0].reason == "resolver-exception"
 
-
-# --- test_parallel_execution.py ---
-
-pytest.importorskip("requests")
 
 # --- test_parallel_execution.py ---
 
@@ -593,7 +595,7 @@ def test_concurrent_pipeline_reduces_wall_time(patcher):
         )
 
     artifact = _StubArtifact()
-    session = requests.Session()
+    client = httpx.Client()
     try:
         sequential_logger = _MemoryLogger()
         sequential = ResolverPipeline(
@@ -611,14 +613,14 @@ def test_concurrent_pipeline_reduces_wall_time(patcher):
         )
 
         start = time.perf_counter()
-        sequential.run(session, artifact, context={"dry_run": False})
+        sequential.run(client, artifact, context={"dry_run": False})
         sequential_elapsed = time.perf_counter() - start
 
         start = time.perf_counter()
-        concurrent.run(session, artifact, context={"dry_run": False})
+        concurrent.run(client, artifact, context={"dry_run": False})
         concurrent_elapsed = time.perf_counter() - start
     finally:
-        session.close()
+        client.close()
 
     assert sequential_elapsed > delay * resolver_count * 0.8
     assert concurrent_elapsed < sequential_elapsed / 2
@@ -688,8 +690,13 @@ def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
 # --- test_pipeline_behaviour.py ---
 
 
-def build_outcome(classification: str, path: str | None = None) -> DownloadOutcome:
-    return DownloadOutcome(
+def build_outcome(
+    classification: str,
+    path: str | None = None,
+    *,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> DownloadOutcome:
+    outcome = DownloadOutcome(
         classification=classification,
         path=path,
         http_status=200 if classification == "pdf" else 400,
@@ -697,6 +704,9 @@ def build_outcome(classification: str, path: str | None = None) -> DownloadOutco
         elapsed_ms=10.0,
         error=None,
     )
+    if metadata:
+        outcome.metadata.update(metadata)
+    return outcome
 
 
 # --- test_pipeline_behaviour.py ---
@@ -706,7 +716,7 @@ def test_pipeline_respects_custom_order(tmp_path):
     artifact = make_artifact(tmp_path)
     attempts: List[str] = []
 
-    def downloader_fn(session, art, url, referer, timeout):
+    def downloader_fn(session, art, url, referer, timeout, **kwargs):
         attempts.append(url)
         if "beta" in url:
             return build_outcome("pdf", path=str(art.pdf_dir / "beta.pdf"))
@@ -727,8 +737,8 @@ def test_pipeline_respects_custom_order(tmp_path):
         download_func=downloader_fn,
         logger=logger,
     )
-    session = requests.Session()
-    result = pipeline.run(session, artifact)
+    with httpx.Client() as client:
+        result = pipeline.run(client, artifact)
     assert result.success is True
     assert attempts == ["https://beta.example/1"]
     assert logger.records[0].resolver_name == "beta"
@@ -740,7 +750,7 @@ def test_pipeline_respects_custom_order(tmp_path):
 def test_pipeline_stops_after_max_attempts(tmp_path):
     artifact = make_artifact(tmp_path)
 
-    def downloader_fn(session, art, url, referer, timeout):
+    def downloader_fn(session, art, url, referer, timeout, **kwargs):
         return build_outcome("http_error")
 
     resolver = StubResolver(
@@ -763,8 +773,8 @@ def test_pipeline_stops_after_max_attempts(tmp_path):
         download_func=downloader_fn,
         logger=logger,
     )
-    session = requests.Session()
-    result = pipeline.run(session, artifact)
+    with httpx.Client() as client:
+        result = pipeline.run(client, artifact)
     assert result.success is False
     assert result.reason == "max-attempts-reached"
     assert len(logger.records) == 1
@@ -789,7 +799,7 @@ def test_pipeline_deduplicates_urls(tmp_path):
     )
     logger = MemoryLogger()
 
-    def downloader_fn(session, art, url, referer, timeout):
+    def downloader_fn(session, art, url, referer, timeout, **kwargs):
         return build_outcome("http_error")
 
     pipeline = ResolverPipeline(
@@ -798,8 +808,8 @@ def test_pipeline_deduplicates_urls(tmp_path):
         download_func=downloader_fn,
         logger=logger,
     )
-    session = requests.Session()
-    pipeline.run(session, artifact)
+    with httpx.Client() as client:
+        pipeline.run(client, artifact)
 
     from DocsToKG.ContentDownload.core import ReasonCode
 
@@ -818,7 +828,7 @@ def test_pipeline_deduplicates_urls(tmp_path):
 def test_pipeline_collects_html_paths(tmp_path):
     artifact = make_artifact(tmp_path)
 
-    def downloader_fn(session, art, url, referer, timeout):
+    def downloader_fn(session, art, url, referer, timeout, **kwargs):
         html_path = art.html_dir / "example.html"
         html_path.parent.mkdir(parents=True, exist_ok=True)
         html_path.write_text("<html></html>", encoding="utf-8")
@@ -837,54 +847,114 @@ def test_pipeline_collects_html_paths(tmp_path):
         download_func=downloader_fn,
         logger=logger,
     )
-    session = requests.Session()
-    result = pipeline.run(session, artifact)
+    with httpx.Client() as client:
+        result = pipeline.run(client, artifact)
     assert result.success is False
     assert result.html_paths and Path(result.html_paths[0]).name == "example.html"
+
+
+# --- test_pipeline_behaviour.py --- 
+
+
+def test_pipeline_records_rate_limiter_metadata(tmp_path):
+    artifact = make_artifact(tmp_path)
+    artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
+    resolver_metadata = {
+        "rate_limiter": {
+            "wait_ms": 1250.0,
+            "backend": "memory",
+            "mode": "sliding-window",
+            "role": "resolver",
+        }
+    }
+
+    def downloader_fn(session, art, url, referer, timeout, **kwargs):
+        del session, art, url, referer, timeout, kwargs
+        return build_outcome("pdf", path=str(artifact.pdf_dir / "out.pdf"))
+
+    resolver = StubResolver(
+        "limited",
+        [ResolverResult(url="https://example.com/pdf", metadata=resolver_metadata)],
+    )
+    logger = MemoryLogger()
+    pipeline = ResolverPipeline(
+        resolvers=[resolver],
+        config=ResolverConfig(
+            resolver_order=["limited"],
+            resolver_toggles={"limited": True},
+            enable_head_precheck=False,
+        ),
+        download_func=downloader_fn,
+        logger=logger,
+    )
+
+    with httpx.Client() as client:
+        result = pipeline.run(client, artifact)
+
+    assert result.success is True
+    assert len(logger.records) == 1
+    record = logger.records[0]
+    assert record.rate_limiter_wait_ms == pytest.approx(1250.0)
+    assert record.rate_limiter_backend == "memory"
+    assert record.rate_limiter_mode == "sliding-window"
+    assert record.rate_limiter_role == "resolver"
 
 
 # --- test_pipeline_behaviour.py ---
 
 
-def test_pipeline_rate_limit_enforced(patcher, tmp_path):
+def test_pipeline_prefers_outcome_rate_metadata(tmp_path):
     artifact = make_artifact(tmp_path)
-    timeline = [0.0, 0.2, 0.2, 1.2, 2.0, 2.8]
+    artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
 
-    def fake_monotonic():
-        return timeline.pop(0)
+    result_metadata = {
+        "rate_limiter": {
+            "wait_ms": 600.0,
+            "backend": "memory",
+            "mode": "resolver",
+        }
+    }
+    outcome_metadata = {
+        "rate_limiter": {
+            "wait_ms": 120.5,
+            "backend": "redis",
+            "mode": "distributed",
+            "role": "Resolver-Download",
+        }
+    }
 
-    sleeps: List[float] = []
+    def downloader_fn(session, art, url, referer, timeout, **kwargs):
+        del session, art, url, referer, timeout, kwargs
+        return build_outcome(
+            "pdf",
+            path=str(artifact.pdf_dir / "result.pdf"),
+            metadata=outcome_metadata,
+        )
 
-    def fake_sleep(duration):
-        sleeps.append(duration)
-
-    patcher.setattr("DocsToKG.ContentDownload.pipeline._time.monotonic", fake_monotonic)
-    patcher.setattr("DocsToKG.ContentDownload.pipeline._time.sleep", fake_sleep)
-
-    def downloader_fn(session, art, url, referer, timeout):
-        return build_outcome("pdf", path=str(art.pdf_dir / "out.pdf"))
-
-    resolver = StubResolver("limited", [ResolverResult(url="https://example.com/pdf")])
-    config = ResolverConfig(
-        resolver_order=["limited"],
-        resolver_toggles={"limited": True},
-        resolver_min_interval_s={"limited": 1.0},
-        enable_head_precheck=False,
+    resolver = StubResolver(
+        "limited",
+        [ResolverResult(url="https://example.com/pdf", metadata=result_metadata)],
     )
+    logger = MemoryLogger()
     pipeline = ResolverPipeline(
         resolvers=[resolver],
-        config=config,
+        config=ResolverConfig(
+            resolver_order=["limited"],
+            resolver_toggles={"limited": True},
+            enable_head_precheck=False,
+        ),
         download_func=downloader_fn,
-        logger=MemoryLogger(),
+        logger=logger,
     )
-    session = requests.Session()
-    pipeline.run(session, artifact)
-    pipeline.run(session, artifact)
-    assert len(sleeps) == 2
-    assert pytest.approx(sleeps[0], rel=0.01) == 1.0
-    # The second invocation occurs 0.2s after the first due to the simulated
-    # timeline, so the sleep duration reflects the remaining 0.8s window.
-    assert pytest.approx(sleeps[1], rel=0.01) == 0.8
+
+    with httpx.Client() as client:
+        pipeline.run(client, artifact)
+
+    record = logger.records[0]
+    assert record.rate_limiter_wait_ms == pytest.approx(120.5)
+    assert record.rate_limiter_backend == "redis"
+    assert record.rate_limiter_mode == "distributed"
+    assert record.rate_limiter_role == "resolver-download"
 
 
 # --- test_pipeline_behaviour.py ---
@@ -896,7 +966,8 @@ def test_openalex_resolver_executes_first(tmp_path):
 
     download_calls: List[str] = []
 
-    def downloader_fn(session, art, url, referer, timeout):
+    def downloader_fn(session, art, url, referer, timeout, **kwargs):
+        del session, referer, timeout, kwargs
         download_calls.append(url)
         pdf_path = art.pdf_dir / "openalex.pdf"
         pdf_path.parent.mkdir(parents=True, exist_ok=True)
@@ -918,8 +989,8 @@ def test_openalex_resolver_executes_first(tmp_path):
         logger=logger,
         metrics=metrics,
     )
-    session = requests.Session()
-    result = pipeline.run(session, artifact)
+    with httpx.Client() as client:
+        result = pipeline.run(client, artifact)
 
     assert result.success is True
     assert result.resolver_name == "openalex"
@@ -931,53 +1002,12 @@ def test_openalex_resolver_executes_first(tmp_path):
 # --- test_pipeline_behaviour.py ---
 
 
-def test_openalex_respects_rate_limit(patcher, tmp_path):
-    artifact = make_artifact(tmp_path)
-    artifact.pdf_urls = ["https://openalex.org/pdf-one"]
-
-    timeline = [0.0, 0.4, 0.4, 1.2, 2.0, 2.8]
-
-    def fake_monotonic():
-        return timeline.pop(0)
-
-    sleeps: List[float] = []
-
-    def fake_sleep(duration):
-        sleeps.append(duration)
-
-    patcher.setattr("DocsToKG.ContentDownload.pipeline._time.monotonic", fake_monotonic)
-    patcher.setattr("DocsToKG.ContentDownload.pipeline._time.sleep", fake_sleep)
-
-    def downloader_fn(session, art, url, referer, timeout):
-        return build_outcome("pdf", path=str(art.pdf_dir / "result.pdf"))
-
-    config = ResolverConfig(
-        resolver_order=["openalex"],
-        resolver_toggles={"openalex": True},
-        resolver_min_interval_s={"openalex": 0.8},
-        enable_head_precheck=False,
-    )
-    pipeline = ResolverPipeline(
-        resolvers=[OpenAlexResolver()],
-        config=config,
-        download_func=downloader_fn,
-        logger=MemoryLogger(),
-    )
-    session = requests.Session()
-    pipeline.run(session, artifact)
-    pipeline.run(session, artifact)
-
-    assert sleeps and pytest.approx(sleeps[0], rel=0.05) == 0.8
-
-
-# --- test_pipeline_behaviour.py ---
-
-
 def test_pipeline_records_failed_urls(tmp_path):
     artifact = make_artifact(tmp_path)
     artifact.pdf_urls = ["https://openalex.org/broken.pdf"]
 
-    def downloader_fn(session, art, url, referer, timeout):
+    def downloader_fn(session, art, url, referer, timeout, **kwargs):
+        del session, art, url, referer, timeout, kwargs
         return build_outcome("http_error")
 
     config = ResolverConfig(
@@ -993,8 +1023,8 @@ def test_pipeline_records_failed_urls(tmp_path):
         download_func=downloader_fn,
         logger=logger,
     )
-    session = requests.Session()
-    result = pipeline.run(session, artifact)
+    with httpx.Client() as client:
+        result = pipeline.run(client, artifact)
 
     assert result.success is False
     assert result.failed_urls == ["https://openalex.org/broken.pdf"]
@@ -1066,7 +1096,7 @@ def test_pipeline_executes_resolvers_in_expected_order(
     logger = MemoryLogger([])
     metrics = ResolverMetrics()
 
-    def download_func(session, art, url, referer, timeout, context=None):
+    def download_func(session, art, url, referer, timeout, context=None, **kwargs):
         classification = "pdf" if "zenodo" in url else "html"
         return DownloadOutcome(
             classification=classification,
@@ -1079,16 +1109,9 @@ def test_pipeline_executes_resolvers_in_expected_order(
         )
 
     pipeline = ResolverPipeline(resolvers, config, download_func, logger, metrics)
-    respect_calls: List[str] = []
-    original_respect = pipeline._respect_rate_limit
 
-    def _tracking_respect(name: str) -> None:
-        respect_calls.append(name)
-        original_respect(name)
-
-    pipeline._respect_rate_limit = _tracking_respect  # type: ignore[assignment]
-
-    result = pipeline.run(object(), artifact)
+    with httpx.Client() as client:
+        result = pipeline.run(client, artifact)
 
     expected_prefix = [
         "openalex",
@@ -1108,7 +1131,6 @@ def test_pipeline_executes_resolvers_in_expected_order(
     assert result.success is True
     assert result.resolver_name == "zenodo"
     assert metrics.successes["zenodo"] == 1
-    assert respect_calls[: len(expected_prefix)] == expected_prefix
 
 
 # --- test_full_pipeline_integration.py ---
@@ -1118,8 +1140,6 @@ def test_pipeline_executes_resolvers_in_expected_order(
 def test_real_network_download(patcher: PatchManager, tmp_path: Path) -> None:
     if not os.environ.get("DOCSTOKG_RUN_NETWORK_TESTS"):
         pytest.skip("set DOCSTOKG_RUN_NETWORK_TESTS=1 to enable network integration test")
-
-    pytest.importorskip("requests")
 
     artifact = _make_artifact(tmp_path)
     artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
@@ -1131,19 +1151,15 @@ def test_real_network_download(patcher: PatchManager, tmp_path: Path) -> None:
     logger = MemoryLogger([])
 
     from DocsToKG.ContentDownload.cli import download_candidate
-    from DocsToKG.ContentDownload.networking import create_session
 
-    session = create_session({"User-Agent": "DocsToKG-Test/1.0"})
-    try:
-        result = ResolverPipeline(
-            resolvers,
-            config,
-            download_candidate,
-            logger,
-            metrics,
-        ).run(session, artifact)
-    finally:
-        session.close()
+    client = httpx_transport.get_http_client()
+    result = ResolverPipeline(
+        resolvers,
+        config,
+        download_candidate,
+        logger,
+        metrics,
+    ).run(client, artifact)
 
     assert isinstance(result.success, bool)
 
@@ -1154,13 +1170,6 @@ pytest.importorskip("pyalex")
 
 # --- test_end_to_end_offline.py ---
 
-responses = pytest.importorskip("responses")
-
-
-# --- test_end_to_end_offline.py ---
-
-
-@responses.activate
 def test_resolver_pipeline_downloads_pdf_end_to_end(tmp_path):
     work = {
         "id": "https://openalex.org/W123",
@@ -1177,25 +1186,31 @@ def test_resolver_pipeline_downloads_pdf_end_to_end(tmp_path):
     )
 
     pdf_url = "https://cdn.example/resolver-demo.pdf"
-    responses.add(
-        responses.GET,
-        "https://api.unpaywall.org/v2/10.1000/resolver-demo",
-        json={"best_oa_location": {"url_for_pdf": pdf_url}},
-        status=200,
-    )
-    responses.add(
-        responses.HEAD,
-        pdf_url,
-        headers={"Content-Type": "application/pdf"},
-        status=200,
-    )
-    responses.add(
-        responses.GET,
-        pdf_url,
-        body=b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<<>>\nendobj\n%%EOF",
-        headers={"Content-Type": "application/pdf"},
-        status=200,
-    )
+    pdf_bytes = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<<>>\nendobj\n%%EOF"
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if request.method == "GET" and url.endswith("/10.1000/resolver-demo"):
+            return httpx.Response(
+                status_code=200,
+                json={"best_oa_location": {"url_for_pdf": pdf_url}},
+                headers={"Content-Type": "application/json"},
+            )
+        if url == pdf_url and request.method == "HEAD":
+            return httpx.Response(
+                status_code=200,
+                headers={"Content-Type": "application/pdf"},
+            )
+        if url == pdf_url and request.method == "GET":
+            return httpx.Response(
+                status_code=200,
+                content=pdf_bytes,
+                headers={"Content-Type": "application/pdf"},
+            )
+        return httpx.Response(status_code=404)
+
+    transport = httpx.MockTransport(_handler)
+    httpx_transport.configure_http_client(transport=transport)
 
     config = resolvers.ResolverConfig(
         resolver_order=["unpaywall"],
@@ -1203,15 +1218,18 @@ def test_resolver_pipeline_downloads_pdf_end_to_end(tmp_path):
         unpaywall_email="team@example.org",
     )
     logger = MemoryLogger()
-    session = requests.Session()
-    session.headers.update({"User-Agent": "pytest"})
     pipeline = resolvers.ResolverPipeline(
         resolvers=[resolvers.UnpaywallResolver()],
         config=config,
         download_func=downloader.download_candidate,
         logger=logger,
     )
-    result = pipeline.run(session, artifact)
+    client = httpx.Client(transport=transport, headers={"User-Agent": "pytest"})
+    try:
+        result = pipeline.run(client, artifact)
+    finally:
+        client.close()
+        httpx_transport.reset_http_client_for_tests()
     assert result.success is True
     assert result.outcome and result.outcome.path
     pdf_path = Path(result.outcome.path)
@@ -1222,7 +1240,6 @@ def test_resolver_pipeline_downloads_pdf_end_to_end(tmp_path):
 # --- test_end_to_end_offline.py ---
 
 
-@responses.activate
 def test_download_candidate_marks_corrupt_without_eof(tmp_path):
     work = {
         "id": "https://openalex.org/W456",
@@ -1238,16 +1255,35 @@ def test_download_candidate_marks_corrupt_without_eof(tmp_path):
         work, pdf_dir=tmp_path / "pdf", html_dir=tmp_path / "html", xml_dir=tmp_path / "xml"
     )
     pdf_url = "https://cdn.example/corrupt.pdf"
-    responses.add(
-        responses.GET,
-        pdf_url,
-        body=b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n",
-        headers={"Content-Type": "application/pdf"},
-        status=200,
-    )
-    responses.add(responses.HEAD, pdf_url, headers={"Content-Type": "application/pdf"}, status=200)
-    session = requests.Session()
-    outcome = downloader.download_candidate(session, artifact, pdf_url, referer=None, timeout=5.0)
+    truncated_pdf = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n"
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) != pdf_url:
+            return httpx.Response(status_code=404)
+        if request.method == "HEAD":
+            return httpx.Response(
+                status_code=200,
+                headers={"Content-Type": "application/pdf"},
+            )
+        if request.method == "GET":
+            return httpx.Response(
+                status_code=200,
+                content=truncated_pdf,
+                headers={"Content-Type": "application/pdf"},
+            )
+        return httpx.Response(status_code=405)
+
+    client = httpx.Client(transport=httpx.MockTransport(_handler))
+    try:
+        outcome = downloader.download_candidate(
+            client,
+            artifact,
+            pdf_url,
+            referer=None,
+            timeout=5.0,
+        )
+    finally:
+        client.close()
     assert outcome.classification is Classification.MISS
     assert outcome.path is None
     assert outcome.reason_detail == "pdf-eof-missing"
