@@ -600,7 +600,9 @@ class ChunkIngestionPipeline:
                     loaded = self._load_precomputed_chunks(document)
                 if not loaded:
                     continue
-                self._delete_existing_for_doc(document.doc_id, document.namespace)
+                staged_deletions = self._delete_existing_for_doc(
+                    document.doc_id, document.namespace
+                )
                 batch = self._commit_batch(
                     loaded, collect_vector_ids=collect_vector_ids
                 )
@@ -608,6 +610,8 @@ class ChunkIngestionPipeline:
                 namespaces.update(batch.namespaces)
                 if vector_ids is not None and batch.vector_ids:
                     vector_ids.extend(batch.vector_ids)
+                if staged_deletions:
+                    self.delete_chunks(staged_deletions)
         except RetryableIngestError:
             raise
         except IngestError:
@@ -830,19 +834,17 @@ class ChunkIngestionPipeline:
             )
         return payloads
 
-    def _delete_existing_for_doc(self, doc_id: str, namespace: str) -> None:
-        """Remove previously ingested chunks for a document/namespace pair.
+    def _delete_existing_for_doc(self, doc_id: str, namespace: str) -> Tuple[str, ...]:
+        """Retrieve existing vector identifiers for a document/namespace pair.
 
         Args:
             doc_id: Document identifier whose chunks should be removed.
             namespace: Namespace to scope the deletion.
 
         Returns:
-            None
+            Tuple of vector identifiers currently associated with the document.
         """
-        existing_vector_ids = tuple(self._registry.vector_ids_for(doc_id, namespace))
-        if existing_vector_ids:
-            self.delete_chunks(existing_vector_ids)
+        return tuple(self._registry.vector_ids_for(doc_id, namespace))
 
     def _features_from_vector(self, payload: Mapping[str, object]) -> ChunkFeatures:
         """Convert stored vector payload into ChunkFeatures.
