@@ -277,8 +277,8 @@ def about() -> Dict[str, object]:
         "package_version": _PACKAGE_VERSION,
         "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
         "plugins": {
-            "resolver": list_plugins("resolver"),
-            "validator": list_plugins("validator"),
+            "resolver": _collect_plugin_details("resolver"),
+            "validator": _collect_plugin_details("validator"),
         },
         "config": config_summary,
         "rate_limits": rate_limits,
