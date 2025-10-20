@@ -23,6 +23,18 @@
 - **WHEN** the retry budget is exhausted
 - **THEN** the helper SHALL return the final `requests.Response` to the caller (without raising `RetryError`) so downstream code can log or inspect the failure.
 
+#### Scenario: Max Retry Duration Stops Additional Attempts
+- **GIVEN** `request_with_retries` is called with `max_retry_duration=5` seconds and `max_retries=5`
+- **AND** the first two attempts each incur `Retry-After` sleeps that would exceed the five-second budget
+- **WHEN** the cumulative wait reaches five seconds before the retry count is exhausted
+- **THEN** the Tenacity controller SHALL stop scheduling new attempts, close the last retryable response, and return that response to the caller while logging the exceeded duration.
+
+#### Scenario: Respect Retry-After Disabled
+- **GIVEN** `request_with_retries` is executed with `respect_retry_after=False`
+- **AND** an attempt returns HTTP `429` with header `Retry-After: 120`
+- **WHEN** Tenacity schedules the next attempt
+- **THEN** the wait duration SHALL ignore the header and use only the configured exponential jitter (bounded by `backoff_max`), still closing the prior response before sleeping.
+
 #### Scenario: Exhausted Network Failures Raise
 - **GIVEN** `request_with_retries` runs with `max_retries=1`
 - **WHEN** both attempts raise `requests.Timeout`
