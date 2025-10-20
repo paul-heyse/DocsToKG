@@ -81,6 +81,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import logging
 import os
 import warnings
 from pathlib import Path
@@ -339,6 +340,72 @@ def test_chunk_resume_skips_unchanged_docs(tmp_path: Path, patcher: PatchManager
 
     assert "skip" in alpha_attempt_statuses, "Alpha should be skipped"
     assert "success" in beta_attempt_statuses, "Beta should be successful"
+
+
+# --- DocTags CLI telemetry ---
+
+
+def test_doctags_served_model_names_normalized(
+    tmp_path: Path, patcher: PatchManager, caplog: pytest.LogCaptureFixture
+) -> None:
+    """DocTags CLI should flatten and deduplicate served model overrides."""
+
+    module = _reload_core_cli()
+    from DocsToKG.DocParsing import doctags as doctags_module
+
+    captured: dict[str, object] = {}
+
+    def fake_pdf_main(args):
+        captured["namespace"] = args
+        return 0
+
+    patcher.setattr(doctags_module, "pdf_main", fake_pdf_main)
+
+    data_root = tmp_path / "DataRoot"
+    pdf_dir = data_root / "PDFs"
+    out_dir = data_root / "DocTagsFiles"
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    patcher.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+
+    caplog.set_level(logging.INFO, logger="DocsToKG.DocParsing.core.cli")
+
+    exit_code = module.doctags(
+        [
+            "--mode",
+            "pdf",
+            "--data-root",
+            str(data_root),
+            "--in-dir",
+            str(pdf_dir),
+            "--out-dir",
+            str(out_dir),
+            "--served-model-name",
+            "alpha",
+            "--served-model-name",
+            "beta",
+            "alpha",
+        ]
+    )
+
+    assert exit_code == 0
+    assert "namespace" in captured
+    namespace = captured["namespace"]
+    assert getattr(namespace, "served_model_names") == ("alpha", "beta")
+
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "DocsToKG.DocParsing.core.cli"
+        and record.message == "Unified DocTags conversion"
+    ]
+    assert records, "Expected DocTags telemetry log entry"
+    last_record = records[-1]
+    assert getattr(last_record, "extra_fields", {}).get("served_model_names") == (
+        "alpha",
+        "beta",
+    )
 
 
 # --- CLI path smoke tests ---

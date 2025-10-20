@@ -284,6 +284,15 @@ def doctags(argv: Sequence[str] | None = None) -> int:
     parsed = parser.parse_args([] if argv is None else list(argv))
     logger = get_logger(__name__, level=parsed.log_level)
 
+    raw_served_names = parsed.served_model_names
+    normalized_served_model_names = doctags_module._normalize_served_model_names(
+        raw_served_names
+    )
+    has_served_name_overrides = raw_served_names is not None
+    parsed.served_model_names = (
+        normalized_served_model_names if has_served_name_overrides else raw_served_names
+    )
+
     try:
         mode, input_dir, output_dir, resolved_root = _resolve_doctags_paths(parsed)
     except CLIValidationError as exc:
@@ -306,7 +315,7 @@ def doctags(argv: Sequence[str] | None = None) -> int:
                 "force": parsed.force,
                 "overwrite": parsed.overwrite,
                 "model": parsed.model,
-                "served_model_names": parsed.served_model_names,
+                "served_model_names": normalized_served_model_names,
                 "gpu_memory_utilization": parsed.gpu_memory_utilization,
                 "vllm_wait_timeout": parsed.vllm_wait_timeout,
             }
@@ -331,7 +340,9 @@ def doctags(argv: Sequence[str] | None = None) -> int:
     overrides = {
         **base_overrides,
         "model": parsed.model,
-        "served_model_names": parsed.served_model_names,
+        "served_model_names": (
+            normalized_served_model_names if has_served_name_overrides else None
+        ),
         "gpu_memory_utilization": parsed.gpu_memory_utilization,
         "vllm_wait_timeout": parsed.vllm_wait_timeout,
     }
