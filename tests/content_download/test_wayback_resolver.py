@@ -172,10 +172,18 @@ def test_cdx_html_parse(monkeypatch, resolver, config, artifact):
     def fake_verify(self, client, cfg, url, min_bytes):
         return True, {"head_status": 200, "content_type": "application/pdf"}
 
+<<<<<<< HEAD
     monkeypatch.setattr(WaybackResolver, "_check_availability", fake_availability, raising=False)
     monkeypatch.setattr(WaybackResolver, "_query_cdx", fake_query, raising=False)
     monkeypatch.setattr(WaybackResolver, "_parse_html_for_pdf", fake_parse, raising=False)
     monkeypatch.setattr(WaybackResolver, "_verify_pdf_snapshot", fake_verify, raising=False)
+=======
+        assert len(results) == 1
+        assert results[0].is_event is True
+        assert results[0].event == ResolverEvent.SKIPPED
+        assert results[0].event_reason == ResolverEventReason.NO_WAYBACK_SNAPSHOT
+        assert results[0].metadata["reason"] == "no_snapshot"
+>>>>>>> a57342e0748bf3b2588065c3260c4b500f98ea4e
 
     results = list(resolver.iter_urls(object(), config, artifact))
     assert len(results) == 1

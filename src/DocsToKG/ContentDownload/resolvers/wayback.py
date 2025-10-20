@@ -179,7 +179,11 @@ class WaybackResolver(RegisteredResolver):
                     yield ResolverResult(
                         url=None,
                         event=ResolverEvent.SKIPPED,
+<<<<<<< HEAD
                         event_reason=ResolverEventReason.NOT_APPLICABLE,
+=======
+                        event_reason=ResolverEventReason.NO_WAYBACK_SNAPSHOT,
+>>>>>>> a57342e0748bf3b2588065c3260c4b500f98ea4e
                         metadata={
                             "source": "wayback",
                             "original": original_url,

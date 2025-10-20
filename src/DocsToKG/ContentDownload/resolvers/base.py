@@ -236,6 +236,7 @@ class ResolverEventReason(Enum):
     NO_DOI = "no-doi"
     NO_BEAUTIFULSOUP = "no-beautifulsoup"
     NO_FAILED_URLS = "no-failed-urls"
+    NO_WAYBACK_SNAPSHOT = "no-wayback-snapshot"
     NO_OPENACCESS_PDF = "no-openaccess-pdf"
     NO_OPENALEX_URLS = "no-openalex-urls"
     NO_PMCID = "no-pmcid"

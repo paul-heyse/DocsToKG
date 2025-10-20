@@ -2107,7 +2107,7 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
     stub_counters: Optional[Dict[str, int]] = state.get("stub_counters")
     log_event(
         logger,
-        "info",
+        "debug",
         "Embedding worker start",
         stage=EMBED_STAGE,
         doc_id=item.item_id,
@@ -2125,7 +2125,7 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
         with acquire_lock(vectors_path):
             log_event(
                 logger,
-                "info",
+                "debug",
                 "Embedding worker invoke process_chunk_file_vectors",
                 stage=EMBED_STAGE,
                 doc_id=item.item_id,
@@ -2143,7 +2143,7 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
                 signature = inspect.signature(process_chunk_file_vectors)
                 log_event(
                     logger,
-                    "info",
+                    "debug",
                     "Embedding worker process_chunk_file_vectors signature",
                     stage=EMBED_STAGE,
                     doc_id=item.item_id,
@@ -2175,7 +2175,7 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
                     )
             log_event(
                 logger,
-                "info",
+                "debug",
                 "Embedding worker completed process_chunk_file_vectors",
                 stage=EMBED_STAGE,
                 doc_id=item.item_id,
@@ -3062,7 +3062,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         )
         log_event(
             logger,
-            "info",
+            "debug",
             "Embedding stage provider selection",
             stage=EMBED_STAGE,
             doc_id="__plan__",
