@@ -1605,7 +1605,6 @@ class HybridSearchService:
         retrieval_cfg = config.retrieval
         signature = self._dense_request_signature(request, filters)
         strategy = self._dense_strategy
-        cached_signature = strategy.has_cache(signature)
         initial_k, oversample, overfetch = strategy.plan(
             signature,
             page_size=page_size,
@@ -1725,11 +1724,11 @@ class HybridSearchService:
             float(observed),
             namespace=request.namespace or "*",
         )
-        update_global = not bool(getattr(request, "recall_first", False))
-        blended_pass = (
-            strategy.observe_pass_rate(signature, observed, update_global=update_global)
-            if not cached_signature
-            else strategy.current_pass_rate()
+        update_global = not recall_first
+        blended_pass = strategy.observe_pass_rate(
+            signature,
+            observed,
+            update_global=update_global,
         )
 
         while True:
