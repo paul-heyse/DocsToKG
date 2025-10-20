@@ -529,6 +529,8 @@ def _write_document_artifacts(
     metadata: Mapping[str, object],
     feature_generator: FeatureGenerator,
     vector_format: str = "jsonl",
+    chunk_span: Optional[Tuple[int, int]] = None,
+    chunk_span_field: str = "char_offset",
 ) -> DocumentInput:
     if not hasattr(feature_generator, "compute_features"):
         feature_generator = FeatureGenerator()
@@ -550,6 +552,8 @@ def _write_document_artifacts(
         "uuid": chunk_uuid,
         "schema_version": "docparse/1.1.0",
     }
+    if chunk_span is not None:
+        chunk_payload[chunk_span_field] = list(chunk_span)
     chunk_path = chunk_dir / f"{doc_id}.chunks.jsonl"
     chunk_path.write_text(json.dumps(chunk_payload) + "\n", encoding="utf-8")
 
@@ -595,6 +599,40 @@ def _write_document_artifacts(
         vector_path=vector_path,
         metadata=dict(metadata),
     )
+
+
+def test_load_precomputed_chunks_preserves_char_span(
+    stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
+    tmp_path: Path,
+) -> None:
+    ingestion, _, _, _, feature_generator, _ = stack()
+    artifacts_dir = tmp_path / "document_with_span"
+    span = (5, 42)
+    document = _write_document_artifacts(
+        artifacts_dir,
+        doc_id="doc-span",
+        namespace="research",
+        text="Chunk spans should persist.",
+        metadata={},
+        feature_generator=feature_generator,
+        chunk_span=span,
+        chunk_span_field="char_range",
+    )
+
+    loaded = ingestion._load_precomputed_chunks(document)
+
+    assert len(loaded) == 1
+    assert loaded[0].char_offset == span
 
 
 # --- test_hybrid_search.py ---
