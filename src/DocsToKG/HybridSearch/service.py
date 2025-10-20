@@ -2885,14 +2885,15 @@ class HybridSearchValidator:
         dense_ranks: List[int] = []
         rrf_ranks: List[int] = []
 
-        doc_to_embedding: Dict[str, np.ndarray] = {}
+        doc_to_embedding: Dict[Tuple[str, str], np.ndarray] = {}
         registry_chunks = self._registry.all()
         if registry_chunks:
             vectors = self._registry.resolve_embeddings(
                 [chunk.vector_id for chunk in registry_chunks]
             )
             for chunk, vector in zip(registry_chunks, vectors):
-                doc_to_embedding.setdefault(chunk.doc_id, vector)
+                key = (chunk.namespace, chunk.doc_id)
+                doc_to_embedding.setdefault(key, vector)
 
         for document_payload, query_payload in sampled_pairs:
             expected_doc_id = str(
@@ -2904,7 +2905,20 @@ class HybridSearchValidator:
                 filters["namespace"] = request.namespace
 
             features = feature_generator.compute_features(request.query)
-            dense_query_vector = doc_to_embedding.get(expected_doc_id, features.embedding)
+            namespace = request.namespace
+            if namespace is None:
+                document_namespace = document_payload.get("namespace")
+                namespace = (
+                    ""
+                    if document_namespace is None
+                    else str(document_namespace)
+                )
+            else:
+                namespace = str(namespace)
+            dense_query_vector = doc_to_embedding.get(
+                (namespace, expected_doc_id),
+                features.embedding,
+            )
 
             bm25_results, _ = self._opensearch.search_bm25(features.bm25_terms, filters, top_k=10)
             bm25_doc_ids = [chunk.doc_id for chunk, _ in bm25_results]
