@@ -3328,7 +3328,24 @@ def test_crossref_resolver_uses_central_retry_logic(patcher, tmp_path) -> None:
             self.calls.append(response.status_code)
             return response
 
-    patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b)
+    class _SequenceWait:
+        def __init__(self, values: list[float]) -> None:
+            self._values = values
+            self._index = 0
+            self._last = values[-1] if values else 0.0
+
+        def __call__(self, retry_state) -> float:  # pragma: no cover - exercised via Tenacity
+            if self._index < len(self._values):
+                value = self._values[self._index]
+                self._index += 1
+                self._last = value
+                return value
+            return self._last
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.networking.wait_random_exponential",
+        lambda *args, **kwargs: _SequenceWait([1.0, 1.5]),
+    )
     sleep_calls: list[float] = []
     patcher.setattr(
         "DocsToKG.ContentDownload.networking.TENACITY_SLEEP", lambda delay: sleep_calls.append(delay)

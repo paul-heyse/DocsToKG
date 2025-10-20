@@ -222,6 +222,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"[hybrid-quickstart] Top result doc_id={top.doc_id} " f"(fused score={top.score:.3f})")
     for idx, result in enumerate(response.results, start=1):
         diagnostics = result.diagnostics
+        if diagnostics is None:
+            print(
+                f"  {idx:02d}. doc_id={result.doc_id} chunk={result.chunk_id} "
+                "diagnostics=disabled"
+            )
+            continue
         print(
             f"  {idx:02d}. doc_id={result.doc_id} chunk={result.chunk_id} "
             f"dense={_format_score(diagnostics.dense_score)} "

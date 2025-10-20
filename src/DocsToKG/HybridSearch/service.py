@@ -301,7 +301,13 @@ class DenseSearchStrategy:
                 self._cache.move_to_end(signature)
             return (min(target, self._MAX_K), oversample, overfetch)
 
-    def observe_pass_rate(self, signature: Tuple[object, ...], observed: float) -> float:
+    def observe_pass_rate(
+        self,
+        signature: Tuple[object, ...],
+        observed: float,
+        *,
+        update_global: bool = True,
+    ) -> float:
         """Blend ``observed`` into the running EMA and return the updated value."""
 
         with self._lock:
@@ -311,9 +317,11 @@ class DenseSearchStrategy:
                 1e-3, min(1.0, self._alpha * bounded + (1.0 - self._alpha) * local_prev)
             )
             self._signature_pass[signature] = local_rate
-            self._pass_rate = max(
-                1e-3, min(1.0, self._alpha * bounded + (1.0 - self._alpha) * self._pass_rate)
-            )
+            if update_global:
+                self._pass_rate = max(
+                    1e-3,
+                    min(1.0, self._alpha * bounded + (1.0 - self._alpha) * self._pass_rate),
+                )
             self._dirty = True
             return local_rate
 
@@ -508,7 +516,7 @@ class ResultShaper:
         ordered_chunks: Sequence[ChunkPayload],
         fused_scores: Mapping[str, float],
         request: HybridSearchRequest,
-        channel_scores: Mapping[str, Dict[str, float]],
+        channel_scores: Optional[Mapping[str, Dict[str, float]]] = None,
         *,
         precomputed_embeddings: Optional[np.ndarray] = None,
     ) -> List[HybridSearchResult]:
@@ -518,7 +526,8 @@ class ResultShaper:
             ordered_chunks: Chunks ordered by fused score.
             fused_scores: Combined score per vector identifier.
             request: Incoming hybrid search request.
-            channel_scores: Per-channel score maps for diagnostics emission.
+            channel_scores: Optional per-channel score maps for diagnostics
+                emission. Ignored when diagnostics are disabled on the request.
             precomputed_embeddings: Optional dense embeddings aligned with chunks.
 
         Returns:
@@ -526,6 +535,9 @@ class ResultShaper:
         """
         if not ordered_chunks:
             return []
+
+        include_diagnostics = bool(request.diagnostics)
+        score_lookup: Mapping[str, Dict[str, float]] = channel_scores or {}
 
         if precomputed_embeddings is not None:
             embeddings = np.ascontiguousarray(precomputed_embeddings, dtype=np.float32)
@@ -563,12 +575,18 @@ class ResultShaper:
                 break
             if byte_budget and bytes_used + chunk_bytes > byte_budget:
                 break
-            diagnostics = HybridSearchDiagnostics(
-                bm25_score=channel_scores.get("bm25", {}).get(chunk.vector_id),
-                splade_score=channel_scores.get("splade", {}).get(chunk.vector_id),
-                dense_score=channel_scores.get("dense", {}).get(chunk.vector_id),
-                fusion_weights=dict(self._channel_weights) if self._channel_weights else None,
-            )
+            diagnostics: Optional[HybridSearchDiagnostics]
+            if include_diagnostics:
+                diagnostics = HybridSearchDiagnostics(
+                    bm25_score=score_lookup.get("bm25", {}).get(chunk.vector_id),
+                    splade_score=score_lookup.get("splade", {}).get(chunk.vector_id),
+                    dense_score=score_lookup.get("dense", {}).get(chunk.vector_id),
+                    fusion_weights=(
+                        dict(self._channel_weights) if self._channel_weights else None
+                    ),
+                )
+            else:
+                diagnostics = None
             doc_buckets[chunk.doc_id] += 1
             results.append(
                 HybridSearchResult(
@@ -1114,11 +1132,15 @@ class HybridSearchService:
                 diversified_embeddings = None
 
             ordered_chunks = [candidate.chunk for candidate in diversified]
-            channel_score_map = {
-                "bm25": bm25.scores,
-                "splade": splade.scores,
-                "dense": dense.scores,
-            }
+            channel_score_map: Optional[Mapping[str, Dict[str, float]]]
+            if request.diagnostics:
+                channel_score_map = {
+                    "bm25": bm25.scores,
+                    "splade": splade.scores,
+                    "dense": dense.scores,
+                }
+            else:
+                channel_score_map = None
             shaper = ResultShaper(
                 self._opensearch,
                 config.fusion,
@@ -1502,15 +1524,23 @@ class HybridSearchService:
 
         score_floor = float(getattr(config.retrieval, "dense_score_floor", 0.0))
         use_score_floor = score_floor > 0.0
-        use_range = bool(getattr(request, "recall_first", False)) or use_score_floor
+        recall_first = bool(getattr(request, "recall_first", False))
+        use_range = recall_first or use_score_floor
         if use_range:
-            hits = list(store.range_search(queries[0], score_floor, limit=None))
+            budget = max(1, int(initial_k))
+            hits = list(store.range_search(queries[0], score_floor, limit=budget))
             self._observability.metrics.observe("faiss_search_batch_size", 1.0, channel="dense")
             filtered, payloads = self._filter_dense_hits(hits, filters, score_floor)
             observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
-            blended_pass = strategy.observe_pass_rate(signature, observed)
+            blended_pass = strategy.observe_pass_rate(
+                signature,
+                observed,
+                update_global=not recall_first,
+                signature, observed, update_global=not bool(getattr(request, "recall_first", False))
+            )
             strategy.remember(signature, max(len(filtered), len(hits)))
             filtered.sort(key=lambda hit: (-hit.score, hit.vector_id))
+            bounded_filtered = filtered[:budget]
             effective_k = len(hits)
             self._observability.metrics.set_gauge(
                 "dense_pass_through_rate",
@@ -1536,7 +1566,7 @@ class HybridSearchService:
             )
             self._observability.metrics.increment("search_channel_requests", channel="dense")
             self._observability.metrics.observe(
-                "search_channel_candidates", len(filtered), channel="dense"
+                "search_channel_candidates", len(bounded_filtered), channel="dense"
             )
             if adapter_stats is not None:
                 fp16_metric = 1.0 if bool(getattr(adapter_stats, "fp16_enabled", False)) else 0.0
@@ -1550,7 +1580,7 @@ class HybridSearchService:
             scores: Dict[str, float] = {}
             embedding_cache_local: Dict[str, np.ndarray] = {}
             resolved_hits: List[tuple[FaissSearchResult, ChunkPayload]] = []
-            for hit in filtered:
+            for hit in bounded_filtered:
                 chunk = payloads.get(hit.vector_id)
                 if chunk is None:
                     continue
@@ -1599,8 +1629,9 @@ class HybridSearchService:
             float(observed),
             namespace=request.namespace or "*",
         )
+        update_global = not bool(getattr(request, "recall_first", False))
         blended_pass = (
-            strategy.observe_pass_rate(signature, observed)
+            strategy.observe_pass_rate(signature, observed, update_global=update_global)
             if not cached_signature
             else strategy.current_pass_rate()
         )
@@ -1628,7 +1659,9 @@ class HybridSearchService:
             hits = run_dense_search(effective_k)
             filtered, payloads = self._filter_dense_hits(hits, filters, score_floor)
             observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
-            blended_pass = strategy.observe_pass_rate(signature, observed)
+            blended_pass = strategy.observe_pass_rate(
+                signature, observed, update_global=update_global
+            )
 
         filtered.sort(key=lambda hit: (-hit.score, hit.vector_id))
         strategy.remember(signature, effective_k)
@@ -2426,7 +2459,7 @@ class HybridSearchValidator:
             page_size=page_size,
             cursor=None,
             diversification=bool(query.get("diversification", False)),
-            diagnostics=True,
+            diagnostics=bool(query.get("diagnostics", True)),
             recall_first=bool(query.get("recall_first", False)),
         )
 
