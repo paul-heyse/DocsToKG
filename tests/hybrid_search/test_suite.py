@@ -292,7 +292,7 @@ from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Dict, List, Mapping, MutableMapping, Sequence, Tuple
+from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import numpy as np
@@ -1577,6 +1577,130 @@ def test_managed_adapter_supports_ingestion_training_sample() -> None:
     np.testing.assert_allclose(features.embedding, np.array([0.5, 1.5, 2.5], dtype=np.float32))
     assert features.bm25_terms == {"token": 0.1}
     assert features.splade_weights == {"token": 0.2}
+
+
+# --- test_hybrid_search.py ---
+
+
+def test_commit_batch_rolls_back_on_lexical_failure() -> None:
+    class _FailingLexicalIndex:
+        def __init__(self) -> None:
+            self.deleted: Optional[List[str]] = None
+
+        def bulk_upsert(self, chunks: Sequence[ChunkPayload]) -> None:
+            raise RuntimeError("lexical failure")
+
+        def bulk_delete(self, vector_ids: Sequence[str]) -> None:
+            self.deleted = list(vector_ids)
+
+    class _TrackingFaissStore:
+        def __init__(self, *, dim: int) -> None:
+            self._dim = dim
+            self._config = DenseIndexConfig(index_type="flat")
+            self._needs_training = False
+            self.adapter_stats = SimpleNamespace(device=0, ntotal=0)
+            self._store: Dict[str, np.ndarray] = {}
+            self._last_remove: List[str] = []
+
+        @property
+        def config(self) -> DenseIndexConfig:
+            return self._config
+
+        @property
+        def dim(self) -> int:
+            return self._dim
+
+        @property
+        def device(self) -> int:  # pragma: no cover - unused fallback
+            return 0
+
+        @property
+        def ntotal(self) -> int:  # pragma: no cover - unused fallback
+            return 0
+
+        def set_id_resolver(self, resolver) -> None:
+            self._resolver = resolver
+
+        def needs_training(self) -> bool:
+            return self._needs_training
+
+        def train(self, vectors: Sequence[np.ndarray]) -> None:  # pragma: no cover - stub
+            self._needs_training = False
+            self.trained = list(vectors)
+
+        def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
+            self._last_add = (list(vectors), list(vector_ids))
+            for vec, vid in zip(vectors, vector_ids):
+                self._store[str(vid)] = np.asarray(vec, dtype=np.float32)
+
+        def remove(self, vector_ids: Sequence[str]) -> None:
+            self._last_remove = list(vector_ids)
+            for vid in vector_ids:
+                self._store.pop(str(vid), None)
+
+        def search(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def search_many(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def search_batch(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def range_search(self, *args, **kwargs):  # pragma: no cover - stub
+            return []
+
+        def reconstruct_batch(self, vector_ids: Sequence[str]) -> np.ndarray:
+            if not vector_ids:
+                return np.empty((0, self._dim), dtype=np.float32)
+            return np.stack([self._store[str(vid)] for vid in vector_ids], dtype=np.float32)
+
+        def serialize(self) -> bytes:  # pragma: no cover - stub
+            return b""
+
+        def restore(self, payload: bytes) -> None:  # pragma: no cover - stub
+            self._last_restore = payload
+
+        def flush_snapshot(self, *, reason: str = "flush") -> None:  # pragma: no cover - stub
+            self._last_flush_reason = reason
+
+    dim = 4
+    chunk = ChunkPayload(
+        doc_id="doc",
+        chunk_id="chunk-0",
+        vector_id="vec-0",
+        namespace="research",
+        text="",
+        metadata={},
+        features=ChunkFeatures(
+            bm25_terms={},
+            splade_weights={},
+            embedding=np.ones((dim,), dtype=np.float32),
+        ),
+        token_count=0,
+        source_chunk_idxs=(),
+        doc_items_refs=(),
+    )
+
+    faiss = _TrackingFaissStore(dim=dim)
+    adapter = ManagedFaissAdapter(faiss)
+    registry = ChunkRegistry()
+    observability = Observability()
+    lexical = _FailingLexicalIndex()
+    pipeline = ChunkIngestionPipeline(
+        faiss_index=adapter,
+        opensearch=lexical,
+        registry=registry,
+        observability=observability,
+    )
+
+    with pytest.raises(RuntimeError, match="lexical failure"):
+        pipeline._commit_batch([chunk])
+
+    assert faiss._store == {}
+    assert faiss._last_remove == [chunk.vector_id]
+    assert registry.count() == 0
+    assert lexical.deleted is None
 
 
 # --- test_hybrid_search.py ---
