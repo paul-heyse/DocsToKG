@@ -1851,7 +1851,7 @@ class HybridSearchAPI:
         except Exception as exc:  # pragma: no cover - defensive guard
             return HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)}
 
-        serialized_results: List[Dict[str, Any]] = []
+        results: List[Mapping[str, Any]] = []
         for result in response.results:
             item: Dict[str, Any] = {
                 "doc_id": result.doc_id,
@@ -1864,21 +1864,22 @@ class HybridSearchAPI:
                 "provenance_offsets": [list(offset) for offset in result.provenance_offsets],
                 "metadata": dict(result.metadata),
             }
-            if result.diagnostics is not None:
+            diagnostics = getattr(result, "diagnostics", None)
+            if request.diagnostics and diagnostics is not None:
                 item["diagnostics"] = {
-                    "bm25": result.diagnostics.bm25_score,
-                    "splade": result.diagnostics.splade_score,
-                    "dense": result.diagnostics.dense_score,
+                    "bm25": getattr(diagnostics, "bm25_score", None),
+                    "splade": getattr(diagnostics, "splade_score", None),
+                    "dense": getattr(diagnostics, "dense_score", None),
                     "fusion_weights": (
-                        dict(result.diagnostics.fusion_weights)
-                        if result.diagnostics.fusion_weights is not None
+                        dict(diagnostics.fusion_weights)
+                        if getattr(diagnostics, "fusion_weights", None) is not None
                         else None
                     ),
                 }
-            serialized_results.append(item)
+            results.append(item)
 
         body = {
-            "results": serialized_results,
+            "results": results,
             "next_cursor": response.next_cursor,
             "total_candidates": response.total_candidates,
             "timings_ms": dict(response.timings_ms),
