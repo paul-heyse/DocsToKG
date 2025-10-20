@@ -260,6 +260,10 @@ def _ensure_cuvs_loader_path() -> None:
             ]
         )
 
+    libraft_root = package_root("libraft")
+    if libraft_root is not None:
+        candidates.append(libraft_root / "lib64" / "libraft.so")
+
     librmm_root = package_root("librmm")
     if librmm_root is not None:
         candidates.append(librmm_root / "lib64" / "librmm.so")
