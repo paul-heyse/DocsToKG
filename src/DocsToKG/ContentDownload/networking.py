@@ -200,6 +200,7 @@ _breaker_registry: Optional["BreakerRegistry"] = None
 # Exceptions considered breaker failures by default
 # (REMOVED DEFAULT_BREAKER_FAILURE_EXCEPTIONS - use BreakerClassification().failure_statuses instead)
 
+
 def configure_breaker_registry(
     config: "BreakerConfig",
     *,

@@ -33,7 +33,7 @@ _console = Console()
 
 class CliContext:
     """Context object passed to commands via callback.
-    
+
     Holds shared state and resources used across commands:
     - Settings instance
     - Logger

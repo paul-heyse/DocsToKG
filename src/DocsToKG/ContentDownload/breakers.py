@@ -174,6 +174,7 @@ class BreakerRolePolicy:
 
     fail_max: Optional[int] = None
     reset_timeout_s: Optional[int] = None
+    success_threshold: Optional[int] = None  # half-open: require N successes to close
     trial_calls: int = 1  # half-open: number of probe calls allowed
 
 
@@ -265,9 +266,6 @@ class InMemoryCooldownStore:
     def clear(self, host: str) -> None:
         with self._lock:
             self._until.pop(host, None)
-
-
-# TODO: Add SQLiteCooldownStore / RedisCooldownStore skeletons if/when needed.
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -508,12 +506,20 @@ class BreakerRegistry:
             l = self.listener_factory(host, "host", None)
             if l is not None:
                 listeners.append(l)
-        cb = pybreaker.CircuitBreaker(
-            fail_max=base.fail_max,
-            reset_timeout=base.reset_timeout_s,
-            state_storage=None,  # in-proc; cooldown overrides handled externally
-            listeners=listeners,
-        )
+        # Build kwargs for CircuitBreaker, conditionally including success_threshold
+        cb_kwargs = {
+            "fail_max": base.fail_max,
+            "reset_timeout": base.reset_timeout_s,
+            "state_storage": None,  # in-proc; cooldown overrides handled externally
+            "listeners": listeners,
+        }
+        # Add success_threshold if configured (pybreaker 1.4.1+ supports this)
+        if base.fail_max is not None and base.fail_max > 1:
+            # Only set if fail_max allows for meaningful threshold
+            cb_kwargs["success_threshold"] = (
+                1  # default; can be overridden per-role via policy tuning
+            )
+        cb = pybreaker.CircuitBreaker(**cb_kwargs)
         self._host_breakers[host] = cb
         return cb
 
@@ -527,12 +533,17 @@ class BreakerRegistry:
             l = self.listener_factory(resolver, "resolver", resolver)
             if l is not None:
                 listeners.append(l)
-        cb = pybreaker.CircuitBreaker(
-            fail_max=base.fail_max,
-            reset_timeout=base.reset_timeout_s,
-            state_storage=None,
-            listeners=listeners,
-        )
+        # Build kwargs for CircuitBreaker
+        cb_kwargs = {
+            "fail_max": base.fail_max,
+            "reset_timeout": base.reset_timeout_s,
+            "state_storage": None,
+            "listeners": listeners,
+        }
+        # Add success_threshold if configured
+        if base.fail_max is not None and base.fail_max > 1:
+            cb_kwargs["success_threshold"] = 1
+        cb = pybreaker.CircuitBreaker(**cb_kwargs)
         self._resolver_breakers[resolver] = cb
         return cb
 

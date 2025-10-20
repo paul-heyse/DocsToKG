@@ -229,13 +229,14 @@ def _merge_policy(base: BreakerPolicy, raw: Mapping[str, str]) -> BreakerPolicy:
 def _merge_role_policy(base: BreakerRolePolicy, raw: Mapping[str, str]) -> BreakerRolePolicy:
     """
     Merge role-level overrides into BreakerRolePolicy.
-    Keys: fail_max, reset, reset_timeout_s, trial_calls
+    Keys: fail_max, reset, reset_timeout_s, success_threshold, trial_calls
     """
     fm = int(raw["fail_max"]) if "fail_max" in raw else base.fail_max
     r = raw.get("reset") or raw.get("reset_timeout_s")
     rs = int(r) if r is not None else base.reset_timeout_s
+    st = int(raw["success_threshold"]) if "success_threshold" in raw else base.success_threshold
     tc = int(raw["trial_calls"]) if "trial_calls" in raw else base.trial_calls
-    return replace(base, fail_max=fm, reset_timeout_s=rs, trial_calls=tc)
+    return replace(base, fail_max=fm, reset_timeout_s=rs, success_threshold=st, trial_calls=tc)
 
 
 def _apply_classify_override(cur: BreakerClassification, s: str) -> BreakerClassification:
@@ -382,6 +383,7 @@ def _config_from_yaml(doc: Dict) -> BreakerConfig:
         roles_map[role] = BreakerRolePolicy(
             fail_max=_maybe_int(rvals.get("fail_max")),
             reset_timeout_s=_maybe_int(rvals.get("reset_timeout_s", rvals.get("reset"))),
+            success_threshold=_maybe_int(rvals.get("success_threshold")),
             trial_calls=int(rvals.get("trial_calls", 1)),
         )
     defaults = replace(defaults, roles=roles_map)
@@ -435,6 +437,7 @@ def _config_from_yaml(doc: Dict) -> BreakerConfig:
             rmap[role] = BreakerRolePolicy(
                 fail_max=_maybe_int(rvals.get("fail_max")),
                 reset_timeout_s=_maybe_int(rvals.get("reset_timeout_s", rvals.get("reset"))),
+                success_threshold=_maybe_int(rvals.get("success_threshold")),
                 trial_calls=int(rvals.get("trial_calls", 1)),
             )
         pol = replace(pol, roles=rmap)
