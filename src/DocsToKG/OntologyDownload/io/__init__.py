@@ -22,9 +22,7 @@ from .filesystem import (
 from .network import (
     RDF_MIME_ALIASES,
     RDF_MIME_FORMAT_LABELS,
-    SESSION_POOL,
     DownloadResult,
-    SessionPool,
     StreamingDownloader,
     download_stream,
     is_retryable_error,
@@ -57,8 +55,6 @@ __all__ = [
     "get_http_client",
     "RDF_MIME_ALIASES",
     "RDF_MIME_FORMAT_LABELS",
-    "SessionPool",
-    "SESSION_POOL",
     "StreamingDownloader",
     "download_stream",
     "is_retryable_error",

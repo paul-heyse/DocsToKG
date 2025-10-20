@@ -267,7 +267,7 @@ Binary indexes use `read_index_binary` / `write_index_binary`.
 The repository includes NVIDIA cuVS Python packages even though the bundled FAISS binary cannot execute cuVS kernels:
 
 - `.venv/lib/python3.13/site-packages/cuvs` (version **25.10.00**) exposes Python wrappers for ANN algorithms (CAGRA, IVF-Flat/PQ, Vamana, NN-Descent), clustering, distance utilities, and preprocessing modules. Only the pure-Python pieces are present—the expected compiled extensions (`*.so`) for subpackages such as `cuvs.neighbors.vamana` are missing, so importing them raises `ModuleNotFoundError`.
-- `.venv/lib/python3.13/site-packages/libcuvs` provides the loader shim (`load.py`) and metadata (`VERSION`, `GIT_COMMIT`) but no `lib64/libcuvs.so` suitable for dispatch. Consequently, FAISS’s `should_use_cuvs(...)` returns `False` when given a `GpuIndexConfig`, and calling `knn_gpu(..., use_cuvs=True)` raises:
+- `.venv/lib/python3.13/site-packages/libcuvs` provides the loader shim (`load.py`) and metadata (`VERSION`, `GIT_COMMIT`) but no `lib64/libcuvs.so` suitable for dispatch. Consequently, FAISS’s `should_use_cuvs(...)` returns `False` even when HybridSearch supplies realistic GPU configs (`GpuDistanceParams`/`GpuIndexFlatConfig`) during capability detection, and calling `knn_gpu(..., use_cuvs=True)` raises:
 
 ```
 RuntimeError: cuVS has not been compiled into the current version so it cannot be used.
@@ -284,7 +284,7 @@ else:
     D, I = faiss.knn_gpu(res, xq, xb, k, use_cuvs=True)
 ```
 
-- HybridSearch’s `resolve_cuvs_state()` (see `store.py`) checks for `faiss.knn_gpu`, calls `faiss.should_use_cuvs(...)`, records telemetry (`AdapterStats.cuvs_*`), and disables cuVS when unavailable. `ManagedFaissAdapter._apply_use_cuvs_parameter()` echoes the applied value back into stats/logs so operators know whether requests took effect.
+- HybridSearch’s `resolve_cuvs_state()` (see `store.py`) now builds or accepts FAISS GPU config objects, feeds them into `faiss.should_use_cuvs(...)`, records telemetry (`AdapterStats.cuvs_*`), and disables cuVS when unavailable. `ManagedFaissAdapter._apply_use_cuvs_parameter()` echoes the applied value back into stats/logs so operators know whether requests took effect.
 - Future wheel updates could ship the missing shared objects (`libcuvs.so` plus per-operator extensions). When that happens, re-run smoke tests with `use_cuvs=True`, monitor `AdapterStats`/logs, and update this reference to document behaviour changes.
 
 ---

@@ -258,6 +258,14 @@ def get_http_client(config: Optional[DownloadConfiguration] = None) -> httpx.Cli
             if candidate is not None and not isinstance(candidate, httpx.Client):
                 raise TypeError("session_factory must return an httpx.Client or None")
             if candidate is not None:
+                factory_name = getattr(factory, "__qualname__", getattr(factory, "__name__", repr(factory)))
+                LOGGER.info(
+                    "using custom httpx client",
+                    extra={
+                        "factory": factory_name,
+                        "factory_module": getattr(factory, "__module__", None),
+                    },
+                )
                 _set_client_unlocked(candidate)
                 return candidate
 

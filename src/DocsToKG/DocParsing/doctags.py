@@ -411,7 +411,7 @@ MANIFEST_STAGE = "doctags-pdf"
 # Execution defaults for the vLLM-backed conversion pipeline.
 PREFERRED_PORT = 8000
 PORT_SCAN_SPAN = 32
-DEFAULT_WORKERS = min(12, (os.cpu_count() or 16) - 4)
+DEFAULT_WORKERS = max(1, min(12, (os.cpu_count() or 16) - 4))
 WAIT_TIMEOUT_S = 300
 DEFAULT_GPU_MEMORY_UTILIZATION = 0.30
 DEFAULT_SERVED_MODEL_NAMES: Tuple[str, ...] = (

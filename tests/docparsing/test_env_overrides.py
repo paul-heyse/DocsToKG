@@ -60,6 +60,22 @@ def test_ensure_qwen_environment_explicit_dtype_overrides(monkeypatch) -> None:
     assert os.environ["VLLM_DEVICE"] == "cuda:legacy"
     assert os.environ["DOCSTOKG_QWEN_DTYPE"] == "float32"
     assert env_info == {"device": "cuda:legacy", "dtype": "float32"}
+
+
+def test_ensure_qwen_environment_defaults_cpu_dtype(monkeypatch) -> None:
+    """CPU-only environments default to a float32 dtype unless overridden."""
+
+    monkeypatch.delenv("DOCSTOKG_QWEN_DEVICE", raising=False)
+    monkeypatch.delenv("VLLM_DEVICE", raising=False)
+    monkeypatch.delenv("DOCSTOKG_QWEN_DTYPE", raising=False)
+    monkeypatch.setattr("DocsToKG.DocParsing.env._detect_cuda_device", lambda: "cpu")
+
+    env_info = ensure_qwen_environment()
+
+    assert env_info == {"device": "cpu", "dtype": "float32"}
+    assert os.environ["DOCSTOKG_QWEN_DEVICE"] == "cpu"
+    assert os.environ["VLLM_DEVICE"] == "cpu"
+    assert os.environ["DOCSTOKG_QWEN_DTYPE"] == "float32"
 def test_ensure_qwen_environment_respects_legacy_env(monkeypatch, tmp_path: Path) -> None:
     """Legacy ``DOCSTOKG_QWEN_MODEL_DIR`` values seed the canonical env variable."""
 
