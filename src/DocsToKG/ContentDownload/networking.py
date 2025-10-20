@@ -200,26 +200,6 @@ _breaker_registry: Optional["BreakerRegistry"] = None
 # Exceptions considered breaker failures by default
 # (REMOVED DEFAULT_BREAKER_FAILURE_EXCEPTIONS - use BreakerClassification().failure_statuses instead)
 
-_DEPRECATED_ATTR_ERRORS: Dict[str, str] = {
-    "ThreadLocalSessionFactory": (
-        "ThreadLocalSessionFactory has been removed; ContentDownload now shares a singleton "
-        "HTTPX client. Patch DocsToKG.ContentDownload.httpx_transport.get_http_client() instead."
-    ),
-    "create_session": (
-        "create_session() has been removed; configure or patch the HTTPX client via "
-        "DocsToKG.ContentDownload.httpx_transport instead."
-    ),
-}
-
-
-def __getattr__(name: str) -> Any:
-    """Provide explicit errors for legacy session factory access."""
-
-    if name in _DEPRECATED_ATTR_ERRORS:
-        raise RuntimeError(_DEPRECATED_ATTR_ERRORS[name])
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
 def configure_breaker_registry(
     config: "BreakerConfig",
     *,

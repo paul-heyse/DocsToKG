@@ -12,7 +12,7 @@ import httpx
 import pytest
 from pyrate_limiter import Duration, Rate
 
-from DocsToKG.ContentDownload import httpx_transport, networking as networking_module
+from DocsToKG.ContentDownload import httpx_transport
 from DocsToKG.ContentDownload.core import Classification, WorkArtifact
 from DocsToKG.ContentDownload.download import (
     DownloadContext,
@@ -66,11 +66,6 @@ def test_conditional_request_requires_complete_metadata(caplog) -> None:
 
     assert headers == {}
     assert any("resume-metadata-incomplete" in record.message for record in caplog.records)
-
-
-def test_threadlocal_session_factory_removed() -> None:
-    with pytest.raises(RuntimeError):
-        getattr(networking_module, "ThreadLocalSessionFactory")
 
 
 def test_conditional_request_interprets_cached_response(tmp_path: Path) -> None:
