@@ -1642,6 +1642,71 @@ def test_run_parallel_workers_aggregates_state(patcher, tmp_path):
     download_run.close()
 
 
+def test_run_parallel_workers_respects_sleep_interval(patcher, tmp_path):
+    worker_count = 3
+    artifact_count = 4
+    sleep_interval = 0.05
+
+    resolved = make_resolved_config(tmp_path, csv=False, workers=worker_count)
+    resolved.args.sleep = sleep_interval
+    bootstrap_run_environment(resolved)
+
+    artifacts = [_make_artifact(resolved, f"W{index}") for index in range(artifact_count)]
+
+    class StubProvider:
+        def __init__(self, batch: List[WorkArtifact]) -> None:
+            self._batch = batch
+
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            yield from self._batch
+
+    patcher.setattr(
+        DownloadRun,
+        "_load_resume_state",
+        lambda self, resume_path: ({}, set(), None),
+    )
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = StubProvider(artifacts)
+        self.provider = provider
+        return provider
+
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+
+    def fake_process_one_work(
+        work: WorkArtifact,
+        session: requests.Session,
+        pdf_dir,
+        html_dir,
+        xml_dir,
+        pipeline,
+        logger,
+        metrics,
+        *,
+        options,
+        session_factory=None,
+    ) -> Dict[str, Any]:
+        return {"saved": True, "downloaded_bytes": 0}
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.process_one_work",
+        fake_process_one_work,
+    )
+
+    download_run = DownloadRun(resolved)
+    start = time.perf_counter()
+    result = download_run.run()
+    elapsed = time.perf_counter() - start
+
+    expected_min = sleep_interval * (artifact_count - 1)
+    tolerance = sleep_interval * 0.25
+
+    assert result.processed == artifact_count
+    assert elapsed >= max(0.0, expected_min - tolerance)
+
+    download_run.close()
+
+
 def test_run_auto_resume_uses_manifest_path_when_resume_flag_absent(patcher, tmp_path):
     resolved = make_resolved_config(tmp_path, csv=False)
     bootstrap_run_environment(resolved)
