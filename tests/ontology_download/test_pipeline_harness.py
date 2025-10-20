@@ -25,8 +25,14 @@ from DocsToKG.OntologyDownload.planning import (
     fetch_all,
     plan_all,
 )
+from DocsToKG.OntologyDownload.errors import OntologyDownloadError
 from DocsToKG.OntologyDownload.resolvers import BaseResolver, FetchPlan
-from DocsToKG.OntologyDownload.testing import ResponseSpec, temporary_resolver
+from DocsToKG.OntologyDownload.testing import (
+    ResponseSpec,
+    temporary_resolver,
+    temporary_validator,
+)
+from DocsToKG.OntologyDownload.validation import ValidationResult
 
 
 def _logger() -> logging.Logger:
@@ -88,6 +94,83 @@ def test_fetch_all_downloads_and_writes_manifest(ontology_env, tmp_path):
         assert manifest_payload["id"] == result.spec.id
         assert manifest_payload["status"] == result.status
         assert Path(manifest_payload["filename"]).name.endswith(".owl")
+
+
+def test_fetch_all_strict_mode_raises_on_validation_failure(ontology_env):
+    """Strict mode should abort when any validator reports failure."""
+
+    resolver_name, resolver = _static_resolver_for(
+        ontology_env, name="strict-validation", filename="strict.owl"
+    )
+    spec = FetchSpec(
+        id="strict-validation",
+        resolver=resolver_name,
+        extras={},
+        target_formats=("owl",),
+    )
+
+    config = _resolved_config(ontology_env)
+    config.defaults.continue_on_error = False
+
+    validator_names = ("rdflib", "pronto", "owlready2", "robot", "arelle")
+
+    def _failing_validator(request, logger):  # type: ignore[override]
+        return ValidationResult(ok=False, details={"reason": "boom"}, output_files=[])
+
+    def _passing_validator(request, logger):  # type: ignore[override]
+        return ValidationResult(ok=True, details={}, output_files=[])
+
+    with ExitStack() as stack:
+        stack.enter_context(temporary_resolver(resolver_name, resolver))
+        for name in validator_names:
+            validator = _failing_validator if name == "rdflib" else _passing_validator
+            stack.enter_context(temporary_validator(name, validator))
+        with pytest.raises(BatchFetchError) as excinfo:
+            fetch_all([spec], config=config, logger=_logger(), force=True)
+
+    original = excinfo.value.original
+    assert isinstance(original, OntologyDownloadError)
+    assert "rdflib" in str(original)
+    manifest_paths = list((ontology_env.ontology_dir / spec.id).rglob("manifest.json"))
+    assert not manifest_paths
+
+
+def test_fetch_all_lenient_mode_logs_validation_failure(ontology_env):
+    """Lenient mode should record validator failures while continuing."""
+
+    resolver_name, resolver = _static_resolver_for(
+        ontology_env, name="lenient-validation", filename="lenient.owl"
+    )
+    spec = FetchSpec(
+        id="lenient-validation",
+        resolver=resolver_name,
+        extras={},
+        target_formats=("owl",),
+    )
+
+    config = _resolved_config(ontology_env)
+    config.defaults.continue_on_error = True
+
+    validator_names = ("rdflib", "pronto", "owlready2", "robot", "arelle")
+
+    def _failing_validator(request, logger):  # type: ignore[override]
+        return ValidationResult(ok=False, details={"reason": "lenient"}, output_files=[])
+
+    def _passing_validator(request, logger):  # type: ignore[override]
+        return ValidationResult(ok=True, details={}, output_files=[])
+
+    with ExitStack() as stack:
+        stack.enter_context(temporary_resolver(resolver_name, resolver))
+        for name in validator_names:
+            validator = _failing_validator if name == "rdflib" else _passing_validator
+            stack.enter_context(temporary_validator(name, validator))
+        results = fetch_all([spec], config=config, logger=_logger(), force=True)
+
+    assert len(results) == 1
+    manifest_payload = json.loads(results[0].manifest_path.read_text())
+    rdflib_result = manifest_payload["validation"]["rdflib"]
+    assert rdflib_result["ok"] is False
+    assert rdflib_result["details"]["reason"] == "lenient"
 
 
 def test_fetch_all_second_run_uses_cache(ontology_env):
