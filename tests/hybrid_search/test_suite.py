@@ -2180,8 +2180,142 @@ def test_recall_first_range_search_respects_initial_k_budget() -> None:
     assert store.range_calls[0][2] == expected_budget
     assert not store.search_batch_calls
     assert len(result.candidates) == expected_budget
-    assert registry.resolve_embeddings_calls
-    assert len(registry.resolve_embeddings_calls[0]) == expected_budget
+    expected_vector_ids = tuple(hit.vector_id for hit in hits[:expected_budget])
+    assert registry.resolve_embeddings_calls == [expected_vector_ids]
+    assert result.embeddings is not None
+    expected_embeddings = np.stack(
+        [payloads[vector_id].features.embedding for vector_id in expected_vector_ids],
+        dtype=np.float32,
+    )
+    np.testing.assert_allclose(result.embeddings, expected_embeddings)
+
+
+def test_execute_dense_batch_resolves_embeddings_once() -> None:
+    request = HybridSearchRequest(
+        query="dense batch embeddings",
+        namespace="demo",
+        filters={},
+        page_size=3,
+    )
+    config = HybridSearchConfig(
+        retrieval=RetrievalConfig(
+            dense_top_k=6,
+            dense_overfetch_factor=1.0,
+            dense_oversample=1.0,
+        )
+    )
+    query_features = ChunkFeatures(
+        bm25_terms={},
+        splade_weights={},
+        embedding=np.array([0.1, 0.3, 0.5], dtype=np.float32),
+    )
+
+    hits = [
+        FaissSearchResult(vector_id=f"vec-{idx}", score=1.0 - idx * 0.1)
+        for idx in range(5)
+    ]
+
+    payloads: Dict[str, ChunkPayload] = {}
+    for idx, hit in enumerate(hits):
+        features = ChunkFeatures(
+            bm25_terms={},
+            splade_weights={},
+            embedding=np.full(
+                query_features.embedding.shape, float(idx + 1), dtype=np.float32
+            ),
+        )
+        payloads[hit.vector_id] = ChunkPayload(
+            doc_id=f"doc-{hit.vector_id}",
+            chunk_id=f"chunk-{hit.vector_id}",
+            vector_id=hit.vector_id,
+            namespace=request.namespace or "",
+            text=f"chunk {hit.vector_id}",
+            metadata={},
+            features=features,
+            token_count=15,
+            source_chunk_idxs=[0],
+            doc_items_refs=[f"doc:{hit.vector_id}"],
+        )
+
+    class RecordingRegistry:
+        def __init__(self, payloads: Mapping[str, ChunkPayload]) -> None:
+            self._payloads = dict(payloads)
+            example = next(iter(payloads.values()))
+            self._dim = example.features.embedding.shape[-1]
+            self.resolve_embeddings_calls: List[Tuple[str, ...]] = []
+
+        def bulk_get(self, vector_ids: Sequence[str]) -> Sequence[ChunkPayload]:
+            return [
+                self._payloads[vector_id]
+                for vector_id in vector_ids
+                if vector_id in self._payloads
+            ]
+
+        def resolve_embeddings(
+            self,
+            vector_ids: Sequence[str],
+            *,
+            cache: Optional[Dict[str, np.ndarray]] = None,
+            dtype: np.dtype = np.float32,
+        ) -> np.ndarray:
+            self.resolve_embeddings_calls.append(tuple(vector_ids))
+            if not vector_ids:
+                return np.empty((0, self._dim), dtype=dtype)
+            rows: List[np.ndarray] = []
+            for vector_id in vector_ids:
+                embedding = np.asarray(self._payloads[vector_id].features.embedding, dtype=dtype)
+                rows.append(embedding)
+                if cache is not None:
+                    cache[vector_id] = embedding
+            return np.ascontiguousarray(np.stack(rows), dtype=dtype)
+
+    class RecordingDenseStore:
+        def __init__(self, hits: Sequence[FaissSearchResult]) -> None:
+            self._hits = list(hits)
+            self.range_calls: List[Tuple[np.ndarray, float, Optional[int]]] = []
+            self.search_batch_calls: List[Tuple[np.ndarray, int]] = []
+            self.adapter_stats = SimpleNamespace(nprobe=1, fp16_enabled=False)
+
+        def range_search(
+            self, query: np.ndarray, score_floor: float, limit: Optional[int] = None
+        ) -> Sequence[FaissSearchResult]:
+            self.range_calls.append((np.asarray(query), float(score_floor), limit))
+            return []
+
+        def search_batch(self, queries: np.ndarray, depth: int) -> List[List[FaissSearchResult]]:
+            self.search_batch_calls.append((np.asarray(queries), int(depth)))
+            return [self._hits[:depth]]
+
+    registry = RecordingRegistry(payloads)
+    store = RecordingDenseStore(hits)
+    service = object.__new__(HybridSearchService)
+    service._registry = registry  # type: ignore[attr-defined]
+    service._dense_strategy = service_module.DenseSearchStrategy()  # type: ignore[attr-defined]
+    service._observability = Observability()  # type: ignore[attr-defined]
+
+    timings: Dict[str, float] = {}
+    result = service._execute_dense(
+        request=request,
+        filters={},
+        config=config,
+        query_features=query_features,
+        timings=timings,
+        store=store,
+    )
+
+    assert not store.range_calls
+    assert store.search_batch_calls
+    expected_vector_ids = tuple(candidate.chunk.vector_id for candidate in result.candidates)
+    assert registry.resolve_embeddings_calls == [expected_vector_ids]
+    if expected_vector_ids:
+        assert result.embeddings is not None
+        expected_matrix = np.stack(
+            [payloads[vector_id].features.embedding for vector_id in expected_vector_ids],
+            dtype=np.float32,
+        )
+        np.testing.assert_allclose(result.embeddings, expected_matrix)
+    else:
+        assert result.embeddings is None
 
 # --- test_hybrid_search.py ---
 
