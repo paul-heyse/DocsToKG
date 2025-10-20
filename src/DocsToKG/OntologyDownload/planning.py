@@ -69,9 +69,8 @@ from .errors import (
     OntologyDownloadError,
     PolicyError,
     ResolverError,
-    ValidationError,
     RetryableValidationError,
-    ValidationFailure,
+    ValidationError,
 )
 from .io import (
     RDF_MIME_ALIASES,
@@ -2006,15 +2005,12 @@ def fetch_one(
                             base_dir=base_dir,
                             logger=adapter,
                         )
-                        raise OntologyDownloadError(
+                        has_additional_candidates = attempt_number < len(candidate_list)
                         raise RetryableValidationError(
                             "Validation failed for "
                             f"'{effective_spec.id}' via {', '.join(failed_validators)}",
                             validators=tuple(failed_validators),
-                        raise ValidationFailure(
-                            "Validation failed for "
-                            f"'{effective_spec.id}' via {', '.join(failed_validators)}",
-                            retryable=True,
+                            retryable=has_additional_candidates,
                         )
 
                 normalized_hash = None
@@ -2162,7 +2158,6 @@ def fetch_one(
                 adapter.info(
                     "trying fallback resolver",
                     extra={
-                        "stage": "download",
                         "stage": "validate",
                         "resolver": candidate.resolver,
                         "attempt": attempt_number,

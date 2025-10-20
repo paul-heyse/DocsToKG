@@ -61,6 +61,20 @@ from ..settings import DownloadConfiguration
 from .filesystem import _compute_file_hash, _materialize_cached_file, sanitize_filename
 from .rate_limit import TokenBucket, apply_retry_after, get_bucket
 
+IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
+
+_DOCUMENTATION_NETWORKS: Tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = (
+    ipaddress.ip_network("192.0.2.0/24"),
+    ipaddress.ip_network("198.51.100.0/24"),
+    ipaddress.ip_network("203.0.113.0/24"),
+)
+
+
+def _is_documentation_address(address: IPAddress) -> bool:
+    """Return ``True`` when *address* belongs to an IANA documentation prefix."""
+
+    return any(address in network for network in _DOCUMENTATION_NETWORKS)
+
 try:  # pragma: no cover - psutil may be unavailable in minimal environments
     import psutil  # type: ignore[import]
 except Exception:  # pragma: no cover - fallback when psutil cannot be imported
@@ -312,8 +326,11 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
 
     if is_ip:
         address = ipaddress.ip_address(ascii_host)
-        if not allow_private_networks and (
-            address.is_private or address.is_loopback or address.is_reserved or address.is_multicast
+        is_doc_address = _is_documentation_address(address)
+        if (
+            not allow_private_networks
+            and not is_doc_address
+            and (address.is_private or address.is_loopback or address.is_multicast)
         ):
             raise ConfigError(f"Refusing to download from private address {host}")
         return urlunparse(parsed)
@@ -331,11 +348,11 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
 
     for info in infos:
         candidate_ip = ipaddress.ip_address(info[4][0])
-        if not allow_private_networks and (
-            candidate_ip.is_private
-            or candidate_ip.is_loopback
-            or candidate_ip.is_reserved
-            or candidate_ip.is_multicast
+        is_doc_address = _is_documentation_address(candidate_ip)
+        if (
+            not allow_private_networks
+            and not is_doc_address
+            and (candidate_ip.is_private or candidate_ip.is_loopback or candidate_ip.is_multicast)
         ):
             raise ConfigError(f"Refusing to download from private address resolved for {host}")
 

@@ -71,7 +71,7 @@ export UNPAYWALL_EMAIL=you@example.org
 
 - **Selectors & filters**: `--topic` (free text), `--topic-id`, `--year-start`, `--year-end`, `--per-page` (1–200), `--oa-only`. `resolve_topic_id_if_needed()` upgrades free-text topics to OpenAlex IDs when possible.
 - **Output layout**: `--out` controls the PDF root; `--html-out`/`--xml-out` override sibling locations; `--staging` produces timestamped `PDF/`, `HTML/`, `XML/` folders; `--content-addressed` moves finalized payloads into hashed directories while leaving friendly symlinks behind.
-- **Run controls**: `--max`, `--workers`, `--sleep`, `--mailto`, `--dry-run`, `--list-only`, `--ignore-robots`, `--resume-from`, `--verify-cache-digest`, `--warm-manifest-cache`, `--log-format {jsonl,csv}`, `--log-csv`, `--log-rotate SIZE`.
+- **Run controls**: `--max`, `--workers`, `--sleep` (defaults to 0.05 for sequential runs and is automatically disabled when `--workers > 1` unless explicitly provided), `--mailto`, `--dry-run`, `--list-only`, `--ignore-robots`, `--resume-from`, `--verify-cache-digest`, `--warm-manifest-cache`, `--log-format {jsonl,csv}`, `--log-csv`, `--log-rotate SIZE`.
 - **Pagination & retries**: `--openalex-retry-attempts`, `--openalex-retry-backoff`, `--openalex-retry-max-delay`, and `--retry-after-cap` configure `iterate_openalex()` and downstream resolver retry ceilings (equal-jitter backoff, honouring `Retry-After`).
 - **Resolver configuration**: `--resolver-config` (YAML/JSON), `--resolver-order`, `--resolver-preset {fast,broad}`, `--enable-resolver`, `--disable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--concurrent-resolvers`, `--max-concurrent-per-host`, `--domain-min-interval`, `--domain-token-bucket`, `--global-url-dedup`/`--no-global-url-dedup`, `--global-url-dedup-cap`, `--head-precheck`/`--no-head-precheck`, `--accept`, plus credential overrides (`--unpaywall-email`, `--core-api-key`, `--semantic-scholar-api-key`, `--doaj-api-key`).
 - **Classifier & extraction tuning**: `--sniff-bytes`, `--min-pdf-bytes`, `--tail-check-bytes`, `--extract-text {html,never}` control payload heuristics in `download.py`.
@@ -139,6 +139,7 @@ flowchart LR
 - `DownloadRun.setup_work_provider()` wraps `iterate_openalex()` (equal-jitter retry/backoff with optional `Retry-After` cap) into a provider that streams `WorkArtifact` objects to worker threads.
 - `DownloadRun.setup_download_state()` hydrates resume data from JSONL or SQLite, seeds `DownloadConfig` (including robots checker, content-addressed flags, digest verification, and dedupe caches), and records cleanup callbacks.
 - Worker execution uses `ThreadLocalSessionFactory` to reuse HTTP sessions per thread, invoking `process_one_work()` which handles resume skips, cached artifact detection, resolver execution, download strategies, telemetry emission, and aggregate counter updates.
+- Concurrent worker pools respect user-supplied `--sleep` values but skip the sequential default delay unless operators explicitly request it; sequential runs retain the 0.05s polite pause.
 - `summary.build_summary_record()` combines `ResolverMetrics` with aggregated counters to persist run metrics using `atomic_write_text`; the same payload powers console summaries.
 
 ## Configuration Surfaces

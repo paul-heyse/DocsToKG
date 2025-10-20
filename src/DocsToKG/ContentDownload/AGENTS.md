@@ -296,7 +296,7 @@ flowchart LR
 ```
 
 - `cli.main()` wires the frozen `ResolvedConfig` into `DownloadRun`, seeding resolver instances, telemetry factories, and configurable hooks (`download_candidate_func`, sink factories) for tests.
-- `DownloadRun.run()` stages the lifecycle in order: `setup_sinks()` → `setup_resolver_pipeline()` → `setup_work_provider()` → `setup_download_state()` → work execution (sequential or `ThreadPoolExecutor`). A `ThreadLocalSessionFactory` provides per-thread `requests.Session` objects and is closed during teardown.
+- `DownloadRun.run()` stages the lifecycle in order: `setup_sinks()` → `setup_resolver_pipeline()` → `setup_work_provider()` → `setup_download_state()` → work execution (sequential or `ThreadPoolExecutor`). A `ThreadLocalSessionFactory` provides per-thread `requests.Session` objects and is closed during teardown, and sequential `--sleep` throttles are automatically disabled when `--workers > 1` unless callers opt in explicitly.
 - `DownloadRun.setup_download_state()` hydrates resume metadata from JSONL/CSV manifests or SQLite caches, seeds `DownloadConfig` (robots cache, content-addressed toggle, digest verification, global dedupe sets), and registers cleanup callbacks on the exit stack.
 - `ResolverPipeline.run()` enforces resolver ordering, per-resolver spacing, domain token buckets, circuit breakers, global URL dedupe, and emits structured `AttemptRecord` telemetry while updating `ResolverMetrics`.
 - `download.process_one_work()` normalises work payloads, evaluates resume decisions, coordinates download strategies (PDF/HTML/XML), finalises artifacts atomically, and logs manifest + summary records via `RunTelemetry`.
@@ -322,7 +322,7 @@ flowchart LR
 
 - CLI selectors & pagination: `--topic`, `--topic-id`, `--year-start`, `--year-end`, `--per-page`, `--oa-only`.
 - Output & lifecycle controls: `--out`, `--html-out`, `--xml-out`, `--staging`, `--content-addressed`, `--manifest`, `--log-format {jsonl,csv}`, `--log-csv`, `--log-rotate`, `--warm-manifest-cache`, `--resume-from`, `--verify-cache-digest`.
-- Runtime controls: `--mailto`, `--max`, `--workers`, `--sleep`, `--dry-run`, `--list-only`, `--ignore-robots`, `--openalex-retry-attempts`, `--openalex-retry-backoff`, `--openalex-retry-max-delay`.
+- Runtime controls: `--mailto`, `--max`, `--workers`, `--sleep` (defaults to 0.05 for sequential runs and is ignored when `--workers > 1` unless explicitly supplied), `--dry-run`, `--list-only`, `--ignore-robots`, `--openalex-retry-attempts`, `--openalex-retry-backoff`, `--openalex-retry-max-delay`.
 - Resolver knobs & credentials: `--resolver-config`, `--resolver-order`, `--resolver-preset {fast,broad}`, `--enable-resolver`, `--disable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--retry-after-cap`, `--concurrent-resolvers`, `--max-concurrent-per-host`, `--domain-min-interval`, `--domain-token-bucket`, `--global-url-dedup`/`--no-global-url-dedup`, `--global-url-dedup-cap`, `--head-precheck`/`--no-head-precheck`, `--accept`, `--unpaywall-email`, `--core-api-key`, `--semantic-scholar-api-key`, `--doaj-api-key`. The CLI threads `--retry-after-cap` into `DownloadConfig.extra` so downloader retries honour the ceiling even outside resolver config files.
 - Classifier & extraction tuning: `--sniff-bytes`, `--min-pdf-bytes`, `--tail-check-bytes`, `--extract-text`.
 

@@ -82,9 +82,9 @@
 """Hybrid-search ingestion pipeline, feature normalisation, and observability.
 
 This module is the operational counterpart to the HybridSearch README section on
-chunk ingestion. It streams DocParsing outputs (`*.chunk.jsonl` + embeddings),
-derives lexical/dense features, and applies namespace routing while emitting
-structured telemetry. Key responsibilities include:
+chunk ingestion. It streams DocParsing outputs (`*.chunk.jsonl` + embeddings or
+Parquet vectors), derives lexical/dense features, and applies namespace routing
+while emitting structured telemetry. Key responsibilities include:
 
 - Loading chunk + vector artifacts in lockstep, validating manifests, and
   invoking `LexicalIndex` / `DenseVectorStore` adapters to keep sparse and dense
@@ -94,6 +94,9 @@ structured telemetry. Key responsibilities include:
 - Surfacing ingestion metrics through `Observability`—latency histograms, batch
   counters, GPU utilisation snapshots—mirroring the “Observability” guidance in
   the package README.
+- Guarding against misordered DocParsing artifacts by streaming vectors lazily
+  with a bounded cache; exceeding the cache limit raises `IngestError` so broken
+  inputs are detected before mutating the stores.
 - Providing retryable error classes to distinguish between transient ingestion
   issues (e.g., FAISS temp-memory exhaustion) and terminal data problems.
 
@@ -761,15 +764,39 @@ class ChunkIngestionPipeline:
             IngestError: If chunk and vector artifacts are inconsistent or missing.
         """
         chunk_entries = self._read_jsonl(document.chunk_path)
-        vector_entries = {
-            str(entry.get("UUID") or entry.get("uuid")): entry
-            for entry in self._read_vector_file(document.vector_path)
-        }
+        vector_iter = self._iter_vector_file(document.vector_path)
+        vector_cache: Dict[str, Mapping[str, object]] = {}
+
+        def _maybe_track_cache() -> None:
+            if self._vector_cache_stats_hook is not None:
+                self._vector_cache_stats_hook(len(vector_cache), document)
+            if self._vector_cache_limit and len(vector_cache) > self._vector_cache_limit:
+                raise IngestError(
+                    "Vector cache grew beyond the configured safety limit; verify DocParsing "
+                    "artifacts are ordered and sorted consistently by UUID before re-running ingestion."
+                )
+
+        def _pop_vector(vector_id: str) -> Optional[Mapping[str, object]]:
+            cached = vector_cache.pop(vector_id, None)
+            if cached is not None:
+                return cached
+            for entry in vector_iter:
+                current_id = str(entry.get("uuid") or entry.get("UUID"))
+                if not current_id:
+                    continue
+                if current_id == vector_id:
+                    return entry
+                vector_cache[current_id] = entry
+                _maybe_track_cache()
+            return None
+
         payloads: List[ChunkPayload] = []
         missing: List[str] = []
         for entry in chunk_entries:
             vector_id = str(entry.get("uuid") or entry.get("UUID"))
-            vector_payload = vector_entries.get(vector_id)
+            vector_payload = vector_cache.pop(vector_id, None)
+            if vector_payload is None:
+                vector_payload = _pop_vector(vector_id)
             if vector_payload is None:
                 missing.append(vector_id)
                 continue
@@ -915,4 +942,3 @@ class ChunkIngestionPipeline:
         """Return the contents of a JSONL artifact eagerly."""
 
         return list(self._iter_jsonl(path))
-

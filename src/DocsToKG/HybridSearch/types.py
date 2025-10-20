@@ -82,7 +82,8 @@ artifacts aligned with FAISS stores and HTTP responses:
   layout documented in the README ("Data inputs & expected layout").
 - Querying: `HybridSearchRequest`, `HybridSearchResponse`, and
   `HybridSearchDiagnostics` encode the contract enforced by `HybridSearchAPI`
-  and demonstrated in the README’s JSON examples.
+  and demonstrated in the README’s JSON examples, including adaptive fusion
+  weights and per-request statistics emitted by the service layer.
 - Fusion/validation: `FusionCandidate`, `ValidationReport`, `ValidationSummary`
   support RRF/MMR scoring and regression harnesses.
 

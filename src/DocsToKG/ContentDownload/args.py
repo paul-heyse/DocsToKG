@@ -12,6 +12,8 @@ Responsibilities
 - Hydrate manifest indexes and global URL dedupe sets (via
   :class:`ManifestUrlIndex`) so runs can reuse cached artifacts before
   contacting resolvers.
+- Detect when ``--sleep`` is supplied explicitly so concurrent runs avoid
+  inheriting sequential throttle defaults unless requested.
 - Expose compatibility shims (``build_query()``, ``resolve_topic_id_if_needed``)
   that tests and automation can exercise without pulling in the full CLI stack.
 
@@ -63,6 +65,8 @@ __all__ = [
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
+DEFAULT_SLEEP_SECONDS = 0.05
+
 
 @dataclass(frozen=True)
 class ResolvedConfig:
@@ -108,6 +112,20 @@ def bootstrap_run_environment(resolved: ResolvedConfig) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     """Create and return the CLI argument parser."""
+
+    class _RecordSleepAction(argparse.Action):
+        """Track explicit ``--sleep`` usage to disambiguate from the default."""
+
+        def __call__(
+            self,
+            parser: argparse.ArgumentParser,
+            namespace: argparse.Namespace,
+            values: Any,
+            option_string: Optional[str] = None,
+        ) -> None:
+            setattr(namespace, self.dest, values)
+            setattr(namespace, "_sleep_explicit", True)
+
     parser = argparse.ArgumentParser(
         description="Download OpenAlex PDFs for a topic and year range with resolvers.",
     )
@@ -167,7 +185,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--sleep",
         type=float,
-        default=0.05,
+        default=DEFAULT_SLEEP_SECONDS,
+        action=_RecordSleepAction,
         help="Sleep seconds between works (sequential mode).",
     )
     parser.add_argument(
@@ -361,7 +380,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override the Accept header sent with resolver HTTP requests.",
     )
 
-    parser.set_defaults(head_precheck=True, global_url_dedup=None)
+    parser.set_defaults(head_precheck=True, global_url_dedup=None, _sleep_explicit=False)
 
     parser.add_argument(
         "--log-format",
@@ -503,6 +522,9 @@ def resolve_config(
     base_pdf_dir = _expand_path(args.out)
     if base_pdf_dir is None:
         parser.error("--out is required")
+
+    if not getattr(args, "_sleep_explicit", False) and getattr(args, "workers", 1) > 1:
+        args.sleep = 0.0
 
     html_override = _expand_path(args.html_out)
     xml_override = _expand_path(args.xml_out)

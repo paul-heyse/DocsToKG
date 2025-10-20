@@ -12,6 +12,8 @@ Responsibilities
   skipping already-processed works before dispatching to the resolver pipeline.
 - Hydrate global URL dedupe sets, robots caches, and thread-local HTTP sessions
   so per-run policies (token buckets, retry caps) are honoured across workers.
+- Coordinate sequential ``--sleep`` throttling while leaving concurrent worker
+  pools free from the default delay unless operators request it explicitly.
 - Surface convenience helpers (:func:`run`, :func:`iterate_openalex`) that are
   reused by tests, smoke scripts, and the CLI while returning a
   :class:`~DocsToKG.ContentDownload.summary.RunResult`.

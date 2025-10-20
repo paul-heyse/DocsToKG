@@ -31,7 +31,6 @@ import heapq
 import json
 import logging
 import multiprocessing
-from multiprocessing.managers import SyncManager
 import os
 import platform
 import re
@@ -45,6 +44,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from itertools import islice
+from multiprocessing.managers import SyncManager
 from pathlib import Path
 from threading import BoundedSemaphore, RLock
 from typing import (

@@ -108,7 +108,7 @@ flow described in the README (“Search API contract”). It owns:
   pools to issue FAISS GPU queries and BM25/SPLADE lookups concurrently.
 - Score fusion (reciprocal rank fusion + optional MMR diversification) and
   response shaping, with per-channel breakdowns that mirror the JSON example in
-  the README.
+  the README (including adaptive `fusion_weights` and per-request `stats`).
 - Diagnostics: latency sampling, pagination verification, rebuild heuristics,
   and stats snapshots for health checks.
 

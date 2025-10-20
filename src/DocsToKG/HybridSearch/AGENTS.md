@@ -268,13 +268,13 @@ Last updated: 2025-02-15
 
 - Linux with CUDA‑12 capable NVIDIA GPUs plus the custom FAISS 1.12 GPU wheel. Required shared libraries: `libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, `libgomp.so.1`, compatible `GLIBC_2.38`/`GLIBCXX_3.4.32`.
 - Environment variables: `DOCSTOKG_DATA_ROOT` (defaults to `./Data`), optional `DOCSTOKG_HYBRID_CONFIG`, `TEMP_DIR`/`TMPDIR` for snapshot staging, `FAISS_OPT_LEVEL` / `FAISS_DISABLE_CPU_FEATURES` for loader overrides.
-- Inputs: DocParsing chunk JSONL + embedding JSONL (aligned via `uuid`/`UUID`) and their manifests; ingestion trusts DocParsing for ID consistency.
+- Inputs: DocParsing chunk JSONL + embedding JSONL/Parquet (aligned via `uuid`/`UUID`) and their manifests; ingestion trusts DocParsing for ID consistency and monotonically sorted vector artefacts.
 
 ## Module architecture
 
 - `config.py` – Dataclass configs (`ChunkingConfig`, `DenseIndexConfig`, `FusionConfig`, `RetrievalConfig`, `HybridSearchConfig`) and the thread-safe `HybridSearchConfigManager`. The config layer now covers snapshot refresh throttles (`snapshot_refresh_interval_seconds` / `_writes`), persistence policies (`persist_mode`), forced ID removal fallbacks, and cuVS/FP16 toggles that map 1:1 onto FAISS GPU options (`GpuMultipleClonerOptions`, `StandardGpuResources`, tiling limits).
 - `features.py` – Canonical deterministic tokeniser, sliding-window chunker, and `FeatureGenerator` used by ingestion, validation, and fixtures. `devtools.features` re-exports these symbols for backwards compatibility.
-- `pipeline.py` – `ChunkIngestionPipeline`, `Observability`, and `IngestMetrics` stream DocParsing artefacts, normalise BM25/SPLADE/dense payloads into contiguous `float32` tensors, keep lexical + FAISS stores in lockstep, and surface structured telemetry.
+- `pipeline.py` – `ChunkIngestionPipeline`, `Observability`, and `IngestMetrics` stream DocParsing artefacts (JSONL or Parquet vectors), normalise BM25/SPLADE/dense payloads into contiguous `float32` tensors, enforce UUID alignment with a bounded vector-cache safety guard, keep lexical + FAISS stores in lockstep, and surface structured telemetry.
 - `store.py` – `FaissVectorStore` and `ManagedFaissAdapter` own CPU training, `index_cpu_to_gpu(_multiple)` cloning, multi-GPU replication/sharding, `StandardGpuResources` pools, cuVS negotiation (`resolve_cuvs_state`), cosine/inner-product helpers (`cosine_topk_blockwise`, `pairwise_inner_products`), snapshot utilities (`serialize_state`, `restore_state`), the `ChunkRegistry`, and rich `AdapterStats`.
 - `router.py` – `FaissRouter` provisions namespace-scoped adapters, caches serialized payloads for evicted stores, rehydrates snapshots lazily, propagates ID resolvers, and reports per-namespace stats/last-used timestamps.
 - `service.py` – Houses `HybridSearchValidator`, `HybridSearchService`, and `HybridSearchAPI`; validates requests, enforces pagination (`verify_pagination`), schedules concurrent lexical/dense searches, applies RRF + optional MMR diversification via `ResultShaper`, emits diagnostics, and exposes `build_stats_snapshot` for health checks.
@@ -283,7 +283,7 @@ Last updated: 2025-02-15
 
 ## Core capabilities
 
-- **Ingestion pipeline** – Validates manifests, normalises chunk payloads, keeps lexical and dense stores in sync, and surfaces metrics (latency histograms, GPU usage).
+- **Ingestion pipeline** – Validates manifests, normalises chunk payloads, streams vectors lazily with a configurable cache guard (`vector_cache_limit`), keeps lexical and dense stores in sync, and surfaces metrics (latency histograms, GPU usage).
 - **Vector store management** – Handles FAISS GPU lifecycle (training, replication, memory reservations, cosine/inner-product helpers) and snapshot metadata used for cold starts.
 - **Namespace routing** – Maintains namespace→adapter mappings, caches snapshots when evicting idle stores, and aggregates stats for multi-tenant deployments.
 - **Hybrid retrieval** – Executes dense + lexical lookups in parallel, fuses results via RRF/MMR, enforces pagination and token budgets, returns per-channel diagnostics.
@@ -295,7 +295,7 @@ Last updated: 2025-02-15
 1. **Source artifacts** – Place chunk and embedding JSONL (plus manifests) under `${DOCSTOKG_DATA_ROOT}`.
 2. **Load configuration** – Instantiate `HybridSearchConfigManager(Path(...))` and call `manager.get()` to obtain the current `HybridSearchConfig` (namespaces, budgets, GPU settings, snapshot directories).
 3. **Initialise indexes** – Instantiate `ManagedFaissAdapter` (and optional lexical indexes) using the loaded config; ensure `ChunkRegistry` is ready.
-4. **Stream ingestion** – Call `ChunkIngestionPipeline.upsert_documents(...)` to normalise features, upsert lexical payloads, add dense vectors to FAISS, and emit telemetry.
+4. **Stream ingestion** – Call `ChunkIngestionPipeline.upsert_documents(...)` to normalise features, lazily load vector artefacts (raising `IngestError` when UUID order drifts past the configured `vector_cache_limit`), upsert lexical payloads, add dense vectors to FAISS, and emit telemetry.
 5. **Snapshot & persist** – Use `FaissRouter.serialize_all()` or per-adapter `serialize()`/`snapshot_meta()` to capture FAISS bytes + metadata; store in durable storage for fast restore.
 6. **Serve queries** – Wire `HybridSearchService` / `HybridSearchAPI` into your runtime, load snapshots on start-up, then serve hybrid queries with deterministic fusion.
 
