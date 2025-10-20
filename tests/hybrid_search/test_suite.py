@@ -2260,6 +2260,44 @@ def test_managed_adapter_supports_ingestion_training_sample() -> None:
     assert features.bm25_terms == {"token": 0.1}
     assert features.splade_weights == {"token": 0.2}
 
+    rng_invocations = 0
+
+    def _deterministic_factory() -> np.random.Generator:
+        nonlocal rng_invocations
+        rng_invocations += 1
+        return np.random.default_rng(7)
+
+    deterministic_faiss = _StubFaissStore(dim=dim, config=dense_config)
+    deterministic_adapter = ManagedFaissAdapter(deterministic_faiss)
+    deterministic_registry = ChunkRegistry()
+    deterministic_pipeline = ChunkIngestionPipeline(
+        faiss_index=deterministic_adapter,
+        opensearch=_StubLexicalIndex(),
+        registry=deterministic_registry,
+        observability=Observability(),
+        training_sample_rng_factory=_deterministic_factory,
+    )
+
+    large_existing = [
+        _make_chunk(f"existing-large-{i}", dim=dim, value=float(i % 5)) for i in range(1100)
+    ]
+    deterministic_pipeline.faiss_index.add(
+        [chunk.features.embedding for chunk in large_existing],
+        [chunk.vector_id for chunk in large_existing],
+    )
+    deterministic_registry.upsert(large_existing)
+
+    large_new = [
+        _make_chunk(f"new-large-{i}", dim=dim, value=float((i + 3) % 7)) for i in range(64)
+    ]
+
+    first_sample = deterministic_pipeline._training_sample(large_new)
+    second_sample = deterministic_pipeline._training_sample(large_new)
+
+    assert rng_invocations == 2
+    assert len(first_sample) == len(second_sample) == 1024
+    np.testing.assert_array_equal(np.stack(first_sample), np.stack(second_sample))
+
 
 # --- test_hybrid_search.py ---
 
