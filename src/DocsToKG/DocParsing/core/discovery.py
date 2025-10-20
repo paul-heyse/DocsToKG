@@ -34,6 +34,7 @@ __all__ = [
     "derive_doc_id_and_chunks_path",
     "derive_doc_id_and_doctags_path",
     "derive_doc_id_and_vectors_path",
+    "vector_artifact_name",
     "iter_chunks",
     "load_structural_marker_config",
     "load_structural_marker_profile",
@@ -134,6 +135,31 @@ def load_structural_marker_config(path: Path) -> Tuple[List[str], List[str]]:
     return load_structural_marker_profile(path)
 
 
+def _normalise_chunk_relative(path: Path) -> Path:
+    """Return ``path`` with ``.chunks[.jsonl]`` suffixes removed."""
+
+    base = path
+    if base.suffix == ".jsonl":
+        base = base.with_suffix("")
+    if base.suffix == ".chunks":
+        base = base.with_suffix("")
+    return base
+
+
+def vector_artifact_name(logical: Path, fmt: str) -> Path:
+    """Return the vectors filename for a chunk ``logical`` path and format."""
+
+    fmt_normalised = str(fmt or "jsonl").lower()
+    if fmt_normalised == "jsonl":
+        suffix = ".vectors.jsonl"
+    elif fmt_normalised == "parquet":
+        suffix = ".vectors.parquet"
+    else:
+        raise ValueError(f"Unsupported vector format: {fmt}")
+    base = _normalise_chunk_relative(logical)
+    return base.with_suffix(suffix)
+
+
 def derive_doc_id_and_doctags_path(
     source_pdf: Path, pdfs_root: Path, doctags_root: Path
 ) -> tuple[str, Path]:
@@ -157,7 +183,11 @@ def derive_doc_id_and_chunks_path(
 
 
 def derive_doc_id_and_vectors_path(
-    chunk_file: Path | ChunkDiscovery, chunks_root: Path, vectors_root: Path
+    chunk_file: Path | ChunkDiscovery,
+    chunks_root: Path,
+    vectors_root: Path,
+    *,
+    vector_format: str = "jsonl",
 ) -> tuple[str, Path]:
     """Return manifest doc identifier and vectors output path for ``chunk_file``."""
 
@@ -174,13 +204,9 @@ def derive_doc_id_and_vectors_path(
                 ) from exc
         else:
             relative = chunk_file
-    base = relative
-    if base.suffix == ".jsonl":
-        base = base.with_suffix("")
-    if base.suffix == ".chunks":
-        base = base.with_suffix("")
+    base = _normalise_chunk_relative(relative)
     doc_id = base.with_suffix(".doctags").as_posix()
-    vector_relative = base.with_suffix(".vectors.jsonl")
+    vector_relative = vector_artifact_name(base, vector_format)
     return doc_id, vectors_root / vector_relative
 
 

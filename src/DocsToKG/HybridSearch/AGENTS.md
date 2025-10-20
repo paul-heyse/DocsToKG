@@ -1,6 +1,7 @@
 
 ## Table of Contents
 
+- [🚨 Mandatory Pre-Read: FAISS/cuVS Stack Walkthrough](#-mandatory-pre-read-faisscuvs-stack-walkthrough)
 - [0) Guard rails (set once per session)](#0-guard-rails-set-once-per-session)
 - [1) Verify the environment exists (no install)](#1-verify-the-environment-exists-no-install)
 - [2) Run commands strictly from the project `.venv`](#2-run-commands-strictly-from-the-project-venv)
@@ -10,7 +11,6 @@
 - [6) “Absolutely no installs” policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
 - [7) Fallback (only with **explicit approval** to install)](#7-fallback-only-with-explicit-approval-to-install)
 - [8) One-page quick reference (copy/paste safe)](#8-one-page-quick-reference-copy-paste-safe)
-- [🚨 Mandatory Pre-Read: FAISS/cuVS Stack Walkthrough](#-mandatory-pre-read-faisscuvs-stack-walkthrough)
 - [Mission and Scope](#mission-and-scope)
 - [Runtime prerequisites](#runtime-prerequisites)
 - [Module architecture](#module-architecture)

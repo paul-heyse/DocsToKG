@@ -1576,6 +1576,138 @@ def _iter_chunks_or_empty(directory: Path) -> Iterable[ChunkDiscovery]:
     return chunk_iter
 
 
+_PYARROW_MODULE: Any | None = None
+_PYARROW_PARQUET: Any | None = None
+_PYARROW_VECTOR_SCHEMA = None
+
+
+def _ensure_pyarrow_vectors() -> tuple[Any, Any]:
+    """Return ``(pyarrow, pyarrow.parquet)`` or raise a CLI validation error."""
+
+    global _PYARROW_MODULE, _PYARROW_PARQUET
+    if _PYARROW_MODULE is not None and _PYARROW_PARQUET is not None:
+        return _PYARROW_MODULE, _PYARROW_PARQUET
+    try:
+        import pyarrow as pa  # type: ignore
+        import pyarrow.parquet as pq  # type: ignore
+    except ImportError as exc:  # pragma: no cover - exercised via CLI error path
+        raise EmbeddingCLIValidationError(
+            option="--format",
+            message=(
+                "parquet vector output requires the optional dependency 'pyarrow'. "
+                'Install DocsToKG[docparse-parquet] or add pyarrow to the environment.'
+            ),
+        ) from exc
+    _PYARROW_MODULE = pa
+    _PYARROW_PARQUET = pq
+    return pa, pq
+
+
+def _vector_arrow_schema(pa_module: Any):
+    """Return (and cache) the Arrow schema used for parquet vector rows."""
+
+    global _PYARROW_VECTOR_SCHEMA
+    if _PYARROW_VECTOR_SCHEMA is not None:
+        return _PYARROW_VECTOR_SCHEMA
+
+    pa = pa_module
+    string_list = pa.list_(pa.string())
+    float_list = pa.list_(pa.float32())
+
+    _PYARROW_VECTOR_SCHEMA = pa.schema(
+        [
+            pa.field("UUID", pa.string(), nullable=False),
+            pa.field(
+                "BM25",
+                pa.struct(
+                    [
+                        pa.field("terms", string_list, nullable=True),
+                        pa.field("weights", float_list, nullable=True),
+                        pa.field("avgdl", pa.float64(), nullable=True),
+                        pa.field("N", pa.int64(), nullable=True),
+                    ]
+                ),
+                nullable=False,
+            ),
+            pa.field(
+                "SPLADEv3",
+                pa.struct(
+                    [
+                        pa.field("tokens", string_list, nullable=True),
+                        pa.field("weights", float_list, nullable=True),
+                    ]
+                ),
+                nullable=False,
+            ),
+            pa.field(
+                "Qwen3-4B",
+                pa.struct(
+                    [
+                        pa.field("model_id", pa.string(), nullable=False),
+                        pa.field("vector", float_list, nullable=False),
+                        pa.field("dimension", pa.int32(), nullable=True),
+                    ]
+                ),
+                nullable=False,
+            ),
+            pa.field("model_metadata", pa.string(), nullable=True),
+            pa.field("schema_version", pa.string(), nullable=False),
+        ]
+    )
+    return _PYARROW_VECTOR_SCHEMA
+
+
+def _prepare_vector_row_for_arrow(row: dict) -> dict:
+    """Normalise a vector row dictionary for Arrow conversion."""
+
+    bm25 = dict(row.get("BM25") or {})
+    splade = dict(row.get("SPLADEv3") or {})
+    qwen = dict(row.get("Qwen3-4B") or row.get("Qwen3_4B") or {})
+    metadata = row.get("model_metadata") or {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    def _to_float_list(values: Any) -> list[float]:
+        if not isinstance(values, (list, tuple)):
+            return []
+        return [float(value) for value in values]
+
+    prepared = {
+        "UUID": str(row.get("UUID", "")),
+        "BM25": {
+            "terms": list(bm25.get("terms") or []),
+            "weights": _to_float_list(bm25.get("weights")),
+            "avgdl": float(bm25["avgdl"]) if bm25.get("avgdl") is not None else None,
+            "N": int(bm25["N"]) if bm25.get("N") is not None else None,
+        },
+        "SPLADEv3": {
+            "tokens": list(splade.get("tokens") or []),
+            "weights": _to_float_list(splade.get("weights")),
+        },
+        "Qwen3-4B": {
+            "model_id": str(qwen.get("model_id") or ""),
+            "vector": _to_float_list(qwen.get("vector")),
+            "dimension": int(qwen["dimension"]) if qwen.get("dimension") is not None else None,
+        },
+        "model_metadata": (
+            json.dumps(metadata, ensure_ascii=False, sort_keys=True) if metadata else None
+        ),
+        "schema_version": str(row.get("schema_version") or VECTOR_SCHEMA_VERSION),
+    }
+    return prepared
+
+
+def _rows_to_arrow_table(rows: Sequence[dict]) -> Any:
+    """Convert ``rows`` into an Arrow table suitable for parquet writes."""
+
+    if not rows:
+        raise ValueError("rows must contain at least one vector payload")
+    pa, _pq = _ensure_pyarrow_vectors()
+    schema = _vector_arrow_schema(pa)
+    prepared = [_prepare_vector_row_for_arrow(row) for row in rows]
+    return pa.Table.from_pylist(prepared, schema=schema)
+
+
 class VectorWriter:
     """Abstract base class for vector writers."""
 
@@ -1594,6 +1726,7 @@ class JsonlVectorWriter(VectorWriter):
         self.path = path
         self._context = None
         self._handle = None
+        self._writes = 0
 
     def __enter__(self) -> "JsonlVectorWriter":
         """Open the underlying atomic writer and return ``self`` for chaining."""
@@ -1613,25 +1746,104 @@ class JsonlVectorWriter(VectorWriter):
         if self._handle is None:
             raise RuntimeError("JsonlVectorWriter not initialised; call __enter__ first.")
         crash_after = getattr(sys.modules[__name__], "_crash_after_write", None)
-        writes = 0
         for row in rows:
-            writes += 1
-            if isinstance(crash_after, int) and writes > crash_after:
+            self._writes += 1
+            if isinstance(crash_after, int) and self._writes > crash_after:
                 raise RuntimeError("Simulated crash")
             self._handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def create_vector_writer(path: Path, fmt: str) -> JsonlVectorWriter:
+class ParquetVectorWriter(VectorWriter):
+    """Write vector rows to a temporary parquet file before atomic promotion."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._tmp_path: Path | None = None
+        self._writer = None
+        self._writes = 0
+
+    def __enter__(self) -> "ParquetVectorWriter":
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        pa, pq = _ensure_pyarrow_vectors()
+        schema = _vector_arrow_schema(pa)
+        self._tmp_path = self.path.with_name(f"{self.path.name}.tmp.{uuid.uuid4().hex}")
+        self._writer = pq.ParquetWriter(self._tmp_path.as_posix(), schema=schema)
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        """Close the parquet writer and promote the temporary file atomically."""
+
+        try:
+            if self._writer is not None:
+                self._writer.close()
+        finally:
+            self._writer = None
+        if exc_type is not None:
+            if self._tmp_path is not None:
+                self._tmp_path.unlink(missing_ok=True)
+            return False
+        if self._tmp_path is None:
+            return False
+        try:
+            with self._tmp_path.open("rb") as handle:
+                os.fsync(handle.fileno())
+            self._tmp_path.replace(self.path)
+        finally:
+            self._tmp_path = None
+        return False
+
+    def write_rows(self, rows: Sequence[dict]) -> None:
+        if not rows:
+            return
+        if self._writer is None or self._tmp_path is None:
+            raise RuntimeError("ParquetVectorWriter not initialised; call __enter__ first.")
+        crash_after = getattr(sys.modules[__name__], "_crash_after_write", None)
+        for _ in rows:
+            self._writes += 1
+            if isinstance(crash_after, int) and self._writes > crash_after:
+                raise RuntimeError("Simulated crash")
+        table = _rows_to_arrow_table(rows)
+        self._writer.write_table(table)
+
+
+def create_vector_writer(path: Path, fmt: str) -> VectorWriter:
     """Factory returning the appropriate vector writer for ``fmt``."""
 
     fmt_normalized = fmt.lower()
     if fmt_normalized == "jsonl":
         return JsonlVectorWriter(path)
     if fmt_normalized == "parquet":
-        raise NotImplementedError(
-            "Parquet vector output is not yet implemented; use --format jsonl."
-        )
+        return ParquetVectorWriter(path)
     raise ValueError(f"Unsupported vector format: {fmt}")
+
+
+def _iter_vector_rows(path: Path, fmt: str, *, batch_size: int = 4096) -> Iterator[List[dict]]:
+    """Yield batches of vector rows for ``path`` respecting the selected format."""
+
+    fmt_normalized = str(fmt or "jsonl").lower()
+    if fmt_normalized == "jsonl":
+        yield from iter_rows_in_batches(path, batch_size)
+        return
+    if fmt_normalized != "parquet":
+        raise ValueError(f"Unsupported vector format: {fmt}")
+
+    _, pq = _ensure_pyarrow_vectors()
+    parquet_file = pq.ParquetFile(path)
+    for record_batch in parquet_file.iter_batches(batch_size=batch_size):
+        rows = record_batch.to_pylist()
+        normalised: List[dict] = []
+        for entry in rows:
+            metadata = entry.get("model_metadata")
+            if isinstance(metadata, str) and metadata:
+                try:
+                    entry["model_metadata"] = json.loads(metadata)
+                except json.JSONDecodeError:
+                    entry["model_metadata"] = {}
+            elif metadata in (None, ""):
+                entry["model_metadata"] = {}
+            normalised.append(entry)
+        if normalised:
+            yield normalised
 
 
 def process_chunk_file_vectors(
@@ -1968,6 +2180,7 @@ def _handle_embedding_quarantine(
     reason: str,
     logger,
     data_root: Optional[Path] = None,
+    vector_format: str = "jsonl",
 ) -> None:
     """Quarantine a problematic chunk or vector artefact and log manifest state."""
 
@@ -1997,6 +2210,7 @@ def _handle_embedding_quarantine(
         input_path=input_path,
         input_hash=input_hash_value,
         output_path=quarantine_path,
+        vector_format=str(vector_format or "jsonl").lower(),
         error=reason,
         quarantine=True,
     )
@@ -2011,6 +2225,7 @@ def _handle_embedding_quarantine(
         output_relpath=relative_path(quarantine_path, data_root),
         error_class="ValueError",
         reason=reason,
+        vector_format=str(vector_format or "jsonl").lower(),
     )
 
 
@@ -2024,25 +2239,32 @@ def _validate_vectors_for_chunks(
     *,
     data_root: Optional[Path] = None,
     expected_dimension: Optional[int] = None,
+    vector_format: str = "jsonl",
 ) -> tuple[int, int]:
     """Validate vectors associated with chunk files without recomputing models.
 
     Returns:
         (files_checked, rows_validated)
     """
+    fmt_normalised = str(vector_format or "jsonl").lower()
     files_checked = 0
     rows_validated = 0
     missing: List[tuple[str, Path]] = []
     quarantined_files = 0
 
     for chunk in _iter_chunks_or_empty(chunks_dir):
-        doc_id, vector_path = derive_doc_id_and_vectors_path(chunk, chunks_dir, vectors_dir)
+        doc_id, vector_path = derive_doc_id_and_vectors_path(
+            chunk,
+            chunks_dir,
+            vectors_dir,
+            vector_format=fmt_normalised,
+        )
         if not vector_path.exists():
             missing.append((doc_id, vector_path))
             continue
         file_rows = 0
         try:
-            for batch in iter_rows_in_batches(vector_path, 4096):
+            for batch in _iter_vector_rows(vector_path, fmt_normalised, batch_size=4096):
                 for row in batch:
                     schema_validate_vector_row(row, expected_dimension=expected_dimension)
                     rows_validated += 1
@@ -2062,6 +2284,7 @@ def _validate_vectors_for_chunks(
                 input_path=vector_path,
                 input_hash=input_hash,
                 output_path=quarantine_path,
+                vector_format=fmt_normalised,
                 error=reason,
                 quarantine=True,
             )
@@ -2106,6 +2329,7 @@ def _validate_vectors_for_chunks(
             missing_sample_size=sample_size,
             chunks_dir=str(chunks_dir),
             vectors_dir=str(vectors_dir),
+            vector_format=fmt_normalised,
         )
         raise FileNotFoundError("Vector files not found for documents: " + preview)
 
@@ -2119,6 +2343,7 @@ def _validate_vectors_for_chunks(
         rows_validated=rows_validated,
         chunks_dir=str(chunks_dir),
         vectors_dir=str(vectors_dir),
+        vector_format=fmt_normalised,
     )
     if quarantined_files:
         log_event(
@@ -2556,13 +2781,20 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                     error=reason,
                 )
                 incompatible_chunks.append(chunk_file)
+                _, quarantine_vector_path = derive_doc_id_and_vectors_path(
+                    chunk_entry,
+                    chunks_dir,
+                    args.out_dir,
+                    vector_format=vector_format,
+                )
                 _handle_embedding_quarantine(
                     chunk_path=chunk_file,
-                    vector_path=chunk_file.with_suffix(chunk_file.suffix + ".vectors"),
+                    vector_path=quarantine_vector_path,
                     doc_id=doc_id,
                     input_hash=chunk_hash,
                     reason=reason,
                     logger=logger,
+                    vector_format=vector_format,
                 )
                 continue
             validated_files.append(chunk_entry)
@@ -2629,13 +2861,24 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         resume_needs_hash = resume_controller.resume and not resume_controller.force
         for chunk_entry in chunk_entries:
             chunk_file = chunk_entry.resolved_path
-            doc_id, out_path = derive_doc_id_and_vectors_path(chunk_entry, chunks_dir, args.out_dir)
+            doc_id, out_path = derive_doc_id_and_vectors_path(
+                chunk_entry,
+                chunks_dir,
+                args.out_dir,
+                vector_format=vector_format,
+            )
             manifest_entry = resume_controller.entry(doc_id) if resume_controller.resume else None
             vectors_exist = out_path.exists()
             has_manifest_entry = manifest_entry is not None
             should_hash = resume_needs_hash and has_manifest_entry and vectors_exist
             input_hash = compute_content_hash(chunk_file) if should_hash else ""
-            if resume_controller.resume:
+            entry_format = (
+                str(manifest_entry.get("vector_format") or "jsonl").lower()
+                if manifest_entry
+                else None
+            )
+            format_mismatch = bool(manifest_entry) and entry_format != vector_format
+            if resume_controller.resume and not format_mismatch:
                 skip_file = should_skip_output(
                     out_path,
                     manifest_entry,
@@ -2657,6 +2900,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         doc_id=doc_id,
                         input_relpath=relative_path(chunk_file, resolved_root),
                         output_relpath=relative_path(out_path, resolved_root),
+                        vector_format=vector_format,
                     )
                     manifest_log_skip(
                         stage=MANIFEST_STAGE,
@@ -2665,9 +2909,24 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         input_hash=input_hash,
                         output_path=out_path,
                         schema_version=VECTOR_SCHEMA_VERSION,
+                        vector_format=vector_format,
                     )
                 skipped_files += 1
                 continue
+            if format_mismatch and not plan_only:
+                log_event(
+                    logger,
+                    "info",
+                    "Regenerating vectors due to format mismatch",
+                    status="process",
+                    stage=EMBED_STAGE,
+                    doc_id=doc_id,
+                    previous_format=entry_format,
+                    requested_format=vector_format,
+                    input_relpath=relative_path(chunk_file, resolved_root),
+                    output_relpath=relative_path(out_path, resolved_root),
+                    vector_format=vector_format,
+                )
             planned_ids.append(doc_id)
             if plan_only:
                 continue
@@ -2758,6 +3017,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         reason=str(exc),
                         logger=logger,
                         data_root=resolved_root,
+                        vector_format=vector_format,
                     )
                     return 0, [], [], duration, True, computed_hash
                 except Exception as exc:  # pragma: no cover - propagated to caller
@@ -2795,6 +3055,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                                 input_path=chunk_file,
                                 input_hash=exc.input_hash,
                                 output_path=out_path,
+                                vector_format=vector_format,
                                 error=str(exc.original),
                             )
                             bar.update(1)
@@ -2808,6 +3069,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                                 input_path=chunk_file,
                                 input_hash=input_hash,
                                 output_path=out_path,
+                                vector_format=vector_format,
                                 error=str(exc),
                             )
                             bar.update(1)
@@ -2827,6 +3089,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                             input_path=chunk_file,
                             input_hash=resolved_hash,
                             output_path=out_path,
+                            vector_format=vector_format,
                             vector_count=count,
                         )
                         avg_nnz_file = statistics.mean(nnz) if nnz else 0.0
@@ -2844,6 +3107,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                             vectors=count,
                             splade_avg_nnz=round(avg_nnz_file, 3),
                             qwen_avg_norm=round(avg_norm_file, 4),
+                            vector_format=vector_format,
                         )
                         bar.update(1)
             else:
@@ -2862,6 +3126,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                             input_path=chunk_file,
                             input_hash=exc.input_hash,
                             output_path=out_path,
+                            vector_format=vector_format,
                             error=str(exc.original),
                         )
                         raise exc.original from exc
@@ -2874,6 +3139,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                             input_path=chunk_file,
                             input_hash=input_hash,
                             output_path=out_path,
+                            vector_format=vector_format,
                             error=str(exc),
                         )
                         raise
@@ -2891,24 +3157,26 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         input_path=chunk_file,
                         input_hash=resolved_hash,
                         output_path=out_path,
+                        vector_format=vector_format,
                         vector_count=count,
                     )
                     avg_nnz_file = statistics.mean(nnz) if nnz else 0.0
                     avg_norm_file = statistics.mean(norms) if norms else 0.0
-                    log_event(
-                        logger,
-                        "info",
-                        "Embedding file written",
-                        status="success",
-                        stage=EMBED_STAGE,
-                        doc_id=doc_id,
-                        input_relpath=relative_path(chunk_file, resolved_root),
-                        output_relpath=relative_path(out_path, resolved_root),
-                        elapsed_ms=int(duration * 1000),
-                        vectors=count,
-                        splade_avg_nnz=round(avg_nnz_file, 3),
-                        qwen_avg_norm=round(avg_norm_file, 4),
-                    )
+                        log_event(
+                            logger,
+                            "info",
+                            "Embedding file written",
+                            status="success",
+                            stage=EMBED_STAGE,
+                            doc_id=doc_id,
+                            input_relpath=relative_path(chunk_file, resolved_root),
+                            output_relpath=relative_path(out_path, resolved_root),
+                            elapsed_ms=int(duration * 1000),
+                            vectors=count,
+                            splade_avg_nnz=round(avg_nnz_file, 3),
+                            qwen_avg_norm=round(avg_norm_file, 4),
+                            vector_format=vector_format,
+                        )
         finally:
             args.qwen_queue = None
             if qwen_queue is not None:

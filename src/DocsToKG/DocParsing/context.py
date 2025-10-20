@@ -41,7 +41,7 @@ class ParsingContext:
     force: bool | None = None
     inject_anchors: bool | None = None
     offline: bool | None = None
-    vector_format: str | None = None
+    vector_format: str = "jsonl"
     profile: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -94,6 +94,7 @@ class ParsingContext:
             if value is None:
                 continue
             self.extra[key] = value
+        self.vector_format = str(self.vector_format or "jsonl").lower()
 
     def merge_extra(self, mapping: Mapping[str, Any]) -> None:
         """Merge arbitrary manifest-safe metadata into the context."""

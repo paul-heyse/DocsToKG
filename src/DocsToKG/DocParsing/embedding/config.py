@@ -218,6 +218,11 @@ class EmbedCfg(StageConfigBase):
             self.config = StageConfigBase._coerce_optional_path(self.config, None)
         self.log_level = str(self.log_level or "INFO").upper()
         self.vector_format = str(self.vector_format or "jsonl").lower()
+        if self.vector_format not in {"jsonl", "parquet"}:
+            raise EmbeddingCLIValidationError(
+                option="--format",
+                message="must be one of: jsonl, parquet",
+            )
         self.splade_attn = str(self.splade_attn or "auto").lower()
         if self.splade_max_active_dims in (None, "", []):
             self.splade_max_active_dims = None

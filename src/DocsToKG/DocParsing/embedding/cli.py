@@ -83,10 +83,10 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
         {
             "type": str,
             "default": "jsonl",
-            "choices": ["jsonl"],
+            "choices": ["jsonl", "parquet"],
             "help": (
                 "Vector output format (default: %(default)s). "
-                "Parquet support is not yet available."
+                "Parquet requires the pyarrow dependency."
             ),
         },
     ),
