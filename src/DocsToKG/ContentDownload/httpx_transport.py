@@ -179,8 +179,7 @@ def _create_client_unlocked() -> None:
     else:
         mounts = None
 
-    _HTTP_CLIENT = httpx.Client(
-        http2=True,
+    client_kwargs = dict(
         transport=cache_transport,
         timeout=_DEFAULT_TIMEOUT,
         limits=_DEFAULT_LIMITS,
@@ -189,3 +188,14 @@ def _create_client_unlocked() -> None:
         event_hooks=event_hooks,
         mounts=mounts,
     )
+
+    try:
+        _HTTP_CLIENT = httpx.Client(http2=True, **client_kwargs)
+    except ImportError as exc:  # pragma: no cover - graceful fallback when h2 missing
+        if "http2" in str(exc) and "h2" in str(exc):
+            LOGGER.warning(
+                "HTTP/2 support unavailable (missing 'h2' package); falling back to HTTP/1.1 transport."
+            )
+            _HTTP_CLIENT = httpx.Client(http2=False, **client_kwargs)
+        else:
+            raise

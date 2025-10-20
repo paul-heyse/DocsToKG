@@ -631,7 +631,11 @@ def request_with_retries(
     if allow_redirects is not None:
         kwargs["follow_redirects"] = bool(allow_redirects)
 
+    stream_enabled = bool(kwargs.pop("stream", False))
+
     def request_func(*, method: str, url: str, **call_kwargs: Any) -> httpx.Response:
+        if stream_enabled:
+            return http_client.stream(method=method, url=url, **call_kwargs)
         return http_client.request(method=method, url=url, **call_kwargs)
 
     controller = _build_retrying_controller(

@@ -9,18 +9,20 @@ from pathlib import Path
 import httpx
 import pytest
 
+from DocsToKG.ContentDownload import networking as networking_module
+from DocsToKG.ContentDownload.core import Classification, WorkArtifact
 from DocsToKG.ContentDownload.download import (
     DownloadContext,
     DownloadOutcome,
     RobotsCache,
     download_candidate,
 )
-from DocsToKG.ContentDownload.core import Classification, WorkArtifact
-from DocsToKG.ContentDownload import networking as networking_module
 from DocsToKG.ContentDownload.networking import ConditionalRequestHelper, request_with_retries
 
 
-def _response(status: int, *, headers: dict[str, str] | None = None, body: bytes = b"") -> httpx.Response:
+def _response(
+    status: int, *, headers: dict[str, str] | None = None, body: bytes = b""
+) -> httpx.Response:
     request = httpx.Request("GET", "https://example.org/resource")
     return httpx.Response(status, headers=headers, content=body, request=request)
 
@@ -134,7 +136,7 @@ def test_streaming_download_writes_atomically(tmp_path: Path, install_mock_http_
         xml_dir=xml_dir,
     )
 
-    chunks = [b"%PDF-1.4\n", b"1 0 obj\n", b"endobj\n"]
+    chunks = [b"%PDF-1.4\n", b"1 0 obj\n", b"endobj\n", b"%%EOF\n"]
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path.endswith("archive.pdf")

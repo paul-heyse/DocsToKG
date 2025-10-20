@@ -65,9 +65,8 @@ from DocsToKG.DocParsing.logging import (
 from .batching import Batcher
 from .cli import (
     CLI_DESCRIPTION,
-    COMMANDS,
     CommandHandler,
-    _Command,
+    app,
     chunk,
     doctags,
     embed,
@@ -188,9 +187,8 @@ __all__ = [
     "load_structural_marker_config",
     "detect_mode",
     "CommandHandler",
-    "_Command",
+    "app",
     "CLI_DESCRIPTION",
-    "COMMANDS",
     "main",
     "run_all",
     "chunk",

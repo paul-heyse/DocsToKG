@@ -34,11 +34,13 @@ import httpx
 
 from .errors import ConfigError, OntologyDownloadError
 from .io import (
+    apply_retry_after,
     get_bucket,
     is_retryable_error,
     retry_with_backoff,
     validate_url_security,
 )
+from .io.network import _extract_correlation_id, _parse_retry_after, request_with_redirect_audit
 from .net import get_http_client
 from .settings import DownloadConfiguration
 
@@ -169,26 +171,47 @@ def _fetch_checksum_from_url(
     parsed = urlparse(secure_url)
     host = parsed.hostname
     bucket = get_bucket(http_config=http_config, service=None, host=host)
-    polite_headers = http_config.polite_http_headers()
+    polite_headers = http_config.polite_http_headers(correlation_id=_extract_correlation_id(logger))
     max_bytes = http_config.max_checksum_bytes()
 
     client = get_http_client(http_config)
 
     def _fetch_once() -> str:
-        bucket.consume()
+        if bucket is not None:
+            bucket.consume()
         tail = b""
         total_bytes = 0
         extensions = {
             "config": http_config,
             "headers": polite_headers,
         }
-        with client.stream(
-            "GET",
-            secure_url,
+        with request_with_redirect_audit(
+            client=client,
+            method="GET",
+            url=secure_url,
             headers=polite_headers,
             timeout=http_config.timeout_sec,
-            extensions={"ontology_headers": extensions},
+            stream=True,
+            http_config=http_config,
+            assume_url_validated=True,
+            extensions=extensions,
         ) as response:
+            status_code = response.status_code
+            if status_code in {429, 503}:
+                retry_delay = _parse_retry_after(response.headers.get("Retry-After"))
+                if retry_delay is not None:
+                    apply_retry_after(
+                        http_config=http_config,
+                        service=None,
+                        host=host,
+                        delay=retry_delay,
+                    )
+                http_error = httpx.HTTPStatusError(
+                    f"HTTP error {status_code}", request=response.request, response=response
+                )
+                if retry_delay is not None:
+                    setattr(http_error, "_retry_after_delay", retry_delay)
+                raise http_error
             response.raise_for_status()
             for chunk in response.iter_bytes(_CHECKSUM_STREAM_CHUNK_SIZE):
                 if not chunk:
@@ -249,6 +272,7 @@ def _fetch_checksum_from_url(
         raise
     except httpx.RequestError as exc:  # pragma: no cover - exercised via retry logic
         raise OntologyDownloadError(f"Failed to fetch checksum from {secure_url}: {exc}") from exc
+
 
 
 def resolve_expected_checksum(

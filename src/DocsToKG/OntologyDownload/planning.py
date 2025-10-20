@@ -59,8 +59,6 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 import httpx
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
-from requests.structures import CaseInsensitiveDict
-
 from .cancellation import CancellationToken, CancellationTokenGroup
 from .checksums import ExpectedChecksum, resolve_expected_checksum
 from .errors import (
@@ -111,6 +109,7 @@ from .settings import (
     ConfigError,
     DefaultsConfig,
     DownloadConfiguration,
+    PlannerConfig,
     ResolvedConfig,
     _coerce_sequence,
     ensure_python_version,
@@ -894,7 +893,8 @@ class PlannerProbeResult:
     method: str
     status_code: int
     ok: bool
-    headers: CaseInsensitiveDict[str]
+    headers: Mapping[str, str]
+    cache_status: Optional[Mapping[str, object]] = None
 
 
 def planner_http_probe(
@@ -905,17 +905,12 @@ def planner_http_probe(
     headers: Optional[Mapping[str, str]] = None,
     service: Optional[str] = None,
     context: Optional[Mapping[str, object]] = None,
-    method: str = "HEAD",
+    planner_config: Optional[PlannerConfig] = None,
 ) -> Optional[PlannerProbeResult]:
-    """Issue a polite planner probe using shared networking primitives.
+    """Issue a polite planner probe using shared networking primitives."""
 
-    Call graph: :func:`plan_one`/ :func:`plan_all` → :func:`_populate_plan_metadata` /
-    :func:`_fetch_last_modified` → :func:`planner_http_probe` → :func:`get_http_client`.
-    """
-
-    primary_method = (method or "HEAD").upper()
     parsed = urlparse(url)
-    host = parsed.hostname
+    host = parsed.hostname.lower() if parsed.hostname else None
 
     base_extra: Dict[str, object] = {"stage": "plan", "url": url}
     if service:
@@ -923,12 +918,36 @@ def planner_http_probe(
     if host:
         base_extra["host"] = host
     if context:
-        for key, value in context.items():
-            base_extra[key] = value
+        base_extra.update(context)
+
+    def _requires_head(hostname: Optional[str]) -> bool:
+        if not hostname or planner_config is None:
+            return False
+        candidates = getattr(planner_config, "head_precheck_hosts", []) or []
+        hostname_lc = hostname.lower()
+        for entry in candidates:
+            if not entry:
+                continue
+            candidate = entry.strip().lower()
+            if not candidate:
+                continue
+            if candidate.startswith("*."):
+                suffix = candidate[1:]
+                if hostname_lc.endswith(suffix):
+                    return True
+            elif candidate.startswith('.'):
+                if hostname_lc.endswith(candidate):
+                    return True
+            else:
+                if hostname_lc == candidate:
+                    return True
+        return False
+
+    primary_method = "HEAD" if _requires_head(host) else "GET"
 
     correlation_id = _extract_correlation_id(logger)
     polite_headers = http_config.polite_http_headers(correlation_id=correlation_id)
-    merged_headers: Dict[str, str] = {str(key): str(value) for key, value in polite_headers.items()}
+    merged_headers: Dict[str, str] = {str(k): str(v) for k, v in polite_headers.items()}
     if headers:
         for key, value in headers.items():
             merged_headers[str(key)] = str(value)
@@ -943,24 +962,30 @@ def planner_http_probe(
         {**base_extra, "method": primary_method, "event": "planner_probe_start"},
     )
 
-    delay_attr = "_retry_after_delay"
+    class _RangeRetry(Exception):
+        """Internal sentinel to retry GET without a Range header."""
+
     client = get_http_client(http_config)
 
-    def _issue(
-        current_method: str,
-    ) -> Tuple[int, bool, CaseInsensitiveDict[str], str]:
-        def _perform_once() -> Tuple[int, bool, CaseInsensitiveDict[str], str]:
-            bucket.consume()
+    def _issue(current_method: str, *, allow_range: bool = True) -> Optional[PlannerProbeResult]:
+        range_header = "bytes=0-0" if current_method == "GET" and allow_range else None
+
+        def _perform_once() -> PlannerProbeResult:
+            if bucket is not None:
+                bucket.consume()
+            request_headers = dict(merged_headers)
+            if range_header and "Range" not in request_headers:
+                request_headers["Range"] = range_header
             extensions = {
                 "config": http_config,
-                "headers": merged_headers,
+                "headers": request_headers,
                 "correlation_id": correlation_id,
             }
             with request_with_redirect_audit(
                 client=client,
                 method=current_method,
                 url=url,
-                headers=merged_headers,
+                headers=request_headers,
                 timeout=timeout,
                 stream=current_method != "HEAD",
                 http_config=http_config,
@@ -969,8 +994,7 @@ def planner_http_probe(
             ) as response:
                 status_code = response.status_code
                 if status_code in {429, 503}:
-                    retry_after_header = response.headers.get("Retry-After")
-                    retry_delay = _parse_retry_after(retry_after_header)
+                    retry_delay = _parse_retry_after(response.headers.get("Retry-After"))
                     if retry_delay is not None:
                         apply_retry_after(
                             http_config=http_config,
@@ -979,17 +1003,26 @@ def planner_http_probe(
                             delay=retry_delay,
                         )
                     http_error = httpx.HTTPStatusError(
-                        f"HTTP error {status_code}",
-                        request=response.request,
-                        response=response,
+                        f"HTTP error {status_code}", request=response.request, response=response
                     )
-                    setattr(http_error, delay_attr, retry_delay)
+                    if retry_delay is not None:
+                        setattr(http_error, "_retry_after_delay", retry_delay)
                     raise http_error
+                if status_code == 416 and range_header:
+                    raise _RangeRetry()
 
                 final_url = getattr(response, "validated_url", str(response.url))
-                headers_map = CaseInsensitiveDict(response.headers.items())
+                headers_map = httpx.Headers(response.headers)
+                cache_status = response.extensions.get("ontology_cache_status")
                 ok = 200 <= status_code < 400
-                return status_code, ok, headers_map, final_url
+                return PlannerProbeResult(
+                    url=final_url,
+                    method=current_method,
+                    status_code=status_code,
+                    ok=ok,
+                    headers=headers_map,
+                    cache_status=cache_status if isinstance(cache_status, Mapping) else None,
+                )
 
         def _on_retry(attempt: int, exc: Exception, delay: float) -> None:
             retry_extra = dict(base_extra)
@@ -1004,74 +1037,71 @@ def planner_http_probe(
             )
             _log_with_extra(logger, logging.WARNING, "planner probe retrying", retry_extra)
 
-        return retry_with_backoff(
-            _perform_once,
-            retryable=is_retryable_error,
-            max_attempts=max(1, http_config.max_retries),
-            backoff_base=http_config.backoff_factor,
-            jitter=http_config.backoff_factor,
-            callback=_on_retry,
-            retry_after=lambda exc: getattr(exc, delay_attr, None),
-        )
+        try:
+            return retry_with_backoff(
+                _perform_once,
+                retryable=is_retryable_error,
+                max_attempts=max(1, http_config.max_retries),
+                backoff_base=http_config.backoff_factor,
+                jitter=http_config.backoff_factor,
+                callback=_on_retry,
+                retry_after=lambda exc: getattr(exc, "_retry_after_delay", None),
+            )
+        except _RangeRetry:
+            if not allow_range:
+                raise
+            return _issue(current_method, allow_range=False)
 
     try:
-        status_code, ok, headers_map, resolved_url = _issue(primary_method)
+        result = _issue(primary_method)
     except Exception as exc:  # pragma: no cover - exercised via tests
         failure_extra = dict(base_extra)
-        failure_extra.update(
-            {"method": primary_method, "error": str(exc), "event": "planner_probe_failed"}
-        )
+        failure_extra.update({"method": primary_method, "error": str(exc), "event": "planner_probe_failed"})
         _log_with_extra(logger, logging.WARNING, "planner probe failed", failure_extra)
         if isinstance(exc, (PolicyError, ConfigError)):
             raise
         return None
 
-        method_used = primary_method
+    if result is None:
+        return None
 
-        if status_code == 405 and primary_method == "HEAD":
-            _log_with_extra(
-                logger,
-                logging.INFO,
-                "planner probe fallback",
-                {
-                    **base_extra,
-                    "from_method": "HEAD",
-                    "to_method": "GET",
-                    "event": "planner_probe_fallback",
-                },
-            )
-            try:
-                status_code, ok, headers_map, resolved_url = _issue("GET")
-            except Exception as exc:  # pragma: no cover - exercised via tests
-                failure_extra = dict(base_extra)
-                failure_extra.update(
-                    {"method": "GET", "error": str(exc), "event": "planner_probe_failed"}
-                )
-                _log_with_extra(logger, logging.WARNING, "planner probe failed", failure_extra)
-                if isinstance(exc, (PolicyError, ConfigError)):
-                    raise
-                return None
-            method_used = "GET"
-
-        completion_extra = dict(base_extra)
-        completion_extra.update(
+    if result.status_code == 405 and primary_method == "HEAD":
+        _log_with_extra(
+            logger,
+            logging.INFO,
+            "planner probe fallback",
             {
-                "method": method_used,
-                "status_code": status_code,
-                "ok": ok,
-                "event": "planner_probe_complete",
-            }
+                **base_extra,
+                "from_method": "HEAD",
+                "to_method": "GET",
+                "event": "planner_probe_fallback",
+            },
         )
-        _log_with_extra(logger, logging.INFO, "planner probe complete", completion_extra)
+        try:
+            result = _issue("GET")
+        except Exception as exc:  # pragma: no cover - exercised via tests
+            failure_extra = dict(base_extra)
+            failure_extra.update({"method": "GET", "error": str(exc), "event": "planner_probe_failed"})
+            _log_with_extra(logger, logging.WARNING, "planner probe failed", failure_extra)
+            if isinstance(exc, (PolicyError, ConfigError)):
+                raise
+            return None
 
-        return PlannerProbeResult(
-            url=resolved_url,
-            method=method_used,
-            status_code=status_code,
-            ok=ok,
-            headers=headers_map,
-        )
+    if result is None:
+        return None
 
+    completion_extra = dict(base_extra)
+    completion_extra.update(
+        {
+            "method": result.method,
+            "status_code": result.status_code,
+            "ok": result.ok,
+            "event": "planner_probe_complete",
+        }
+    )
+    _log_with_extra(logger, logging.INFO, "planner probe complete", completion_extra)
+
+    return result
 
 def _populate_plan_metadata(
     planned: PlannedFetch,
@@ -1157,6 +1187,7 @@ def _populate_plan_metadata(
         headers=planned.plan.headers,
         service=planned.plan.service,
         context={"ontology_id": planned.spec.id, "resolver": planned.resolver},
+        planner_config=planner_defaults,
     )
     if probe_result is None:
         return planned
@@ -1176,6 +1207,9 @@ def _populate_plan_metadata(
             },
         )
         return planned
+
+    if probe_result.cache_status:
+        metadata.setdefault("cache_status", {}).update(dict(probe_result.cache_status))
 
     headers_map = probe_result.headers
 
@@ -1351,6 +1385,7 @@ def _fetch_last_modified(
         headers=plan.headers,
         service=plan.service,
         context={"resolver": plan.service or plan.url},
+        planner_config=planner_defaults,
     )
     if result is None:
         return None

@@ -6,11 +6,13 @@ redirect chains, slow responses, or content-length anomalies.
 """
 
 import logging
+from urllib.parse import urlparse
 
 import pytest
 
 from DocsToKG.OntologyDownload.errors import PolicyError
 from DocsToKG.OntologyDownload.planning import planner_http_probe
+from DocsToKG.OntologyDownload.settings import PlannerConfig
 from DocsToKG.OntologyDownload.testing import ResponseSpec
 
 
@@ -46,6 +48,8 @@ def test_planner_probe_redirect_chain_to_disallowed_host(ontology_env):
 
     config = ontology_env.build_download_config()
     url = ontology_env.http_url(start_path)
+    host = urlparse(url).hostname
+    planner_cfg = PlannerConfig(head_precheck_hosts=[host] if host else [])
 
     with pytest.raises(PolicyError):
         planner_http_probe(
@@ -54,6 +58,7 @@ def test_planner_probe_redirect_chain_to_disallowed_host(ontology_env):
             logger=_logger(),
             service="test",
             context={"ontology_id": "test-ontology"},
+            planner_config=planner_cfg,
         )
 
     methods_paths = [(record.method, record.path) for record in ontology_env.requests]
@@ -80,6 +85,8 @@ def test_planner_probe_redirect_to_disallowed_scheme(ontology_env):
 
     config = ontology_env.build_download_config()
     url = ontology_env.http_url(start_path)
+    host = urlparse(url).hostname
+    planner_cfg = PlannerConfig(head_precheck_hosts=[host] if host else [])
 
     with pytest.raises(PolicyError):
         planner_http_probe(
@@ -88,6 +95,7 @@ def test_planner_probe_redirect_to_disallowed_scheme(ontology_env):
             logger=_logger(),
             service="test",
             context={"ontology_id": "test-ontology"},
+            planner_config=planner_cfg,
         )
 
     methods_paths = [(record.method, record.path) for record in ontology_env.requests]
@@ -134,6 +142,8 @@ def test_planner_probe_applies_retry_after_delay(monkeypatch, ontology_env):
 
     config = ontology_env.build_download_config()
     url = ontology_env.http_url(target_path)
+    host = urlparse(url).hostname
+    planner_cfg = PlannerConfig(head_precheck_hosts=[host] if host else [])
 
     result = planner_http_probe(
         url=url,
@@ -141,6 +151,7 @@ def test_planner_probe_applies_retry_after_delay(monkeypatch, ontology_env):
         logger=_logger(),
         service="test",
         context={"ontology_id": "retry-after"},
+        planner_config=planner_cfg,
     )
 
     assert result is not None
@@ -152,3 +163,40 @@ def test_planner_probe_applies_retry_after_delay(monkeypatch, ontology_env):
     assert host
     methods = [record.method for record in ontology_env.requests]
     assert methods == ["HEAD", "HEAD"]
+
+
+def test_planner_probe_defaults_to_get_with_range_header(ontology_env):
+    """Planner probes should default to GET and request a single byte."""
+
+    payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
+    path = "fixtures/planner-default-get.owl"
+    ontology_env.queue_response(
+        path,
+        ResponseSpec(
+            method="GET",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": str(len(payload)),
+            },
+            body=payload,
+        ),
+    )
+
+    config = ontology_env.build_download_config()
+    url = ontology_env.http_url(path)
+
+    result = planner_http_probe(
+        url=url,
+        http_config=config,
+        logger=_logger(),
+        service="test",
+        context={"ontology_id": "default-get"},
+    )
+
+    assert result is not None
+    assert result.method == "GET"
+    methods = [record.method for record in ontology_env.requests]
+    assert methods == ["GET"]
+    last_request = ontology_env.requests[-1]
+    assert last_request.headers.get("Range") == "bytes=0-0"

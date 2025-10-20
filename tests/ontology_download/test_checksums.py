@@ -14,7 +14,7 @@ from typing import Dict, Optional
 from urllib.parse import urlparse
 
 import pytest
-import requests
+import httpx
 
 from DocsToKG.OntologyDownload.checksums import (
     ExpectedChecksum,
@@ -176,7 +176,7 @@ def test_fetch_checksum_retries_consume_bucket(ontology_env, download_config) ->
         def consume(self, tokens: float = 1.0) -> None:
             self.calls += 1
             if self.calls == 1:
-                raise requests.ConnectionError("transient bucket failure")
+                raise httpx.TransportError("transient bucket failure")
 
     bucket = RecordingBucket()
     config.set_bucket_provider(lambda service, cfg, host: bucket)

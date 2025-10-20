@@ -135,7 +135,7 @@ max_retry_duration: Maximum total time to spend on retries in seconds. When exce
 the final response after logging a warning. Defaults to ``None`` (no limit).
 backoff_max: Maximum delay between retries in seconds. Prevents excessive wait times.
 Defaults to ``60.0`` seconds.
-**kwargs: Additional keyword arguments forwarded directly to :meth:`requests.Session.request`.
+**kwargs: Additional keyword arguments forwarded directly to :meth:`httpx.Client.request`.
 
 Returns:
 httpx.Response: Successful (or exhausted) response object. Callers are responsible for closing the

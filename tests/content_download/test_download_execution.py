@@ -13,8 +13,9 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
+import httpx
 import pytest
 
 from DocsToKG.ContentDownload import download as downloader
@@ -30,25 +31,36 @@ from DocsToKG.ContentDownload.networking import CachedResult, ConditionalRequest
 from DocsToKG.ContentDownload.pipeline import PipelineResult, ResolverMetrics
 from tests.conftest import PatchManager
 
-requests = downloader.requests
-CaseInsensitiveDict = downloader.requests.structures.CaseInsensitiveDict
+
+def _build_mock_client() -> httpx.Client:
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, request=request))
+    return httpx.Client(transport=transport)
 
 
-class _FakeResponse(requests.Response):
-    def __init__(
-        self,
-        content: bytes,
-        *,
-        status: int = 200,
-        content_type: str = "application/pdf",
-    ) -> None:
-        super().__init__()
-        self._content = content
-        self.status_code = status
-        self.headers = CaseInsensitiveDict({"Content-Type": content_type})
+def _build_response(
+    content: bytes,
+    *,
+    status: int = 200,
+    content_type: str = "application/pdf",
+) -> httpx.Response:
+    headers = {"Content-Type": content_type}
+    request = httpx.Request("GET", "https://example.com/foo.pdf")
+    return httpx.Response(status, headers=headers, content=content, request=request)
 
-    def iter_content(self, chunk_size: int) -> Iterator[bytes]:
-        yield self._content
+
+download_impl = downloader
+
+
+class _ResponseContext:
+    def __init__(self, response: httpx.Response) -> None:
+        self._response = response
+
+    def __enter__(self) -> httpx.Response:
+        return self._response
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        self._response.close()
+        return False
 
 
 @pytest.fixture
@@ -77,21 +89,25 @@ def artifact(tmp_path: Path) -> WorkArtifact:
 
 
 class _DenyRobots:
-    def is_allowed(self, session: requests.Session, url: str, timeout: float) -> bool:
+    def is_allowed(self, client: httpx.Client, url: str, timeout: float) -> bool:
         return False
 
 
 def test_prepare_candidate_download_blocks_robots(artifact: WorkArtifact) -> None:
     config = DownloadConfig(run_id="run", robots_checker=_DenyRobots())
     ctx = config.to_context({})
-    plan = prepare_candidate_download(
-        requests.Session(),
-        artifact,
-        "https://example.com/foo.pdf",
-        None,
-        5.0,
-        ctx,
-    )
+    client = _build_mock_client()
+    try:
+        plan = prepare_candidate_download(
+            client,
+            artifact,
+            "https://example.com/foo.pdf",
+            None,
+            5.0,
+            ctx,
+        )
+    finally:
+        client.close()
     assert plan.skip_outcome is not None
     assert plan.skip_outcome.reason is ReasonCode.ROBOTS_DISALLOWED
 
@@ -102,7 +118,7 @@ def test_prepare_candidate_download_skip_head_precheck(
     calls: List[str] = []
 
     def fake_head(
-        session: requests.Session,
+        client: httpx.Client,
         url: str,
         timeout: float,
         *,
@@ -114,14 +130,18 @@ def test_prepare_candidate_download_skip_head_precheck(
     patcher.setattr(downloader, "head_precheck", fake_head)
     config = DownloadConfig(run_id="run", skip_head_precheck=True)
     ctx = config.to_context({})
-    plan = prepare_candidate_download(
-        requests.Session(),
-        artifact,
-        "https://example.com/foo.pdf",
-        None,
-        5.0,
-        ctx,
-    )
+    client = _build_mock_client()
+    try:
+        plan = prepare_candidate_download(
+            client,
+            artifact,
+            "https://example.com/foo.pdf",
+            None,
+            5.0,
+            ctx,
+        )
+    finally:
+        client.close()
     assert not calls
     assert not plan.head_precheck_passed
 
@@ -131,12 +151,12 @@ def test_range_resume_warning_emitted_once(
 ) -> None:
     config = DownloadConfig(run_id="run", enable_range_resume=True)
     base_ctx = config.to_context({})
-    session = requests.Session()
+    client = _build_mock_client()
     url = "https://example.com/foo.pdf"
 
     with caplog.at_level(logging.WARNING):
         prepare_candidate_download(
-            session,
+            client,
             artifact,
             url,
             None,
@@ -144,13 +164,14 @@ def test_range_resume_warning_emitted_once(
             base_ctx.clone_for_download(),
         )
         prepare_candidate_download(
-            session,
+            client,
             artifact,
             url,
             None,
             5.0,
             base_ctx.clone_for_download(),
         )
+    client.close()
 
     warning_messages = [
         record.getMessage()
@@ -166,14 +187,18 @@ def test_stream_candidate_payload_returns_cached(
 ) -> None:
     config = DownloadConfig(run_id="run")
     ctx = config.to_context({})
-    plan = prepare_candidate_download(
-        requests.Session(),
-        artifact,
-        "https://example.com/foo.pdf",
-        None,
-        5.0,
-        ctx,
-    )
+    client = _build_mock_client()
+    try:
+        plan = prepare_candidate_download(
+            client,
+            artifact,
+            "https://example.com/foo.pdf",
+            None,
+            5.0,
+            ctx,
+        )
+    finally:
+        client.close()
 
     cached_bytes = b"cacheddata"
     cached = CachedResult(
@@ -189,19 +214,16 @@ def test_stream_candidate_payload_returns_cached(
         def build_headers(self) -> Dict[str, str]:
             return {}
 
-        def interpret_response(self, response: requests.Response) -> CachedResult:
+        def interpret_response(self, response: httpx.Response) -> CachedResult:
             return cached
 
     plan.cond_helper = StubHelper()
 
-    class CachedResponse:
-        def __enter__(self) -> requests.Response:
-            return _FakeResponse(b"", status=304)
-
-        def __exit__(self, exc_type, exc, tb) -> bool:
-            return False
-
-    patcher.setattr(downloader, "request_with_retries", lambda *args, **kwargs: CachedResponse())
+    patcher.setattr(
+        downloader,
+        "request_with_retries",
+        lambda *args, **kwargs: _ResponseContext(_build_response(b"", status=304)),
+    )
     result = stream_candidate_payload(plan)
     assert result.outcome is not None
     assert result.outcome.classification is Classification.CACHED
@@ -221,25 +243,26 @@ def test_stream_candidate_payload_streams_pdf(
         min_pdf_bytes=16,
     )
     ctx = config.to_context({})
-    plan = prepare_candidate_download(
-        requests.Session(),
-        artifact,
-        "https://example.com/foo.pdf",
-        None,
-        5.0,
-        ctx,
-    )
+    client = _build_mock_client()
+    try:
+        plan = prepare_candidate_download(
+            client,
+            artifact,
+            "https://example.com/foo.pdf",
+            None,
+            5.0,
+            ctx,
+        )
+    finally:
+        client.close()
 
     pdf_bytes = b"%PDF-1.4\n" + (b"x" * 32) + b"\n%%EOF\n"
 
-    class OkResponse:
-        def __enter__(self) -> requests.Response:
-            return _FakeResponse(pdf_bytes)
-
-        def __exit__(self, exc_type, exc, tb) -> bool:
-            return False
-
-    patcher.setattr(downloader, "request_with_retries", lambda *args, **kwargs: OkResponse())
+    patcher.setattr(
+        downloader,
+        "request_with_retries",
+        lambda *args, **kwargs: _ResponseContext(_build_response(pdf_bytes)),
+    )
     result = stream_candidate_payload(plan)
     assert result.outcome is None
     assert result.strategy is not None
@@ -256,18 +279,11 @@ def test_download_candidate_retries_and_cleans_partial(
 ) -> None:
     pdf_bytes = b"%PDF-1.4\n" + (b"y" * 64) + b"\n%%EOF\n"
 
-    class OkResponse:
-        def __enter__(self) -> requests.Response:
-            return _FakeResponse(pdf_bytes)
-
-        def __exit__(self, exc_type, exc, tb) -> bool:
-            return False
-
     request_calls: List[Tuple[str, bool]] = []
 
-    def _request_with_retries(session, method, url, **kwargs):
+    def _request_with_retries(client, method, url, **kwargs):
         request_calls.append((method.upper(), bool(kwargs.get("stream"))))
-        return OkResponse()
+        return _ResponseContext(_build_response(pdf_bytes))
 
     patcher.setattr(downloader, "request_with_retries", _request_with_retries, raising=False)
     patcher.setattr(download_impl, "request_with_retries", _request_with_retries)
@@ -287,7 +303,10 @@ def test_download_candidate_retries_and_cleans_partial(
         part_path.parent.mkdir(parents=True, exist_ok=True)
         part_path.write_bytes(data)
         if call_state["count"] == 1:
-            raise requests.exceptions.ChunkedEncodingError("boom")
+            raise httpx.ReadError(
+                "stream error",
+                request=httpx.Request("GET", "https://example.com/foo.pdf"),
+            )
         dest_path.write_bytes(data)
         part_path.unlink(missing_ok=True)
 
@@ -301,14 +320,18 @@ def test_download_candidate_retries_and_cleans_partial(
         min_pdf_bytes=16,
     )
     context = config.to_context({})
-    outcome = downloader.download_candidate(
-        requests.Session(),
-        artifact,
-        "https://example.com/foo.pdf",
-        None,
-        5.0,
-        context,
-    )
+    client = _build_mock_client()
+    try:
+        outcome = downloader.download_candidate(
+            client,
+            artifact,
+            "https://example.com/foo.pdf",
+            None,
+            5.0,
+            context,
+        )
+    finally:
+        client.close()
     assert outcome.classification is Classification.PDF
     assert Path(outcome.path or "").exists()
     assert not Path(str(outcome.path) + ".part").exists()
@@ -385,7 +408,7 @@ def test_build_download_outcome_html_tail_reason(tmp_path: Path, artifact: WorkA
     pdf_path = tmp_path / "example.pdf"
     pdf_path.write_bytes(b"%PDF-1.4\n" + (b"z" * 32))
     tail = b"<html>"
-    response = _FakeResponse(b"", content_type="application/pdf")
+    response = _build_response(b"", content_type="application/pdf")
     outcome = downloader.build_download_outcome(
         artifact=artifact,
         classification=Classification.PDF,
@@ -463,17 +486,21 @@ def test_process_one_work_preserves_reason(patcher: PatchManager, artifact: Work
     logger = StubLogger()
     metrics = ResolverMetrics()
     config = DownloadConfig(run_id="run")
-    result = downloader.process_one_work(
-        artifact,
-        requests.Session(),
-        artifact.pdf_dir,
-        artifact.html_dir,
-        artifact.xml_dir,
-        StubPipeline(),
-        logger,
-        metrics,
-        options=config,
-    )
+    client = _build_mock_client()
+    try:
+        result = downloader.process_one_work(
+            artifact,
+            client,
+            artifact.pdf_dir,
+            artifact.html_dir,
+            artifact.xml_dir,
+            StubPipeline(),
+            logger,
+            metrics,
+            options=config,
+        )
+    finally:
+        client.close()
     assert not result["saved"]
     assert logger.manifest_reason == ReasonCode.HTML_TAIL_DETECTED
     assert logger.manifest_detail == "html_tail_detected"

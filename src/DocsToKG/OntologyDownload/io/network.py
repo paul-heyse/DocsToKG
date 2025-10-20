@@ -65,7 +65,7 @@ from ..cancellation import CancellationToken
 from ..errors import ConfigError, DownloadFailure, OntologyDownloadError, PolicyError
 from ..net import get_http_client
 from ..settings import DownloadConfiguration
-from .filesystem import _compute_file_hash, _materialize_cached_file, sanitize_filename
+from .filesystem import _compute_file_hash, _materialize_cached_file, sanitize_filename, sha256_file
 from .rate_limit import TokenBucket, apply_retry_after, get_bucket
 
 IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
@@ -865,6 +865,8 @@ def _stream_body_to_cache(
     logger: logging.Logger,
     progress_percent_step: float,
     progress_bytes_threshold: int,
+    download_deadline: Optional[float],
+    download_timeout: float,
 ) -> int:
     part_path = cache_path.with_suffix(cache_path.suffix + '.part')
     part_path.parent.mkdir(parents=True, exist_ok=True)
@@ -879,11 +881,36 @@ def _stream_body_to_cache(
     )
     max_bytes = http_config.max_uncompressed_bytes()
     bytes_downloaded = resume_position
+    logger.info(
+        "download timeout configuration (timeout_sec=%s, deadline=%s)",
+        download_timeout,
+        download_deadline,
+        extra={"stage": "download"},
+    )
     try:
         with part_path.open(mode) as stream:
             for chunk in response.iter_bytes(1 << 20):
                 if not chunk:
                     continue
+                if download_deadline is not None:
+                    now = time.monotonic()
+                    logger.info(
+                        "download timeout check (now=%s, deadline=%s)",
+                        now,
+                        download_deadline,
+                        extra={"stage": "download"},
+                    )
+                    if now >= download_deadline:
+                        logger.error(
+                            "download timeout",
+                            extra={
+                                "stage": "download",
+                                "error": "timeout",
+                                "elapsed_sec": round(now - (download_deadline - download_timeout), 2),
+                                "timeout_sec": download_timeout,
+                            },
+                        )
+                        raise DownloadFailure("Download exceeded timeout", retryable=False)
                 if cancellation_token and cancellation_token.is_cancelled():
                     raise DownloadFailure("Download was cancelled", retryable=False)
                 stream.write(chunk)
@@ -931,6 +958,7 @@ def _download_once(
     client: httpx.Client,
     url: str,
     cache_path: Path,
+    destination: Path,
     headers: Mapping[str, str],
     http_config: DownloadConfiguration,
     bucket: Optional[TokenBucket],
@@ -949,18 +977,38 @@ def _download_once(
 
     resume_position = 0
     part_path = cache_path.with_suffix(cache_path.suffix + '.part')
+    destination_part = destination.with_suffix(destination.suffix + ".part")
     if part_path.exists():
         try:
             resume_position = part_path.stat().st_size
         except OSError:
             resume_position = 0
-    elif cache_path.exists():
-        resume_position = 0
+    else:
+        if destination_part.exists():
+            try:
+                part_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(destination_part, part_path)
+            except OSError:
+                pass
+            else:
+                try:
+                    resume_position = part_path.stat().st_size
+                except OSError:
+                    resume_position = 0
+        elif cache_path.exists():
+            resume_position = 0
 
     content_type_hint: Optional[str] = None
     content_length_hint: Optional[int] = None
     etag_hint: Optional[str] = None
     last_modified_hint: Optional[str] = None
+    raw_download_timeout = getattr(http_config, "download_timeout_sec", None)
+    download_timeout_value: float = 0.0
+    if raw_download_timeout:
+        try:
+            download_timeout_value = float(raw_download_timeout)
+        except (TypeError, ValueError):
+            download_timeout_value = 0.0
 
     if perform_head:
         if bucket is not None:
@@ -990,6 +1038,15 @@ def _download_once(
                         service=service,
                         host=host,
                     )
+                    if (
+                        download_timeout_value > 0
+                        and retry_delay is not None
+                        and retry_delay >= download_timeout_value
+                    ):
+                        raise DownloadFailure(
+                            "Retry-After exceeded download timeout",
+                            retryable=False,
+                        )
                     http_error = httpx.HTTPStatusError(
                         f"HTTP error {status_code}", request=response.request, response=response
                     )
@@ -1037,6 +1094,9 @@ def _download_once(
         "headers": request_headers,
         "correlation_id": correlation_id,
     }
+    download_deadline: Optional[float] = None
+    if download_timeout_value > 0:
+        download_deadline = time.monotonic() + download_timeout_value
 
     with request_with_redirect_audit(
         client=client,
@@ -1065,6 +1125,7 @@ def _download_once(
             raise http_error
         if status_code == 416 and resume_position > 0:
             part_path.unlink(missing_ok=True)
+            destination_part.unlink(missing_ok=True)
             raise DownloadFailure("Range request rejected by origin", retryable=True)
         if status_code == 304:
             return _StreamOutcome(
@@ -1096,6 +1157,8 @@ def _download_once(
             logger=logger,
             progress_percent_step=progress_percent_step,
             progress_bytes_threshold=progress_bytes_threshold,
+            download_deadline=download_deadline,
+            download_timeout=download_timeout_value,
         )
 
         status = "updated" if resume_position > 0 else "fresh"
@@ -1196,6 +1259,7 @@ def download_stream(
                     client=http_client,
                     url=secure_url,
                     cache_path=cache_path,
+                    destination=destination,
                     headers=request_headers,
                     http_config=http_config,
                     bucket=bucket,
@@ -1248,6 +1312,8 @@ def download_stream(
             )
         except DownloadFailure:
             raise
+        except PolicyError:
+            raise
         except Exception as exc:  # pragma: no cover - defensive
             logger.error(
                 "unexpected download error",
@@ -1281,6 +1347,9 @@ def download_stream(
                     "elapsed_ms": round(elapsed, 2),
                 },
             )
+
+        destination_part = Path(str(destination) + ".part")
+        destination_part.unlink(missing_ok=True)
 
         sha256 = _compute_sha256(artifact_path)
         expected_value: Optional[str] = None

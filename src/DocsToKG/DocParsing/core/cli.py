@@ -20,7 +20,11 @@ from pathlib import Path
 from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
 
 import typer
-from typer.models import TyperCommand
+
+try:  # Compat: TyperCommand moved in Typer 0.14+
+    from typer.main import TyperCommand
+except ImportError:  # pragma: no cover - fallback for newer Typer versions
+    from typer.core import TyperCommand  # type: ignore[attr-defined]
 
 from DocsToKG.DocParsing.cli_errors import (
     CLIValidationError,
@@ -48,6 +52,28 @@ from .cli_utils import (
 from .planning import display_plan, plan_chunk, plan_doctags, plan_embed
 
 CommandHandler = Callable[[Sequence[str]], int]
+
+
+class _ParserHelpCommand(TyperCommand):
+    """Click command wrapper that appends legacy parser help to Typer output."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._parser_help_factory = getattr(self.callback, "__parser_help_factory__", None)
+
+    def get_help(self, ctx: typer.Context) -> str:
+        """Render Typer help combined with the delegated argparse help text."""
+
+        help_text = super().get_help(ctx)
+        if self._parser_help_factory is None:
+            return help_text
+        try:
+            extra_help = self._parser_help_factory()
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            extra_help = f"Unable to render legacy help: {exc}"
+        if not extra_help:
+            return help_text
+        return f"{help_text.rstrip()}\n\n{extra_help.rstrip()}\n"
 
 
 class _ManifestHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
@@ -102,10 +128,16 @@ Examples:
   python -m DocsToKG.DocParsing.core.cli plan --data-root Data --mode auto
 """
 
+app = typer.Typer(
+    help=CLI_DESCRIPTION.strip(),
+    add_completion=True,
+    rich_markup_mode="markdown",
+)
+
 __all__ = [
     "CLI_DESCRIPTION",
-    "COMMANDS",
     "CommandHandler",
+    "app",
     "build_doctags_parser",
     "chunk",
     "doctags",
@@ -220,6 +252,12 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
         help="Overwrite existing DocTags files (HTML mode only)",
     )
     return parser
+
+
+def _doctags_help_text() -> str:
+    """Return the legacy argparse help for the DocTags command."""
+
+    return build_doctags_parser().format_help()
 
 
 def _resolve_doctags_paths(args: argparse.Namespace) -> tuple[str, Path, Path, str]:
@@ -363,39 +401,64 @@ def doctags(argv: Sequence[str] | None = None) -> int:
     return doctags_module.pdf_main(pdf_args)
 
 
+def _chunk_import_error_messages(exc: ImportError) -> List[str]:
+    """Return user-facing error lines when the chunking module is unavailable."""
+
+    missing = getattr(exc, "name", None)
+    if not missing:
+        message_text = str(exc)
+        if message_text.startswith("No module named"):
+            parts = message_text.split("'")
+            missing = parts[1] if len(parts) >= 2 else message_text
+        else:
+            missing = message_text
+    friendly_message = (
+        "DocsToKG.DocParsing.chunking could not be imported because the optional "
+        f"dependency '{missing}' is not installed. Install the appropriate extras, "
+        'for example `pip install "DocsToKG[docling,gpu]"` to enable this module.'
+    )
+    follow_up = (
+        "Optional DocTags/chunking dependencies are required for `docparse chunk`. "
+        "Install them with `pip install DocsToKG[gpu12x]` or `pip install transformers`."
+    )
+    return [friendly_message, follow_up]
+
+
+def _import_chunk_module():
+    """Import the chunking module, refreshing the DocsToKG package cache."""
+
+    import DocsToKG.DocParsing as docparsing_pkg
+
+    docparsing_pkg._MODULE_CACHE.pop("chunking", None)
+    sys.modules.pop("DocsToKG.DocParsing.chunking", None)
+    docparsing_pkg.__dict__.pop("chunking", None)
+
+    chunk_module = builtins.__import__("DocsToKG.DocParsing.chunking", fromlist=("chunking",))
+    docparsing_pkg._MODULE_CACHE["chunking"] = chunk_module
+    docparsing_pkg.__dict__["chunking"] = chunk_module
+    return chunk_module
+
+
+def _chunk_help_text() -> str:
+    """Return help text for the chunk subcommand (or guidance if unavailable)."""
+
+    try:
+        chunk_module = _import_chunk_module()
+    except ImportError as exc:  # pragma: no cover - exercised in environments without extras
+        return "\n".join(_chunk_import_error_messages(exc))
+    parser = chunk_module.build_parser()
+    parser.prog = "docparse chunk"
+    return parser.format_help()
+
+
 def chunk(argv: Sequence[str] | None = None) -> int:
     """Execute the Docling chunker subcommand."""
 
     try:
-        import DocsToKG.DocParsing as docparsing_pkg
-
-        docparsing_pkg._MODULE_CACHE.pop("chunking", None)
-        sys.modules.pop("DocsToKG.DocParsing.chunking", None)
-        docparsing_pkg.__dict__.pop("chunking", None)
-
-        chunk_module = builtins.__import__("DocsToKG.DocParsing.chunking", fromlist=("chunking",))
-        docparsing_pkg._MODULE_CACHE["chunking"] = chunk_module
-        docparsing_pkg.__dict__["chunking"] = chunk_module
+        chunk_module = _import_chunk_module()
     except ImportError as exc:
-        missing = getattr(exc, "name", None)
-        if not missing:
-            message_text = str(exc)
-            if message_text.startswith("No module named"):
-                parts = message_text.split("'")
-                missing = parts[1] if len(parts) >= 2 else message_text
-            else:
-                missing = message_text
-        friendly_message = (
-            "DocsToKG.DocParsing.chunking could not be imported because the optional "
-            f"dependency '{missing}' is not installed. Install the appropriate extras, "
-            'for example `pip install "DocsToKG[docling,gpu]"` to enable this module.'
-        )
-        print(friendly_message, file=sys.stderr)
-        print(
-            "Optional DocTags/chunking dependencies are required for `docparse chunk`. "
-            "Install them with `pip install DocsToKG[gpu12x]` or `pip install transformers`.",
-            file=sys.stderr,
-        )
+        for line in _chunk_import_error_messages(exc):
+            print(line, file=sys.stderr)
         return 1
 
     parser = chunk_module.build_parser()
@@ -423,6 +486,16 @@ def embed(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
+def _embed_help_text() -> str:
+    """Return the legacy argparse help for the embed command."""
+
+    from DocsToKG.DocParsing import embedding as embedding_module
+
+    parser = embedding_module.build_parser()
+    parser.prog = "docparse embed"
+    return parser.format_help()
+
+
 def token_profiles(argv: Sequence[str] | None = None) -> int:
     """Execute the tokenizer profiling subcommand."""
 
@@ -448,6 +521,22 @@ def token_profiles(argv: Sequence[str] | None = None) -> int:
     return token_profiles_module.main(args)
 
 
+def _token_profiles_help_text() -> str:
+    """Return the legacy argparse help for the token-profiles command."""
+
+    try:
+        from DocsToKG.DocParsing import token_profiles as token_profiles_module
+    except ImportError as exc:  # pragma: no cover - depends on optional transformers
+        return (
+            "Optional dependency 'transformers' is required for `docparse token-profiles`. "
+            f"Install it with `pip install transformers`.\n\n{exc}"
+        )
+
+    parser = token_profiles_module.build_parser()
+    parser.prog = "docparse token-profiles"
+    return parser.format_help()
+
+
 def plan(argv: Sequence[str] | None = None) -> int:
     """Display the doctags → chunk → embed plan without executing."""
 
@@ -463,8 +552,8 @@ def manifest(argv: Sequence[str] | None = None) -> int:
     return _run_stage(_manifest_main, argv)
 
 
-def _manifest_main(argv: Sequence[str]) -> int:
-    """Implementation for the ``docparse manifest`` command."""
+def _build_manifest_parser() -> argparse.ArgumentParser:
+    """Construct the manifest inspection parser."""
 
     parser = argparse.ArgumentParser(
         prog="docparse manifest",
@@ -506,7 +595,19 @@ def _manifest_main(argv: Sequence[str]) -> int:
         action="store_true",
         help="Output tail entries as JSON instead of human-readable text",
     )
+    return parser
 
+
+def _manifest_help_text() -> str:
+    """Return the legacy argparse help for the manifest command."""
+
+    return _build_manifest_parser().format_help()
+
+
+def _manifest_main(argv: Sequence[str]) -> int:
+    """Implementation for the ``docparse manifest`` command."""
+
+    parser = _build_manifest_parser()
     args = parser.parse_args(list(argv))
     manifest_dir = data_manifests(args.data_root, ensure=False)
     logger = get_logger(__name__, base_fields={"stage": "manifest"})
@@ -684,87 +785,11 @@ def _manifest_main(argv: Sequence[str]) -> int:
     return 0
 
 
-def _build_stage_args(args: argparse.Namespace) -> tuple[List[str], List[str], List[str]]:
-    """Construct argument lists for doctags/chunk/embed stages."""
-
-    chunk_shard_count = args.chunk_shard_count
-    chunk_shard_index = args.chunk_shard_index
-    embed_shard_count = (
-        args.embed_shard_count if args.embed_shard_count is not None else chunk_shard_count
-    )
-    embed_shard_index = (
-        args.embed_shard_index if args.embed_shard_index is not None else args.chunk_shard_index
-    )
-
-    doctags_args: List[str] = ["--log-level", args.log_level]
-    chunk_args: List[str] = ["--log-level", args.log_level]
-    embed_args: List[str] = ["--log-level", args.log_level]
-
-    if args.data_root:
-        doctags_args.extend(["--data-root", str(args.data_root)])
-        chunk_args.extend(["--data-root", str(args.data_root)])
-        embed_args.extend(["--data-root", str(args.data_root)])
-    if args.resume:
-        doctags_args.append("--resume")
-        chunk_args.append("--resume")
-        embed_args.append("--resume")
-    if args.force:
-        doctags_args.append("--force")
-        chunk_args.append("--force")
-        embed_args.append("--force")
-
-    if args.mode != "auto":
-        doctags_args.extend(["--mode", args.mode])
-    if args.doctags_in_dir:
-        doctags_args.extend(["--in-dir", str(args.doctags_in_dir)])
-    if args.doctags_out_dir:
-        doctags_args.extend(["--out-dir", str(args.doctags_out_dir)])
-        chunk_args.extend(["--in-dir", str(args.doctags_out_dir)])
-    if args.overwrite:
-        doctags_args.append("--overwrite")
-    if args.vllm_wait_timeout is not None:
-        doctags_args.extend(["--vllm-wait-timeout", str(args.vllm_wait_timeout)])
-
-    if args.chunk_out_dir:
-        chunk_args.extend(["--out-dir", str(args.chunk_out_dir)])
-        embed_args.extend(["--chunks-dir", str(args.chunk_out_dir)])
-    if args.chunk_workers is not None:
-        chunk_args.extend(["--workers", str(args.chunk_workers)])
-    if args.chunk_min_tokens is not None:
-        chunk_args.extend(["--min-tokens", str(args.chunk_min_tokens)])
-    if args.chunk_max_tokens is not None:
-        chunk_args.extend(["--max-tokens", str(args.chunk_max_tokens)])
-    if args.structural_markers:
-        chunk_args.extend(["--structural-markers", str(args.structural_markers)])
-    if chunk_shard_count is not None:
-        chunk_args.extend(["--shard-count", str(chunk_shard_count)])
-    if chunk_shard_index is not None:
-        chunk_args.extend(["--shard-index", str(chunk_shard_index)])
-
-    if args.embed_out_dir:
-        embed_args.extend(["--out-dir", str(args.embed_out_dir)])
-    if args.embed_offline:
-        embed_args.append("--offline")
-    if args.embed_validate_only:
-        embed_args.append("--validate-only")
-    if args.embed_format:
-        embed_args.extend(["--format", args.embed_format])
-    if args.embed_no_cache:
-        embed_args.append("--no-cache")
-    if embed_shard_count is not None:
-        embed_args.extend(["--shard-count", str(embed_shard_count)])
-    if embed_shard_index is not None:
-        embed_args.extend(["--shard-index", str(embed_shard_index)])
-    if args.sparsity_warn_threshold_pct is not None:
-        embed_args.extend(["--sparsity-warn-threshold-pct", str(args.sparsity_warn_threshold_pct)])
-
-    return doctags_args, chunk_args, embed_args
-
-
-def run_all(argv: Sequence[str] | None = None) -> int:
-    """Execute DocTags conversion, chunking, and embedding sequentially."""
+def _build_run_all_parser() -> argparse.ArgumentParser:
+    """Create the parser shared by `docparse all` and `docparse plan`."""
 
     parser = argparse.ArgumentParser(
+        prog="docparse all",
         description="Run doctags → chunk → embed in sequence",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -900,6 +925,104 @@ def run_all(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Show a plan of the files each stage would touch instead of running",
     )
+    return parser
+
+
+def _run_all_help_text() -> str:
+    """Return the legacy argparse help for the all command."""
+
+    return _build_run_all_parser().format_help()
+
+
+def _plan_help_text() -> str:
+    """Return the legacy argparse help for the plan command."""
+
+    parser = _build_run_all_parser()
+    parser.prog = "docparse plan"
+    return parser.format_help()
+
+
+def _build_stage_args(args: argparse.Namespace) -> tuple[List[str], List[str], List[str]]:
+    """Construct argument lists for doctags/chunk/embed stages."""
+
+    chunk_shard_count = args.chunk_shard_count
+    chunk_shard_index = args.chunk_shard_index
+    embed_shard_count = (
+        args.embed_shard_count if args.embed_shard_count is not None else chunk_shard_count
+    )
+    embed_shard_index = (
+        args.embed_shard_index if args.embed_shard_index is not None else args.chunk_shard_index
+    )
+
+    doctags_args: List[str] = ["--log-level", args.log_level]
+    chunk_args: List[str] = ["--log-level", args.log_level]
+    embed_args: List[str] = ["--log-level", args.log_level]
+
+    if args.data_root:
+        doctags_args.extend(["--data-root", str(args.data_root)])
+        chunk_args.extend(["--data-root", str(args.data_root)])
+        embed_args.extend(["--data-root", str(args.data_root)])
+    if args.resume:
+        doctags_args.append("--resume")
+        chunk_args.append("--resume")
+        embed_args.append("--resume")
+    if args.force:
+        doctags_args.append("--force")
+        chunk_args.append("--force")
+        embed_args.append("--force")
+
+    if args.mode != "auto":
+        doctags_args.extend(["--mode", args.mode])
+    if args.doctags_in_dir:
+        doctags_args.extend(["--in-dir", str(args.doctags_in_dir)])
+    if args.doctags_out_dir:
+        doctags_args.extend(["--out-dir", str(args.doctags_out_dir)])
+        chunk_args.extend(["--in-dir", str(args.doctags_out_dir)])
+    if args.overwrite:
+        doctags_args.append("--overwrite")
+    if args.vllm_wait_timeout is not None:
+        doctags_args.extend(["--vllm-wait-timeout", str(args.vllm_wait_timeout)])
+
+    if args.chunk_out_dir:
+        chunk_args.extend(["--out-dir", str(args.chunk_out_dir)])
+        embed_args.extend(["--chunks-dir", str(args.chunk_out_dir)])
+    if args.chunk_workers is not None:
+        chunk_args.extend(["--workers", str(args.chunk_workers)])
+    if args.chunk_min_tokens is not None:
+        chunk_args.extend(["--min-tokens", str(args.chunk_min_tokens)])
+    if args.chunk_max_tokens is not None:
+        chunk_args.extend(["--max-tokens", str(args.chunk_max_tokens)])
+    if args.structural_markers:
+        chunk_args.extend(["--structural-markers", str(args.structural_markers)])
+    if chunk_shard_count is not None:
+        chunk_args.extend(["--shard-count", str(chunk_shard_count)])
+    if chunk_shard_index is not None:
+        chunk_args.extend(["--shard-index", str(chunk_shard_index)])
+
+    if args.embed_out_dir:
+        embed_args.extend(["--out-dir", str(args.embed_out_dir)])
+    if args.embed_offline:
+        embed_args.append("--offline")
+    if args.embed_validate_only:
+        embed_args.append("--validate-only")
+    if args.embed_format:
+        embed_args.extend(["--format", args.embed_format])
+    if args.embed_no_cache:
+        embed_args.append("--no-cache")
+    if embed_shard_count is not None:
+        embed_args.extend(["--shard-count", str(embed_shard_count)])
+    if embed_shard_index is not None:
+        embed_args.extend(["--shard-index", str(embed_shard_index)])
+    if args.sparsity_warn_threshold_pct is not None:
+        embed_args.extend(["--sparsity-warn-threshold-pct", str(args.sparsity_warn_threshold_pct)])
+
+    return doctags_args, chunk_args, embed_args
+
+
+def run_all(argv: Sequence[str] | None = None) -> int:
+    """Execute DocTags conversion, chunking, and embedding sequentially."""
+
+    parser = _build_run_all_parser()
 
     args = parser.parse_args([] if argv is None else list(argv))
     plan_only = bool(args.plan)
@@ -1022,48 +1145,127 @@ def run_all(argv: Sequence[str] | None = None) -> int:
     return 0
 
 
-def _command(handler: CommandHandler, help_text: str) -> "_Command":
-    """Package a handler and help text into a command descriptor."""
+def _forward_with_context(
+    ctx: typer.Context, handler: Callable[[Sequence[str] | None], int]
+) -> None:
+    """Invoke ``handler`` with the Typer context arguments and exit with its code."""
 
-    return _Command(handler, help_text)
-
-
-class _Command:
-    """Callable wrapper storing handler metadata for subcommands."""
-
-    __slots__ = ("handler", "help")
-
-    def __init__(self, handler: CommandHandler, help: str) -> None:
-        """Store the callable ``handler`` and help text for the command."""
-
-        self.handler = handler
-        self.help = help
+    argv = list(ctx.args)
+    exit_code = handler(None if not argv else argv)
+    raise typer.Exit(code=exit_code)
 
 
-COMMANDS: Dict[str, _Command] = {
-    "all": _command(run_all, "Run doctags → chunk → embed sequentially"),
-    "chunk": _command(chunk, "Run the Docling hybrid chunker"),
-    "embed": _command(embed, "Generate BM25/SPLADE/dense vectors"),
-    "doctags": _command(doctags, "Convert HTML/PDF corpora into DocTags"),
-    "token-profiles": _command(
-        token_profiles, "Print token count ratios for DocTags samples across tokenizers"
-    ),
-    "plan": _command(
-        plan, "Show the projected doctags → chunk → embed actions without running stages"
-    ),
-    "manifest": _command(manifest, "Inspect manifest artifacts (tail/summarize)"),
-}
+@app.command(
+    "doctags",
+    cls=_ParserHelpCommand,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def _doctags_cli(ctx: typer.Context) -> None:
+    """Typer surface for `docparse doctags`."""
+
+    _forward_with_context(ctx, doctags)
+
+
+_doctags_cli.__parser_help_factory__ = _doctags_help_text
+
+
+@app.command(
+    "chunk",
+    cls=_ParserHelpCommand,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def _chunk_cli(ctx: typer.Context) -> None:
+    """Typer surface for `docparse chunk`."""
+
+    _forward_with_context(ctx, chunk)
+
+
+_chunk_cli.__parser_help_factory__ = _chunk_help_text
+
+
+@app.command(
+    "embed",
+    cls=_ParserHelpCommand,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def _embed_cli(ctx: typer.Context) -> None:
+    """Typer surface for `docparse embed`."""
+
+    _forward_with_context(ctx, embed)
+
+
+_embed_cli.__parser_help_factory__ = _embed_help_text
+
+
+@app.command(
+    "token-profiles",
+    cls=_ParserHelpCommand,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def _token_profiles_cli(ctx: typer.Context) -> None:
+    """Typer surface for `docparse token-profiles`."""
+
+    _forward_with_context(ctx, token_profiles)
+
+
+_token_profiles_cli.__parser_help_factory__ = _token_profiles_help_text
+
+
+@app.command(
+    "plan",
+    cls=_ParserHelpCommand,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def _plan_cli(ctx: typer.Context) -> None:
+    """Typer surface for `docparse plan`."""
+
+    _forward_with_context(ctx, plan)
+
+
+_plan_cli.__parser_help_factory__ = _plan_help_text
+
+
+@app.command(
+    "manifest",
+    cls=_ParserHelpCommand,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def _manifest_cli(ctx: typer.Context) -> None:
+    """Typer surface for `docparse manifest`."""
+
+    _forward_with_context(ctx, manifest)
+
+
+_manifest_cli.__parser_help_factory__ = _manifest_help_text
+
+
+@app.command(
+    "all",
+    cls=_ParserHelpCommand,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def _all_cli(ctx: typer.Context) -> None:
+    """Typer surface for `docparse all`."""
+
+    _forward_with_context(ctx, run_all)
+
+
+_all_cli.__parser_help_factory__ = _run_all_help_text
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Dispatch to one of the DocParsing subcommands."""
+    """Entry point used by `python -m DocsToKG.DocParsing.core.cli`."""
 
-    parser = argparse.ArgumentParser(
-        description=CLI_DESCRIPTION,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument("command", choices=COMMANDS.keys(), help="CLI to execute")
-    parser.add_argument("args", nargs=argparse.REMAINDER, help="Arguments passed to the command")
-    parsed = parser.parse_args(argv)
-    command = COMMANDS[parsed.command]
-    return command.handler(parsed.args)
+    args = [] if argv is None else list(argv)
+    try:
+        app(args=args, prog_name="docparse", standalone_mode=False)
+    except typer.Exit as exc:
+        return exc.exit_code
+    except SystemExit as exc:  # pragma: no cover - defensive
+        code = exc.code if isinstance(exc.code, int) else int(exc.code or 0)
+        return code
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entry point
+    raise SystemExit(main(sys.argv[1:]))

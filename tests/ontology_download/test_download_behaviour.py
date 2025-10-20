@@ -125,7 +125,7 @@ def test_download_stream_recovers_from_range_not_satisfiable(ontology_env, tmp_p
     assert not destination_part.exists(), "Expected stale partial files to be removed"
 
     methods = [record.method for record in ontology_env.requests]
-    assert methods.count("HEAD") == 1
+    assert methods.count("HEAD") == 2
     assert methods.count("GET") == 2
 
     get_records = [record for record in ontology_env.requests if record.method == "GET"]
@@ -172,7 +172,7 @@ def test_head_get_connections_remain_bounded(ontology_env, tmp_path):
     assert client_a is client_b
 
 
-def test_preliminary_head_check_handles_malformed_content_length(ontology_env, tmp_path):
+def test_download_stream_head_precheck_handles_malformed_content_length(ontology_env, tmp_path):
     """Malformed Content-Length headers should be ignored by the downloader."""
 
     payload = b"@prefix : <http://example.org/> .\n:hp a :Ontology .\n"
@@ -181,7 +181,6 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
         payload,
         media_type="application/rdf+xml",
     )
-    parsed_url = urlparse(url)
     ontology_env.queue_response(
         "fixtures/hp-malformed-length.owl",
         ResponseSpec(
@@ -196,26 +195,31 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
 
     config = ontology_env.build_download_config()
     destination = tmp_path / "hp-malformed-length.owl"
-    expected_user_agent = config.polite_http_headers().get("User-Agent")
-    downloader = network_mod._StreamingDownloader(
+
+    result = network_mod.download_stream(
+        url=url,
         destination=destination,
         headers={},
-        http_config=config,
         previous_manifest=None,
+        http_config=config,
+        cache_dir=ontology_env.cache_dir,
         logger=_logger(),
         expected_media_type="application/rdf+xml",
         service="obo",
-        origin_host=parsed_url.hostname,
     )
 
-    content_type, content_length = downloader._preliminary_head_check(url)
+    assert result.status == "fresh"
+    assert destination.read_bytes() == payload
+    assert result.content_type == "application/rdf+xml"
+    assert result.content_length == len(payload)
 
-    assert content_type == "application/rdf+xml"
-    assert content_length is None
-    assert ontology_env.requests[-1].method == "HEAD"
-    assert ontology_env.requests[-1].path.endswith("hp-malformed-length.owl")
+    head_requests = [request for request in ontology_env.requests if request.method == "HEAD"]
+    assert head_requests, "Expected a HEAD request to be issued"
+    head_request = head_requests[-1]
+    assert head_request.path.endswith("hp-malformed-length.owl")
+    expected_user_agent = config.polite_http_headers().get("User-Agent")
     if expected_user_agent is not None:
-        assert ontology_env.requests[-1].headers.get("User-Agent") == expected_user_agent
+        assert head_request.headers.get("User-Agent") == expected_user_agent
 
 
 def test_head_request_includes_polite_and_conditional_headers(ontology_env, tmp_path):
@@ -249,7 +253,7 @@ def test_head_request_includes_polite_and_conditional_headers(ontology_env, tmp_
     )
 
 
-def test_preliminary_head_check_cancels_retry_sleep(ontology_env, tmp_path):
+def test_download_stream_cancellation_breaks_retry_after_sleep(ontology_env, tmp_path):
     """Cancellation during Retry-After backoff should abort promptly."""
 
     config = ontology_env.build_download_config()
@@ -267,60 +271,46 @@ def test_preliminary_head_check_cancels_retry_sleep(ontology_env, tmp_path):
         ),
     )
     destination = tmp_path / "cancelled.owl"
-    expected_headers = config.polite_http_headers()
     previous_manifest = {
         "etag": 'W/"conditional-etag"',
         "last_modified": "Wed, 21 Oct 2015 07:28:00 GMT",
     }
-    request_headers = dict(expected_headers)
-    request_headers.update(
-        {
-            "If-None-Match": previous_manifest["etag"],
-            "If-Modified-Since": previous_manifest["last_modified"],
-        }
-    )
     token = CancellationToken()
-    parsed_url = urlparse(url)
-    downloader = network_mod._StreamingDownloader(
-        destination=destination,
-        headers=expected_headers,
-        http_config=config,
-        previous_manifest=previous_manifest,
-        logger=_logger(),
-        service="obo",
-        origin_host=parsed_url.hostname,
-        cancellation_token=token,
-    )
-
-    remaining_budget = mock.Mock(return_value=10.0)
-    timeout_callback = mock.Mock()
     sleep_calls: list[float] = []
 
     def fake_sleep(duration: float) -> None:
         sleep_calls.append(duration)
         token.cancel()
 
-    with mock.patch(
-        "DocsToKG.OntologyDownload.io.network.time.sleep", side_effect=fake_sleep
-    ):
+    original_retry = network_mod.retry_with_backoff
+
+    def wrapped_retry(func, **kwargs):
+        kwargs["sleep"] = fake_sleep
+        return original_retry(func, **kwargs)
+
+    with mock.patch.object(network_mod, "retry_with_backoff", side_effect=wrapped_retry):
         with pytest.raises(DownloadFailure):
-            downloader._preliminary_head_check(
-                url,
-                headers=request_headers,
-                remaining_budget=remaining_budget,
-                timeout_callback=timeout_callback,
+            network_mod.download_stream(
+                url=url,
+                destination=destination,
+                headers={},
+                previous_manifest=previous_manifest,
+                http_config=config,
+                cache_dir=ontology_env.cache_dir,
+                logger=_logger(),
+                expected_media_type="application/rdf+xml",
+                service="obo",
+                cancellation_token=token,
             )
 
     assert sleep_calls, "Expected the retry loop to invoke sleep"
     assert sleep_calls[0] < 1.5, "Sleep loop should use short increments"
     assert token.is_cancelled(), "Cancellation token should be triggered by the fake sleep"
-    assert remaining_budget.call_count >= 2
-    timeout_callback.assert_not_called()
 
     head_requests = [request for request in ontology_env.requests if request.method == "HEAD"]
     assert head_requests, "Expected a HEAD request to be issued"
     head_headers = head_requests[-1].headers
-
+    expected_headers = config.polite_http_headers()
     user_agent = expected_headers.get("User-Agent")
     if user_agent is not None:
         assert head_headers.get("User-Agent") == user_agent
@@ -347,30 +337,52 @@ def test_head_retry_after_honours_delay_before_get(ontology_env, tmp_path):
             headers={"Retry-After": f"{retry_after_sec:.2f}"},
         ),
     )
+    ontology_env.queue_response(
+        "fixtures/hp-retry-after.owl",
+        ResponseSpec(
+            method="HEAD",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": str(len(payload)),
+            },
+        ),
+    )
 
     config = ontology_env.build_download_config()
     destination = tmp_path / "hp-retry-after.owl"
 
-    start = time.monotonic()
-    result = network_mod.download_stream(
-        url=url,
-        destination=destination,
-        headers={},
-        previous_manifest=None,
-        http_config=config,
-        cache_dir=ontology_env.cache_dir,
-        logger=_logger(),
-        expected_media_type="application/rdf+xml",
-        service="obo",
-    )
-    elapsed = time.monotonic() - start
+    sleeps: list[float] = []
+
+    def fake_sleep(duration: float) -> None:
+        sleeps.append(duration)
+
+    original_retry = network_mod.retry_with_backoff
+
+    def wrapped_retry(func, **kwargs):
+        kwargs["sleep"] = fake_sleep
+        return original_retry(func, **kwargs)
+
+    with mock.patch.object(network_mod, "retry_with_backoff", side_effect=wrapped_retry):
+        result = network_mod.download_stream(
+            url=url,
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=ontology_env.cache_dir,
+            logger=_logger(),
+            expected_media_type="application/rdf+xml",
+            service="obo",
+        )
 
     assert result.status == "fresh"
     assert destination.read_bytes() == payload
-    assert elapsed >= retry_after_sec - 0.05
+    assert sleeps, "Expected Retry-After to trigger a sleep"
+    assert sleeps[0] == pytest.approx(retry_after_sec, abs=0.05)
 
     methods = [request.method for request in ontology_env.requests]
-    assert methods.count("HEAD") == 1
+    assert methods.count("HEAD") == 2
     assert methods.count("GET") == 1
 
 
@@ -384,7 +396,6 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
         media_type="application/rdf+xml",
         repeats=1,
     )
-    parsed_url = urlparse(url)
     ontology_env.queue_response(
         "fixtures/hp-retry.owl",
         ResponseSpec(
@@ -392,30 +403,66 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
             status=200,
             headers={
                 "Content-Type": "application/rdf+xml",
-                "Content-Length": "not-an-integer",
+                "Content-Length": str(len(payload)),
             },
+        ),
+    )
+    ontology_env.queue_response(
+        "fixtures/hp-retry.owl",
+        ResponseSpec(method="GET", status=503),
+    )
+    ontology_env.queue_response(
+        "fixtures/hp-retry.owl",
+        ResponseSpec(
+            method="HEAD",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": str(len(payload)),
+            },
+        ),
+    )
+    ontology_env.queue_response(
+        "fixtures/hp-retry.owl",
+        ResponseSpec(
+            method="GET",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": str(len(payload)),
+            },
+            body=payload,
         ),
     )
 
     config = ontology_env.build_download_config()
     destination = tmp_path / "hp-retry.owl"
-    downloader = network_mod._StreamingDownloader(
-        destination=destination,
-        headers={},
-        http_config=config,
-        previous_manifest=None,
-        logger=_logger(),
-        expected_media_type="application/rdf+xml",
-        service="obo",
-        origin_host=parsed_url.hostname,
-    )
 
-    content_type, content_length = downloader._preliminary_head_check(url)
+    class RecordingBucket:
+        def __init__(self) -> None:
+            self.calls: list[float] = []
 
-    assert content_type == "application/rdf+xml"
-    assert content_length is None
-    assert ontology_env.requests[-1].method == "HEAD"
-    assert ontology_env.requests[-1].path.endswith("hp-retry.owl")
+        def consume(self, tokens: float = 1.0) -> None:  # pragma: no cover - simple recorder
+            self.calls.append(tokens)
+
+    recording_bucket = RecordingBucket()
+
+    with mock.patch.object(network_mod, "get_bucket", return_value=recording_bucket):
+        result = network_mod.download_stream(
+            url=url,
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=ontology_env.cache_dir,
+            logger=_logger(),
+            expected_media_type="application/rdf+xml",
+            service="obo",
+        )
+
+    assert destination.read_bytes() == payload
+    assert result.status == "fresh"
+    assert recording_bucket.calls == [1.0, 1.0, 1.0, 1.0]
 
 
 def test_download_stream_uses_cached_manifest(ontology_env, tmp_path):

@@ -357,9 +357,20 @@ python -m DocsToKG.DocParsing.core.cli embed --resume
 
 ```
 
-Use `--help` or append `-- --help` after the subcommand for the full set of
-flags, including data-root overrides, resume/force controls, and tokenizer
-configuration.
+The CLI now routes through a Typer application, so `python -m
+DocsToKG.DocParsing.core.cli --help` lists every available subcommand and
+`python -m DocsToKG.DocParsing.core.cli doctags --help` (or any other command)
+mirrors the legacy argparse options—no flags were renamed. Shell completion is
+available via Typer as well:
+
+```bash
+python -m DocsToKG.DocParsing.core.cli --install-completion  # one-time setup
+python -m DocsToKG.DocParsing.core.cli --show-completion     # inspect the script
+```
+
+Every subcommand still respects the data-root overrides, resume/force controls,
+and tokenizer configuration documented previously—Typer simply replaces the
+bespoke dispatcher.
 
 Synthetic benchmarking now lives in the test suite; run
 `pytest tests/docparsing/test_synthetic_benchmark.py` to exercise the

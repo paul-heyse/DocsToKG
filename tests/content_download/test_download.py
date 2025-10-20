@@ -11,12 +11,17 @@ from __future__ import annotations
 from pathlib import Path
 from unittest import mock
 
+import httpx
+
 from DocsToKG.ContentDownload import download as downloader
 from DocsToKG.ContentDownload.core import ReasonCode, WorkArtifact
 from DocsToKG.ContentDownload.download import DownloadConfig, prepare_candidate_download
 from tests.conftest import PatchManager
 
-requests = downloader.requests
+
+def _build_mock_client() -> httpx.Client:
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, request=request))
+    return httpx.Client(transport=transport)
 
 
 def _build_artifact(tmp_path: Path) -> WorkArtifact:
@@ -62,14 +67,18 @@ def test_head_precheck_not_called_when_robots_disallow(
 
     artifact = _build_artifact(tmp_path)
 
-    plan = prepare_candidate_download(
-        requests.Session(),
-        artifact,
-        "https://example.com/blocked.pdf",
-        None,
-        5.0,
-        ctx,
-    )
+    client = _build_mock_client()
+    try:
+        plan = prepare_candidate_download(
+            client,
+            artifact,
+            "https://example.com/blocked.pdf",
+            None,
+            5.0,
+            ctx,
+        )
+    finally:
+        client.close()
 
     assert plan.skip_outcome is not None
     assert plan.skip_outcome.reason is ReasonCode.ROBOTS_DISALLOWED

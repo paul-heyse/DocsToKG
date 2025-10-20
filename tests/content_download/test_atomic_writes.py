@@ -124,6 +124,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import types
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
@@ -204,7 +205,9 @@ if DOWNLOAD_DEPS_AVAILABLE:
     def test_partial_download_cleans_part_file(tmp_path: Path) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             if request.method == "HEAD":
-                return httpx.Response(200, headers={"Content-Type": "application/pdf"}, request=request)
+                return httpx.Response(
+                    200, headers={"Content-Type": "application/pdf"}, request=request
+                )
             if request.method == "GET":
                 response = httpx.Response(
                     200,
@@ -212,11 +215,11 @@ if DOWNLOAD_DEPS_AVAILABLE:
                     request=request,
                 )
 
-                def _iter_bytes(chunk_size: int = 8192):
+                def _iter_bytes(self, chunk_size: int = 8192):
                     yield b"%PDF-1.4\n"
                     raise httpx.ReadError("simulated failure", request=request)
 
-                response.iter_bytes = _iter_bytes  # type: ignore[attr-defined]
+                response.iter_bytes = types.MethodType(_iter_bytes, response)  # type: ignore[attr-defined]
                 return response
             raise AssertionError(f"Unexpected method {request.method}")
 
@@ -251,10 +254,10 @@ if DOWNLOAD_DEPS_AVAILABLE:
                     request=request,
                 )
 
-                def _iter_bytes(chunk_size: int = 8192):
+                def _iter_bytes(self, chunk_size: int = 8192):
                     yield from chunks
 
-                response.iter_bytes = _iter_bytes  # type: ignore[attr-defined]
+                response.iter_bytes = types.MethodType(_iter_bytes, response)  # type: ignore[attr-defined]
                 return response
             raise AssertionError(f"Unexpected method {request.method}")
 

@@ -518,6 +518,13 @@ class PlannerConfig(BaseModel):
         default=True,
         description="When false, planner metadata HTTP probes are skipped after URL validation.",
     )
+    head_precheck_hosts: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Collection of hostnames (exact or suffixes prefixed with a dot) that require a "
+            "HEAD request before issuing the metadata GET probe."
+        ),
+    )
 
     model_config = {"validate_assignment": True}
 
