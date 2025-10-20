@@ -135,6 +135,8 @@ def setup_logging(
         resolved_dir / file_name,
         maxBytes=int(max_log_size_mb * 1024 * 1024),
         backupCount=5,
+        encoding="utf-8",
+        errors="backslashreplace",
     )
     file_handler.setFormatter(JSONFormatter())
     file_handler._ontofetch_managed = True  # type: ignore[attr-defined]
