@@ -137,8 +137,9 @@ def test_setup_logging_emits_structured_json(tmp_path):
         log_dir=tmp_path,
     )
     try:
+        message = "download complete – café ☕"
         logger.info(
-            "download complete",
+            message,
             extra={
                 "correlation_id": "abc123",
                 "ontology_id": "hp",
@@ -155,10 +156,11 @@ def test_setup_logging_emits_structured_json(tmp_path):
             handler.flush()
         log_files = sorted(tmp_path.glob("*.jsonl"))
         assert log_files, "expected a JSON log file"
-        payload = log_files[0].read_text().strip()
-        assert payload, "log file should contain an entry"
-        record = json.loads(payload)
-        assert record["message"] == "download complete"
+        payload_bytes = log_files[0].read_bytes()
+        decoded = payload_bytes.decode("utf-8").strip()
+        assert decoded, "log file should contain an entry"
+        record = json.loads(decoded)
+        assert record["message"] == message
         assert record["level"] == "INFO"
         assert record["correlation_id"] == "abc123"
         assert record["ontology_id"] == "hp"
