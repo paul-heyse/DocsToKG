@@ -47,7 +47,7 @@ def resolve_hf_home() -> Path:
     return expand_path(Path.home() / ".cache" / "huggingface")
 
 
-def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
+def resolve_model_root(hf_home: Path | str | None = None) -> Path:
     """Resolve the DocsToKG model root honouring ``DOCSTOKG_MODEL_ROOT``."""
 
     env = os.getenv("DOCSTOKG_MODEL_ROOT")
@@ -58,7 +58,7 @@ def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
         if hf_home is not None
         else resolve_hf_home()
     )
-    cache_root = resolved_hf.parent
+    cache_root = resolved_hf.parent if resolved_hf.name == "huggingface" else resolved_hf
     default_root = cache_root / "docs-to-kg" / "models"
     return expand_path(default_root)
 
@@ -103,14 +103,16 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
 
 
 def init_hf_env(
-    hf_home: Optional[Path] = None,
-    model_root: Optional[Path] = None,
+    hf_home: Path | str | None = None,
+    model_root: Path | str | None = None,
 ) -> Tuple[Path, Path]:
     """Initialise Hugging Face and transformer cache environment variables."""
 
-    resolved_hf = expand_path(hf_home) if isinstance(hf_home, Path) else resolve_hf_home()
+    resolved_hf = expand_path(hf_home) if hf_home is not None else resolve_hf_home()
     resolved_model_root = (
-        expand_path(model_root) if isinstance(model_root, Path) else resolve_model_root(resolved_hf)
+        expand_path(model_root)
+        if model_root is not None
+        else resolve_model_root(resolved_hf)
     )
 
     os.environ["HF_HOME"] = str(resolved_hf)
@@ -139,7 +141,7 @@ def _detect_cuda_device() -> str:
 
 
 def ensure_model_environment(
-    hf_home: Optional[Path] = None, model_root: Optional[Path] = None
+    hf_home: Path | str | None = None, model_root: Path | str | None = None
 ) -> Tuple[Path, Path]:
     """Initialise and cache the HuggingFace/model-root environment settings."""
 
@@ -180,9 +182,11 @@ def ensure_splade_environment(
 ) -> Dict[str, str]:
     """Bootstrap SPLADE defaults and persist the resolved environment settings.
 
-    When ``cache_dir`` is supplied the resolved path seeds both
+    When ``cache_dir`` is supplied the resolved path eagerly overrides both
     ``DOCSTOKG_SPLADE_DIR`` and the legacy ``DOCSTOKG_SPLADE_MODEL_DIR`` for
-    backwards compatibility.
+    backwards compatibility. If no override is provided any existing
+    environment configuration is preserved while missing variables are
+    populated to ensure consistent lookups.
     """
 
     resolved_device = (
@@ -199,14 +203,23 @@ def ensure_splade_environment(
     cache_path: Path | None = None
     if cache_dir is not None:
         cache_path = Path(cache_dir).expanduser().resolve()
-    else:
-        existing_cache = os.getenv("DOCSTOKG_SPLADE_MODEL_DIR")
-        if existing_cache:
-            cache_path = Path(existing_cache).expanduser().resolve()
-
-    if cache_path is not None:
         resolved_cache = str(cache_path)
+        os.environ["DOCSTOKG_SPLADE_DIR"] = resolved_cache
         os.environ["DOCSTOKG_SPLADE_MODEL_DIR"] = resolved_cache
+        env_info["model_dir"] = resolved_cache
+        return env_info
+
+    current_dir = os.getenv("DOCSTOKG_SPLADE_DIR")
+    legacy_dir = os.getenv("DOCSTOKG_SPLADE_MODEL_DIR")
+    selected_cache = current_dir or legacy_dir
+
+    if selected_cache:
+        cache_path = Path(selected_cache).expanduser().resolve()
+        resolved_cache = str(cache_path)
+        if current_dir is None:
+            os.environ["DOCSTOKG_SPLADE_DIR"] = resolved_cache
+        if legacy_dir is None:
+            os.environ["DOCSTOKG_SPLADE_MODEL_DIR"] = resolved_cache
         env_info["model_dir"] = resolved_cache
 
     return env_info
@@ -244,12 +257,17 @@ def ensure_qwen_environment(
     if model_dir is not None:
         model_path = Path(model_dir).expanduser().resolve()
     else:
-        existing_model_dir = os.getenv("DOCSTOKG_QWEN_MODEL_DIR")
+        existing_model_dir = os.getenv("DOCSTOKG_QWEN_DIR")
         if existing_model_dir:
             model_path = Path(existing_model_dir).expanduser().resolve()
+        else:
+            legacy_model_dir = os.getenv("DOCSTOKG_QWEN_MODEL_DIR")
+            if legacy_model_dir:
+                model_path = Path(legacy_model_dir).expanduser().resolve()
 
     if model_path is not None:
         resolved_model_dir = str(model_path)
+        os.environ["DOCSTOKG_QWEN_DIR"] = resolved_model_dir
         os.environ["DOCSTOKG_QWEN_MODEL_DIR"] = resolved_model_dir
         env_info["model_dir"] = resolved_model_dir
 
