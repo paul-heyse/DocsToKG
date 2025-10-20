@@ -171,6 +171,7 @@ import sys
 import threading
 import time
 import zipfile
+from concurrent.futures import ThreadPoolExecutor as RealThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from contextlib import contextmanager
 from pathlib import Path
@@ -462,6 +463,109 @@ def test_run_validators_respects_concurrency(tmp_path, config):
     for name in validators:
         artifact = tmp_path / f"val-{name}" / f"{name}_parse.json"
         assert artifact.exists()
+
+
+def test_run_validators_uses_tightest_worker_cap(tmp_path, config):
+    config_limits = []
+    for limit in (6, 3, 5):
+        cfg = config.model_copy(deep=True)
+        cfg.defaults.validation.max_concurrent_validators = limit
+        config_limits.append(cfg)
+
+    validators = {}
+
+    def _validator(request: ValidationRequest, logger):  # pragma: no cover - simple stub
+        return ValidationResult(ok=True, details={"validator": request.name}, output_files=[])
+
+    requests = []
+    for index, cfg in enumerate(config_limits):
+        name = f"validator{index}"
+        validators[name] = _validator
+        file_path = tmp_path / f"{name}.ttl"
+        file_path.write_text("@prefix ex: <http://example.org/> .")
+        requests.append(
+            ValidationRequest(
+                name,
+                file_path,
+                tmp_path / f"norm-{name}",
+                tmp_path / f"val-{name}",
+                cfg,
+            )
+        )
+
+    captured: dict[str, int] = {}
+
+    class TrackingExecutor:
+        def __init__(self, *args, **kwargs):
+            max_workers = kwargs.get("max_workers")
+            if max_workers is None and args:
+                max_workers = args[0]
+            captured["max_workers"] = max_workers
+            self._executor = RealThreadPoolExecutor(*args, **kwargs)
+
+        def submit(self, *args, **kwargs):
+            return self._executor.submit(*args, **kwargs)
+
+        def shutdown(self, *args, **kwargs):
+            return self._executor.shutdown(*args, **kwargs)
+
+    with patch.object(validation_mod, "VALIDATORS", validators), patch.object(
+        validation_mod, "ThreadPoolExecutor", TrackingExecutor
+    ):
+        results = run_validators(requests, _noop_logger())
+
+    assert set(results) == set(validators)
+    assert captured.get("max_workers") == 3
+
+
+def test_run_validators_defaults_to_two_workers(tmp_path, config):
+    config_one = config.model_copy(deep=True)
+    config_two = config.model_copy(deep=True)
+
+    validators = {}
+
+    def _validator(request: ValidationRequest, logger):  # pragma: no cover - simple stub
+        return ValidationResult(ok=True, details={"validator": request.name}, output_files=[])
+
+    requests = []
+    for index, cfg in enumerate((config_one, config_two)):
+        name = f"default{index}"
+        validators[name] = _validator
+        file_path = tmp_path / f"{name}.ttl"
+        file_path.write_text("@prefix ex: <http://example.org/> .")
+        requests.append(
+            ValidationRequest(
+                name,
+                file_path,
+                tmp_path / f"norm-{name}",
+                tmp_path / f"val-{name}",
+                cfg,
+            )
+        )
+
+    captured: dict[str, int] = {}
+
+    class TrackingExecutor:
+        def __init__(self, *args, **kwargs):
+            max_workers = kwargs.get("max_workers")
+            if max_workers is None and args:
+                max_workers = args[0]
+            captured["max_workers"] = max_workers
+            self._executor = RealThreadPoolExecutor(*args, **kwargs)
+
+        def submit(self, *args, **kwargs):
+            return self._executor.submit(*args, **kwargs)
+
+        def shutdown(self, *args, **kwargs):
+            return self._executor.shutdown(*args, **kwargs)
+
+    with patch.object(validation_mod, "VALIDATORS", validators), patch.object(
+        validation_mod, "ThreadPoolExecutor", TrackingExecutor
+    ):
+        results = run_validators(requests, _noop_logger())
+
+    assert set(results) == set(validators)
+    assert captured.get("max_workers") == 2
 
 
 def test_run_validators_mixed_pools_respects_budget(tmp_path, config):
