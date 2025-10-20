@@ -292,7 +292,7 @@ from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import numpy as np
@@ -2985,6 +2985,96 @@ def test_service_close_flushes_dense_snapshot(tmp_path: Path, patcher: PatchMana
     service.close()
 
     assert len(calls) >= baseline + 1, "service.close() should flush a final snapshot"
+
+
+def test_scale_channel_relevance_uses_namespace_embeddings(
+    stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ingestion, _, registry, validator, feature_generator, _ = stack()
+
+    shared_doc_id = "shared-doc"
+    tenant_a = _write_document_artifacts(
+        tmp_path,
+        doc_id=shared_doc_id,
+        namespace="tenant-a",
+        text="alpha tenant a",
+        metadata={},
+        feature_generator=feature_generator,
+    )
+    tenant_b = _write_document_artifacts(
+        tmp_path,
+        doc_id=shared_doc_id,
+        namespace="tenant-b",
+        text="beta tenant b",
+        metadata={},
+        feature_generator=feature_generator,
+    )
+    ingestion.upsert_documents([tenant_a, tenant_b])
+
+    dataset = [
+        {
+            "document": {"doc_id": shared_doc_id, "namespace": "tenant-a"},
+            "queries": [
+                {
+                    "query": "alpha tenant a",
+                    "expected_doc_id": shared_doc_id,
+                    "namespace": "tenant-a",
+                }
+            ],
+        },
+        {
+            "document": {"doc_id": shared_doc_id, "namespace": "tenant-b"},
+            "queries": [
+                {
+                    "query": "beta tenant b",
+                    "expected_doc_id": shared_doc_id,
+                    "namespace": "tenant-b",
+                }
+            ],
+        },
+    ]
+
+    registry_chunks = registry.all()
+    vectors = registry.resolve_embeddings([chunk.vector_id for chunk in registry_chunks])
+    vectors_by_key = {
+        (chunk.namespace, chunk.doc_id): vector
+        for chunk, vector in zip(registry_chunks, vectors)
+    }
+
+    expected_order = [("tenant-a", shared_doc_id), ("tenant-b", shared_doc_id)]
+    observed_order: List[Tuple[str, str]] = []
+    original_search = validator._ingestion.faiss_index.search
+
+    def spy_search(vector: np.ndarray, top_k: int) -> Any:
+        expected_namespace, expected_doc = expected_order[len(observed_order)]
+        expected_vector = vectors_by_key[(expected_namespace, expected_doc)]
+        np.testing.assert_allclose(vector, expected_vector)
+        observed_order.append((expected_namespace, expected_doc))
+        return original_search(vector, top_k)
+
+    monkeypatch.setattr(validator._ingestion.faiss_index, "search", spy_search)
+
+    report = validator._scale_channel_relevance(
+        dataset,
+        thresholds={},
+        rng=random.Random(0),
+        query_sample_size=len(expected_order),
+    )
+
+    assert observed_order == expected_order
+    assert report.details["dense_hit_rate@10"] == pytest.approx(1.0)
 
 
 # --- test_hybrid_search_scale.py ---
