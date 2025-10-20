@@ -81,3 +81,38 @@ def test_validate_chunk_files_failure_logs_status_and_hash_alg(tmp_path) -> None
     manifest_record = json.loads(manifest_entries[0])
     assert manifest_record["status"] == "failure"
     assert manifest_record["hash_alg"] == expected_hash_alg
+
+
+def test_log_skip_preserves_null_schema_version(tmp_path) -> None:
+    """Skip manifests should preserve ``None`` schema versions and metadata."""
+
+    attempts_path = tmp_path / "attempts.jsonl"
+    manifest_path = tmp_path / "manifest.jsonl"
+    telemetry = StageTelemetry(
+        TelemetrySink(attempts_path, manifest_path),
+        run_id="test-run",
+        stage="chunking",
+    )
+
+    metadata = {
+        "schema_version": None,
+        "output_path": str(tmp_path / "skipped.jsonl"),
+        "hash_alg": "sha256",
+        "skip_reason": "unchanged input",
+    }
+
+    telemetry.log_skip(
+        doc_id="doc-123",
+        input_path=tmp_path / "input.jsonl",
+        reason="unchanged input",
+        metadata=metadata,
+    )
+
+    manifest_entries = manifest_path.read_text(encoding="utf-8").strip().splitlines()
+    assert manifest_entries, "expected a manifest entry to be written"
+    manifest_record = json.loads(manifest_entries[0])
+
+    assert "schema_version" in manifest_record, "schema_version field missing"
+    assert manifest_record["schema_version"] is None
+    assert manifest_record["hash_alg"] == metadata["hash_alg"]
+    assert manifest_record["skip_reason"] == metadata["skip_reason"]

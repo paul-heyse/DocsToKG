@@ -57,7 +57,7 @@ class ManifestEntry:
     stage: str
     output_path: str
     tokens: int
-    schema_version: str
+    schema_version: Optional[str]
     duration_s: float
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -149,7 +149,7 @@ class StageTelemetry:
         doc_id: str,
         output_path: Path | str,
         tokens: Optional[int] = None,
-        schema_version: str,
+        schema_version: Optional[str],
         duration_s: float,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -249,7 +249,7 @@ class StageTelemetry:
                 doc_id=doc_id,
                 output_path=metadata.get("output_path", ""),
                 tokens=0,
-                schema_version=str(metadata.get("schema_version", "")),
+                schema_version=metadata.get("schema_version"),
                 duration_s=0.0,
                 metadata=metadata,
             )
