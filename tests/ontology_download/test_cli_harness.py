@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import textwrap
+import shutil
 from pathlib import Path
 
 from DocsToKG.OntologyDownload import cli as cli_module
@@ -156,3 +157,35 @@ def test_cli_pull_accepts_tilde_spec_path(monkeypatch, ontology_env, tmp_path, c
     stdout = capsys.readouterr().out
     payload = json.loads(stdout)
     assert payload[0]["id"] == "hp"
+
+
+def test_cli_init_expands_tilde_destination(monkeypatch, tmp_path, capsys):
+    """`ontofetch init` should expand ``~`` destinations before writing files."""
+
+    home_dir = tmp_path / "home"
+    home_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HOME", str(home_dir))
+
+    tilde_argument = Path("~") / "temp.yaml"
+    literal_parent = Path.cwd() / "~"
+    literal_destination = literal_parent / "temp.yaml"
+    if literal_parent.exists():
+        shutil.rmtree(literal_parent)
+
+    exit_code = cli_module.cli_main(["init", str(tilde_argument)])
+    assert exit_code == 0
+    first_output = capsys.readouterr()
+    created_path = home_dir / "temp.yaml"
+    assert created_path.exists()
+    assert "Wrote example configuration" in first_output.out
+    assert str(created_path) in first_output.out
+    assert not literal_destination.exists()
+
+    second_exit = cli_module.cli_main(["init", str(tilde_argument)])
+    assert second_exit == 1
+    second_output = capsys.readouterr()
+    assert "Error: Refusing to overwrite existing file" in second_output.err
+    assert str(created_path) in second_output.err
+
+    if literal_parent.exists():
+        shutil.rmtree(literal_parent)
