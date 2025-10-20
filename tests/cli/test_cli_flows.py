@@ -558,6 +558,8 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, patcher, tmp_pa
     assert len(rows) == 1
     captured_row = rows[0]
     assert captured_row.pop("run_id")
+    assert captured_row.pop("canonical_url") == "https://oa.example/direct.pdf"
+    assert captured_row.pop("original_url") == "https://oa.example/direct.pdf"
     assert captured_row == {
         "work_id": "WCSV",
         "title": "CSV Work",

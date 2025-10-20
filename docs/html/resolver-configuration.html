@@ -137,26 +137,22 @@ reason. Operators can enable the feature either in configuration files:</p>
 <p>Global deduplication is enabled by default; supply <code class="docutils literal notranslate"><span class="pre">--no-global-url-dedup</span></code> when
 you need to reprocess URLs regardless of prior runs.</p>
 </section>
-<section id="configuring-domain-level-rate-limiting">
-<h2>4. Configuring Domain-Level Rate Limiting<a class="headerlink" href="#configuring-domain-level-rate-limiting" title="Link to this heading"></a></h2>
-<p>Some publishers share infrastructure across multiple resolvers. The
-<code class="docutils literal notranslate"><span class="pre">domain_min_interval_s</span></code> mapping enforces minimum spacing between requests to a
-hostname regardless of the originating resolver. Configure the interval in
-seconds per domain:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">domain_min_interval_s</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">example.org</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.75</span>
-<span class="w">  </span><span class="nt">publisher.edu</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.5</span>
-</pre></div>
-</div>
-<p>CLI runs can supply the same information with repeated
-<code class="docutils literal notranslate"><span class="pre">--domain-min-interval</span></code> flags. Domains are matched case-insensitively:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.cli<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--domain-min-interval<span class="w"> </span>example.org<span class="o">=</span><span class="m">0</span>.5<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--domain-min-interval<span class="w"> </span>publisher.edu<span class="o">=</span><span class="m">1</span>.5
-</pre></div>
-</div>
-<p>Domain-level limits complement existing resolver-level throttles and are
-particularly helpful when multiple providers resolve to the same host.</p>
+<section id="configuring-centralized-rate-policies">
+<h2>4. Configuring Centralized Rate Policies<a class="headerlink" href="#configuring-centralized-rate-policies" title="Link to this heading"></a></h2>
+<p>The pyrate-backed limiter is now the single source of truth for host throttling.
+Use the CLI (or matching environment variables) to tune behaviour:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--rate</span></code> overrides limiter windows (for example
+<code class="docutils literal notranslate"><span class="pre">--rate</span> <span class="pre">api.openalex.org=10/s,1000/h</span></code> or
+<code class="docutils literal notranslate"><span class="pre">--rate</span> <span class="pre">export.arxiv.org.artifact=1/3s</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rate-mode</span></code> toggles bounded waiting vs. immediate failure per host/role
+(<code class="docutils literal notranslate"><span class="pre">--rate-mode</span> <span class="pre">api.crossref.org=wait:250</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rate-max-delay</span></code> adjusts wait ceilings, while <code class="docutils literal notranslate"><span class="pre">--rate-backend</span></code> selects the limiter backend
+(memory, sqlite, redis, postgres).</p></li>
+</ul>
+<p>Configuration files that still declare <code class="docutils literal notranslate"><span class="pre">domain_min_interval_s</span></code> or
+<code class="docutils literal notranslate"><span class="pre">domain_token_buckets</span></code> now fail validation. Update those files to express host
+limits via the centralized policies instead.</p>
 </section>
 <section id="adjusting-classification-heuristics">
 <h2>5. Adjusting Classification Heuristics<a class="headerlink" href="#adjusting-classification-heuristics" title="Link to this heading"></a></h2>

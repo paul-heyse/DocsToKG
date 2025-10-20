@@ -93,6 +93,8 @@ def test_manifest_entry_roundtrip_matches_golden(tmp_path: Path) -> None:
         publication_year=2024,
         resolver="contract-resolver",
         url="https://pub.example/paper.pdf",
+        canonical_url="https://pub.example/paper.pdf",
+        original_url="https://pub.example/paper.pdf",
         path="/tmp/paper.pdf",
         classification=Classification.PDF.value,
         content_type="application/pdf",

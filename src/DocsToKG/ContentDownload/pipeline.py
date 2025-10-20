@@ -132,7 +132,6 @@ import json
 import logging
 import math
 import os
-import random
 import threading
 import time as _time
 import warnings
@@ -373,13 +372,11 @@ class ResolverConfig:
         semantic_scholar_api_key: API key for Semantic Scholar resolver.
         doaj_api_key: API key for DOAJ resolver.
         resolver_timeouts: Resolver-specific timeout overrides.
-        resolver_min_interval_s: Minimum interval between resolver HTTP requests.
         enable_head_precheck: Toggle applying HEAD filtering before downloads.
         resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
         host_accept_overrides: Mapping of hostname to Accept header override.
         mailto: Contact email appended to polite headers and user agent string.
         max_concurrent_resolvers: Upper bound on concurrent resolver threads per work.
-        max_concurrent_per_host: Upper bound on simultaneous downloads per hostname.
         enable_global_url_dedup: Enable global URL deduplication across works when True.
         global_url_dedup_cap: Maximum URLs hydrated into the global dedupe cache.
         domain_content_rules: Mapping of hostname to MIME allow-lists.
@@ -390,8 +387,7 @@ class ResolverConfig:
         to filter obvious HTML responses. ``resolver_head_precheck`` allows
         per-resolver overrides when specific providers reject HEAD requests.
         ``max_concurrent_resolvers`` bounds the number of resolver threads used
-        per work while still respecting configured rate limits. ``max_concurrent_per_host``
-        limits simultaneous downloads hitting the same hostname across workers.
+        per work while still respecting configured rate limits.
 
     Examples:
         >>> config = ResolverConfig()
@@ -412,14 +408,12 @@ class ResolverConfig:
     semantic_scholar_api_key: Optional[str] = None
     doaj_api_key: Optional[str] = None
     resolver_timeouts: Dict[str, float] = field(default_factory=dict)
-    resolver_min_interval_s: Dict[str, float] = field(default_factory=dict)
     enable_head_precheck: bool = True
     resolver_head_precheck: Dict[str, bool] = field(default_factory=dict)
     head_precheck_host_overrides: Dict[str, bool] = field(default_factory=dict)
     host_accept_overrides: Dict[str, str] = field(default_factory=dict)
     mailto: Optional[str] = None
     max_concurrent_resolvers: int = 1
-    max_concurrent_per_host: int = 3
     enable_global_url_dedup: bool = True
     global_url_dedup_cap: Optional[int] = 100_000
     domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
@@ -481,16 +475,11 @@ class ResolverConfig:
             warnings.warn(
                 (
                     "max_concurrent_resolvers="
-                    f"{self.max_concurrent_resolvers} > 10 may violate rate limits. "
-                    "Ensure resolver_min_interval_s is configured appropriately for all resolvers."
+                    f"{self.max_concurrent_resolvers} > 10 may violate provider rate limits. "
+                    "Review centralized limiter policies before increasing concurrency."
                 ),
                 UserWarning,
                 stacklevel=2,
-            )
-
-        if self.max_concurrent_per_host < 0:
-            raise ValueError(
-                f"max_concurrent_per_host must be >= 0, got {self.max_concurrent_per_host}"
             )
 
         if self.timeout <= 0:
@@ -500,14 +489,6 @@ class ResolverConfig:
                 raise ValueError(
                     ("resolver_timeouts['{name}'] must be positive, got {value}").format(
                         name=resolver_name, value=timeout_val
-                    )
-                )
-
-        for resolver_name, interval in self.resolver_min_interval_s.items():
-            if interval < 0:
-                raise ValueError(
-                    ("resolver_min_interval_s['{name}'] must be non-negative, got {value}").format(
-                        name=resolver_name, value=interval
                     )
                 )
 
@@ -610,6 +591,10 @@ def apply_config_overrides(
         raise ValueError(
             "domain_token_buckets is no longer supported. Configure host policies via centralized rate limiter overrides."
         )
+    if "resolver_min_interval_s" in data and data["resolver_min_interval_s"] not in (None, {}):
+        raise ValueError(
+            "resolver_min_interval_s is no longer supported. Configure resolver-friendly rate policies via centralized limiter overrides."
+        )
 
     for field_name in (
         "resolver_order",
@@ -617,24 +602,22 @@ def apply_config_overrides(
         "max_attempts_per_work",
         "timeout",
         "retry_after_cap",
-        "sleep_jitter",
         "polite_headers",
         "unpaywall_email",
         "core_api_key",
         "semantic_scholar_api_key",
         "doaj_api_key",
         "resolver_timeouts",
-        "resolver_min_interval_s",
         "mailto",
         "resolver_head_precheck",
         "head_precheck_host_overrides",
         "host_accept_overrides",
         "resolver_circuit_breakers",
         "max_concurrent_resolvers",
-        "max_concurrent_per_host",
         "enable_global_url_dedup",
         "domain_content_rules",
         "global_url_dedup_cap",
+        "resolver_min_interval_s",
     ):
         if field_name in data and data[field_name] is not None:
             value = data[field_name]
@@ -646,7 +629,7 @@ def apply_config_overrides(
 
     if "resolver_rate_limits" in data:
         raise ValueError(
-            "resolver_rate_limits is no longer supported. Rename entries to resolver_min_interval_s."
+            "resolver_rate_limits is no longer supported. Configure resolver-specific rate policies via centralized limiter overrides."
         )
 
     _seed_resolver_toggle_defaults(config, resolver_names)
@@ -700,8 +683,6 @@ def load_resolver_config(
         config.retry_after_cap = float(args.retry_after_cap)
     if hasattr(args, "concurrent_resolvers") and args.concurrent_resolvers is not None:
         config.max_concurrent_resolvers = args.concurrent_resolvers
-    if hasattr(args, "max_concurrent_per_host") and args.max_concurrent_per_host is not None:
-        config.max_concurrent_per_host = args.max_concurrent_per_host
 
     if resolver_order_override:
         ordered: List[str] = []
@@ -752,7 +733,6 @@ def load_resolver_config(
     if hasattr(args, "head_precheck") and args.head_precheck is not None:
         config.enable_head_precheck = args.head_precheck
 
-    config.resolver_min_interval_s.setdefault("unpaywall", 1.0)
 
     return config
 
@@ -1259,7 +1239,6 @@ class ResolverPipeline:
         self.logger = logger
         self.metrics = metrics or ResolverMetrics()
         self._run_id = run_id
-        self._last_invocation: Dict[str, float] = defaultdict(lambda: 0.0)
         self._lock = threading.Lock()
         self._global_seen_urls: set[str] = set(initial_seen_urls or ())
         self._global_manifest_index = global_manifest_index or {}
@@ -1338,34 +1317,6 @@ class ResolverPipeline:
             detail_text = str(detail_token)
         if detail_text and detail_text != reason_text:
             self.metrics.record_skip(resolver_name, detail_text)
-
-    def _respect_rate_limit(self, resolver_name: str) -> None:
-        """Sleep as required to respect per-resolver rate limiting policies.
-
-        The method performs an atomic read-modify-write on
-        :attr:`_last_invocation` guarded by :attr:`_lock` to ensure that
-        concurrent threads honour resolver spacing requirements.
-
-        Args:
-            resolver_name: Name of the resolver to rate limit.
-
-        Returns:
-            None
-        """
-
-        limit = self.config.resolver_min_interval_s.get(resolver_name)
-        if not limit:
-            return
-        wait = 0.0
-        with self._lock:
-            last = self._last_invocation[resolver_name]
-            now = _time.monotonic()
-            delta = now - last
-            if delta < limit:
-                wait = limit - delta
-            self._last_invocation[resolver_name] = now + wait
-        if wait > 0:
-            _time.sleep(wait)
 
     def _get_existing_host_breaker(self, host: str) -> Optional[CircuitBreaker]:
         with self._host_breaker_lock:
@@ -1809,7 +1760,6 @@ class ResolverPipeline:
 
         client = client_provider()
         results: List[ResolverResult] = []
-        self._respect_rate_limit(resolver_name)
         start = _time.monotonic()
         try:
             for result in resolver.iter_urls(client, self.config, artifact):

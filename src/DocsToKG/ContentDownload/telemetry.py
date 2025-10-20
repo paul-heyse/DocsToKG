@@ -686,6 +686,8 @@ class RunTelemetry(AttemptSink):
         run_id: Optional[str],
         reason: Optional[ReasonCode | str] = None,
         reason_detail: Optional[str] = None,
+        canonical_url: Optional[str] = None,
+        original_url: Optional[str] = None,
     ) -> ManifestEntry:
         """Construct and emit a manifest entry for ``artifact``.
 
@@ -703,8 +705,16 @@ class RunTelemetry(AttemptSink):
         Returns:
             ManifestEntry: Structured manifest entry persisted via the sink.
         """
-        canonical_hint = getattr(outcome, "canonical_url", None) if outcome else None
-        original_hint = getattr(outcome, "original_url", None) if outcome else None
+        canonical_hint = (
+            canonical_url
+            if canonical_url is not None
+            else (getattr(outcome, "canonical_url", None) if outcome else None)
+        )
+        original_hint = (
+            original_url
+            if original_url is not None
+            else (getattr(outcome, "original_url", None) if outcome else None)
+        )
         entry = build_manifest_entry(
             artifact,
             resolver=resolver,
@@ -1354,32 +1364,29 @@ class SqliteSink:
         metadata_json = json.dumps(record.metadata, sort_keys=True) if record.metadata else None
         with locks.sqlite_lock(self._path):
             with self._lock:
-                self._conn.execute(
-                """
-                INSERT INTO attempts (
-                    timestamp,
-                    run_id,
-                    work_id,
-                    resolver_name,
-                    resolver_order,
-                    url,
-                    canonical_url,
-                    original_url,
-                    status,
-                    http_status,
-                    content_type,
-                    elapsed_ms,
-                    resolver_wall_time_ms,
-                    reason,
-                    reason_detail,
-                    metadata,
-                    sha256,
-                    content_length,
-                    dry_run,
-                    retry_after
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
+                columns = (
+                    "timestamp",
+                    "run_id",
+                    "work_id",
+                    "resolver_name",
+                    "resolver_order",
+                    "url",
+                    "canonical_url",
+                    "original_url",
+                    "status",
+                    "http_status",
+                    "content_type",
+                    "elapsed_ms",
+                    "resolver_wall_time_ms",
+                    "reason",
+                    "reason_detail",
+                    "metadata",
+                    "sha256",
+                    "content_length",
+                    "dry_run",
+                    "retry_after",
+                )
+                values = (
                     ts,
                     record.run_id,
                     record.work_id,
@@ -1408,7 +1415,11 @@ class SqliteSink:
                     record.content_length,
                     1 if record.dry_run else 0,
                     record.retry_after,
-                ),
+                )
+                placeholders = ", ".join(["?"] * len(columns))
+                self._conn.execute(
+                    f"INSERT INTO attempts ({', '.join(columns)}) VALUES ({placeholders})",
+                    values,
                 )
                 self._conn.commit()
 
@@ -1424,36 +1435,33 @@ class SqliteSink:
         html_paths_json = json.dumps(entry.html_paths, sort_keys=True) if entry.html_paths else None
         with locks.sqlite_lock(self._path):
             with self._lock:
-                self._conn.execute(
-                """
-                INSERT INTO manifests (
-                    timestamp,
-                    run_id,
-                    schema_version,
-                    work_id,
-                    title,
-                    publication_year,
-                    resolver,
-                    url,
-                    canonical_url,
-                    original_url,
-                    normalized_url,
-                    path,
-                    path_mtime_ns,
-                    classification,
-                    content_type,
-                    reason,
-                    reason_detail,
-                    html_paths,
-                    sha256,
-                    content_length,
-                    etag,
-                    last_modified,
-                    extracted_text_path,
-                    dry_run
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
+                columns = (
+                    "timestamp",
+                    "run_id",
+                    "schema_version",
+                    "work_id",
+                    "title",
+                    "publication_year",
+                    "resolver",
+                    "url",
+                    "canonical_url",
+                    "original_url",
+                    "normalized_url",
+                    "path",
+                    "path_mtime_ns",
+                    "classification",
+                    "content_type",
+                    "reason",
+                    "reason_detail",
+                    "html_paths",
+                    "sha256",
+                    "content_length",
+                    "etag",
+                    "last_modified",
+                    "extracted_text_path",
+                    "dry_run",
+                )
+                values = (
                     entry.timestamp,
                     entry.run_id,
                     entry.schema_version,
@@ -1478,7 +1486,11 @@ class SqliteSink:
                     entry.last_modified,
                     entry.extracted_text_path,
                     1 if entry.dry_run else 0,
-                ),
+                )
+                placeholders = ", ".join(["?"] * len(columns))
+                self._conn.execute(
+                    f"INSERT INTO manifests ({', '.join(columns)}) VALUES ({placeholders})",
+                    values,
                 )
                 self._conn.commit()
 

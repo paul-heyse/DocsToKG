@@ -109,41 +109,62 @@ def _seed_sqlite_resume(sqlite_path: Path) -> None:
             )
             """
         )
+        columns = (
+            "timestamp",
+            "run_id",
+            "schema_version",
+            "work_id",
+            "title",
+            "publication_year",
+            "resolver",
+            "url",
+            "canonical_url",
+            "original_url",
+            "normalized_url",
+            "path",
+            "path_mtime_ns",
+            "classification",
+            "content_type",
+            "reason",
+            "reason_detail",
+            "html_paths",
+            "sha256",
+            "content_length",
+            "etag",
+            "last_modified",
+            "extracted_text_path",
+            "dry_run",
+        )
+        values = (
+            "2025-01-02T00:00:00Z",
+            "resume-run",
+            MANIFEST_SCHEMA_VERSION,
+            "W-SQLITE",
+            "SQLite Resume",
+            2024,
+            "openalex",
+            "https://example.org/W-SQLITE.pdf",
+            "https://example.org/w-sqlite.pdf",
+            "https://example.org/W-SQLITE.pdf",
+            "https://example.org/w-sqlite.pdf",
+            "/data/stored.pdf",
+            None,
+            "pdf",
+            "application/pdf",
+            None,
+            None,
+            None,
+            "deadbeef",
+            2048,
+            None,
+            None,
+            None,
+            0,
+        )
+        placeholders = ", ".join(["?"] * len(columns))
         conn.execute(
-            """
-            INSERT INTO manifests (
-                timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, canonical_url, original_url, normalized_url, path, path_mtime_ns, classification,
-                content_type, reason, reason_detail, html_paths, sha256,
-                content_length, etag, last_modified, extracted_text_path, dry_run
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                "2025-01-02T00:00:00Z",
-                "resume-run",
-                MANIFEST_SCHEMA_VERSION,
-                "W-SQLITE",
-                "SQLite Resume",
-                2024,
-                "openalex",
-                "https://example.org/W-SQLITE.pdf",
-                "https://example.org/w-sqlite.pdf",
-                "https://example.org/W-SQLITE.pdf",
-                "https://example.org/w-sqlite.pdf",
-                "/data/stored.pdf",
-                None,
-                "pdf",
-                "application/pdf",
-                None,
-                None,
-                None,
-                "deadbeef",
-                2048,
-                None,
-                None,
-                None,
-                0,
-            ),
+            f"INSERT INTO manifests ({', '.join(columns)}) VALUES ({placeholders})",
+            values,
         )
         conn.commit()
     finally:
@@ -317,6 +338,8 @@ def test_load_previous_manifest_uses_sqlite_fallback(tmp_path: Path) -> None:
     first_entry = next(iter(resume_entry.values()))
     assert first_entry["classification"] == "pdf"
     assert first_entry["path"] == "/data/stored.pdf"
+    assert first_entry["canonical_url"] == "https://example.org/w-sqlite.pdf"
+    assert first_entry["original_url"] == "https://example.org/W-SQLITE.pdf"
 
 
 def test_load_previous_manifest_truncated_jsonl_uses_sqlite_fallback(
@@ -342,6 +365,8 @@ def test_load_previous_manifest_truncated_jsonl_uses_sqlite_fallback(
     first_entry = next(iter(resume_entry.values()))
     assert first_entry["classification"] == "pdf"
     assert first_entry["path"] == "/data/stored.pdf"
+    assert first_entry["canonical_url"] == "https://example.org/w-sqlite.pdf"
+    assert first_entry["original_url"] == "https://example.org/W-SQLITE.pdf"
 
 
 def test_load_previous_manifest_sqlite_path_has_no_warning(tmp_path: Path, caplog) -> None:
@@ -363,6 +388,8 @@ def test_load_previous_manifest_sqlite_path_has_no_warning(tmp_path: Path, caplo
     first_entry = next(iter(resume_entry.values()))
     assert first_entry["classification"] == "pdf"
     assert first_entry["path"] == "/data/stored.pdf"
+    assert first_entry["canonical_url"] == "https://example.org/w-sqlite.pdf"
+    assert first_entry["original_url"] == "https://example.org/W-SQLITE.pdf"
 
 
 def test_load_resolver_config_rejects_legacy_rate_limits(tmp_path: Path):
@@ -414,7 +441,6 @@ def test_load_resolver_config_applies_concurrency_and_dedup_overrides(tmp_path: 
         resolver_timeout=None,
         retry_after_cap=None,
         concurrent_resolvers=None,
-        max_concurrent_per_host=None,
         disable_resolver=[],
         enable_resolver=[],
         resolver_order=None,
@@ -445,7 +471,6 @@ def test_load_resolver_config_rejects_invalid_concurrency_override(tmp_path: Pat
         resolver_timeout=None,
         retry_after_cap=None,
         concurrent_resolvers=None,
-        max_concurrent_per_host=None,
         disable_resolver=[],
         enable_resolver=[],
         resolver_order=None,
@@ -476,7 +501,6 @@ def test_load_resolver_config_rejects_legacy_domain_limits(tmp_path: Path) -> No
         resolver_timeout=None,
         retry_after_cap=None,
         concurrent_resolvers=None,
-        max_concurrent_per_host=None,
         disable_resolver=[],
         enable_resolver=[],
         resolver_order=None,
@@ -507,7 +531,6 @@ def test_load_resolver_config_rejects_legacy_domain_token_buckets(tmp_path: Path
         resolver_timeout=None,
         retry_after_cap=None,
         concurrent_resolvers=None,
-        max_concurrent_per_host=None,
         disable_resolver=[],
         enable_resolver=[],
         resolver_order=None,

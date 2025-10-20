@@ -70,30 +70,21 @@ python -m DocsToKG.ContentDownload.cli \
 Global deduplication is enabled by default; supply ``--no-global-url-dedup`` when
 you need to reprocess URLs regardless of prior runs.
 
-## 4. Configuring Domain-Level Rate Limiting
+## 4. Configuring Centralized Rate Policies
 
-Some publishers share infrastructure across multiple resolvers. The
-``domain_min_interval_s`` mapping enforces minimum spacing between requests to a
-hostname regardless of the originating resolver. Configure the interval in
-seconds per domain:
+The pyrate-backed limiter is now the single source of truth for host throttling.
+Use the CLI (or matching environment variables) to tune behaviour:
 
-```yaml
-domain_min_interval_s:
-  example.org: 0.75
-  publisher.edu: 1.5
-```
+- ``--rate`` overrides limiter windows (e.g., ``--rate api.openalex.org=10/s,1000/h`` or
+  ``--rate export.arxiv.org.artifact=1/3s``).
+- ``--rate-mode`` toggles bounded waiting vs. immediate failure per host/role
+  (``--rate-mode api.crossref.org=wait:250``).
+- ``--rate-max-delay`` adjusts wait ceilings, while ``--rate-backend`` selects the
+  limiter backend (memory, sqlite, redis, postgres).
 
-CLI runs can supply the same information with repeated
-``--domain-min-interval`` flags. Domains are matched case-insensitively:
-
-```bash
-python -m DocsToKG.ContentDownload.cli \
-    --domain-min-interval example.org=0.5 \
-    --domain-min-interval publisher.edu=1.5
-```
-
-Domain-level limits complement existing resolver-level throttles and are
-particularly helpful when multiple providers resolve to the same host.
+Configuration files that still declare ``domain_min_interval_s`` or
+``domain_token_buckets`` now fail validation. Update those files to express host limits
+via the centralized policies instead.
 
 ## 5. Adjusting Classification Heuristics
 

@@ -414,12 +414,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum resolver threads per work item (default: 1).",
     )
     resolver_group.add_argument(
-        "--max-concurrent-per-host",
-        type=int,
-        default=None,
-        help="Maximum concurrent downloads per host (default: 3). Set to 0 to disable.",
-    )
-    resolver_group.add_argument(
         "--global-url-dedup",
         dest="global_url_dedup",
         action="store_true",

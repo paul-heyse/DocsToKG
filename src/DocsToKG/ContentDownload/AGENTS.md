@@ -352,12 +352,11 @@ resolver_toggles:
   wayback: false
 resolver_min_interval_s:
   unpaywall: 0.5
-domain_token_buckets:
-  crossref.org:
-    rate_per_second: 4
-    capacity: 12
-    breaker_threshold: 15
-    breaker_cooldown: 120
+rate_overrides:
+  - "api.crossref.org=10/s,1000/h"
+  - "export.arxiv.org.artifact=1/3s"
+rate_mode_overrides:
+  - "api.crossref.org=wait:250"
 domain_content_rules:
   arxiv.org:
     allowed_types:
@@ -369,7 +368,7 @@ resolver_circuit_breakers:
 ```
 
 - Unknown keys raise `ValueError`; extend `ResolverConfig` before adding new options.
-- Domain rate limits cascade into centralized limiter policies; resolver toggles override defaults per provider.
+- Centralized limiter overrides (`rate_overrides`, `rate_mode_overrides`, `--rate*` CLI) replace legacy per-domain throttles.
 
 ## Telemetry, Data Contracts & Error Handling
 
@@ -398,7 +397,7 @@ resolver_circuit_breakers:
 - **Resolver health audit**: `jq 'select(.record_type=="attempt") | {resolver_name, reason}' runs/content/manifest.jsonl | sort | uniq -c`.
 - **Cache hygiene**: delete artifact directory and corresponding `manifest.*`/`manifest.sqlite3` together; regenerate manifests immediately if manual cleanup occurs.
 - **Concurrency validation**: run small `--dry-run --log-format jsonl` workloads, inspect `manifest.metrics.json` latency blocks before raising `--workers`.
-- **Rate limiter tuning**: default backend is in-memory (single host). Switch to SQLite for shared runners (`--rate-backend sqlite:path=/var/run/docstokg/rl.sqlite`), `multiprocess` for forked workers, or Redis/Postgres for distributed quotas. Use `--rate` / `--rate-mode` CLI flags (or `DOCSTOKG_RATE*` env vars) to adjust host windows, then confirm changes via startup `rate-policy` log and `manifest.metrics.json`. Legacy `--domain-token-bucket` / `--domain-min-interval` map to artifact role policies automatically; `--rate-disable` (or `DOCSTOKG_RATE_DISABLED=true`) keeps the fallback path handy during pilots.
+- **Rate limiter tuning**: default backend is in-memory (single host). Switch to SQLite for shared runners (`--rate-backend sqlite:path=/var/run/docstokg/rl.sqlite`), `multiprocess` for forked workers, or Redis/Postgres for distributed quotas. Use `--rate` / `--rate-mode` / `--rate-max-delay` (or `DOCSTOKG_RATE*` env vars) to adjust host windows, then confirm changes via startup `rate-policy` log and `manifest.metrics.json`. `--rate-disable` (or `DOCSTOKG_RATE_DISABLED=true`) keeps the fallback path handy during pilots.
 
 ## Migration Checklist
 

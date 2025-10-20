@@ -444,41 +444,6 @@ def test_concurrent_execution_with_three_workers(tmp_path):
 # --- test_bounded_concurrency.py ---
 
 
-def test_rate_limits_enforced_under_concurrency(tmp_path):
-    artifact = _make_artifact(tmp_path)
-    resolvers = [
-        DelayResolver("r1", ["https://r1.example/a"], delay=0.0),
-        DelayResolver("r2", ["https://r2.example/a"], delay=0.0),
-    ]
-    config = _make_config(
-        [r.name for r in resolvers],
-        max_concurrent_resolvers=2,
-        resolver_min_interval_s={r.name: 0.2 for r in resolvers},
-    )
-    logger = RecordingLogger()
-    metrics = ResolverMetrics()
-
-    def download_func(session, artifact, url, referer, timeout):
-        return _html_outcome()
-
-    pipeline = ResolverPipeline(resolvers, config, download_func, logger, metrics)
-    now = time.monotonic()
-    for resolver in resolvers:
-        pipeline._last_invocation[resolver.name] = now
-
-    for _ in range(3):
-        pipeline.run(object(), artifact)
-
-    for resolver in resolvers:
-        assert resolver.start_times, "Resolver did not execute"
-        for idx in range(1, len(resolver.start_times)):
-            delta = resolver.start_times[idx] - resolver.start_times[idx - 1]
-            assert delta >= 0.19, f"Rate limit gap too small: {delta:.3f}s for {resolver.name}"
-
-
-# --- test_bounded_concurrency.py ---
-
-
 def test_early_stop_cancels_remaining_resolvers(tmp_path):
     artifact = _make_artifact(tmp_path)
     fast = DelayResolver("fast", ["https://fast.example/pdf"], delay=0.0)
@@ -559,29 +524,6 @@ class _NullLogger:
 # --- test_parallel_execution.py ---
 
 
-def test_rate_limiting_with_parallel_workers():
-    config = ResolverConfig()
-    config.resolver_min_interval_s = {"test": 0.1}
-    pipeline = ResolverPipeline([], config, lambda *args, **kwargs: None, _NullLogger())
-
-    # Establish initial timestamp so subsequent calls respect the interval.
-    pipeline._respect_rate_limit("test")
-
-    def call_respect_limit() -> float:
-        pipeline._respect_rate_limit("test")
-        return time.monotonic()
-
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        timestamps = list(executor.map(lambda _: call_respect_limit(), range(4)))
-
-    timestamps.sort()
-    for first, second in zip(timestamps, timestamps[1:]):
-        assert second - first >= 0.09
-
-
-# --- test_parallel_execution.py ---
-
-
 class _SlowResolver:
     def __init__(self, name: str, delay: float) -> None:
         self.name = name
@@ -648,7 +590,6 @@ def test_concurrent_pipeline_reduces_wall_time(patcher):
             resolver_toggles={name: True for name in resolver_names},
             max_concurrent_resolvers=max_workers,
             enable_head_precheck=False,
-            sleep_jitter=0.0,
         )
 
     artifact = _StubArtifact()

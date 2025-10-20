@@ -2403,7 +2403,6 @@ def test_pipeline_respects_max_attempts(tmp_path):
 
 def test_pipeline_jitter_sleep_no_delay():
     config = ResolverConfig()
-    config.sleep_jitter = 0.0
     pipeline = ResolverPipeline([], config, lambda *a, **k: None, ListLogger(), ResolverMetrics())
 
     with patch("DocsToKG.ContentDownload.pipeline._time.sleep") as mock_sleep:
