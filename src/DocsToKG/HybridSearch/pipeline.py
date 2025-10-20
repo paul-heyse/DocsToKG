@@ -1085,10 +1085,15 @@ class ChunkIngestionPipeline:
         if not path.exists():
             raise IngestError(f"Artifact file {path} not found")
         with path.open("r", encoding="utf-8") as handle:
-            for line in handle:
+            for line_number, line in enumerate(handle, start=1):
                 if not line.strip():
                     continue
-                yield json.loads(line)
+                try:
+                    yield json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise IngestError(
+                        f"Failed to parse JSONL artifact {path} at line {line_number}: {exc.msg}"
+                    ) from exc
 
     def _read_jsonl(self, path: Path) -> List[Dict[str, object]]:
         """Return the contents of a JSONL artifact eagerly."""
