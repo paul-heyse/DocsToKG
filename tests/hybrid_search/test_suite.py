@@ -312,7 +312,12 @@ from DocsToKG.HybridSearch import (
     HybridSearchValidator,
     Observability,
 )
-from DocsToKG.HybridSearch.config import DenseIndexConfig, FusionConfig, HybridSearchConfig
+from DocsToKG.HybridSearch.config import (
+    DenseIndexConfig,
+    FusionConfig,
+    HybridSearchConfig,
+    RetrievalConfig,
+)
 from DocsToKG.HybridSearch.devtools.features import FeatureGenerator, tokenize
 from DocsToKG.HybridSearch.devtools.opensearch_simulator import (
     OpenSearchSchemaManager,
@@ -320,6 +325,7 @@ from DocsToKG.HybridSearch.devtools.opensearch_simulator import (
 )
 from DocsToKG.HybridSearch.pipeline import IngestError, RetryableIngestError
 from DocsToKG.HybridSearch.service import (
+    AdaptiveDensePlanner,
     RequestValidationError,
     ResultShaper,
     build_stats_snapshot,
@@ -1352,6 +1358,171 @@ def test_execute_dense_uses_range_search_for_recall_first_without_score_floor() 
     assert registry.resolve_embeddings_calls == [("vec-0",)]
     assert result.embeddings is not None
     np.testing.assert_allclose(result.embeddings, chunk_features.embedding[None, :])
+
+
+def test_recall_first_pass_rate_isolated_from_default_planner() -> None:
+    class _MetricsStub:
+        def observe(self, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        def set_gauge(self, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        def increment(self, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        def percentile(self, *_args: object, **_kwargs: object) -> Optional[float]:
+            return None
+
+    class _RegistryStub:
+        def __init__(self, payload: ChunkPayload) -> None:
+            self._payload = payload
+            self._embedding = payload.features.embedding
+
+        def bulk_get(self, vector_ids: Sequence[str]) -> Sequence[ChunkPayload]:
+            return [
+                self._payload
+                for vector_id in vector_ids
+                if vector_id == self._payload.vector_id
+            ]
+
+        def resolve_embeddings(
+            self, vector_ids: Sequence[str], *, cache: Optional[Dict[str, np.ndarray]] = None
+        ) -> np.ndarray:
+            rows = [
+                self._embedding
+                for vector_id in vector_ids
+                if vector_id == self._payload.vector_id
+            ]
+            if not rows:
+                return np.empty((0, self._embedding.shape[-1]), dtype=np.float32)
+            return np.vstack(rows)
+
+        def resolve_embedding(
+            self, vector_id: str, *, cache: Optional[Dict[str, np.ndarray]] = None
+        ) -> np.ndarray:
+            return self._embedding
+
+    class _StoreStub:
+        def __init__(
+            self,
+            range_hits: Sequence[FaissSearchResult],
+            batch_hits: Sequence[FaissSearchResult],
+        ) -> None:
+            self._range_hits = list(range_hits)
+            self._batch_hits = list(batch_hits)
+            self.range_calls = 0
+            self.batch_depths: List[int] = []
+
+        def range_search(
+            self, _query: np.ndarray, _score_floor: float, *, limit: Optional[int] = None
+        ) -> Sequence[FaissSearchResult]:
+            self.range_calls += 1
+            return list(self._range_hits)
+
+        def search_batch(
+            self, _queries: np.ndarray, depth: int
+        ) -> Sequence[Sequence[FaissSearchResult]]:
+            self.batch_depths.append(depth)
+            return [list(self._batch_hits)]
+
+    service = object.__new__(HybridSearchService)
+    planner = AdaptiveDensePlanner(alpha=0.4, initial_pass_rate=0.5)
+    service._dense_strategy = planner  # type: ignore[attr-defined]
+    service._observability = SimpleNamespace(metrics=_MetricsStub())  # type: ignore[attr-defined]
+
+    chunk_features = ChunkFeatures(
+        bm25_terms={},
+        splade_weights={},
+        embedding=np.array([0.1, 0.2, 0.3], dtype=np.float32),
+    )
+    chunk = ChunkPayload(
+        doc_id="doc-0",
+        chunk_id="chunk-0",
+        vector_id="vec-keep",
+        namespace="demo",
+        text="dense chunk",
+        metadata={},
+        features=chunk_features,
+        token_count=5,
+        source_chunk_idxs=[0],
+        doc_items_refs=["doc:0"],
+    )
+    service._registry = _RegistryStub(chunk)  # type: ignore[attr-defined]
+
+    config = HybridSearchConfig(
+        retrieval=RetrievalConfig(
+            dense_top_k=3,
+            dense_overfetch_factor=1.0,
+            dense_oversample=1.0,
+        )
+    )
+    recall_request = HybridSearchRequest(
+        query="dense recall",
+        namespace="demo",
+        filters={},
+        page_size=2,
+        recall_first=True,
+    )
+    standard_request = replace(recall_request, recall_first=False)
+    filters: Dict[str, object] = {}
+    query_features = ChunkFeatures(
+        bm25_terms={},
+        splade_weights={},
+        embedding=np.array([0.2, 0.4, 0.6], dtype=np.float32),
+    )
+
+    range_hits = [
+        FaissSearchResult(vector_id="vec-keep", score=0.95)
+    ] + [
+        FaissSearchResult(vector_id=f"vec-miss-{idx}", score=0.05)
+        for idx in range(19)
+    ]
+    batch_hits = [
+        FaissSearchResult(vector_id="vec-keep", score=0.9),
+        FaissSearchResult(vector_id="vec-miss", score=0.2),
+    ]
+    store = _StoreStub(range_hits, batch_hits)
+
+    normal_signature = service._dense_request_signature(standard_request, filters)
+    planned_before = planner.plan(
+        normal_signature,
+        page_size=standard_request.page_size,
+        retrieval_cfg=config.retrieval,
+        dense_cfg=config.dense,
+    )[0]
+    initial_pass = planner.current_pass_rate()
+
+    service._execute_dense(
+        recall_request,
+        filters,
+        config,
+        query_features,
+        timings={},
+        store=store,
+    )
+
+    assert store.range_calls == 1
+    assert planner.current_pass_rate() == pytest.approx(initial_pass, rel=1e-6)
+
+    planned_after = planner.plan(
+        normal_signature,
+        page_size=standard_request.page_size,
+        retrieval_cfg=config.retrieval,
+        dense_cfg=config.dense,
+    )[0]
+    assert planned_after == planned_before
+
+    service._execute_dense(
+        standard_request,
+        filters,
+        config,
+        query_features,
+        timings={},
+        store=store,
+    )
+
+    assert store.batch_depths[0] == planned_before
 
 
 # --- test_hybrid_search.py ---

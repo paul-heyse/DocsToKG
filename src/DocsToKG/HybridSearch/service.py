@@ -301,8 +301,19 @@ class DenseSearchStrategy:
                 self._cache.move_to_end(signature)
             return (min(target, self._MAX_K), oversample, overfetch)
 
-    def observe_pass_rate(self, signature: Tuple[object, ...], observed: float) -> float:
-        """Blend ``observed`` into the running EMA and return the updated value."""
+    def observe_pass_rate(
+        self, signature: Tuple[object, ...], observed: float, *, update_global: bool = True
+    ) -> float:
+        """Blend ``observed`` into the running EMA and return the updated value.
+
+        Args:
+            signature: Unique signature for the dense request whose pass rate is being
+                tracked.
+            observed: Measured pass rate for the request (0.0–1.0).
+            update_global: When ``True`` blend the observation into the global planner
+                pass rate; when ``False`` the global planner state remains unchanged and
+                only the per-signature EMA is updated.
+        """
 
         with self._lock:
             bounded = max(0.0, min(1.0, float(observed)))
@@ -311,9 +322,11 @@ class DenseSearchStrategy:
                 1e-3, min(1.0, self._alpha * bounded + (1.0 - self._alpha) * local_prev)
             )
             self._signature_pass[signature] = local_rate
-            self._pass_rate = max(
-                1e-3, min(1.0, self._alpha * bounded + (1.0 - self._alpha) * self._pass_rate)
-            )
+            if update_global:
+                self._pass_rate = max(
+                    1e-3,
+                    min(1.0, self._alpha * bounded + (1.0 - self._alpha) * self._pass_rate),
+                )
             self._dirty = True
             return local_rate
 
@@ -1508,7 +1521,9 @@ class HybridSearchService:
             self._observability.metrics.observe("faiss_search_batch_size", 1.0, channel="dense")
             filtered, payloads = self._filter_dense_hits(hits, filters, score_floor)
             observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
-            blended_pass = strategy.observe_pass_rate(signature, observed)
+            blended_pass = strategy.observe_pass_rate(
+                signature, observed, update_global=not bool(getattr(request, "recall_first", False))
+            )
             strategy.remember(signature, max(len(filtered), len(hits)))
             filtered.sort(key=lambda hit: (-hit.score, hit.vector_id))
             effective_k = len(hits)
@@ -1599,8 +1614,9 @@ class HybridSearchService:
             float(observed),
             namespace=request.namespace or "*",
         )
+        update_global = not bool(getattr(request, "recall_first", False))
         blended_pass = (
-            strategy.observe_pass_rate(signature, observed)
+            strategy.observe_pass_rate(signature, observed, update_global=update_global)
             if not cached_signature
             else strategy.current_pass_rate()
         )
@@ -1628,7 +1644,9 @@ class HybridSearchService:
             hits = run_dense_search(effective_k)
             filtered, payloads = self._filter_dense_hits(hits, filters, score_floor)
             observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
-            blended_pass = strategy.observe_pass_rate(signature, observed)
+            blended_pass = strategy.observe_pass_rate(
+                signature, observed, update_global=update_global
+            )
 
         filtered.sort(key=lambda hit: (-hit.score, hit.vector_id))
         strategy.remember(signature, effective_k)
