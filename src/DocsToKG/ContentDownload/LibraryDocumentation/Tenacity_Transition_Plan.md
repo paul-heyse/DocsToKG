@@ -1,3 +1,5 @@
+**Status:** ✅ Completed in `openspec/changes/refactor-contentdownload-tenacity-retries`.
+
 We’re going for **maximal consolidation into Tenacity** (and we don’t need to preserve old semantics), here’s the concrete plan—module-by-module—so you can replace the custom backoff logic with Tenacity’s primitives everywhere that matters.
 
 ---

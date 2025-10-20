@@ -375,7 +375,8 @@ resolver_circuit_breakers:
 ## Networking, Rate Limiting & Politeness
 
 - `networking.ThreadLocalSessionFactory` + `create_session()` maintain per-thread sessions with shared adapter pools, polite defaults, and consistent timeouts; call `close_all()` during teardown.
-- `request_with_retries()` implements exponential backoff + equal jitter, respecting `Retry-After`, `--retry-after-cap`, and emitting `CachedResult` / `ModifiedResult` wrappers for conditional requests.
+- `request_with_retries()` delegates to a Tenacity controller that retries `{429, 500, 502, 503, 504}`, honours `Retry-After` headers (bounded by `retry_after_cap` and `backoff_max`), closes intermediate `requests.Response` objects before sleeping, and surfaces the final response when HTTP retries exhaust. Patch `DocsToKG.ContentDownload.networking.TENACITY_SLEEP` in tests to freeze pacing.
+- Resolver/CLI knobs flow directly into the Tenacity policy: `backoff_factor` controls jitter amplitude, `backoff_max` bounds waits, `retry_after_cap` enforces ceilings, `respect_retry_after` toggles header parsing, and `max_retry_duration` halts retries early.
 - Token buckets/circuit breakers defined in `ResolverConfig` throttle host+resolver concurrency; host semaphores and `CircuitBreaker` instances (`resolver_circuit_breakers`, domain breakers) share telemetry and enforce cooldowns.
 - `download.RobotsCache` enforces robots.txt unless `--ignore-robots`; override only with explicit approval.
 - `ConditionalRequestHelper` builds `If-None-Match` / `If-Modified-Since` headers; `head_precheck` downgrades to conditional GETs when HEAD is unsupported.

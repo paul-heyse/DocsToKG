@@ -3331,7 +3331,7 @@ def test_crossref_resolver_uses_central_retry_logic(patcher, tmp_path) -> None:
     patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b)
     sleep_calls: list[float] = []
     patcher.setattr(
-        "DocsToKG.ContentDownload.networking.time.sleep", lambda delay: sleep_calls.append(delay)
+        "DocsToKG.ContentDownload.networking.TENACITY_SLEEP", lambda delay: sleep_calls.append(delay)
     )
 
     session = _Session()

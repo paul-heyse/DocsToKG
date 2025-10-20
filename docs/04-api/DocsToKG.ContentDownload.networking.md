@@ -16,8 +16,9 @@ Key Features:
 
 - ``create_session``: Configure ``requests.Session`` instances with pooled
   adapters and optional header injection.
-- ``request_with_retries``: Execute resilient HTTP calls with jittered,
-  exponential backoff while honouring ``Retry-After`` directives.
+- ``request_with_retries``: Execute resilient HTTP calls via a Tenacity
+  controller that honours ``Retry-After`` directives, jittered exponential
+  backoff, and retry budgets.
 - ``ConditionalRequestHelper``: Build and validate conditional request headers
   for polite revalidation workflows.
 
@@ -114,43 +115,45 @@ Return the canonical MIME type component from a Content-Type header.
 
 Raise ContentPolicyViolation when response headers violate policy.
 
-### `_calculate_equal_jitter_delay(attempt)`
-
-Return an exponential backoff delay using equal jitter.
-
 ### `request_with_retries(session, method, url)`
 
-Execute an HTTP request with exponential backoff and retry handling.
+Execute an HTTP request using a Tenacity-backed retry controller.
 
 Args:
 session: Session used to execute the outbound request.
 method: HTTP method such as ``"GET"`` or ``"HEAD"``.
 url: Fully qualified URL for the request.
-max_retries: Maximum number of retry attempts before returning the final response or
-raising an exception. Defaults to ``3``.
+max_retries: Maximum number of retry attempts before returning the final response.
 retry_statuses: HTTP status codes that should trigger a retry. Defaults to
 ``{429, 500, 502, 503, 504}``.
-backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to ``0.75``.
+backoff_factor: Base multiplier for the Tenacity jitter strategy. Defaults to ``0.75``.
 respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
 retry_after_cap: Optional ceiling applied to parsed ``Retry-After`` values in seconds. When provided,
 the helper honours the lesser of the header value and this cap while still respecting ``backoff_max``.
 content_policy: Optional mapping describing allowed MIME types for the target host.
-max_retry_duration: Maximum total time to spend on retries in seconds. If exceeded, raises
-immediately. Defaults to ``None`` (no limit).
+max_retry_duration: Maximum total time to spend on retries in seconds. When exceeded, the helper returns
+the final response after logging a warning. Defaults to ``None`` (no limit).
 backoff_max: Maximum delay between retries in seconds. Prevents excessive wait times.
 Defaults to ``60.0`` seconds.
 **kwargs: Additional keyword arguments forwarded directly to :meth:`requests.Session.request`.
-Note: If ``timeout`` is provided as a single float, it will be converted to a tuple
-(connect_timeout, read_timeout) with read_timeout = timeout * 2 for better error handling.
 
 Returns:
-requests.Response: Successful response object. Callers are responsible for closing the
+requests.Response: Successful (or exhausted) response object. Callers are responsible for closing the
 response when streaming content.
 
 Raises:
 ValueError: If ``max_retries`` or ``backoff_factor`` are invalid or ``url``/``method`` are empty.
 requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.
-TimeoutError: If ``max_retry_duration`` is exceeded.
+
+Notes:
+    The Tenacity controller wires :class:`RetryAfterJitterWait` to prefer
+    ``Retry-After`` delays before falling back to
+    :func:`tenacity.wait_random_exponential`. Intermediate responses are
+    closed via ``_before_sleep_close_response``, cumulative sleep time is
+    tracked on the controller (``_docs_retry_sleep``), and tests may patch
+    :data:`TENACITY_SLEEP` to short-circuit waits. Exhausted HTTP retries
+    return the final :class:`requests.Response`, whereas exhausted exception
+    retries raise the underlying :class:`requests.RequestException`.
 
 ### `head_precheck(session, url, timeout)`
 

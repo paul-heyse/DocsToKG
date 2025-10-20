@@ -306,7 +306,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=120.0,
         help=(
             "Maximum seconds honoured from Retry-After headers during resolver HTTP retries. "
-            "Retries use exponential backoff with equal jitter; this cap prevents multi-minute sleeps."
+            "Retries use Tenacity-managed exponential jitter; this cap prevents multi-minute sleeps."
         ),
     )
     resolver_group.add_argument(

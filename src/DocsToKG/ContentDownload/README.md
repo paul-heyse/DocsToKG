@@ -100,7 +100,7 @@ export UNPAYWALL_EMAIL=you@example.org
 - `runner.py` – `DownloadRun` lifecycle (telemetry sinks, thread pools, resume hydration, OpenAlex pagination, metrics emission).
 - `pipeline.py` – resolver registry, `ResolverConfig`, concurrency/rate-limiting primitives, attempt logging, and `ResolverMetrics`.
 - `download.py` – download strategies, cache validation, robots enforcement, payload classification, manifest emission, and resume logic.
-- `networking.py` – HTTP session factory, retry policies, conditional requests, token buckets, circuit breakers, and polite head prechecks.
+- `networking.py` – HTTP session factory, Tenacity-backed retry controller (`request_with_retries`), conditional requests, token buckets, circuit breakers, and polite head prechecks.
 - `telemetry.py` – manifest schemas, sink implementations (`JsonlSink`, `RotatingJsonlSink`, `CsvSink`, `LastAttemptCsvSink`, `ManifestIndexSink`, `SqliteSink`, `SummarySink`, `MultiSink`), resume helpers, `RunTelemetry`.
 - `providers.py` – `WorkProvider` protocol and `OpenAlexWorkProvider` that wraps `iterate_openalex()` with retry-aware pagination.
 - `statistics.py` – lightweight runtime metrics (`DownloadStatistics`, `ResolverStats`, `BandwidthTracker`) consumed by summaries and tests.
@@ -136,7 +136,7 @@ flowchart LR
 - `args.resolve_config()` validates CLI input, expands output directories, instantiates resolvers via `ResolverRegistry`, and seeds `ManifestUrlIndex`/`persistent_seen_urls` when global URL dedupe is enabled.
 - `DownloadRun.setup_sinks()` must be invoked before pipeline construction; it wires `RunTelemetry` to `MultiSink` compositions of JSONL, CSV, SQLite, manifest-index, summary, metrics, and last-attempt outputs.
 - `DownloadRun.setup_resolver_pipeline()` transfers run-level dedupe sets, global manifest indexes, and per-resolver configuration into `ResolverPipeline`, capturing a shared `ResolverMetrics`.
-- `DownloadRun.setup_work_provider()` wraps `iterate_openalex()` (equal-jitter retry/backoff with optional `Retry-After` cap) into a provider that streams `WorkArtifact` objects to worker threads.
+- `DownloadRun.setup_work_provider()` wraps `iterate_openalex()` (equal-jitter retry/backoff with optional `Retry-After` cap) into a provider that streams `WorkArtifact` objects to worker threads. HTTP fetches issued by the pipeline and resolvers rely on the shared Tenacity policy described below.
 - `DownloadRun.setup_download_state()` hydrates resume data from JSONL or SQLite, seeds `DownloadConfig` (including robots checker, content-addressed flags, digest verification, and dedupe caches), and records cleanup callbacks.
 - Worker execution uses `ThreadLocalSessionFactory` to reuse HTTP sessions per thread, invoking `process_one_work()` which handles resume skips, cached artifact detection, resolver execution, download strategies, telemetry emission, and aggregate counter updates.
 - Concurrent worker pools respect user-supplied `--sleep` values but skip the sequential default delay unless operators explicitly request it; sequential runs retain the 0.05s polite pause.
@@ -148,6 +148,14 @@ flowchart LR
 - **Resolver configuration**: `pipeline.ResolverConfig` captures resolver ordering, toggles, polite headers, timeout overrides, per-domain token buckets, min-interval throttles, host Accept overrides, HEAD precheck toggles, global URL dedupe (`global_url_dedup_cap`), and resolver/domain circuit breakers. Unknown keys raise `ValueError`.
 - **Download configuration**: `download.DownloadConfig` normalises resume lookups, HTML extraction, robots enforcement (`RobotsCache`), content-addressed storage, digest verification, domain content rules, Accept overrides, optional chunk sizing, and exposes a `.to_context()` adapter for strategies.
 - **Mailto/polite headers**: `pyalex_shim.apply_mailto()` updates the live `pyalex.config` object when CLI or resolver config supplies a contact email.
+
+### Tenacity-backed `request_with_retries`
+
+- All resolver, pipeline, robots, and preflight requests funnel through `networking.request_with_retries`, which is now governed by `tenacity.Retrying`.
+- Default retryable statuses remain `{429, 500, 502, 503, 504}`. Status-driven retries close the previous `requests.Response` before Tenacity sleeps so sockets are not leaked.
+- CLI/resolver knobs wire directly into the controller: `backoff_factor` drives the exponential jitter multiplier, `backoff_max` bounds the jitter, `retry_after_cap` limits header-driven sleeps, `respect_retry_after` toggles header parsing, and `max_retry_duration` enforces a wall-clock ceiling.
+- Exhausted HTTP retries return the final `requests.Response` (with a warning) so downstream logging and analytics match previous behaviour; exhausted exception retries still raise.
+- Tests can stub retry pacing by patching `DocsToKG.ContentDownload.networking.TENACITY_SLEEP`; the constant intentionally mirrors `time.sleep` for ease of monkeypatching.
 - **Environment variables**: `UNPAYWALL_EMAIL`, `CORE_API_KEY`, `S2_API_KEY`, `DOAJ_API_KEY` populate resolver credentials; `PIP_REQUIRE_VIRTUALENV`, `PIP_NO_INDEX`, `PYTHONNOUSERSITE` keep the managed environment immutable.
 - **Concurrency safety**: The runner logs a warning when `workers * max_concurrent_resolvers > 32` but still honours token buckets, host semaphores, and circuit breakers to protect upstream services.
 
@@ -176,7 +184,7 @@ flowchart LR
 ## Networking, Rate Limiting, and Politeness
 
 - `networking.ThreadLocalSessionFactory` provisions per-thread sessions backed by `create_session()` (shared adapter pools, default timeouts, polite headers).
-- `request_with_retries()` implements capped exponential backoff with equal jitter, honours `Retry-After`, integrates domain content rules, and returns structured results differentiating cached vs modified responses.
+- `request_with_retries()` delegates to Tenacity for capped exponential backoff with jitter, honours `Retry-After`, integrates domain content rules, and returns structured results differentiating cached vs modified responses.
 - `head_precheck()` performs HEAD or conditional GET probes, classifying likely PDFs before downloading full payloads; resolvers can disable HEAD per host via configuration.
 - `ConditionalRequestHelper` constructs `If-None-Match`/`If-Modified-Since` headers and interprets 304 responses as cache hits via `CachedResult`/`ModifiedResult`.
 - `TokenBucket`, `CircuitBreaker`, domain semaphores, and per-resolver spacing maintain concurrency discipline. Resolver and domain breakers share telemetry; thresholds/cooldowns are configurable.
