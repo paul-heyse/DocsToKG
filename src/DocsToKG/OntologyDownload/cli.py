@@ -38,6 +38,7 @@ import logging
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -422,25 +423,29 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-EXAMPLE_SOURCES_YAML = """# Example configuration for ontology downloader\ndefaults:
+EXAMPLE_SOURCES_YAML = """# Example configuration for the ontology downloader\ndefaults:
   accept_licenses: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"]
   normalize_to: ["ttl"]
   prefer_source: ["obo", "ols", "bioportal", "direct"]
   http:
     max_retries: 5
     timeout_sec: 30
+    download_timeout_sec: 300
     backoff_factor: 0.5
     per_host_rate_limit: "4/second"
-    max_uncompressed_size_gb: 10
+    rate_limits:
+      ols: "5/second"
+      bioportal: "1/second"
     validate_media_type: true
   validation:
-    skip_reasoning_if_size_mb: 500
     parser_timeout_sec: 60
+    max_memory_mb: 2048
+    skip_reasoning_if_size_mb: 500
   logging:
     level: "INFO"
     max_log_size_mb: 100
     retention_days: 30
-  enable_cas_mirror: false
+  continue_on_error: true
 
 ontologies:
   - id: hp
@@ -663,6 +668,21 @@ def _resolve_specs_from_args(
     if resolver_override and resolver_override not in RESOLVERS:
         raise ConfigError("Unknown resolver(s) specified: " + resolver_override)
 
+    def apply_target_override(specs: Sequence[FetchSpec]) -> List[FetchSpec]:
+        """Replace ``target_formats`` when CLI overrides are provided."""
+
+        if not target_formats:
+            return list(specs)
+        return [
+            FetchSpec(
+                id=spec.id,
+                resolver=spec.resolver,
+                extras=dict(spec.extras),
+                target_formats=tuple(target_formats),
+            )
+            for spec in specs
+        ]
+
     def apply_resolver_override(specs: Sequence[FetchSpec]) -> List[FetchSpec]:
         """Force all ``specs`` to use the resolver override when one is provided.
 
@@ -760,8 +780,9 @@ def _resolve_specs_from_args(
         return config, apply_resolver_override(resolved_specs)
 
     if config.specs:
-        specs = apply_resolver_override(config.specs)
-        if resolver_override:
+        specs = apply_target_override(config.specs)
+        specs = apply_resolver_override(specs)
+        if resolver_override or target_formats:
             config.specs = specs
         return config, specs
 
@@ -1079,11 +1100,22 @@ def _doctor_report() -> Dict[str, object]:
         "logs": LOG_DIR,
         "ontologies": ontology_dir,
     }.items():
+        is_dir = path.is_dir()
+        write_allowed = os.access(path, os.W_OK)
         entry = {
             "path": str(path),
             "exists": path.exists(),
-            "writable": os.access(path, os.W_OK),
+            "writable": False,
+            "write_permission": write_allowed,
         }
+        if is_dir:
+            execute_allowed = os.access(path, os.X_OK)
+            entry["execute_permission"] = execute_allowed
+            entry["writable"] = os.access(path, os.W_OK | os.X_OK)
+            entry["directory"] = True
+        else:
+            entry["writable"] = write_allowed
+            entry["directory"] = False
         if name == "ontologies" and created_for_diagnostics:
             entry["created_for_diagnostics"] = True
         directories[name] = entry
@@ -1266,6 +1298,30 @@ def _doctor_report() -> Dict[str, object]:
     return report
 
 
+def _ensure_owner_only_permissions(path: Path, actions: List[str]) -> None:
+    """Restrict placeholder files to owner read/write when supported."""
+
+    desired_mode = stat.S_IRUSR | stat.S_IWUSR
+    chmod = getattr(os, "chmod", None)
+
+    if chmod is None or os.name == "nt":
+        return
+
+    try:
+        current_mode = stat.S_IMODE(path.stat().st_mode)
+    except OSError as exc:  # pragma: no cover - stat failures are rare but logged
+        actions.append(f"Failed to inspect permissions for {path}: {exc}")
+        return
+
+    if current_mode | desired_mode == desired_mode:
+        return
+
+    try:
+        chmod(path, desired_mode)
+    except OSError as exc:
+        actions.append(f"Failed to update permissions for {path}: {exc}")
+
+
 def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
     """Attempt to remediate common doctor issues and return action notes."""
 
@@ -1308,6 +1364,7 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content)
                 actions.append(f"Ensured placeholder {path.name}")
+                _ensure_owner_only_permissions(path, actions)
         except OSError as exc:
             actions.append(f"Failed to update {path}: {exc}")
 
@@ -1323,15 +1380,20 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
 
     print("Directories:")
     for name, info in report["directories"].items():
-        status = []
-        if info["exists"]:
-            status.append("exists")
+        status = ["exists" if info.get("exists") else "missing"]
+
+        permission_labels: List[str] = []
+        if info.get("writable"):
+            permission_labels.append("writable")
         else:
-            status.append("missing")
-        if info["writable"]:
-            status.append("writable")
-        else:
-            status.append("read-only")
+            if info.get("write_permission") is False:
+                permission_labels.append("read-only")
+            if info.get("directory") and info.get("execute_permission") is False:
+                permission_labels.append("no execute permission")
+            if not permission_labels:
+                permission_labels.append("restricted")
+
+        status.extend(permission_labels)
         print(f"  - {name}: {', '.join(status)} ({info['path']})")
 
     disk = report["disk"]
@@ -1515,7 +1577,11 @@ def _handle_validate(args, config: ResolvedConfig) -> dict:
         max_log_size_mb=logging_config.max_log_size_mb,
     )
     results = run_validators(requests, logger)
-    manifest["validation"] = {name: result.to_dict() for name, result in results.items()}
+    existing_validation = dict(manifest.get("validation", {}))
+    existing_validation.update(
+        {name: result.to_dict() for name, result in results.items()}
+    )
+    manifest["validation"] = existing_validation
     write_json_atomic(manifest_path, manifest)
     return manifest["validation"]
 

@@ -43,9 +43,16 @@ class JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Render ``record`` as a JSON string with DocsToKG-specific fields."""
 
-        now = datetime.now(timezone.utc)
+        created = getattr(record, "created", None)
+        if isinstance(created, (int, float)):
+            try:
+                timestamp = datetime.fromtimestamp(created, tz=timezone.utc)
+            except (OverflowError, OSError, ValueError):
+                timestamp = datetime.now(timezone.utc)
+        else:
+            timestamp = datetime.now(timezone.utc)
         payload = {
-            "timestamp": now.isoformat().replace("+00:00", "Z"),
+            "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
             "level": record.levelname,
             "message": record.getMessage(),
             "correlation_id": getattr(record, "correlation_id", None),

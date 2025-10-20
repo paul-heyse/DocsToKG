@@ -51,8 +51,10 @@ Usage:
 """
 
 import json
+import logging
 import os
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -189,6 +191,23 @@ def test_setup_logging_expands_env_log_dir(tmp_path, monkeypatch):
         assert expected_dir.exists()
     finally:
         _cleanup_logger(logger)
+def test_json_formatter_uses_record_created_timestamp():
+    formatter = logging_utils_mod.JSONFormatter()
+    record = logging.LogRecord(
+        name="DocsToKG.OntologyDownload",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=123,
+        msg="fixed time",
+        args=(),
+        exc_info=None,
+    )
+    fixed = datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    record.created = fixed.timestamp()
+
+    payload = json.loads(formatter.format(record))
+
+    assert payload["timestamp"] == fixed.isoformat().replace("+00:00", "Z")
 
 
 def _get_file_handler(logger):
