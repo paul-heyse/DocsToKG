@@ -225,6 +225,10 @@ _COSINE_TOPK_AUTO_BLOCK_ROWS_SENTINEL = -1
 _COSINE_TOPK_AUTO_MEM_FRACTION = 0.5
 
 
+_COSINE_TOPK_BLOCK_LOG_LOCK = threading.Lock()
+_COSINE_TOPK_LAST_BLOCK_ROWS: dict[int, int] = {}
+
+
 _CUVS_LIBRARIES_LOADED = False
 _CUVS_LIB_HANDLES: list[ctypes.CDLL] = []
 
@@ -3026,7 +3030,14 @@ def cosine_topk_blockwise(
     }
     if memory_snapshot is not None:
         log_payload.update(memory_snapshot)
-    logger.info("cosine-topk-block-config", extra={"event": log_payload})
+    device_key = int(device)
+    with _COSINE_TOPK_BLOCK_LOG_LOCK:
+        last_block_rows = _COSINE_TOPK_LAST_BLOCK_ROWS.get(device_key)
+        emit_info = last_block_rows != int(block_rows)
+        if emit_info:
+            _COSINE_TOPK_LAST_BLOCK_ROWS[device_key] = int(block_rows)
+    log_fn = logger.info if emit_info else logger.debug
+    log_fn("cosine-topk-block-config", extra={"event": log_payload})
 
     if q.ndim == 1:
         q = q.reshape(1, -1)
