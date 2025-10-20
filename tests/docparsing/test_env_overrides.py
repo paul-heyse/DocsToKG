@@ -42,3 +42,18 @@ def test_ensure_qwen_environment_cli_overrides_existing_env(monkeypatch, tmp_pat
     assert os.environ["DOCSTOKG_QWEN_DTYPE"] == "float32"
     assert os.environ["DOCSTOKG_QWEN_MODEL_DIR"] == resolved_override
     assert env_info == {"device": "cpu", "dtype": "float32", "model_dir": resolved_override}
+
+
+def test_ensure_qwen_environment_explicit_dtype_overrides(monkeypatch) -> None:
+    """Explicit ``dtype`` arguments take priority over pre-existing environment state."""
+
+    monkeypatch.setenv("DOCSTOKG_QWEN_DEVICE", "cuda:legacy")
+    monkeypatch.setenv("VLLM_DEVICE", "cuda:stale")
+    monkeypatch.setenv("DOCSTOKG_QWEN_DTYPE", "float16")
+
+    env_info = ensure_qwen_environment(dtype="float32")
+
+    assert os.environ["DOCSTOKG_QWEN_DEVICE"] == "cuda:legacy"
+    assert os.environ["VLLM_DEVICE"] == "cuda:legacy"
+    assert os.environ["DOCSTOKG_QWEN_DTYPE"] == "float32"
+    assert env_info == {"device": "cuda:legacy", "dtype": "float32"}
