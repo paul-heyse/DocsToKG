@@ -69,6 +69,7 @@ from .errors import (
     PolicyError,
     ResolverError,
     ValidationError,
+    ValidationFailure,
 )
 from .io import (
     RDF_MIME_ALIASES,
@@ -1937,9 +1938,10 @@ def fetch_one(
                         adapter.error(
                             "validation failures detected", extra=log_payload
                         )
-                        raise OntologyDownloadError(
+                        raise ValidationFailure(
                             "Validation failed for "
-                            f"'{effective_spec.id}' via {', '.join(failed_validators)}"
+                            f"'{effective_spec.id}' via {', '.join(failed_validators)}",
+                            retryable=True,
                         )
 
                 normalized_hash = None
@@ -2066,6 +2068,36 @@ def fetch_one(
 
         try:
             return _execute_candidate()
+        except ValidationFailure as exc:
+            last_error = exc
+            attempt_record.update(
+                {"status": "failed", "error": str(exc), "stage": "validate"}
+            )
+            resolver_attempts.append(dict(attempt_record))
+            log_method = adapter.warning if getattr(exc, "retryable", False) else adapter.error
+            log_method(
+                "validation attempt failed",
+                extra={
+                    "stage": "validate",
+                    "resolver": candidate.resolver,
+                    "attempt": attempt_number,
+                    "error": str(exc),
+                },
+            )
+            retryable = getattr(exc, "retryable", False)
+            if retryable:
+                adapter.info(
+                    "trying fallback resolver",
+                    extra={
+                        "stage": "validate",
+                        "resolver": candidate.resolver,
+                        "attempt": attempt_number,
+                    },
+                )
+                continue
+            raise OntologyDownloadError(
+                f"Validation failed for '{pending_spec.id}': {exc}"
+            ) from exc
         except (ConfigError, DownloadFailure) as exc:
             attempt_record.update({"status": "failed", "error": str(exc)})
             resolver_attempts.append(dict(attempt_record))
