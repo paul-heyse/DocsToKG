@@ -266,7 +266,8 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
         if normalized:
             allowed_exact, allowed_suffixes, allowed_host_ports, allowed_ip_literals = normalized
 
-    allow_private = False
+    allow_private_networks = False
+    allow_plain_http = False
     if allowed_exact or allowed_suffixes:
         matched_exact = ascii_host in allowed_exact
         matched_suffix = any(
@@ -276,12 +277,16 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
             raise PolicyError(f"Host {host} not in allowlist")
 
         if matched_exact and ascii_host in allowed_ip_literals:
-            allow_private = True
+            allow_private_networks = True
+            allow_plain_http = True
         elif http_config and http_config.allow_private_networks_for_host_allowlist:
-            allow_private = True
+            allow_private_networks = True
+
+        if http_config and http_config.allow_plain_http_for_host_allowlist:
+            allow_plain_http = True
 
     if scheme == "http":
-        if allow_private:
+        if allow_plain_http:
             logger.warning(
                 "allowing http url for explicit allowlist host",
                 extra={"stage": "download", "original_url": url},
@@ -294,7 +299,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
             parsed = parsed._replace(scheme="https")
             scheme = "https"
 
-    if scheme != "https" and not allow_private:
+    if scheme != "https" and not allow_plain_http:
         raise PolicyError("Only HTTPS URLs are allowed for ontology downloads")
 
     port = parsed.port
@@ -307,7 +312,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
 
     if is_ip:
         address = ipaddress.ip_address(ascii_host)
-        if not allow_private and (
+        if not allow_private_networks and (
             address.is_private or address.is_loopback or address.is_reserved or address.is_multicast
         ):
             raise ConfigError(f"Refusing to download from private address {host}")
@@ -326,7 +331,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
 
     for info in infos:
         candidate_ip = ipaddress.ip_address(info[4][0])
-        if not allow_private and (
+        if not allow_private_networks and (
             candidate_ip.is_private
             or candidate_ip.is_loopback
             or candidate_ip.is_reserved

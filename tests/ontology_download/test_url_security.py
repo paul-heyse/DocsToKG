@@ -79,6 +79,19 @@ def test_allowlisted_domain_resolving_to_public_ip_is_allowed() -> None:
     assert validated.startswith("https://allowed.example.org")
 
 
+def test_allowlisted_http_url_upgrades_without_opt_in() -> None:
+    """HTTP URLs for allowlisted hosts are upgraded to HTTPS unless explicitly allowed."""
+
+    def _public_getaddrinfo(host: str) -> List[Tuple]:
+        return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("203.0.113.5", 0))]
+
+    network_mod.register_dns_stub("http-only.example.org", _public_getaddrinfo)
+    config = DownloadConfiguration(allowed_hosts=["http-only.example.org"])
+
+    validated = api_mod.validate_url_security("http://http-only.example.org/data", config)
+    assert validated.startswith("https://http-only.example.org")
+
+
 def test_allowlisted_domain_resolving_to_private_ip_is_rejected() -> None:
     """Allowlisted domains resolving to private space should still be blocked."""
 
@@ -118,6 +131,47 @@ def test_allowlisted_domain_private_resolution_allowed_when_opted_in() -> None:
 
     validated = api_mod.validate_url_security("https://legacy.example.org/data", config)
     assert validated.startswith("https://legacy.example.org")
+
+
+def test_allow_plain_http_flag_allows_http_but_blocks_private_resolution() -> None:
+    """Allowing HTTP for allowlisted hosts should not weaken private-IP checks."""
+
+    def _public_getaddrinfo(host: str) -> List[Tuple]:
+        return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("198.51.100.23", 0))]
+
+    host = "plain-http.example.org"
+    config = DownloadConfiguration(
+        allowed_hosts=[host],
+        allow_plain_http_for_host_allowlist=True,
+    )
+
+    network_mod.register_dns_stub(host, _public_getaddrinfo)
+    validated = api_mod.validate_url_security(f"http://{host}/data", config)
+    assert validated.startswith(f"http://{host}")
+
+    def _private_getaddrinfo(hostname: str) -> List[Tuple]:
+        return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("10.4.3.2", 0))]
+
+    network_mod.register_dns_stub(host, _private_getaddrinfo)
+    with pytest.raises(ConfigError):
+        api_mod.validate_url_security(f"http://{host}/data", config)
+
+
+def test_private_network_flag_keeps_https_upgrade() -> None:
+    """Allowing private networks should not implicitly allow HTTP."""
+
+    def _private_getaddrinfo(host: str) -> List[Tuple]:
+        return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("10.20.30.40", 0))]
+
+    host = "legacy-http.example.org"
+    network_mod.register_dns_stub(host, _private_getaddrinfo)
+    config = DownloadConfiguration(
+        allowed_hosts=[host],
+        allow_private_networks_for_host_allowlist=True,
+    )
+
+    validated = api_mod.validate_url_security(f"http://{host}/data", config)
+    assert validated.startswith(f"https://{host}")
 
 
 def test_validate_url_security_dns_failure_strict_mode() -> None:

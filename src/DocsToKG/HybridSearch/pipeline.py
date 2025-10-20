@@ -114,6 +114,7 @@ from pathlib import Path
 from threading import RLock
 from typing import (
     TYPE_CHECKING,
+    Callable,
     Deque,
     Dict,
     Iterable,
@@ -167,6 +168,8 @@ TRAINING_SAMPLE_RNG = np.random.default_rng(13)
 
 _PYARROW_MODULE = None
 _PYARROW_PARQUET = None
+
+_DEFAULT_VECTOR_CACHE_LIMIT = 10_000
 
 
 # --- Public Classes ---
@@ -476,6 +479,8 @@ class ChunkIngestionPipeline:
         opensearch: LexicalIndex,
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
+        vector_cache_limit: int = _DEFAULT_VECTOR_CACHE_LIMIT,
+        vector_cache_stats_hook: Optional[Callable[[int, DocumentInput], None]] = None,
     ) -> None:
         """Initialise the ingestion pipeline with storage backends and instrumentation.
 
@@ -484,6 +489,13 @@ class ChunkIngestionPipeline:
             opensearch: Lexical index handling sparse storage.
             registry: Registry mapping vector identifiers to chunk metadata.
             observability: Optional observability façade for tracing and metrics.
+            vector_cache_limit: Maximum number of unmatched vector artifacts that may
+                remain resident in memory while reconciling chunk/vector streams.
+                Defaults to ``10_000`` which bounds memory growth for misordered
+                artifacts.
+            vector_cache_stats_hook: Optional callback invoked whenever the
+                unmatched vector cache changes size. Observability backends may use
+                this to surface drift in dashboards.
 
         Returns:
             None: Constructors perform initialisation side effects only.
@@ -494,6 +506,10 @@ class ChunkIngestionPipeline:
         self._registry = registry
         self._metrics = IngestMetrics()
         self._observability = observability or Observability()
+        self._vector_cache_limit = int(vector_cache_limit)
+        if self._vector_cache_limit < 1:
+            self._vector_cache_limit = 0
+        self._vector_cache_stats_hook = vector_cache_stats_hook
         self._faiss.set_id_resolver(self._registry.resolve_faiss_id)
         attach = getattr(self._registry, "attach_dense_store", None)
         if callable(attach):
@@ -793,11 +809,7 @@ class ChunkIngestionPipeline:
         Returns:
             None
         """
-        existing_vector_ids = [
-            chunk.vector_id
-            for chunk in self._registry.all()
-            if chunk.doc_id == doc_id and chunk.namespace == namespace
-        ]
+        existing_vector_ids = tuple(self._registry.vector_ids_for(doc_id, namespace))
         if existing_vector_ids:
             self.delete_chunks(existing_vector_ids)
 

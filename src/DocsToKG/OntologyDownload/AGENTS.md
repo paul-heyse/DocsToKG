@@ -329,6 +329,8 @@ flowchart LR
   | `ONTOFETCH_MAX_RETRIES`, `ONTOFETCH_TIMEOUT_SEC`, `ONTOFETCH_DOWNLOAD_TIMEOUT_SEC`, `ONTOFETCH_PER_HOST_RATE_LIMIT`, `ONTOFETCH_BACKOFF_FACTOR`, `ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB`, `ONTOFETCH_LOG_LEVEL` | Override download/logging config without editing YAML. | Values from `defaults.http` / `defaults.logging` |
   | Resolver credentials (`BIOPORTAL_API_KEY`, `EUROPE_PMC_API_KEY`, …) | Injected into resolver extras via `settings.get_env_overrides`. | Required per resolver when applicable |
 
+- Host allowlists remain TLS-first: `DownloadConfiguration.allow_private_networks_for_host_allowlist` only controls whether allowlisted hosts may resolve to private/loopback space, while `allow_plain_http_for_host_allowlist` must be set when explicit HTTP endpoints should skip the automatic HTTPS upgrade.
+
 - Validate configuration: `./.venv/bin/python -m DocsToKG.OntologyDownload.cli config validate --spec configs/sources.yaml` or `config show --spec … --json`.
 - Deterministic runs: `./.venv/bin/python -m DocsToKG.OntologyDownload.cli plan hp --spec configs/sources.yaml --lock-output ontologies.lock.json` then `pull --lock ontologies.lock.json`.
 
