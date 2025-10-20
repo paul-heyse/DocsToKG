@@ -83,3 +83,22 @@ development laptops without GPUs or optional DocParsing dependencies.
 ### 1.6 Validation Checklist
 * `pytest tests/test_cuda_safety.py tests/test_docparsing_common.py`
 * Structured logging verified manually through updated log context for vLLM startup failures.
+
+## 3. 2025-03-20 — standardize-jsonl-locking
+
+### 3.1 Summary
+* Adopted `filelock.FileLock` for all DocParsing manifest/telemetry writes by re-implementing `core.concurrency.acquire_lock`.
+* Swapped bespoke `_iter_jsonl_records` for a `jsonlines`-backed iterator that preserves `skip_invalid`, `max_errors`, `start`, and `end` semantics.
+* Refactored telemetry sinks to accept an injectable writer, enabling tests to provide lock-free fakes while the default continues to call `jsonl_append_iter(..., atomic=True)`.
+
+### 3.2 Migration Guide
+1. Ensure environments install `filelock>=3.20.0` and `jsonlines>=4.0.0` (bundled with the `DocsToKG[docparse]` extra).
+2. Custom telemetry integrations should pass a writer callable if they need specialised append behaviour; the default remains lock + atomic append.
+3. Remove any bespoke `.lock` sentinel handling from downstream extensions—use the shared helper instead.
+
+### 3.3 Validation Checklist
+* `pytest tests/docparsing/test_concurrency_lock.py`
+* `pytest tests/docparsing/test_docparsing_core.py -k telemetry`
+* `pytest tests/docparsing/test_chunk_validation_telemetry.py`
+* `./.venv/bin/python scripts/enforce_no_manual_docparse_locks.py`
+

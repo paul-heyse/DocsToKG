@@ -797,45 +797,47 @@ def test_summarize_image_metadata_logs_non_iterable_sources() -> None:
     assert "CHUNK_PREDICTED_CLASSES_NON_ITERABLE" in error_codes
 
 
-def test_telemetry_sink_uses_lock_and_jsonl_append(tmp_path: Path) -> None:
+def test_telemetry_sink_uses_injected_writer(tmp_path: Path) -> None:
     attempts_path = tmp_path / "telemetry" / "attempts.jsonl"
     manifest_path = tmp_path / "telemetry" / "manifest.jsonl"
 
-    lock_calls: list[Path] = []
+    write_calls: list[Path] = []
 
-    @contextlib.contextmanager
-    def _fake_lock(path: Path):
-        lock_calls.append(path)
-        yield True
+    def _fake_writer(path: Path, rows):
+        payloads = list(rows)
+        write_calls.append(path)
+        doc_telemetry.jsonl_append_iter(path, payloads, atomic=True)
+        return len(payloads)
 
-    with mock.patch.object(doc_telemetry, "_acquire_lock_for", _fake_lock):
-        sink = doc_telemetry.TelemetrySink(attempts_path, manifest_path)
+    sink = doc_telemetry.TelemetrySink(attempts_path, manifest_path, writer=_fake_writer)
 
-        sink.write_attempt(
-            doc_telemetry.Attempt(
-                run_id="run-1",
-                file_id="file-1",
-                stage="chunking",
-                status="success",
-                reason=None,
-                started_at=0.0,
-                finished_at=1.0,
-                bytes=256,
-                metadata={"extra": "attempt"},
-            )
+    sink.write_attempt(
+        doc_telemetry.Attempt(
+            run_id="run-1",
+            file_id="file-1",
+            stage="chunking",
+            status="success",
+            reason=None,
+            started_at=0.0,
+            finished_at=1.0,
+            bytes=256,
+            metadata={"extra": "attempt"},
         )
-        sink.write_manifest_entry(
-            doc_telemetry.ManifestEntry(
-                run_id="run-1",
-                file_id="file-1",
-                stage="chunking",
-                output_path="output.jsonl",
-                tokens=42,
-                schema_version="1.0",
-                duration_s=0.5,
-                metadata={"extra": "manifest"},
-            )
+    )
+    sink.write_manifest_entry(
+        doc_telemetry.ManifestEntry(
+            run_id="run-1",
+            file_id="file-1",
+            stage="chunking",
+            output_path="output.jsonl",
+            tokens=42,
+            schema_version="1.0",
+            duration_s=0.5,
+            metadata={"extra": "manifest"},
         )
+    )
+
+    assert write_calls == [attempts_path, manifest_path]
 
     attempts_records = [
         json.loads(line) for line in attempts_path.read_text(encoding="utf-8").splitlines()
@@ -870,7 +872,6 @@ def test_telemetry_sink_uses_lock_and_jsonl_append(tmp_path: Path) -> None:
             "doc_id": "file-1",
         }
     ]
-    assert lock_calls == [attempts_path, manifest_path]
 
 
 @pytest.mark.parametrize(

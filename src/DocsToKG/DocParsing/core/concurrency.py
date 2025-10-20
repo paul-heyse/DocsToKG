@@ -49,6 +49,8 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
     finally:
         with contextlib.suppress(RuntimeError):
             file_lock.release()
+        with contextlib.suppress(OSError):
+            lock_path.unlink()
 
 
 def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:

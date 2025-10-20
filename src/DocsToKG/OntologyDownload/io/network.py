@@ -1208,6 +1208,12 @@ class _StreamingDownloader:
                 while True:
                     resume_position = part_path.stat().st_size if part_path.exists() else 0
 
+                    self.logger.debug(
+                        "range state resume=%s range_supported=%s",
+                        resume_position,
+                        self._range_supported,
+                    )
+
                     if resume_position > 0 and not self._range_supported:
                         with contextlib.suppress(OSError):
                             part_path.unlink(missing_ok=True)
@@ -1309,21 +1315,24 @@ class _StreamingDownloader:
                             response.close()
                             raise http_error
 
-                        if response.status_code == 416:
-                            self.logger.warning(
-                                "range request rejected; retrying without resume",
-                                extra={
-                                    "stage": "download",
-                                    "status_code": response.status_code,
-                                    "resume_position": original_resume_position,
-                                    "service": self.service,
-                                    "host": self.origin_host,
-                                },
-                            )
-                            _clear_partial_files()
-                            self._range_supported = False
-                            restart_download = True
-                        else:
+                    if response.status_code == 416:
+                        self.logger.warning(
+                            "range request rejected; retrying without resume",
+                            extra={
+                                "stage": "download",
+                                "status_code": response.status_code,
+                                "resume_position": original_resume_position,
+                                "service": self.service,
+                                "host": self.origin_host,
+                            },
+                        )
+                        _clear_partial_files()
+                        self._range_supported = False
+                        raise DownloadFailure(
+                            "Range request rejected by origin",
+                            retryable=True,
+                        )
+                    else:
                             range_honored = response.status_code == 206
                             if want_range and range_honored:
                                 content_range = response.headers.get("Content-Range")
