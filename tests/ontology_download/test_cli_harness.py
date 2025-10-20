@@ -13,6 +13,7 @@ import os
 import shutil
 import textwrap
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from DocsToKG.OntologyDownload import cli as cli_module
@@ -195,6 +196,33 @@ def test_cli_config_validate_expands_tilde_path(tmp_path, capsys):
     stdout = capsys.readouterr().out
     assert "Configuration passed" in stdout
     assert str(config_path) in stdout
+
+
+def test_handle_config_validate_invokes_validate_once(tmp_path):
+    """`_handle_config_validate` should normalize once and call `validate_config` a single time."""
+
+    config_path = tmp_path / "custom.yaml"
+    config_path.write_text("ontologies: []\n", encoding="utf-8")
+
+    with mock.patch.dict(os.environ, {"HOME": str(tmp_path)}, clear=False):
+        raw_path = Path("~") / config_path.name
+        expected_path = cli_module.normalize_config_path(raw_path)
+        fake_config = SimpleNamespace(specs=["hp", "mp"])
+
+        with mock.patch.object(
+            cli_module,
+            "validate_config",
+            autospec=True,
+            return_value=fake_config,
+        ) as validate_mock:
+            result = cli_module._handle_config_validate(raw_path)
+
+    validate_mock.assert_called_once_with(expected_path)
+    assert result == {
+        "ok": True,
+        "ontologies": len(fake_config.specs),
+        "path": str(expected_path),
+    }
 
 
 def test_cli_init_expands_tilde_destination(tmp_path, capsys):

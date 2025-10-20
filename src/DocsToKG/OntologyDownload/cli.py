@@ -1537,8 +1537,6 @@ def _handle_config_validate(path: Path) -> dict:
     Returns:
         Dictionary describing validation status, ontology count, and file path.
     """
-    config = validate_config(path)
-
     normalized_path = normalize_config_path(path)
     config = validate_config(normalized_path)
     return {
