@@ -40,8 +40,9 @@ def load_config_mapping(path: Path) -> Dict[str, Any]:
         except json.JSONDecodeError as exc:
             raise ConfigLoadError(f"Failed to parse JSON configuration payload: {exc}") from exc
     if not isinstance(data, dict):
-        raise ValueError(
-            f"Stage configuration file {path} must contain an object; received {type(data).__name__}."
+        raise ConfigLoadError(
+            "Stage configuration file "
+            f"{path} must contain an object; received {type(data).__name__}."
         )
     return data
 

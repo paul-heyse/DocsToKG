@@ -24,7 +24,12 @@ import pytest
 
 import DocsToKG.DocParsing.core.http as core_http
 from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
-from DocsToKG.DocParsing.config import ConfigLoadError, load_toml_markers, load_yaml_markers
+from DocsToKG.DocParsing.config import (
+    ConfigLoadError,
+    load_config_mapping,
+    load_toml_markers,
+    load_yaml_markers,
+)
 from DocsToKG.DocParsing.core import (
     ResumeController,
     compute_relative_doc_id,
@@ -422,6 +427,20 @@ def test_load_toml_markers_failure() -> None:
     with pytest.raises(ConfigLoadError) as excinfo:
         load_toml_markers("[bad\nvalue = 1")
     assert "TOML" in str(excinfo.value)
+
+
+def test_load_config_mapping_rejects_non_mapping(tmp_path: Path) -> None:
+    """Non-object config payloads surface ConfigLoadError with type context."""
+
+    config_file = tmp_path / "config.json"
+    config_file.write_text("[\n  1,\n  2\n]", encoding="utf-8")
+
+    with pytest.raises(ConfigLoadError) as excinfo:
+        load_config_mapping(config_file)
+
+    message = str(excinfo.value)
+    assert "Stage configuration file" in message
+    assert "list" in message
 
 
 def test_chunk_cli_validation_failure(
