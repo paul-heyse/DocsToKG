@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_validation_psutil_optional",
+#   "purpose": "Validation module behaviour when ``psutil`` is missing.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Validation module behaviour when ``psutil`` is missing.
 
 Simulates environments without ``psutil`` to ensure the validation entry point
 imports, registers plugins, and runs validators without optional monitoring
-capabilities.
-"""
+capabilities."""
 
 from __future__ import annotations
 

@@ -1,8 +1,10 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_api_about",
-#   "purpose": "Validate DocsToKG.OntologyDownload.api.about metadata contract",
-#   "sections": []
+#   "purpose": "Tests covering the ``DocsToKG.OntologyDownload.api.about`` helper.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
 # }
 # === /NAVMAP ===
 

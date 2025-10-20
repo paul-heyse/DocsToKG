@@ -1,10 +1,19 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_cli_harness",
+#   "purpose": "Happy-path CLI smoke tests executed against the harness sandbox.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Happy-path CLI smoke tests executed against the harness sandbox.
 
 Exercises ``ontofetch`` commands (pull, plan, plugins, config) using the
 TestingEnvironment harness that spins up loopback resolvers. Validates content
 writing, manifest generation, plugin enumeration, and JSON mode to guard the
-golden path for automation and documentation snippets.
-"""
+golden path for automation and documentation snippets."""
 
 from __future__ import annotations
 

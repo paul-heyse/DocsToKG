@@ -1,3 +1,13 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_cli_argument_normalization",
+#   "purpose": "Regression tests for CLI argument normalization behaviour.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Regression tests for CLI argument normalization behaviour."""
 
 from __future__ import annotations

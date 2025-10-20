@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_planner_probe",
+#   "purpose": "Planner HTTP probe guardrail tests.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Planner HTTP probe guardrail tests.
 
 Checks that the lightweight HEAD probe enforcing allowlists, header policies,
 and retry behaviour raises `PolicyError` or respects caching when encountering
-redirect chains, slow responses, or content-length anomalies.
-"""
+redirect chains, slow responses, or content-length anomalies."""
 
 import logging
 from collections import deque

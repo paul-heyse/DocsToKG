@@ -1,8 +1,10 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_import_time",
-#   "purpose": "Ensures DocsToKG.OntologyDownload import stays lightweight",
-#   "sections": []
+#   "purpose": "Ensures ``DocsToKG.OntologyDownload`` remains lightweight at import time.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
 # }
 # === /NAVMAP ===
 
@@ -10,8 +12,7 @@
 
 The CLI bootstraps frequently, so these tests assert the package imports within
 an acceptable latency budget and fails fast when optional dependencies are
-missing, protecting command responsiveness.
-"""
+missing, protecting command responsiveness."""
 
 from __future__ import annotations
 

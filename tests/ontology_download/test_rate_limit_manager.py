@@ -1,3 +1,15 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_rate_limit_manager",
+#   "purpose": "Tests the rate limiter registry and bucket provisioning helpers.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
+"""Tests the rate limiter registry and bucket provisioning helpers."""
+
 from pathlib import Path
 
 import pytest

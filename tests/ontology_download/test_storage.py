@@ -1,14 +1,9 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_storage",
-#   "purpose": "Pytest coverage for ontology download storage scenarios",
+#   "purpose": "Storage backend regression tests.",
 #   "sections": [
-#     {
-#       "id": "test-fsspec-storage-roundtrip",
-#       "name": "test_fsspec_storage_roundtrip",
-#       "anchor": "function-test-fsspec-storage-roundtrip",
-#       "kind": "function"
-#     }
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -17,8 +12,7 @@
 
 Ensures the fsspec storage delegate can persist and retrieve manifests,
 supports round-tripping artifacts, and emits helpful errors when optional
-backends are unavailable.
-"""
+backends are unavailable."""
 
 from __future__ import annotations
 

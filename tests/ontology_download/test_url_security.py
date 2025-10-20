@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_url_security",
+#   "purpose": "URL safety and allowlist enforcement tests.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """URL safety and allowlist enforcement tests.
 
 Exercises ``validate_url_security`` against IPv4/v6 edge cases, private ranges,
 port overrides, IPv6 literals, and DNS stubbing to ensure resolvers can only
-contact approved endpoints.
-"""
+contact approved endpoints."""
 
 from __future__ import annotations
 

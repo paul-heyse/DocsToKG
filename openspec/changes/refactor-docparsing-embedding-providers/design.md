@@ -14,12 +14,30 @@
   - Modify writer abstractions (`VectorWriter`, `create_vector_writer`) or chunk discovery/manifests.
 
 ## Decisions
-- **Provider interfaces**: Define `DenseEmbeddingBackend`, `SparseEmbeddingBackend`, and `LexicalEmbeddingBackend` as small Protocols (or ABCs) with `open(cfg)`, `embed|encode|vector(...)`, and `close()` plus a `name` property. Providers raise `ProviderError(provider, category, detail, retryable)` so callers can distinguish init vs runtime vs network issues.
-- **Module layout**: New package `DocsToKG.DocParsing.embedding.backends` hosts `base.py`, `factory.py`, and submodules: `dense/sentence_transformers.py`, `dense/tei.py`, `dense/qwen_vllm.py`, `sparse/splade_st.py`, `lexical/local_bm25.py`. Optional helpers live in `utils.py` to avoid runtime dependency leakage.
-- **Factory behaviour**: `ProviderFactory` accepts fully merged `EmbedCfg`, resolves backend names (`dense.backend` etc.), lazy-imports the requested module, instantiates provider objects, and coordinates lifecycle (ensuring `open`/`close` occurs exactly once). Passing `backend=none` returns a `NullProvider` shim that the runtime understands as disabled.
-- **Configuration schema**: Rework `EmbedCfg` to expose cross-cutting keys under `embedding.*` (device, dtype, batch size, concurrency, normalize_l2, offline, cache_dir, telemetry tags) and nested provider keys (`dense.backend`, `dense.qwen_vllm.model_id`, `sparse.splade_st.model_id`, `lexical.local_bm25.k1`, etc.). CLI > ENV > config > defaults precedence is enforced centrally, and legacy flags/envs populate the new keys with deprecation warnings.
-- **Runtime integration**: `process_pass_a` and `process_chunk_file_vectors` request providers from the factory, then only use interface methods. Backend-specific helpers (`_get_vllm_components`, `_QWEN_LLM_CACHE`, `_get_sparse_encoder_cls`, `QwenEmbeddingQueue`) are deleted; concurrency/queue handling moves into providers, each respecting hints like `embedding.batch_size` and `embedding.max_concurrency`.
-- **Telemetry**: Providers emit structured telemetry via call-backs or context managers supplied by the runtime/factory, producing per-batch tags: `provider_name`, `provider_version`, `device`, `dtype`, `batch_size_effective`, `max_inflight_requests`, `time_open_ms`, `time_embed_ms`, `time_close_ms`, `normalize_l2`, and `fallback_used`. Errors attach `ProviderError` fields and propagate to manifests.
+- **Provider interfaces**: Define `DenseEmbeddingBackend`, `SparseEmbeddingBackend`, and `LexicalEmbeddingBackend` as small Protocols (or ABCs) with `open(cfg: ProviderConfig) -> None`, `embed|encode|vector(batch, *, batch_hint=None) -> Sequence[...]`, and `close() -> None` plus a `name` property. Providers raise `ProviderError(provider, category, detail, retryable, wrapped)` so callers can distinguish init vs runtime vs network issues and surface remediation hints.
+- **Module layout**: New package `DocsToKG.DocParsing.embedding.backends` hosts `base.py`, `factory.py`, shared `utils.py`, and subpackages `dense/`, `sparse/`, `lexical/`. Concrete modules include `dense/sentence_transformers.py`, `dense/tei.py`, `dense/qwen_vllm.py`, `sparse/splade_st.py`, and `lexical/local_bm25.py`. The package exposes a `ProviderBundle` typing alias summarising the three providers returned to the runtime.
+- **Factory behaviour**: `ProviderFactory` accepts a fully merged `EmbedCfg`, resolves backend names (`dense.backend`, etc.), lazy-imports the requested module, instantiates provider objects with shared hints (device, dtype, batch size, concurrency, cache directory, normalization flags), and coordinates lifecycle (ensuring `open`/`close` occurs exactly once). Passing `backend=none` returns a `NullProvider` shim that the runtime treats as disabled. Factory exposes a context manager API so runtime integrations require minimal boilerplate.
+- **Configuration schema**: Rework `EmbedCfg` to expose cross-cutting keys under `embedding.*` (device, dtype, batch size, max_concurrency, normalize_l2, offline, cache_dir, telemetry tags) and nested provider keys (`dense.backend`, `dense.qwen_vllm.model_id`, `dense.tei.url`, `sparse.backend`, `sparse.splade_st.model_id`, `lexical.backend`, `lexical.local_bm25.k1`, `lexical.local_bm25.b`, etc.). CLI > ENV > config > defaults precedence is enforced centrally, and every legacy flag/env populates the new keys with single-line deprecation warnings.
+- **Runtime integration**: `process_pass_a` and `process_chunk_file_vectors` request providers from the factory, use interface methods only, and rely on provider-managed queues/caches. Backend-specific helpers (`_get_vllm_components`, `_QWEN_LLM_CACHE`, `_get_sparse_encoder_cls`, `_qwen_embed_direct`, `QwenEmbeddingQueue`, `_ensure_*_dependencies`) are removed from the runtime. Concurrency hints like `embedding.batch_size` and `embedding.max_concurrency` are passed through the factory instead of being hard-coded in the runtime.
+- **Telemetry**: Providers emit structured telemetry via callbacks supplied by the factory, producing per-batch tags: `provider_name`, `provider_version`, `device`, `dtype`, `batch_size_effective`, `max_inflight_requests`, `time_open_ms`, `time_embed_ms`, `time_close_ms`, `normalize_l2`, and `fallback_used`. Errors attach `ProviderError` fields and propagate to manifests and CLI messaging. Telemetry inherits `embedding.telemetry_tags` so downstream analytics can correlate runs.
+- **Developer ergonomics**: A provider onboarding checklist, configuration mapping table, and doc updates accompany the change so junior contributors can add providers by following explicit steps (config key allocation, telemetry wiring, tests, docs).
+
+## Data Flow Overview
+1. **Configuration ingestion**
+   - Typer CLI, environment variables, and config files populate `EmbedCfg`. A compatibility layer rewrites legacy inputs (e.g., `--bm25-k1`) into nested keys and logs deprecation warnings.
+   - `EmbedCfg.finalize()` resolves defaults, applies precedence, expands relative paths, and derives provider hints such as `batch_hint`, `queue_depth`, and `cache_dir`.
+2. **Provider factory**
+   - `ProviderFactory.build(cfg, telemetry_sink)` lazily imports provider modules, instantiates each backend (`dense`, `sparse`, `lexical`), and injects shared hints (device, dtype, batch size, max concurrency, normalize_l2, cache directory, telemetry tags).
+   - The factory returns a context-managed bundle (`with ProviderFactory.bundle(cfg) as providers:`) that calls `open()` for each provider on entry and guarantees `close()` on exit even when processing errors occur.
+3. **Runtime execution**
+   - `process_pass_a` uses the lexical provider to compute BM25 stats rather than directly invoking `BM25StatsAccumulator`.
+   - `process_chunk_file_vectors` iterates chunk batches, delegates dense/sparse vector generation to providers (`provider.embed(...)`, `provider.encode(...)`, `provider.vector(...)`), validates outputs, merges telemetry, and writes vectors using existing writers.
+   - Disabled providers (`backend=none`) return neutral shims; runtime skips vector generation for those categories without altering manifest semantics.
+4. **Telemetry & manifests**
+   - Providers emit telemetry events through supplied callbacks; runtime augments manifest entries with provider metadata (name, version, device/dtype, normalization flag, fallback state).
+   - Failures raise `ProviderError`, which runtime logs, records in manifests, and converts into CLI error messages while preserving existing retry behaviour.
+5. **Shutdown**
+   - Runtime `finally` blocks (or context manager exit) call `provider.close()` to free GPU memory, HTTP sessions, queues, and other resources deterministically.
 
 ## Risks / Trade-offs
 - **Parity drift**: Moving logic risks subtle behavioural changes (e.g., different normalization defaults). Mitigation: copy existing implementations into providers, add regression tests comparing outputs, and run focused integration tests on default configs.
@@ -34,6 +52,7 @@
 4. Enable new configuration keys and alias legacy flags/env vars; update CLI option parsing and docs simultaneously.
 5. Run integration suite (JSONL/Parquet) and compare against baselines; adjust tolerances if needed.
 6. Remove obsolete runtime helpers once parity and documentation updates are confirmed.
+7. Publish updated telemetry/manifest field documentation and the provider onboarding checklist; communicate configuration changes to downstream consumers.
 
 ## Open Questions
 - Should we add an explicit provider fallback chain (e.g., try TEI, then Sentence-Transformers) in this refactor or leave it for a follow-up once telemetry proves useful?

@@ -2,9 +2,9 @@
 
 This subpackage bundles filesystem utilities (archive extraction, checksum
 helpers), streaming download logic with resilient retry/back-off behaviour, and
-rate limiting primitives shared across resolvers.  Re-exporting the most common
-symbols from here keeps importing ergonomics simple for the rest of the
-codebase.
+the pyrate-limiter backed throttling façade shared across resolvers.  Re-
+exporting the most common symbols keeps importing ergonomics simple for the rest
+of the codebase.
 """
 
 from ..errors import DownloadFailure

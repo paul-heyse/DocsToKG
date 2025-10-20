@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_optional_dependencies",
+#   "purpose": "Optional dependency shim coverage.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Optional dependency shim coverage.
 
 Simulates missing libraries such as pystow/rdflib/pronto/owlready2 and ensures
 the helpers in ``optdeps`` raise informative errors or provide stubbed
-implementations so the CLI remains robust in minimal environments.
-"""
+implementations so the CLI remains robust in minimal environments."""
 
 from __future__ import annotations
 

@@ -1,3 +1,13 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_cli_config_show",
+#   "purpose": "CLI coverage for the ``ontofetch config show`` subcommand.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI coverage for the ``ontofetch config show`` subcommand."""
 
 from __future__ import annotations

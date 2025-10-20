@@ -1,50 +1,9 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_cli_utils",
-#   "purpose": "Pytest coverage for ontology download cli utils scenarios",
+#   "purpose": "Regression coverage for CLI table/summary formatting helpers.",
 #   "sections": [
-#     {
-#       "id": "test-format-table-basic",
-#       "name": "test_format_table_basic",
-#       "anchor": "function-test-format-table-basic",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-format-table-column-alignment",
-#       "name": "test_format_table_column_alignment",
-#       "anchor": "function-test-format-table-column-alignment",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-format-table-empty-rows",
-#       "name": "test_format_table_empty_rows",
-#       "anchor": "function-test-format-table-empty-rows",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-format-validation-summary-success",
-#       "name": "test_format_validation_summary_success",
-#       "anchor": "function-test-format-validation-summary-success",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-format-validation-summary-error",
-#       "name": "test_format_validation_summary_error",
-#       "anchor": "function-test-format-validation-summary-error",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-format-validation-summary-multiple",
-#       "name": "test_format_validation_summary_multiple",
-#       "anchor": "function-test-format-validation-summary-multiple",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-format-validation-summary-non-dict-details",
-#       "name": "test_format_validation_summary_non_dict_details",
-#       "anchor": "function-test-format-validation-summary-non-dict-details",
-#       "kind": "function"
-#     }
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -53,8 +12,7 @@
 
 Verifies that plan/result tables, validation summaries, and inline hyperlinks
 render with correct alignment, padding, and detail aggregation. Protects the
-text output consumed by operators and documentation snippets.
-"""
+text output consumed by operators and documentation snippets."""
 
 from __future__ import annotations
 

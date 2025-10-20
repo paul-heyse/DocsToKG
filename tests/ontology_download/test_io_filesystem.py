@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_io_filesystem",
+#   "purpose": "Filesystem helper regression tests.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Filesystem helper regression tests.
 
 Covers cached file materialisation, cross-device fallback paths, archive
 extraction safety, sanitized filenames, and correlation ID generation for
-logging. Ensures ontology artefacts are staged securely before validation.
-"""
+logging. Ensures ontology artefacts are staged securely before validation."""
 
 from __future__ import annotations
 

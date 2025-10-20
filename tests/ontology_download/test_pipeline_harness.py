@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_pipeline_harness",
+#   "purpose": "End-to-end integration tests using the ontology download harness.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """End-to-end integration tests using the ontology download harness.
 
 Spins up temporary resolvers/validators, runs the full planning → download →
 validation → manifest pipeline, and asserts behaviour across cancellation,
-retry/backoff, error aggregation, and telemetry capture.
-"""
+retry/backoff, error aggregation, and telemetry capture."""
 
 from __future__ import annotations
 

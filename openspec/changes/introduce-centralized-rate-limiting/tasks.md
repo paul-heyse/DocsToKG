@@ -45,9 +45,9 @@
 - [x] 2.5 Emit a structured policy table at startup from `runner.py` or `cli.py` (before the run begins) showing host, role, ordered rates, mode, max_delay, backend, and count_head flag. Ensure logging respects JSON/structured output when enabled.
 
 ## 3. Telemetry & Observability
-- [ ] 3.1 Extend `DocsToKG.ContentDownload.telemetry.RunTelemetry` (or the relevant sink writer) to record new metrics: `rate_limiter_acquire_total{host,role}`, `rate_limiter_wait_ms_sum`, `rate_limiter_block_total`, and `rate_limiter_policy_backend{host}` gauges. Ensure metrics are thread-safe.
-- [ ] 3.2 Update `AttemptRecord` (or the manifest payload) to include optional fields `rate_limiter_wait_ms`, `rate_limiter_mode`, `rate_limiter_backend`, and `from_cache` so cached hits and waits can be analysed together.
-- [ ] 3.3 Modify `summary.emit_console_summary` and `statistics.DownloadStatistics` to aggregate limiter waits/blocks, include them in the console report, and persist them in `manifest.metrics.json`.
+- [x] 3.1 Extend `DocsToKG.ContentDownload.telemetry.RunTelemetry` (or the relevant sink writer) to record new metrics: `rate_limiter_acquire_total{host,role}`, `rate_limiter_wait_ms_sum`, `rate_limiter_block_total`, and `rate_limiter_policy_backend{host}` gauges. Ensure metrics are thread-safe.
+- [x] 3.2 Update `AttemptRecord` (or the manifest payload) to include optional fields `rate_limiter_wait_ms`, `rate_limiter_mode`, `rate_limiter_backend`, and `from_cache` so cached hits and waits can be analysed together.
+- [x] 3.3 Modify `summary.emit_console_summary` and `statistics.DownloadStatistics` to aggregate limiter waits/blocks, include them in the console report, and persist them in `manifest.metrics.json`.
 - [x] 3.4 Enhance `log_download_failure` to attach limiter metadata when `RateLimitError` occurs; confirm manifest sinks persist the extra keys without schema violations.
 - [x] 3.5 Add structured logging (`LOGGER.info("rate-policy", …)`) during startup showing resolved policies and `LOGGER.debug("rate-acquire", …)` for each limiter acquisition when debug logging is enabled.
 

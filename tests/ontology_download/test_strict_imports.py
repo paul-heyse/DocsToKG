@@ -1,8 +1,10 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_strict_imports",
-#   "purpose": "Validates strict import toggles for optional shims",
-#   "sections": []
+#   "purpose": "Strict import flag behaviour for optional shims.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
 # }
 # === /NAVMAP ===
 
@@ -10,8 +12,7 @@
 
 Validates that setting ``ONTOFETCH_STRICT_IMPORTS`` causes legacy shim modules
 to raise immediate errors while core modules continue importing, protecting
-against silently degraded environments.
-"""
+against silently degraded environments."""
 
 from __future__ import annotations
 

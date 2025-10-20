@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_doctor",
+#   "purpose": "Deep coverage for the ``ontofetch doctor`` remediation workflow.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Deep coverage for the ``ontofetch doctor`` remediation workflow.
 
 Validates log rotation, dependency reporting, cache inspection, and error exit
 codes when the operator requests automated fixes. Guards against regressions in
-the interactive troubleshooting experience.
-"""
+the interactive troubleshooting experience."""
 
 from __future__ import annotations
 

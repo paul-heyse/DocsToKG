@@ -1,11 +1,20 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_checksums",
+#   "purpose": "Regression matrix for checksum parsing, normalization, and resolution.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Regression matrix for checksum parsing, normalization, and resolution.
 
 These tests cover how ``DocsToKG.OntologyDownload.checksums`` pulls digests
 from configuration extras, resolver metadata, and remote checksum manifests.
 They verify algorithm coercion, precedence rules between spec and plan hints,
 error propagation when downloads fail, and caching behaviour used by the
-planner while constructing manifests.
-"""
+planner while constructing manifests."""
 
 from __future__ import annotations
 

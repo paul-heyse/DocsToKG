@@ -1,10 +1,19 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_cli_prune",
+#   "purpose": "Retention and cleanup scenarios for the ``ontofetch prune`` command.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Retention and cleanup scenarios for the ``ontofetch prune`` command.
 
 Seeds synthetic ontology versions and manifests, then verifies that prune keeps
 the desired number of versions, respects JSON reporting, and refuses dangerous
 parameters. Guards the retention workflow that operators rely on to manage
-LOCAL_ONTOLOGY_DIR size.
-"""
+LOCAL_ONTOLOGY_DIR size."""
 
 from __future__ import annotations
 

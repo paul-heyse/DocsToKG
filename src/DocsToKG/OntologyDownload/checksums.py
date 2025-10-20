@@ -17,9 +17,12 @@
 Configuration files and resolver payloads may describe expected digests in a
 variety of formats.  This module normalises those declarations, validates the
 algorithms that callers request, and exposes streaming utilities that compute
-hashes without materialising entire ontology archives in memory.  The helpers
-are used by the planner when constructing manifests and by the downloader to
-enforce tamper-detection policies prior to ingestion.
+hashes without materialising entire ontology archives in memory.  When remote
+checksum endpoints reply with `Retry-After` guidance the helpers propagate the
+delay to the caller instead of mutating limiter state, matching the shared
+pyrate-limiter semantics.  The helpers are used by the planner when constructing
+manifests and by the downloader to enforce tamper-detection policies prior to
+ingestion.
 """
 
 from __future__ import annotations

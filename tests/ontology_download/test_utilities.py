@@ -1,56 +1,9 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_utilities",
-#   "purpose": "Pytest coverage for ontology download utilities scenarios",
+#   "purpose": "Utility-function regression coverage for planners/settings.",
 #   "sections": [
-#     {
-#       "id": "test-parse-rate-limit-to-rps-formats",
-#       "name": "test_parse_rate_limit_to_rps_formats",
-#       "anchor": "function-test-parse-rate-limit-to-rps-formats",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-parse-rate-limit-to-rps-invalid",
-#       "name": "test_parse_rate_limit_to_rps_invalid",
-#       "anchor": "function-test-parse-rate-limit-to-rps-invalid",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-directory-size-counts-all-files",
-#       "name": "test_directory_size_counts_all_files",
-#       "anchor": "function-test-directory-size-counts-all-files",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-directory-size-handles-empty-directory",
-#       "name": "test_directory_size_handles_empty_directory",
-#       "anchor": "function-test-directory-size-handles-empty-directory",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-parse-iso-datetime-normalizes-timezone",
-#       "name": "test_parse_iso_datetime_normalizes_timezone",
-#       "anchor": "function-test-parse-iso-datetime-normalizes-timezone",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-parse-http-datetime-handles-gmt-header",
-#       "name": "test_parse_http_datetime_handles_gmt_header",
-#       "anchor": "function-test-parse-http-datetime-handles-gmt-header",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-parse-version-timestamp-variants",
-#       "name": "test_parse_version_timestamp_variants",
-#       "anchor": "function-test-parse-version-timestamp-variants",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-infer-version-timestamp-from-composite-strings",
-#       "name": "test_infer_version_timestamp_from_composite_strings",
-#       "anchor": "function-test-infer-version-timestamp-from-composite-strings",
-#       "kind": "function"
-#     }
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -58,8 +11,7 @@
 """Utility-function regression coverage for planners/settings.
 
 Exercises rate-limit parsing, timestamp inference, directory size helpers, and
-other small utilities that power manifest generation and telemetry.
-"""
+other small utilities that power manifest generation and telemetry."""
 
 import datetime as dt
 from pathlib import Path

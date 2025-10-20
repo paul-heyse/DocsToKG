@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_download_behaviour",
+#   "purpose": "Streaming download behaviour against the harness HTTP server.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Streaming download behaviour against the harness HTTP server.
 
 Validates retry/backoff semantics, checksum enforcement, archive extraction
 limits, filename sanitisation, and conditional GET handling to ensure the
-downloader hardens against adversarial responses.
-"""
+downloader hardens against adversarial responses."""
 
 from __future__ import annotations
 

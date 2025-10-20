@@ -1,3 +1,13 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_doctor_fixes_permissions",
+#   "purpose": "Tests covering permission hardening in `_apply_doctor_fixes`.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Tests covering permission hardening in `_apply_doctor_fixes`."""
 
 from __future__ import annotations

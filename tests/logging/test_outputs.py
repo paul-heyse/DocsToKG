@@ -77,12 +77,14 @@ import csv
 import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any, Dict, List
 
 import pytest
 
 pytest.importorskip("requests")
 pytest.importorskip("pyalex")
 
+from DocsToKG.ContentDownload.core import ReasonCode  # noqa: E402
 from DocsToKG.ContentDownload.pipeline import AttemptRecord  # noqa: E402
 from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
     MANIFEST_SCHEMA_VERSION,
@@ -92,6 +94,7 @@ from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
     ManifestEntry,
     ManifestIndexSink,
     MultiSink,
+    RunTelemetry,
     RotatingJsonlSink,
 )
 from scripts.export_attempts_csv import export_attempts_jsonl_to_csv  # noqa: E402
@@ -684,3 +687,75 @@ def test_last_attempt_csv_sink_writes_latest_entries(tmp_path: Path) -> None:
             "last_modified": "",
         },
     ]
+
+
+class _StubAttemptSink:
+    def __init__(self) -> None:
+        self.attempts: List[AttemptRecord] = []
+        self.summaries: List[Dict[str, Any]] = []
+
+    def log_attempt(self, record: AttemptRecord, *, timestamp: str | None = None) -> None:
+        self.attempts.append(record)
+
+    def log_manifest(self, entry: ManifestEntry) -> None:  # pragma: no cover - unused
+        return None
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:
+        self.summaries.append(summary.copy())
+
+
+def test_run_telemetry_tracks_rate_limiter_metrics() -> None:
+    sink = _StubAttemptSink()
+    telemetry = RunTelemetry(sink)
+
+    success_record = AttemptRecord(
+        run_id="run-rl",
+        work_id="W-success",
+        resolver_name="unpaywall",
+        resolver_order=1,
+        url="https://example.org/pdf",
+        status="pdf",
+        http_status=200,
+        content_type="application/pdf",
+        elapsed_ms=100.0,
+        metadata={},
+        dry_run=False,
+        rate_limiter_wait_ms=50.0,
+        rate_limiter_backend="memory",
+        rate_limiter_mode="wait",
+        rate_limiter_role="metadata",
+    )
+
+    blocked_record = AttemptRecord(
+        run_id="run-rl",
+        work_id="W-block",
+        resolver_name="unpaywall",
+        resolver_order=1,
+        url="https://example.org/pdf",
+        status="skipped",
+        http_status=None,
+        content_type=None,
+        elapsed_ms=None,
+        reason=ReasonCode.RATE_LIMITED,
+        metadata={"rate_limiter": {"blocked": True, "mode": "raise", "backend": "memory"}},
+        dry_run=False,
+        rate_limiter_backend="memory",
+        rate_limiter_mode="raise",
+        rate_limiter_role="metadata",
+    )
+
+    telemetry.log_attempt(success_record)
+    telemetry.log_attempt(blocked_record)
+
+    snapshot = telemetry.rate_limiter_metrics_snapshot()
+    assert snapshot["example.org"]["metadata"]["acquire_total"] == 2
+    assert snapshot["example.org"]["metadata"]["blocked_total"] == 1
+    assert snapshot["example.org"]["metadata"]["wait_ms_sum"] == 50.0
+
+    summary_payload: Dict[str, Any] = {}
+    telemetry.log_summary(summary_payload)
+    assert "rate_limiter_attempts" in summary_payload
+    assert (
+        summary_payload["rate_limiter_attempts"]["example.org"]["metadata"]["blocked_total"]
+        == 1
+    )

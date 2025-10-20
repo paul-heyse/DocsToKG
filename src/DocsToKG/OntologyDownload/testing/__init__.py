@@ -1,4 +1,9 @@
-"""Testing utilities for exercising the ontology downloader end-to-end."""
+"""Testing utilities for exercising the ontology downloader end-to-end.
+
+Provides a harness that fakes HTTP servers, toggles pyrate vs. legacy rate
+limiters, and exposes helpers for temporarily registering resolvers/validators
+during unit tests.
+"""
 
 from __future__ import annotations
 
@@ -8,11 +13,11 @@ import json
 import logging
 import os
 import socket
-from email.utils import parsedate_to_datetime
 import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from email.utils import parsedate_to_datetime
 from importlib import import_module
 from pathlib import Path
 from tempfile import TemporaryDirectory

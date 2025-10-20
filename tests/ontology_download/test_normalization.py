@@ -1,50 +1,9 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_normalization",
-#   "purpose": "Pytest coverage for ontology download normalization scenarios",
+#   "purpose": "Normalization pipeline regression tests.",
 #   "sections": [
-#     {
-#       "id": "make-config",
-#       "name": "_make_config",
-#       "anchor": "function-make-config",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "noop-logger",
-#       "name": "_noop_logger",
-#       "anchor": "function-noop-logger",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "run-rdflib",
-#       "name": "_run_rdflib",
-#       "anchor": "function-run-rdflib",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-streaming-hash-is-deterministic",
-#       "name": "test_streaming_hash_is_deterministic",
-#       "anchor": "function-test-streaming-hash-is-deterministic",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-streaming-matches-in-memory",
-#       "name": "test_streaming_matches_in_memory",
-#       "anchor": "function-test-streaming-matches-in-memory",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-streaming-edge-cases",
-#       "name": "test_streaming_edge_cases",
-#       "anchor": "function-test-streaming-edge-cases",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-streaming-flushes-chunks",
-#       "name": "test_streaming_flushes_chunks",
-#       "anchor": "function-test-streaming-flushes-chunks",
-#       "kind": "function"
-#     }
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -54,8 +13,7 @@
 Focuses on the streaming normalization stage: rdflib/skos transformations,
 archive extraction, temporary directory handling, and manifest metadata
 updates. Ensures the pipeline produces consistent outputs across ontology
-formats and handles validator failures gracefully.
-"""
+formats and handles validator failures gracefully."""
 
 from __future__ import annotations
 

@@ -44,11 +44,12 @@ import shutil
 import sqlite3
 import tempfile
 import threading
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
+from urllib.parse import urlsplit
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -518,6 +519,69 @@ class RunTelemetry(AttemptSink):
 
     def __init__(self, sink: AttemptSink) -> None:
         self._sink = sink
+        self._metrics_lock = threading.Lock()
+        self._rate_limiter_metrics: Dict[str, Dict[str, Dict[str, Any]]] = defaultdict(
+            lambda: defaultdict(
+                lambda: {
+                    "acquire_total": 0,
+                    "wait_ms_sum": 0.0,
+                    "wait_ms_count": 0,
+                    "blocked_total": 0,
+                    "backend": None,
+                }
+            )
+        )
+
+    def _update_rate_metrics(self, record: "AttemptRecord") -> None:
+        if not record.rate_limiter_backend and record.rate_limiter_wait_ms is None:
+            return
+
+        url_value = record.url or ""
+        host = urlsplit(url_value).netloc.lower() if url_value else "unknown"
+        role = (record.rate_limiter_role or "unknown").lower()
+        with self._metrics_lock:
+            entry = self._rate_limiter_metrics[host][role]
+            entry["acquire_total"] += 1
+            if record.rate_limiter_wait_ms is not None:
+                entry["wait_ms_sum"] += float(record.rate_limiter_wait_ms)
+                entry["wait_ms_count"] += 1
+            if record.rate_limiter_backend:
+                entry["backend"] = record.rate_limiter_backend
+
+            reason_token = None
+            if isinstance(record.reason, ReasonCode):
+                reason_token = record.reason.value
+            elif isinstance(record.reason, str):
+                reason_token = record.reason
+
+            if reason_token == ReasonCode.RATE_LIMITED.value:
+                entry["blocked_total"] += 1
+            else:
+                metadata = record.metadata if isinstance(record.metadata, Mapping) else {}
+                rate_info = metadata.get("rate_limiter") if isinstance(metadata, Mapping) else {}
+                if isinstance(rate_info, Mapping) and rate_info.get("blocked"):
+                    entry["blocked_total"] += 1
+
+    def _rate_metrics_snapshot(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+        with self._metrics_lock:
+            snapshot: Dict[str, Dict[str, Dict[str, Any]]] = {}
+            for host, roles in self._rate_limiter_metrics.items():
+                host_view: Dict[str, Dict[str, Any]] = {}
+                for role, stats in roles.items():
+                    host_view[role] = {
+                        "acquire_total": stats["acquire_total"],
+                        "wait_ms_sum": stats["wait_ms_sum"],
+                        "blocked_total": stats["blocked_total"],
+                        "backend": stats.get("backend"),
+                        "wait_ms_count": stats["wait_ms_count"],
+                    }
+                snapshot[host] = host_view
+            return snapshot
+
+    def rate_limiter_metrics_snapshot(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+        """Return a thread-safe snapshot of rate limiter metrics."""
+
+        return self._rate_metrics_snapshot()
 
     def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
         """Proxy attempt logging to the underlying sink.
@@ -526,6 +590,7 @@ class RunTelemetry(AttemptSink):
             record: Resolver attempt payload to record.
             timestamp: Optional ISO-8601 timestamp overriding ``datetime.utcnow``.
         """
+        self._update_rate_metrics(record)
         self._sink.log_attempt(record, timestamp=timestamp)
 
     def log_manifest(self, entry: ManifestEntry) -> None:
@@ -534,6 +599,9 @@ class RunTelemetry(AttemptSink):
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
         """Publish the final run summary to downstream sinks."""
+        rate_snapshot = self._rate_metrics_snapshot()
+        if rate_snapshot and "rate_limiter_attempts" not in summary:
+            summary["rate_limiter_attempts"] = rate_snapshot
         self._sink.log_summary(summary)
 
     def __enter__(self) -> "RunTelemetry":
@@ -698,6 +766,11 @@ class JsonlSink:
                 "content_length": record.content_length,
                 "dry_run": record.dry_run,
                 "retry_after": record.retry_after,
+                "rate_limiter_wait_ms": record.rate_limiter_wait_ms,
+                "rate_limiter_mode": record.rate_limiter_mode,
+                "rate_limiter_backend": record.rate_limiter_backend,
+                "rate_limiter_role": record.rate_limiter_role,
+                "from_cache": record.from_cache,
             }
         )
 
@@ -837,6 +910,11 @@ class CsvSink:
         "content_length",
         "retry_after",
         "dry_run",
+        "rate_limiter_wait_ms",
+        "rate_limiter_mode",
+        "rate_limiter_backend",
+        "rate_limiter_role",
+        "from_cache",
         "metadata",
     ]
 
@@ -883,6 +961,11 @@ class CsvSink:
             "content_length": record.content_length,
             "retry_after": record.retry_after,
             "dry_run": record.dry_run,
+            "rate_limiter_wait_ms": record.rate_limiter_wait_ms,
+            "rate_limiter_mode": record.rate_limiter_mode or "",
+            "rate_limiter_backend": record.rate_limiter_backend or "",
+            "rate_limiter_role": record.rate_limiter_role or "",
+            "from_cache": record.from_cache,
             "metadata": json.dumps(record.metadata, sort_keys=True) if record.metadata else "",
         }
         with self._lock:

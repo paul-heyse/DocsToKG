@@ -872,6 +872,11 @@ class AttemptRecord:
     dry_run: bool = False
     resolver_wall_time_ms: Optional[float] = None
     retry_after: Optional[float] = None
+    rate_limiter_wait_ms: Optional[float] = None
+    rate_limiter_backend: Optional[str] = None
+    rate_limiter_mode: Optional[str] = None
+    rate_limiter_role: Optional[str] = None
+    from_cache: Optional[bool] = None
     run_id: Optional[str] = None
 
     def __post_init__(self) -> None:
@@ -2125,39 +2130,64 @@ class ResolverPipeline:
             if key.startswith("resume_") and key != "resume_disabled":
                 metadata_payload.pop(key, None)
 
-            self._emit_attempt(
-                AttemptRecord(
-                    run_id=self._run_id,
-                    work_id=artifact.work_id,
-                    resolver_name=resolver_name,
-                    resolver_order=order_index,
-                    url=url,
-                    status=outcome.classification,
-                    http_status=outcome.http_status,
-                    content_type=outcome.content_type,
-                    elapsed_ms=outcome.elapsed_ms,
-                    reason=outcome.reason,
-                    reason_detail=outcome.reason_detail,
-                    metadata=metadata_payload,
-                    sha256=outcome.sha256,
-                    content_length=outcome.content_length,
-                    dry_run=state.dry_run,
-                    resolver_wall_time_ms=resolver_wall_time_ms,
-                    retry_after=retry_after_hint,
-                )
-            )
-            self.metrics.record_attempt(resolver_name, outcome)
-            self._update_breakers(resolver_name, host_value, outcome)
+        rate_limiter_info = metadata_payload.get("rate_limiter")
+        if not isinstance(rate_limiter_info, Mapping):
+            rate_limiter_info = {}
+        network_info = metadata_payload.get("network")
+        if not isinstance(network_info, Mapping):
+            network_info = {}
 
-            classification = outcome.classification
-            if classification is Classification.HTML and outcome.path:
-                state.html_paths.append(outcome.path)
+        wait_ms_value: Optional[float]
+        try:
+            wait_raw = rate_limiter_info.get("wait_ms")
+            wait_ms_value = float(wait_raw) if wait_raw is not None else None
+        except (TypeError, ValueError):
+            wait_ms_value = None
 
-            if classification not in PDF_LIKE and url:
-                if url not in state.failed_urls:
-                    state.failed_urls.append(url)
-                if url not in artifact.failed_pdf_urls:
-                    artifact.failed_pdf_urls.append(url)
+        rate_limiter_role = rate_limiter_info.get("role")
+        if isinstance(rate_limiter_role, str):
+            rate_limiter_role = rate_limiter_role.lower()
+        else:
+            rate_limiter_role = None
+
+        attempt_record = AttemptRecord(
+            run_id=self._run_id,
+            work_id=artifact.work_id,
+            resolver_name=resolver_name,
+            resolver_order=order_index,
+            url=url,
+            status=outcome.classification,
+            http_status=outcome.http_status,
+            content_type=outcome.content_type,
+            elapsed_ms=outcome.elapsed_ms,
+            reason=outcome.reason,
+            reason_detail=outcome.reason_detail,
+            metadata=metadata_payload,
+            sha256=outcome.sha256,
+            content_length=outcome.content_length,
+            dry_run=state.dry_run,
+            resolver_wall_time_ms=resolver_wall_time_ms,
+            retry_after=retry_after_hint,
+            rate_limiter_wait_ms=wait_ms_value,
+            rate_limiter_backend=rate_limiter_info.get("backend"),
+            rate_limiter_mode=rate_limiter_info.get("mode"),
+            rate_limiter_role=rate_limiter_role,
+            from_cache=network_info.get("from_cache"),
+        )
+
+        self._emit_attempt(attempt_record)
+        self.metrics.record_attempt(resolver_name, outcome)
+        self._update_breakers(resolver_name, host_value, outcome)
+
+        classification = outcome.classification
+        if classification is Classification.HTML and outcome.path:
+            state.html_paths.append(outcome.path)
+
+        if classification not in PDF_LIKE and url:
+            if url not in state.failed_urls:
+                state.failed_urls.append(url)
+            if url not in artifact.failed_pdf_urls:
+                artifact.failed_pdf_urls.append(url)
 
             if classification in PDF_LIKE:
                 return PipelineResult(

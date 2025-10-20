@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_doctor_report",
+#   "purpose": "Unit-level coverage for doctor diagnostics assembly.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Unit-level coverage for doctor diagnostics assembly.
 
 Exercises the helper routines that gather disk usage, optional dependency
 status, resolver/plugin metadata, and structured suggestions so that the doctor
-CLI can render actionable reports.
-"""
+CLI can render actionable reports."""
 
 from __future__ import annotations
 

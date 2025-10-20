@@ -1,39 +1,14 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_logging",
-#   "purpose": "Pytest coverage for ontology download logging scenarios",
+#   "purpose": "Ontology Logging Tests",
 #   "sections": [
-#     {
-#       "id": "test-mask-sensitive-data-masks-tokens",
-#       "name": "test_mask_sensitive_data_masks_tokens",
-#       "anchor": "function-test-mask-sensitive-data-masks-tokens",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-setup-logging-emits-structured-json",
-#       "name": "test_setup_logging_emits_structured_json",
-#       "anchor": "function-test-setup-logging-emits-structured-json",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-setup-logging-expands-env-log-dir",
-#       "name": "test_setup_logging_expands_env_log_dir",
-#       "anchor": "function-test-setup-logging-expands-env-log-dir",
-#       "kind": "function"
-#     }
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
 #   ]
 # }
 # === /NAVMAP ===
 
-"""Logging helper regression coverage.
-
-Validates masking of sensitive fields, structured JSON formatting, log
-rotation/compression, and convenience functions to ensure operational telemetry
-remains safe and consumable by downstream systems.
-"""
-
-"""
-Ontology Logging Tests
+"""Ontology Logging Tests
 
 This module validates logging helpers for the ontology download service,
 ensuring sensitive fields are masked and structured JSON logs include
@@ -47,8 +22,7 @@ Dependencies:
 - DocsToKG.OntologyDownload: Logging utilities under test
 
 Usage:
-    pytest tests/ontology_download/test_logging.py
-"""
+    pytest tests/ontology_download/test_logging.py"""
 
 import json
 import logging

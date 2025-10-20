@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_cli_validate",
+#   "purpose": "Regression suite for the ``ontofetch validate`` CLI handler.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Regression suite for the ``ontofetch validate`` CLI handler.
 
 Confirms validation results are written atomically, cache directories are
 discovered, exit codes reflect validator failures, and JSON output mirrors the
-structure consumed by operational dashboards.
-"""
+structure consumed by operational dashboards."""
 
 from __future__ import annotations
 

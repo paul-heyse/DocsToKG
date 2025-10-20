@@ -1,197 +1,21 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_config",
-#   "purpose": "Pytest coverage for ontology download config scenarios",
+#   "purpose": "Configuration model regression tests.",
 #   "sections": [
-#     {
-#       "id": "test-merge-defaults-creates-fetch-spec",
-#       "name": "test_merge_defaults_creates_fetch_spec",
-#       "anchor": "function-test-merge-defaults-creates-fetch-spec",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-logging-config-defaults",
-#       "name": "test_logging_config_defaults",
-#       "anchor": "function-test-logging-config-defaults",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-logging-config-validates-level",
-#       "name": "test_logging_config_validates_level",
-#       "anchor": "function-test-logging-config-validates-level",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-logging-config-case-insensitive-level",
-#       "name": "test_logging_config_case_insensitive_level",
-#       "anchor": "function-test-logging-config-case-insensitive-level",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-logging-config-validates-positive-values",
-#       "name": "test_logging_config_validates_positive_values",
-#       "anchor": "function-test-logging-config-validates-positive-values",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validation-config-timeout-bounds",
-#       "name": "test_validation_config_timeout_bounds",
-#       "anchor": "function-test-validation-config-timeout-bounds",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-download-config-rate-limit-formats",
-#       "name": "test_download_config_rate_limit_formats",
-#       "anchor": "function-test-download-config-rate-limit-formats",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-download-config-service-rate-limits",
-#       "name": "test_download_config_service_rate_limits",
-#       "anchor": "function-test-download-config-service-rate-limits",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-download-config-invalid-rate-limit",
-#       "name": "test_download_config_invalid_rate_limit",
-#       "anchor": "function-test-download-config-invalid-rate-limit",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-download-config-allowed-hosts",
-#       "name": "test_download_config_allowed_hosts",
-#       "anchor": "function-test-download-config-allowed-hosts",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-download-config-defaults-include-service-limits",
-#       "name": "test_download_config_defaults_include_service_limits",
-#       "anchor": "function-test-download-config-defaults-include-service-limits",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-download-config-normalizes-allowed-hosts",
-#       "name": "test_download_config_normalizes_allowed_hosts",
-#       "anchor": "function-test-download-config-normalizes-allowed-hosts",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-download-config-polite-headers-defaults",
-#       "name": "test_download_config_polite_headers_defaults",
-#       "anchor": "function-test-download-config-polite-headers-defaults",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-download-config-polite-headers-custom-values",
-#       "name": "test_download_config_polite_headers_custom_values",
-#       "anchor": "function-test-download-config-polite-headers-custom-values",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-defaults-config-pydantic",
-#       "name": "test_defaults_config_pydantic",
-#       "anchor": "function-test-defaults-config-pydantic",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-defaults-config-json-schema",
-#       "name": "test_defaults_config_json_schema",
-#       "anchor": "function-test-defaults-config-json-schema",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-defaults-config-prefer-source-validation",
-#       "name": "test_defaults_config_prefer_source_validation",
-#       "anchor": "function-test-defaults-config-prefer-source-validation",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-env-override-applies-settings",
-#       "name": "test_env_override_applies_settings",
-#       "anchor": "function-test-env-override-applies-settings",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-get-env-overrides-backwards-compatible",
-#       "name": "test_get_env_overrides_backwards_compatible",
-#       "anchor": "function-test-get-env-overrides-backwards-compatible",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-load-config-parses-defaults",
-#       "name": "test_load_config_parses_defaults",
-#       "anchor": "function-test-load-config-parses-defaults",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validate-config-rejects-missing-id",
-#       "name": "test_validate_config_rejects_missing_id",
-#       "anchor": "function-test-validate-config-rejects-missing-id",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validate-config-unknown-key",
-#       "name": "test_validate_config_unknown_key",
-#       "anchor": "function-test-validate-config-unknown-key",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validate-config-rejects-non-mapping-extras",
-#       "name": "test_validate_config_rejects_non_mapping_extras",
-#       "anchor": "function-test-validate-config-rejects-non-mapping-extras",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-load-raw-yaml-missing-file-exits",
-#       "name": "test_load_raw_yaml_missing_file_exits",
-#       "anchor": "function-test-load-raw-yaml-missing-file-exits",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-load-config-invalid-yaml",
-#       "name": "test_load_config_invalid_yaml",
-#       "anchor": "function-test-load-config-invalid-yaml",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-fetch-one-rejects-disallowed-license",
-#       "name": "test_fetch_one_rejects_disallowed_license",
-#       "anchor": "function-test-fetch-one-rejects-disallowed-license",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-fetch-one-unknown-resolver",
-#       "name": "test_fetch_one_unknown_resolver",
-#       "anchor": "function-test-fetch-one-unknown-resolver",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-fetch-one-download-error",
-#       "name": "test_fetch_one_download_error",
-#       "anchor": "function-test-fetch-one-download-error",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "noop-logger",
-#       "name": "_noop_logger",
-#       "anchor": "function-noop-logger",
-#       "kind": "function"
-#     }
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
 #   ]
 # }
 # === /NAVMAP ===
-
-from __future__ import annotations
 
 """Configuration model regression tests.
 
 Exercises the layered configuration system: YAML parsing, defaults merging,
 environment overrides, validation of allowed hosts/rate limits, and backwards
 compatibility helpers. Ensures the CLI and API receive well-formed
-``ResolvedConfig`` objects and that misconfigurations raise descriptive errors.
-"""
+``ResolvedConfig`` objects and that misconfigurations raise descriptive errors."""
 
-"""Tests for ontology downloader configuration models and helpers."""
+from __future__ import annotations
 
 import logging
 import os

@@ -1,3 +1,15 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_network_retry",
+#   "purpose": "Covers retry/backoff utilities, ensuring jitter, retry-after hints, and retryable exception classification work as expected.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
+"""Covers retry/backoff utilities, ensuring jitter, retry-after hints, and retryable exception classification work as expected."""
+
 from __future__ import annotations
 
 from typing import List

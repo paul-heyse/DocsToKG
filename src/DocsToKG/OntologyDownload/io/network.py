@@ -16,24 +16,24 @@
 
 This module manages resilient HTTP downloads: DNS caching, a shared HTTPX
 client with RFC-9111 caching, range resume, provenance logging, retry-after
-aware throttling, and security guards around redirects, content types, and
-host allowlists. It provides the streaming helpers consumed by resolvers and
-the planner when fetching ontology artefacts. The legacy `requests` session
-pool has been retired—every code path now goes through the shared HTTPX +
-Hishel transport defined in `DocsToKG.OntologyDownload.net`.
+aware throttling against the pyrate-limiter façade, and security guards around
+redirects, content types, and host allowlists. It provides the streaming
+helpers consumed by resolvers and the planner when fetching ontology artefacts.
+The legacy `requests` session pool has been retired—every code path now goes
+through the shared HTTPX + Hishel transport defined in
+`DocsToKG.OntologyDownload.net`.
 """
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import ipaddress
 import logging
 import os
 import random
-import ssl
 import shutil
 import socket
+import ssl
 import threading
 import time
 import unicodedata
@@ -46,7 +46,6 @@ from pathlib import Path
 from typing import (
     Callable,
     Dict,
-    Iterable,
     Iterator,
     List,
     Mapping,
@@ -1485,8 +1484,4 @@ def download_stream(
 
     raise OntologyDownloadError(
         f"checksum mismatch after {checksum_attempts} attempts: {secure_url}"
-    )
-
-    raise OntologyDownloadError(
-        f"checksum mismatch after {max_checksum_attempts} attempts: {secure_url}"
     )

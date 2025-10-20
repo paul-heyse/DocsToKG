@@ -1,20 +1,9 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_cli_spec_resolution",
-#   "purpose": "Regression coverage for CLI spec resolution overrides",
+#   "purpose": "Comprehensive coverage for CLI fetch-spec override semantics.",
 #   "sections": [
-#     {
-#       "id": "test-pull-spec-cli-target-formats-override",
-#       "name": "test_pull_spec_cli_target_formats_override",
-#       "anchor": "function-test-pull-spec-cli-target-formats-override",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-cli-ad-hoc-ids-use-cli-target-formats",
-#       "name": "test_cli_ad_hoc_ids_use_cli_target_formats",
-#       "anchor": "function-test-cli-ad-hoc-ids-use-cli-target-formats",
-#       "kind": "function"
-#     }
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -24,8 +13,7 @@
 Verifies that CLI-supplied target formats, resolver choices, and ad-hoc
 ontology IDs correctly override YAML configuration defaults without mutating
 the on-disk config. Ensures validation errors surface for incompatible
-combinations and that plan/pull commands honour the resolved specification.
-"""
+combinations and that plan/pull commands honour the resolved specification."""
 
 from __future__ import annotations
 

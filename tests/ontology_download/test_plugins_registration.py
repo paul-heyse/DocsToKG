@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_plugins_registration",
+#   "purpose": "Resolver/validator plugin registration regression tests.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Resolver/validator plugin registration regression tests.
 
 Exercises entry-point loading, manual registration/unregistration, registry
 caching, and metadata exposure so that dynamic extensions behave predictably
-across threads and repeated CLI invocations.
-"""
+across threads and repeated CLI invocations."""
 
 from __future__ import annotations
 

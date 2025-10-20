@@ -1,3 +1,13 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_httpx_streaming",
+#   "purpose": "HTTPX MockTransport-based coverage for the streaming downloader.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """HTTPX MockTransport-based coverage for the streaming downloader."""
 
 from __future__ import annotations

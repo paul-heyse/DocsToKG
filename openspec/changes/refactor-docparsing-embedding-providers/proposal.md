@@ -1,15 +1,25 @@
 ## Why
-Embedding currently binds backend-specific logic directly into `DocsToKG.DocParsing.embedding.runtime`: the module imports vLLM and sentence-transformers, manages bespoke queues/caches, and wires dense, sparse, and lexical behaviour through ad-hoc helpers. Configuration is likewise fragmented across `EmbedCfg`, CLI flags, and environment variables. This tight coupling makes it painful to swap providers (e.g., TEI vs. local Qwen), tempts regressions when optional dependencies are missing, and forces every enhancement to touch runtime plumbing, tests, and docs in tandem.
+Embedding currently binds backend-specific logic directly into `DocsToKG.DocParsing.embedding.runtime`. The module imports vLLM and sentence-transformers, owns bespoke queues/caches (for example `_QWEN_LLM_CACHE` and `QwenEmbeddingQueue`), and decides how to batch or retry each backend. Configuration knobs are fragmented across `EmbedCfg`, CLI flags, and ad-hoc environment variables, so adding a new backend requires touching runtime plumbing, config loaders, telemetry, and docs in tandem. That coupling makes provider swaps (e.g., TEI vs. local Qwen) risky for junior contributors, obscures provenance in telemetry, and complicates offline runs where optional dependencies are missing.
 
 ## What Changes
-- Introduce `DocsToKG.DocParsing.embedding.backends` with base protocols (`DenseEmbeddingBackend`, `SparseEmbeddingBackend`, `LexicalEmbeddingBackend`) and a structured `ProviderError`, plus a `ProviderFactory` that builds providers from `EmbedCfg` inputs.
-- Ship concrete providers: `dense.sentence_transformers`, `dense.tei`, `dense.qwen_vllm`, `sparse.splade_st`, and `lexical.local_bm25`, each responsible for their own imports, batching, caching, and lifecycle.
-- Reshape `EmbedCfg` so provider selection lives under `embedding.*`, `dense.*`, `sparse.*`, and `lexical.*` keys with explicit defaults, CLI/env/config precedence, and legacy flag/env aliases that emit deprecation notices.
-- Refactor `embedding.runtime` (and helpers) to request providers from the factory, call `open/embed|encode/vector/close`, and drop direct use of `_get_vllm_components`, `_QWEN_LLM_CACHE`, `QwenEmbeddingQueue`, `_get_sparse_encoder_cls`, and related globals.
-- Expand telemetry: every provider emits `provider_name`, model/device/dtype, effective batch/concurrency, timings, normalization flag, and structured error signals so manifests and logs capture backend provenance.
-- Strengthen validation and testing: unit cases for provider selection, config precedence, legacy alias mapping, telemetry emission, and parity runs that confirm default dense/sparse/lexical outputs match today’s JSONL/Parquet artefacts.
-- Update docs (DocParsing README/API, provider best practices) and developer tooling to describe backend choices, required keys (e.g., `dense.tei.url`), offline behaviour, and migration guidance.
+- Build a dedicated `DocsToKG.DocParsing.embedding.backends` package containing:
+  - Base protocols (`DenseEmbeddingBackend`, `SparseEmbeddingBackend`, `LexicalEmbeddingBackend`) that define exact method signatures (`open(cfg: ProviderConfig) -> None`, `embed(texts: Sequence[str], batch_hint: int | None) -> list[list[float]]`, etc.) and the `ProviderError` taxonomy (`provider`, `category`, `detail`, `retryable`).
+  - A `ProviderFactory` responsible for merging configuration, lazy-importing providers, managing lifecycle (`open`/`close`), injecting telemetry hooks, and returning null-provider shims when a backend is disabled.
+- Ship concrete providers with full lifecycle ownership:
+  - `dense.qwen_vllm` absorbs vLLM imports, caching, queue depth logic derived from `files_parallel`, warm-up, and normalization defaults.
+  - `dense.sentence_transformers` encapsulates SBERT/SPLADE local models, cache directory usage, offline validation, and dtype/device handling.
+  - `dense.tei` wraps the HTTP client (TLS, timeout, concurrency hints) and error handling for TEI deployments.
+  - `sparse.splade_st` owns SPLADE dependency checks, attention backend fallbacks, and sparsity threshold reporting.
+  - `lexical.local_bm25` manages stats accumulation, per-token weights, and deterministic ordering.
+- Reshape configuration so provider selection and tuning live under nested keys with documented defaults:
+  - `embedding.*` cross-cutting keys (`device`, `dtype`, `batch_size`, `max_concurrency`, `normalize_l2`, `offline`, `cache_dir`, `telemetry_tags`).
+  - `dense.*`, `sparse.*`, `lexical.*` namespaces containing backend identifiers, per-backend overrides, and validation rules.
+  - CLI/env/config precedence rules (CLI > ENV > config > defaults) plus a compatibility layer that maps every legacy flag/env (e.g., `--bm25-k1`, `DOCSTOKG_QWEN_DIR`) into the new structure while emitting single-line deprecation notices.
+- Refactor `embedding.runtime` so it obtains providers from the factory, calls interface methods only, and drops direct imports of vLLM or sentence-transformers, as well as helpers like `_get_vllm_components`, `_QWEN_LLM_CACHE`, `QwenEmbeddingQueue`, `_get_sparse_encoder_cls`, `_ensure_*_dependencies`, and related globals.
+- Expand telemetry coverage: every provider call reports `provider_name`, model revision, device/dtype, effective batch size, inflight concurrency, timing metrics (open/embed/close), normalization flag, fallback usage, and structured errors that propagate to manifests.
+- Strengthen validation and testing to make the refactor safe for junior contributors: unit tests for provider selection/config precedence/legacy aliasing/error categories, provider-level smoke tests (shape, normalization, network retry semantics), integration parity tests for JSONL and Parquet outputs (including plan-only/tracemalloc flows), and documentation walkthroughs showcasing new backend selection.
+- Update user and maintainer docs (DocParsing README/API reference, ProviderOverview, operations guides) with configuration examples, offline expectations, telemetry fields, and instructions for adding new providers or fallbacks.
 
 ## Impact
 - Affected specs: docparsing-embedding
-- Affected code: `src/DocsToKG/DocParsing/embedding/runtime.py`, `src/DocsToKG/DocParsing/embedding/config.py`, new `src/DocsToKG/DocParsing/embedding/backends/*`, CLI config loaders, telemetry emitters, unit/integration tests, and DocParsing documentation
+- Affected code: `src/DocsToKG/DocParsing/embedding/runtime.py`, `src/DocsToKG/DocParsing/embedding/config.py`, new `src/DocsToKG/DocParsing/embedding/backends/*`, CLI config loaders, telemetry emitters, manifest builders, unit/integration tests, and DocParsing documentation/handbooks.

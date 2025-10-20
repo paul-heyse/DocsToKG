@@ -1,3 +1,15 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_net",
+#   "purpose": "Validates the shared HTTPX client, request/response hooks, and Hishel-backed caching transport helpers.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
+"""Validates the shared HTTPX client, request/response hooks, and Hishel-backed caching transport helpers."""
+
 from __future__ import annotations
 
 from pathlib import Path

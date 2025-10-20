@@ -17,12 +17,12 @@
 
 The planner converts configuration and resolver metadata into concrete fetch
 plans, executes parallel downloads with retry/backoff controls, and records the
-outcomes into manifests.  It also enforces security policies (checksum
-verification, allowed hosts, archive sanity checks), cooperates with the storage
-backend for CAS mirroring, and records streaming hash fingerprints alongside
-traditional provenance fields.  Once artefacts land on disk the planner
-coordinates validator execution and writes lockfiles so CLI and API callers can
-replay deterministic runs.
+outcomes into manifests.  It enforces security policies (checksum verification,
+allowed hosts, archive sanity checks), cooperates with the storage backend for
+CAS mirroring, honours the pyrate-limiter façade (including Retry-After delays),
+and records streaming hash fingerprints alongside traditional provenance fields.
+Once artefacts land on disk the planner coordinates validator execution and
+writes lockfiles so CLI and API callers can replay deterministic runs.
 """
 
 from __future__ import annotations
@@ -59,6 +59,7 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 import httpx
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
+
 from .cancellation import CancellationToken, CancellationTokenGroup
 from .checksums import ExpectedChecksum, resolve_expected_checksum
 from .errors import (

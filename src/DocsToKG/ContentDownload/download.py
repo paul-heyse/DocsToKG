@@ -83,6 +83,7 @@ from DocsToKG.ContentDownload.core import (
     update_tail_buffer,
 )
 from DocsToKG.ContentDownload.errors import (
+    RateLimitError,
     log_download_failure,
 )
 from DocsToKG.ContentDownload.httpx_transport import get_http_client
@@ -1306,6 +1307,57 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                     elapsed_ms=elapsed_ms,
                     retry_after=retry_after_hint,
                 )
+    except RateLimitError as exc:
+        elapsed_ms = (time.monotonic() - start) * 1000.0
+        log_download_failure(
+            LOGGER,
+            url,
+            artifact.work_id,
+            http_status=None,
+            reason_code=ReasonCode.RATE_LIMITED.value,
+            error_details=str(exc),
+            exception=exc,
+        )
+
+        limiter_metadata: Dict[str, Any] = {
+            "backend": exc.backend,
+            "mode": exc.mode,
+            "wait_ms": exc.waited_ms,
+            "role": exc.role,
+            "blocked": True,
+        }
+        if exc.host:
+            limiter_metadata["host"] = exc.host
+        if exc.next_allowed_at is not None:
+            limiter_metadata["next_allowed_at"] = exc.next_allowed_at.isoformat()
+        if exc.retry_after is not None:
+            limiter_metadata["retry_after"] = exc.retry_after
+        outcome_metadata: Dict[str, Any] = {
+            "rate_limiter": limiter_metadata,
+        }
+        if exc.details:
+            outcome_metadata["rate_limit_details"] = exc.details
+
+        return DownloadStreamResult(
+            outcome=DownloadOutcome(
+                classification=Classification.SKIPPED,
+                path=None,
+                http_status=None,
+                content_type=None,
+                elapsed_ms=elapsed_ms,
+                reason=ReasonCode.RATE_LIMITED,
+                reason_detail="rate_limited",
+                sha256=None,
+                content_length=None,
+                etag=None,
+                last_modified=None,
+                extracted_text_path=None,
+                retry_after=exc.retry_after,
+                metadata=outcome_metadata,
+                error=str(exc),
+            )
+        )
+
     except httpx.HTTPError as exc:
         elapsed_ms = (time.monotonic() - start) * 1000.0
         http_status = (

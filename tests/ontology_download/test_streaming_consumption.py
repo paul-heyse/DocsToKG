@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_streaming_consumption",
+#   "purpose": "Streaming planner/fetcher behaviour tests.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Streaming planner/fetcher behaviour tests.
 
 Ensures ``plan_all`` and ``fetch_all`` consume iterators lazily, honour
 cancellation semantics, and propagate validation results while running under
-multi-threaded harness scenarios.
-"""
+multi-threaded harness scenarios."""
 
 from __future__ import annotations
 

@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_guardrails",
+#   "purpose": "Suite-level guardrails that enforce harness usage and coding standards.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Suite-level guardrails that enforce harness usage and coding standards.
 
 Asserts that pytest's built-in monkeypatch fixture is not reintroduced (tests
 must rely on the project PatchManager) and that shared conventions remain in
-place. Acts as a lint-like sentinel for the test suite.
-"""
+place. Acts as a lint-like sentinel for the test suite."""
 
 from __future__ import annotations
 

@@ -1,10 +1,19 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_cli_doctor",
+#   "purpose": "Behavioural coverage for the ``ontofetch doctor`` diagnostics command.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Behavioural coverage for the ``ontofetch doctor`` diagnostics command.
 
 Exercises the doctor CLI across healthy and degraded environments, ensuring it
 reports missing directories, optional dependency gaps, and plugin metadata
 without crashing. Validates JSON output structure and the remediation hints
-emitted for common misconfigurations.
-"""
+emitted for common misconfigurations."""
 
 from __future__ import annotations
 

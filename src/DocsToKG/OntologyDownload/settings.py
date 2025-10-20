@@ -279,11 +279,10 @@ class DownloadConfiguration(BaseModel):
         default=None,
         description="Directory used to persist shared token bucket state across processes",
     )
-    rate_limiter: Literal["pyrate", "legacy"] = Field(
+    rate_limiter: Literal["pyrate"] = Field(
         default="pyrate",
         description=(
-            "Selects the rate limiter backend. Use 'pyrate' for the pyrate-limiter manager"
-            " or 'legacy' to fall back to the built-in token bucket."
+            "Selects the rate limiter backend. Only the pyrate-limiter manager is supported."
         ),
     )
 
@@ -706,7 +705,6 @@ if _HAS_PYDANTIC_SETTINGS:
         )
         backoff_factor: Optional[float] = Field(default=None, alias="ONTOFETCH_BACKOFF_FACTOR")
         log_level: Optional[str] = Field(default=None, alias="ONTOFETCH_LOG_LEVEL")
-        rate_limiter: Optional[str] = Field(default=None, alias="ONTOFETCH_RATE_LIMITER")
         shared_rate_limit_dir: Optional[Path] = Field(
             default=None, alias="ONTOFETCH_SHARED_RATE_LIMIT_DIR"
         )

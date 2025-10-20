@@ -111,6 +111,25 @@ def emit_console_summary(result: RunResult, *, dry_run: bool) -> None:
                 f"p95={p95_ms:.1f}ms max={max_ms:.1f}ms"
             )
 
+    limiter_attempts = summary.get("rate_limiter_attempts", {})
+    if limiter_attempts:
+        print("Rate limiter attempts:")
+        for host in sorted(limiter_attempts):
+            roles = limiter_attempts[host]
+            for role in sorted(roles):
+                stats = roles[role]
+                acquire = stats.get("acquire_total", 0)
+                blocked = stats.get("blocked_total", 0)
+                wait_sum = float(stats.get("wait_ms_sum", 0.0))
+                wait_count = stats.get("wait_ms_count", 0)
+                avg_wait = wait_sum / wait_count if wait_count else 0.0
+                backend = stats.get("backend") or ""
+                print(
+                    "  "
+                    f"{host}.{role}: acquire={acquire} blocked={blocked} "
+                    f"wait_sum={wait_sum:.1f}ms avg_wait={avg_wait:.1f}ms backend={backend}"
+                )
+
     status_counts = summary.get("status_counts", {})
     if status_counts:
         print("  status_counts:")

@@ -48,8 +48,6 @@ from .cli_utils import (
 from .models import DEFAULT_TOKENIZER
 from .planning import display_plan, plan_chunk, plan_doctags, plan_embed
 
-CommandHandler = Callable[[Sequence[str]], int]
-
 try:  # Optional chunking extras may not be installed
     from DocsToKG.DocParsing.chunking.config import SOFT_BARRIER_MARGIN
 except Exception:  # pragma: no cover - fallback when chunking optional deps missing
@@ -121,17 +119,9 @@ app = typer.Typer(
 
 __all__ = [
     "CLI_DESCRIPTION",
-    "CommandHandler",
     "app",
     "build_doctags_parser",
-    "chunk",
-    "doctags",
-    "embed",
     "main",
-    "manifest",
-    "plan",
-    "run_all",
-    "token_profiles",
 ]
 
 
@@ -296,7 +286,7 @@ def _resolve_doctags_paths(args: argparse.Namespace) -> tuple[str, Path, Path, s
     return mode, input_dir, output_dir, str(resolved_root)
 
 
-def doctags(argv: Sequence[str] | None = None) -> int:
+def _execute_doctags(argv: Sequence[str] | None = None) -> int:
     """Execute the DocTags conversion subcommand."""
 
     from DocsToKG.DocParsing import doctags as doctags_module
@@ -684,7 +674,7 @@ def _import_chunk_module():
     return chunk_module
 
 
-def chunk(argv: Sequence[str] | None = None) -> int:
+def _execute_chunk(argv: Sequence[str] | None = None) -> int:
     """Execute the Docling chunker subcommand."""
 
     try:
@@ -704,7 +694,7 @@ def chunk(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
-def embed(argv: Sequence[str] | None = None) -> int:
+def _execute_embed(argv: Sequence[str] | None = None) -> int:
     """Execute the embedding pipeline subcommand."""
 
     from DocsToKG.DocParsing import embedding as embedding_module
@@ -719,7 +709,7 @@ def embed(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
-def token_profiles(argv: Sequence[str] | None = None) -> int:
+def _execute_token_profiles(argv: Sequence[str] | None = None) -> int:
     """Execute the tokenizer profiling subcommand."""
 
     try:
@@ -744,16 +734,16 @@ def token_profiles(argv: Sequence[str] | None = None) -> int:
     return token_profiles_module.main(args)
 
 
-def plan(argv: Sequence[str] | None = None) -> int:
+def _execute_plan(argv: Sequence[str] | None = None) -> int:
     """Display the doctags → chunk → embed plan without executing."""
 
     args = [] if argv is None else list(argv)
     if not any(option in args for option in ("--plan", "--plan-only")):
         args.append("--plan")
-    return run_all(args)
+    return _execute_run_all(args)
 
 
-def manifest(argv: Sequence[str] | None = None) -> int:
+def _execute_manifest(argv: Sequence[str] | None = None) -> int:
     """Inspect pipeline manifest artifacts via CLI."""
 
     return _run_stage(_manifest_main, argv)
@@ -1206,7 +1196,7 @@ def _build_stage_args(args: argparse.Namespace) -> tuple[List[str], List[str], L
     return doctags_args, chunk_args, embed_args
 
 
-def run_all(argv: Sequence[str] | None = None) -> int:
+def _execute_run_all(argv: Sequence[str] | None = None) -> int:
     """Execute DocTags conversion, chunking, and embedding sequentially."""
 
     parser = _build_run_all_parser()
@@ -1401,6 +1391,9 @@ def _doctags_cli(
         typer.Option(
             "--data-root",
             help="Override DocsToKG Data directory. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT.",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
         ),
     ] = None,
     input_dir: Annotated[
@@ -1409,6 +1402,9 @@ def _doctags_cli(
             "--input",
             "--in-dir",
             help="Directory containing HTML or PDF sources (defaults vary by mode).",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
         ),
     ] = None,
     output_dir: Annotated[
@@ -1417,6 +1413,8 @@ def _doctags_cli(
             "--output",
             "--out-dir",
             help="Destination for generated .doctags files (defaults vary by mode).",
+            dir_okay=True,
+            file_okay=False,
         ),
     ] = None,
     workers: Annotated[
@@ -1424,6 +1422,7 @@ def _doctags_cli(
         typer.Option(
             "--workers",
             help="Worker processes to launch; backend defaults used when omitted.",
+            min=1,
         ),
     ] = None,
     model: Annotated[
@@ -1438,6 +1437,7 @@ def _doctags_cli(
         typer.Option(
             "--vllm-wait-timeout",
             help="Seconds to wait for vLLM readiness before failing (PDF mode only; defaults to the PDF runner setting).",
+            min=0,
         ),
     ] = None,
     served_model_name: Annotated[
@@ -1453,6 +1453,8 @@ def _doctags_cli(
         typer.Option(
             "--gpu-memory-utilization",
             help="Fraction of GPU memory allocated to the vLLM server.",
+            min=0.0,
+            max=1.0,
         ),
     ] = None,
     resume: Annotated[
@@ -1532,6 +1534,9 @@ def _chunk_cli(
         typer.Option(
             "--data-root",
             help="DocsToKG data root override used when resolving inputs.",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
         ),
     ] = None,
     config: Annotated[
@@ -1539,6 +1544,9 @@ def _chunk_cli(
         typer.Option(
             "--config",
             help="Path to stage config file (JSON/YAML/TOML).",
+            exists=True,
+            dir_okay=False,
+            file_okay=True,
         ),
     ] = None,
     profile: Annotated[
@@ -1553,6 +1561,9 @@ def _chunk_cli(
         typer.Option(
             "--in-dir",
             help="DocTags input directory (defaults to data_root/DocTagsFiles).",
+            exists=True,
+            dir_okay=True,
+            file_okay=False,
         ),
     ] = None,
     output_dir: Annotated[
@@ -1560,6 +1571,8 @@ def _chunk_cli(
         typer.Option(
             "--out-dir",
             help="Chunk output directory (defaults to data_root/ChunkedDocTagFiles).",
+            dir_okay=True,
+            file_okay=False,
         ),
     ] = None,
     min_tokens: Annotated[
@@ -1568,6 +1581,7 @@ def _chunk_cli(
             "--min-tokens",
             help="Minimum tokens per chunk passed to the chunk stage.",
             show_default=True,
+            min=1,
         ),
     ] = 256,
     max_tokens: Annotated[
@@ -1576,6 +1590,7 @@ def _chunk_cli(
             "--max-tokens",
             help="Maximum tokens per chunk passed to the chunk stage.",
             show_default=True,
+            min=1,
         ),
     ] = 512,
     log_level: Annotated[
@@ -1599,6 +1614,7 @@ def _chunk_cli(
             "--soft-barrier-margin",
             help="Token margin to retain around soft barriers.",
             show_default=True,
+            min=0,
         ),
     ] = SOFT_BARRIER_MARGIN,
     structural_markers: Annotated[
@@ -1607,6 +1623,9 @@ def _chunk_cli(
             "--structural-markers",
             "--heading-markers",
             help="Optional path to structural marker overrides JSON.",
+            exists=True,
+            dir_okay=False,
+            file_okay=True,
         ),
     ] = None,
     serializer_provider: Annotated[
@@ -1622,6 +1641,7 @@ def _chunk_cli(
             "--workers",
             help="Worker processes for the chunk stage.",
             show_default=True,
+            min=1,
         ),
     ] = 1,
     shard_count: Annotated[
@@ -1630,6 +1650,7 @@ def _chunk_cli(
             "--shard-count",
             help="Total number of shards for the chunk stage.",
             show_default=True,
+            min=1,
         ),
     ] = 1,
     shard_index: Annotated[
@@ -1638,6 +1659,7 @@ def _chunk_cli(
             "--shard-index",
             help="Zero-based shard index for the chunk stage.",
             show_default=True,
+            min=0,
         ),
     ] = 0,
     validate_only: Annotated[
@@ -1762,6 +1784,9 @@ def _embed_cli(
         typer.Option(
             "--chunks-dir",
             help="Override path to chunk files (auto-detected relative to data root).",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
         ),
     ] = None,
     out_dir: Annotated[
@@ -1770,6 +1795,8 @@ def _embed_cli(
             "--out-dir",
             "--vectors-dir",
             help="Directory where vector outputs will be written (auto-detected).",
+            dir_okay=True,
+            file_okay=False,
         ),
     ] = None,
     vector_format: Annotated[
@@ -1783,27 +1810,28 @@ def _embed_cli(
     ] = "jsonl",
     bm25_k1: Annotated[
         float,
-        typer.Option("--bm25-k1", help="BM25 k1 parameter.", show_default=True),
+        typer.Option("--bm25-k1", help="BM25 k1 parameter.", show_default=True, min=0.0),
     ] = 1.5,
     bm25_b: Annotated[
         float,
-        typer.Option("--bm25-b", help="BM25 b parameter.", show_default=True),
+        typer.Option("--bm25-b", help="BM25 b parameter.", show_default=True, min=0.0),
     ] = 0.75,
     batch_size_splade: Annotated[
         int,
         typer.Option(
-            "--batch-size-splade", help="SPLADE batch size.", show_default=True
+            "--batch-size-splade", help="SPLADE batch size.", show_default=True, min=1
         ),
     ] = 32,
     batch_size_qwen: Annotated[
         int,
-        typer.Option("--batch-size-qwen", help="Qwen batch size.", show_default=True),
+        typer.Option("--batch-size-qwen", help="Qwen batch size.", show_default=True, min=1),
     ] = 64,
     splade_max_active_dims: Annotated[
         Optional[int],
         typer.Option(
             "--splade-max-active-dims",
             help="Optional SPLADE sparsity cap.",
+            min=1,
         ),
     ] = None,
     splade_model_dir: Annotated[
@@ -1811,6 +1839,9 @@ def _embed_cli(
         typer.Option(
             "--splade-model-dir",
             help="Explicit path to the SPLADE model directory (defaults to DocsToKG cache).",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
         ),
     ] = None,
     splade_attn: Annotated[
@@ -1834,15 +1865,18 @@ def _embed_cli(
         typer.Option(
             "--qwen-model-dir",
             help="Explicit path to the Qwen model directory (defaults to DocsToKG cache).",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
         ),
     ] = None,
     qwen_dim: Annotated[
         int,
-        typer.Option("--qwen-dim", help="Qwen embedding dimension.", show_default=True),
+        typer.Option("--qwen-dim", help="Qwen embedding dimension.", show_default=True, min=1),
     ] = 2560,
     tensor_parallel: Annotated[
         int,
-        typer.Option("--tp", "--tensor-parallel", help="Tensor parallel degree.", show_default=True),
+        typer.Option("--tp", "--tensor-parallel", help="Tensor parallel degree.", show_default=True, min=1),
     ] = 1,
     sparsity_warn_threshold_pct: Annotated[
         float,
@@ -1850,6 +1884,7 @@ def _embed_cli(
             "--sparsity-warn-threshold-pct",
             help="Override SPLADE sparsity warning threshold.",
             show_default=True,
+            min=0.0,
         ),
     ] = SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
     sparsity_report_top_n: Annotated[
@@ -1858,6 +1893,7 @@ def _embed_cli(
             "--sparsity-report-top-n",
             help="Number of SPLADE terms to report in sparsity summaries.",
             show_default=True,
+            min=1,
         ),
     ] = 10,
     files_parallel: Annotated[
@@ -1866,6 +1902,7 @@ def _embed_cli(
             "--files-parallel",
             help="Process up to N chunk files concurrently during embedding.",
             show_default=True,
+            min=1,
         ),
     ] = 1,
     validate_only: Annotated[
@@ -1956,6 +1993,9 @@ def _token_profiles_cli(
         typer.Option(
             "--data-root",
             help="DocsToKG data root override. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT.",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
         ),
     ] = None,
     config: Annotated[
@@ -1963,6 +2003,9 @@ def _token_profiles_cli(
         typer.Option(
             "--config",
             help="Optional path to JSON/YAML/TOML config.",
+            exists=True,
+            dir_okay=False,
+            file_okay=True,
         ),
     ] = None,
     doctags_dir: Annotated[
@@ -1970,6 +2013,9 @@ def _token_profiles_cli(
         typer.Option(
             "--doctags-dir",
             help="Directory containing DocTags files.",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
         ),
     ] = None,
     sample_size: Annotated[
@@ -2061,11 +2107,19 @@ def _manifest_cli(
         typer.Option(
             "--data-root",
             help="DocsToKG data root override used when resolving manifests.",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
         ),
     ] = None,
     tail: Annotated[
         int,
-        typer.Option("--tail", help="Print the last N manifest entries.", show_default=True),
+        typer.Option(
+            "--tail",
+            help="Print the last N manifest entries.",
+            show_default=True,
+            min=0,
+        ),
     ] = 0,
     summarize: Annotated[
         bool,
@@ -2095,6 +2149,9 @@ def _plan_cli(
         typer.Option(
             "--data-root",
             help="DocsToKG data root override passed to all stages.",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
         ),
     ] = None,
     log_level: Annotated[
@@ -2129,11 +2186,22 @@ def _plan_cli(
     ] = "auto",
     doctags_in_dir: Annotated[
         Optional[Path],
-        typer.Option("--doctags-in-dir", help="Override DocTags input directory."),
+        typer.Option(
+            "--doctags-in-dir",
+            help="Override DocTags input directory.",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
+        ),
     ] = None,
     doctags_out_dir: Annotated[
         Optional[Path],
-        typer.Option("--doctags-out-dir", help="Override DocTags output directory."),
+        typer.Option(
+            "--doctags-out-dir",
+            help="Override DocTags output directory.",
+            dir_okay=True,
+            file_okay=False,
+        ),
     ] = None,
     overwrite: Annotated[
         bool,
@@ -2147,42 +2215,76 @@ def _plan_cli(
         typer.Option(
             "--vllm-wait-timeout",
             help="Seconds to wait for vLLM readiness during the DocTags stage.",
+            min=0,
         ),
     ] = None,
     chunk_out_dir: Annotated[
         Optional[Path],
-        typer.Option("--chunk-out-dir", help="Output directory override for chunk JSONL files."),
+        typer.Option(
+            "--chunk-out-dir",
+            help="Output directory override for chunk JSONL files.",
+            dir_okay=True,
+            file_okay=False,
+        ),
     ] = None,
     chunk_workers: Annotated[
         Optional[int],
-        typer.Option("--chunk-workers", help="Worker processes for the chunk stage."),
+        typer.Option(
+            "--chunk-workers",
+            help="Worker processes for the chunk stage.",
+            min=1,
+        ),
     ] = None,
     chunk_min_tokens: Annotated[
         Optional[int],
-        typer.Option("--chunk-min-tokens", help="Minimum tokens per chunk passed to the chunk stage."),
+        typer.Option(
+            "--chunk-min-tokens",
+            help="Minimum tokens per chunk passed to the chunk stage.",
+            min=1,
+        ),
     ] = None,
     chunk_max_tokens: Annotated[
         Optional[int],
-        typer.Option("--chunk-max-tokens", help="Maximum tokens per chunk passed to the chunk stage."),
+        typer.Option(
+            "--chunk-max-tokens",
+            help="Maximum tokens per chunk passed to the chunk stage.",
+            min=1,
+        ),
     ] = None,
     structural_markers: Annotated[
         Optional[Path],
         typer.Option(
             "--structural-markers",
             help="Structural marker configuration forwarded to the chunk stage.",
+            exists=True,
+            dir_okay=False,
+            file_okay=True,
         ),
     ] = None,
     chunk_shard_count: Annotated[
         Optional[int],
-        typer.Option("--chunk-shard-count", help="Total number of shards for the chunk stage."),
+        typer.Option(
+            "--chunk-shard-count",
+            help="Total number of shards for the chunk stage.",
+            min=1,
+        ),
     ] = None,
     chunk_shard_index: Annotated[
         Optional[int],
-        typer.Option("--chunk-shard-index", help="Zero-based shard index for the chunk stage."),
+        typer.Option(
+            "--chunk-shard-index",
+            help="Zero-based shard index for the chunk stage.",
+            min=0,
+        ),
     ] = None,
     embed_out_dir: Annotated[
         Optional[Path],
-        typer.Option("--embed-out-dir", help="Output directory override for embedding JSONL files."),
+        typer.Option(
+            "--embed-out-dir",
+            help="Output directory override for embedding JSONL files.",
+            dir_okay=True,
+            file_okay=False,
+        ),
     ] = None,
     embed_offline: Annotated[
         bool,
@@ -2210,6 +2312,7 @@ def _plan_cli(
         typer.Option(
             "--embed-shard-count",
             help="Total number of shards for the embed stage (defaults to chunk shard count).",
+            min=1,
         ),
     ] = None,
     embed_shard_index: Annotated[
@@ -2217,6 +2320,7 @@ def _plan_cli(
         typer.Option(
             "--embed-shard-index",
             help="Zero-based shard index for the embed stage (defaults to chunk shard index).",
+            min=0,
         ),
     ] = None,
     embed_format: Annotated[
@@ -2270,6 +2374,9 @@ def _all_cli(
         typer.Option(
             "--data-root",
             help="DocsToKG data root override passed to all stages.",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
         ),
     ] = None,
     log_level: Annotated[
@@ -2304,11 +2411,22 @@ def _all_cli(
     ] = "auto",
     doctags_in_dir: Annotated[
         Optional[Path],
-        typer.Option("--doctags-in-dir", help="Override DocTags input directory."),
+        typer.Option(
+            "--doctags-in-dir",
+            help="Override DocTags input directory.",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
+        ),
     ] = None,
     doctags_out_dir: Annotated[
         Optional[Path],
-        typer.Option("--doctags-out-dir", help="Override DocTags output directory."),
+        typer.Option(
+            "--doctags-out-dir",
+            help="Override DocTags output directory.",
+            dir_okay=True,
+            file_okay=False,
+        ),
     ] = None,
     overwrite: Annotated[
         bool,
@@ -2322,42 +2440,76 @@ def _all_cli(
         typer.Option(
             "--vllm-wait-timeout",
             help="Seconds to wait for vLLM readiness during the DocTags stage.",
+            min=0,
         ),
     ] = None,
     chunk_out_dir: Annotated[
         Optional[Path],
-        typer.Option("--chunk-out-dir", help="Output directory override for chunk JSONL files."),
+        typer.Option(
+            "--chunk-out-dir",
+            help="Output directory override for chunk JSONL files.",
+            dir_okay=True,
+            file_okay=False,
+        ),
     ] = None,
     chunk_workers: Annotated[
         Optional[int],
-        typer.Option("--chunk-workers", help="Worker processes for the chunk stage."),
+        typer.Option(
+            "--chunk-workers",
+            help="Worker processes for the chunk stage.",
+            min=1,
+        ),
     ] = None,
     chunk_min_tokens: Annotated[
         Optional[int],
-        typer.Option("--chunk-min-tokens", help="Minimum tokens per chunk passed to the chunk stage."),
+        typer.Option(
+            "--chunk-min-tokens",
+            help="Minimum tokens per chunk passed to the chunk stage.",
+            min=1,
+        ),
     ] = None,
     chunk_max_tokens: Annotated[
         Optional[int],
-        typer.Option("--chunk-max-tokens", help="Maximum tokens per chunk passed to the chunk stage."),
+        typer.Option(
+            "--chunk-max-tokens",
+            help="Maximum tokens per chunk passed to the chunk stage.",
+            min=1,
+        ),
     ] = None,
     structural_markers: Annotated[
         Optional[Path],
         typer.Option(
             "--structural-markers",
             help="Structural marker configuration forwarded to the chunk stage.",
+            exists=True,
+            dir_okay=False,
+            file_okay=True,
         ),
     ] = None,
     chunk_shard_count: Annotated[
         Optional[int],
-        typer.Option("--chunk-shard-count", help="Total number of shards for the chunk stage."),
+        typer.Option(
+            "--chunk-shard-count",
+            help="Total number of shards for the chunk stage.",
+            min=1,
+        ),
     ] = None,
     chunk_shard_index: Annotated[
         Optional[int],
-        typer.Option("--chunk-shard-index", help="Zero-based shard index for the chunk stage."),
+        typer.Option(
+            "--chunk-shard-index",
+            help="Zero-based shard index for the chunk stage.",
+            min=0,
+        ),
     ] = None,
     embed_out_dir: Annotated[
         Optional[Path],
-        typer.Option("--embed-out-dir", help="Output directory override for embedding JSONL files."),
+        typer.Option(
+            "--embed-out-dir",
+            help="Output directory override for embedding JSONL files.",
+            dir_okay=True,
+            file_okay=False,
+        ),
     ] = None,
     embed_offline: Annotated[
         bool,
@@ -2385,6 +2537,7 @@ def _all_cli(
         typer.Option(
             "--embed-shard-count",
             help="Total number of shards for the embed stage (defaults to chunk shard count).",
+            min=1,
         ),
     ] = None,
     embed_shard_index: Annotated[
@@ -2392,6 +2545,7 @@ def _all_cli(
         typer.Option(
             "--embed-shard-index",
             help="Zero-based shard index for the embed stage (defaults to chunk shard index).",
+            min=0,
         ),
     ] = None,
     embed_format: Annotated[

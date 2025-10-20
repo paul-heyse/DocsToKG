@@ -1,3 +1,13 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_cli",
+#   "purpose": "Regression coverage for the ontology download CLI entrypoints.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Regression coverage for the ontology download CLI entrypoints."""
 
 from __future__ import annotations

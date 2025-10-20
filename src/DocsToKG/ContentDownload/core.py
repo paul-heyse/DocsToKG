@@ -466,6 +466,7 @@ class ReasonCode(Enum):
     DUPLICATE_URL_GLOBAL = "duplicate_url_global"
     LIST_ONLY = "list_only"
     MAX_ATTEMPTS_REACHED = "max_attempts_reached"
+    RATE_LIMITED = "rate_limited"
     RESOLVER_BREAKER_OPEN = "resolver_breaker_open"
     DOMAIN_BREAKER_OPEN = "domain_breaker_open"
     DOMAIN_DISALLOWED_MIME = "domain_disallowed_mime"

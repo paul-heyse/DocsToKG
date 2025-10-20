@@ -1,8 +1,10 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_public_api",
-#   "purpose": "Guards the public surface of DocsToKG.OntologyDownload",
-#   "sections": []
+#   "purpose": "Public API surface contract tests.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
 # }
 # === /NAVMAP ===
 
@@ -10,8 +12,7 @@
 
 Verifies ``DocsToKG.OntologyDownload`` re-exports the expected symbols and
 raises informative errors when compatibility is broken. Acts as a safety net
-for semantic versioning guarantees.
-"""
+for semantic versioning guarantees."""
 
 from __future__ import annotations
 

@@ -1,3 +1,13 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_settings_import_error",
+#   "purpose": "Regression tests for settings import-time guidance.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Regression tests for settings import-time guidance."""
 
 from __future__ import annotations

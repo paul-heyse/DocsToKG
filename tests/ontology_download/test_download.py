@@ -1,9 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_download",
+#   "purpose": "Edge-case coverage for the streaming downloader and redirect handling.",
+#   "sections": [
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Edge-case coverage for the streaming downloader and redirect handling.
 
 Focuses on HTTP semantics like redirect chains, retry-after handling, and
 rate-limited token bucket resets to ensure ``io.network`` enforces security
-policies during real downloads.
-"""
+policies during real downloads."""
 
 import logging
 import time

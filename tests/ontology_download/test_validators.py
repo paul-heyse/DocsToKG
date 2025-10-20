@@ -1,147 +1,14 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.test_validators",
-#   "purpose": "Pytest coverage for ontology download validators scenarios",
+#   "purpose": "Ontology Validator Tests",
 #   "sections": [
-#     {
-#       "id": "config",
-#       "name": "config",
-#       "anchor": "function-config",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ttl-file",
-#       "name": "ttl_file",
-#       "anchor": "function-ttl-file",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "obo-file",
-#       "name": "obo_file",
-#       "anchor": "function-obo-file",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "owl-file",
-#       "name": "owl_file",
-#       "anchor": "function-owl-file",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "make-request",
-#       "name": "make_request",
-#       "anchor": "function-make-request",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "xbrl-package",
-#       "name": "xbrl_package",
-#       "anchor": "function-xbrl-package",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validate-rdflib-success",
-#       "name": "test_validate_rdflib_success",
-#       "anchor": "function-test-validate-rdflib-success",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-normalize-streaming-deterministic",
-#       "name": "test_normalize_streaming_deterministic",
-#       "anchor": "function-test-normalize-streaming-deterministic",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-streaming-matches-in-memory",
-#       "name": "test_streaming_matches_in_memory",
-#       "anchor": "function-test-streaming-matches-in-memory",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-normalize-streaming-edge-cases",
-#       "name": "test_normalize_streaming_edge_cases",
-#       "anchor": "function-test-normalize-streaming-edge-cases",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-run-validators-respects-concurrency",
-#       "name": "test_run_validators_respects_concurrency",
-#       "anchor": "function-test-run-validators-respects-concurrency",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-run-validators-matches-sequential",
-#       "name": "test_run_validators_matches_sequential",
-#       "anchor": "function-test-run-validators-matches-sequential",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-sort-triple-file-falls-back-without-sort",
-#       "name": "test_sort_triple_file_falls_back_without_sort",
-#       "anchor": "function-test-sort-triple-file-falls-back-without-sort",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validator-plugin-loader-registers-and-warns",
-#       "name": "test_validator_plugin_loader_registers_and_warns",
-#       "anchor": "function-test-validator-plugin-loader-registers-and-warns",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validate-pronto-success",
-#       "name": "test_validate_pronto_success",
-#       "anchor": "function-test-validate-pronto-success",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validate-pronto-handles-exception",
-#       "name": "test_validate_pronto_handles_exception",
-#       "anchor": "function-test-validate-pronto-handles-exception",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validate-owlready2-success",
-#       "name": "test_validate_owlready2_success",
-#       "anchor": "function-test-validate-owlready2-success",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validate-robot-skips-when-missing",
-#       "name": "test_validate_robot_skips_when_missing",
-#       "anchor": "function-test-validate-robot-skips-when-missing",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validate-arelle-with-stub",
-#       "name": "test_validate_arelle_with_stub",
-#       "anchor": "function-test-validate-arelle-with-stub",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "test-validate-owlready2-memory-error",
-#       "name": "test_validate_owlready2_memory_error",
-#       "anchor": "function-test-validate-owlready2-memory-error",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "noop-logger",
-#       "name": "_noop_logger",
-#       "anchor": "function-noop-logger",
-#       "kind": "function"
-#     }
+#     {"id": "tests", "name": "Test Cases", "anchor": "TST", "kind": "tests"}
 #   ]
 # }
 # === /NAVMAP ===
 
-"""Validator harness regression coverage.
-
-Exercises validator configuration parsing, resource budgeting, subprocess flow,
-and success/failure recording across robot, rdflib, pronto, owlready2, Arelle,
-and custom XBRL validators to ensure consistent manifest entries.
-"""
-
-"""
-Ontology Validator Tests
+"""Ontology Validator Tests
 
 This module verifies the ontology validation adapters across RDFLib,
 Pronto, Owlready2, ROBOT, and Arelle to ensure normalization artefacts
@@ -157,8 +24,7 @@ Dependencies:
 - DocsToKG.OntologyDownload.ontology_download: Validation entry points under test
 
 Usage:
-    pytest tests/ontology_download/test_validators.py
-"""
+    pytest tests/ontology_download/test_validators.py"""
 
 import functools
 import hashlib
