@@ -109,6 +109,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import time
 from collections import defaultdict, deque
@@ -165,15 +166,20 @@ __all__ = (
     "BatchCommitResult",
     "IngestSummary",
     "RetryableIngestError",
-    "TRAINING_SAMPLE_RNG",
 )
-
-TRAINING_SAMPLE_RNG = np.random.default_rng(13)
 
 _PYARROW_MODULE = None
 _PYARROW_PARQUET = None
 
 _DEFAULT_VECTOR_CACHE_LIMIT = 10_000
+
+
+def _default_training_rng_factory() -> np.random.Generator:
+    """Return a fresh RNG seeded from high-entropy sources."""
+
+    seed_bytes = os.urandom(16)
+    seed = int.from_bytes(seed_bytes, "big") ^ time.time_ns()
+    return np.random.default_rng(seed)
 
 
 # --- Public Classes ---
@@ -485,6 +491,7 @@ class ChunkIngestionPipeline:
         observability: Optional[Observability] = None,
         vector_cache_limit: int = _DEFAULT_VECTOR_CACHE_LIMIT,
         vector_cache_stats_hook: Optional[Callable[[int, DocumentInput], None]] = None,
+        training_sample_rng_factory: Optional[Callable[[], np.random.Generator]] = None,
     ) -> None:
         """Initialise the ingestion pipeline with storage backends and instrumentation.
 
@@ -501,6 +508,11 @@ class ChunkIngestionPipeline:
             vector_cache_stats_hook: Optional callback invoked whenever the
                 unmatched vector cache changes size. Observability backends may use
                 this to surface drift in dashboards.
+            training_sample_rng_factory: Optional callable that returns a new
+                :class:`numpy.random.Generator` instance for training-sample
+                reservoir selection. Defaults to a factory that seeds generators
+                from high-entropy sources so each invocation of
+                :meth:`_training_sample` is independent.
 
         Returns:
             None: Constructors perform initialisation side effects only.
@@ -526,6 +538,9 @@ class ChunkIngestionPipeline:
         attach = getattr(self._registry, "attach_dense_store", None)
         if callable(attach):
             attach(self._faiss)
+        if training_sample_rng_factory is None:
+            training_sample_rng_factory = _default_training_rng_factory
+        self._training_sample_rng_factory = training_sample_rng_factory
 
     @property
     def metrics(self) -> IngestMetrics:
@@ -754,6 +769,8 @@ class ChunkIngestionPipeline:
         factor = max(1, int(getattr(self._faiss.config, "ivf_train_factor", 8)))
         target = max(1024, nlist * factor)
 
+        rng = self._training_sample_rng_factory()
+
         reservoir: List[ChunkPayload] = []
         # Reservoir sampling over existing registry entries
         iterator = self._registry.iter_all()
@@ -762,7 +779,7 @@ class ChunkIngestionPipeline:
             if i < target:
                 reservoir.append(item)
             else:
-                j = int(TRAINING_SAMPLE_RNG.integers(0, i + 1))
+                j = int(rng.integers(0, i + 1))
                 if j < target:
                     reservoir[j] = item
             i += 1
@@ -771,7 +788,7 @@ class ChunkIngestionPipeline:
             if i < target:
                 reservoir.append(item)
             else:
-                j = int(TRAINING_SAMPLE_RNG.integers(0, i + 1))
+                j = int(rng.integers(0, i + 1))
                 if j < target:
                     reservoir[j] = item
             i += 1
