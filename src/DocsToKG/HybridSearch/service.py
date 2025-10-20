@@ -1949,6 +1949,7 @@ def verify_pagination(
             cursor=next_cursor,
             diversification=request.diversification,
             diagnostics=request.diagnostics,
+            recall_first=request.recall_first,
         )
 
     return PaginationCheckResult(cursor_chain=cursor_chain, duplicate_detected=duplicate)

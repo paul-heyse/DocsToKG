@@ -308,7 +308,6 @@ from DocsToKG.HybridSearch import (
     DocumentInput,
     HybridSearchAPI,
     HybridSearchConfigManager,
-    HybridSearchRequest,
     HybridSearchService,
     HybridSearchValidator,
     Observability,
@@ -341,6 +340,10 @@ from DocsToKG.HybridSearch.types import (
     ChunkFeatures,
     ChunkPayload,
     EmbeddingProxy,
+    HybridSearchDiagnostics,
+    HybridSearchRequest,
+    HybridSearchResponse,
+    HybridSearchResult,
 )
 from tests.conftest import PatchManager
 
@@ -939,6 +942,99 @@ def test_operations_snapshot_and_restore_roundtrip(
     assert should_rebuild_index(
         registry, deleted_since_snapshot=max(1, registry.count() // 2), threshold=0.25
     )
+
+
+def test_verify_pagination_preserves_recall_first() -> None:
+    responses = [
+        HybridSearchResponse(
+            results=[
+                HybridSearchResult(
+                    doc_id="doc-0",
+                    chunk_id="chunk-0",
+                    vector_id="vec-0",
+                    namespace="test",
+                    score=1.0,
+                    fused_rank=0,
+                    text="page 0",
+                    highlights=(),
+                    provenance_offsets=(),
+                    diagnostics=HybridSearchDiagnostics(),
+                    metadata={},
+                )
+            ],
+            next_cursor="cursor-1",
+            total_candidates=1,
+            timings_ms={},
+        ),
+        HybridSearchResponse(
+            results=[
+                HybridSearchResult(
+                    doc_id="doc-1",
+                    chunk_id="chunk-1",
+                    vector_id="vec-1",
+                    namespace="test",
+                    score=1.0,
+                    fused_rank=1,
+                    text="page 1",
+                    highlights=(),
+                    provenance_offsets=(),
+                    diagnostics=HybridSearchDiagnostics(),
+                    metadata={},
+                )
+            ],
+            next_cursor="cursor-2",
+            total_candidates=1,
+            timings_ms={},
+        ),
+        HybridSearchResponse(
+            results=[
+                HybridSearchResult(
+                    doc_id="doc-2",
+                    chunk_id="chunk-2",
+                    vector_id="vec-2",
+                    namespace="test",
+                    score=1.0,
+                    fused_rank=2,
+                    text="page 2",
+                    highlights=(),
+                    provenance_offsets=(),
+                    diagnostics=HybridSearchDiagnostics(),
+                    metadata={},
+                )
+            ],
+            next_cursor=None,
+            total_candidates=1,
+            timings_ms={},
+        ),
+    ]
+
+    class RecordingService:
+        def __init__(self, pages: Sequence[HybridSearchResponse]) -> None:
+            self._pages = list(pages)
+            self._index = 0
+            self.requests: list[HybridSearchRequest] = []
+
+        def search(self, search_request: HybridSearchRequest) -> HybridSearchResponse:
+            self.requests.append(search_request)
+            page = self._pages[self._index]
+            self._index += 1
+            return page
+
+    service = RecordingService(responses)
+    request = HybridSearchRequest(
+        query="recall",
+        namespace="demo",
+        filters={},
+        page_size=1,
+        recall_first=True,
+    )
+
+    pagination = verify_pagination(service, request)
+
+    assert pagination.cursor_chain == ["cursor-1", "cursor-2"]
+    assert not pagination.duplicate_detected
+    assert len(service.requests) == 3
+    assert all(call.recall_first for call in service.requests)
 
 
 # --- test_hybrid_search.py ---
