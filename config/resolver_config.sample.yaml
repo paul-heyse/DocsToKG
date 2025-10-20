@@ -16,6 +16,21 @@ domain_content_rules:
     allowed_types: ["application/pdf"]
   "dl.acm.org":
     allowed_types: ["application/pdf"]
+
+# Optional: configure circuit breaker policies shared with networking
+breaker_config:
+  defaults:
+    fail_max: 5
+    reset_timeout_s: 60
+    retry_after_cap_s: 900
+  hosts:
+    "api.crossref.org":
+      fail_max: 3
+      reset_timeout_s: 90
+      roles:
+        artifact:
+          trial_calls: 2
+# breaker_config entries accept nested mappings or external YAML paths; see docs for details.
 # Optional: host-specific Accept header overrides (uncomment if required)
 # host_accept_overrides:
 #   "onlinelibrary.wiley.com":

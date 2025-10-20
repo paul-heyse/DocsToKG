@@ -157,6 +157,7 @@ from urllib.parse import urlparse, urlsplit
 
 import httpx
 
+from DocsToKG.ContentDownload.breakers import BreakerConfig
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
@@ -380,7 +381,7 @@ class ResolverConfig:
         enable_global_url_dedup: Enable global URL deduplication across works when True.
         global_url_dedup_cap: Maximum URLs hydrated into the global dedupe cache.
         domain_content_rules: Mapping of hostname to MIME allow-lists.
-        # resolver_circuit_breakers: Legacy - now handled by pybreaker-based BreakerRegistry
+        breaker_config: Fully resolved circuit breaker configuration shared with networking.
         wayback_config: Wayback-specific configuration options (year_window, max_snapshots, etc.).
 
     Notes:
@@ -418,7 +419,7 @@ class ResolverConfig:
     enable_global_url_dedup: bool = True
     global_url_dedup_cap: Optional[int] = 100_000
     domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    # resolver_circuit_breakers: Legacy - now handled by pybreaker-based BreakerRegistry
+    breaker_config: BreakerConfig = field(default_factory=BreakerConfig)
     # Wayback-specific configuration
     wayback_config: Dict[str, Any] = field(default_factory=dict)
     # Heuristic knobs (defaults preserve current CLI behaviour)
@@ -624,6 +625,25 @@ def load_resolver_config(
 
     config = ResolverConfig()
     config_paths: List[Path] = []
+    breaker_fragments: List[Mapping[str, Any]] = []
+    breaker_yaml_paths: List[Path] = []
+
+    def _collect_breaker_section(value: Any) -> None:
+        if value is None:
+            return
+        if isinstance(value, Mapping):
+            breaker_fragments.append(dict(value))
+            return
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                _collect_breaker_section(item)
+            return
+        if isinstance(value, (str, os.PathLike)):
+            breaker_yaml_paths.append(Path(value).expanduser().resolve(strict=False))
+            return
+        raise ValueError(
+            "breaker_config entries must be mappings, sequences, or filesystem paths"
+        )
 
     if DEFAULT_RESOLVER_CREDENTIALS_PATH.is_file():
         config_paths.append(DEFAULT_RESOLVER_CREDENTIALS_PATH)
@@ -634,7 +654,71 @@ def load_resolver_config(
 
     for config_path in config_paths:
         config_data = read_resolver_config(config_path)
+        for breaker_key in ("breaker_config", "breaker_policies"):
+            if breaker_key in config_data and config_data[breaker_key] not in (None, {}):
+                _collect_breaker_section(config_data[breaker_key])
         apply_config_overrides(config, config_data, resolver_names)
+
+    env_breaker_yaml = os.getenv("DOCSTOKG_BREAKERS_YAML")
+    if env_breaker_yaml:
+        _collect_breaker_section(env_breaker_yaml)
+
+    cli_breaker_path = getattr(args, "breaker_config_path", None)
+    if cli_breaker_path:
+        _collect_breaker_section(cli_breaker_path)
+
+    cli_host_overrides = list(getattr(args, "breaker_host_overrides", []) or [])
+    cli_role_overrides = list(getattr(args, "breaker_role_overrides", []) or [])
+    cli_resolver_overrides = list(getattr(args, "breaker_resolver_overrides", []) or [])
+    cli_defaults_override = getattr(args, "breaker_defaults_override", None)
+    cli_classify_override = getattr(args, "breaker_classify_override", None)
+    cli_rolling_override = getattr(args, "breaker_rolling_override", None)
+
+    env_has_breaker_overrides = any(
+        key.startswith("DOCSTOKG_BREAKER") for key in os.environ
+    )
+
+    breaker_overrides_requested = bool(
+        breaker_fragments
+        or breaker_yaml_paths
+        or cli_host_overrides
+        or cli_role_overrides
+        or cli_resolver_overrides
+        or cli_defaults_override
+        or cli_classify_override
+        or cli_rolling_override
+        or env_has_breaker_overrides
+    )
+
+    if breaker_overrides_requested:
+        try:
+            from DocsToKG.ContentDownload.breakers_loader import (
+                load_breaker_config,
+                merge_breaker_docs,
+            )
+        except (ImportError, RuntimeError) as exc:
+            raise ValueError(
+                "Breaker configuration requested but dependencies are unavailable. Install PyYAML or remove breaker overrides."
+            ) from exc
+
+        base_doc: Dict[str, Any] = {}
+        for fragment in breaker_fragments:
+            base_doc = merge_breaker_docs(base_doc, fragment)
+
+        config.breaker_config = load_breaker_config(
+            None,
+            env=os.environ,
+            cli_host_overrides=cli_host_overrides or None,
+            cli_role_overrides=cli_role_overrides or None,
+            cli_resolver_overrides=cli_resolver_overrides or None,
+            cli_defaults_override=cli_defaults_override,
+            cli_classify_override=cli_classify_override,
+            cli_rolling_override=cli_rolling_override,
+            base_doc=base_doc or None,
+            extra_yaml_paths=breaker_yaml_paths,
+        )
+    else:
+        config.breaker_config = BreakerConfig()
 
     config.unpaywall_email = (
         getattr(args, "unpaywall_email", None)
