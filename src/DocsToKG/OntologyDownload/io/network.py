@@ -25,6 +25,7 @@ Hishel transport defined in `DocsToKG.OntologyDownload.net`.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import ipaddress
 import logging
@@ -54,10 +55,9 @@ from typing import (
 )
 from urllib.parse import ParseResult, urljoin, urlparse, urlunparse
 
+import httpx
 import pooch
 import requests
-import httpx
-
 from tenacity import Retrying, retry_if_exception, stop_after_attempt
 from tenacity.wait import wait_base
 
@@ -81,6 +81,7 @@ def _is_documentation_address(address: IPAddress) -> bool:
     """Return ``True`` when *address* belongs to an IANA documentation prefix."""
 
     return any(address in network for network in _DOCUMENTATION_NETWORKS)
+
 
 try:  # pragma: no cover - psutil may be unavailable in minimal environments
     import psutil  # type: ignore[import]
@@ -365,7 +366,6 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
     return urlunparse(parsed)
 
 
-
 def retry_with_backoff(
     func: Callable[[], T],
     *,
@@ -594,7 +594,11 @@ def request_with_redirect_audit(
 
     try:
         while True:
-            secure_url = current_url if assume_validated_flag else validate_url_security(current_url, http_config)
+            secure_url = (
+                current_url
+                if assume_validated_flag
+                else validate_url_security(current_url, http_config)
+            )
             assume_validated_flag = False
             last_validated_url = secure_url
 
@@ -732,7 +736,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self._reset_hashers()
         self._reuse_head_token = False
         self._assume_url_validated = url_already_validated
-        self._force_full_download = False
+        self._range_supported = True
         self.client = client or get_http_client(http_config)
 
     def _reset_hashers(self) -> None:
@@ -837,11 +841,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
             if remaining_budget is not None:
                 budget_remaining = remaining_budget()
-                if (
-                    timeout_callback is not None
-                    and budget_remaining <= 0
-                    and not callback_invoked
-                ):
+                if timeout_callback is not None and budget_remaining <= 0 and not callback_invoked:
                     timeout_callback()
                     callback_invoked = True
 
@@ -1203,271 +1203,280 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     )
 
                 self._reset_hashers()
-                resume_position = part_path.stat().st_size if part_path.exists() else 0
-                print("DEBUG resume_position start", resume_position, "force", self._force_full_download)
-                force_full_download = self._force_full_download
-                if force_full_download:
-                    self._force_full_download = False
-                    resume_position = 0
-                original_resume_position = resume_position
-                request_headers = dict(base_headers)
-                if not force_full_download and original_resume_position > 0:
-                    request_headers["Range"] = f"bytes={original_resume_position}-"
-                else:
-                    request_headers.pop("Range", None)
-                want_range = (not force_full_download) and original_resume_position > 0
 
-                if self.bucket is not None:
-                    if self._reuse_head_token:
-                        self.logger.debug(
-                            "reusing head token after retry-after",
-                            extra={
-                                "stage": "download",
-                                "service": self.service,
-                                "host": self.origin_host,
-                            },
-                        )
-                        self._reuse_head_token = False
+                while True:
+                    resume_position = part_path.stat().st_size if part_path.exists() else 0
+
+                    if resume_position > 0 and not self._range_supported:
+                        with contextlib.suppress(OSError):
+                            part_path.unlink(missing_ok=True)
+                        resume_position = 0
+
+                    original_resume_position = resume_position
+                    request_headers = dict(base_headers)
+                    if self._range_supported and original_resume_position > 0:
+                        request_headers["Range"] = f"bytes={original_resume_position}-"
+                        want_range = True
                     else:
-                        self.bucket.consume()
+                        request_headers.pop("Range", None)
+                        want_range = False
 
-                request_timeout = self.http_config.timeout_sec
-
-                # Check for cancellation immediately before HTTP request
-                if self.cancellation_token and self.cancellation_token.is_cancelled():
-                    self.logger.info(
-                        "download cancelled before GET request",
-                        extra={
-                            "stage": "download",
-                            "status": "cancelled",
-                        },
-                    )
-                    raise DownloadFailure(
-                        "Download was cancelled before GET request",
-                        retryable=False,
-                    )
-
-                with self._request_with_redirect_audit(
-                    method="GET",
-                    url=url,
-                    headers=request_headers,
-                    timeout=request_timeout,
-                    stream=True,
-                ) as response:
-                    if response.status_code == 304 and Path(self.destination).exists():
-                        self.status = "cached"
-                        self.response_etag = response.headers.get(
-                            "ETag"
-                        ) or self.previous_manifest.get("etag")
-                        self.response_last_modified = response.headers.get(
-                            "Last-Modified"
-                        ) or self.previous_manifest.get("last_modified")
-                        manifest_type = self.previous_manifest.get("content_type")
-                        self.response_content_type = (
-                            manifest_type if isinstance(manifest_type, str) else None
-                        )
-                        manifest_length = self.previous_manifest.get("content_length")
-                        try:
-                            self.response_content_length = (
-                                int(manifest_length) if manifest_length is not None else None
-                            )
-                        except (TypeError, ValueError):
-                            self.response_content_length = None
-                        part_path.unlink(missing_ok=True)
-                        return "cached"
-
-                    if response.status_code in {429, 503}:
-                        retry_after_header = response.headers.get("Retry-After")
-                        retry_after_delay = _parse_retry_after(retry_after_header)
-                        if retry_after_delay is not None:
-                            self.logger.warning(
-                                "download retry-after",
+                    if self.bucket is not None:
+                        if self._reuse_head_token:
+                            self.logger.debug(
+                                "reusing head token after retry-after",
                                 extra={
                                     "stage": "download",
-                                    "status_code": response.status_code,
-                                    "retry_after_sec": round(retry_after_delay, 2),
                                     "service": self.service,
                                     "host": self.origin_host,
                                 },
                             )
-                            apply_retry_after(
-                                http_config=self.http_config,
-                                service=self.service,
-                                host=self.origin_host,
-                                delay=retry_after_delay,
-                            )
-                        http_error = requests.HTTPError(
-                            f"HTTP error {response.status_code}", response=response
-                        )
-                        setattr(http_error, "_retry_after_delay", retry_after_delay)
-                        response.close()
-                        raise http_error
+                            self._reuse_head_token = False
+                        else:
+                            self.bucket.consume()
 
-                    if response.status_code == 416:
-                        print("DEBUG trigger 416")
-                        self.logger.warning(
-                            "range request rejected; retrying without resume",
+                    request_timeout = self.http_config.timeout_sec
+
+                    if self.cancellation_token and self.cancellation_token.is_cancelled():
+                        self.logger.info(
+                            "download cancelled before GET request",
                             extra={
                                 "stage": "download",
-                                "status_code": response.status_code,
-                                "resume_position": original_resume_position,
-                                "service": self.service,
-                                "host": self.origin_host,
+                                "status": "cancelled",
                             },
                         )
-                        _clear_partial_files()
-                        resume_position = 0
-                        want_range = False
-                        self._force_full_download = True
-                        raise requests.HTTPError(
-                            f"HTTP error {response.status_code}", response=response
+                        raise DownloadFailure(
+                            "Download was cancelled before GET request",
+                            retryable=False,
                         )
 
-                    range_honored = response.status_code == 206
-                    if want_range and range_honored:
-                        content_range = response.headers.get("Content-Range")
-                        reported_offset: Optional[int] = None
-                        if content_range and content_range.startswith("bytes "):
+                    restart_download = False
+
+                    with self._request_with_redirect_audit(
+                        method="GET",
+                        url=url,
+                        headers=request_headers,
+                        timeout=request_timeout,
+                        stream=True,
+                    ) as response:
+                        if response.status_code == 304 and Path(self.destination).exists():
+                            self.status = "cached"
+                            self.response_etag = response.headers.get(
+                                "ETag"
+                            ) or self.previous_manifest.get("etag")
+                            self.response_last_modified = response.headers.get(
+                                "Last-Modified"
+                            ) or self.previous_manifest.get("last_modified")
+                            manifest_type = self.previous_manifest.get("content_type")
+                            self.response_content_type = (
+                                manifest_type if isinstance(manifest_type, str) else None
+                            )
+                            manifest_length = self.previous_manifest.get("content_length")
                             try:
-                                reported_offset = int(content_range.split()[1].split("-")[0])
-                            except (IndexError, ValueError):
-                                reported_offset = None
-                        if (
-                            reported_offset is not None
-                            and reported_offset != original_resume_position
-                        ):
+                                self.response_content_length = (
+                                    int(manifest_length) if manifest_length is not None else None
+                                )
+                            except (TypeError, ValueError):
+                                self.response_content_length = None
+                            part_path.unlink(missing_ok=True)
+                            return "cached"
+
+                        if response.status_code in {429, 503}:
+                            retry_after_header = response.headers.get("Retry-After")
+                            retry_after_delay = _parse_retry_after(retry_after_header)
+                            if retry_after_delay is not None:
+                                self.logger.warning(
+                                    "download retry-after",
+                                    extra={
+                                        "stage": "download",
+                                        "status_code": response.status_code,
+                                        "retry_after_sec": round(retry_after_delay, 2),
+                                        "service": self.service,
+                                        "host": self.origin_host,
+                                    },
+                                )
+                                apply_retry_after(
+                                    http_config=self.http_config,
+                                    service=self.service,
+                                    host=self.origin_host,
+                                    delay=retry_after_delay,
+                                )
+                            http_error = requests.HTTPError(
+                                f"HTTP error {response.status_code}", response=response
+                            )
+                            setattr(http_error, "_retry_after_delay", retry_after_delay)
+                            response.close()
+                            raise http_error
+
+                        if response.status_code == 416:
                             self.logger.warning(
-                                "range resume misaligned; restarting from beginning",
+                                "range request rejected; retrying without resume",
                                 extra={
                                     "stage": "download",
-                                    "expected_offset": original_resume_position,
-                                    "reported_offset": reported_offset,
                                     "status_code": response.status_code,
+                                    "resume_position": original_resume_position,
+                                    "service": self.service,
+                                    "host": self.origin_host,
                                 },
                             )
                             _clear_partial_files()
-                            range_honored = False
-                            resume_position = 0
-                            want_range = False
-                            self._force_full_download = True
-                    if want_range and not range_honored:
-                        self.logger.warning(
-                            "range resume not honored; restarting from beginning",
-                            extra={
-                                "stage": "download",
-                                "status_code": response.status_code,
-                                "resume_position": original_resume_position,
-                            },
-                        )
-                        _clear_partial_files()
-                        range_honored = False
-                        resume_position = 0
-                        want_range = False
-                        self._force_full_download = True
-                    elif range_honored:
-                        resume_position = original_resume_position
-                    else:
-                        resume_position = 0
-
-                    if range_honored:
-                        self.status = "updated"
-                        if resume_position > 0:
-                            self._seed_hashers_from_file(part_path)
-                    response.raise_for_status()
-
-                    self._validate_media_type(
-                        response.headers.get("Content-Type"),
-                        self.expected_media_type,
-                        url,
-                    )
-                    self.response_content_type = response.headers.get("Content-Type")
-                    length_header = response.headers.get("Content-Length")
-                    total_bytes: Optional[int] = None
-                    next_progress: Optional[float] = 0.1
-                    parsed_length: Optional[int] = None
-                    if length_header:
-                        try:
-                            parsed_length = int(length_header)
-                        except ValueError:
-                            parsed_length = None
-                    self.response_content_length = parsed_length
-                    if parsed_length is not None:
-                        total_bytes = parsed_length
-                    if total_bytes:
-                        completed_fraction = resume_position / total_bytes
-                        if completed_fraction >= 1:
-                            next_progress = None
+                            self._range_supported = False
+                            restart_download = True
                         else:
-                            next_progress = ((int(completed_fraction * 10)) + 1) / 10
-                    self.response_etag = response.headers.get("ETag")
-                    self.response_last_modified = response.headers.get("Last-Modified")
-                    mode = "ab" if range_honored else "wb"
-                    bytes_downloaded = resume_position
-                    part_path.parent.mkdir(parents=True, exist_ok=True)
-                    try:
-                        with part_path.open(mode) as fh:
-                            for chunk in response.iter_bytes(1 << 20):
-                                _enforce_timeout()
-                                if not chunk:
-                                    continue
-
-                                # Check for cancellation before processing chunk
+                            range_honored = response.status_code == 206
+                            if want_range and range_honored:
+                                content_range = response.headers.get("Content-Range")
+                                reported_offset: Optional[int] = None
+                                if content_range and content_range.startswith("bytes "):
+                                    try:
+                                        reported_offset = int(
+                                            content_range.split()[1].split("-")[0]
+                                        )
+                                    except (IndexError, ValueError):
+                                        reported_offset = None
                                 if (
-                                    self.cancellation_token
-                                    and self.cancellation_token.is_cancelled()
+                                    reported_offset is not None
+                                    and reported_offset != original_resume_position
                                 ):
-                                    part_path.unlink(missing_ok=True)
-                                    self.logger.info(
-                                        "download cancelled",
+                                    self.logger.warning(
+                                        "range resume misaligned; restarting from beginning",
                                         extra={
                                             "stage": "download",
-                                            "status": "cancelled",
-                                            "bytes_downloaded": bytes_downloaded,
+                                            "expected_offset": original_resume_position,
+                                            "reported_offset": reported_offset,
+                                            "status_code": response.status_code,
                                         },
                                     )
-                                    raise DownloadFailure(
-                                        "Download was cancelled",
-                                        retryable=False,
-                                    )
+                                    _clear_partial_files()
+                                    self._range_supported = False
+                                    restart_download = True
+                            if want_range and not range_honored and not restart_download:
+                                self.logger.warning(
+                                    "range resume not honored; restarting from beginning",
+                                    extra={
+                                        "stage": "download",
+                                        "status_code": response.status_code,
+                                        "resume_position": original_resume_position,
+                                    },
+                                )
+                                _clear_partial_files()
+                                self._range_supported = False
+                                restart_download = True
 
-                                fh.write(chunk)
-                                for hasher in self._hashers.values():
-                                    hasher.update(chunk)
-                                bytes_downloaded += len(chunk)
-                                if total_bytes and next_progress:
-                                    progress = bytes_downloaded / total_bytes
-                                    while next_progress and progress >= next_progress:
-                                        self.logger.info(
-                                            "download progress",
-                                            extra={
-                                                "stage": "download",
-                                                "status": "in-progress",
-                                                "progress": {
-                                                    "percent": round(min(progress, 1.0) * 100, 1)
+                            if restart_download:
+                                continue
+
+                            if range_honored:
+                                resume_position = original_resume_position
+                                self.status = "updated"
+                                if resume_position > 0:
+                                    self._seed_hashers_from_file(part_path)
+                            else:
+                                resume_position = 0
+
+                            response.raise_for_status()
+
+                            self._validate_media_type(
+                                response.headers.get("Content-Type"),
+                                self.expected_media_type,
+                                url,
+                            )
+                            self.response_content_type = response.headers.get("Content-Type")
+                            length_header = response.headers.get("Content-Length")
+                            total_bytes: Optional[int] = None
+                            next_progress: Optional[float] = 0.1
+                            parsed_length: Optional[int] = None
+                            if length_header:
+                                try:
+                                    parsed_length = int(length_header)
+                                except ValueError:
+                                    parsed_length = None
+                            self.response_content_length = parsed_length
+                            if parsed_length is not None:
+                                total_bytes = parsed_length
+                            if total_bytes:
+                                completed_fraction = resume_position / total_bytes
+                                if completed_fraction >= 1:
+                                    next_progress = None
+                                else:
+                                    next_progress = ((int(completed_fraction * 10)) + 1) / 10
+                            self.response_etag = response.headers.get("ETag")
+                            self.response_last_modified = response.headers.get("Last-Modified")
+                            mode = "ab" if range_honored else "wb"
+                            bytes_downloaded = resume_position
+                            part_path.parent.mkdir(parents=True, exist_ok=True)
+                            try:
+                                with part_path.open(mode) as fh:
+                                    for chunk in response.iter_bytes(1 << 20):
+                                        _enforce_timeout()
+                                        if not chunk:
+                                            continue
+
+                                        if (
+                                            self.cancellation_token
+                                            and self.cancellation_token.is_cancelled()
+                                        ):
+                                            part_path.unlink(missing_ok=True)
+                                            self.logger.info(
+                                                "download cancelled",
+                                                extra={
+                                                    "stage": "download",
+                                                    "status": "cancelled",
+                                                    "bytes_downloaded": bytes_downloaded,
                                                 },
-                                            },
-                                        )
-                                        next_progress += 0.1
-                                        if next_progress > 1:
-                                            next_progress = None
-                                            break
-                    except OSError as exc:
-                        part_path.unlink(missing_ok=True)
-                        self.logger.error(
-                            "filesystem error during download",
-                            extra={"stage": "download", "error": str(exc)},
-                        )
-                        if "No space left" in str(exc):
-                            raise OntologyDownloadError(
-                                "No space left on device while writing download"
-                            ) from exc
-                        raise OntologyDownloadError(f"Failed to write download: {exc}") from exc
+                                            )
+                                            raise DownloadFailure(
+                                                "Download was cancelled",
+                                                retryable=False,
+                                            )
 
-                    if self._hashers:
-                        self.streamed_digests = {
-                            algorithm: hasher.hexdigest()
-                            for algorithm, hasher in self._hashers.items()
-                        }
+                                        fh.write(chunk)
+                                        for hasher in self._hashers.values():
+                                            hasher.update(chunk)
+                                        bytes_downloaded += len(chunk)
+                                        if total_bytes and next_progress:
+                                            progress = bytes_downloaded / total_bytes
+                                            while next_progress and progress >= next_progress:
+                                                self.logger.info(
+                                                    "download progress",
+                                                    extra={
+                                                        "stage": "download",
+                                                        "status": "in-progress",
+                                                        "progress": {
+                                                            "percent": round(
+                                                                min(progress, 1.0) * 100, 1
+                                                            )
+                                                        },
+                                                    },
+                                                )
+                                                next_progress += 0.1
+                                                if next_progress > 1:
+                                                    next_progress = None
+                                                    break
+                            except OSError as exc:
+                                part_path.unlink(missing_ok=True)
+                                self.logger.error(
+                                    "filesystem error during download",
+                                    extra={"stage": "download", "error": str(exc)},
+                                )
+                                if "No space left" in str(exc):
+                                    raise OntologyDownloadError(
+                                        "No space left on device while writing download"
+                                    ) from exc
+                                raise OntologyDownloadError(
+                                    f"Failed to write download: {exc}"
+                                ) from exc
+
+                            if self._hashers:
+                                self.streamed_digests = {
+                                    algorithm: hasher.hexdigest()
+                                    for algorithm, hasher in self._hashers.items()
+                                }
+                            break
+
+                    if restart_download:
+                        continue
+
                     return "success"
 
             def _stream_once_with_timeout() -> str:

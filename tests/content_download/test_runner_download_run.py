@@ -22,13 +22,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+import httpx
 import pytest
-import requests
 
 from DocsToKG.ContentDownload.args import ResolvedConfig, bootstrap_run_environment
 from DocsToKG.ContentDownload.core import Classification, ReasonCode, WorkArtifact
 from DocsToKG.ContentDownload.download import handle_resume_logic
-from DocsToKG.ContentDownload.networking import ThreadLocalSessionFactory
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.providers import WorkProvider
 from DocsToKG.ContentDownload.runner import DownloadRun, iterate_openalex
@@ -95,13 +94,14 @@ class _FlakyPager:
     def __next__(self) -> Iterable[Dict[str, object]]:
         if not self._raised:
             self._raised = True
-            response = requests.Response()
-            response.status_code = 429
+            request = httpx.Request("GET", "https://api.openalex.org/works")
+            headers = {}
             if self._retry_after is not None:
-                response.headers["Retry-After"] = str(self._retry_after)
-            error = requests.HTTPError("rate limited")
-            error.response = response
-            raise error
+                headers["Retry-After"] = str(self._retry_after)
+            response = httpx.Response(429, headers=headers, request=request)
+            raise httpx.HTTPStatusError(
+                "rate limited", request=request, response=response
+            )
         if self._index >= len(self._pages):
             raise StopIteration
         page = self._pages[self._index]
@@ -183,6 +183,13 @@ def make_resolved_config(
     )
 
 
+def _make_http_client(status_code: int = 200) -> httpx.Client:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code, request=request)
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
 def test_iterate_openalex_retries_then_succeeds(patcher):
     works = FlakyWorks([[{"id": "W1"}, {"id": "W2"}]])
     slept: List[float] = []
@@ -219,7 +226,9 @@ def test_iterate_openalex_uses_equal_jitter(patcher):
         def __next__(self) -> Iterable[Dict[str, object]]:
             if not self._raised:
                 self._raised = True
-                raise requests.HTTPError("temporary failure")
+                raise httpx.RequestError(
+                    "temporary failure", request=httpx.Request("GET", "https://api.openalex.org/works")
+                )
             if self._index >= len(self._pages):
                 raise StopIteration
             page = self._pages[self._index]
@@ -296,12 +305,15 @@ def test_iterate_openalex_retry_after_exceeds_cap(patcher):
         def __next__(self) -> Iterable[Dict[str, object]]:
             if not self._raised:
                 self._raised = True
-                response = requests.Response()
-                response.status_code = 429
-                response.headers["Retry-After"] = retry_after_header
-                error = requests.HTTPError("rate limited")
-                error.response = response
-                raise error
+                request = httpx.Request("GET", "https://api.openalex.org/works")
+                response = httpx.Response(
+                    429,
+                    headers={"Retry-After": retry_after_header},
+                    request=request,
+                )
+                raise httpx.HTTPStatusError(
+                    "rate limited", request=request, response=response
+                )
             if self._index >= len(self._pages):
                 raise StopIteration
             page = self._pages[self._index]
@@ -557,15 +569,15 @@ def test_setup_download_state_records_manifest_data(patcher, tmp_path):
         lambda *args, **kwargs: lookup_instance,
     )
 
-    factory = ThreadLocalSessionFactory(requests.Session)
-    state = download_run.setup_download_state(factory, robots_cache="robots")
+    client = _make_http_client()
+    state = download_run.setup_download_state(http_client=client, robots_cache="robots")
 
     assert state.resume_lookup is lookup_instance
     assert state.options.previous_lookup is lookup_instance
     assert state.options.resume_completed == dummy_completed
     assert state.options.robots_checker == "robots"
 
-    factory.close_all()
+    client.close()
     download_run.close()
 
 
@@ -603,9 +615,9 @@ def test_setup_download_state_uses_lazy_sqlite_lookup(tmp_path):
             sink.log_manifest(entry)
 
     download_run = DownloadRun(resolved)
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
     try:
-        state = download_run.setup_download_state(factory)
+        state = download_run.setup_download_state(http_client=client)
         lookup = state.options.previous_lookup
         assert isinstance(lookup, SqliteResumeLookup)
         assert getattr(lookup, "_cache") == {}
@@ -613,7 +625,7 @@ def test_setup_download_state_uses_lazy_sqlite_lookup(tmp_path):
         assert sample is not None and sample
         assert len(getattr(lookup, "_cache")) == 1
     finally:
-        factory.close_all()
+        client.close()
         download_run.close()
 
 
@@ -629,14 +641,14 @@ def test_setup_download_state_fresh_csv_run_has_no_resume_warning(caplog, tmp_pa
 
     download_run = DownloadRun(resolved)
 
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
     try:
         with caplog.at_level(logging.WARNING):
-            download_run.setup_download_state(factory)
+            download_run.setup_download_state(http_client=client)
         messages = [record.getMessage() for record in caplog.records]
         assert not any("Resume manifest" in message for message in messages)
     finally:
-        factory.close_all()
+        client.close()
         download_run.close()
 
 
@@ -647,15 +659,15 @@ def test_setup_download_state_raises_when_resume_manifest_missing(tmp_path):
     resolved.args.resume_from = missing_manifest
     download_run = DownloadRun(resolved)
 
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
     try:
         with pytest.raises(ValueError) as excinfo:
-            download_run.setup_download_state(factory)
+            download_run.setup_download_state(http_client=client)
         message = str(excinfo.value)
         assert str(missing_manifest) in message
         assert "--resume-from" in message
     finally:
-        factory.close_all()
+        client.close()
         download_run.close()
 
 
@@ -681,12 +693,12 @@ def test_setup_download_state_expands_user_resume_path(tmp_path, patcher):
     resolved.args.resume_from = "~/manifests/resume.jsonl"
     download_run = DownloadRun(resolved)
 
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
     try:
-        download_run.setup_download_state(factory)
+        download_run.setup_download_state(http_client=client)
         assert captured.get("path") == expected_resume
     finally:
-        factory.close_all()
+        client.close()
         download_run.close()
 
 
@@ -769,9 +781,9 @@ def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_pat
     resolved.args.resume_from = missing_manifest
     download_run = DownloadRun(resolved)
 
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
     try:
-        state = download_run.setup_download_state(factory)
+        state = download_run.setup_download_state(http_client=client)
         assert "W-SQLITE" in state.options.resume_completed
         previous_lookup = state.options.previous_lookup.get("W-SQLITE")
         assert previous_lookup is not None and previous_lookup
@@ -779,7 +791,7 @@ def test_setup_download_state_falls_back_to_sqlite_when_manifest_missing(tmp_pat
         assert sqlite_entry["classification"] == "pdf"
         assert sqlite_entry["path"].endswith("stored.pdf")
     finally:
-        factory.close_all()
+        client.close()
         download_run.close()
 
 
@@ -859,7 +871,7 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
         conn.close()
 
     download_run = DownloadRun(resolved)
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
 
     during = None
     try:
@@ -867,13 +879,13 @@ def test_download_run_closes_sqlite_resume_handles(tmp_path):
             before = _count_open_fds()
         except FileNotFoundError:
             pytest.skip("/proc/self/fd is required for handle tracking")
-        state = download_run.setup_download_state(factory)
+        state = download_run.setup_download_state(http_client=client)
         during = _count_open_fds()
         assert isinstance(state.resume_lookup, SqliteResumeLookup)
         assert during > before
     finally:
         download_run.close()
-        factory.close_all()
+        client.close()
 
 
 def test_sqlite_resume_lookup_preload_allows_post_close_access(tmp_path):
@@ -910,9 +922,9 @@ def test_sqlite_resume_lookup_preload_allows_post_close_access(tmp_path):
             sink.log_manifest(entry)
 
     download_run = DownloadRun(resolved)
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
     try:
-        state = download_run.setup_download_state(factory)
+        state = download_run.setup_download_state(http_client=client)
         lookup = state.resume_lookup
         assert isinstance(lookup, SqliteResumeLookup)
 
@@ -924,7 +936,7 @@ def test_sqlite_resume_lookup_preload_allows_post_close_access(tmp_path):
         cached_entry = next(iter(lookup["W3"].values()))
         assert cached_entry["path"].endswith("W3.pdf")
     finally:
-        factory.close_all()
+        client.close()
         download_run.close()
 
 
@@ -962,9 +974,9 @@ def test_resume_cleanup_avoids_bulk_selects_for_large_resume(tmp_path):
             sink.log_manifest(entry)
 
     download_run = DownloadRun(resolved)
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
     try:
-        state = download_run.setup_download_state(factory)
+        state = download_run.setup_download_state(http_client=client)
         lookup = state.resume_lookup
         assert isinstance(lookup, SqliteResumeLookup)
         sample_entry = next(iter(lookup["W1024"].values()))
@@ -981,7 +993,7 @@ def test_resume_cleanup_avoids_bulk_selects_for_large_resume(tmp_path):
         select_queries = [sql for sql in traced if sql and sql.strip().lower().startswith("select")]
         assert select_queries == []
     finally:
-        factory.close_all()
+        client.close()
         download_run.close()
 
 
@@ -1071,9 +1083,9 @@ def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
 
     download_run = DownloadRun(resolved)
 
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
     try:
-        state = download_run.setup_download_state(factory)
+        state = download_run.setup_download_state(http_client=client)
         assert "W-CSV" in state.options.resume_completed
         csv_lookup = state.options.previous_lookup.get("W-CSV")
         assert csv_lookup is not None and csv_lookup
@@ -1081,7 +1093,7 @@ def test_setup_download_state_resumes_with_csv_only_logs(tmp_path):
         assert resume_entry["classification"] == "pdf"
         assert resume_entry["path"].endswith("stored.pdf")
     finally:
-        factory.close_all()
+        client.close()
         download_run.close()
 
 
@@ -1173,9 +1185,9 @@ def test_setup_download_state_accepts_explicit_csv_resume(tmp_path):
 
     download_run = DownloadRun(resolved)
 
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
     try:
-        state = download_run.setup_download_state(factory)
+        state = download_run.setup_download_state(http_client=client)
         assert "W-CSV" in state.options.resume_completed
         previous_lookup = state.options.previous_lookup.get("W-CSV")
         assert previous_lookup is not None and previous_lookup
@@ -1183,7 +1195,7 @@ def test_setup_download_state_accepts_explicit_csv_resume(tmp_path):
         assert resume_entry["classification"] == "pdf"
         assert resume_entry["path"].endswith("stored.pdf")
     finally:
-        factory.close_all()
+        client.close()
         download_run.close()
 
 
@@ -1275,9 +1287,9 @@ def test_setup_download_state_prefers_adjacent_sqlite_for_external_csv(tmp_path)
 
     download_run = DownloadRun(resolved)
 
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
     try:
-        state = download_run.setup_download_state(factory)
+        state = download_run.setup_download_state(http_client=client)
         assert "W-EXTERNAL" in state.options.resume_completed
         previous_lookup = state.options.previous_lookup.get("W-EXTERNAL")
         assert previous_lookup is not None and previous_lookup
@@ -1285,7 +1297,7 @@ def test_setup_download_state_prefers_adjacent_sqlite_for_external_csv(tmp_path)
         assert resume_entry["classification"] == "pdf"
         assert resume_entry["path"].endswith("external.pdf")
     finally:
-        factory.close_all()
+        client.close()
         download_run.close()
 
 
@@ -1351,18 +1363,18 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, p
     bootstrap_run_environment(resolved)
 
     download_run = DownloadRun(resolved)
-    factory = ThreadLocalSessionFactory(requests.Session)
+    client = _make_http_client()
     previous_lookup: Optional[Dict[str, Dict[str, Any]]] = None
     cached_path: Optional[str] = None
     try:
-        state = download_run.setup_download_state(factory)
+        state = download_run.setup_download_state(http_client=client)
         assert "W-ABS" in state.options.resume_completed
         previous_lookup = state.options.previous_lookup.get("W-ABS")
         assert previous_lookup is not None and previous_lookup
         resume_entry = next(iter(previous_lookup.values()))
         cached_path = resume_entry["path"]
     finally:
-        factory.close_all()
+        client.close()
         download_run.close()
 
     assert previous_lookup is not None and previous_lookup
@@ -1537,7 +1549,7 @@ def test_download_run_run_processes_artifacts(patcher, tmp_path):
 
     def fake_process_one_work(
         work: WorkArtifact,
-        session: requests.Session,
+        client: httpx.Client,
         pdf_dir,
         html_dir,
         xml_dir,
@@ -1546,7 +1558,6 @@ def test_download_run_run_processes_artifacts(patcher, tmp_path):
         metrics,
         *,
         options,
-        session_factory=None,
     ) -> Dict[str, Any]:
         return {"saved": True, "downloaded_bytes": 42}
 
@@ -1609,7 +1620,7 @@ def test_run_parallel_workers_aggregates_state(patcher, tmp_path):
 
     def fake_process_one_work(
         work: WorkArtifact,
-        session: requests.Session,
+        client: httpx.Client,
         pdf_dir,
         html_dir,
         xml_dir,
@@ -1618,7 +1629,6 @@ def test_run_parallel_workers_aggregates_state(patcher, tmp_path):
         metrics,
         *,
         options,
-        session_factory=None,
     ) -> Dict[str, Any]:
         time.sleep(0.002)
         if work.work_id in failure_ids:
@@ -1762,7 +1772,7 @@ def test_run_auto_resume_uses_manifest_path_when_resume_flag_absent(patcher, tmp
 
     def fake_process_one_work(
         work: WorkArtifact,
-        session: requests.Session,
+        client: httpx.Client,
         pdf_dir,
         html_dir,
         xml_dir,
@@ -1771,7 +1781,6 @@ def test_run_auto_resume_uses_manifest_path_when_resume_flag_absent(patcher, tmp
         metrics,
         *,
         options,
-        session_factory=None,
     ) -> Dict[str, Any]:
         skipped = work.work_id in options.resume_completed
         return {
@@ -1822,7 +1831,7 @@ def test_run_respects_explicit_resume_from_override(patcher, tmp_path):
 
     def fake_process_one_work(
         work: WorkArtifact,
-        session: requests.Session,
+        client: httpx.Client,
         pdf_dir,
         html_dir,
         xml_dir,
@@ -1831,7 +1840,6 @@ def test_run_respects_explicit_resume_from_override(patcher, tmp_path):
         metrics,
         *,
         options,
-        session_factory=None,
     ) -> Dict[str, Any]:
         skipped = work.work_id in options.resume_completed
         return {
@@ -1881,7 +1889,7 @@ def test_worker_crash_records_manifest_reason(patcher, tmp_path, worker_count):
 
     def fake_process_one_work(
         work: WorkArtifact,
-        session: requests.Session,
+        client: httpx.Client,
         pdf_dir,
         html_dir,
         xml_dir,
@@ -1890,7 +1898,6 @@ def test_worker_crash_records_manifest_reason(patcher, tmp_path, worker_count):
         metrics,
         *,
         options,
-        session_factory=None,
     ) -> Dict[str, Any]:
         if work.work_id == failure_id:
             raise RuntimeError("boom")
@@ -1918,163 +1925,3 @@ def test_worker_crash_records_manifest_reason(patcher, tmp_path, worker_count):
     assert failure_record["reason_detail"] == "worker-crash"
 
 
-def test_single_worker_exception_discards_session(patcher, tmp_path):
-    resolved = make_resolved_config(tmp_path, workers=1, csv=False)
-    bootstrap_run_environment(resolved)
-
-    failure_id = "W_SEQ_FAIL"
-    recovery_id = "W_SEQ_RECOVER"
-    artifacts = [
-        _make_artifact(resolved, failure_id),
-        _make_artifact(resolved, recovery_id),
-    ]
-
-    class StubProvider:
-        def __init__(self, batch: List[WorkArtifact]) -> None:
-            self._batch = batch
-
-        def iter_artifacts(self) -> Iterable[WorkArtifact]:
-            yield from self._batch
-
-    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
-        provider = StubProvider(artifacts)
-        self.provider = provider
-        return provider
-
-    session_counter = itertools.count()
-    created_sessions: List["RecordingSession"] = []
-    closed_tokens: List[int] = []
-
-    class RecordingSession:
-        def __init__(self, token: int) -> None:
-            self.token = token
-
-        def close(self) -> None:
-            closed_tokens.append(self.token)
-
-    def fake_create_session(*args, **kwargs):
-        token = next(session_counter)
-        session = RecordingSession(token)
-        created_sessions.append(session)
-        return session
-
-    observed_sessions: List[RecordingSession] = []
-
-    def fake_process_one_work(
-        work: WorkArtifact,
-        session: RecordingSession,
-        pdf_dir,
-        html_dir,
-        xml_dir,
-        pipeline,
-        logger,
-        metrics,
-        *,
-        options,
-        session_factory=None,
-    ) -> Dict[str, Any]:
-        observed_sessions.append(session)
-        if work.work_id == failure_id:
-            raise RuntimeError("boom")
-        return {"saved": True, "downloaded_bytes": 1}
-
-    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
-    patcher.setattr("DocsToKG.ContentDownload.runner.create_session", fake_create_session)
-    patcher.setattr(
-        "DocsToKG.ContentDownload.runner.process_one_work",
-        fake_process_one_work,
-    )
-
-    download_run = DownloadRun(resolved)
-    result = download_run.run()
-
-    assert result.worker_failures == 1
-    assert len(observed_sessions) == 2
-    assert observed_sessions[0] is created_sessions[0]
-    assert observed_sessions[1] is created_sessions[1]
-    assert observed_sessions[0] is not observed_sessions[1]
-    assert closed_tokens and closed_tokens[0] == created_sessions[0].token
-
-    download_run.close()
-
-
-def test_worker_tls_failure_discards_thread_session(patcher, tmp_path):
-    resolved = make_resolved_config(tmp_path, workers=2, csv=False)
-    bootstrap_run_environment(resolved)
-
-    failure_id = "W_TLS_FAIL"
-    recovery_id = "W_RECOVER"
-    artifacts = [
-        _make_artifact(resolved, failure_id),
-        _make_artifact(resolved, recovery_id),
-    ]
-
-    class StubProvider:
-        def __init__(self, batch: List[WorkArtifact]) -> None:
-            self._batch = batch
-
-        def iter_artifacts(self) -> Iterable[WorkArtifact]:
-            yield from self._batch
-
-    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
-        provider = StubProvider(artifacts)
-        self.provider = provider
-        return provider
-
-    session_counter = itertools.count()
-    created_sessions: List["RecordingSession"] = []
-    closed_tokens: List[int] = []
-
-    class RecordingSession:
-        def __init__(self, token: int) -> None:
-            self.token = token
-
-        def close(self) -> None:
-            closed_tokens.append(self.token)
-
-    def fake_create_session(*args, **kwargs):
-        token = next(session_counter)
-        session = RecordingSession(token)
-        created_sessions.append(session)
-        return session
-
-    observed_sessions: List[RecordingSession] = []
-
-    def fake_process_one_work(
-        work: WorkArtifact,
-        session: RecordingSession,
-        pdf_dir,
-        html_dir,
-        xml_dir,
-        pipeline,
-        logger,
-        metrics,
-        *,
-        options,
-        session_factory=None,
-    ) -> Dict[str, Any]:
-        observed_sessions.append(session)
-        if work.work_id == failure_id:
-            raise requests.exceptions.SSLError("tls handshake failed")
-        return {"saved": True, "downloaded_bytes": 1}
-
-    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
-    patcher.setattr("DocsToKG.ContentDownload.runner.create_session", fake_create_session)
-    patcher.setattr(
-        "DocsToKG.ContentDownload.runner.process_one_work",
-        fake_process_one_work,
-    )
-    patcher.setattr(
-        DownloadRun,
-        "setup_worker_pool",
-        lambda self: ThreadPoolExecutor(max_workers=1),
-    )
-
-    download_run = DownloadRun(resolved)
-    result = download_run.run()
-
-    assert result.worker_failures == 1
-    assert len(observed_sessions) == 2
-    assert observed_sessions[0] is not observed_sessions[1]
-    assert created_sessions[0].token in closed_tokens
-    assert closed_tokens[0] == created_sessions[0].token

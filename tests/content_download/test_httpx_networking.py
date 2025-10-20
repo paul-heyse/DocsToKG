@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 import httpx
+import pytest
 
 from DocsToKG.ContentDownload.download import (
     DownloadContext,
@@ -15,12 +16,49 @@ from DocsToKG.ContentDownload.download import (
     download_candidate,
 )
 from DocsToKG.ContentDownload.core import Classification, WorkArtifact
+from DocsToKG.ContentDownload import networking as networking_module
 from DocsToKG.ContentDownload.networking import ConditionalRequestHelper, request_with_retries
 
 
 def _response(status: int, *, headers: dict[str, str] | None = None, body: bytes = b"") -> httpx.Response:
     request = httpx.Request("GET", "https://example.org/resource")
     return httpx.Response(status, headers=headers, content=body, request=request)
+
+
+def test_conditional_request_builds_headers_when_metadata_complete() -> None:
+    helper = ConditionalRequestHelper(
+        prior_etag='"etag"',
+        prior_last_modified="Wed, 01 May 2024 00:00:00 GMT",
+        prior_sha256="sha",
+        prior_content_length=1024,
+        prior_path="/tmp/cached.pdf",
+    )
+
+    headers = helper.build_headers()
+
+    assert headers["If-None-Match"] == '"etag"'
+    assert headers["If-Modified-Since"] == "Wed, 01 May 2024 00:00:00 GMT"
+
+
+def test_conditional_request_requires_complete_metadata(caplog) -> None:
+    helper = ConditionalRequestHelper(
+        prior_etag='"etag"',
+        prior_last_modified="Wed, 01 May 2024 00:00:00 GMT",
+        prior_sha256=None,
+        prior_content_length=None,
+        prior_path=None,
+    )
+
+    with caplog.at_level("WARNING"):
+        headers = helper.build_headers()
+
+    assert headers == {}
+    assert any("resume-metadata-incomplete" in record.message for record in caplog.records)
+
+
+def test_threadlocal_session_factory_removed() -> None:
+    with pytest.raises(RuntimeError):
+        getattr(networking_module, "ThreadLocalSessionFactory")
 
 
 def test_conditional_request_interprets_cached_response(tmp_path: Path) -> None:

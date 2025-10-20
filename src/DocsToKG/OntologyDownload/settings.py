@@ -34,8 +34,6 @@ import stat
 import sys
 import threading
 import uuid
-
-import httpx
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from types import ModuleType
@@ -52,6 +50,8 @@ from typing import (
     Set,
     Tuple,
 )
+
+import httpx
 
 try:  # pragma: no cover - dependency check
     import yaml  # type: ignore
