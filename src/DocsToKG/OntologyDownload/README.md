@@ -36,6 +36,13 @@ Scope boundary: Handles resolver planning, secure HTTP streaming, and manifest/v
 
 ## Quickstart
 > Stay inside the managed `.venv` (see [AGENTS.md](./AGENTS.md) for guardrails), sanity-check the environment, then run a dry pull to exercise the full stack without persisting artefacts.
+
+> 📦 **Config prep:** Copy the shipped sample spec or scaffold one with `ontofetch init` before running the commands below.
+> ```bash
+> cp docs/examples/sources.yaml configs/sources.yaml
+> # or
+> ./.venv/bin/python -m DocsToKG.OntologyDownload.cli init configs/sources.yaml
+> ```
 ```bash
 test -x .venv/bin/python || { echo "ERROR: .venv is missing — STOP"; exit 1; }
 ./.venv/bin/python -m DocsToKG.OntologyDownload.cli doctor --json
@@ -45,6 +52,7 @@ test -x .venv/bin/python || { echo "ERROR: .venv is missing — STOP"; exit 1; }
 > Alternative wrappers: `./scripts/dev.sh exec <cmd>` or `direnv exec . <cmd>` are both `.venv`-aware, but the direct `./.venv/bin/python …` form is safest for automation.
 
 ## Common commands
+> 📂 **Config expectation:** All snippets assume `configs/sources.yaml` exists (copied from `docs/examples/sources.yaml` or generated via `ontofetch init` as shown above).
 ```bash
 ./.venv/bin/python -m DocsToKG.OntologyDownload.cli pull hp --spec configs/sources.yaml --force --concurrent-downloads 2 --json
 ./.venv/bin/python -m DocsToKG.OntologyDownload.cli plan hp --spec configs/sources.yaml --no-planner-probes --lock-output ontologies.lock.json --json
