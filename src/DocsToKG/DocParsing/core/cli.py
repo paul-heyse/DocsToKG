@@ -1,11 +1,27 @@
-"""Unified command-line interface orchestrating DocParsing stages.
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.cli",
+#   "purpose": "Expose the Typer CLI surface that orchestrates DocParsing stages while preserving legacy helpers.",
+#   "sections": [
+#     {"id": "module-overview", "name": "Module Overview", "anchor": "module-overview"},
+#     {"id": "typer-bootstrap", "name": "Typer Bootstrap & Shared State", "anchor": "_root_callback"},
+#     {"id": "argv-builders", "name": "Legacy Arg Builders", "anchor": "_build_doctags_cli_args"},
+#     {"id": "typer-commands", "name": "Typer Commands", "anchor": "_doctags_cli"},
+#     {"id": "entrypoint", "name": "Entrypoint", "anchor": "main"}
+#   ]
+# }
+# === /NAVMAP ===
 
-The core CLI module wires together subcommand parsers, shared validation
-logic, manifest inspection tooling, and execution helpers for the DocTags,
-chunking, embedding, planning, and diagnostics workflows. It keeps operator
-experience consistent across orchestrated runs by centralising option parsing,
-error reporting, telemetry emission, and resume handling—whether the CLI is
-invoked directly or through automation.
+"""Typer-driven command-line interface orchestrating DocParsing stages.
+
+This module replaces the bespoke argparse dispatcher with a single Typer app
+that mirrors the legacy CLI contract. Each command translates strongly-typed
+options into the argv expected by the existing stage helpers so downstream
+automation continues to call the same `_execute_*` shims. The module also
+keeps a shared context object that surfaces root-level options—such as a
+default `--data-root` and an eager `--version` flag—to every subcommand while
+maintaining the structured logging and error handling established by the
+legacy implementation.
 """
 
 from __future__ import annotations

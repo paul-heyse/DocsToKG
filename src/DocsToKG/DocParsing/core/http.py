@@ -47,7 +47,7 @@ class _RetryAfterWait(wait_base):
 
     def __init__(self, *, backoff_factor: float) -> None:
         multiplier = max(float(backoff_factor), 0.0)
-        self._fallback_wait = wait_random_exponential(multiplier=multiplier or 0.0, max=None)
+        self._fallback_wait = wait_random_exponential(multiplier=multiplier or 0.0)
 
     def __call__(self, retry_state) -> float:  # type: ignore[override]
         delay = float(self._fallback_wait(retry_state))
@@ -101,6 +101,14 @@ class TenacitySession(requests.Session):
         for key, value in headers.items():
             if value is not None:
                 clone.headers[str(key)] = str(value)
+        with suppress(Exception):
+            clone.cookies = self.cookies.copy()  # type: ignore[assignment]
+        clone.auth = self.auth
+        clone.proxies = self.proxies.copy()
+        clone.verify = self.verify
+        clone.cert = self.cert
+        clone.trust_env = self.trust_env
+        clone.params = self.params.copy()
         return clone
 
     def request(self, method: str, url: str, **kwargs):

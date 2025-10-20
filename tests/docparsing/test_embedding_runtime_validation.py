@@ -1,3 +1,16 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.docparsing.test_embedding_runtime_validation",
+#   "purpose": "Exercise embedding runtime validation and CLI exit behaviour through focused scenarios.",
+#   "sections": [
+#     {"id": "module-overview", "name": "Module Overview", "anchor": "module-overview"},
+#     {"id": "fixtures", "name": "Runtime Helpers", "anchor": "_get_runtime"},
+#     {"id": "tests-missing-vectors", "name": "Missing Vector Validation", "anchor": "test_validate_vectors_missing_logs_capped"},
+#     {"id": "tests-embed-cli", "name": "CLI Missing Chunks Behaviour", "anchor": "test_docparse_embed_missing_chunks_warns_and_exits"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Targeted validation coverage for the embedding runtime quality checks.
 
 The embedding stage performs numerous guardrails before writing vectors. These

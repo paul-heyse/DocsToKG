@@ -1,4 +1,25 @@
-"""Regression tests for the Typer-backed DocParsing CLI dispatcher."""
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.docparsing.test_typer_cli",
+#   "purpose": "Regression-spec for the Typer CLI wiring ensuring legacy behaviour parity.",
+#   "sections": [
+#     {"id": "module-overview", "name": "Module Overview", "anchor": "module-overview"},
+#     {"id": "root-help", "name": "Root Help Coverage", "anchor": "test_docparse_root_help_lists_subcommands"},
+#     {"id": "doctags-behaviour", "name": "DocTags Command Behaviour", "anchor": "test_docparse_doctags_help_preserves_legacy_flags"},
+#     {"id": "global-flags", "name": "Global Flag Behaviour", "anchor": "test_docparse_root_version_flag"},
+#     {"id": "plan-forwarding", "name": "Plan Forwarding", "anchor": "test_docparse_plan_receives_none_when_no_args"}
+#   ]
+# }
+# === /NAVMAP ===
+
+"""Regression tests for the Typer-backed DocParsing CLI dispatcher.
+
+Each test asserts that the Typer application surfaces the expected help text,
+forwards argv to the legacy stage shims unchanged, and honours the new global
+flags introduced during the migration (e.g. `--version`, root-level
+`--data-root`). The suite is designed to detect behavioural regressions
+without depending on the heavy downstream pipelines.
+"""
 
 from __future__ import annotations
 
