@@ -818,6 +818,7 @@ class ChunkIngestionPipeline:
 
         def _pop_vector(vector_id: str) -> Optional[Mapping[str, object]]:
             cached = vector_cache.pop(vector_id, None)
+            _maybe_track_cache()
             if cached is not None:
                 return cached
             for entry in vector_iter:
@@ -835,6 +836,7 @@ class ChunkIngestionPipeline:
         for entry in chunk_entries:
             vector_id = str(entry.get("uuid") or entry.get("UUID"))
             vector_payload = vector_cache.pop(vector_id, None)
+            _maybe_track_cache()
             if vector_payload is None:
                 vector_payload = _pop_vector(vector_id)
             if vector_payload is None:
