@@ -801,7 +801,7 @@ class ChunkIngestionPipeline:
         Raises:
             IngestError: If chunk and vector artifacts are inconsistent or missing.
         """
-        chunk_entries = self._read_jsonl(document.chunk_path)
+        chunk_iter = self._iter_jsonl(document.chunk_path)
         vector_iter = self._iter_vector_file(document.vector_path)
         vector_cache: Dict[str, Mapping[str, object]] = {}
 
@@ -831,7 +831,7 @@ class ChunkIngestionPipeline:
 
         payloads: List[ChunkPayload] = []
         missing: List[str] = []
-        for entry in chunk_entries:
+        for entry in chunk_iter:
             vector_id = str(entry.get("uuid") or entry.get("UUID"))
             vector_payload = vector_cache.pop(vector_id, None)
             _maybe_track_cache()
