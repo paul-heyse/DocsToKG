@@ -89,7 +89,11 @@ class RoleConfig:
 
 @dataclass
 class RolePolicy:
-    """Host-level policy keyed by role."""
+    """Host-level policy keyed by role (`metadata`, `landing`, `artifact`).
+
+    Each role controls the rate windows, wait budget, HEAD counting, and
+    optional request weight that feed limiter construction.
+    """
 
     rates: Dict[RoleName, List[Rate]] = field(default_factory=dict)
     max_delay_ms: Dict[RoleName, int] = field(default_factory=dict)
@@ -266,7 +270,11 @@ BACKEND_BUILDERS = MappingProxyType(
 
 
 class LimiterManager:
-    """Central registry managing rate limiter creation and acquisition."""
+    """Central registry managing rate limiter creation, caching, and metrics.
+
+    Limiter instances are memoised per ``(host, role)`` so repeated HTTP calls
+    reuse the same pyrate objects regardless of backend (memory/SQLite/Redis/etc.).
+    """
 
     def __init__(
         self,
@@ -578,7 +586,7 @@ def _build_default_policy() -> Dict[str, RolePolicy]:
         rates={
             ROLE_METADATA: [Rate(10, Duration.SECOND), Rate(5000, Duration.HOUR)],
             ROLE_LANDING: [Rate(6, Duration.SECOND), Rate(2000, Duration.HOUR)],
-            ROLE_ARTIFACT: [Rate(2, Duration.SECOND), Rate(180, Duration.MINUTE)],
+            ROLE_ARTIFACT: [Rate(2, Duration.SECOND), Rate(120, Duration.MINUTE)],
         },
         max_delay_ms={
             ROLE_METADATA: 150,
@@ -615,7 +623,7 @@ def _build_default_policy() -> Dict[str, RolePolicy]:
         "api.crossref.org": _bp(
             [Rate(50, Duration.SECOND), Rate(7500, Duration.HOUR)],
             [Rate(20, Duration.SECOND), Rate(5000, Duration.HOUR)],
-            [Rate(5, Duration.SECOND), Rate(500, Duration.MINUTE)],
+            [Rate(5, Duration.SECOND), Rate(300, Duration.MINUTE)],
             metadata_delay=250,
             landing_delay=350,
             artifact_delay=5000,
@@ -632,7 +640,7 @@ def _build_default_policy() -> Dict[str, RolePolicy]:
         "api.unpaywall.org": _bp(
             [Rate(10, Duration.SECOND), Rate(1000, Duration.HOUR)],
             [Rate(5, Duration.SECOND), Rate(500, Duration.HOUR)],
-            [Rate(2, Duration.SECOND), Rate(150, Duration.MINUTE)],
+            [Rate(2, Duration.SECOND), Rate(120, Duration.MINUTE)],
             metadata_delay=200,
             landing_delay=200,
             artifact_delay=4000,
@@ -708,7 +716,12 @@ def configure_rate_limits(
 
 
 class RateLimitedTransport(httpx.BaseTransport):
-    """HTTPX transport wrapper that enforces rate limiter policies."""
+    """HTTPX transport wrapper that enforces rate limiter policies underneath Hishel.
+
+    The transport is always mounted *below* the cache layer so 304/cache hits do
+    not consume limiter tokens, and metadata from each acquisition is stamped
+    onto ``request.extensions["docs_network_meta"]`` for downstream telemetry.
+    """
 
     def __init__(
         self,

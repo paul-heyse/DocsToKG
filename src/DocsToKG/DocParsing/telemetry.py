@@ -125,6 +125,16 @@ class TelemetrySink:
         payload.setdefault("doc_id", entry.file_id)
         self._append_payload(self._manifest_path, payload, writer=writer)
 
+    def write_provider_event(
+        self,
+        payload: Dict[str, Any],
+        *,
+        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+    ) -> None:
+        """Append provider telemetry to the attempts log."""
+
+        self._append_payload(self._attempts_path, payload, writer=writer)
+
 
 def _input_bytes(path: Path | str) -> int:
     """Best-effort size lookup for ``path`` returning zero on failure."""
@@ -308,3 +318,28 @@ class StageTelemetry:
             duration_s=0.0,
             metadata=metadata,
         )
+
+    def log_provider_event(
+        self,
+        *,
+        provider: "ProviderIdentity",
+        phase: str,
+        data: Dict[str, Any],
+    ) -> None:
+        """Record telemetry for provider lifecycle and batch metrics."""
+
+        payload: Dict[str, Any] = {
+            "run_id": self._run_id,
+            "file_id": f"__provider__/{provider.name}",
+            "stage": self._stage,
+            "status": f"provider:{phase}",
+            "provider": provider.name,
+            "provider_version": provider.version,
+            "phase": phase,
+            "timestamp": time.time(),
+        }
+        for key, value in data.items():
+            if value is not None:
+                payload[key] = value
+        payload = {k: v for k, v in payload.items() if v is not None}
+        self._sink.write_provider_event(payload, writer=self._writer)

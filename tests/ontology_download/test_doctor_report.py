@@ -37,7 +37,16 @@ def _doctor_report_with_disk(
     """Execute ``_doctor_report`` within a controlled testing environment."""
 
     usage = FakeUsage(total=total_bytes, used=total_bytes - free_bytes, free=free_bytes)
-    dummy_response = SimpleNamespace(status_code=200, ok=True, reason="OK")
+    class _DummyResponse:
+        def __init__(self, status: int = 200, reason: str = "OK") -> None:
+            self.status_code = status
+            self.reason_phrase = reason
+
+        @property
+        def is_success(self) -> bool:
+            return 200 <= self.status_code < 400
+
+    dummy_response = _DummyResponse()
     dummy_config = SimpleNamespace(defaults=SimpleNamespace(http=SimpleNamespace(rate_limits={})))
 
     with TestingEnvironment() as env:
@@ -52,8 +61,15 @@ def _doctor_report_with_disk(
             stack.enter_context(patch.object(cli, "STORAGE", env._storage))
             stack.enter_context(patch.object(cli.shutil, "disk_usage", return_value=usage))
             stack.enter_context(patch.object(cli.shutil, "which", return_value=None))
-            stack.enter_context(patch.object(cli.requests, "head", return_value=dummy_response))
-            stack.enter_context(patch.object(cli.requests, "get", return_value=dummy_response))
+
+            class _DummyClient:
+                def head(self, *_args, **_kwargs):  # noqa: D401 - simple stub
+                    return dummy_response
+
+                def get(self, *_args, **_kwargs):  # noqa: D401 - simple stub
+                    return dummy_response
+
+            stack.enter_context(patch.object(cli.net, "get_http_client", return_value=_DummyClient()))
             stack.enter_context(
                 patch.object(
                     cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: dummy_config)

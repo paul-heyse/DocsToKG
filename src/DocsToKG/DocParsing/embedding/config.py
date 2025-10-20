@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Dict, Mapping, Optional
@@ -453,6 +454,47 @@ class EmbedCfg(StageConfigBase):
             self.qwen_model_dir = self.dense_qwen_vllm_download_dir
         if self.sparse_splade_st_model_dir is not None:
             self.splade_model_dir = self.sparse_splade_st_model_dir
+
+        deprecation_warnings = []
+        if self.is_overridden("bm25_k1") and not self.is_overridden("lexical_local_bm25_k1"):
+            deprecation_warnings.append(
+                "--bm25-k1 is deprecated; use --lexical-local-bm25-k1"
+            )
+        if self.is_overridden("bm25_b") and not self.is_overridden("lexical_local_bm25_b"):
+            deprecation_warnings.append("--bm25-b is deprecated; use --lexical-local-bm25-b")
+        if self.is_overridden("batch_size_qwen") and not self.is_overridden(
+            "dense_qwen_vllm_batch_size"
+        ):
+            deprecation_warnings.append(
+                "--batch-size-qwen is deprecated; use --dense-qwen-batch-size"
+            )
+        if self.is_overridden("batch_size_splade") and not self.is_overridden(
+            "sparse_splade_st_batch_size"
+        ):
+            deprecation_warnings.append(
+                "--batch-size-splade is deprecated; use --sparse-splade-batch-size"
+            )
+        if self.is_overridden("splade_attn") and not self.is_overridden(
+            "sparse_splade_st_attn_backend"
+        ):
+            deprecation_warnings.append(
+                "--splade-attn is deprecated; use --sparse-splade-attn-backend"
+            )
+        if self.is_overridden("qwen_quant") and not self.is_overridden(
+            "dense_qwen_vllm_quantization"
+        ):
+            deprecation_warnings.append(
+                "--qwen-quant is deprecated; use --dense-qwen-quantization"
+            )
+        if self.is_overridden("qwen_dim") and not self.is_overridden(
+            "dense_qwen_vllm_dimension"
+        ):
+            deprecation_warnings.append(
+                "--qwen-dim is deprecated; use --dense-qwen-dimension"
+            )
+
+        for message in deprecation_warnings:
+            print(f"[docparse embed] {message}", file=sys.stderr)
 
     @staticmethod
     def _coerce_str_dict(value: Any) -> Dict[str, str]:

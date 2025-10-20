@@ -93,3 +93,16 @@ class UserConfigError(RuntimeError):
 
 # Backwards compatibility alias used throughout the package.
 ConfigError = UserConfigError
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.errors",
+#   "purpose": "Define the exception hierarchy used across ontology planning, download, and validation",
+#   "sections": [
+#     {"id": "base", "name": "Base Exceptions", "anchor": "BAS", "kind": "api"},
+#     {"id": "configuration", "name": "Configuration Errors", "anchor": "CFG", "kind": "api"},
+#     {"id": "resolver", "name": "Resolver & Download Errors", "anchor": "RES", "kind": "api"},
+#     {"id": "validation", "name": "Validation Errors", "anchor": "VAL", "kind": "api"},
+#     {"id": "policy", "name": "Policy & Retry Failures", "anchor": "POL", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===

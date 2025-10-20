@@ -62,6 +62,7 @@ from DocsToKG.ContentDownload.ratelimit import (
     configure_rate_limits,
     get_rate_limiter_manager,
     validate_policies,
+    DEFAULT_ROLE,
     ROLE_ORDER,
 )
 from pyrate_limiter import Duration, Rate
@@ -646,16 +647,13 @@ def _split_host_role(target: str) -> Tuple[str, Optional[str]]:
     if not token:
         raise argparse.ArgumentTypeError("host identifier cannot be empty.")
     if "." in token:
-        host_part, role_part = token.split(".", 1)
+        host_part, candidate_role = token.rsplit(".", 1)
         host_part = host_part.strip()
-        role_part = role_part.strip()
-        if not host_part:
-            raise argparse.ArgumentTypeError("host segment cannot be empty.")
-        if role_part not in ROLE_ORDER and role_part != DEFAULT_ROLE:
-            raise argparse.ArgumentTypeError(
-                f"unknown limiter role '{role_part}'. Valid roles: {', '.join(ROLE_ORDER)}"
-            )
-        return host_part, role_part
+        candidate_role = candidate_role.strip()
+        if candidate_role in ROLE_ORDER or candidate_role == DEFAULT_ROLE:
+            if not host_part:
+                raise argparse.ArgumentTypeError("host segment cannot be empty.")
+            return host_part, candidate_role
     return token, None
 
 
@@ -728,7 +726,13 @@ def _parse_delay_ms(value: str) -> int:
         raise argparse.ArgumentTypeError("delay must be a positive duration (e.g., 250 or 0.5s).")
     if value in {"inf", "infinite"}:
         raise argparse.ArgumentTypeError("infinite waits are not supported.")
-    return _parse_interval_ms(value)
+    try:
+        numeric = float(value)
+    except ValueError:
+        return _parse_interval_ms(value)
+    if numeric <= 0:
+        raise argparse.ArgumentTypeError("delay must be greater than 0 milliseconds.")
+    return int(math.ceil(numeric))
 
 
 def merge_rate_overrides(

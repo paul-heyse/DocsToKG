@@ -39,16 +39,6 @@ def _ensure_optional_dependency_stubs() -> None:
         bioregistry.get_rdf_download = lambda prefix: None  # type: ignore[attr-defined]
         sys.modules["bioregistry"] = bioregistry
 
-    if "ols_client" not in sys.modules:
-        ols_client = types.ModuleType("ols_client")
-        ols_client.OlsClient = lambda *args, **kwargs: types.SimpleNamespace()  # type: ignore[attr-defined]
-        sys.modules["ols_client"] = ols_client
-
-    if "ontoportal_client" not in sys.modules:
-        onto_client = types.ModuleType("ontoportal_client")
-        onto_client.BioPortalClient = lambda *args, **kwargs: types.SimpleNamespace()  # type: ignore[attr-defined]
-        sys.modules["ontoportal_client"] = onto_client
-
     if "pystow" not in sys.modules and importlib.util.find_spec("pystow") is None:
         data_root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
 

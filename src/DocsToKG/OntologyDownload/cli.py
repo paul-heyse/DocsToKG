@@ -45,12 +45,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Union
 
-import requests
+import httpx
 import yaml
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 from pydantic import ValidationError as PydanticValidationError
 
+from . import net
 from .api import _collect_plugin_details
 from .errors import ConfigError, ConfigurationError, OntologyDownloadError, UnsupportedPythonError
 from .formatters import (
@@ -1188,20 +1189,21 @@ def _doctor_report() -> Dict[str, object]:
         "bioregistry": "https://bioregistry.io",
     }
     network: Dict[str, Dict[str, object]] = {}
+    http_client = net.get_http_client()
     for name, url in network_targets.items():
         result: Dict[str, object] = {"url": url}
         try:
-            response = requests.head(url, timeout=3, allow_redirects=True)
+            response = http_client.head(url, timeout=3.0, follow_redirects=True)
             status = response.status_code
-            ok = response.ok
+            ok = response.is_success
             if status == 405:
-                response = requests.get(url, timeout=3, allow_redirects=True)
+                response = http_client.get(url, timeout=3.0, follow_redirects=True)
                 status = response.status_code
-                ok = response.ok
+                ok = response.is_success
             result.update({"ok": ok, "status": status})
             if not ok:
-                result["detail"] = response.reason
-        except requests.RequestException as exc:  # pragma: no cover - network variability
+                result["detail"] = response.reason_phrase
+        except httpx.RequestError as exc:  # pragma: no cover - network variability
             result.update({"ok": False, "detail": str(exc)})
         network[name] = result
 
@@ -1595,7 +1597,7 @@ def _handle_validate(args, config: ResolvedConfig) -> dict:
     validation_dir = version_dir / "validation"
     normalized_dir = version_dir / "normalized"
     validator_names = _selected_validators(args)
-    requests = [
+    validation_requests = [
         ValidationRequest(name, original_path, normalized_dir, validation_dir, config)
         for name in validator_names
     ]
@@ -1605,7 +1607,7 @@ def _handle_validate(args, config: ResolvedConfig) -> dict:
         retention_days=logging_config.retention_days,
         max_log_size_mb=logging_config.max_log_size_mb,
     )
-    results = run_validators(requests, logger)
+    results = run_validators(validation_requests, logger)
     existing_validation = dict(manifest.get("validation", {}))
     existing_validation.update({name: result.to_dict() for name, result in results.items()})
     manifest["validation"] = existing_validation

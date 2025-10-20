@@ -53,6 +53,33 @@ def test_docparse_doctags_forwards_arguments(monkeypatch) -> None:
     assert captured["argv"] == ["--mode", "pdf", "--resume"]
 
 
+def test_docparse_root_version_flag() -> None:
+    """The global --version flag should print the package version and exit."""
+
+    result = runner.invoke(core_cli.app, ["--version"])
+    assert result.exit_code == 0
+    assert "DocsToKG" in result.stdout
+
+
+def test_docparse_root_data_root_option_applies_to_subcommand(
+    tmp_path, monkeypatch
+) -> None:
+    """Global --data-root should populate subcommands when omitted locally."""
+
+    captured: dict[str, Sequence[str] | None] = {}
+
+    def fake_chunk(argv: Sequence[str] | None = None) -> int:
+        captured["argv"] = argv
+        return 0
+
+    monkeypatch.setattr(core_cli, "_execute_chunk", fake_chunk)
+    result = runner.invoke(core_cli.app, ["--data-root", str(tmp_path), "chunk"])
+    assert result.exit_code == 0
+    assert captured["argv"] is not None
+    assert "--data-root" in captured["argv"]
+    assert captured["argv"][captured["argv"].index("--data-root") + 1] == str(tmp_path)
+
+
 def test_docparse_plan_receives_none_when_no_args(monkeypatch) -> None:
     """The plan command should forward None when no explicit flags are given."""
 

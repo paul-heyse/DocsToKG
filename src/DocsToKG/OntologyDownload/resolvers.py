@@ -131,20 +131,6 @@ except ModuleNotFoundError:  # pragma: no cover - provide actionable error for r
     get_owl_download = None  # type: ignore[assignment]
     get_rdf_download = None  # type: ignore[assignment]
 
-try:  # pragma: no cover - optional dependency shim
-    from ols_client import OlsClient as _OlsClient
-except ImportError:
-    try:
-        from ols_client import Client as _OlsClient
-    except ImportError:  # ols-client not installed
-        _OlsClient = None  # type: ignore[assignment]
-
-try:  # pragma: no cover - optional dependency guidance
-    from ontoportal_client import BioPortalClient
-except ModuleNotFoundError:  # pragma: no cover - provide actionable error later
-    BioPortalClient = None  # type: ignore[assignment]
-
-OlsClient = _OlsClient
 pystow = get_pystow()
 
 _FORMAT_TO_MEDIA = {
@@ -397,22 +383,6 @@ class BaseResolver:
         http_config = config.defaults.http
         return http_config.polite_http_headers(correlation_id=self._extract_correlation_id(logger))
 
-    @staticmethod
-    def _apply_headers_to_session(session: Any, headers: Dict[str, str]) -> None:
-        """Apply polite headers to third-party client sessions when supported."""
-
-        if session is None:
-            return
-        mapping = getattr(session, "headers", None)
-        if mapping is None:
-            return
-        updater = getattr(mapping, "update", None)
-        if callable(updater):
-            updater(headers)
-        elif isinstance(mapping, dict):  # pragma: no cover - defensive branch
-            mapping.update(headers)
-
-    @staticmethod
     def _request_with_retry(
         self,
         *,
@@ -557,20 +527,9 @@ class OBOResolver(BaseResolver):
 
 
 class OLSResolver(BaseResolver):
-    """Resolve ontologies from the Ontology Lookup Service (OLS4)."""
+    """Resolve ontologies from the OLS REST API using the shared HTTPX client."""
 
-    def __init__(self) -> None:
-        client_factory = OlsClient
-        if client_factory is None:
-            raise UserConfigError("ols-client package is required for the OLS resolver")
-        try:
-            self.client = client_factory()
-        except TypeError:
-            try:
-                self.client = client_factory("https://www.ebi.ac.uk/ols4")
-            except TypeError:  # pragma: no cover - keyword-only versions
-                self.client = client_factory(base_url="https://www.ebi.ac.uk/ols4")
-        self.credentials_path = pystow.join("ontology-fetcher", "configs") / "ols_api_token.txt"
+    API_ROOT = "https://www.ebi.ac.uk/ols4/api/ontologies"
 
     def plan(
         self,
@@ -580,87 +539,75 @@ class OLSResolver(BaseResolver):
         *,
         cancellation_token: Optional[CancellationToken] = None,
     ) -> FetchPlan:
-        """Plan an OLS download by negotiating media type and authentication."""
+        """Plan an OLS download by issuing HTTPX requests through the shared client."""
 
         if cancellation_token and cancellation_token.is_cancelled():
             raise ResolverError("Operation cancelled")
 
         ontology_id = spec.id.lower()
-        headers = self._build_polite_headers(config, logger)
-        try:
-            session = getattr(self.client, "session", None)
-        except RuntimeError:  # placeholder clients used in tests may raise
-            session = None
-        self._apply_headers_to_session(session, headers)
-
-        try:
-            record = self._execute_with_retry(
-                lambda: self.client.get_ontology(ontology_id),
-                config=config,
-                logger=logger,
-                name="ols",
-                service="ols",
-                host=urlparse(getattr(self.client, "base_url", "https://www.ebi.ac.uk")).hostname,
-            )
-        except requests.HTTPError as exc:
-            status = exc.response.status_code if exc.response is not None else None
-            if status in {401, 403}:
-                raise UserConfigError(
-                    f"OLS authentication failed with status {status}. Configure API key at {self.credentials_path}"
-                ) from exc
-            raise
-        download_url = None
-        version = None
-        license_value = None
-        filename = None
-        if hasattr(record, "download"):
-            download_url = getattr(record, "download")
-        if not download_url and isinstance(record, dict):
-            download_url = (
-                record.get("config", {}).get("downloadLocation")
-                or record.get("download")
-                or record.get("links", {}).get("download")
-            )
-            version = record.get("version")
-            license_value = record.get("license")
-            filename = record.get("id")
-        if not download_url:
-            raise ResolverError(f"No OLS download URL found for {spec.id}")
         logger.info(
-            "resolved download url",
+            "fetching OLS metadata",
             extra={
                 "stage": "plan",
                 "resolver": "ols",
                 "ontology_id": spec.id,
-                "url": download_url,
             },
         )
+
+        client = get_http_client(config.defaults.http)
+        polite_headers = self._build_polite_headers(config, logger)
+
+        def _fetch() -> httpx.Response:
+            response = client.get(
+                f"{self.API_ROOT}/{ontology_id}",
+                headers=polite_headers,
+                timeout=config.defaults.http.timeout_sec,
+            )
+            response.raise_for_status()
+            return response
+
+        response = self._execute_with_retry(
+            _fetch,
+            config=config,
+            logger=logger,
+            name="ols",
+            service="ols",
+            host=urlparse(self.API_ROOT).hostname,
+        )
+
+        payload = response.json()
+        config_block = payload.get("config", {}) if isinstance(payload, dict) else {}
+        version = payload.get("version") if isinstance(payload, dict) else None
+        license_value = normalize_license_to_spdx(config_block.get("license"))
+
+        download_url = config_block.get("fileLocation") or config_block.get("downloadLocation")
+        if not download_url:
+            raise ResolverError(f"No OLS download URL found for {spec.id}")
+
         media_type, download_headers = self._negotiate_media_type(
             spec=spec,
             default="application/rdf+xml",
-            headers=headers,
+            headers=polite_headers,
         )
+
         return self._build_plan(
             url=download_url,
             http_config=config.defaults.http,
             headers=download_headers,
-            filename_hint=filename,
+            filename_hint=config_block.get("id"),
             version=version,
-            license=normalize_license_to_spdx(license_value),
+            license=license_value,
             media_type=media_type,
             service="ols",
         )
 
 
 class BioPortalResolver(BaseResolver):
-    """Resolve ontologies using the BioPortal (OntoPortal) API."""
+    """Resolve ontologies using the BioPortal REST API with the shared HTTPX client."""
+
+    API_ROOT = "https://data.bioontology.org/ontologies"
 
     def __init__(self) -> None:
-        if BioPortalClient is None:
-            raise UserConfigError(
-                "ontoportal-client is required for the BioPortal resolver. Install it with: pip install ontoportal-client"
-            )
-        self.client = BioPortalClient()
         config_dir = pystow.join("ontology-fetcher", "configs")
         self.api_key_path = config_dir / "bioportal_api_key.txt"
 
@@ -677,69 +624,58 @@ class BioPortalResolver(BaseResolver):
         *,
         cancellation_token: Optional[CancellationToken] = None,
     ) -> FetchPlan:
-        """Plan a BioPortal download by combining ontology and submission metadata."""
+        """Plan a BioPortal download using HTTPX."""
 
         if cancellation_token and cancellation_token.is_cancelled():
             raise ResolverError("Operation cancelled")
 
         acronym = spec.extras.get("acronym", spec.id.upper())
-        headers = self._build_polite_headers(config, logger)
-        self._apply_headers_to_session(getattr(self.client, "session", None), headers)
-
-        try:
-            ontology = self._execute_with_retry(
-                lambda: self.client.get_ontology(acronym),
-                config=config,
-                logger=logger,
-                name="bioportal",
-                service="bioportal",
-                host=urlparse(
-                    getattr(self.client, "base_url", "https://data.bioontology.org")
-                ).hostname,
+        api_key = self._load_api_key()
+        if not api_key:
+            raise UserConfigError(
+                f"BioPortal resolver requires an API key at {self.api_key_path}."
             )
-        except requests.HTTPError as exc:
-            status = exc.response.status_code if exc.response is not None else None
-            if status in {401, 403}:
-                raise UserConfigError(
-                    f"BioPortal authentication failed with status {status}. Configure API key at {self.api_key_path}"
-                ) from exc
-            raise
-        version = None
-        license_value = None
-        if isinstance(ontology, dict):
-            license_value = normalize_license_to_spdx(ontology.get("license"))
-        latest_submission = self._execute_with_retry(
-            lambda: self.client.get_latest_submission(acronym),
+
+        client = get_http_client(config.defaults.http)
+        def _fetch_metadata(endpoint: str) -> httpx.Response:
+            response = client.get(
+                endpoint,
+                headers={"Authorization": f"apikey {api_key}"},
+                timeout=config.defaults.http.timeout_sec,
+            )
+            response.raise_for_status()
+            return response
+
+        ontology_response = self._execute_with_retry(
+            lambda: _fetch_metadata(f"{self.API_ROOT}/{acronym}"),
             config=config,
             logger=logger,
             name="bioportal",
             service="bioportal",
-            host=urlparse(
-                getattr(self.client, "base_url", "https://data.bioontology.org")
-            ).hostname,
+            host=urlparse(self.API_ROOT).hostname,
         )
-        if isinstance(latest_submission, dict):
-            download_url = (
-                latest_submission.get("download")
-                or latest_submission.get("links", {}).get("download")
-                or latest_submission.get("ontologyPurl")
-            )
-            version = latest_submission.get("version") or latest_submission.get("submissionId")
-        else:
-            download_url = getattr(latest_submission, "download", None)
-            if not download_url:
-                links = getattr(latest_submission, "links", {})
-                download_url = links.get("download") if isinstance(links, dict) else None
-            version = getattr(latest_submission, "version", None)
-            license_value = license_value or normalize_license_to_spdx(
-                getattr(latest_submission, "license", None)
-            )
+        ontology_payload = ontology_response.json()
+        license_value = normalize_license_to_spdx(ontology_payload.get("license"))
+
+        submission_response = self._execute_with_retry(
+            lambda: _fetch_metadata(f"{self.API_ROOT}/{acronym}/latest_submission"),
+            config=config,
+            logger=logger,
+            name="bioportal",
+            service="bioportal",
+            host=urlparse(self.API_ROOT).hostname,
+        )
+        submission_payload = submission_response.json()
+
+        download_url = submission_payload.get("download") or submission_payload.get("ontologyPurl")
         if not download_url:
             raise ResolverError(f"No BioPortal submission with download URL for {acronym}")
-        headers: Dict[str, str] = {}
-        api_key = self._load_api_key()
-        if api_key:
-            headers["Authorization"] = f"apikey {api_key}"
+
+        version = submission_payload.get("version") or submission_payload.get("submissionId")
+        license_value = normalize_license_to_spdx(
+            submission_payload.get("license")
+        ) or license_value
+
         logger.info(
             "resolved download url",
             extra={
@@ -749,11 +685,13 @@ class BioPortalResolver(BaseResolver):
                 "url": download_url,
             },
         )
+
         media_type, download_headers = self._negotiate_media_type(
             spec=spec,
             default="application/rdf+xml",
-            headers=headers,
+            headers={"Authorization": f"apikey {api_key}"},
         )
+
         return self._build_plan(
             url=download_url,
             http_config=config.defaults.http,
@@ -1064,21 +1002,15 @@ RESOLVERS: Dict[str, BaseResolver] = {
     "ontobee": OntobeeResolver(),
 }
 
-if OlsClient is not None:
-    try:
-        RESOLVERS["ols"] = OLSResolver()
-    except Exception as exc:  # pragma: no cover - depends on local credentials
-        LOGGER.debug("OLS resolver disabled: %s", exc)
-else:  # pragma: no cover
-    LOGGER.debug("OLS resolver disabled because ols-client is not installed")
+try:
+    RESOLVERS["ols"] = OLSResolver()
+except Exception as exc:  # pragma: no cover - depends on network availability
+    LOGGER.debug("OLS resolver disabled: %s", exc)
 
-if BioPortalClient is not None:
-    try:
-        RESOLVERS["bioportal"] = BioPortalResolver()
-    except Exception as exc:  # pragma: no cover - depends on API key availability
-        LOGGER.debug("BioPortal resolver disabled: %s", exc)
-else:  # pragma: no cover
-    LOGGER.debug("BioPortal resolver disabled because ontoportal-client is not installed")
+try:
+    RESOLVERS["bioportal"] = BioPortalResolver()
+except Exception as exc:  # pragma: no cover - depends on API key availability
+    LOGGER.debug("BioPortal resolver disabled: %s", exc)
 
 register_plugin_registry("resolver", RESOLVERS)
 ensure_resolver_plugins(RESOLVERS, logger=LOGGER)

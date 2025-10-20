@@ -383,12 +383,12 @@ resolver_circuit_breakers:
 
 ## Networking, Rate Limiting & Politeness
 
-- `DocsToKG.ContentDownload.httpx_transport` provisions a singleton HTTPX client wrapped in Hishel caching. It enables HTTP/2 when the optional `h2` dependency is present and falls back to HTTP/1.1 automatically when it is not. `configure_http_client()` injects transports/event hooks (e.g., `httpx.MockTransport` during tests) and `purge_http_cache()` clears `${CACHE_DIR}/http/ContentDownload` for ops/testing.
-- `request_with_retries()` delegates to a Tenacity controller that retries `{429, 500, 502, 503, 504}`, honours `Retry-After` headers (bounded by `retry_after_cap` and `backoff_max`), closes intermediate `httpx.Response` objects before sleeping, and surfaces the final response when HTTP retries exhaust. Patch `DocsToKG.ContentDownload.networking.time.sleep` or use `configure_http_client()` in tests to freeze pacing. When `stream=True`, the helper returns an object usable as a context manager (plain responses are wrapped via `contextlib.nullcontext`) so call sites can always use `with` blocks safely.
-- Resolver/CLI knobs flow directly into the Tenacity policy: `backoff_factor` controls jitter amplitude, `backoff_max` bounds waits, `retry_after_cap` enforces ceilings, `respect_retry_after` toggles header parsing, and `max_retry_duration` halts retries early.
-- Token buckets/circuit breakers defined in `ResolverConfig` throttle host+resolver concurrency; host semaphores and `CircuitBreaker` instances (`resolver_circuit_breakers`, domain breakers) share telemetry and enforce cooldowns.
+- `DocsToKG.ContentDownload.httpx_transport` provisions a singleton HTTPX client with Hishel caching; the transport stack is `CacheTransport → RateLimitedTransport → HTTPTransport`, so cache hits bypass limiter quotas. `configure_http_client()` injects transports/event hooks (e.g., `httpx.MockTransport` during tests) and `purge_http_cache()` clears `${CACHE_DIR}/http/ContentDownload` between runs.
+- `request_with_retries()` delegates to a Tenacity controller that retries `{429, 500, 502, 503, 504}`, honours `Retry-After` headers (bounded by `retry_after_cap` and `backoff_max`), closes intermediate `httpx.Response` objects before sleeping, and surfaces the final response when HTTP retries exhaust. Patch `DocsToKG.ContentDownload.networking.time.sleep` or use `configure_http_client()` in tests to freeze pacing. When `stream=True`, the helper returns an object usable as a context manager (plain responses are wrapped via `contextlib.nullcontext`).
+- `ConditionalRequestHelper` builds `If-None-Match` / `If-Modified-Since` headers and `head_precheck` downgrades to conditional GETs when HEAD is unsupported. Resolver/CLI knobs (`backoff_factor`, `max_retry_duration`, `retry_after_cap`) flow directly into the Tenacity policy.
+- Centralized rate limiting lives in `DocsToKG.ContentDownload.ratelimit`. Policies are keyed by `(host, role)` (`metadata`, `landing`, `artifact`), validated at startup, and cached in a process-wide `LimiterManager`. Each limiter acquisition records wait metadata on the request (`docs_network_meta.rate_limiter_*`), aggregates manifest metrics, and emits structured logs (`rate-policy`, `rate-acquire`).
+- Configure policies via CLI/env: `--rate host=5/s,300/h`, `--rate-mode host.artifact=wait:5000`, `--rate-max-delay host.artifact=5000`, and `--rate-backend backend[:key=value,…]`. Environment variables (`DOCSTOKG_RATE*`) mirror the overrides. `--rate-disable` / `DOCSTOKG_RATE_DISABLED=1` keeps the rollback path handy during pilots.
 - `download.RobotsCache` enforces robots.txt unless `--ignore-robots`; it reuses `request_with_retries()`, returns deterministic context managers for streaming responses, and is safe to override only with explicit approval.
-- `ConditionalRequestHelper` builds `If-None-Match` / `If-Modified-Since` headers; `head_precheck` downgrades to conditional GETs when HEAD is unsupported.
 - `statistics.BandwidthTracker` (opt-in) can expose throughput for tuning `--workers`.
 
 ## Operational Playbooks
@@ -398,6 +398,14 @@ resolver_circuit_breakers:
 - **Resolver health audit**: `jq 'select(.record_type=="attempt") | {resolver_name, reason}' runs/content/manifest.jsonl | sort | uniq -c`.
 - **Cache hygiene**: delete artifact directory and corresponding `manifest.*`/`manifest.sqlite3` together; regenerate manifests immediately if manual cleanup occurs.
 - **Concurrency validation**: run small `--dry-run --log-format jsonl` workloads, inspect `manifest.metrics.json` latency blocks before raising `--workers`.
+- **Rate limiter tuning**: default backend is in-memory (single host). Switch to SQLite for shared runners (`--rate-backend sqlite:path=/var/run/docstokg/rl.sqlite`), `multiprocess` for forked workers, or Redis/Postgres for distributed quotas. Use `--rate` / `--rate-mode` CLI flags (or `DOCSTOKG_RATE*` env vars) to adjust host windows, then confirm changes via startup `rate-policy` log and `manifest.metrics.json`. Legacy `--domain-token-bucket` / `--domain-min-interval` map to artifact role policies automatically; `--rate-disable` (or `DOCSTOKG_RATE_DISABLED=true`) keeps the fallback path handy during pilots.
+
+## Migration Checklist
+
+- Remove bespoke sleeps/token buckets from automation and rely on the centralized limiter (`--rate*` flags) for host-specific politeness.
+- Translate existing throttle settings to CLI overrides (e.g., `example.org=3/s,180/h`) and commit the resolved policies in run playbooks for traceability.
+- Pilot the centralized limiter alongside legacy configs by toggling `--rate-disable`/`DOCSTOKG_RATE_DISABLED=1`; compare limiter telemetry between runs before decommissioning old throttles.
+- Monitor `manifest.metrics.json` and console summaries for limiter waits/blocks and unexpected `429`s during rollout; adjust default policies or overrides before removing the fallback switch.
 
 ## Invariants & Safe Change Surfaces
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import types
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from pathlib import Path
 
 import httpx
@@ -133,6 +135,12 @@ def _clone_backend_config(manager) -> BackendConfig:
     )
 
 
+def _restore_manager(manager, policies, backend: BackendConfig) -> None:
+    manager.configure_backend(backend)
+    manager.configure_policies(clone_policies(policies))
+    manager.reset_metrics()
+
+
 def test_cache_hit_skips_rate_limiter_tokens(tmp_path: Path, monkeypatch) -> None:
     manager = get_rate_limiter_manager()
     original_policies = clone_policies(manager.policies())
@@ -166,11 +174,14 @@ def test_cache_hit_skips_rate_limiter_tokens(tmp_path: Path, monkeypatch) -> Non
         def handler(request: httpx.Request) -> httpx.Response:
             nonlocal request_count
             request_count += 1
+            now = datetime.now(timezone.utc)
             return httpx.Response(
                 200,
                 headers={
                     "Cache-Control": "public, max-age=60",
                     "Content-Type": "text/plain",
+                    "Date": format_datetime(now),
+                    "Expires": format_datetime(now + timedelta(seconds=60)),
                 },
                 content=b"cached",
                 request=request,
@@ -185,9 +196,11 @@ def test_cache_hit_skips_rate_limiter_tokens(tmp_path: Path, monkeypatch) -> Non
         assert response1.status_code == 200
         response1.close()
 
-        response2 = client.get("https://example.org/resource")
+        response2 = client.get(
+            "https://example.org/resource",
+            headers={"Cache-Control": "only-if-cached"},
+        )
         assert response2.status_code == 200
-        assert response2.extensions.get("from_cache") is True
         response2.close()
 
         assert request_count == 1
@@ -195,10 +208,7 @@ def test_cache_hit_skips_rate_limiter_tokens(tmp_path: Path, monkeypatch) -> Non
         assert acquire_calls[0] == ("example.org", "metadata", "GET")
     finally:
         httpx_transport.reset_http_client_for_tests()
-        configure_rate_limits(
-            policies=clone_policies(original_policies),
-            backend=original_backend,
-        )
+        _restore_manager(manager, original_policies, original_backend)
 
 
 def test_multi_window_waits_when_fast_window_exhausted() -> None:
@@ -327,10 +337,7 @@ def test_role_specific_max_delay_behaviour(tmp_path: Path, monkeypatch) -> None:
             list(stream_response.iter_bytes())
     finally:
         httpx_transport.reset_http_client_for_tests()
-        configure_rate_limits(
-            policies=clone_policies(original_policies),
-            backend=original_backend,
-        )
+        _restore_manager(manager, original_policies, original_backend)
 
 
 @pytest.mark.parametrize(

@@ -38,7 +38,7 @@ import threading
 import time
 import unicodedata
 from collections import OrderedDict
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -383,44 +383,52 @@ def retry_with_backoff(
     if max_attempts < 1:
         raise ValueError("max_attempts must be at least 1")
 
-    class _BackoffWait(wait_base):
+    class _RetryAfterWait(wait_base):
         def __call__(self, retry_state) -> float:  # type: ignore[override]
-            outcome = retry_state.outcome
-            exc: Optional[Exception]
-            if outcome is None or not outcome.failed:
-                exc = None
-            else:
-                exc = outcome.exception()
-
             attempt_number = max(retry_state.attempt_number, 1)
             delay = backoff_base * (2 ** (attempt_number - 1))
 
-            if retry_after is not None and exc is not None:
-                try:
-                    hint = retry_after(exc)
-                except Exception:  # pragma: no cover - defensive against callbacks
-                    hint = None
-                else:
-                    if hint is not None:
-                        delay = max(hint, 0.0)
+            outcome = retry_state.outcome
+            exc: Optional[Exception] = None
+            if outcome is not None and outcome.failed:
+                exc = outcome.exception()
+
+            candidate_delay: Optional[float] = None
+            if exc is not None:
+                attr_delay = getattr(exc, "_retry_after_delay", None)
+                if attr_delay is not None:
+                    with suppress(TypeError, ValueError):
+                        candidate_delay = max(float(attr_delay), 0.0)
+                if retry_after is not None:
+                    try:
+                        hint = retry_after(exc)
+                    except Exception:  # pragma: no cover - defensive against callbacks
+                        hint = None
+                    else:
+                        if hint is not None:
+                            candidate_delay = max(float(hint), 0.0)
+
+            if candidate_delay is not None:
+                delay = max(delay, candidate_delay)
 
             if jitter > 0:
                 delay += random.uniform(0.0, jitter)
 
-            delay = max(delay, 0.0)
-            setattr(retry_state.retry_object, "_ontology_retry_delay", delay)
-            setattr(retry_state.retry_object, "_ontology_retry_exception", exc)
-            return delay
+            return max(delay, 0.0)
 
     def _before_sleep(retry_state) -> None:
         if callback is None:
             return
 
-        delay = getattr(retry_state.retry_object, "_ontology_retry_delay", 0.0)
-        exc = getattr(retry_state.retry_object, "_ontology_retry_exception", None)
-        if exc is None and retry_state.outcome and retry_state.outcome.failed:
-            exc = retry_state.outcome.exception()
+        delay = 0.0
+        if retry_state.next_action is not None and retry_state.next_action.sleep is not None:
+            with suppress(TypeError, ValueError):
+                delay = max(float(retry_state.next_action.sleep), 0.0)
 
+        exc: Optional[Exception] = None
+        outcome = retry_state.outcome
+        if outcome is not None and outcome.failed:
+            exc = outcome.exception()
         if exc is None:
             return
 
@@ -431,7 +439,7 @@ def retry_with_backoff(
 
     retry_controller = Retrying(
         retry=retry_if_exception(lambda exc: retryable(exc)),
-        wait=_BackoffWait(),
+        wait=_RetryAfterWait(),
         stop=stop_after_attempt(max_attempts),
         sleep=sleep,
         reraise=True,

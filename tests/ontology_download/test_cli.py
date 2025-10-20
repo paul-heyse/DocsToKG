@@ -53,10 +53,33 @@ def test_example_sources_yaml_matches_docs_examples_sources_yaml() -> None:
         )
 
 
+class _DoctorResponse:
+    def __init__(self, status: int = 200, reason: str = "OK") -> None:
+        self.status_code = status
+        self.reason_phrase = reason
+
+    @property
+    def is_success(self) -> bool:
+        return 200 <= self.status_code < 400
+
+
+class _DoctorHttpClient:
+    def __init__(self) -> None:
+        self._response = _DoctorResponse()
+
+    def head(self, *_args, **_kwargs):
+        return self._response
+
+    def get(self, *_args, **_kwargs):
+        return self._response
+
+
 def test_doctor_fix_reports_directory_creation_failure(capsys):
     """``doctor --fix`` should surface directory creation failures."""
 
-    with TestingEnvironment() as env:
+    with TestingEnvironment() as env, patch.object(
+        cli_module.net, "get_http_client", return_value=_DoctorHttpClient()
+    ):
         failing_dir = env.cache_dir
         shutil.rmtree(failing_dir)
         assert not failing_dir.exists()

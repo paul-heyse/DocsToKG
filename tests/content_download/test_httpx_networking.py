@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import os
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from pathlib import Path
 
 import httpx
 import pytest
+from pyrate_limiter import Duration, Rate
 
-from DocsToKG.ContentDownload import networking as networking_module
+from DocsToKG.ContentDownload import httpx_transport, networking as networking_module
 from DocsToKG.ContentDownload.core import Classification, WorkArtifact
 from DocsToKG.ContentDownload.download import (
     DownloadContext,
@@ -19,6 +22,12 @@ from DocsToKG.ContentDownload.download import (
 )
 from DocsToKG.ContentDownload.errors import RateLimitError
 from DocsToKG.ContentDownload.networking import ConditionalRequestHelper, request_with_retries
+from DocsToKG.ContentDownload.ratelimit import (
+    RolePolicy,
+    clone_policies,
+    configure_rate_limits,
+    get_rate_limiter_manager,
+)
 
 
 def _response(
@@ -210,3 +219,67 @@ def test_request_with_retries_does_not_retry_rate_limit_error() -> None:
 
     client.close()
     assert attempts == 1
+
+
+def test_cache_hits_do_not_consume_rate_tokens(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, install_mock_http_client
+) -> None:
+    manager = get_rate_limiter_manager()
+    original_policies = clone_policies(manager.policies())
+    original_backend = manager.backend
+
+    policy = RolePolicy(
+        rates={"metadata": [Rate(5, Duration.SECOND)]},
+        max_delay_ms={"metadata": 0},
+        mode={"metadata": "raise"},
+        count_head={"metadata": False},
+        weight={"metadata": 1},
+    )
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+    httpx_transport.purge_http_cache()
+    manager.reset_metrics()
+    configure_rate_limits(policies={"example.org": policy})
+
+    request_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal request_count
+        request_count += 1
+        now = datetime.now(timezone.utc)
+        headers = {
+            "Cache-Control": "public, max-age=60",
+            "Date": format_datetime(now),
+            "Expires": format_datetime(now + timedelta(seconds=60)),
+        }
+        return httpx.Response(
+            200,
+            headers=headers,
+            request=request,
+            content=b"payload",
+        )
+
+    client = install_mock_http_client(handler)
+    url = "https://example.org/resource"
+
+    response1 = client.get(url)
+    assert response1.status_code == 200
+    assert request_count == 1
+
+    snapshot1 = manager.metrics_snapshot()
+    assert snapshot1["example.org"]["metadata"]["acquire_total"] == 1
+
+    response2 = client.get(url)
+    assert response2.status_code == 200
+    assert request_count == 1  # cache hit should bypass inner transport
+
+    cache_flag = response2.extensions.get("from_cache")
+    if cache_flag is None:
+        cache_flag = response2.request.extensions.get("docs_network_meta", {}).get("from_cache")
+    assert cache_flag is True
+
+    snapshot2 = manager.metrics_snapshot()
+    assert snapshot2["example.org"]["metadata"]["acquire_total"] == 1
+
+    configure_rate_limits(policies=original_policies, backend=original_backend)
+    manager.reset_metrics()

@@ -12,16 +12,27 @@ from __future__ import annotations
 import logging
 import re
 import threading
+import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from contextlib import suppress
 from typing import Mapping, Optional, Sequence, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+from tenacity import (
+    Retrying,
+    retry_if_exception_type,
+    retry_if_result,
+    stop_after_attempt,
+    wait_random_exponential,
+)
+from tenacity.wait import wait_base
 
 DEFAULT_HTTP_TIMEOUT: Tuple[float, float] = (5.0, 30.0)
 
 _HTTP_SESSION_LOCK = threading.Lock()
-_HTTP_SESSION: Optional[requests.Session] = None
+_HTTP_SESSION: Optional["TenacitySession"] = None
 _HTTP_SESSION_TIMEOUT: Tuple[float, float] = DEFAULT_HTTP_TIMEOUT
 
 __all__ = [
@@ -30,6 +41,125 @@ __all__ = [
     "normalize_http_timeout",
 ]
 
+
+class _RetryAfterWait(wait_base):
+    """Tenacity wait strategy that honours Retry-After headers when present."""
+
+    def __init__(self, *, backoff_factor: float) -> None:
+        multiplier = max(float(backoff_factor), 0.0)
+        self._fallback_wait = wait_random_exponential(multiplier=multiplier or 0.0, max=None)
+
+    def __call__(self, retry_state) -> float:  # type: ignore[override]
+        delay = float(self._fallback_wait(retry_state))
+        outcome = retry_state.outcome
+        if outcome is not None and not outcome.failed:
+            response = outcome.result()
+            if isinstance(response, requests.Response):
+                retry_after = _parse_retry_after_header(response.headers.get("Retry-After"))
+                if retry_after is not None:
+                    delay = max(delay, retry_after)
+        return max(delay, 0.0)
+
+
+class TenacitySession(requests.Session):
+    """`requests.Session` subclass that delegates retries to Tenacity."""
+
+    def __init__(
+        self,
+        *,
+        retry_total: int,
+        retry_backoff: float,
+        status_forcelist: Sequence[int],
+        allowed_methods: Sequence[str],
+    ) -> None:
+        super().__init__()
+        adapter = HTTPAdapter(max_retries=0)
+        self.mount("http://", adapter)
+        self.mount("https://", adapter)
+        self._retry_total = max(0, int(retry_total))
+        self._retry_backoff = float(retry_backoff)
+        self._status_forcelist = {int(code) for code in status_forcelist}
+        self._allowed_methods = {method.upper() for method in allowed_methods}
+        self._retryable_exceptions = (
+            requests.Timeout,
+            requests.ConnectionError,
+            requests.RequestException,
+        )
+        self._default_timeout: Tuple[float, float] = DEFAULT_HTTP_TIMEOUT
+        self._logger = logging.getLogger(__name__)
+        self._wait_strategy = _RetryAfterWait(backoff_factor=self._retry_backoff)
+
+    def clone_with_headers(self, headers: Mapping[str, str]) -> "TenacitySession":
+        clone = TenacitySession(
+            retry_total=self._retry_total,
+            retry_backoff=self._retry_backoff,
+            status_forcelist=tuple(self._status_forcelist),
+            allowed_methods=tuple(self._allowed_methods),
+        )
+        clone._default_timeout = self._default_timeout
+        clone.headers.update(self.headers)
+        for key, value in headers.items():
+            if value is not None:
+                clone.headers[str(key)] = str(value)
+        return clone
+
+    def request(self, method: str, url: str, **kwargs):
+        timeout = kwargs.get("timeout", self._default_timeout)
+        kwargs["timeout"] = normalize_http_timeout(timeout)
+
+        if self._retry_total <= 0 or method.upper() not in self._allowed_methods:
+            return super().request(method, url, **kwargs)
+
+        retrying = self._build_retrying(method)
+
+        def _send():
+            response = super().request(method, url, **kwargs)
+            return response
+
+        return retrying(_send)
+
+    def _build_retrying(self, method: str) -> Retrying:
+        retry_predicate = retry_if_exception_type(self._retryable_exceptions)
+        if self._status_forcelist:
+            retry_predicate = retry_predicate | retry_if_result(
+                lambda response: isinstance(response, requests.Response)
+                and response.status_code in self._status_forcelist
+            )
+
+        return Retrying(
+            retry=retry_predicate,
+            wait=self._wait_strategy,
+            stop=stop_after_attempt(self._retry_total + 1),
+            sleep=time.sleep,
+            reraise=True,
+            before_sleep=self._before_sleep,
+        )
+
+    def _before_sleep(self, retry_state) -> None:
+        outcome = retry_state.outcome
+        if outcome is not None and not outcome.failed:
+            response = outcome.result()
+            if isinstance(response, requests.Response):
+                with suppress(Exception):
+                    response.close()
+
+        if not self._logger.isEnabledFor(logging.DEBUG):
+            return
+
+        delay = 0.0
+        if retry_state.next_action is not None and retry_state.next_action.sleep is not None:
+            with suppress(TypeError, ValueError):
+                delay = max(float(retry_state.next_action.sleep), 0.0)
+
+        exc = outcome.exception() if outcome is not None and outcome.failed else None
+        extra = {
+            "extra_fields": {
+                "attempt": retry_state.attempt_number,
+                "delay": round(delay, 3),
+                "exception": repr(exc) if exc is not None else None,
+            }
+        }
+        self._logger.debug("DocParsing HTTP retry", extra=extra)
 
 def normalize_http_timeout(timeout: Optional[object]) -> Tuple[float, float]:
     """Normalize timeout inputs into a ``(connect, read)`` tuple of floats."""
@@ -70,6 +200,28 @@ def normalize_http_timeout(timeout: Optional[object]) -> Tuple[float, float]:
     raise TypeError(f"Unsupported timeout type: {type(timeout)!r}")
 
 
+def _parse_retry_after_header(value: Optional[str]) -> Optional[float]:
+    if not value:
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    try:
+        seconds = float(candidate)
+    except ValueError:
+        try:
+            retry_time = parsedate_to_datetime(candidate)
+        except (TypeError, ValueError, IndexError):
+            return None
+        if retry_time is None:
+            return None
+        if retry_time.tzinfo is None:
+            retry_time = retry_time.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        seconds = (retry_time - now).total_seconds()
+    return max(float(seconds), 0.0)
+
+
 def get_http_session(
     *,
     timeout: Optional[object] = None,
@@ -86,66 +238,33 @@ def get_http_session(
     with _HTTP_SESSION_LOCK:
         global _HTTP_SESSION, _HTTP_SESSION_TIMEOUT
         if _HTTP_SESSION is None:
-            session = requests.Session()
-            retry = Retry(
-                total=retry_total,
-                read=retry_total,
-                connect=retry_total,
-                backoff_factor=retry_backoff,
-                status_forcelist=tuple(int(code) for code in status_forcelist),
-                allowed_methods=frozenset(method.upper() for method in allowed_methods),
-                raise_on_status=False,
+            _HTTP_SESSION = TenacitySession(
+                retry_total=retry_total,
+                retry_backoff=retry_backoff,
+                status_forcelist=status_forcelist,
+                allowed_methods=allowed_methods,
             )
-            adapter = HTTPAdapter(max_retries=retry)
-            session.mount("http://", adapter)
-            session.mount("https://", adapter)
-            _HTTP_SESSION = session
             logging.getLogger(__name__).debug(
-                "Created shared HTTP session",
+                "Created Tenacity-backed DocParsing HTTP session",
                 extra={
                     "extra_fields": {
                         "retry_total": retry_total,
-                        "status_forcelist": list(status_forcelist),
+                        "retry_backoff": retry_backoff,
+                        "status_forcelist": [int(code) for code in status_forcelist],
                         "allowed_methods": [method.upper() for method in allowed_methods],
                     }
                 },
             )
 
-        session_to_return = _HTTP_SESSION
+        session: TenacitySession = _HTTP_SESSION
+        session._default_timeout = effective_timeout
+
         if base_headers:
-            session_to_return = _clone_http_session(_HTTP_SESSION)
-            session_to_return.headers.update(
-                {key: value for key, value in base_headers.items() if value is not None}
-            )
+            header_map = {str(key): str(value) for key, value in base_headers.items() if value is not None}
+            session_to_return: TenacitySession = session.clone_with_headers(header_map)
+            session_to_return._default_timeout = effective_timeout
+        else:
+            session_to_return = session
 
         _HTTP_SESSION_TIMEOUT = effective_timeout
         return session_to_return, _HTTP_SESSION_TIMEOUT
-
-
-def _clone_http_session(session: requests.Session) -> requests.Session:
-    """Create a shallow copy of a :class:`requests.Session` for transient headers."""
-
-    clone = requests.Session()
-
-    # Preserve base configuration while isolating header mutations and mutable containers.
-    clone.headers.clear()
-    clone.headers.update(session.headers)
-    clone.auth = session.auth
-    clone.cookies = session.cookies.copy()
-    clone.params = session.params.copy()
-    clone.proxies = session.proxies.copy()
-    clone.verify = session.verify
-    clone.cert = session.cert
-    clone.trust_env = session.trust_env
-    clone.max_redirects = session.max_redirects
-    clone.stream = session.stream
-
-    clone.hooks.clear()
-    for event, hooks in session.hooks.items():
-        clone.hooks[event] = hooks[:]
-
-    clone.adapters.clear()
-    for prefix, adapter in session.adapters.items():
-        clone.mount(prefix, adapter)
-
-    return clone

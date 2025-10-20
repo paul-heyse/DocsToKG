@@ -12,6 +12,17 @@ Perfect—here’s a **repo-shaped, agent-ready implementation plan** to introdu
 
 ---
 
+## Implementation Notes
+
+- `src/DocsToKG/ContentDownload/ratelimit.py` now owns the limiter runtime: `LimiterManager`, `RateLimitedTransport`, policy cloning/validation, backend factories, and telemetry helpers. `networking.request_with_retries` delegates role selection (`request.extensions["role"]`) and Tenacity treats `RateLimitError` as non-retryable.
+- `httpx_transport._create_client_unlocked()` wraps the inner `HTTPTransport` with `RateLimitedTransport` before handing it to Hishel’s `CacheTransport`, so cache hits never acquire tokens. The stack is persisted for both real transports and test transports (`httpx.MockTransport`).
+- CLI surfaces `--rate`, `--rate-mode`, `--rate-max-delay`, `--rate-backend`, and `--rate-disable`. Environment variables (`DOCSTOKG_RATE*`, `DOCSTOKG_RATE_DISABLED`) mirror these switches for automation. Legacy throttling flags are translated into artifact role policies and emit warnings.
+- Telemetry: `docs_network_meta.rate_limiter_*` accompanies each attempt, manifest metrics include acquire/block counters, `summary.emit_console_summary` reports per-host waits/blocks, and `DownloadRun` logs the resolved backend/policy table during startup.
+- Default policies were normalised (`Rate(2/sec), Rate(120/min)` for artifacts, etc.) to satisfy `pyrate_limiter.utils.validate_rate_list`. Backends ship with in-memory defaults, while SQLite/Redis/Postgres initialisers surface friendly errors when optional dependencies are missing.
+- Test coverage includes cache-hit bypass (`only-if-cached` flows), multi-window waits, role-specific wait budgets across sync/streaming paths, CLI override/parsing (including the rollback switch), legacy flag mappings, and backend smoke tests. Redis/Postgres tests are guarded by env flags to avoid accidental network requirements.
+
+---
+
 ## A. Where the limiter lives (module boundaries)
 
 ### 1) `src/DocsToKG/ContentDownload/networking.py` (the canonical hub)
@@ -222,6 +233,17 @@ When blocking is disallowed or time budget exceeded:
      * Prove multi-window limits enforce both windows.
      * Prove max_delay behavior (short vs. long) for metadata vs. artifact.
      * Prove limiter exceptions are **not** retried by Tenacity, but 429/`Retry-After` is.
+
+---
+
+## Implementation snapshot (2025-03-18)
+
+* `src/DocsToKG/ContentDownload/ratelimit.py` owns `RolePolicy`, `LimiterManager`, and the `RateLimitedTransport`; limiter instances are cached per `(host, role)` and the transport always sits beneath Hishel to avoid charging cache hits.
+* `src/DocsToKG/ContentDownload/httpx_transport._create_client_unlocked` wraps the shared `HTTPTransport` in `RateLimitedTransport` before handing it to `CacheTransport`, so every HTTP client that comes out of `get_http_client()` is centrally throttled.
+* CLI and env overrides are parsed in `src/DocsToKG/ContentDownload/args.resolve_config()`, which clone base policies, merge `--rate*` / `DOCSTOKG_RATE*` inputs, translate legacy `--domain-token-bucket` / `--domain-min-interval` flags, and surface the active `rate_policies` + `rate_backend` on `ResolvedConfig`. `DownloadRun.run()` logs the policy table on startup.
+* Telemetry surfaces limiter fields end-to-end: `telemetry.RunTelemetry` and `AttemptRecord` include `rate_limiter_*` metadata, `summary.emit_console_summary()` and `statistics.DownloadStatistics` aggregate acquire/wait/block counters, and manifests (`manifest.metrics.json`) expose backend/role snapshots.
+* Tests covering the contract live in `tests/content_download/test_httpx_networking.py` (cache hits), `test_rate_control.py` (multi-window, role delays, backend smoke), and `test_args_config.py` (CLI overrides, legacy flag mapping, startup logging). Use them as regression guides when tuning policies.
+* Operations runbooks highlight backend selection and migration toggles (`--rate-disable` / `DOCSTOKG_RATE_DISABLED`). Default backend remains in-memory; use SQLite for shared runners, `multiprocess` for forked workers, or Redis/Postgres when a distributed store is required.
 
 ---
 

@@ -33,6 +33,12 @@ Dependencies:
 All helpers are safe to import in multiprocessing contexts and avoid heavy
 third-party dependencies beyond the standard library.
 
+The package previously exposed thin wrappers such as ``core.doctags()`` and
+``core.embed()`` for direct CLI invocation. Those helpers have been removed as
+part of the Typer migration—callers should now import
+``DocsToKG.DocParsing.core.cli`` and execute the ``Typer`` application (or the
+private ``_execute_*`` helpers) instead.
+
 ## 2. Functions
 
 ### `_ensure_str_sequence(value, label)`
@@ -188,106 +194,6 @@ if the current method is ``spawn``. If not, it emits a warning about the
 potential CUDA safety risk, logging the current method so callers understand
 the degraded safety state.
 
-### `_run_chunk(argv)`
-
-Execute the Docling chunker subcommand.
-
-### `_run_embed(argv)`
-
-Execute the embedding pipeline subcommand.
-
-### `_run_token_profiles(argv)`
-
-Execute the tokenizer profiling subcommand.
-
-### `_run_plan(argv)`
-
-Display the doctags → chunk → embed plan without executing.
-
-### `_run_manifest(argv)`
-
-Inspect pipeline manifest artifacts via CLI.
-
-### `_build_doctags_parser(prog)`
-
-Create an :mod:`argparse` parser configured for DocTags conversion.
-
-### `_scan_pdf_html(input_dir)`
-
-Return booleans indicating whether PDFs or HTML files exist beneath ``input_dir``.
-
-### `_directory_contains_suffixes(directory, suffixes)`
-
-Return True when ``directory`` contains at least one file ending with ``suffixes``.
-
-### `_detect_mode(input_dir)`
-
-Infer conversion mode based on the contents of ``input_dir``.
-
-### `_merge_args(parser, overrides)`
-
-Merge override values into the default parser namespace.
-
-### `_run_doctags(argv)`
-
-Execute the DocTags conversion subcommand.
-
-### `_preview_list(items, limit)`
-
-Return a truncated preview list with remainder hint.
-
-### `_plan_doctags(argv)`
-
-Compute which DocTags inputs would be processed.
-
-### `_plan_chunk(argv)`
-
-Compute which DocTags files the chunk stage would touch.
-
-### `_plan_embed(argv)`
-
-Compute which chunk files the embed stage would process or validate.
-
-### `_display_plan(plans)`
-
-Pretty-print plan summaries to stdout.
-
-### `_run_all(argv)`
-
-Execute DocTags conversion, chunking, and embedding sequentially.
-
-### `main(argv)`
-
-Dispatch to one of the DocParsing subcommands.
-
-### `run_all(argv)`
-
-Public wrapper for the ``all`` subcommand.
-
-### `chunk(argv)`
-
-Public wrapper for the ``chunk`` subcommand.
-
-### `embed(argv)`
-
-Public wrapper for the ``embed`` subcommand.
-
-### `doctags(argv)`
-
-Public wrapper for the ``doctags`` subcommand.
-
-### `token_profiles(argv)`
-
-Public wrapper for the ``token-profiles`` subcommand.
-
-### `plan(argv)`
-
-Public wrapper for the ``plan`` subcommand.
-
-### `manifest(argv)`
-
-Public wrapper for the ``manifest`` subcommand.
-
 ### `_coerce_pair(values)`
 
 Coerce timeout sequences to ``(connect, read)`` floats.
@@ -369,7 +275,3 @@ length-aware batching policies.
 Examples:
 >>> list(Batcher([1, 2, 3, 4, 5], 2))
 [[1, 2], [3, 4], [5]]
-
-### `_Command`
-
-Callable wrapper storing handler metadata for subcommands.

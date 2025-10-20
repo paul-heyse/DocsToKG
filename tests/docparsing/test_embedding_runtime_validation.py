@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from DocsToKG.DocParsing.core import cli as core_cli
+from typer.testing import CliRunner
 
 
 def _get_runtime():
@@ -104,6 +105,7 @@ def test_docparse_embed_missing_chunks_warns_and_exits(tmp_path, patcher, vector
     splade_dir.mkdir(parents=True)
 
     missing_chunks = data_root / "ChunkedDocTagFiles" / "missing"
+    missing_chunks.mkdir(parents=True)
     vectors_dir = data_root / "Embeddings"
 
     patcher.setattr(runtime, "ensure_model_environment", lambda: (model_root, model_root))
@@ -144,18 +146,21 @@ def test_docparse_embed_missing_chunks_warns_and_exits(tmp_path, patcher, vector
 
     patcher.setattr(runtime, "log_event", fake_log_event)
 
-    args = [
-            "--data-root",
-            str(data_root),
-            "--chunks-dir",
-            str(missing_chunks),
-            "--out-dir",
-            str(vectors_dir),
-        ]
+    cli_args = [
+        "embed",
+        "--data-root",
+        str(data_root),
+        "--chunks-dir",
+        str(missing_chunks),
+        "--out-dir",
+        str(vectors_dir),
+    ]
     if vector_format != "jsonl":
-        args.extend(["--format", vector_format])
+        cli_args.extend(["--format", vector_format])
 
-    exit_code = core_cli._run_stage(core_cli.embed, args)
+    runner = CliRunner()
+    result = runner.invoke(core_cli.app, cli_args)
+    exit_code = result.exit_code
 
     assert exit_code == 0
     warning_fields = [fields for _, message, fields in events if message == "No chunk files found"]

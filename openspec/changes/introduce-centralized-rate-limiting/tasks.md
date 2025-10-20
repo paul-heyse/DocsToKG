@@ -52,21 +52,21 @@
 - [x] 3.5 Add structured logging (`LOGGER.info("rate-policy", …)`) during startup showing resolved policies and `LOGGER.debug("rate-acquire", …)` for each limiter acquisition when debug logging is enabled.
 
 ## 4. Testing
-- [ ] 4.1 Add unit tests that simulate cache hits versus misses and assert that only misses consume limiter tokens.
-- [ ] 4.2 Add tests for multi-window behaviour by configuring two rates, issuing bursts that violate the fast window but respect the slow window, and asserting waits/blocks match expectations.
-- [ ] 4.3 Test per-role `max_delay_ms` differences by forcing congestion and verifying metadata requests raise quickly while artifact requests wait within allowance; include both sync and streaming (`client.stream`) calls.
+- [x] 4.1 Add unit tests that simulate cache hits versus misses and assert that only misses consume limiter tokens.
+- [x] 4.2 Add tests for multi-window behaviour by configuring two rates, issuing bursts that violate the fast window but respect the slow window, and asserting waits/blocks match expectations.
+- [x] 4.3 Test per-role `max_delay_ms` differences by forcing congestion and verifying metadata requests raise quickly while artifact requests wait within allowance; include both sync and streaming (`client.stream`) calls.
 - [x] 4.4 Verify Tenacity does not retry limiter exceptions yet still honours server `Retry-After` by simulating both cases inside `request_with_retries` tests.
-- [ ] 4.5 Add integration tests or contract tests that confirm CLI overrides (rates, backend, mode) alter runtime behaviour and startup logging (e.g., using click runner or argparse harness).
-- [ ] 4.6 Provide regression tests covering legacy throttling flags to confirm their new mappings produce equivalent or explicitly documented behaviour.
-- [ ] 4.7 Add smoke tests ensuring `RateLimitedTransport` can be constructed with each backend type (skip redis/postgres tests when dependencies unavailable, but guard with feature flags).
+- [x] 4.5 Add integration tests or contract tests that confirm CLI overrides (rates, backend, mode) alter runtime behaviour and startup logging (e.g., using click runner or argparse harness).
+- [x] 4.6 Provide regression tests covering legacy throttling flags to confirm their new mappings produce equivalent or explicitly documented behaviour.
+- [x] 4.7 Add smoke tests ensuring `RateLimitedTransport` can be constructed with each backend type (skip redis/postgres tests when dependencies unavailable, but guard with feature flags).
 
 ## 5. Documentation
-- [ ] 5.1 Update `src/DocsToKG/ContentDownload/README.md` networking/politeness sections with the new rate-limiter architecture, configuration flags, telemetry, and migration notes from deprecated options.
-- [ ] 5.2 Add docstrings and inline comments explaining RatePolicy roles, limiter caching, and transport layering so future contributors understand why the limiter sits beneath Hishel.
-- [ ] 5.3 Extend internal runbooks or operations docs to include guidance on choosing backends (memory vs redis vs sqlite) and tuning rates per provider.
-- [ ] 5.4 Update `docs-instruct/DO NOT DELETE - Refactor review/ContentDownload/ContentDownload_pyrate-limiter.md` with implementation notes once complete (if that document remains source of truth).
+- [x] 5.1 Update `src/DocsToKG/ContentDownload/README.md` networking/politeness sections with the new rate-limiter architecture, configuration flags, telemetry, and migration notes from deprecated options.
+- [x] 5.2 Add docstrings and inline comments explaining RatePolicy roles, limiter caching, and transport layering so future contributors understand why the limiter sits beneath Hishel.
+- [x] 5.3 Extend internal runbooks or operations docs to include guidance on choosing backends (memory vs redis vs sqlite) and tuning rates per provider.
+- [x] 5.4 Update `docs-instruct/DO NOT DELETE - Refactor review/ContentDownload/ContentDownload_pyrate-limiter.md` with implementation notes once complete (if that document remains source of truth).
 
 ## 6. Migration & Rollout
-- [ ] 6.1 Provide a migration checklist to clean up existing run configurations (remove manual sleeps, update CLI invocations) and circulate to operational owners.
-- [ ] 6.2 Stage the change behind a feature flag or config toggle, if needed, so pilot runs can compare old vs new limiter behaviour before full cutover.
-- [ ] 6.3 Monitor early runs for unexpected limiter blocks or 429s, and tune default policies accordingly before declaring the migration complete.
+- [x] 6.1 Provide a migration checklist to clean up existing run configurations (remove manual sleeps, update CLI invocations) and circulate to operational owners.
+- [x] 6.2 Stage the change behind a feature flag or config toggle, if needed, so pilot runs can compare old vs new limiter behaviour before full cutover.
+- [x] 6.3 Monitor early runs for unexpected limiter blocks or 429s, and tune default policies accordingly before declaring the migration complete.

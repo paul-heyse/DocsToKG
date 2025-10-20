@@ -46,7 +46,16 @@ class ProviderContext:
 
         if self.telemetry_emitter is None:
             return
-        payload = dict(self.telemetry_tags)
+        payload = {
+            "device": self.device,
+            "dtype": self.dtype,
+            "batch_hint": self.batch_hint,
+            "max_concurrency": self.max_concurrency,
+            "normalize_l2": self.normalize_l2,
+            "offline": self.offline,
+            "cache_dir": str(self.cache_dir) if self.cache_dir else None,
+        }
+        payload.update(self.telemetry_tags)
         payload.update(data)
         event = ProviderTelemetryEvent(provider=provider, phase=phase, data=payload)
         self.telemetry_emitter(event)

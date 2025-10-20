@@ -128,3 +128,13 @@ class CancellationTokenGroup:
         """Return the number of tokens in this group."""
         with self._lock:
             return len(self._tokens)
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.cancellation",
+#   "purpose": "Provide cooperative cancellation tokens shared by planners, resolvers, and validators",
+#   "sections": [
+#     {"id": "token", "name": "CancellationToken", "anchor": "TOK", "kind": "api"},
+#     {"id": "group", "name": "CancellationTokenGroup", "anchor": "GRP", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===

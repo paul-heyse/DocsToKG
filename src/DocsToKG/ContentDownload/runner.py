@@ -831,12 +831,12 @@ class DownloadRun:
         finally:
             self.close()
 
-    return RunResult(
-        run_id=self.resolved.run_id,
-        processed=state.processed if state else 0,
-        saved=state.saved if state else 0,
-        html_only=state.html_only if state else 0,
-        xml_only=state.xml_only if state else 0,
+        return RunResult(
+            run_id=self.resolved.run_id,
+            processed=state.processed if state else 0,
+            saved=state.saved if state else 0,
+            html_only=state.html_only if state else 0,
+            xml_only=state.xml_only if state else 0,
             skipped=state.skipped if state else 0,
             worker_failures=state.worker_failures if state else 0,
             bytes_downloaded=state.downloaded_bytes if state else 0,
@@ -845,26 +845,6 @@ class DownloadRun:
         )
 
 
-def _calculate_equal_jitter_delay(
-    attempt: int,
-    *,
-    backoff_factor: float,
-    backoff_max: float,
-) -> float:
-    """Return an exponential backoff delay using equal jitter."""
-
-    if backoff_factor <= 0 or attempt < 0:
-        return 0.0
-
-    base_delay = backoff_factor * (2**attempt)
-    if base_delay <= 0:
-        return 0.0
-
-    capped_base = min(base_delay, backoff_max)
-    if capped_base <= 0:
-        return 0.0
-
-    half = capped_base / 2.0
 def iterate_openalex(
     query: Works,
     per_page: int,
@@ -931,7 +911,7 @@ def iterate_openalex(
     retrieved = 0
     while True:
         try:
-            page = retrying.call(next, pager_iter)
+            page = retrying(lambda: next(pager_iter))
         except StopIteration:
             break
         except _OPENALEX_RETRYABLE_EXCEPTIONS as exc:

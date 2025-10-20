@@ -104,3 +104,13 @@ def iter_manifest_exports() -> Iterable[ExportSpec]:
     for spec in EXPORTS:
         if spec.include_in_manifest:
             yield spec
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.exports",
+#   "purpose": "Catalogue and expose the public API surface for the ontology downloader",
+#   "sections": [
+#     {"id": "spec", "name": "ExportSpec dataclass", "anchor": "SPEC", "kind": "api"},
+#     {"id": "manifest", "name": "Export Manifest", "anchor": "MAN", "kind": "constants"}
+#   ]
+# }
+# === /NAVMAP ===

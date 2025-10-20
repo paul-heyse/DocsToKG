@@ -42,3 +42,12 @@ def migrate_manifest(payload: Mapping[str, Any]) -> Dict[str, Any]:
         extra={"stage": "manifest", "schema_version": version},
     )
     return upgraded
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.migrations",
+#   "purpose": "Upgrade historic ontology manifests to the current schema version",
+#   "sections": [
+#     {"id": "helpers", "name": "Migration Helpers", "anchor": "MIG", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===

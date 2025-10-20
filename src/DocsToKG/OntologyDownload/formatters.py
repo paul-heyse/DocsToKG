@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
-from .planning import FetchResult, PlannedFetch
 from .io import format_bytes
+from .planning import FetchResult, PlannedFetch
 
 PlanRow = Tuple[str, str, str, str, str, str, str, str]
 
@@ -171,3 +171,15 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
                 message = ", ".join(f"{key}={value}" for key, value in details.items())
         formatted.append((name, status, message))
     return format_table(VALIDATION_TABLE_HEADERS, formatted)
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.formatters",
+#   "purpose": "Turn planning, download, and validation results into reusable table renderings",
+#   "sections": [
+#     {"id": "schema", "name": "Table Schemas", "anchor": "SCH", "kind": "constants"},
+#     {"id": "plan", "name": "Plan Row Formatting", "anchor": "PLN", "kind": "helpers"},
+#     {"id": "results", "name": "Download Result Formatting", "anchor": "RES", "kind": "helpers"},
+#     {"id": "validation", "name": "Validation Summary Formatting", "anchor": "VAL", "kind": "helpers"}
+#   ]
+# }
+# === /NAVMAP ===

@@ -101,36 +101,23 @@ if __name__ == "__main__" and __package__ is None:
         sys.path.insert(0, str(package_root))
 
 import argparse
-import atexit
 import hashlib
+import threading
 import json
 import logging
 import math
 import os
-import queue
 import re
 import statistics
-import threading
 import time
 import tracemalloc
 import unicodedata
 import uuid
-from collections import Counter, OrderedDict
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import fields
 from types import SimpleNamespace
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-)
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 # Third-party imports
 try:
@@ -202,18 +189,18 @@ from DocsToKG.DocParsing.core import (
 )
 from DocsToKG.DocParsing.embedding.backends import (
     ProviderBundle,
+    ProviderContext,
     ProviderError,
     ProviderFactory,
     ProviderIdentity,
+    ProviderTelemetryEvent,
 )
 from DocsToKG.DocParsing.env import (
     data_chunks,
     data_vectors,
     detect_data_root,
     ensure_model_environment,
-    ensure_qwen_dependencies,
     ensure_qwen_environment,
-    ensure_splade_dependencies,
     ensure_splade_environment,
     expand_path,
     prepare_data_root,
@@ -314,6 +301,108 @@ def _build_vector_row(**kwargs):
     return VectorRow(**kwargs)
 
 
+def flush_llm_cache() -> None:
+    """Compatibility shim delegating to the Qwen provider cache flush."""
+
+    from DocsToKG.DocParsing.embedding.backends.dense.qwen_vllm import flush_llm_cache as _flush
+
+    _flush()
+
+
+def close_all_qwen() -> None:
+    """Compatibility shim equivalent to :func:`flush_llm_cache`."""
+
+    flush_llm_cache()
+
+
+def _ensure_splade_dependencies() -> None:
+    """Compatibility shim retained for legacy callers (providers handle this)."""
+
+
+def _ensure_qwen_dependencies() -> None:
+    """Compatibility shim retained for legacy callers (providers handle this)."""
+
+
+def splade_encode(
+    cfg: SpladeCfg, texts: List[str], batch_size: Optional[int] = None
+) -> Tuple[List[List[str]], List[List[float]]]:
+    """Backward-compatible SPLADE encoder wrapper using provider abstractions."""
+
+    from DocsToKG.DocParsing.embedding.backends.sparse.splade_st import (
+        SpladeSTConfig,
+        SpladeSTProvider,
+    )
+
+    provider = SpladeSTProvider(
+        SpladeSTConfig(
+            model_dir=cfg.model_dir,
+            device=cfg.device,
+            batch_size=batch_size or cfg.batch_size,
+            cache_folder=cfg.cache_folder,
+            max_active_dims=cfg.max_active_dims,
+            attn_impl=cfg.attn_impl,
+            local_files_only=cfg.local_files_only,
+        )
+    )
+    context = ProviderContext(
+        device=cfg.device,
+        batch_hint=batch_size or cfg.batch_size,
+        cache_dir=cfg.cache_folder,
+        offline=cfg.local_files_only,
+    )
+    provider.open(context)
+    try:
+        encoded = provider.encode(texts)
+        token_lists: List[List[str]] = []
+        weight_lists: List[List[float]] = []
+        for row in encoded:
+            tokens = [str(token) for token, _weight in row]
+            weights = [float(weight) for _token, weight in row]
+            token_lists.append(tokens)
+            weight_lists.append(weights)
+        return token_lists, weight_lists
+    finally:
+        provider.close()
+
+
+def qwen_embed(
+    cfg: QwenCfg, texts: List[str], batch_size: Optional[int] = None
+) -> List[List[float]]:
+    """Backward-compatible Qwen embedding wrapper using provider abstractions."""
+
+    from DocsToKG.DocParsing.embedding.backends.dense.qwen_vllm import (
+        QwenVLLMConfig,
+        QwenVLLMProvider,
+    )
+
+    provider = QwenVLLMProvider(
+        QwenVLLMConfig(
+            model_dir=cfg.model_dir,
+            model_id=None,
+            dtype=cfg.dtype,
+            tensor_parallelism=cfg.tp,
+            gpu_memory_utilization=getattr(cfg, "gpu_mem_util", 0.60),
+            batch_size=batch_size or cfg.batch_size,
+            quantization=cfg.quantization,
+            dimension=cfg.dim,
+            cache_enabled=bool(getattr(cfg, "cache_enabled", True)),
+            queue_depth=max(1, batch_size or cfg.batch_size),
+        )
+    )
+    context = ProviderContext(
+        device="auto",
+        dtype=cfg.dtype,
+        batch_hint=batch_size or cfg.batch_size,
+        normalize_l2=True,
+    )
+    provider.open(context)
+    try:
+        vectors = provider.embed(texts, batch_hint=batch_size or cfg.batch_size)
+        return [[float(value) for value in vector] for vector in vectors]
+    finally:
+        provider.close()
+
+
 # --- Globals ---
 
 EMBED_STAGE = "embedding"
@@ -335,183 +424,16 @@ __all__ = (
     "process_chunk_file_vectors",
     "process_pass_a",
     "qwen_embed",
-    "QwenEmbeddingQueue",
     "splade_encode",
     "tokens",
     "write_vectors",
     "flush_llm_cache",
     "close_all_qwen",
-    "_QWEN_LLM_CACHE",
-    "_get_sparse_encoder_cls",
-    "_get_vllm_components",
-    "_qwen_cache_key",
-    "LLM",
 )
 
 
 # --- Public Functions ---
 
-if TYPE_CHECKING:  # pragma: no cover - type checking only
-    from sentence_transformers import SparseEncoder  # type: ignore
-
-    from vllm import LLM, PoolingParams
-else:  # pragma: no cover - runtime fallback when optional deps absent
-    SparseEncoder = Any  # type: ignore[assignment]
-    LLM = Any  # type: ignore[assignment]
-    PoolingParams = Any  # type: ignore[assignment]
-
-
-_SPARSE_ENCODER_CLS: type | None = None
-_VLLM_COMPONENTS: Tuple[type, type] | None = None
-
-
-def _get_sparse_encoder_cls() -> type:
-    """Import and cache the sentence-transformers SparseEncoder class."""
-
-    global _SPARSE_ENCODER_CLS
-    if _SPARSE_ENCODER_CLS is not None:
-        return _SPARSE_ENCODER_CLS
-    ensure_splade_dependencies()
-    try:
-        from sentence_transformers import SparseEncoder as cls  # type: ignore
-    except ImportError as exc:  # pragma: no cover - optional dependency missing
-        raise RuntimeError(
-            "sentence-transformers is required for SPLADE embeddings. "
-            "Install it with `pip install sentence-transformers`."
-        ) from exc
-    _SPARSE_ENCODER_CLS = cls
-    return cls
-
-
-def _get_vllm_components() -> Tuple[type, type]:
-    """Import and cache vLLM components used by the embedding runtime."""
-
-    global _VLLM_COMPONENTS
-    if _VLLM_COMPONENTS is not None:
-        return _VLLM_COMPONENTS
-    ensure_qwen_dependencies()
-    try:
-        from vllm import LLM as llm_cls  # type: ignore
-        from vllm import PoolingParams as pooling_cls
-    except ImportError as exc:  # pragma: no cover - optional dependency missing
-        raise RuntimeError(
-            "vLLM is required for Qwen embeddings. Install it with `pip install vllm`."
-        ) from exc
-    _VLLM_COMPONENTS = (llm_cls, pooling_cls)
-    return _VLLM_COMPONENTS
-
-
-def _shutdown_llm_instance(llm) -> None:
-    """Best-effort shutdown for a cached Qwen LLM instance."""
-
-    try:
-        engine = getattr(llm, "llm_engine", None) or getattr(llm, "engine", None)
-        if engine and hasattr(engine, "shutdown"):
-            engine.shutdown()
-    except Exception:  # pragma: no cover - defensive cleanup
-        pass
-    try:
-        if hasattr(llm, "shutdown"):
-            llm.shutdown()  # type: ignore[call-arg]
-    except Exception:  # pragma: no cover - defensive cleanup
-        pass
-
-
-class _LRUCache:
-    """Simple LRU cache that automatically closes evicted entries."""
-
-    def __init__(
-        self,
-        maxsize: int = 2,
-        closer: Optional[Callable[[Any], None]] = None,
-    ) -> None:
-        """Seed the cache configuration and underlying storage."""
-
-        self.maxsize = max(1, maxsize)
-        self._closer = closer
-        self._store: OrderedDict[Any, Any] = OrderedDict()
-
-    def get(self, key: Any) -> Any:
-        """Return the cached value for ``key`` or ``None`` when absent."""
-
-        try:
-            value = self._store[key]
-        except KeyError:
-            return None
-        self._store.move_to_end(key)
-        return value
-
-    def put(self, key: Any, value: Any) -> None:
-        """Insert ``value`` for ``key`` and evict least-recently-used entries."""
-
-        self._store[key] = value
-        self._store.move_to_end(key)
-        self._evict_if_needed()
-
-    def clear(self) -> None:
-        """Discard all cached values, invoking the closer for each."""
-
-        for _, value in list(self._store.items()):
-            self._close(value)
-        self._store.clear()
-
-    def items(self) -> List[Tuple[Any, Any]]:
-        """Return a snapshot of ``(key, value)`` pairs ordered by recency."""
-
-        return list(self._store.items())
-
-    def values(self) -> List[Any]:
-        """Return cached values ordered from least to most recently used."""
-
-        return list(self._store.values())
-
-    def _evict_if_needed(self) -> None:
-        """Trim the cache to the configured size, closing evicted entries."""
-
-        while len(self._store) > self.maxsize:
-            _, value = self._store.popitem(last=False)
-            self._close(value)
-
-    def _close(self, value: Any) -> None:
-        """Invoke the configured closer for ``value`` while swallowing errors."""
-
-        if self._closer is None:
-            return
-        try:
-            self._closer(value)
-        except Exception:  # pragma: no cover - defensive cleanup
-            pass
-
-
-_QWEN_LLM_CACHE = _LRUCache(maxsize=2, closer=_shutdown_llm_instance)
-
-
-def flush_llm_cache() -> None:
-    """Explicitly clear the cached Qwen LLM instances."""
-
-    _QWEN_LLM_CACHE.clear()
-
-
-def close_all_qwen() -> None:
-    """Release all cached Qwen LLM instances."""
-
-    flush_llm_cache()
-
-
-atexit.register(close_all_qwen)
-
-
-def _qwen_cache_key(cfg: QwenCfg) -> Tuple[str, str, int, float, str | None]:
-    """Return cache key tuple for Qwen LLM instances."""
-
-    quant = cfg.quantization if cfg.quantization else None
-    return (
-        str(cfg.model_dir),
-        cfg.dtype,
-        int(cfg.tp),
-        float(cfg.gpu_mem_util),
-        quant,
-    )
 
 
 # --- Cache Utilities ---
@@ -601,18 +523,6 @@ def _percentile(data: Sequence[float], pct: float) -> float:
 
 
 MANIFEST_STAGE = "embeddings"
-
-
-def _ensure_splade_dependencies() -> None:
-    """Backward-compatible shim that delegates to core.ensure_splade_dependencies."""
-
-    _get_sparse_encoder_cls()
-
-
-def _ensure_qwen_dependencies() -> None:
-    """Backward-compatible shim that delegates to core.ensure_qwen_dependencies."""
-
-    _get_vllm_components()
 
 
 # --- BM25 Tokenizer ---
@@ -803,139 +713,6 @@ def bm25_vector(
     return terms, weights
 
 
-# --- SPLADE-v3 (GPU) ---
-
-
-def splade_encode(
-    cfg: SpladeCfg, texts: List[str], batch_size: Optional[int] = None
-) -> Tuple[List[List[str]], List[List[float]]]:
-    """Encode text with SPLADE to obtain sparse lexical vectors.
-
-    Args:
-        cfg: SPLADE configuration describing device, batch size, and cache.
-        texts: Batch of input strings to encode.
-        batch_size: Optional override for the encoding batch size.
-
-    Returns:
-        Tuple of token lists and weight lists aligned per input text.
-    """
-    effective_batch = batch_size or cfg.batch_size
-    enc = _get_splade_encoder(cfg)
-    token_lists, weight_lists = [], []
-    for i in range(0, len(texts), effective_batch):
-        batch = texts[i : i + effective_batch]
-        # returns a torch.sparse tensor (rows = batch)
-        s = enc.encode(batch)  # shape: (B, |vocab|)
-        for r in range(s.shape[0]):
-            # decode all non-zeros for this row
-            # decodes to list[(token, weight)] sorted by weight
-            nnz = s[r].coalesce().values().numel()
-            decoded = enc.decode(s[r], top_k=int(nnz))
-            toks, wts = zip(*decoded) if decoded else ([], [])
-            token_lists.append(list(toks))
-            weight_lists.append([float(w) for w in wts])
-    return token_lists, weight_lists
-
-
-_SPLADE_ENCODER_CACHE: Dict[Tuple[str, str, Optional[str], Optional[int]], SparseEncoder] = {}
-_SPLADE_ENCODER_BACKENDS: Dict[Tuple[str, str, Optional[str], Optional[int]], str] = {}
-
-
-def _detect_splade_backend(encoder: SparseEncoder, requested: str | None) -> str:
-    """Best-effort detection of the attention backend used by SPLADE."""
-
-    candidates = (
-        ("model", "model", "config", "attn_implementation"),
-        ("model", "config", "attn_implementation"),
-        ("config", "attn_implementation"),
-        ("model", "model", "attn_implementation"),
-    )
-    for path in candidates:
-        value = encoder
-        for attr in path:
-            value = getattr(value, attr, None)
-            if value is None:
-                break
-        else:
-            if isinstance(value, str) and value:
-                return value
-
-    if requested in {"sdpa", "eager", "flash_attention_2"}:
-        return requested
-    return "auto" if requested is None else requested
-
-
-def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
-    """Retrieve (or create) a cached SPLADE encoder instance.
-
-    Args:
-        cfg: SPLADE configuration describing model location and runtime options.
-
-    Returns:
-        Cached :class:`SparseEncoder` ready for SPLADE inference.
-
-    Raises:
-        ValueError: If the encoder cannot be initialised with the supplied configuration.
-        ImportError: If required SPLADE dependencies are unavailable.
-    """
-
-    encoder_cls = _get_sparse_encoder_cls()
-
-    key = (str(cfg.model_dir), cfg.device, cfg.attn_impl, cfg.max_active_dims)
-    if key in _SPLADE_ENCODER_CACHE:
-        if key not in _SPLADE_ENCODER_BACKENDS:
-            _SPLADE_ENCODER_BACKENDS[key] = cfg.attn_impl or "auto"
-        return _SPLADE_ENCODER_CACHE[key]
-
-    model_kwargs: Dict[str, object] = {}
-    if cfg.attn_impl:
-        model_kwargs["attn_implementation"] = cfg.attn_impl
-    if cfg.max_active_dims is not None:
-        model_kwargs["max_active_dims"] = cfg.max_active_dims
-
-    backend_used: str | None = cfg.attn_impl
-    try:
-        encoder = encoder_cls(
-            str(cfg.model_dir),
-            device=cfg.device,
-            cache_folder=str(cfg.cache_folder),
-            model_kwargs=model_kwargs,
-            local_files_only=cfg.local_files_only,
-        )
-        backend_used = _detect_splade_backend(encoder, backend_used)
-    except (ValueError, ImportError) as exc:
-        if cfg.attn_impl == "flash_attention_2" and "Flash Attention 2" in str(exc):
-            print("[SPLADE] FlashAttention 2 unavailable; retrying with standard attention.")
-            fallback_kwargs = dict(model_kwargs)
-            fallback_kwargs["attn_implementation"] = "sdpa"
-            encoder = encoder_cls(
-                str(cfg.model_dir),
-                device=cfg.device,
-                cache_folder=str(cfg.cache_folder),
-                model_kwargs=fallback_kwargs,
-                local_files_only=cfg.local_files_only,
-            )
-            backend_used = _detect_splade_backend(encoder, "sdpa")
-        else:
-            raise
-
-    _SPLADE_ENCODER_CACHE[key] = encoder
-    _SPLADE_ENCODER_BACKENDS[key] = backend_used or "auto"
-    return encoder
-
-
-def _get_splade_backend_used(cfg: SpladeCfg) -> str:
-    """Return the backend string recorded for a given SPLADE configuration."""
-
-    key = (str(cfg.model_dir), cfg.device, cfg.attn_impl, cfg.max_active_dims)
-    backend = _SPLADE_ENCODER_BACKENDS.get(key)
-    if backend:
-        return backend
-    if cfg.attn_impl:
-        return cfg.attn_impl
-    return "auto"
-
-
 class SPLADEValidator:
     """Track SPLADE sparsity metrics across the corpus.
 
@@ -1046,122 +823,6 @@ class SPLADEValidator:
 
 
 # --- Qwen3 Embeddings ---
-
-
-def _qwen_embed_direct(
-    cfg: QwenCfg, texts: List[str], batch_size: Optional[int] = None
-) -> List[List[float]]:
-    """Produce dense embeddings using a local Qwen3 model served by vLLM.
-
-    Args:
-        cfg: Configuration describing model path, dtype, and batching.
-        texts: Batch of documents to embed.
-        batch_size: Optional override for inference batch size.
-
-    Returns:
-        List of embedding vectors, one per input text.
-    """
-    effective_batch = batch_size or cfg.batch_size
-    use_cache = bool(getattr(cfg, "cache_enabled", True))
-    cache_key = _qwen_cache_key(cfg)
-    llm_cls, pooling_cls = _get_vllm_components()
-    llm = _QWEN_LLM_CACHE.get(cache_key) if use_cache else None
-    if llm is None:
-        llm = llm_cls(
-            model=str(cfg.model_dir),  # local path
-            task="embed",
-            dtype=cfg.dtype,
-            tensor_parallel_size=cfg.tp,
-            gpu_memory_utilization=cfg.gpu_mem_util,
-            quantization=cfg.quantization,  # None or 'awq' (if a matching AWQ checkpoint exists)
-            download_dir=str(HF_HOME),  # belt & suspenders: keep any aux files in your cache
-        )
-        if use_cache:
-            if hasattr(_QWEN_LLM_CACHE, "put"):
-                _QWEN_LLM_CACHE.put(cache_key, llm)
-            else:  # pragma: no cover - compatibility with dict-like caches in tests
-                _QWEN_LLM_CACHE[cache_key] = llm
-    pool = pooling_cls(normalize=True, dimensions=int(cfg.dim))
-    out: List[List[float]] = []
-    try:
-        for i in range(0, len(texts), effective_batch):
-            batch = texts[i : i + effective_batch]
-            try:
-                res = llm.embed(batch, pooling_params=pool)
-            except TypeError:
-                res = llm.embed(batch)
-            for r in res:
-                embedding = getattr(r, "outputs", None)
-                if embedding is not None:
-                    embedding = getattr(embedding, "embedding", embedding)
-                else:
-                    embedding = r
-                out.append([float(x) for x in embedding])
-    finally:
-        if not use_cache:
-            _shutdown_llm_instance(llm)
-    return out
-
-
-def qwen_embed(
-    cfg: QwenCfg, texts: List[str], batch_size: Optional[int] = None
-) -> List[List[float]]:
-    """Public wrapper around the direct Qwen embedding implementation."""
-
-    return _qwen_embed_direct(cfg, texts, batch_size=batch_size)
-
-
-class QwenEmbeddingQueue:
-    """Serialize Qwen embedding requests across worker threads."""
-
-    def __init__(self, cfg: QwenCfg, *, maxsize: int = 8):
-        """Initialise a bounded request queue and background worker."""
-
-        self._cfg = cfg
-        self._queue: "queue.Queue[tuple[List[str], int, Future[List[List[float]]]] | None]" = (
-            queue.Queue(maxsize=max(1, maxsize))
-        )
-        self._closed = False
-        self._thread = threading.Thread(target=self._worker, name="QwenEmbeddingQueue", daemon=True)
-        self._thread.start()
-
-    def _worker(self) -> None:
-        """Consume enqueued embedding requests until shutdown is signalled."""
-
-        while True:
-            item = self._queue.get()
-            if item is None:
-                self._queue.task_done()
-                break
-            texts, batch_size, future = item
-            try:
-                result = _qwen_embed_direct(self._cfg, texts, batch_size=batch_size)
-            except Exception as exc:  # pragma: no cover - propagates to caller
-                future.set_exception(exc)
-            else:
-                future.set_result(result)
-            finally:
-                self._queue.task_done()
-
-    def embed(self, texts: Sequence[str], batch_size: int) -> List[List[float]]:
-        """Queue an embedding request and block until the result is ready."""
-
-        if self._closed:
-            raise RuntimeError("QwenEmbeddingQueue has been shut down")
-        future: Future[List[List[float]]] = Future()
-        self._queue.put((list(texts), int(batch_size), future))
-        return future.result()
-
-    def shutdown(self, wait: bool = True) -> None:
-        """Flush pending requests and terminate the worker thread."""
-
-        if self._closed:
-            return
-        self._closed = True
-        self._queue.put(None)
-        if wait:
-            self._queue.join()
-            self._thread.join()
 
 
 class EmbeddingProcessingError(RuntimeError):
@@ -2314,23 +1975,6 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                 "Offline mode requires local model directories. Missing: " + missing_desc
             )
 
-    if not validate_only:
-        try:
-            _ensure_splade_dependencies()
-            _ensure_qwen_dependencies()
-        except ImportError as exc:
-            log_event(
-                logger,
-                "error",
-                "Embedding dependencies unavailable",
-                stage=EMBED_STAGE,
-                doc_id="__system__",
-                input_hash=None,
-                error_code="MISSING_DEPENDENCY",
-                dependency_error=str(exc),
-            )
-            raise
-
     data_root_override = cfg.data_root
     data_root_overridden = data_root_override is not None
     resolved_root = prepare_data_root(data_root_override, detect_data_root())
@@ -2437,6 +2081,13 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
             config=context_payload,
             vector_format=vector_format,
         )
+
+        def _provider_telemetry(event: ProviderTelemetryEvent) -> None:
+            stage_telemetry.log_provider_event(
+                provider=event.provider,
+                phase=event.phase,
+                data=dict(event.data),
+            )
 
         if validate_only:
             expected_dimension: int | None = int(cfg.qwen_dim)
@@ -2588,21 +2239,6 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         elif cfg.resume:
             logger.info("Resume mode enabled: unchanged chunk files will be skipped")
 
-        try:
-            provider_bundle = ProviderFactory.create(cfg)
-        except ProviderError as exc:
-            log_event(
-                logger,
-                "error",
-                "Failed to initialise embedding providers",
-                stage=EMBED_STAGE,
-                error=str(exc),
-            )
-            raise
-
-        exit_stack = ExitStack()
-        bundle = exit_stack.enter_context(provider_bundle)
-
         if plan_only:
             stats = BM25Stats(N=0, avgdl=0.0, df={})
         else:
@@ -2619,6 +2255,39 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                 )
                 return 0
 
+        try:
+            provider_bundle = ProviderFactory.create(cfg, telemetry_emitter=_provider_telemetry)
+        except ProviderError as exc:
+            log_event(
+                logger,
+                "error",
+                "Failed to initialise embedding providers",
+                stage=EMBED_STAGE,
+                error=str(exc),
+            )
+            raise
+
+        args.splade_cfg = SpladeCfg(
+            model_dir=splade_model_dir,
+            cache_folder=model_root,
+            batch_size=cfg.batch_size_splade,
+            max_active_dims=cfg.sparse_splade_st_max_active_dims,
+            attn_impl=cfg.sparse_splade_st_attn_backend,
+            local_files_only=bool(cfg.offline),
+        )
+        args.qwen_cfg = QwenCfg(
+            model_dir=qwen_model_dir,
+            dtype=cfg.qwen_dtype,
+            tp=int(cfg.tp),
+            batch_size=int(cfg.dense_qwen_vllm_batch_size or cfg.batch_size_qwen),
+            quantization=cfg.dense_qwen_vllm_quantization,
+            dim=int(cfg.dense_qwen_vllm_dimension or cfg.qwen_dim),
+            cache_enabled=not bool(cfg.no_cache),
+        )
+
+        exit_stack: ExitStack | None = ExitStack()
+        bundle = exit_stack.enter_context(provider_bundle)
+
         validator = SPLADEValidator(
             warn_threshold_pct=float(cfg.sparsity_warn_threshold_pct),
             top_n=max(1, int(cfg.sparsity_report_top_n)),
@@ -2627,7 +2296,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         pass_b_start = time.perf_counter()
         total_vectors = 0
         splade_nnz_all: List[int] = []
-        qwen_norms_all: List[float] = []
+        dense_norms_all: List[float] = []
 
         manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
         resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
@@ -2755,6 +2424,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                 logger, "info", "File-level parallelism enabled", files_parallel=files_parallel
             )
 
+        provider_identities_summary: Dict[str, ProviderIdentity] = {}
         try:
             def _process_entry(
                 entry: Tuple[Path, Path, str, str],
@@ -2853,7 +2523,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                             continue
                         total_vectors += count
                         splade_nnz_all.extend(nnz)
-                        qwen_norms_all.extend(norms)
+                        dense_norms_all.extend(norms)
                         manifest_log_success(
                             stage=MANIFEST_STAGE,
                             doc_id=doc_id,
@@ -2921,7 +2591,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         continue
                     total_vectors += count
                     splade_nnz_all.extend(nnz)
-                    qwen_norms_all.extend(norms)
+                    dense_norms_all.extend(norms)
                     manifest_log_success(
                         stage=MANIFEST_STAGE,
                         doc_id=doc_id,
@@ -2950,8 +2620,10 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         qwen_avg_norm=round(avg_norm_file, 4),
                         vector_format=vector_format,
                     )
+            provider_identities_summary = bundle.identities()
         finally:
-            exit_stack.close()
+            if exit_stack is not None:
+                exit_stack.close()
 
         if quarantined_files:
             log_event(
@@ -2978,16 +2650,18 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         median_nnz = statistics.median(splade_nnz_all) if splade_nnz_all else 0.0
         splade_p95 = _percentile(splade_nnz_all, 95.0)
         splade_p99 = _percentile(splade_nnz_all, 99.0)
-        avg_norm = statistics.mean(qwen_norms_all) if qwen_norms_all else 0.0
-        std_norm = statistics.pstdev(qwen_norms_all) if len(qwen_norms_all) > 1 else 0.0
-        norm_p95 = _percentile(qwen_norms_all, 95.0)
-        norm_p99 = _percentile(qwen_norms_all, 99.0)
+        avg_norm = statistics.mean(dense_norms_all) if dense_norms_all else 0.0
+        std_norm = statistics.pstdev(dense_norms_all) if len(dense_norms_all) > 1 else 0.0
+        norm_p95 = _percentile(dense_norms_all, 95.0)
+        norm_p99 = _percentile(dense_norms_all, 99.0)
         norm_low_threshold = 0.9
         norm_high_threshold = 1.1
-        norm_low_outliers = len([n for n in qwen_norms_all if n < norm_low_threshold])
-        norm_high_outliers = len([n for n in qwen_norms_all if n > norm_high_threshold])
+        norm_low_outliers = len([n for n in dense_norms_all if n < norm_low_threshold])
+        norm_high_outliers = len([n for n in dense_norms_all if n > norm_high_threshold])
 
-        backend_used = _get_splade_backend_used(args.splade_cfg)
+        sparse_identity = provider_identities_summary.get("sparse")
+        dense_identity = provider_identities_summary.get("dense")
+        lexical_identity = provider_identities_summary.get("lexical")
 
         logger.info(
             "Embedding summary",
@@ -3009,8 +2683,12 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                     "skipped_files": skipped_files,
                     "quarantined_files": quarantined_files,
                     "files_parallel": files_parallel,
-                    "splade_attn_backend_used": backend_used,
+                    "splade_attn_backend_used": cfg.sparse_splade_st_attn_backend or "auto",
                     "sparsity_warn_threshold_pct": float(cfg.sparsity_warn_threshold_pct),
+                    "dense_provider": dense_identity.name if dense_identity else None,
+                    "dense_provider_version": dense_identity.version if dense_identity else None,
+                    "sparse_provider": sparse_identity.name if sparse_identity else None,
+                    "lexical_provider": lexical_identity.name if lexical_identity else None,
                 }
             },
         )

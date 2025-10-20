@@ -198,12 +198,14 @@ def _create_client_unlocked() -> None:
         cache_transport = base_transport
         inner_transport = getattr(cache_transport, "transport", None)
         if inner_transport is not None and not isinstance(inner_transport, RateLimitedTransport):
+            # Ensure the limiter sits beneath Hishel so cache hits avoid consuming quota.
             cache_transport.transport = RateLimitedTransport(
                 inner_transport, manager=limiter_manager
             )
     else:
         base_transport = base_transport or httpx.HTTPTransport(retries=0)
         if not isinstance(base_transport, RateLimitedTransport):
+            # Wrap the raw transport so every cache miss/revalidation flows through the limiter.
             base_transport = RateLimitedTransport(base_transport, manager=limiter_manager)
         cache_transport = CacheTransport(transport=base_transport, storage=storage)
 

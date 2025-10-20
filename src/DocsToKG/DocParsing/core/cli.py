@@ -16,6 +16,8 @@ import json
 import sys
 import textwrap
 from collections import Counter, OrderedDict, deque
+from dataclasses import dataclass
+import importlib.metadata as importlib_metadata
 from pathlib import Path
 from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
 
@@ -116,6 +118,68 @@ app = typer.Typer(
     add_completion=True,
     rich_markup_mode="markdown",
 )
+
+
+@dataclass
+class CLIState:
+    """Mutable state shared across CLI commands via Typer context."""
+
+    data_root: Optional[Path] = None
+
+
+def _ensure_cli_state(ctx: typer.Context) -> CLIState:
+    """Return the CLI state object stored on ``ctx.obj``."""
+
+    state = getattr(ctx, "obj", None)
+    if not isinstance(state, CLIState):
+        state = CLIState()
+        ctx.obj = state
+    return state
+
+
+def _version_callback(value: bool) -> None:
+    """Print the package version and exit when ``--version`` is requested."""
+
+    if not value:
+        return
+    try:
+        package_version = importlib_metadata.version("DocsToKG")
+    except importlib_metadata.PackageNotFoundError:
+        package_version = "unknown"
+    typer.echo(f"DocsToKG {package_version}")
+    raise typer.Exit()
+
+
+@app.callback()
+def _root_callback(
+    ctx: typer.Context,
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            help="Show the DocsToKG package version and exit.",
+            callback=_version_callback,
+            is_eager=True,
+        ),
+    ] = False,
+    data_root: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--data-root",
+            help="Default DocsToKG data root passed to subcommands when omitted.",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
+            envvar="DOCSTOKG_DATA_ROOT",
+        ),
+    ] = None,
+) -> None:
+    """Initialise shared CLI state and propagate global options."""
+
+    _ = version  # handled eagerly via the callback above
+    state = _ensure_cli_state(ctx)
+    if data_root is not None:
+        state.data_root = data_root
 
 __all__ = [
     "CLI_DESCRIPTION",
@@ -504,8 +568,10 @@ def _build_embed_cli_args(
     _append_option(argv, "--chunks-dir", chunks_dir, formatter=str)
     _append_option(argv, "--out-dir", out_dir, formatter=str)
     _append_option(argv, "--vector-format", vector_format, default="jsonl")
-    _append_option(argv, "--bm25-k1", bm25_k1, default=1.5)
-    _append_option(argv, "--bm25-b", bm25_b, default=0.75)
+    _append_option(argv, "--bm25-k1", bm25_k1)
+    _append_option(argv, "--bm25-b", bm25_b)
+    _append_option(argv, "--lexical-local-bm25-k1", bm25_k1)
+    _append_option(argv, "--lexical-local-bm25-b", bm25_b)
     _append_option(argv, "--batch-size-splade", batch_size_splade, default=32)
     _append_option(argv, "--batch-size-qwen", batch_size_qwen, default=64)
     _append_option(argv, "--splade-max-active-dims", splade_max_active_dims)
@@ -1371,6 +1437,7 @@ EmbedProfileOption = Literal["cpu-small", "gpu-default", "gpu-max"]
 
 @app.command("doctags")
 def _doctags_cli(
+    ctx: typer.Context,
     mode: Annotated[
         DoctagsModeOption,
         typer.Option(
@@ -1394,6 +1461,7 @@ def _doctags_cli(
             dir_okay=True,
             file_okay=False,
             exists=True,
+            envvar="DOCSTOKG_DATA_ROOT",
         ),
     ] = None,
     input_dir: Annotated[
@@ -1503,6 +1571,11 @@ def _doctags_cli(
     ] = False,
 ) -> None:
     """Typer command implementation for `docparse doctags`."""
+    state = _ensure_cli_state(ctx)
+    if data_root is None:
+        data_root = state.data_root
+    else:
+        state.data_root = data_root
     if pdf and html:
         raise typer.BadParameter("Cannot combine --pdf and --html aliases.")
     effective_mode = "pdf" if pdf else "html" if html else mode
@@ -1529,6 +1602,7 @@ def _doctags_cli(
 
 @app.command("chunk")
 def _chunk_cli(
+    ctx: typer.Context,
     data_root: Annotated[
         Optional[Path],
         typer.Option(
@@ -1537,6 +1611,7 @@ def _chunk_cli(
             dir_okay=True,
             file_okay=False,
             exists=True,
+            envvar="DOCSTOKG_DATA_ROOT",
         ),
     ] = None,
     config: Annotated[
@@ -1699,6 +1774,11 @@ def _chunk_cli(
     ] = False,
 ) -> None:
     """Typer command implementation for `docparse chunk`."""
+    state = _ensure_cli_state(ctx)
+    if data_root is None:
+        data_root = state.data_root
+    else:
+        state.data_root = data_root
     argv = _build_chunk_cli_args(
         data_root,
         config,
@@ -1727,11 +1807,16 @@ def _chunk_cli(
 
 @app.command("embed")
 def _embed_cli(
+    ctx: typer.Context,
     data_root: Annotated[
         Optional[Path],
         typer.Option(
             "--data-root",
             help="DocsToKG data root override passed to the embedding stage.",
+            dir_okay=True,
+            file_okay=False,
+            exists=True,
+            envvar="DOCSTOKG_DATA_ROOT",
         ),
     ] = None,
     config: Annotated[
@@ -1949,6 +2034,11 @@ def _embed_cli(
     ] = False,
 ) -> None:
     """Typer command implementation for `docparse embed`."""
+    state = _ensure_cli_state(ctx)
+    if data_root is None:
+        data_root = state.data_root
+    else:
+        state.data_root = data_root
     argv = _build_embed_cli_args(
         data_root,
         config,
@@ -1988,6 +2078,7 @@ def _embed_cli(
 
 @app.command("token-profiles")
 def _token_profiles_cli(
+    ctx: typer.Context,
     data_root: Annotated[
         Optional[Path],
         typer.Option(
@@ -1996,6 +2087,7 @@ def _token_profiles_cli(
             dir_okay=True,
             file_okay=False,
             exists=True,
+            envvar="DOCSTOKG_DATA_ROOT",
         ),
     ] = None,
     config: Annotated[
@@ -2076,6 +2168,11 @@ def _token_profiles_cli(
     ] = "INFO",
 ) -> None:
     """Typer command implementation for `docparse token-profiles`."""
+    state = _ensure_cli_state(ctx)
+    if data_root is None:
+        data_root = state.data_root
+    else:
+        state.data_root = data_root
     argv = _build_token_profiles_cli_args(
         data_root,
         config,
@@ -2094,6 +2191,7 @@ def _token_profiles_cli(
 
 @app.command("manifest")
 def _manifest_cli(
+    ctx: typer.Context,
     stages: Annotated[
         Optional[List[str]],
         typer.Option(
@@ -2110,6 +2208,7 @@ def _manifest_cli(
             dir_okay=True,
             file_okay=False,
             exists=True,
+            envvar="DOCSTOKG_DATA_ROOT",
         ),
     ] = None,
     tail: Annotated[
@@ -2137,6 +2236,11 @@ def _manifest_cli(
     ] = False,
 ) -> None:
     """Typer command implementation for `docparse manifest`."""
+    state = _ensure_cli_state(ctx)
+    if data_root is None:
+        data_root = state.data_root
+    else:
+        state.data_root = data_root
     argv = _build_manifest_cli_args(stages or [], data_root, tail, summarize, raw)
     exit_code = _execute_manifest(argv)
     raise typer.Exit(code=exit_code)
@@ -2144,6 +2248,7 @@ def _manifest_cli(
 
 @app.command("plan")
 def _plan_cli(
+    ctx: typer.Context,
     data_root: Annotated[
         Optional[Path],
         typer.Option(
@@ -2152,6 +2257,7 @@ def _plan_cli(
             dir_okay=True,
             file_okay=False,
             exists=True,
+            envvar="DOCSTOKG_DATA_ROOT",
         ),
     ] = None,
     log_level: Annotated[
@@ -2336,6 +2442,11 @@ def _plan_cli(
     ] = False,
 ) -> None:
     """Typer command implementation for `docparse plan`."""
+    state = _ensure_cli_state(ctx)
+    if data_root is None:
+        data_root = state.data_root
+    else:
+        state.data_root = data_root
     argv = _build_run_all_cli_args(
         data_root,
         log_level,
@@ -2369,6 +2480,7 @@ def _plan_cli(
 
 @app.command("all")
 def _all_cli(
+    ctx: typer.Context,
     data_root: Annotated[
         Optional[Path],
         typer.Option(
@@ -2377,6 +2489,7 @@ def _all_cli(
             dir_okay=True,
             file_okay=False,
             exists=True,
+            envvar="DOCSTOKG_DATA_ROOT",
         ),
     ] = None,
     log_level: Annotated[
@@ -2569,6 +2682,11 @@ def _all_cli(
     ] = False,
 ) -> None:
     """Typer command implementation for `docparse all`."""
+    state = _ensure_cli_state(ctx)
+    if data_root is None:
+        data_root = state.data_root
+    else:
+        state.data_root = data_root
     argv = _build_run_all_cli_args(
         data_root,
         log_level,

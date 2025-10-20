@@ -677,3 +677,15 @@ def temporary_validator(name: str, validator: Callable[..., object]):
         unregister_validator(name)
         if existed and previous is not None:
             register_validator(name, previous, overwrite=True)
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.testing",
+#   "purpose": "Test utilities providing isolated environments, mock clients, and resolver stubs",
+#   "sections": [
+#     {"id": "fixtures", "name": "TestingEnvironment", "anchor": "ENV", "kind": "api"},
+#     {"id": "mock-http", "name": "HTTP Client Helpers", "anchor": "HTTP", "kind": "helpers"},
+#     {"id": "responses", "name": "Loopback Server & Response Specs", "anchor": "SRV", "kind": "helpers"},
+#     {"id": "plugins", "name": "Temporary Plugin Registration", "anchor": "PLG", "kind": "helpers"}
+#   ]
+# }
+# === /NAVMAP ===

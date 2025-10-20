@@ -186,13 +186,23 @@ flowchart LR
 
 ## Networking, Rate Limiting, and Politeness
 
-- `DocsToKG.ContentDownload.httpx_transport` provisions a singleton HTTPX client wrapped in Hishel caching; it enables HTTP/2 when the optional `h2` dependency is available and automatically falls back to HTTP/1.1 otherwise. `configure_http_client()` swaps transports/event hooks (e.g., `httpx.MockTransport` for tests) while `purge_http_cache()` clears `${CACHE_DIR}/http/ContentDownload` between runs. Event hooks stamp telemetry fields (`network.client=httpx`, cache metadata, attempt numbers), enforce `response.raise_for_status()` once per attempt, and shut down intermediate responses when Tenacity schedules retries.
+- `DocsToKG.ContentDownload.httpx_transport` provisions a singleton HTTPX client with Hishel caching. The transport stack is `CacheTransport → RateLimitedTransport → HTTPTransport`, so cache hits never consume limiter budget. `configure_http_client()` swaps transports/event hooks (e.g., `httpx.MockTransport` for tests) while `purge_http_cache()` clears `${CACHE_DIR}/http/ContentDownload`. Event hooks annotate telemetry (`network.client=httpx`, cache metadata, attempt numbers) and dispose of intermediate responses when Tenacity retries.
 - `request_with_retries()` delegates to Tenacity for capped exponential backoff with jitter, honours `Retry-After`, integrates domain content rules, and returns structured results differentiating cached vs modified responses.
 - `head_precheck()` performs HEAD or conditional GET probes, classifying likely PDFs before downloading full payloads; resolvers can disable HEAD per host via configuration.
 - `ConditionalRequestHelper` constructs `If-None-Match`/`If-Modified-Since` headers and interprets 304 responses as cache hits via `CachedResult`/`ModifiedResult`.
-- Centralized rate limiting is provided by `DocsToKG.ContentDownload.ratelimit`, which layers a pyrate-limiter transport beneath Hishel so only cache misses consume quota. Each request tags limiter role (`metadata`, `landing`, `artifact`) and the transport records wait/block statistics exposed in manifests and run summaries. Circuit breakers remain in place for failure suppression.
-- CLI overrides (`--rate`, `--rate-mode`, `--rate-max-delay`, `--rate-backend`) and matching environment variables (`DOCSTOKG_RATE*`) configure host/role policies. Legacy flags such as `--domain-token-bucket` and `--domain-min-interval` are mapped to the centralized limiter and emit deprecation warnings.
+- Centralized rate limiting lives in `DocsToKG.ContentDownload.ratelimit`. Policies are keyed by `(host, role)` (`metadata`, `landing`, `artifact`) and validated at startup; the limiter records wait/block metadata on each request (`docs_network_meta.rate_limiter_*`), aggregates acquire/block counters for manifest metrics, and emits structured logs (`rate-policy`, `rate-acquire`) when verbose logging is enabled.
+- Configure policies via CLI or env: `--rate api.openalex.org=10/s,1000/h` adjusts windows, `--rate-mode export.arxiv.org.artifact=wait:6000` tunes wait budgets, `--rate-max-delay host.artifact=5000` overrides per-role delays, and `--rate-backend sqlite:path=/tmp/rl.sqlite` selects a backend. Environment variables (`DOCSTOKG_RATE`, `DOCSTOKG_RATE_MODE`, `DOCSTOKG_RATE_MAX_DELAY`, `DOCSTOKG_RATE_BACKEND`) mirror these switches. `--rate-disable`/`DOCSTOKG_RATE_DISABLED=1` bypasses the limiter for pilot comparisons.
+- Legacy throttling flags (`--domain-token-bucket`, `--domain-min-interval`, resolver config equivalents) are translated into artifact role policies and emit a warning noting the new source of truth. Circuit breakers remain in place for failure suppression.
 - `download.RobotsCache` caches robots.txt results per origin, respecting TTLs and user-agent configuration. When `--ignore-robots` is used the cache is bypassed entirely.
+
+### Rate Limiter Backend Guidance
+
+- **memory** (default) — fast, in-process bucket suitable for single-worker runs and CI. No external dependencies.
+- **multiprocess** — shares quota across local worker processes via `multiprocessing.Manager`; pick when the downloader forks multiple workers on one host.
+- **sqlite** — persistent local store with optional file locking; recommended for multi-process schedulers or resumable runs that should persist limiter state between invocations.
+- **redis** — distributed backend for shared quotas across machines. Requires the optional `redis` dependency and a reachable Redis server.
+- **postgres** — distributed backend backed by PostgreSQL via `psycopg3`. Use for deployments that already maintain PostgreSQL and want transactional limiter state.
+- Switching backends resets the in-memory limiter cache; `DownloadRun` logs the resolved backend/options table at startup so operators can confirm the active configuration.
 
 ## Interactions with Other Packages
 
@@ -246,6 +256,14 @@ python -m DocsToKG.ContentDownload.cli --topic "vision" --year-start 2024 --year
 - **Inspect resolver health**: `jq 'select(.record_type=="attempt") | {resolver_name, reason}' runs/content/manifest.jsonl | sort | uniq -c` surfaces dominant failure modes; cross-check with `manifest.metrics.json`.
 - **Purge cached artifacts safely**: use `DocsToKG.ContentDownload.httpx_transport.purge_http_cache()` to reset HTTP cache entries; when deleting run directories manually, remove artifact folders and the matching `manifest.*` / `manifest.sqlite3` together to avoid orphaned resume state, then regenerate manifests immediately.
 - **Validate concurrency posture**: run `--dry-run --log-format jsonl` workloads, inspect `latency_ms` and `status_counts` blocks in `manifest.metrics.json` before increasing `--workers` or `--concurrent-resolvers`.
+- **Monitor limiter health**: review `summary.emit_console_summary()` output and `manifest.metrics.json` (`rate_limiter.acquired`, `rate_limiter.blocked`, `rate_limiter.wait_ms_*`) after each run; sustained waits or blocks should trigger policy adjustments rather than re-introducing manual sleeps.
+
+## Migration Checklist
+
+- Remove bespoke sleeps/token buckets from automation and rely on the centralized limiter (`--rate*` flags) for host-specific politeness.
+- Translate existing throttle settings to CLI overrides (e.g., `example.org=3/s,180/h`) and commit the resolved policies in run playbooks for traceability.
+- Pilot the centralized limiter alongside legacy configs by toggling `--rate-disable`/`DOCSTOKG_RATE_DISABLED=1`; compare limiter telemetry between runs before decommissioning old throttles.
+- During the rollout, monitor `manifest.metrics.json` and console summaries for unexpected limiter blocks or sudden `429`s; adjust default policies or CLI overrides before removing the fallback switch.
 
 ## Agent Guardrails
 

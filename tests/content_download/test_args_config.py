@@ -3,10 +3,11 @@
 import logging
 from dataclasses import FrozenInstanceError
 from pathlib import Path
+from typing import Mapping
 
 import pytest
 
-from DocsToKG.ContentDownload import args as args_module
+from DocsToKG.ContentDownload import args as args_module, httpx_transport
 from DocsToKG.ContentDownload.args import (
     ResolvedConfig,
     bootstrap_run_environment,
@@ -15,7 +16,15 @@ from DocsToKG.ContentDownload.args import (
     resolve_config,
 )
 from DocsToKG.ContentDownload.core import Classification
-from DocsToKG.ContentDownload.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.pipeline import ResolverConfig, ResolverPipeline
+from DocsToKG.ContentDownload.ratelimit import (
+    BackendConfig,
+    clone_policies,
+    get_rate_limiter_manager,
+    RolePolicy,
+)
+from DocsToKG.ContentDownload.runner import DownloadRun
+from pyrate_limiter import Duration
 from tests.conftest import PatchManager
 
 
@@ -33,6 +42,24 @@ def _build_args(tmp_path: Path):
     ]
     args = parse_args(parser, argv)
     return parser, args
+
+
+def _clone_backend_config() -> BackendConfig:
+    manager = get_rate_limiter_manager()
+    options = manager.backend.options
+    if isinstance(options, dict):
+        cloned_options = dict(options)
+    else:
+        cloned_options = dict(options or {})
+    return BackendConfig(backend=manager.backend.backend, options=cloned_options)
+
+
+def _restore_manager_state(
+    manager, policies: Mapping[str, RolePolicy], backend: BackendConfig
+) -> None:
+    manager.configure_backend(backend)
+    manager.configure_policies(clone_policies(policies))
+    manager.reset_metrics()
 
 
 def test_resolve_config_is_pure(tmp_path: Path) -> None:
@@ -366,3 +393,173 @@ def test_lookup_topic_id_handles_request_exception(patcher, caplog) -> None:
         for record in caplog.record_tuples
     )
     assert any("Topic lookup failed" in record[2] for record in caplog.record_tuples)
+
+
+def test_rate_disable_flag_disables_limiter(tmp_path: Path, caplog) -> None:
+    parser = build_parser()
+    argv = [
+        "--topic-id",
+        "https://openalex.org/T12345",
+        "--year-start",
+        "2020",
+        "--year-end",
+        "2020",
+        "--out",
+        str(tmp_path / "pdfs"),
+        "--rate-disable",
+    ]
+    args = parse_args(parser, argv)
+
+    manager = get_rate_limiter_manager()
+    original_policies = clone_policies(manager.policies())
+    original_backend = _clone_backend_config()
+
+    try:
+        caplog.set_level(logging.INFO)
+        resolved = resolve_config(args, parser)
+
+        assert resolved.rate_policies == {}
+        assert resolved.rate_backend.backend == "disabled"
+        assert manager.policies() == {}
+        assert manager.backend.backend == "disabled"
+        assert any(
+            "Centralized rate limiter disabled" in record.message for record in caplog.records
+        )
+    finally:
+        _restore_manager_state(manager, original_policies, original_backend)
+
+
+def test_rate_disable_conflicts_with_overrides(tmp_path: Path) -> None:
+    parser = build_parser()
+    argv = [
+        "--topic-id",
+        "https://openalex.org/T12345",
+        "--year-start",
+        "2020",
+        "--year-end",
+        "2020",
+        "--out",
+        str(tmp_path / "pdfs"),
+        "--rate-disable",
+        "--rate",
+        "example.org=1/s",
+    ]
+    args = parse_args(parser, argv)
+    with pytest.raises(SystemExit):
+        resolve_config(args, parser)
+
+
+def test_cli_rate_overrides_update_policies_and_logging(
+    tmp_path: Path, caplog, monkeypatch
+) -> None:
+    parser = build_parser()
+    rate_db = tmp_path / "limits" / "policy.sqlite"
+    rate_db.parent.mkdir(parents=True, exist_ok=True)
+    argv = [
+        "--topic-id",
+        "https://openalex.org/T12345",
+        "--year-start",
+        "2020",
+        "--year-end",
+        "2020",
+        "--out",
+        str(tmp_path / "pdfs"),
+        "--rate",
+        "example.org=3/s,180/h",
+        "--rate-mode",
+        "example.org.artifact=wait:750",
+        "--rate-backend",
+        f"sqlite:path={rate_db},use_file_lock=true",
+    ]
+    args = parse_args(parser, argv)
+
+    manager = get_rate_limiter_manager()
+    original_policies = clone_policies(manager.policies())
+    original_backend = _clone_backend_config()
+
+    try:
+        resolved = resolve_config(args, parser)
+
+        policy = resolved.rate_policies["example.org"]
+        metadata_rates = [
+            (rate.limit, int(rate.interval)) for rate in policy.rates["metadata"]
+        ]
+        artifact_delay = policy.max_delay_ms["artifact"]
+        assert metadata_rates == [
+            (3, Duration.SECOND),
+            (180, Duration.HOUR),
+        ]
+        assert artifact_delay == 750
+        assert resolved.rate_backend.backend == "sqlite"
+        assert resolved.rate_backend.options["path"] == str(rate_db)
+
+        bootstrap_run_environment(resolved)
+        caplog.set_level("INFO", logger="DocsToKG.ContentDownload")
+
+        def _abort_setup(self, stack):
+            raise RuntimeError("stop-run")
+
+        monkeypatch.setattr(DownloadRun, "setup_sinks", _abort_setup)
+
+        run = DownloadRun(resolved)
+        with pytest.raises(RuntimeError, match="stop-run"):
+            run.run()
+
+        messages = [
+            record.message
+            for record in caplog.records
+            if record.name == "DocsToKG.ContentDownload"
+        ]
+        assert any(
+            "Rate limiter configured with backend=sqlite" in message for message in messages
+        ), messages
+    finally:
+        _restore_manager_state(manager, original_policies, original_backend)
+
+
+def test_legacy_domain_flags_map_to_rate_policies(tmp_path: Path, caplog) -> None:
+    parser = build_parser()
+    argv = [
+        "--topic-id",
+        "https://openalex.org/T12345",
+        "--year-start",
+        "2020",
+        "--year-end",
+        "2020",
+        "--out",
+        str(tmp_path / "pdfs"),
+        "--domain-token-bucket",
+        "example.org=0.5:capacity=3",
+        "--domain-min-interval",
+        "legacy.org=2",
+    ]
+    args = parse_args(parser, argv)
+
+    manager = get_rate_limiter_manager()
+    original_policies = clone_policies(manager.policies())
+    original_backend = _clone_backend_config()
+
+    try:
+        caplog.set_level(logging.WARNING)
+        resolved = resolve_config(args, parser)
+
+        token_rates = [
+            (rate.limit, int(rate.interval))
+            for rate in resolved.rate_policies["example.org"].rates["artifact"]
+        ]
+        min_interval_rates = [
+            (rate.limit, int(rate.interval))
+            for rate in resolved.rate_policies["legacy.org"].rates["artifact"]
+        ]
+
+        assert token_rates == [
+            (1, Duration.SECOND),
+            (3, Duration.MINUTE),
+        ]
+        assert min_interval_rates == [(1, 2000)]
+        assert any(
+            "Legacy domain throttling options detected" in record.message
+            for record in caplog.records
+        )
+    finally:
+        _restore_manager_state(manager, original_policies, original_backend)

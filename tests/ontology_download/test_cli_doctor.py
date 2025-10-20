@@ -30,10 +30,33 @@ from DocsToKG.OntologyDownload.testing import TestingEnvironment
 from tests.conftest import PatchManager
 
 
+class _DoctorResponse:
+    def __init__(self, status: int = 200, reason: str = "OK") -> None:
+        self.status_code = status
+        self.reason_phrase = reason
+
+    @property
+    def is_success(self) -> bool:
+        return 200 <= self.status_code < 400
+
+
+class _DoctorHttpClient:
+    def __init__(self) -> None:
+        self._response = _DoctorResponse()
+
+    def head(self, *_args, **_kwargs):
+        return self._response
+
+    def get(self, *_args, **_kwargs):
+        return self._response
+
+
 def test_cli_doctor_handles_missing_ontology_dir(capsys):
     """``doctor`` should succeed even when the ontology directory is absent."""
 
-    with TestingEnvironment() as env:
+    with TestingEnvironment() as env, patch.object(
+        cli_module.net, "get_http_client", return_value=_DoctorHttpClient()
+    ):
         missing_dir = env.ontology_dir
         assert missing_dir.exists()
         shutil.rmtree(missing_dir)
@@ -60,7 +83,9 @@ def test_cli_doctor_handles_missing_ontology_dir(capsys):
 def test_cli_doctor_reports_disk_error(capsys):
     """Disk probe failures should surface the probe path and error details."""
 
-    with TestingEnvironment() as env:
+    with TestingEnvironment() as env, patch.object(
+        cli_module.net, "get_http_client", return_value=_DoctorHttpClient()
+    ):
         with patch.object(
             cli_module.shutil, "disk_usage", side_effect=OSError("synthetic disk failure")
         ):
@@ -81,7 +106,9 @@ def test_cli_doctor_reports_invalid_rate_limit_override_json(capsys):
 
     patcher = PatchManager()
     try:
-        with TestingEnvironment():
+        with TestingEnvironment(), patch.object(
+            cli_module.net, "get_http_client", return_value=_DoctorHttpClient()
+        ):
             patcher.setenv("ONTOFETCH_PER_HOST_RATE_LIMIT", "not-a-limit")
             exit_code = cli_module.cli_main(["doctor", "--json"])
     finally:
@@ -101,7 +128,9 @@ def test_cli_doctor_reports_invalid_rate_limit_override_tty(capsys):
 
     patcher = PatchManager()
     try:
-        with TestingEnvironment():
+        with TestingEnvironment(), patch.object(
+            cli_module.net, "get_http_client", return_value=_DoctorHttpClient()
+        ):
             patcher.setenv("ONTOFETCH_PER_HOST_RATE_LIMIT", "not-a-limit")
             exit_code = cli_module.cli_main(["doctor"])
     finally:
@@ -116,7 +145,9 @@ def test_cli_doctor_reports_invalid_rate_limit_override_tty(capsys):
 def test_cli_doctor_reports_missing_execute_permission_in_json(capsys):
     """The JSON report should surface directories lacking execute permissions."""
 
-    with TestingEnvironment() as env:
+    with TestingEnvironment() as env, patch.object(
+        cli_module.net, "get_http_client", return_value=_DoctorHttpClient()
+    ):
         restricted_dir = env.cache_dir
         original_access = cli_module.os.access
 
@@ -156,7 +187,9 @@ def test_cli_doctor_reports_missing_execute_permission_in_json(capsys):
 def test_cli_doctor_prints_missing_execute_permission(capsys):
     """Human-readable doctor output should note missing directory execute permissions."""
 
-    with TestingEnvironment() as env:
+    with TestingEnvironment() as env, patch.object(
+        cli_module.net, "get_http_client", return_value=_DoctorHttpClient()
+    ):
         restricted_dir = env.cache_dir
         original_access = cli_module.os.access
 
