@@ -46,6 +46,7 @@ from pyrate_limiter.buckets import (
 from pyrate_limiter.utils import validate_rate_list
 
 from DocsToKG.ContentDownload.errors import RateLimitError
+# (REMOVED: from DocsToKG.ContentDownload.breakers_loader import _normalize_host_key to avoid circular import)
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.ratelimit")
 
@@ -282,8 +283,11 @@ class LimiterManager:
         policies: Optional[Mapping[str, RolePolicy]] = None,
         backend_config: Optional[BackendConfig] = None,
     ) -> None:
+        # Use deferred import to avoid circular dependency
+        from DocsToKG.ContentDownload.breakers_loader import _normalize_host_key
+
         self._policies: Dict[str, RolePolicy] = {
-            (host or "").lower(): policy for host, policy in (policies or {}).items()
+            _normalize_host_key(host): policy for host, policy in (policies or {}).items()
         }
         self._backend_config = backend_config or BackendConfig()
         self._cache = LimiterCache()
@@ -306,7 +310,10 @@ class LimiterManager:
         self.reset_metrics()
 
     def configure_policies(self, policies: Mapping[str, RolePolicy]) -> None:
-        self._policies = {host.lower(): policy for host, policy in policies.items()}
+        # Use deferred import to avoid circular dependency
+        from DocsToKG.ContentDownload.breakers_loader import _normalize_host_key
+
+        self._policies = {_normalize_host_key(host): policy for host, policy in policies.items()}
         self._cache.clear()
         self.reset_metrics()
 
@@ -314,7 +321,10 @@ class LimiterManager:
         return MappingProxyType(self._policies)
 
     def get_policy(self, host: str) -> Optional[RolePolicy]:
-        host_key = (host or "").lower()
+        # Use deferred import to avoid circular dependency
+        from DocsToKG.ContentDownload.breakers_loader import _normalize_host_key
+
+        host_key = _normalize_host_key(host)
         if host_key in self._policies:
             return self._policies[host_key]
         return self._policies.get("default")
@@ -348,11 +358,15 @@ class LimiterManager:
     def acquire(self, *, host: str, role: RoleName, method: str) -> AcquisitionResult:
         policy = self.get_policy(host)
         if not policy:
-            return AcquisitionResult(host=host, role=role, wait_ms=0, backend="disabled", mode="disabled")
+            return AcquisitionResult(
+                host=host, role=role, wait_ms=0, backend="disabled", mode="disabled"
+            )
 
         role_config = policy.for_role(role)
         if not role_config or not role_config.rates:
-            return AcquisitionResult(host=host, role=role, wait_ms=0, backend="disabled", mode="disabled")
+            return AcquisitionResult(
+                host=host, role=role, wait_ms=0, backend="disabled", mode="disabled"
+            )
 
         if method.upper() == "HEAD" and not role_config.count_head:
             return AcquisitionResult(
@@ -460,7 +474,10 @@ class LimiterManager:
         )
 
     def _stats_entry(self, host: str, role: RoleName) -> Dict[str, Any]:
-        host_key = host.lower()
+        # Use deferred import to avoid circular dependency
+        from DocsToKG.ContentDownload.breakers_loader import _normalize_host_key
+
+        host_key = _normalize_host_key(host)
         role_key = role.lower()
         role_map = self._metrics.setdefault(host_key, {})
         entry = role_map.get(role_key)
@@ -676,9 +693,7 @@ def serialize_policy(policy: RolePolicy) -> Dict[str, Any]:
         if not rates:
             continue
         serialized[role] = {
-            "rates": [
-                {"limit": rate.limit, "interval_ms": int(rate.interval)} for rate in rates
-            ],
+            "rates": [{"limit": rate.limit, "interval_ms": int(rate.interval)} for rate in rates],
             "mode": policy.mode.get(role, "wait"),
             "max_delay_ms": int(policy.max_delay_ms.get(role, 0)),
             "count_head": bool(policy.count_head.get(role, False)),
@@ -776,9 +791,7 @@ class RateLimitedTransport(httpx.BaseTransport):
     def _attach_metadata(self, request: httpx.Request, metadata: Mapping[str, Any]) -> None:
         if not metadata:
             return
-        meta: MutableMapping[str, Any] = request.extensions.setdefault(
-            "docs_network_meta", {}
-        )  # type: ignore[assignment]
+        meta: MutableMapping[str, Any] = request.extensions.setdefault("docs_network_meta", {})  # type: ignore[assignment]
         for key, value in metadata.items():
             if value is not None:
                 meta[key] = value

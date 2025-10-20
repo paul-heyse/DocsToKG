@@ -200,6 +200,7 @@ from DocsToKG.ContentDownload.resolvers import (
     default_resolvers,
 )
 from DocsToKG.ContentDownload.telemetry import AttemptSink
+from DocsToKG.ContentDownload.breakers_loader import load_breaker_config
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
@@ -505,13 +506,17 @@ class ResolverConfig:
                 f"max_attempts_per_work must be >= 1, got {self.max_attempts_per_work}"
             )
 
+        # Accept overrides (host -> custom Accept header value)
+        overrides: Dict[str, str] = {}
         if self.host_accept_overrides:
-            overrides: Dict[str, str] = {}
+            # Use deferred import to avoid circular dependency at module load time
+            from DocsToKG.ContentDownload.breakers_loader import _normalize_host_key
+
             for host, header in self.host_accept_overrides.items():
                 if not host:
                     continue
-                overrides[host.lower()] = str(header)
-            self.host_accept_overrides = overrides
+                overrides[_normalize_host_key(host)] = str(header)
+        self.host_accept_overrides = overrides
 
         # Legacy resolver_circuit_breakers validation removed - now handled by pybreaker-based BreakerRegistry
 

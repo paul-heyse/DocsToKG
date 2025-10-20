@@ -562,7 +562,10 @@ def prepare_candidate_download(
         prior_mtime_ns=previous_mtime_ns,
     )
 
-    plan_origin_host = (origin_host.lower() if origin_host else host_key) or None
+    # Use deferred import to avoid circular dependency
+    from DocsToKG.ContentDownload.breakers_loader import _normalize_host_key
+
+    plan_origin_host = (_normalize_host_key(origin_host) if origin_host else host_key) or None
 
     return DownloadPreflightPlan(
         client=http_client,
@@ -861,8 +864,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                             classification=Classification.HTTP_ERROR,
                             path=None,
                             http_status=response.status_code,
-                            content_type=response.headers.get("Content-Type")
-                            or content_type_hint,
+                            content_type=response.headers.get("Content-Type") or content_type_hint,
                             elapsed_ms=elapsed_ms,
                             reason=ReasonCode.UNKNOWN,
                             reason_detail="unexpected-206-partial-content",
@@ -2211,7 +2213,9 @@ def build_download_outcome(
         host_state_value = breaker_snapshot.get("host_state") or breaker_snapshot.get("host")
         if isinstance(host_state_value, str):
             breaker_host_state = host_state_value
-        resolver_state_value = breaker_snapshot.get("resolver_state") or breaker_snapshot.get("resolver")
+        resolver_state_value = breaker_snapshot.get("resolver_state") or breaker_snapshot.get(
+            "resolver"
+        )
         if isinstance(resolver_state_value, str):
             breaker_resolver_state = resolver_state_value
         recorded_value = breaker_snapshot.get("recorded")

@@ -1,0 +1,169 @@
+# DocsToKG Configuration Profiles
+#
+# This file demonstrates the multi-profile configuration system for DocParsing.
+# Load a profile via: docparse --profile <name> <command>
+# Or set: DOCSTOKG_PROFILE=<name>
+#
+# Precedence: CLI args > ENV vars > profile > defaults
+
+[profile.local]
+# Local development profile (CPU-only, low concurrency)
+
+[profile.local.app]
+data_root = "Data"
+log_level = "INFO"
+log_format = "console"
+metrics_enabled = false
+
+[profile.local.runner]
+policy = "cpu"
+workers = 4
+schedule = "fifo"
+retries = 0
+
+[profile.local.doctags]
+mode = "html"
+
+[profile.local.chunk]
+min_tokens = 120
+max_tokens = 800
+tokenizer_model = "cl100k_base"
+
+[profile.local.embed.dense]
+backend = "sentence_transformers"
+
+[profile.local.embed.dense.sentence_transformers]
+model_id = "sentence-transformers/all-MiniLM-L6-v2"
+device = "cpu"
+batch_size = 16
+
+[profile.local.embed.sparse.splade_st]
+batch_size = 16
+device = "cpu"
+
+[profile.local.embed.lexical.local_bm25]
+k1 = 1.5
+b = 0.75
+
+
+# ============================================================================
+
+[profile.gpu]
+# GPU optimized profile (A100 / H100 with tensor parallelism)
+
+[profile.gpu.app]
+data_root = "/mnt/data"
+log_level = "INFO"
+log_format = "json"
+metrics_enabled = true
+metrics_port = 9108
+
+[profile.gpu.runner]
+policy = "gpu"
+workers = 8
+schedule = "sjf"
+retries = 2
+retry_backoff_s = 1.0
+adaptive = "conservative"
+fingerprinting = true
+
+[profile.gpu.doctags]
+mode = "pdf"
+model_id = "granite-docling-258M"
+vllm_wait_timeout_s = 120
+
+[profile.gpu.chunk]
+min_tokens = 256
+max_tokens = 1024
+tokenizer_model = "cl100k_base"
+format = "parquet"
+shard_count = 1
+
+[profile.gpu.embed]
+enable_dense = true
+enable_sparse = true
+enable_lexical = true
+
+[profile.gpu.embed.vectors]
+format = "parquet"
+
+[profile.gpu.embed.dense]
+backend = "qwen_vllm"
+
+[profile.gpu.embed.dense.qwen_vllm]
+model_id = "Qwen2-7B-Embedding"
+batch_size = 64
+dtype = "bfloat16"
+device = "cuda:0"
+tensor_parallelism = 1
+max_model_len = 8192
+gpu_memory_utilization = 0.9
+warmup = true
+
+[profile.gpu.embed.sparse.splade_st]
+batch_size = 64
+device = "cuda"
+dtype = "bfloat16"
+attn_backend = "flash_attention_2"
+topk_per_doc = 0
+
+[profile.gpu.embed.lexical.local_bm25]
+k1 = 1.5
+b = 0.75
+
+
+# ============================================================================
+
+[profile.airgapped]
+# Airgapped/offline profile (no network access during inference)
+
+[profile.airgapped.app]
+data_root = "/var/lib/docstokg/data"
+log_level = "WARNING"
+
+[profile.airgapped.runner]
+policy = "cpu"
+workers = 2
+retries = 0
+
+[profile.airgapped.embed]
+offline = true
+
+[profile.airgapped.embed.dense]
+backend = "sentence_transformers"
+
+[profile.airgapped.embed.dense.sentence_transformers]
+model_id = "sentence-transformers/all-MiniLM-L6-v2"
+device = "cpu"
+batch_size = 8
+trust_remote_code = false
+
+
+# ============================================================================
+
+[profile.dev]
+# Development / debugging profile (verbose logging, small batches)
+
+[profile.dev.app]
+data_root = "Data"
+log_level = "DEBUG"
+log_format = "json"
+random_seed = 42
+
+[profile.dev.runner]
+policy = "cpu"
+workers = 1
+retries = 1
+per_item_timeout_s = 300.0
+
+[profile.dev.chunk]
+min_tokens = 64
+max_tokens = 256
+
+[profile.dev.embed.dense.sentence_transformers]
+batch_size = 4
+device = "cpu"
+
+[profile.dev.embed.sparse.splade_st]
+batch_size = 4
+device = "cpu"

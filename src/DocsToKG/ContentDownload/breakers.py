@@ -104,14 +104,14 @@ Typical Usage:
 
     config = BreakerConfig()  # Load from YAML/env/CLI
     registry = BreakerRegistry(config, listener_factory=my_listener_factory)
-    
+
     # Pre-flight check
     registry.allow(host="api.crossref.org", role=RequestRole.METADATA)
-    
+
     # After request
     registry.on_success(host="api.crossref.org", role=RequestRole.METADATA)
     # or
-    registry.on_failure(host="api.crossref.org", role=RequestRole.METADATA, 
+    registry.on_failure(host="api.crossref.org", role=RequestRole.METADATA,
                         status=503, retry_after_s=60.0)
 """
 
@@ -119,7 +119,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Protocol, Sequence, Tuple
+from typing import (
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+)
 import time
 import threading
 from collections import deque
@@ -130,20 +141,22 @@ try:
 except Exception:  # pragma: no cover
     pybreaker = None  # type: ignore
 
-
 # ────────────────────────────────────────────────────────────────────────────────
 # Roles & Exceptions
 # ────────────────────────────────────────────────────────────────────────────────
 
+
 class RequestRole(str, Enum):
     """Request roles for role-specific breaker policies."""
+
     METADATA = "metadata"
-    LANDING  = "landing"
+    LANDING = "landing"
     ARTIFACT = "artifact"
 
 
 class BreakerOpenError(RuntimeError):
     """Raised by BreakerRegistry.allow() when a breaker is open (cooldown in effect)."""
+
     pass
 
 
@@ -152,12 +165,13 @@ class BreakerOpenError(RuntimeError):
 # ────────────────────────────────────────────────────────────────────────────────
 
 DEFAULT_FAILURE_STATUSES = frozenset({429, 500, 502, 503, 504, 408})
-DEFAULT_NEUTRAL_STATUSES  = frozenset({401, 403, 404, 410, 451})
+DEFAULT_NEUTRAL_STATUSES = frozenset({401, 403, 404, 410, 451})
 
 
 @dataclass(frozen=True)
 class BreakerRolePolicy:
     """Overrides for a specific role (metadata|landing|artifact)."""
+
     fail_max: Optional[int] = None
     reset_timeout_s: Optional[int] = None
     trial_calls: int = 1  # half-open: number of probe calls allowed
@@ -166,6 +180,7 @@ class BreakerRolePolicy:
 @dataclass(frozen=True)
 class BreakerPolicy:
     """Base per-host policy, with optional per-role overrides and Retry-After cap."""
+
     fail_max: int = 5
     reset_timeout_s: int = 60
     retry_after_cap_s: int = 900
@@ -175,6 +190,7 @@ class BreakerPolicy:
 @dataclass(frozen=True)
 class BreakerClassification:
     """What counts as failure vs neutral (non-failure) for breaker accounting."""
+
     failure_statuses: frozenset[int] = DEFAULT_FAILURE_STATUSES
     neutral_statuses: frozenset[int] = DEFAULT_NEUTRAL_STATUSES
     # Exceptions are provided by networking when constructing the registry (httpx exceptions, etc.)
@@ -184,6 +200,7 @@ class BreakerClassification:
 @dataclass(frozen=True)
 class RollingWindowPolicy:
     """Best-effort manual-open if too many failures land in a short window."""
+
     enabled: bool = False
     window_s: int = 30
     threshold_failures: int = 6
@@ -193,6 +210,7 @@ class RollingWindowPolicy:
 @dataclass(frozen=True)
 class HalfOpenPolicy:
     """Global knobs for half-open behavior."""
+
     jitter_ms: int = 150  # stagger probe calls a little
 
 
@@ -204,23 +222,26 @@ class BreakerConfig:
     - hosts: host-specific policies
     - resolvers: optional per-resolver policies (applied in addition to host)
     """
+
     defaults: BreakerPolicy = field(default_factory=BreakerPolicy)
     classify: BreakerClassification = field(default_factory=BreakerClassification)
     half_open: HalfOpenPolicy = field(default_factory=HalfOpenPolicy)
     rolling: RollingWindowPolicy = field(default_factory=RollingWindowPolicy)
-    hosts: Mapping[str, BreakerPolicy] = field(default_factory=dict)          # host -> policy
-    resolvers: Mapping[str, BreakerPolicy] = field(default_factory=dict)      # resolver-name -> policy
+    hosts: Mapping[str, BreakerPolicy] = field(default_factory=dict)  # host -> policy
+    resolvers: Mapping[str, BreakerPolicy] = field(default_factory=dict)  # resolver-name -> policy
 
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Cooldown store abstraction (for cross-process sharing)
 # ────────────────────────────────────────────────────────────────────────────────
 
+
 class CooldownStore(Protocol):
     """
     External store for host cooldown overrides (Retry-After or rolling-window).
     Times are monotonic deadlines (time.monotonic()) to avoid wall clock drift.
     """
+
     def get_until(self, host: str) -> Optional[float]: ...
     def set_until(self, host: str, until_monotonic: float, reason: str) -> None: ...
     def clear(self, host: str) -> None: ...
@@ -229,6 +250,7 @@ class CooldownStore(Protocol):
 @dataclass
 class InMemoryCooldownStore:
     """Process-local cooldown store; safe default."""
+
     _until: Dict[str, float] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -252,12 +274,14 @@ class InMemoryCooldownStore:
 # Listener factory protocol (to emit transitions)
 # ────────────────────────────────────────────────────────────────────────────────
 
+
 class BreakerListenerFactory(Protocol):
     """
     Given (host, scope, resolver) returns a pybreaker listener (or None) to attach.
     Scope is 'host' or 'resolver'. Use your NetworkBreakerListener from
     networking_breaker_listener.py to build these.
     """
+
     def __call__(self, host: str, scope: str, resolver: Optional[str]) -> Optional[object]: ...
 
 
@@ -265,9 +289,11 @@ class BreakerListenerFactory(Protocol):
 # Registry
 # ────────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class _HalfOpenCounter:
     """Track how many probes are allowed in half-open per (host, role)."""
+
     remaining: int
     last_open_at: float
 
@@ -316,26 +342,34 @@ class BreakerRegistry:
 
     def allow(self, host: str, *, role: RequestRole, resolver: Optional[str] = None) -> None:
         """
-        Pre-flight check before sending a network request.
+        Pre-flight check: raise BreakerOpenError if host/resolver is in cooldown or breaker is open.
 
         Raises:
             BreakerOpenError if the breaker is open OR a manual cooldown override is active.
         """
+        from DocsToKG.ContentDownload.breakers_loader import (
+            _normalize_host_key,
+        )  # Deferred to avoid circular
+
         now = self._now()
-        host_key = host.lower()  # host is expected to be canonicalized upstream
+        host_key = _normalize_host_key(host)
 
         with self._lock:
             # 1) Cooldown override (Retry-After or rolling window)
             until = self.cooldowns.get_until(host_key)
             if until and until > now:
-                raise BreakerOpenError(f"host={host_key} cooldown_remaining_ms={int((until-now)*1000)}")
+                raise BreakerOpenError(
+                    f"host={host_key} cooldown_remaining_ms={int((until - now) * 1000)}"
+                )
 
             # 2) Manual-open from rolling-window policy (check window and maybe set cooldown)
             if self._should_manual_open(host_key, now):
                 # If opened now, the cooldown store holds the deadline; deny this call.
                 until2 = self.cooldowns.get_until(host_key)
                 if until2 and until2 > now:
-                    raise BreakerOpenError(f"host={host_key} cooldown_remaining_ms={int((until2-now)*1000)}")
+                    raise BreakerOpenError(
+                        f"host={host_key} cooldown_remaining_ms={int((until2 - now) * 1000)}"
+                    )
 
             # 3) pybreaker state (host)
             h_cb = self._get_or_create_host_breaker(host_key)
@@ -348,7 +382,9 @@ class BreakerRegistry:
                 r_cb = self._get_or_create_resolver_breaker(resolver)
                 if r_cb.current_state == pybreaker.STATE_OPEN:
                     remaining = self._remaining_cooldown_ms(r_cb, now)
-                    raise BreakerOpenError(f"resolver={resolver} breaker=open remaining_ms={remaining}")
+                    raise BreakerOpenError(
+                        f"resolver={resolver} breaker=open remaining_ms={remaining}"
+                    )
 
             # 5) Half-open trial calls per role
             self._enforce_half_open_probe_limit(host_key, role, h_cb, now)
@@ -358,7 +394,11 @@ class BreakerRegistry:
         Call when a request succeeded (2xx/3xx or healthy terminal path).
         Resets counters and clears cooldown overrides.
         """
-        host_key = host.lower()
+        from DocsToKG.ContentDownload.breakers_loader import (
+            _normalize_host_key,
+        )  # Deferred to avoid circular
+
+        host_key = _normalize_host_key(host)
         with self._lock:
             self._get_or_create_host_breaker(host_key).call_success()
             if resolver:
@@ -382,7 +422,11 @@ class BreakerRegistry:
         Call when a request failed due to retryable server status or network exception.
         May open pybreaker and/or set a cooldown override (Retry-After or rolling-window).
         """
-        host_key = host.lower()
+        from DocsToKG.ContentDownload.breakers_loader import (
+            _normalize_host_key,
+        )  # Deferred to avoid circular
+
+        host_key = _normalize_host_key(host)
         now = self._now()
         with self._lock:
             # Record pybreaker failures (host + optional resolver)
@@ -404,7 +448,11 @@ class BreakerRegistry:
     def current_state(self, host: str, *, resolver: Optional[str] = None) -> str:
         """Return the pybreaker state for ``host`` or an optional ``resolver``."""
 
-        host_key = host.lower()
+        from DocsToKG.ContentDownload.breakers_loader import (
+            _normalize_host_key,
+        )  # Deferred to avoid circular
+
+        host_key = _normalize_host_key(host)
         with self._lock:
             if resolver:
                 return self._state_name(self._get_or_create_resolver_breaker(resolver))
@@ -413,7 +461,11 @@ class BreakerRegistry:
     def cooldown_remaining_ms(self, host: str, *, resolver: Optional[str] = None) -> Optional[int]:
         """Return remaining cooldown in milliseconds for host/resolver if open."""
 
-        host_key = host.lower()
+        from DocsToKG.ContentDownload.breakers_loader import (
+            _normalize_host_key,
+        )  # Deferred to avoid circular
+
+        host_key = _normalize_host_key(host)
         now = self._now()
         remaining: List[int] = []
 
@@ -459,7 +511,7 @@ class BreakerRegistry:
         cb = pybreaker.CircuitBreaker(
             fail_max=base.fail_max,
             reset_timeout=base.reset_timeout_s,
-            state_storage=None,                # in-proc; cooldown overrides handled externally
+            state_storage=None,  # in-proc; cooldown overrides handled externally
             listeners=listeners,
         )
         self._host_breakers[host] = cb
@@ -499,7 +551,9 @@ class BreakerRegistry:
         except Exception:
             return 0
 
-    def _enforce_half_open_probe_limit(self, host: str, role: RequestRole, cb: pybreaker.CircuitBreaker, now: float) -> None:
+    def _enforce_half_open_probe_limit(
+        self, host: str, role: RequestRole, cb: pybreaker.CircuitBreaker, now: float
+    ) -> None:
         """Allow only N trial calls in half-open per (host, role)."""
         if cb.current_state != pybreaker.STATE_HALF_OPEN:
             return
@@ -567,6 +621,7 @@ class BreakerRegistry:
 # ────────────────────────────────────────────────────────────────────────────────
 # Helpers for networking (classification)
 # ────────────────────────────────────────────────────────────────────────────────
+
 
 def is_failure_for_breaker(
     classify: BreakerClassification,

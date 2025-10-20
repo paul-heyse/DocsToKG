@@ -188,7 +188,11 @@ class ResolverResult:
             parsed = urlsplit(self.referer)
             host = parsed.hostname
             if host:
-                object.__setattr__(self, "origin_host", host.lower())
+                from DocsToKG.ContentDownload.breakers_loader import (
+                    _normalize_host_key,
+                )  # Deferred to avoid circular
+
+                object.__setattr__(self, "origin_host", _normalize_host_key(host))
 
     @property
     def is_event(self) -> bool:

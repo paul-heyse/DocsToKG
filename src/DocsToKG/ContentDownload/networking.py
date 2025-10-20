@@ -149,9 +149,10 @@ from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_req
 
 try:  # pragma: no cover - optional when pybreaker missing in envs
     from DocsToKG.ContentDownload.breakers import (
+        BreakerClassification,
         BreakerOpenError,
+        BreakerRegistry,
         RequestRole,
-        is_failure_for_breaker,
     )
 except Exception:  # pragma: no cover - pybreaker absent, keep networking importable
     BreakerOpenError = None  # type: ignore[assignment]
@@ -197,11 +198,7 @@ _BREAKER_LOCK = threading.RLock()
 _breaker_registry: Optional["BreakerRegistry"] = None
 
 # Exceptions considered breaker failures by default
-DEFAULT_BREAKER_FAILURE_EXCEPTIONS = (
-    httpx.TimeoutException,
-    httpx.TransportError,
-    httpx.ProtocolError,
-)
+# (REMOVED DEFAULT_BREAKER_FAILURE_EXCEPTIONS - use BreakerClassification().failure_statuses instead)
 
 _DEPRECATED_ATTR_ERRORS: Dict[str, str] = {
     "ThreadLocalSessionFactory": (
@@ -235,7 +232,7 @@ def configure_breaker_registry(
 
     classify = config.classify
     if not classify.failure_exceptions:
-        classify = replace(classify, failure_exceptions=DEFAULT_BREAKER_FAILURE_EXCEPTIONS)
+        classify = replace(classify, failure_exceptions=BreakerClassification().failure_exceptions)
         config = replace(config, classify=classify)
 
     registry = BreakerRegistry(
