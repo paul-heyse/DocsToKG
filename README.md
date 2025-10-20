@@ -122,6 +122,20 @@ for result in response.results:
     print(result.doc_id, round(result.score, 3), result.highlights)
 ```
 
+#### Thread pool sizing
+
+`HybridSearchService` runs BM25, SPLADE, and dense lookups concurrently using a
+`ThreadPoolExecutor`. Override the default worker count (3) via
+`RetrievalConfig.executor_max_workers` when tuning throughput or resource usage:
+
+```python
+HybridSearchConfig(
+    retrieval=RetrievalConfig(executor_max_workers=6),
+)
+```
+
+Set the field to `None` (or omit it) to fall back to the built-in default.
+
 #### CPU snapshot refresh throttling
 
 Dense FAISS indexes now throttle CPU snapshot refreshes to reduce excessive
@@ -146,6 +160,13 @@ Observability now reports when snapshots occur: counters
 and throttled attempts (labelled by reason and whether the refresh was forced),
 while the gauge `faiss_snapshot_age_seconds` surfaces the age of the cached CPU
 replica for dashboards and alerts.
+
+Cold restores should now call `DocsToKG.HybridSearch.store.restore_state`
+with the active `ChunkRegistry` (``restore_state(..., registry=registry)``).
+The helper applies the serialized ``vector_ids`` sequence to
+``ChunkRegistry`` before handing the byte stream to FAISS, ensuring UUID
+bridges remain consistent with the rehydrated index while you reload chunk
+metadata from durable storage.
 
 #### Ingestion workflow validation
 

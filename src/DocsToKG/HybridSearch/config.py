@@ -262,6 +262,7 @@ class RetrievalConfig:
         bm25_scoring: \"compat\" for legacy dot-product, \"true\" for Okapi BM25
         bm25_k1: Okapi BM25 k1 parameter (used when bm25_scoring == \"true\")
         bm25_b: Okapi BM25 b parameter (used when bm25_scoring == \"true\")
+        executor_max_workers: Optional override for the service thread pool size
 
     Examples:
         >>> config = RetrievalConfig(
@@ -287,6 +288,22 @@ class RetrievalConfig:
     # Okapi BM25 hyperparameters (only used when bm25_scoring == "true")
     bm25_k1: float = 1.2
     bm25_b: float = 0.75
+    # Optional override for HybridSearchService executor parallelism (None uses default)
+    executor_max_workers: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        max_workers = self.executor_max_workers
+        if max_workers is None:
+            return
+        if not isinstance(max_workers, int):
+            raise TypeError(
+                "RetrievalConfig.executor_max_workers must be an int, "
+                f"received {type(max_workers).__name__}"
+            )
+        if max_workers <= 0:
+            raise ValueError(
+                "RetrievalConfig.executor_max_workers must be positive"
+            )
 
 
 @dataclass(frozen=True)

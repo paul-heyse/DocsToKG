@@ -107,9 +107,7 @@ def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
             masked_pair = _mask_header_pair(value)
             if masked_pair is not None:
                 return masked_pair
-            return tuple(
-                _mask_header_pair(item) or _mask_value(item, key_hint) for item in value
-            )
+            return tuple(_mask_header_pair(item) or _mask_value(item, key_hint) for item in value)
         if isinstance(value, set):
             masked_set = set()
             for item in value:

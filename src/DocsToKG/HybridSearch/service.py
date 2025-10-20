@@ -866,6 +866,7 @@ class HybridSearchService:
             None
         """
         self._config_manager = config_manager
+        config = self._config_manager.get()
         self._feature_generator = feature_generator
         self._opensearch = opensearch
         self._registry = registry
@@ -884,7 +885,8 @@ class HybridSearchService:
         self._assert_managed_store(self._faiss)
         self._faiss_router.set_resolver(self._registry.resolve_faiss_id)
         self._dense_strategy = DenseSearchStrategy(cache_path=cache_path)
-        self._executor = ThreadPoolExecutor(max_workers=3)
+        max_workers = config.retrieval.executor_max_workers or 3
+        self._executor = ThreadPoolExecutor(max_workers=max_workers)
         schema_manager = None
         for attr in ("schema_manager", "schema", "_schema"):
             candidate = getattr(self._opensearch, attr, None)
@@ -977,7 +979,12 @@ class HybridSearchService:
                 else bool(getattr(getattr(dense_store, "config", object()), "flat_use_fp16", False))
             )
             cuvs_requested = getattr(config.dense, "use_cuvs", None)
-            cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(cuvs_requested)
+            if adapter_stats is not None:
+                cuvs_enabled = bool(adapter_stats.cuvs_enabled)
+                cuvs_available = bool(adapter_stats.cuvs_available)
+                cuvs_reported = adapter_stats.cuvs_reported
+            else:
+                cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(cuvs_requested)
             self._observability.metrics.set_gauge(
                 "faiss_cuvs_enabled", 1.0 if cuvs_enabled else 0.0, channel="dense"
             )
@@ -1011,9 +1018,51 @@ class HybridSearchService:
                 timings,
                 dense_store,
             )
-            bm25 = f_bm25.result()
-            splade = f_splade.result()
-            dense = f_dense.result()
+            futures = {"bm25": f_bm25, "splade": f_splade, "dense": f_dense}
+            channel_results: Dict[str, ChannelResults] = {}
+            failed_channel: Optional[str] = None
+            try:
+                for channel_name in ("bm25", "splade", "dense"):
+                    failed_channel = channel_name
+                    channel_results[channel_name] = futures[channel_name].result()
+            except Exception as exc:
+                for name, future in futures.items():
+                    if name != failed_channel and not future.done():
+                        future.cancel()
+                namespace = request.namespace or "*"
+                error_message = str(exc)
+                error_details = (
+                    f"{type(exc).__name__}: {error_message}"
+                    if error_message
+                    else type(exc).__name__
+                )
+                self._observability.logger.exception(
+                    "hybrid-search-channel-error",
+                    extra={
+                        "event": {
+                            "channel": failed_channel,
+                            "namespace": namespace,
+                            "filters": filters,
+                            "query": request.query,
+                            "error": error_details,
+                        }
+                    },
+                )
+                if failed_channel:
+                    message = (
+                        "Hybrid search channel '"
+                        f"{failed_channel}' failed for namespace '{namespace}': "
+                        f"{error_details}"
+                    )
+                else:
+                    message = (
+                        "Hybrid search channel failed for namespace '"
+                        f"{namespace}': {error_details}"
+                    )
+                raise RequestValidationError(message) from exc
+            bm25 = channel_results["bm25"]
+            splade = channel_results["splade"]
+            dense = channel_results["dense"]
 
             embedding_cache: Dict[str, np.ndarray] = {}
             if dense.embeddings is not None:
@@ -1930,6 +1979,8 @@ class PaginationCheckResult:
     Attributes:
         cursor_chain: Sequence of pagination cursors encountered.
         duplicate_detected: True when duplicate results were observed.
+        termination_reason: Description explaining why pagination inspection
+            stopped.
 
     Examples:
         >>> result = PaginationCheckResult(cursor_chain=["cursor1"], duplicate_detected=False)
@@ -1939,6 +1990,7 @@ class PaginationCheckResult:
 
     cursor_chain: Sequence[str]
     duplicate_detected: bool
+    termination_reason: str = "cursor_exhausted"
 
 
 # --- Public Functions ---
@@ -1967,8 +2019,14 @@ def build_stats_snapshot(
     }
 
 
+_DEFAULT_PAGINATION_PAGE_LIMIT = 32
+
+
 def verify_pagination(
-    service: HybridSearchService, request: HybridSearchRequest
+    service: HybridSearchService,
+    request: HybridSearchRequest,
+    *,
+    max_pages: Optional[int] = None,
 ) -> PaginationCheckResult:
     """Ensure pagination cursors produce non-duplicated results.
 
@@ -1985,9 +2043,31 @@ def verify_pagination(
     next_request = request
     duplicate = False
     seen_cursors: set[str] = set()
+    inspected_pages = 0
+    termination_reason = "cursor_exhausted"
+
+    page_limit = max_pages
+    if page_limit is None:
+        try:
+            config = service._config_manager.get()  # type: ignore[attr-defined]
+        except Exception:
+            config = None
+        if config is not None:
+            try:
+                mmr_pool = getattr(config.retrieval, "mmr_pool_size", None)
+                page_size = max(1, int(getattr(request, "page_size", 1)))
+            except Exception:
+                mmr_pool = None
+                page_size = 1
+            else:
+                if isinstance(mmr_pool, (int, float)) and mmr_pool > 0:
+                    page_limit = max(1, math.ceil(mmr_pool / page_size))
+    if page_limit is None:
+        page_limit = _DEFAULT_PAGINATION_PAGE_LIMIT
 
     while True:
         response = service.search(next_request)
+        inspected_pages += 1
         for result in response.results:
             key = (result.doc_id, result.chunk_id)
             if key in seen:
@@ -1995,7 +2075,14 @@ def verify_pagination(
             seen.add(key)
 
         next_cursor = response.next_cursor
-        if not next_cursor or next_cursor in seen_cursors:
+        if not next_cursor:
+            termination_reason = "cursor_exhausted"
+            break
+        if next_cursor in seen_cursors:
+            termination_reason = "cursor_cycle"
+            break
+        if inspected_pages >= page_limit:
+            termination_reason = "max_pages_reached"
             break
 
         cursor_chain.append(next_cursor)
@@ -2011,7 +2098,11 @@ def verify_pagination(
             recall_first=request.recall_first,
         )
 
-    return PaginationCheckResult(cursor_chain=cursor_chain, duplicate_detected=duplicate)
+    return PaginationCheckResult(
+        cursor_chain=cursor_chain,
+        duplicate_detected=duplicate,
+        termination_reason=termination_reason,
+    )
 
 
 def should_rebuild_index(
@@ -3239,7 +3330,7 @@ class HybridSearchValidator:
                 [(result.doc_id, round(result.score, 6)) for result in response.results[:15]]
             )
 
-        restore_state(self._ingestion.faiss_index, snapshot)
+        restore_state(self._ingestion.faiss_index, snapshot, registry=self._registry)
 
         mismatches = 0
         for (_, query_payload), expected in zip(sampled_pairs, baseline_results):

@@ -16,9 +16,10 @@ from types import SimpleNamespace
 from typing import Callable, Mapping, Optional, Sequence
 
 import numpy as np
+import pytest
 
 from DocsToKG.HybridSearch.config import DenseIndexConfig
-from DocsToKG.HybridSearch.router import FaissRouter
+from DocsToKG.HybridSearch.router import DEFAULT_NAMESPACE, FaissRouter
 from DocsToKG.HybridSearch.store import ManagedFaissAdapter
 
 
@@ -177,6 +178,31 @@ class RecordingFaissStore:
         return False
 
 
+class RichStatsStore(DummyDenseStore):
+    """Dummy store exposing richer stats for aggregate tests."""
+
+    def __init__(
+        self,
+        namespace: str,
+        *,
+        serialized_bytes: float,
+        rebuild_required: bool,
+        index_size: float,
+    ) -> None:
+        super().__init__(namespace)
+        self._serialized_bytes = float(serialized_bytes)
+        self._rebuild_required = rebuild_required
+        self._index_size = float(index_size)
+
+    def stats(self) -> Mapping[str, float | str | bool]:  # type: ignore[override]
+        return {
+            "ntotal": float(self.ntotal),
+            "serialized_bytes": self._serialized_bytes,
+            "index_size": self._index_size,
+            "rebuild_required": self._rebuild_required,
+        }
+
+
 def test_restore_all_rehydrates_multiple_namespaces() -> None:
     """Ensure per-namespace restores hydrate every serialized store."""
 
@@ -256,6 +282,50 @@ def test_managed_adapter_restores_with_snapshot_metadata() -> None:
     assert inner_rehydrated.last_restore_meta == snapshot_meta
     assert inner_rehydrated._vectors == ["alpha-vector"]
 
+
+def test_stats_aggregate_handles_mixed_metric_types() -> None:
+    """Aggregate stats should sum gauges, max timestamps, and track booleans."""
+
+    router = FaissRouter(
+        per_namespace=True,
+        default_store=RichStatsStore(
+            "__default__",
+            serialized_bytes=0.0,
+            rebuild_required=False,
+            index_size=0.0,
+        ),
+        factory=lambda namespace: RichStatsStore(
+            namespace,
+            serialized_bytes=111.0 if namespace == "alpha" else 222.0,
+            rebuild_required=namespace == "beta",
+            index_size=10.0 if namespace == "alpha" else 20.0,
+        ),
+    )
+
+    alpha_store = router.get("alpha")
+    beta_store = router.get("beta")
+    alpha_store.add([np.zeros(3, dtype=np.float32)], ["alpha-vector"])
+    beta_store.add([np.zeros(3, dtype=np.float32)], ["beta-vector-1", "beta-vector-2"])
+
+    router._last_used[DEFAULT_NAMESPACE] = 1.0
+    router._last_used["alpha"] = 123.456
+    router._last_used["beta"] = 789.101
+
+    stats = router.stats()
+    aggregate = stats["aggregate"]
+
+    assert aggregate["ntotal"] == pytest.approx(3.0)
+    assert aggregate["serialized_bytes"] == pytest.approx(333.0)
+    assert aggregate["index_size"] == pytest.approx(30.0)
+    assert aggregate["last_used_ts"] == pytest.approx(789.101)
+
+    boolean_fields = aggregate.get("boolean_fields")
+    assert isinstance(boolean_fields, Mapping)
+    assert "evicted" in boolean_fields
+    assert boolean_fields["evicted"] == {"true": 0, "false": 3}
+    assert boolean_fields["rebuild_required"] == {"true": 1, "false": 2}
+    assert "evicted" not in aggregate
+    assert "rebuild_required" not in aggregate
 
 def test_serialize_and_restore_roundtrip_carries_metadata() -> None:
     """Router serialization should retain metadata for restore_all."""

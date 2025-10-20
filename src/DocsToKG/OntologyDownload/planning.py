@@ -86,9 +86,9 @@ from .io import (
     validate_url_security,
 )
 from .io.network import _extract_correlation_id, _parse_retry_after, request_with_redirect_audit
-from .net import get_http_client
 from .logging_utils import setup_logging
 from .migrations import migrate_manifest
+from .net import get_http_client
 from .resolvers import (
     RESOLVERS,
     BaseResolver,
@@ -1995,13 +1995,9 @@ def fetch_one(
                     }
                     attempt_record["validators"] = list(failed_validators)
                     if active_config.defaults.continue_on_error:
-                        adapter.warning(
-                            "validation failures ignored", extra=log_payload
-                        )
+                        adapter.warning("validation failures ignored", extra=log_payload)
                     else:
-                        adapter.error(
-                            "validation failures detected", extra=log_payload
-                        )
+                        adapter.error("validation failures detected", extra=log_payload)
                         _cleanup_failed_validation_artifacts(
                             destination=destination,
                             extraction_dir=extraction_dir,

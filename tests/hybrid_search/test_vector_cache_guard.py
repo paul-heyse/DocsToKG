@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Callable, List, Tuple
+from typing import Callable, Iterable, List, Tuple
 
 import pytest
 
@@ -37,6 +37,13 @@ class _StubLexical:
 def _write_jsonl(path: Path, entries: List[dict]) -> None:
     payload = "\n".join(json.dumps(entry) for entry in entries) + "\n"
     path.write_text(payload, encoding="utf-8")
+
+
+def _write_jsonl_iter(path: Path, entries: Iterable[dict]) -> None:
+    with path.open("w", encoding="utf-8") as handle:
+        for entry in entries:
+            handle.write(json.dumps(entry))
+            handle.write("\n")
 
 
 def _misordered_document(tmp_path: Path) -> DocumentInput:
@@ -103,6 +110,55 @@ def _misordered_document(tmp_path: Path) -> DocumentInput:
 
     return DocumentInput(
         doc_id="doc",
+        namespace="ns",
+        chunk_path=chunk_path,
+        vector_path=vector_path,
+        metadata={},
+    )
+
+
+def _ordered_document(
+    tmp_path: Path,
+    *,
+    count: int,
+    drop_last_vector: bool = False,
+    doc_id: str = "ordered",
+) -> DocumentInput:
+    chunk_dir = tmp_path / f"chunks-{doc_id}"
+    vector_dir = tmp_path / f"vectors-{doc_id}"
+    chunk_dir.mkdir()
+    vector_dir.mkdir()
+
+    chunk_path = chunk_dir / f"{doc_id}.chunks.jsonl"
+    vector_path = vector_dir / f"{doc_id}.vectors.jsonl"
+
+    def chunk_entries() -> Iterable[dict]:
+        for idx in range(count):
+            yield {
+                "uuid": f"vec-{idx}",
+                "chunk_id": idx,
+                "text": f"chunk {idx}",
+                "num_tokens": 1,
+                "source_chunk_idxs": [idx],
+                "doc_items_refs": [],
+            }
+
+    def vector_entries() -> Iterable[dict]:
+        upper = count - 1 if drop_last_vector and count else count
+        for idx in range(upper):
+            yield {
+                "UUID": f"vec-{idx}",
+                "BM25": {"terms": [], "weights": []},
+                "SPLADEv3": {"tokens": [], "weights": []},
+                "Qwen3-4B": {"vector": [float(idx % 3), float((idx + 1) % 3)], "dimension": 2},
+                "model_metadata": {},
+            }
+
+    _write_jsonl_iter(chunk_path, chunk_entries())
+    _write_jsonl_iter(vector_path, vector_entries())
+
+    return DocumentInput(
+        doc_id=doc_id,
         namespace="ns",
         chunk_path=chunk_path,
         vector_path=vector_path,
@@ -245,3 +301,50 @@ def test_vector_cache_stats_hook_tracks_cache_shrink(tmp_path: Path) -> None:
     assert any(
         earlier > later for earlier, later in zip(sizes, sizes[1:])
     ), "Expected at least one cache shrink event"
+
+
+def test_missing_vectors_detected_during_streaming(tmp_path: Path) -> None:
+    """Missing vectors should raise even when chunk JSONL is streamed lazily."""
+
+    document = _ordered_document(tmp_path, count=3, drop_last_vector=True, doc_id="missing")
+
+    pipeline = ChunkIngestionPipeline(
+        faiss_index=_StubFaiss(),
+        opensearch=_StubLexical(),
+        registry=_StubRegistry(),
+        observability=Observability(),
+        vector_cache_limit=4,
+    )
+
+    with pytest.raises(IngestError, match="Missing vector entries for chunk UUIDs: vec-2"):
+        pipeline._load_precomputed_chunks(document)
+
+
+def test_large_jsonl_ingest_bounded_memory(tmp_path: Path) -> None:
+    """Ingesting large JSONL artifacts should keep the vector cache bounded."""
+
+    document = _ordered_document(tmp_path, count=5_000, doc_id="large")
+    stats: List[Tuple[int, str]] = []
+    pipeline = ChunkIngestionPipeline(
+        faiss_index=_StubFaiss(),
+        opensearch=_StubLexical(),
+        registry=_StubRegistry(),
+        observability=Observability(),
+        vector_cache_limit=16,
+        vector_cache_stats_hook=lambda size, doc: stats.append((size, doc.doc_id)),
+    )
+
+    import tracemalloc
+
+    tracemalloc.start()
+    try:
+        payloads = pipeline._load_precomputed_chunks(document)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert len(payloads) == 5_000
+    max_cache = max((size for size, doc_id in stats if doc_id == "large"), default=0)
+    assert max_cache <= 1
+    # Ensure the ingestion stays well within a 100 MiB working set while streaming.
+    assert peak < 100 * 1024 * 1024

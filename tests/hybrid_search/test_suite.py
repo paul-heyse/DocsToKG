@@ -291,7 +291,7 @@ import uuid
 from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 from typing import Any, Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
@@ -335,6 +335,7 @@ from DocsToKG.HybridSearch.service import (
     verify_pagination,
 )
 from DocsToKG.HybridSearch.store import (
+    AdapterStats,
     ChunkRegistry,
     FaissSearchResult,
     FaissVectorStore,
@@ -416,6 +417,165 @@ def test_infer_embedding_dim_handles_underscore_key(tmp_path: Path) -> None:
     dataset = [{"document": {"vector_file": str(vector_path)}}]
 
     assert infer_embedding_dim(dataset) == 4
+
+
+def test_search_gauges_prefer_adapter_stats_when_cuvs_fails(
+    monkeypatch: "pytest.MonkeyPatch",
+) -> None:
+    class RecordingLogger:
+        def __init__(self) -> None:
+            self.records: list[tuple[str, str, Dict[str, object]]] = []
+
+        def info(self, message: str, *args: object, **kwargs: object) -> None:
+            self.records.append(("info", message, dict(kwargs)))
+
+        def debug(self, message: str, *args: object, **kwargs: object) -> None:
+            self.records.append(("debug", message, dict(kwargs)))
+
+        def exception(self, message: str, *args: object, **kwargs: object) -> None:
+            self.records.append(("exception", message, dict(kwargs)))
+
+    class ImmediateFuture:
+        def __init__(
+            self, fn: Callable[..., object], args: tuple[object, ...], kwargs: Dict[str, object]
+        ) -> None:
+            self._fn = fn
+            self._args = args
+            self._kwargs = kwargs
+
+        def result(self) -> object:
+            return self._fn(*self._args, **self._kwargs)
+
+    class ImmediateExecutor:
+        def submit(
+            self, fn: Callable[..., object], *args: object, **kwargs: object
+        ) -> ImmediateFuture:
+            return ImmediateFuture(fn, args, dict(kwargs))
+
+        def shutdown(self, wait: bool = False) -> None:
+            return None
+
+    logger = RecordingLogger()
+    observability = Observability(logger=logger)
+
+    adapter_stats = AdapterStats(
+        device=0,
+        ntotal=0,
+        index_description="flat",
+        nprobe=1,
+        multi_gpu_mode="single",
+        replicated=False,
+        fp16_enabled=False,
+        resources=None,
+        cuvs_enabled=False,
+        cuvs_available=False,
+        cuvs_reported=False,
+        cuvs_requested=True,
+        cuvs_applied=False,
+    )
+
+    class DummyDenseStore:
+        def __init__(self, stats: AdapterStats) -> None:
+            self._stats = stats
+
+        @property
+        def adapter_stats(self) -> AdapterStats:
+            return self._stats
+
+        def get_gpu_resources(self) -> None:
+            return None
+
+        def stats(self) -> Mapping[str, object]:
+            return {"ntotal": 0}
+
+    dense_store = DummyDenseStore(adapter_stats)
+
+    class DummyRouter:
+        def __init__(self, store: DummyDenseStore) -> None:
+            self.default_store = store
+
+        def get(self, namespace: Optional[str]) -> DummyDenseStore:
+            return self.default_store
+
+    router = DummyRouter(dense_store)
+
+    registry = SimpleNamespace(
+        resolve_embedding=lambda vector_id, cache=None: np.zeros(1, dtype=np.float32),
+        resolve_embeddings=lambda vector_ids, cache=None: np.zeros((len(vector_ids), 1), dtype=np.float32),
+        count=lambda: 0,
+    )
+    opensearch = SimpleNamespace(
+        stats=lambda: {},
+        search_bm25=lambda *_args, **_kwargs: ([], {}),
+        search_splade=lambda *_args, **_kwargs: ([], {}),
+    )
+
+    config = SimpleNamespace(
+        dense=SimpleNamespace(use_cuvs=True),
+        fusion=SimpleNamespace(
+            k0=60.0,
+            enable_mmr=False,
+            channel_weights=None,
+            mmr_lambda=0.5,
+            mmr_pool_size=4,
+            token_budget=0,
+            byte_budget=0,
+            max_chunks_per_doc=2,
+        ),
+        retrieval=SimpleNamespace(bm25_top_k=0, splade_top_k=0, dense_score_floor=0.0),
+    )
+    config_manager = SimpleNamespace(get=lambda: config)
+
+    feature_generator = SimpleNamespace(
+        compute_features=lambda _query: SimpleNamespace(
+            bm25_terms={}, splade_weights={}, embedding=np.zeros(1, dtype=np.float32)
+        )
+    )
+
+    service = object.__new__(HybridSearchService)
+    service._config_manager = config_manager
+    service._feature_generator = feature_generator
+    service._observability = observability
+    service._faiss_router = router
+    service._faiss = dense_store
+    service._registry = registry
+    service._opensearch = opensearch
+    service._executor = ImmediateExecutor()
+    service._validate_request = MethodType(lambda _self, _request: None, service)
+    service._assert_managed_store = MethodType(lambda _self, _store: None, service)
+
+    def _empty_channel(*_args: object, **_kwargs: object) -> service_module.ChannelResults:
+        return service_module.ChannelResults(candidates=[], scores={}, embeddings=None)
+
+    service._execute_bm25 = MethodType(_empty_channel, service)
+    service._execute_splade = MethodType(_empty_channel, service)
+    service._execute_dense = MethodType(_empty_channel, service)
+
+    monkeypatch.setattr(service_module, "resolve_cuvs_state", lambda *args, **kwargs: (True, True, True))
+
+    request = HybridSearchRequest(query="demo", namespace=None, filters={}, page_size=1, diagnostics=False)
+
+    response = service.search(request)
+
+    assert isinstance(response, HybridSearchResponse)
+
+    gauge_map = {
+        (sample.name, tuple(sorted(sample.labels.items()))): sample.value
+        for sample in observability.metrics.export_gauges()
+    }
+
+    dense_enabled = gauge_map.get(("faiss_cuvs_enabled", (("channel", "dense"),)))
+    dense_available = gauge_map.get(("faiss_cuvs_available", (("channel", "dense"),)))
+
+    assert dense_enabled == pytest.approx(0.0)
+    assert dense_available == pytest.approx(0.0)
+
+    cuvs_logs = [entry for entry in logger.records if entry[1] == "faiss-cuvs-state"]
+    assert cuvs_logs, "search should log cuVS state"
+    payload = cuvs_logs[-1][2].get("extra", {}).get("event", {})
+    assert payload.get("requested") is True
+    assert payload.get("enabled") is False
+    assert payload.get("available") is False
 
 
 # --- test_hybrid_search.py ---
@@ -1069,6 +1229,7 @@ def test_operations_snapshot_and_restore_roundtrip(
     request = HybridSearchRequest(query="faiss", namespace="research", filters={}, page_size=2)
     pagination_result = verify_pagination(service, request)
     assert not pagination_result.duplicate_detected
+    assert pagination_result.termination_reason == "cursor_exhausted"
 
     assert not should_rebuild_index(registry, deleted_since_snapshot=0, threshold=0.5)
     assert should_rebuild_index(
@@ -1165,8 +1326,65 @@ def test_verify_pagination_preserves_recall_first() -> None:
 
     assert pagination.cursor_chain == ["cursor-1", "cursor-2"]
     assert not pagination.duplicate_detected
+    assert pagination.termination_reason == "cursor_exhausted"
     assert len(service.requests) == 3
     assert all(call.recall_first for call in service.requests)
+
+
+def test_verify_pagination_enforces_page_limit() -> None:
+    responses = []
+    for idx in range(6):
+        next_cursor = f"cursor-{idx + 1}" if idx < 5 else None
+        responses.append(
+            HybridSearchResponse(
+                results=[
+                    HybridSearchResult(
+                        doc_id=f"doc-{idx}",
+                        chunk_id=f"chunk-{idx}",
+                        vector_id=f"vec-{idx}",
+                        namespace="test",
+                        score=1.0,
+                        fused_rank=idx,
+                        text=f"page {idx}",
+                        highlights=(),
+                        provenance_offsets=(),
+                        diagnostics=HybridSearchDiagnostics(),
+                        metadata={},
+                    )
+                ],
+                next_cursor=next_cursor,
+                total_candidates=1,
+                timings_ms={},
+            )
+        )
+
+    class RecordingService:
+        def __init__(self, pages: Sequence[HybridSearchResponse]) -> None:
+            self._pages = list(pages)
+            self._index = 0
+            self.requests: list[HybridSearchRequest] = []
+
+        def search(self, search_request: HybridSearchRequest) -> HybridSearchResponse:
+            self.requests.append(search_request)
+            page = self._pages[self._index]
+            self._index += 1
+            return page
+
+    service = RecordingService(responses)
+    request = HybridSearchRequest(
+        query="recall",
+        namespace="demo",
+        filters={},
+        page_size=1,
+    )
+
+    pagination = verify_pagination(service, request, max_pages=3)
+
+    assert pagination.cursor_chain == ["cursor-1", "cursor-2"]
+    assert pagination.termination_reason == "max_pages_reached"
+    assert not pagination.duplicate_detected
+    assert len(service.requests) == 3
+    assert service.requests[-1].cursor == "cursor-2"
 
 
 def test_recall_first_dense_signature_isolated(
@@ -2861,6 +3079,7 @@ def test_real_fixture_reingest_and_reports(
     )
     pagination = verify_pagination(service, request)
     assert not pagination.duplicate_detected
+    assert pagination.termination_reason == "cursor_exhausted"
 
     assert not should_rebuild_index(registry, deleted_since_snapshot=0, threshold=0.5)
 

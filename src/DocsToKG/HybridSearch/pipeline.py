@@ -113,7 +113,7 @@ import os
 import re
 import time
 from collections import defaultdict, deque
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
@@ -773,7 +773,6 @@ class ChunkIngestionPipeline:
 
         reservoir: List[ChunkPayload] = []
         # Reservoir sampling over existing registry entries
-        iterator = self._registry.iter_all()
         i = 0
         for item in iterator:
             if i < target:
@@ -783,6 +782,15 @@ class ChunkIngestionPipeline:
                 if j < target:
                     reservoir[j] = item
             i += 1
+        with closing(self._registry.iter_all()) as iterator:
+            for item in iterator:
+                if i < target:
+                    reservoir.append(item)
+                else:
+                    j = int(TRAINING_SAMPLE_RNG.integers(0, i + 1))
+                    if j < target:
+                        reservoir[j] = item
+                i += 1
         # Stream over new chunks as well
         for item in new_chunks:
             if i < target:
@@ -818,7 +826,7 @@ class ChunkIngestionPipeline:
         Raises:
             IngestError: If chunk and vector artifacts are inconsistent or missing.
         """
-        chunk_entries = self._read_jsonl(document.chunk_path)
+        chunk_iter = self._iter_jsonl(document.chunk_path)
         vector_iter = self._iter_vector_file(document.vector_path)
         vector_cache: Dict[str, Mapping[str, object]] = {}
 
@@ -848,7 +856,7 @@ class ChunkIngestionPipeline:
 
         payloads: List[ChunkPayload] = []
         missing: List[str] = []
-        for entry in chunk_entries:
+        for entry in chunk_iter:
             vector_id = str(entry.get("uuid") or entry.get("UUID"))
             vector_payload = vector_cache.pop(vector_id, None)
             _maybe_track_cache()

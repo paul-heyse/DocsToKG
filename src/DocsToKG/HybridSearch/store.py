@@ -225,6 +225,10 @@ _COSINE_TOPK_AUTO_BLOCK_ROWS_SENTINEL = -1
 _COSINE_TOPK_AUTO_MEM_FRACTION = 0.5
 
 
+_COSINE_TOPK_BLOCK_LOG_LOCK = threading.Lock()
+_COSINE_TOPK_LAST_BLOCK_ROWS: dict[int, int] = {}
+
+
 _CUVS_LIBRARIES_LOADED = False
 _CUVS_LIB_HANDLES: list[ctypes.CDLL] = []
 
@@ -828,7 +832,12 @@ class FaissVectorStore(DenseVectorStore):
 
         index_desc = self._describe_index(getattr(self, "_index", None))
         requested_cuvs = getattr(self._config, "use_cuvs", None)
+        applied_cuvs = self._last_applied_cuvs
         cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(requested_cuvs)
+        if applied_cuvs is not None:
+            cuvs_enabled = bool(applied_cuvs)
+            cuvs_available = bool(applied_cuvs)
+            cuvs_reported = bool(applied_cuvs)
         return AdapterStats(
             device=self.device,
             ntotal=self.ntotal,
@@ -842,7 +851,7 @@ class FaissVectorStore(DenseVectorStore):
             cuvs_available=cuvs_available,
             cuvs_reported=cuvs_reported,
             cuvs_requested=requested_cuvs,
-            cuvs_applied=self._last_applied_cuvs,
+            cuvs_applied=applied_cuvs,
         )
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
@@ -3021,7 +3030,14 @@ def cosine_topk_blockwise(
     }
     if memory_snapshot is not None:
         log_payload.update(memory_snapshot)
-    logger.info("cosine-topk-block-config", extra={"event": log_payload})
+    device_key = int(device)
+    with _COSINE_TOPK_BLOCK_LOG_LOCK:
+        last_block_rows = _COSINE_TOPK_LAST_BLOCK_ROWS.get(device_key)
+        emit_info = last_block_rows != int(block_rows)
+        if emit_info:
+            _COSINE_TOPK_LAST_BLOCK_ROWS[device_key] = int(block_rows)
+    log_fn = logger.info if emit_info else logger.debug
+    log_fn("cosine-topk-block-config", extra={"event": log_payload})
 
     if q.ndim == 1:
         q = q.reshape(1, -1)
@@ -3180,6 +3196,13 @@ def cosine_topk_blockwise(
 def serialize_state(faiss_index: FaissVectorStore, registry: "ChunkRegistry") -> dict[str, object]:
     """Serialize the vector store and chunk registry to a JSON-safe payload.
 
+    The resulting dictionary captures three pieces of information that
+    collectively describe a managed FAISS deployment: the raw FAISS byte
+    stream, snapshot metadata (``snapshot_meta``), and the ordered vector ids
+    tracked by :class:`ChunkRegistry`. ``restore_state`` rehydrates FAISS from
+    the byte stream and repopulates the registry using ``vector_ids`` so both
+    structures stay aligned after a cold restore.
+
     Args:
         faiss_index: Vector store whose state should be captured.
         registry: Chunk registry providing vector identifier mappings.
@@ -3200,24 +3223,42 @@ def restore_state(
     faiss_index: FaissVectorStore,
     payload: dict[str, object],
     *,
+    registry: Optional["ChunkRegistry"] = None,
     allow_legacy: bool = True,
 ) -> None:
-    """Restore the vector store from a payload produced by :func:`serialize_state`.
+    """Restore the vector store (and optionally a registry) from serialized state.
 
     Args:
         faiss_index: Vector store receiving the restored state.
         payload: Mapping with ``faiss`` (base64) and registry vector ids.
+        registry: Optional chunk registry kept in lockstep with the FAISS store.
+            When supplied, ``vector_ids`` from the payload are applied via
+            :meth:`ChunkRegistry.restore_vector_ids` before returning.
         allow_legacy: Permit payloads missing ``meta`` (emits a warning). Defaults to ``True``.
 
     Returns:
         None
 
     Raises:
-        ValueError: If the payload is missing the FAISS byte stream.
+        ValueError: If the payload is missing the FAISS byte stream or carries
+            an invalid registry payload.
     """
     encoded = payload.get("faiss")
     if not isinstance(encoded, str):
         raise ValueError("Missing FAISS payload")
+    vector_ids_payload = payload.get("vector_ids")
+    if registry is not None:
+        if vector_ids_payload is None:
+            logger.warning(
+                "restore_state: payload missing 'vector_ids'; registry will be cleared"
+            )
+            registry.restore_vector_ids(())
+        else:
+            if isinstance(vector_ids_payload, (str, bytes)) or not isinstance(
+                vector_ids_payload, Sequence
+            ):
+                raise ValueError("FAISS snapshot payload has invalid 'vector_ids' type")
+            registry.restore_vector_ids(vector_ids_payload)
     if "meta" in payload:
         meta = payload["meta"]
         if not isinstance(meta, Mapping):
@@ -3241,6 +3282,7 @@ class ChunkRegistry:
         self._bridge: Dict[int, str] = {}
         self._embedding_store: Optional[DenseVectorStore] = None
         self._doc_namespace_index: Dict[str, Dict[str, set[str]]] = {}
+        self._vector_order: list[str] = []
 
     @staticmethod
     def to_faiss_id(vector_id: str) -> int:
@@ -3268,6 +3310,8 @@ class ChunkRegistry:
                     self._remove_from_index(chunk.vector_id, chunk=existing)
                 chunk.features.embedding = EmbeddingProxy(chunk.vector_id)
                 self._chunks[chunk.vector_id] = chunk
+                if chunk.vector_id not in self._vector_order:
+                    self._vector_order.append(chunk.vector_id)
                 self._bridge[self.to_faiss_id(chunk.vector_id)] = chunk.vector_id
                 namespace_index = self._doc_namespace_index.setdefault(chunk.doc_id, {})
                 namespace_index.setdefault(chunk.namespace, set()).add(chunk.vector_id)
@@ -3279,6 +3323,8 @@ class ChunkRegistry:
                 chunk = self._chunks.pop(vector_id, None)
                 self._bridge.pop(self.to_faiss_id(vector_id), None)
                 self._remove_from_index(vector_id, chunk=chunk)
+                if vector_id in self._vector_order:
+                    self._vector_order.remove(vector_id)
 
     def _remove_from_index(self, vector_id: str, *, chunk: Optional[ChunkPayload] = None) -> None:
         with self._lock:
@@ -3331,20 +3377,56 @@ class ChunkRegistry:
             return list(self._chunks.values())
 
     def iter_all(self) -> Iterator[ChunkPayload]:
-        """Yield chunk payloads without materialising the full list."""
-        with self._lock:
-            snapshot = tuple(self._chunks.values())
-        return iter(snapshot)
+        """Yield chunk payloads without materialising the full list.
+
+        The iterator acquires the registry lock while streaming results so writers
+        cannot mutate the mapping during iteration. The lock is released as soon as
+        the iterator exhausts or is closed, avoiding the additional allocation cost
+        of snapshotting all payloads eagerly.
+        """
+
+        def _stream() -> Iterator[ChunkPayload]:
+            self._lock.acquire()
+            try:
+                for chunk in self._chunks.values():
+                    yield chunk
+            finally:
+                self._lock.release()
+
+        return _stream()
 
     def count(self) -> int:
         """Return the number of chunks tracked by the registry."""
         with self._lock:
-            return len(self._chunks)
+            return len(self._vector_order)
 
     def vector_ids(self) -> List[str]:
         """Return all vector identifiers in insertion order."""
         with self._lock:
-            return list(self._chunks.keys())
+            return list(self._vector_order)
+
+    def restore_vector_ids(self, vector_ids: Sequence[str]) -> None:
+        """Repopulate registry ordering and bridges from serialized snapshot ids."""
+
+        with self._lock:
+            unique: list[str] = []
+            seen: set[str] = set()
+            for vector_id in vector_ids:
+                if not isinstance(vector_id, str):
+                    raise ValueError("ChunkRegistry vector_ids must be strings")
+                if vector_id in seen:
+                    continue
+                unique.append(vector_id)
+                seen.add(vector_id)
+
+            stale = [vid for vid in list(self._chunks.keys()) if vid not in seen]
+            for vector_id in stale:
+                chunk = self._chunks.pop(vector_id, None)
+                self._bridge.pop(self.to_faiss_id(vector_id), None)
+                self._remove_from_index(vector_id, chunk=chunk)
+
+            self._vector_order = unique
+            self._bridge = {self.to_faiss_id(vector_id): vector_id for vector_id in unique}
 
     def resolve_embeddings(
         self,

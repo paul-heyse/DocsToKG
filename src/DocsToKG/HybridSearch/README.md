@@ -306,7 +306,7 @@ config = manager.get()
 ### Failure recovery & snapshot management
 - After ingestion, capture state via `FaissRouter.serialize_all()` (namespaced deployments) or by calling `ManagedFaissAdapter.serialize()` / `snapshot_meta()` and `ChunkRegistry.vector_ids()`. `store.serialize_state(...)` bundles these into a JSON-safe payload.
 - Persist snapshots under a durable directory (for example, a `snapshots/` path managed by your deployment configuration) and mirror them to object storage for disaster recovery.
-- Restore with `restore_state(...)` or `ManagedFaissAdapter.restore(payload, meta=...)`. When using `FaissRouter`, cached snapshots are rehydrated lazily the next time a namespace is requested.
+- Restore with `restore_state(..., registry=chunk_registry)` or `ManagedFaissAdapter.restore(payload, meta=...)`. Passing the registry ensures `vector_ids` from the snapshot repopulate `ChunkRegistry` before FAISS comes back online. When using `FaissRouter`, cached snapshots are rehydrated lazily the next time a namespace is requested.
 - Remove stale vectors with `ChunkRegistry.delete(...)` (paired with FAISS `remove`) and re-run ingestion for the affected namespaces to maintain parity.
 
 ### Deployment considerations
@@ -391,7 +391,7 @@ sequenceDiagram
 - ID/path guarantees: vector IDs are UUIDs; chunk paths referenced by `ChunkRegistry`; FAISS snapshots stored alongside service state.
 
 ## Observability
-- **Logs**: `HybridSearchService` writes structured info logs through `Observability.logger` with payloads containing the query string, namespace, result counts, and per-channel timings. Attach handlers/formatters to that logger to persist JSONL, emit to stdout, or inject upstream correlation IDs.
+- **Logs**: `HybridSearchService` writes structured info logs through `Observability.logger` with payloads containing the query string, namespace, result counts, and per-channel timings. Attach handlers/formatters to that logger to persist JSONL, emit to stdout, or inject upstream correlation IDs. The GPU helper's `cosine-topk-block-config` event now only emits at info level when the computed block size changes; repeated identical payloads are downgraded to debug to reduce noise.
 - **Metrics/tracing**: `Observability.metrics` provides `increment`, `observe`, `set_gauge`, and `percentile` helpers; wrap expensive sections with `Observability.trace(...)` to record span timings. `AdapterStats`, pagination verifiers, and fusion diagnostics feed additional gauges/counters (e.g., `faiss_fp16_enabled`, `search_channel_latency_ms`) that you can scrape via your telemetry stack.
 - **SLIs/SLOs**: track ≥99 % successful query responses, P50 latency ≤150 ms, P99 ≤600 ms. Surface ingestion lag (`ChunkIngestionPipeline.last_ingested_timestamp`) to ensure snapshots stay current.
 - **Health checks**: expose `HybridSearchService.build_stats_snapshot()` via `/healthz` to summarise namespace counts, snapshot age, and recent latency. The quickstart harness supports `--stats` for local debugging.

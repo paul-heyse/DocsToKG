@@ -110,7 +110,14 @@ class FaissRouter:
             return store
 
     def stats(self) -> Dict[str, object]:
-        """Return stats for all managed stores (namespaced and aggregate)."""
+        """Return stats for all managed stores (namespaced and aggregate).
+
+        The aggregate payload now summarises numeric gauges while preserving
+        boolean fields under a dedicated ``boolean_fields`` entry so dashboards
+        can distinguish between counts and state flags. Timestamp fields ending
+        in ``_ts`` or ``_timestamp`` report the most recent value across
+        namespaces rather than being summed.
+        """
 
         if not self._per_namespace:
             stats = dict(self._default_store.stats())
@@ -138,15 +145,35 @@ class FaissRouter:
         return {"namespaces": snapshots, "aggregate": aggregate}
 
     @staticmethod
-    def _aggregate_stats(namespaced: Mapping[str, Mapping[str, object]]) -> Dict[str, float]:
+    def _aggregate_stats(
+        namespaced: Mapping[str, Mapping[str, object]]
+    ) -> Dict[str, object]:
         totals: Dict[str, float] = {}
+        booleans: Dict[str, Dict[str, int]] = {}
+        timestamp_suffixes = ("_ts", "_timestamp")
         for stats in namespaced.values():
             if not isinstance(stats, Mapping):
                 continue
             for key, value in stats.items():
+                if isinstance(value, bool):
+                    counts = booleans.setdefault(key, {"true": 0, "false": 0})
+                    bucket = "true" if value else "false"
+                    counts[bucket] += 1
+                    continue
                 if isinstance(value, (int, float)):
-                    totals[key] = totals.get(key, 0.0) + float(value)
-        return totals
+                    numeric = float(value)
+                    if key.endswith(timestamp_suffixes):
+                        current = totals.get(key)
+                        totals[key] = numeric if current is None else max(current, numeric)
+                    else:
+                        totals[key] = totals.get(key, 0.0) + numeric
+        aggregate: Dict[str, object] = dict(totals)
+        if booleans:
+            aggregate["boolean_fields"] = {
+                key: {"true": counts["true"], "false": counts["false"]}
+                for key, counts in booleans.items()
+            }
+        return aggregate
 
     def serialize_all(self) -> Dict[str, Dict[str, object]]:
         """Serialize every managed store including snapshot metadata."""

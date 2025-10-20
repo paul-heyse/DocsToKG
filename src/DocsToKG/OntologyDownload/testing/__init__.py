@@ -29,6 +29,8 @@ from typing import (
 )
 from urllib.parse import urljoin
 
+import httpx
+
 from ..io import rate_limit as rate_mod
 from ..io import sanitize_filename
 from ..plugins import (

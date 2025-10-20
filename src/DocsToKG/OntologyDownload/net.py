@@ -10,11 +10,34 @@
 # }
 # === /NAVMAP ===
 
-"""Shared HTTPX + Hishel client used across OntologyDownload networking.
+"""HTTPX/Hishel Transport Layer
 
-All HTTP operations (planner probes, checksum fetchers, streaming downloads)
-reuse this singleton client; the legacy `requests`-backed session pool has been
-removed in favour of HTTPX transports with Hishel disk caching.
+This module constructs and manages the singleton :class:`httpx.Client` that powers
+every outbound HTTP request in ``DocsToKG.OntologyDownload`` (planner probes,
+checksum fetches, streaming downloads, and test harnesses). The client is wrapped
+in a Hishel disk cache so conditional requests (``ETag``/``Last-Modified``) are
+handled transparently, and event hooks stamp polite telemetry headers while
+recording cache metadata for downstream consumers.
+
+Key Features:
+- Deterministic client construction with explicit timeout, pool, HTTP/2, and SSL
+  settings sourced from :class:`~DocsToKG.OntologyDownload.settings.DownloadConfiguration`.
+- Hishel ``CacheTransport`` storage rooted at ``CACHE_DIR / "http" / "ontology"``
+  to share cached responses across planners, downloaders, and tests.
+- Thread-safe helpers to configure, reset, or inject custom clients/transport
+  factories (for example, :class:`httpx.MockTransport` during tests).
+
+Dependencies:
+- ``httpx`` for the HTTP client implementation.
+- ``hishel`` for RFC-9111 compliant caching.
+- ``certifi`` to seed the default SSL trust store.
+
+Usage:
+    from DocsToKG.OntologyDownload.net import get_http_client
+
+    client = get_http_client()
+    response = client.get("https://example.org/ontology.owl")
+    response.raise_for_status()
 """
 
 from __future__ import annotations
@@ -192,7 +215,7 @@ def _build_http_client(cache_root: Path, config: Optional[DownloadConfiguration]
             follow_redirects=False,
             event_hooks={"request": [_request_hook], "response": [_response_hook]},
         )
-    except ImportError as exc:  # pragma: no cover - h2 optional in some environments
+    except ImportError:  # pragma: no cover - h2 optional in some environments
         if http2_enabled:
             LOGGER.warning(
                 "http2 support requested but 'h2' package not installed; falling back to HTTP/1.1"
@@ -219,6 +242,7 @@ def _close_client_unlocked() -> None:
 
 
 # --- Public API ----------------------------------------------------------------
+
 
 def configure_http_client(
     client: Optional[httpx.Client] = None,
@@ -281,7 +305,9 @@ def get_http_client(config: Optional[DownloadConfiguration] = None) -> httpx.Cli
             if candidate is not None and not isinstance(candidate, httpx.Client):
                 raise TypeError("session_factory must return an httpx.Client or None")
             if candidate is not None:
-                factory_name = getattr(factory, "__qualname__", getattr(factory, "__name__", repr(factory)))
+                factory_name = getattr(
+                    factory, "__qualname__", getattr(factory, "__name__", repr(factory))
+                )
                 LOGGER.info(
                     "using custom httpx client",
                     extra={

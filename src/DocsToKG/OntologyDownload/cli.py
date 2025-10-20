@@ -47,9 +47,9 @@ from typing import Dict, List, Optional, Sequence, Union
 
 import requests
 import yaml
-from pydantic import ValidationError as PydanticValidationError
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
+from pydantic import ValidationError as PydanticValidationError
 
 from .api import _collect_plugin_details
 from .errors import ConfigError, ConfigurationError, OntologyDownloadError, UnsupportedPythonError
@@ -1597,9 +1597,7 @@ def _handle_validate(args, config: ResolvedConfig) -> dict:
     )
     results = run_validators(requests, logger)
     existing_validation = dict(manifest.get("validation", {}))
-    existing_validation.update(
-        {name: result.to_dict() for name, result in results.items()}
-    )
+    existing_validation.update({name: result.to_dict() for name, result in results.items()})
     manifest["validation"] = existing_validation
     write_json_atomic(manifest_path, manifest)
     return manifest["validation"]
