@@ -1504,13 +1504,16 @@ class HybridSearchService:
         use_score_floor = score_floor > 0.0
         use_range = bool(getattr(request, "recall_first", False)) or use_score_floor
         if use_range:
-            hits = list(store.range_search(queries[0], score_floor, limit=None))
+            budget = max(1, int(initial_k))
+            hits = list(store.range_search(queries[0], score_floor, limit=budget))
             self._observability.metrics.observe("faiss_search_batch_size", 1.0, channel="dense")
             filtered, payloads = self._filter_dense_hits(hits, filters, score_floor)
             observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
             blended_pass = strategy.observe_pass_rate(signature, observed)
-            strategy.remember(signature, max(len(filtered), len(hits)))
+            filtered_total = len(filtered)
+            strategy.remember(signature, max(filtered_total, len(hits)))
             filtered.sort(key=lambda hit: (-hit.score, hit.vector_id))
+            bounded_filtered = filtered[:budget]
             effective_k = len(hits)
             self._observability.metrics.set_gauge(
                 "dense_pass_through_rate",
@@ -1536,7 +1539,7 @@ class HybridSearchService:
             )
             self._observability.metrics.increment("search_channel_requests", channel="dense")
             self._observability.metrics.observe(
-                "search_channel_candidates", len(filtered), channel="dense"
+                "search_channel_candidates", len(bounded_filtered), channel="dense"
             )
             if adapter_stats is not None:
                 fp16_metric = 1.0 if bool(getattr(adapter_stats, "fp16_enabled", False)) else 0.0
@@ -1550,7 +1553,7 @@ class HybridSearchService:
             scores: Dict[str, float] = {}
             embedding_cache_local: Dict[str, np.ndarray] = {}
             resolved_hits: List[tuple[FaissSearchResult, ChunkPayload]] = []
-            for hit in filtered:
+            for hit in bounded_filtered:
                 chunk = payloads.get(hit.vector_id)
                 if chunk is None:
                     continue

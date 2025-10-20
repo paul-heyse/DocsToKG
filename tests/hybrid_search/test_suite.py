@@ -1354,6 +1354,129 @@ def test_execute_dense_uses_range_search_for_recall_first_without_score_floor() 
     np.testing.assert_allclose(result.embeddings, chunk_features.embedding[None, :])
 
 
+def test_recall_first_range_search_respects_initial_k_budget() -> None:
+    request = HybridSearchRequest(
+        query="dense recall budget",
+        namespace="demo",
+        filters={},
+        page_size=8,
+        recall_first=True,
+    )
+    config = HybridSearchConfig()
+    query_features = ChunkFeatures(
+        bm25_terms={},
+        splade_weights={},
+        embedding=np.array([0.5, 0.25], dtype=np.float32),
+    )
+
+    class RecordingRegistry:
+        def __init__(self, payloads: Mapping[str, ChunkPayload]) -> None:
+            self._payloads = dict(payloads)
+            self._dim = next(iter(payloads.values())).features.embedding.shape[-1]
+            self.resolve_embeddings_calls: List[Tuple[str, ...]] = []
+
+        def bulk_get(self, vector_ids: Sequence[str]) -> Sequence[ChunkPayload]:
+            return [
+                self._payloads[vector_id]
+                for vector_id in vector_ids
+                if vector_id in self._payloads
+            ]
+
+        def resolve_embeddings(
+            self,
+            vector_ids: Sequence[str],
+            *,
+            cache: Optional[Dict[str, np.ndarray]] = None,
+            dtype: np.dtype = np.float32,
+        ) -> np.ndarray:
+            self.resolve_embeddings_calls.append(tuple(vector_ids))
+            rows: List[np.ndarray] = []
+            for vector_id in vector_ids:
+                embedding = np.asarray(
+                    self._payloads[vector_id].features.embedding, dtype=dtype
+                )
+                rows.append(embedding)
+                if cache is not None:
+                    cache[vector_id] = embedding
+            if not rows:
+                return np.empty((0, self._dim), dtype=dtype)
+            return np.ascontiguousarray(np.stack(rows), dtype=dtype)
+
+    class RecordingDenseStore:
+        def __init__(self, hits: Sequence[FaissSearchResult]) -> None:
+            self._hits = list(hits)
+            self.range_calls: List[Tuple[np.ndarray, float, Optional[int]]] = []
+            self.search_batch_calls: List[Tuple[np.ndarray, int]] = []
+            self.adapter_stats = SimpleNamespace(nprobe=1, fp16_enabled=False)
+
+        def range_search(
+            self, query: np.ndarray, score_floor: float, limit: Optional[int] = None
+        ) -> Sequence[FaissSearchResult]:
+            self.range_calls.append((np.asarray(query), float(score_floor), limit))
+            return list(self._hits)
+
+        def search_batch(self, queries: np.ndarray, depth: int) -> List[List[FaissSearchResult]]:
+            self.search_batch_calls.append((np.asarray(queries), int(depth)))
+            return [self._hits[:depth]]
+
+    vector_count = service_module.DenseSearchStrategy._MAX_K * 2
+    hits = [
+        FaissSearchResult(vector_id=f"vec-{idx}", score=1.0 - idx * 1e-4)
+        for idx in range(vector_count)
+    ]
+    payloads: Dict[str, ChunkPayload] = {}
+    for idx, hit in enumerate(hits):
+        features = ChunkFeatures(
+            bm25_terms={},
+            splade_weights={},
+            embedding=np.full(query_features.embedding.shape, float(idx + 1), dtype=np.float32),
+        )
+        payloads[hit.vector_id] = ChunkPayload(
+            doc_id=f"doc-{idx}",
+            chunk_id=f"chunk-{idx}",
+            vector_id=hit.vector_id,
+            namespace=request.namespace or "",
+            text=f"chunk {idx}",
+            metadata={},
+            features=features,
+            token_count=10,
+            source_chunk_idxs=[0],
+            doc_items_refs=[f"doc:{idx}"],
+        )
+
+    registry = RecordingRegistry(payloads)
+    store = RecordingDenseStore(hits)
+    service = object.__new__(HybridSearchService)
+    service._registry = registry  # type: ignore[attr-defined]
+    service._dense_strategy = service_module.DenseSearchStrategy()  # type: ignore[attr-defined]
+    service._observability = Observability()  # type: ignore[attr-defined]
+
+    filters: Dict[str, object] = {}
+    signature = service._dense_request_signature(request, filters)
+    expected_budget, _, _ = service._dense_strategy.plan(  # type: ignore[attr-defined]
+        signature,
+        page_size=max(1, request.page_size),
+        retrieval_cfg=config.retrieval,
+        dense_cfg=config.dense,
+    )
+
+    timings: Dict[str, float] = {}
+    result = service._execute_dense(
+        request=request,
+        filters=filters,
+        config=config,
+        query_features=query_features,
+        timings=timings,
+        store=store,
+    )
+
+    assert store.range_calls, "range_search should be invoked with a bounded budget"
+    assert store.range_calls[0][2] == expected_budget
+    assert not store.search_batch_calls
+    assert len(result.candidates) == expected_budget
+    assert registry.resolve_embeddings_calls
+    assert len(registry.resolve_embeddings_calls[0]) == expected_budget
+
 # --- test_hybrid_search.py ---
 
 
