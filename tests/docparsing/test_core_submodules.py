@@ -22,6 +22,7 @@ from unittest import mock
 
 import pytest
 
+import DocsToKG.DocParsing.chunking.runtime as chunk_runtime
 import DocsToKG.DocParsing.core.http as core_http
 from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
 from DocsToKG.DocParsing.config import ConfigLoadError, load_toml_markers, load_yaml_markers
@@ -458,6 +459,32 @@ def test_chunk_cli_validation_failure(
     assert "chunk" in captured.err
     assert "--min-tokens" in captured.err
     assert "non-negative" in captured.err
+
+
+def test_chunk_runtime_unknown_config_fields(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Chunk runtime reports unknown config keys as a CLI validation error."""
+
+    config_path = tmp_path / "chunk.json"
+    config_path.write_text('{"unexpected": true}', encoding="utf-8")
+
+    data_root = tmp_path / "Data"
+    doctags_dir = data_root / "DocTagsFiles"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    chunks_dir.mkdir(parents=True)
+    doctags_dir.mkdir(parents=True)
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+
+    exit_code = chunk_runtime.main(argparse.Namespace(config=str(config_path)))
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "[chunk]" in captured.err
+    assert "Unknown configuration fields" in captured.err
+    assert "unexpected" in captured.err
 
 
 def test_embed_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> None:
