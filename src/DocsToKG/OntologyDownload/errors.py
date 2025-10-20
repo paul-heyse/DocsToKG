@@ -17,6 +17,7 @@ __all__ = [
     "ConfigurationError",
     "ResolverError",
     "ValidationError",
+    "ValidationFailure",
     "PolicyError",
     "DownloadFailure",
     "UserConfigError",
@@ -42,6 +43,14 @@ class ResolverError(OntologyDownloadError):
 
 class ValidationError(OntologyDownloadError):
     """Raised when ontology validation encounters unrecoverable issues."""
+
+
+class ValidationFailure(ValidationError):
+    """Raised when validation results should be treated as a failed attempt."""
+
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(message)
+        self.retryable = retryable
 
 
 class PolicyError(OntologyDownloadError):
