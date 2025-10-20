@@ -18,7 +18,6 @@ Design Notes
 from __future__ import annotations
 
 import logging
-import textwrap
 from dataclasses import dataclass
 from typing import Optional
 
@@ -169,7 +168,6 @@ class CacheRouter:
                     host_display = host_key
 
                 if role == "(default)":
-                    ttl = host_policy.ttl_s or "(unset)"
                     ttl_days = f"{host_policy.ttl_s / 86400:.1f}" if host_policy.ttl_s else "-"
                     swrv = "-"
                 else:

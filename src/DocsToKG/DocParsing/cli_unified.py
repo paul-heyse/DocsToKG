@@ -15,30 +15,19 @@ NAVMAP:
 
 from __future__ import annotations
 
-import sys
-from enum import Enum
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Optional
 
 import typer
-from typing_extensions import Literal
 
+# Import stage entry points
+from DocsToKG.DocParsing import doctags as doctags_module
 from DocsToKG.DocParsing.app_context import (
-    build_app_context,
     AppContext,
+    build_app_context,
 )
-from DocsToKG.DocParsing.settings import (
-    LogLevel,
-    LogFormat,
-    RunnerPolicy,
-    RunnerSchedule,
-    RunnerAdaptive,
-    DoctagsMode,
-    Format,
-    DenseBackend,
-    TeiCompression,
-    AttnBackend,
-)
+from DocsToKG.DocParsing.chunking import runtime as chunking_runtime
+from DocsToKG.DocParsing.embedding import runtime as embedding_runtime
 
 # ============================================================================
 # CLI Application Setup
@@ -123,7 +112,7 @@ def root_callback(
         elif verbose == 1:
             effective_log_level = "DEBUG"
         else:
-            effective_log_level = log_level
+            effective_log_level = log_level or "INFO"
 
         # Build application context with all settings layered
         ctx.obj = build_app_context(
@@ -216,7 +205,7 @@ def config_show(
         # Append cfg_hash and profile info
         typer.echo("\n[dim]# Configuration metadata[/dim]")
         typer.echo(f"profile: {app_ctx.profile or 'none'}")
-        typer.echo(f"cfg_hashes:")
+        typer.echo("cfg_hashes:")
         for stage_name, hash_val in app_ctx.cfg_hashes.items():
             typer.echo(f"  {stage_name}: {hash_val}")
 
@@ -316,9 +305,77 @@ def doctags(
         typer.secho("[red]✗ Configuration not initialized[/red]", err=True)
         raise typer.Exit(code=1)
 
-    typer.secho("[yellow]⚠ doctags stage execution not yet implemented in Phase 2[/yellow]")
-    typer.echo(f"[dim]Profile: {app_ctx.profile or 'none'}[/dim]")
-    typer.echo(f"[dim]Config hash: {app_ctx.cfg_hashes['doctags']}[/dim]")
+    try:
+        # Build argv for stage
+        argv = []
+
+        # Add input directory
+        if input_dir:
+            argv.extend(["--input", str(input_dir)])
+        elif app_ctx.settings.doctags.input_dir:
+            argv.extend(["--input", str(app_ctx.settings.doctags.input_dir)])
+
+        # Add output directory
+        if output_dir:
+            argv.extend(["--output", str(output_dir)])
+        elif app_ctx.settings.doctags.output_dir:
+            argv.extend(["--output", str(app_ctx.settings.doctags.output_dir)])
+
+        # Add mode
+        if mode:
+            argv.extend(["--mode", mode])
+        elif app_ctx.settings.doctags.mode:
+            argv.extend(["--mode", app_ctx.settings.doctags.mode])
+
+        # Add model ID
+        if model_id:
+            argv.extend(["--model-id", model_id])
+        elif app_ctx.settings.doctags.model_id:
+            argv.extend(["--model-id", app_ctx.settings.doctags.model_id])
+
+        # Add resume/force flags
+        if resume:
+            argv.append("--resume")
+        if force:
+            argv.append("--force")
+
+        # Add runner options
+        if workers:
+            argv.extend(["--workers", str(workers)])
+        elif app_ctx.settings.runner.workers:
+            argv.extend(["--workers", str(app_ctx.settings.runner.workers)])
+
+        if policy:
+            argv.extend(["--policy", policy])
+        elif app_ctx.settings.runner.policy:
+            argv.extend(["--policy", app_ctx.settings.runner.policy])
+
+        # Determine which main function to call based on mode
+        effective_mode = mode or (
+            app_ctx.settings.doctags.mode if app_ctx.settings.doctags.mode else "auto"
+        )
+
+        typer.echo(
+            f"[dim]📋 Profile: {app_ctx.profile or 'none'} | Hash: {app_ctx.cfg_hashes['doctags'][:8]}...[/dim]"
+        )
+        typer.echo(f"[dim]🔧 Mode: {effective_mode}[/dim]")
+
+        # Call appropriate main function
+        if effective_mode.lower() == "html":
+            exit_code = doctags_module.html_main(args=None)
+        else:  # pdf or auto
+            exit_code = doctags_module.pdf_main(args=None)
+
+        if exit_code != 0:
+            typer.secho(f"[red]✗ DocTags stage failed with exit code {exit_code}[/red]", err=True)
+        else:
+            typer.secho("[green]✅ DocTags stage completed successfully[/green]")
+
+        raise typer.Exit(code=exit_code)
+
+    except Exception as e:
+        typer.secho(f"[red]✗ Error in doctags stage:[/red] {e}", err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -368,9 +425,80 @@ def chunk(
         typer.secho("[red]✗ Configuration not initialized[/red]", err=True)
         raise typer.Exit(code=1)
 
-    typer.secho("[yellow]⚠ chunk stage execution not yet implemented in Phase 2[/yellow]")
-    typer.echo(f"[dim]Profile: {app_ctx.profile or 'none'}[/dim]")
-    typer.echo(f"[dim]Config hash: {app_ctx.cfg_hashes['chunk']}[/dim]")
+    try:
+        # Build argv for stage
+        argv = []
+
+        # Add input directory
+        if input_dir:
+            argv.extend(["--in-dir", str(input_dir)])
+        elif app_ctx.settings.chunk.input_dir:
+            argv.extend(["--in-dir", str(app_ctx.settings.chunk.input_dir)])
+
+        # Add output directory
+        if output_dir:
+            argv.extend(["--out-dir", str(output_dir)])
+        elif app_ctx.settings.chunk.output_dir:
+            argv.extend(["--out-dir", str(app_ctx.settings.chunk.output_dir)])
+
+        # Add format
+        if fmt:
+            argv.extend(["--format", fmt])
+
+        # Add token limits
+        if min_tokens:
+            argv.extend(["--min-tokens", str(min_tokens)])
+        else:
+            argv.extend(["--min-tokens", str(app_ctx.settings.chunk.min_tokens)])
+
+        if max_tokens:
+            argv.extend(["--max-tokens", str(max_tokens)])
+        else:
+            argv.extend(["--max-tokens", str(app_ctx.settings.chunk.max_tokens)])
+
+        # Add tokenizer
+        if tokenizer:
+            argv.extend(["--tokenizer-model", tokenizer])
+        elif app_ctx.settings.chunk.tokenizer_model:
+            argv.extend(["--tokenizer-model", app_ctx.settings.chunk.tokenizer_model])
+
+        # Add resume/force flags
+        if resume:
+            argv.append("--resume")
+        if force:
+            argv.append("--force")
+
+        # Add runner options
+        if workers:
+            argv.extend(["--workers", str(workers)])
+        elif app_ctx.settings.runner.workers:
+            argv.extend(["--workers", str(app_ctx.settings.runner.workers)])
+
+        if policy:
+            argv.extend(["--policy", policy])
+        elif app_ctx.settings.runner.policy:
+            argv.extend(["--policy", app_ctx.settings.runner.policy])
+
+        typer.echo(
+            f"[dim]📋 Profile: {app_ctx.profile or 'none'} | Hash: {app_ctx.cfg_hashes['chunk'][:8]}...[/dim]"
+        )
+        typer.echo(
+            f"[dim]🔧 Min tokens: {min_tokens or app_ctx.settings.chunk.min_tokens}, Max tokens: {max_tokens or app_ctx.settings.chunk.max_tokens}[/dim]"
+        )
+
+        # Call chunk main function
+        exit_code = chunking_runtime.main(args=None)
+
+        if exit_code != 0:
+            typer.secho(f"[red]✗ Chunk stage failed with exit code {exit_code}[/red]", err=True)
+        else:
+            typer.secho("[green]✅ Chunk stage completed successfully[/green]")
+
+        raise typer.Exit(code=exit_code)
+
+    except Exception as e:
+        typer.secho(f"[red]✗ Error in chunk stage:[/red] {e}", err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -415,9 +543,67 @@ def embed(
         typer.secho("[red]✗ Configuration not initialized[/red]", err=True)
         raise typer.Exit(code=1)
 
-    typer.secho("[yellow]⚠ embed stage execution not yet implemented in Phase 2[/yellow]")
-    typer.echo(f"[dim]Profile: {app_ctx.profile or 'none'}[/dim]")
-    typer.echo(f"[dim]Config hash: {app_ctx.cfg_hashes['embed']}[/dim]")
+    try:
+        # Build argv for stage
+        argv = []
+
+        # Add input directory
+        if chunks_dir:
+            argv.extend(["--chunks-dir", str(chunks_dir)])
+        elif app_ctx.settings.embed.input_chunks_dir:
+            argv.extend(["--chunks-dir", str(app_ctx.settings.embed.input_chunks_dir)])
+
+        # Add output directory
+        if output_dir:
+            argv.extend(["--out-dir", str(output_dir)])
+        elif app_ctx.settings.embed.output_vectors_dir:
+            argv.extend(["--out-dir", str(app_ctx.settings.embed.output_vectors_dir)])
+
+        # Add vector format
+        if vector_format:
+            argv.extend(["--format", vector_format])
+
+        # Add dense backend
+        if dense_backend:
+            argv.extend(["--dense-backend", dense_backend])
+
+        # Add resume/force flags
+        if resume:
+            argv.append("--resume")
+        if force:
+            argv.append("--force")
+
+        # Add runner options
+        if workers:
+            argv.extend(["--workers", str(workers)])
+        elif app_ctx.settings.runner.workers:
+            argv.extend(["--workers", str(app_ctx.settings.runner.workers)])
+
+        if policy:
+            argv.extend(["--policy", policy])
+        elif app_ctx.settings.runner.policy:
+            argv.extend(["--policy", app_ctx.settings.runner.policy])
+
+        typer.echo(
+            f"[dim]📋 Profile: {app_ctx.profile or 'none'} | Hash: {app_ctx.cfg_hashes['embed'][:8]}...[/dim]"
+        )
+        typer.echo(
+            f"[dim]🔧 Dense backend: {dense_backend or 'qwen_vllm'}, Format: {vector_format or 'parquet'}[/dim]"
+        )
+
+        # Call embed main function
+        exit_code = embedding_runtime.main(args=None)
+
+        if exit_code != 0:
+            typer.secho(f"[red]✗ Embed stage failed with exit code {exit_code}[/red]", err=True)
+        else:
+            typer.secho("[green]✅ Embed stage completed successfully[/green]")
+
+        raise typer.Exit(code=exit_code)
+
+    except Exception as e:
+        typer.secho(f"[red]✗ Error in embed stage:[/red] {e}", err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -447,9 +633,59 @@ def all(
         typer.secho("[red]✗ Configuration not initialized[/red]", err=True)
         raise typer.Exit(code=1)
 
-    typer.secho("[yellow]⚠ Full pipeline execution not yet implemented in Phase 2[/yellow]")
-    typer.echo(f"[dim]Profile: {app_ctx.profile or 'none'}[/dim]")
-    typer.echo(f"[dim]Stages: doctags → chunk → embed[/dim]")
+    try:
+        typer.echo("[bold cyan]🚀 Pipeline Start[/bold cyan]")
+        typer.echo(f"[dim]📋 Profile: {app_ctx.profile or 'none'}[/dim]")
+        typer.echo(
+            f"[dim]🔧 Resume: {resume}, Force: {force}, Stop-on-fail: {stop_on_fail}[/dim]\n"
+        )
+
+        # Stage 1: DocTags
+        typer.echo("[bold yellow]▶ Stage 1: DocTags Conversion[/bold yellow]")
+        typer.echo(f"[dim]Hash: {app_ctx.cfg_hashes['doctags'][:8]}...[/dim]")
+
+        exit_code = doctags_module.pdf_main(args=None)
+
+        if exit_code != 0:
+            typer.secho(f"[red]✗ DocTags stage failed with exit code {exit_code}[/red]", err=True)
+            if stop_on_fail:
+                raise typer.Exit(code=exit_code)
+        else:
+            typer.secho("[green]✅ DocTags completed[/green]")
+
+        # Stage 2: Chunk
+        typer.echo("\n[bold yellow]▶ Stage 2: Chunking[/bold yellow]")
+        typer.echo(f"[dim]Hash: {app_ctx.cfg_hashes['chunk'][:8]}...[/dim]")
+
+        exit_code = chunking_runtime.main(args=None)
+
+        if exit_code != 0:
+            typer.secho(f"[red]✗ Chunk stage failed with exit code {exit_code}[/red]", err=True)
+            if stop_on_fail:
+                raise typer.Exit(code=exit_code)
+        else:
+            typer.secho("[green]✅ Chunk completed[/green]")
+
+        # Stage 3: Embed
+        typer.echo("\n[bold yellow]▶ Stage 3: Embedding[/bold yellow]")
+        typer.echo(f"[dim]Hash: {app_ctx.cfg_hashes['embed'][:8]}...[/dim]")
+
+        exit_code = embedding_runtime.main(args=None)
+
+        if exit_code != 0:
+            typer.secho(f"[red]✗ Embed stage failed with exit code {exit_code}[/red]", err=True)
+            raise typer.Exit(code=exit_code)
+        else:
+            typer.secho("[green]✅ Embed completed[/green]")
+
+        typer.echo("[bold green]✅ Pipeline Complete[/bold green]")
+        raise typer.Exit(code=0)
+
+    except typer.Exit:
+        raise
+    except Exception as e:
+        typer.secho(f"[red]✗ Error in pipeline:[/red] {e}", err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command()

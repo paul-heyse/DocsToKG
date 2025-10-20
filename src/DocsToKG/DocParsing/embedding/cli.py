@@ -1,10 +1,29 @@
 """CLI parser utilities for configuring the DocParsing embedding stage.
 
+IMPORTANT: This module is INTERNAL CLI INFRASTRUCTURE
+────────────────────────────────────────────────────────────────────────────
+
+This is NOT "legacy code" to be removed. While the unified CLI system
+(cli_unified.py) exists as the primary entry point, it delegates to the
+stage main() functions, which internally use the parsers defined here.
+
+Specifically:
+  1. The new unified CLI calls embedding_runtime.main(args=None)
+  2. embedding_runtime.main() parses sys.argv[1:] using the parser from
+     this module (build_parser() and parse_args() functions)
+  3. The stage main() function then executes the embedding logic
+
+Therefore, this module must be maintained alongside embedding/runtime.py.
+DO NOT DELETE without updating embedding/runtime.py to use the new
+unified configuration system directly.
+
+────────────────────────────────────────────────────────────────────────────
+
 The embedding CLI mirrors the chunking interface but introduces additional
-flags for dense/sparse backends, shard coordination, and cache management. This
-module defines the reusable option tuples and parser constructors consumed by
-``docparse embed`` and orchestration scripts so vector generation runs are
-configured consistently across environments.
+flags for dense/sparse backends, shard coordination, and cache management.
+This module defines the reusable option tuples and parser constructors
+consumed by ``docparse embed`` and orchestration scripts so vector
+generation runs are configured consistently across environments.
 """
 
 from __future__ import annotations
@@ -186,27 +205,57 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--embedding-device",),
-        {"type": str, "default": None, "dest": "embedding_device", "help": "Preferred device for providers (auto, cpu, cuda, cuda:N)."},
+        {
+            "type": str,
+            "default": None,
+            "dest": "embedding_device",
+            "help": "Preferred device for providers (auto, cpu, cuda, cuda:N).",
+        },
     ),
     CLIOption(
         ("--embedding-dtype",),
-        {"type": str, "default": None, "dest": "embedding_dtype", "help": "Preferred dtype for dense providers (auto, float32, float16, bfloat16)."},
+        {
+            "type": str,
+            "default": None,
+            "dest": "embedding_dtype",
+            "help": "Preferred dtype for dense providers (auto, float32, float16, bfloat16).",
+        },
     ),
     CLIOption(
         ("--embedding-batch-size",),
-        {"type": int, "default": None, "dest": "embedding_batch_size", "help": "Global batch size hint shared by providers."},
+        {
+            "type": int,
+            "default": None,
+            "dest": "embedding_batch_size",
+            "help": "Global batch size hint shared by providers.",
+        },
     ),
     CLIOption(
         ("--embedding-max-concurrency",),
-        {"type": int, "default": None, "dest": "embedding_max_concurrency", "help": "Maximum in-flight batches per provider (defaults to files-parallel)."},
+        {
+            "type": int,
+            "default": None,
+            "dest": "embedding_max_concurrency",
+            "help": "Maximum in-flight batches per provider (defaults to files-parallel).",
+        },
     ),
     CLIOption(
         ("--embedding-normalize-l2",),
-        {"type": str, "default": None, "dest": "embedding_normalize_l2", "help": "Enable/disable L2 normalisation for dense outputs (true/false)."},
+        {
+            "type": str,
+            "default": None,
+            "dest": "embedding_normalize_l2",
+            "help": "Enable/disable L2 normalisation for dense outputs (true/false).",
+        },
     ),
     CLIOption(
         ("--embedding-cache-dir",),
-        {"type": Path, "default": None, "dest": "embedding_cache_dir", "help": "Shared cache directory for provider artifacts."},
+        {
+            "type": Path,
+            "default": None,
+            "dest": "embedding_cache_dir",
+            "help": "Shared cache directory for provider artifacts.",
+        },
     ),
     CLIOption(
         ("--embedding-telemetry-tag",),
@@ -257,31 +306,66 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--dense-qwen-batch-size",),
-        {"type": int, "default": None, "dest": "dense_qwen_vllm_batch_size", "help": "Batch size override for Qwen embeddings."},
+        {
+            "type": int,
+            "default": None,
+            "dest": "dense_qwen_vllm_batch_size",
+            "help": "Batch size override for Qwen embeddings.",
+        },
     ),
     CLIOption(
         ("--dense-qwen-queue-depth",),
-        {"type": int, "default": None, "dest": "dense_qwen_vllm_queue_depth", "help": "Max queued batches for Qwen embedding worker."},
+        {
+            "type": int,
+            "default": None,
+            "dest": "dense_qwen_vllm_queue_depth",
+            "help": "Max queued batches for Qwen embedding worker.",
+        },
     ),
     CLIOption(
         ("--dense-qwen-quantization",),
-        {"type": str, "default": None, "dest": "dense_qwen_vllm_quantization", "help": "Quantization preset for Qwen (e.g., nf4, awq)."},
+        {
+            "type": str,
+            "default": None,
+            "dest": "dense_qwen_vllm_quantization",
+            "help": "Quantization preset for Qwen (e.g., nf4, awq).",
+        },
     ),
     CLIOption(
         ("--dense-qwen-dimension",),
-        {"type": int, "default": None, "dest": "dense_qwen_vllm_dimension", "help": "Expected dense vector dimension (defaults to 2560)."},
+        {
+            "type": int,
+            "default": None,
+            "dest": "dense_qwen_vllm_dimension",
+            "help": "Expected dense vector dimension (defaults to 2560).",
+        },
     ),
     CLIOption(
         ("--dense-tei-url",),
-        {"type": str, "default": None, "dest": "dense_tei_url", "help": "Base URL for TEI embedding service."},
+        {
+            "type": str,
+            "default": None,
+            "dest": "dense_tei_url",
+            "help": "Base URL for TEI embedding service.",
+        },
     ),
     CLIOption(
         ("--dense-tei-timeout",),
-        {"type": float, "default": None, "dest": "dense_tei_timeout_seconds", "help": "Per-request timeout when using TEI backend (seconds)."},
+        {
+            "type": float,
+            "default": None,
+            "dest": "dense_tei_timeout_seconds",
+            "help": "Per-request timeout when using TEI backend (seconds).",
+        },
     ),
     CLIOption(
         ("--dense-tei-max-inflight",),
-        {"type": int, "default": None, "dest": "dense_tei_max_inflight", "help": "Maximum concurrent TEI requests."},
+        {
+            "type": int,
+            "default": None,
+            "dest": "dense_tei_max_inflight",
+            "help": "Maximum concurrent TEI requests.",
+        },
     ),
     CLIOption(
         ("--dense-sentence-transformers-model-id",),
@@ -368,11 +452,21 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--lexical-local-bm25-k1",),
-        {"type": float, "default": None, "dest": "lexical_local_bm25_k1", "help": "Override BM25 k1 parameter."},
+        {
+            "type": float,
+            "default": None,
+            "dest": "lexical_local_bm25_k1",
+            "help": "Override BM25 k1 parameter.",
+        },
     ),
     CLIOption(
         ("--lexical-local-bm25-b",),
-        {"type": float, "default": None, "dest": "lexical_local_bm25_b", "help": "Override BM25 b parameter."},
+        {
+            "type": float,
+            "default": None,
+            "dest": "lexical_local_bm25_b",
+            "help": "Override BM25 b parameter.",
+        },
     ),
 )
 

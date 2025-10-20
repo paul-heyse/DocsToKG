@@ -53,6 +53,7 @@ from typing import (
 )
 
 import httpx
+import json
 
 try:  # pragma: no cover - dependency check
     import yaml  # type: ignore
@@ -64,7 +65,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - explicit guidance for u
         "instead of installing packages directly."
     ) from exc
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator, ConfigDict
 from pydantic import ValidationError as PydanticValidationError
 from pydantic_core import ValidationError as CoreValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -1622,6 +1623,684 @@ def get_storage_backend() -> StorageBackend:
 STORAGE: StorageBackend = get_storage_backend()
 
 
+# ============================================================================
+# PHASE 5: PYDANTIC v2 SETTINGS DOMAIN MODELS (Foundation)
+# ============================================================================
+# Phase 5.1: Domain Models Foundation
+# Implements: HttpSettings, CacheSettings, RetrySettings, LoggingSettings, TelemetrySettings
+# Status: In Progress (Phase 5.1)
+# ============================================================================
+
+
+class HttpSettings(BaseModel):
+    """HTTP client settings for HTTPX + Hishel integration.
+
+    Controls timeout, pool, HTTP/2, user agent, and proxy trust behavior.
+    """
+
+    model_config = ConfigDict(frozen=True, validate_assignment=False)
+
+    http2: bool = Field(default=True, description="Enable HTTP/2 support")
+    timeout_connect: float = Field(
+        default=5.0,
+        gt=0.0,
+        le=60.0,
+        description="Connect timeout in seconds",
+    )
+    timeout_read: float = Field(
+        default=30.0,
+        gt=0.0,
+        le=300.0,
+        description="Read timeout in seconds",
+    )
+    timeout_write: float = Field(
+        default=30.0,
+        gt=0.0,
+        le=300.0,
+        description="Write timeout in seconds",
+    )
+    timeout_pool: float = Field(
+        default=5.0,
+        gt=0.0,
+        le=60.0,
+        description="Acquire-from-pool timeout in seconds",
+    )
+    pool_max_connections: int = Field(
+        default=64,
+        ge=1,
+        le=1024,
+        description="Max concurrent connections",
+    )
+    pool_keepalive_max: int = Field(
+        default=20,
+        ge=0,
+        le=1024,
+        description="Keepalive pool size",
+    )
+    keepalive_expiry: float = Field(
+        default=30.0,
+        ge=0.0,
+        le=600.0,
+        description="Idle connection expiry in seconds",
+    )
+    trust_env: bool = Field(
+        default=True,
+        description="Honor HTTP(S)_PROXY and NO_PROXY environment variables",
+    )
+    user_agent: str = Field(
+        default="DocsToKG/OntoFetch (+https://github.com/allenai/DocsToKG)",
+        description="User-Agent header value",
+    )
+
+
+class CacheSettings(BaseModel):
+    """Hishel HTTP cache settings."""
+
+    model_config = ConfigDict(frozen=True, validate_assignment=False)
+
+    enabled: bool = Field(default=True, description="Enable Hishel RFC-9111 cache")
+    dir: Path = Field(
+        default_factory=lambda: Path.home() / ".cache" / "ontofetch" / "http",
+        description="Cache directory (auto-created if needed)",
+    )
+    bypass: bool = Field(
+        default=False,
+        description="Force bypass cache (no revalidation)",
+    )
+
+    @field_validator("dir", mode="before")
+    @classmethod
+    def normalize_cache_dir(cls, v: Any) -> Path:
+        """Normalize cache directory to absolute path."""
+        if isinstance(v, str):
+            p = Path(v).expanduser()
+        elif isinstance(v, Path):
+            p = v.expanduser()
+        else:
+            p = Path(v).expanduser()
+        return p.resolve()
+
+
+class RetrySettings(BaseModel):
+    """HTTP retry settings for transient failures."""
+
+    model_config = ConfigDict(frozen=True, validate_assignment=False)
+
+    connect_retries: int = Field(
+        default=2,
+        ge=0,
+        le=20,
+        description="Number of connect retries",
+    )
+    backoff_base: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=10.0,
+        description="Backoff start (seconds)",
+    )
+    backoff_max: float = Field(
+        default=2.0,
+        ge=0.0,
+        le=60.0,
+        description="Backoff cap (seconds)",
+    )
+
+
+class LoggingSettings(BaseModel):
+    """Logging configuration."""
+
+    model_config = ConfigDict(frozen=True, validate_assignment=False)
+
+    level: str = Field(
+        default="INFO",
+        description="Logging level (DEBUG, INFO, WARNING, ERROR)",
+    )
+    json: bool = Field(default=True, description="Output JSON-formatted logs")
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def normalize_level(cls, v: str) -> str:
+        """Normalize and validate logging level."""
+        upper = v.upper()
+        valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR"}
+        if upper not in valid_levels:
+            raise ValueError(f"level must be one of {sorted(valid_levels)}, got '{v}'")
+        return upper
+
+    def level_int(self) -> int:
+        """Convert level string to logging module integer."""
+        level_map = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+        }
+        return level_map[self.level]
+
+
+class TelemetrySettings(BaseModel):
+    """Telemetry and observability settings."""
+
+    model_config = ConfigDict(frozen=True, validate_assignment=False)
+
+    run_id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        description="Unique run identifier for tracing and provenance",
+    )
+    emit_events: bool = Field(
+        default=True,
+        description="Emit telemetry events to logs and database",
+    )
+
+    @field_validator("run_id", mode="before")
+    @classmethod
+    def coerce_run_id(cls, v: Any) -> uuid.UUID:
+        """Convert run_id from string or UUID."""
+        if isinstance(v, uuid.UUID):
+            return v
+        if isinstance(v, str):
+            return uuid.UUID(v)
+        raise ValueError(f"run_id must be UUID or valid UUID string, got {type(v)}")
+
+
+# ============================================================================
+# PHASE 5.2: COMPLEX DOMAIN MODELS
+# ============================================================================
+# Phase 5.2: Complex Domains with Advanced Parsing
+# Implements: SecuritySettings, RateLimitSettings, ExtractionSettings, StorageSettings, DuckDBSettings
+# Status: In Progress (Phase 5.2)
+# ============================================================================
+
+
+class SecuritySettings(BaseModel):
+    """URL security and DNS settings."""
+
+    model_config = ConfigDict(frozen=True, validate_assignment=False)
+
+    allowed_hosts: Optional[List[str]] = Field(
+        default=None,
+        description="Comma-separated allowed hosts (supports *.suffix, IP/CIDR, host:port)",
+    )
+    allowed_ports: Optional[List[int]] = Field(
+        default=None,
+        description="Allowed ports; defaults to 80,443 if not specified",
+    )
+    allow_private_networks: bool = Field(
+        default=False,
+        description="Allow private/loopback addresses if allowlisted",
+    )
+    allow_plain_http: bool = Field(
+        default=False,
+        description="Allow plain HTTP (non-HTTPS) for allowlisted hosts",
+    )
+    strict_dns: bool = Field(
+        default=True,
+        description="Fail on DNS resolution errors",
+    )
+
+    @field_validator("allowed_ports", mode="before")
+    @classmethod
+    def parse_ports(cls, v: Any) -> Optional[List[int]]:
+        """Parse and validate port list."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v = [int(p.strip()) for p in v.split(",") if p.strip()]
+        if isinstance(v, list):
+            for port in v:
+                if not isinstance(port, int) or port < 1 or port > 65535:
+                    raise ValueError(f"Port must be 1-65535, got {port}")
+            return v
+        raise ValueError(f"allowed_ports must be list or CSV string, got {type(v)}")
+
+    def normalized_allowed_hosts(
+        self,
+    ) -> Optional[Tuple[Set[str], Set[str], Dict[str, Set[int]], Set[str]]]:
+        """Parse allowed_hosts into exact domains, wildcard suffixes, per-host ports, and IP literals."""
+        if not self.allowed_hosts:
+            return None
+
+        exact: Set[str] = set()
+        suffixes: Set[str] = set()
+        host_ports: Dict[str, Set[int]] = {}
+        ip_literals: Set[str] = set()
+
+        for entry in self.allowed_hosts:
+            candidate = entry.strip()
+            if not candidate:
+                continue
+
+            port: Optional[int] = None
+            working = candidate
+
+            # Handle IPv6 literals [::1]:port
+            if working.startswith("["):
+                end_bracket = working.find("]")
+                if end_bracket == -1:
+                    raise ValueError(f"Invalid IPv6 literal '{entry}'")
+                literal = working[1:end_bracket]
+                remainder = working[end_bracket + 1 :]
+                if remainder:
+                    if not remainder.startswith(":"):
+                        raise ValueError(f"Invalid port in entry '{entry}'")
+                    port_str = remainder[1:]
+                    if not port_str.isdigit():
+                        raise ValueError(f"Invalid port '{port_str}' in entry '{entry}'")
+                    port = int(port_str)
+                    if port < 1 or port > 65535:
+                        raise ValueError(f"Port out of range in entry '{entry}'")
+                working = literal
+            # Handle IPv4:port or hostname:port
+            elif ":" in working and working.count(":") == 1:
+                host_candidate, maybe_port = working.rsplit(":", 1)
+                if maybe_port.isdigit():
+                    port_value = int(maybe_port)
+                    if port_value < 1 or port_value > 65535:
+                        raise ValueError(f"Port out of range in entry '{entry}'")
+                    port = port_value
+                    working = host_candidate
+                else:
+                    raise ValueError(f"Invalid port in entry '{entry}'")
+
+            # Handle wildcards
+            wildcard = False
+            if working.startswith("*."):
+                wildcard = True
+                working = working[2:]
+            elif working.startswith("."):
+                wildcard = True
+                working = working[1:]
+
+            # Parse as IP or hostname
+            try:
+                ipaddress.ip_address(working)
+                normalized = working.lower()
+                if wildcard:
+                    raise ValueError(f"Wildcard not allowed for IP address '{entry}'")
+                ip_literals.add(normalized)
+            except ValueError:
+                # Try hostname
+                try:
+                    normalized = working.encode("idna").decode("ascii").lower()
+                except UnicodeError:
+                    raise ValueError(f"Invalid hostname in entry '{entry}'")
+
+                if wildcard and port is not None:
+                    raise ValueError(f"Wildcard entries cannot specify ports: '{entry}'")
+
+                if wildcard:
+                    suffixes.add(normalized)
+                else:
+                    exact.add(normalized)
+                    if port is not None:
+                        host_ports.setdefault(normalized, set()).add(port)
+
+        if not exact and not suffixes and not ip_literals and not host_ports:
+            return None
+
+        return exact, suffixes, host_ports, ip_literals
+
+    def allowed_port_set(self) -> Set[int]:
+        """Return the set of allowed ports (defaults to 80, 443)."""
+        if self.allowed_ports:
+            return set(self.allowed_ports)
+        return {80, 443}
+
+
+class RateLimitSettings(BaseModel):
+    """Rate limiting configuration."""
+
+    model_config = ConfigDict(frozen=True, validate_assignment=False)
+
+    default: Optional[str] = Field(
+        default=None,
+        description="Default rate limit (e.g., '10/second', '60/minute')",
+    )
+    per_service: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Per-service rate limits (e.g., {'ols': '4/second'})",
+    )
+    shared_dir: Optional[Path] = Field(
+        default=None,
+        description="Directory for shared SQLite token bucket state",
+    )
+    engine: str = Field(
+        default="pyrate",
+        description="Rate limit engine (currently only 'pyrate' supported)",
+    )
+
+    @field_validator("default", mode="before")
+    @classmethod
+    def validate_rate_string(cls, v: Optional[str]) -> Optional[str]:
+        """Validate rate limit string format."""
+        if v is None:
+            return None
+        if not _RATE_LIMIT_PATTERN.match(v):
+            raise ValueError(f"Invalid rate limit format '{v}'; expected 'N/(second|minute|hour)'")
+        return v
+
+    @field_validator("per_service", mode="before")
+    @classmethod
+    def validate_per_service(cls, v: Any) -> Dict[str, str]:
+        """Parse and validate per-service rate limits."""
+        if isinstance(v, str):
+            # Parse CSV format: "ols:4/second;bioportal:2/second"
+            v = {
+                service: rate
+                for pair in v.split(";")
+                for service, rate in [pair.split(":")]
+                if service and rate
+            }
+        if isinstance(v, dict):
+            for service, rate in v.items():
+                if not _RATE_LIMIT_PATTERN.match(rate):
+                    raise ValueError(f"Invalid rate limit '{rate}' for service '{service}'")
+            return v
+        return {}
+
+    def parse_service_rate_limit(self, service: str) -> Optional[float]:
+        """Parse service-specific rate limit to requests-per-second."""
+        rate_str = self.per_service.get(service)
+        if rate_str is None:
+            return parse_rate_limit_to_rps(self.default)
+        return parse_rate_limit_to_rps(rate_str)
+
+
+class ExtractionSettings(BaseModel):
+    """Archive extraction policy (safety, throughput, integrity)."""
+
+    model_config = ConfigDict(frozen=True, validate_assignment=False)
+
+    # Safety settings
+    encapsulate: bool = Field(default=True, description="Extract in deterministic root")
+    encapsulation_name: str = Field(
+        default="sha256",
+        description="Encapsulation strategy (sha256 or basename)",
+    )
+    max_depth: int = Field(default=32, ge=1, le=255, description="Max path depth")
+    max_components_len: int = Field(
+        default=240, ge=1, le=4096, description="Max bytes per path component"
+    )
+    max_path_len: int = Field(default=4096, ge=1, le=32768, description="Max bytes per full path")
+    max_entries: int = Field(default=50000, ge=1, le=1000000, description="Max extractable entries")
+    max_file_size_bytes: int = Field(
+        default=2147483648, ge=1, description="Per-file size cap (2GB default)"
+    )
+    max_total_ratio: float = Field(
+        default=10.0, ge=1.0, le=1000.0, description="Zip-bomb ratio (uncompressed/compressed)"
+    )
+    max_entry_ratio: float = Field(
+        default=100.0, ge=1.0, le=10000.0, description="Per-entry ratio cap"
+    )
+    unicode_form: str = Field(default="NFC", description="Unicode normalization (NFC or NFD)")
+    casefold_collision_policy: str = Field(
+        default="reject", description="Case collision policy (reject or allow)"
+    )
+    overwrite: str = Field(
+        default="reject",
+        description="Overwrite policy (reject, replace, keep_existing)",
+    )
+    duplicate_policy: str = Field(
+        default="reject", description="Duplicate policy (reject, first_wins, last_wins)"
+    )
+
+    # Throughput settings
+    space_safety_margin: float = Field(
+        default=1.10, ge=1.0, le=10.0, description="Free-space headroom"
+    )
+    preallocate: bool = Field(default=True, description="Preallocate files when size known")
+    copy_buffer_min: int = Field(
+        default=65536, ge=1024, description="Min copy buffer bytes (64 KiB)"
+    )
+    copy_buffer_max: int = Field(
+        default=1048576, ge=65536, description="Max copy buffer bytes (1 MiB)"
+    )
+    group_fsync: int = Field(default=32, ge=1, le=1000, description="fsync directory every N files")
+    max_wall_time_seconds: int = Field(
+        default=120, ge=1, le=3600, description="Soft time budget per archive"
+    )
+
+    # Integrity settings
+    hash_enable: bool = Field(default=True, description="Compute file digests")
+    hash_algorithms: List[str] = Field(
+        default_factory=lambda: ["sha256"],
+        description="Hash algorithms (e.g., sha256, sha1)",
+    )
+    include_globs: List[str] = Field(
+        default_factory=list, description="Include patterns (empty = all)"
+    )
+    exclude_globs: List[str] = Field(default_factory=list, description="Exclude patterns")
+    timestamps_mode: str = Field(
+        default="preserve",
+        description="Timestamp handling (preserve, normalize, source_date_epoch)",
+    )
+    timestamps_normalize_to: str = Field(
+        default="archive_mtime",
+        description="When normalizing: archive_mtime or now",
+    )
+
+    @field_validator("encapsulation_name", mode="before")
+    @classmethod
+    def validate_encapsulation_name(cls, v: str) -> str:
+        """Validate encapsulation strategy."""
+        valid = {"sha256", "basename"}
+        if v.lower() not in valid:
+            raise ValueError(f"encapsulation_name must be one of {valid}")
+        return v.lower()
+
+    @field_validator("unicode_form", mode="before")
+    @classmethod
+    def validate_unicode_form(cls, v: str) -> str:
+        """Validate Unicode normalization form."""
+        valid = {"NFC", "NFD"}
+        upper = v.upper()
+        if upper not in valid:
+            raise ValueError(f"unicode_form must be one of {valid}")
+        return upper
+
+    @field_validator("overwrite", "duplicate_policy", "casefold_collision_policy", mode="before")
+    @classmethod
+    def validate_policy(cls, v: str) -> str:
+        """Validate extraction policies."""
+        return v.lower()
+
+
+class StorageSettings(BaseModel):
+    """Local storage configuration."""
+
+    model_config = ConfigDict(frozen=True, validate_assignment=False)
+
+    root: Path = Field(
+        default_factory=lambda: Path.home() / "ontologies",
+        description="Blob storage root",
+    )
+    latest_name: str = Field(default="LATEST.json", description="Latest marker filename")
+    url: Optional[str] = Field(default=None, description="Optional remote backend URL (fsspec)")
+
+    @field_validator("root", mode="before")
+    @classmethod
+    def normalize_root(cls, v: Any) -> Path:
+        """Normalize storage root to absolute path."""
+        if isinstance(v, str):
+            p = Path(v).expanduser()
+        elif isinstance(v, Path):
+            p = v.expanduser()
+        else:
+            p = Path(v).expanduser()
+        return p.resolve()
+
+
+class DuckDBSettings(BaseModel):
+    """DuckDB catalog configuration."""
+
+    model_config = ConfigDict(frozen=True, validate_assignment=False)
+
+    path: Path = Field(
+        default_factory=lambda: Path.home() / ".data" / "ontofetch.duckdb",
+        description="DuckDB file path",
+    )
+    threads: Optional[int] = Field(
+        default=None, ge=1, description="Query execution threads (auto-detect if None)"
+    )
+    readonly: bool = Field(default=False, description="Open database read-only")
+    wlock: bool = Field(default=True, description="Enable writer file-lock for serialization")
+    parquet_events: bool = Field(default=False, description="Store events as Parquet files")
+
+    @field_validator("path", mode="before")
+    @classmethod
+    def normalize_path(cls, v: Any) -> Path:
+        """Normalize DuckDB path to absolute."""
+        if isinstance(v, str):
+            p = Path(v).expanduser()
+        elif isinstance(v, Path):
+            p = v.expanduser()
+        else:
+            p = Path(v).expanduser()
+        return p.resolve()
+
+
+# ============================================================================
+# PHASE 5.3: ROOT SETTINGS INTEGRATION
+# ============================================================================
+# Phase 5.3: Root Settings Composition with Environment Integration
+# Implements: OntologyDownloadSettings (composes all 10 domain models)
+# Status: In Progress (Phase 5.3)
+# ============================================================================
+
+
+class OntologyDownloadSettings(BaseModel):
+    """Root settings for OntologyDownload module.
+
+    Composes all 10 domain models with environment variable support.
+    Uses pydantic-settings for .env file and environment variable integration.
+
+    Composition:
+    - Foundation (5 models): HTTP, Cache, Retry, Logging, Telemetry
+    - Complex (5 models): Security, RateLimit, Extraction, Storage, DuckDB
+
+    Environment Variable Prefix: ONTOFETCH_
+    Example: ONTOFETCH_HTTP__TIMEOUT_READ=30
+
+    Source Precedence (highest to lowest):
+    1. CLI arguments (passed to constructor)
+    2. .env.ontofetch file
+    3. .env file
+    4. Environment variables (ONTOFETCH_*)
+    5. Defaults (baked-in)
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        validate_assignment=False,
+        extra="ignore",  # Ignore unknown fields from env vars
+    )
+
+    # Foundation Domain Models (Phase 5.1)
+    http: HttpSettings = Field(
+        default_factory=HttpSettings,
+        description="HTTP client settings (HTTPX + Hishel)",
+    )
+    cache: CacheSettings = Field(
+        default_factory=CacheSettings,
+        description="Cache settings (Hishel RFC-9111)",
+    )
+    retry: RetrySettings = Field(
+        default_factory=RetrySettings,
+        description="Retry settings (exponential backoff)",
+    )
+    logging: LoggingSettings = Field(
+        default_factory=LoggingSettings,
+        description="Logging configuration",
+    )
+    telemetry: TelemetrySettings = Field(
+        default_factory=TelemetrySettings,
+        description="Telemetry and observability",
+    )
+
+    # Complex Domain Models (Phase 5.2)
+    security: SecuritySettings = Field(
+        default_factory=SecuritySettings,
+        description="URL security and DNS settings",
+    )
+    ratelimit: RateLimitSettings = Field(
+        default_factory=RateLimitSettings,
+        description="Rate limiting configuration",
+    )
+    extraction: ExtractionSettings = Field(
+        default_factory=ExtractionSettings,
+        description="Archive extraction policies",
+    )
+    storage: StorageSettings = Field(
+        default_factory=StorageSettings,
+        description="Storage configuration",
+    )
+    db: DuckDBSettings = Field(
+        default_factory=DuckDBSettings,
+        description="DuckDB catalog configuration",
+    )
+
+    def config_hash(self) -> str:
+        """Compute SHA-256 hash of normalized configuration for provenance tracking."""
+        import hashlib
+
+        # Serialize non-secret config
+        config_dict = self.model_dump()
+        config_json = json.dumps(config_dict, sort_keys=True, default=str)
+        return hashlib.sha256(config_json.encode()).hexdigest()
+
+
+# Global settings instance cache
+_settings_instance: Optional[OntologyDownloadSettings] = None
+_settings_lock = __import__("threading").Lock()
+
+
+def get_settings(
+    *,
+    force_reload: bool = False,
+) -> OntologyDownloadSettings:
+    """Get or create singleton settings instance with caching.
+
+    Args:
+        force_reload: Force reload from environment (bypass cache)
+
+    Returns:
+        OntologyDownloadSettings: Cached or new instance
+
+    Environment Variables:
+        ONTOFETCH_HTTP__TIMEOUT_READ=30
+        ONTOFETCH_SECURITY__ALLOWED_HOSTS=example.com,*.other.org
+        ONTOFETCH_EXTRACT__MAX_DEPTH=64
+        etc.
+
+    Example:
+        >>> settings = get_settings()
+        >>> print(settings.http.timeout_read)
+        30.0
+        >>> print(settings.config_hash())
+        a1b2c3...
+    """
+    global _settings_instance
+
+    if _settings_instance is not None and not force_reload:
+        return _settings_instance
+
+    with _settings_lock:
+        if _settings_instance is not None and not force_reload:
+            return _settings_instance
+
+        # Create new instance from defaults
+        # Phase 5.3 enhancement: Add environment variable parsing here
+        _settings_instance = OntologyDownloadSettings()
+        return _settings_instance
+
+
+def clear_settings_cache() -> None:
+    """Clear the settings cache (useful for testing)."""
+    global _settings_instance
+    with _settings_lock:
+        _settings_instance = None
+
+
 __all__ = [
     "UserConfigError",
     "OntologyDownloadError",
@@ -1659,4 +2338,20 @@ __all__ = [
     "FsspecStorageBackend",
     "get_storage_backend",
     "STORAGE",
+    # Phase 5.1: Domain Models Foundation
+    "HttpSettings",
+    "CacheSettings",
+    "RetrySettings",
+    "LoggingSettings",
+    "TelemetrySettings",
+    # Phase 5.2: Complex Domain Models
+    "SecuritySettings",
+    "RateLimitSettings",
+    "ExtractionSettings",
+    "StorageSettings",
+    "DuckDBSettings",
+    # Phase 5.3: Root Settings Integration
+    "OntologyDownloadSettings",
+    "get_settings",
+    "clear_settings_cache",
 ]

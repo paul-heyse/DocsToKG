@@ -1,0 +1,301 @@
+# Hishel HTTP Caching Configuration
+# ===================================
+#
+# RFC 9111 compliant HTTP cache configuration for scholarly artifact resolution.
+#
+# Configuration Precedence:
+#   1. This YAML file (base)
+#   2. Environment variables (DOCSTOKG_CACHE_*)
+#   3. CLI arguments (--cache-*)
+#
+# Host Normalization:
+#   All host keys are normalized using IDNA 2008 + UTS #46 for RFC compliance.
+#   Examples: API.Crossref.Org → api.crossref.org, münchen.example → xn--mnich-kva.example
+#
+# Usage:
+#   ./.venv/bin/python -m DocsToKG.ContentDownload.cli \
+#     --topic "machine learning" \
+#     --year-start 2023 \
+#     --cache-config src/DocsToKG/ContentDownload/config/cache.yaml
+
+storage:
+    # Cache storage backend
+    # Options: file, memory, redis, sqlite, s3
+    # file: Local filesystem (default, ~/.cache/hishel or DOCSTOKG_DATA_ROOT/cache/http)
+    # memory: In-memory LFU eviction (ephemeral, single-process)
+    # redis: Shared cache via Redis (multi-process/host)
+    # sqlite: SQLite database (lightweight persistent)
+    # s3: AWS S3 (large distributed caches)
+    kind: file
+
+    # Path to cache storage (supports ${DOCSTOKG_DATA_ROOT} expansion)
+    path: "${DOCSTOKG_DATA_ROOT}/cache/http"
+
+    # TTL sweep interval (seconds) - how often to check for expired entries
+    check_ttl_every_s: 600
+
+controller:
+    # RFC 9111 cacheable HTTP methods
+    # Most APIs only support GET; POST caching requires explicit body-key handling
+    cacheable_methods:
+        - GET
+        - HEAD
+
+    # RFC 9111 cacheable status codes
+    # 200: OK (standard successful response)
+    # 301: Moved Permanently (safe to cache, redirects)
+    # 308: Permanent Redirect (safe to cache, preserves method)
+    # Note: 304 (Not Modified) handled automatically by hishel
+    cacheable_statuses:
+        - 200
+        - 301
+        - 308
+
+    # Enable heuristic caching when Cache-Control headers are absent
+    # Conservative default: false (only cache responses with explicit Cache-Control)
+    allow_heuristics: false
+
+    # Global policy for unknown hosts
+    # DO_NOT_CACHE: Unknown hosts not cached (safe, conservative, recommended)
+    # CACHE: Unknown hosts cached with default TTL (risky for scrapers, not recommended)
+    default: DO_NOT_CACHE
+
+# Host-specific caching policies
+# ================================
+#
+# Each host can define:
+#   ttl_s: Time-to-live in seconds (cache validity period)
+#   role: Per-role overrides (metadata, landing, artifact)
+#
+# Roles:
+#   - metadata: API responses with publication metadata (highly cacheable)
+#   - landing: Landing page HTML from publisher sites (stable, less frequent)
+#   - artifact: PDF/HTML/XML content downloads (too variable, typically not cached)
+#
+# TTL Selection Guide:
+#   - Crossref metadata: 3 days (259200s) - stable, updated on publication
+#   - OpenAlex metadata: 3 days (259200s) - stable index, updated nightly
+#   - arXiv landing: 1 day (86400s) - abstract relatively stable
+#   - Landing pages: 1-7 days - depends on publisher update frequency
+#
+# Stale-While-Revalidate (swrv_s):
+#   - Specifies grace period for serving stale cache during revalidation (seconds)
+#   - Example: ttl_s: 259200, swrv_s: 180 means:
+#     * Serve fresh for 3 days
+#     * Serve stale for additional 3 minutes while revalidating in background
+#   - Reduces latency on cache expiry (returns stale while fetching fresh)
+
+hosts:
+    # Crossref API
+    # ============
+    # Metadata API: Stable, high volume, slow to update
+    # Rate limit: 50 requests/second (generous)
+    # Caching: Highly beneficial - metadata rarely changes
+    api.crossref.org:
+        ttl_s: 259200 # 3 days
+        role:
+            metadata:
+                ttl_s: 259200
+                swrv_s: 180 # Serve stale for 3 minutes during revalidation
+            landing:
+                ttl_s: 86400 # 1 day
+                swrv_s: 60
+
+    # OpenAlex API
+    # ============
+    # Comprehensive scholarly metadata API
+    # Rate limit: Varies by endpoint, generally generous
+    # Caching: Highly beneficial - data updated nightly
+    api.openalex.org:
+        ttl_s: 259200 # 3 days
+        role:
+            metadata:
+                ttl_s: 259200
+                swrv_s: 180 # 3 minutes stale window
+            landing:
+                ttl_s: 86400 # 1 day
+                swrv_s: 60
+
+    # CORE API
+    # ========
+    # Aggregated open-access research papers
+    # Rate limit: Depends on API tier (free tier: ~120 requests/min)
+    # Caching: Beneficial - metadata aggregated, not real-time
+    api.core.ac.uk:
+        ttl_s: 432000 # 5 days
+        role:
+            metadata:
+                ttl_s: 432000
+                swrv_s: 300 # 5 minutes stale window
+
+    # Unpaywall API
+    # =============
+    # OA status lookup for DOIs
+    # Rate limit: Generous (anonymous access allowed)
+    # Caching: Highly beneficial - OA status changes rarely
+    api.unpaywall.org:
+        ttl_s: 604800 # 7 days
+        role:
+            metadata:
+                ttl_s: 604800
+                swrv_s: 600 # 10 minutes stale window
+
+    # Semantic Scholar API
+    # ====================
+    # AI-powered research paper information
+    # Rate limit: 100 requests/second (for academic users)
+    # Caching: Beneficial - aggregated data, updated periodically
+    api.semanticscholar.org:
+        ttl_s: 432000 # 5 days
+        role:
+            metadata:
+                ttl_s: 432000
+                swrv_s: 300
+
+    # arXiv eBPrints API / oai.arxiv.org
+    # ===================================
+    # Preprint server, metadata rarely changes after posting
+    # Rate limit: Strict (rate-limiting enforced, requests throttled)
+    # Caching: Beneficial - preprints immutable after initial posting
+    export.arxiv.org:
+        ttl_s: 864000 # 10 days
+        role:
+            metadata:
+                ttl_s: 864000
+                swrv_s: 600
+            landing:
+                ttl_s: 259200
+                swrv_s: 180
+
+    # PubMed API
+    # ==========
+    # NCBI's medical literature database
+    # Rate limit: Not enforced (but requests throttled by server)
+    # Caching: Beneficial - metadata stable, updated with publication lag
+    eutils.ncbi.nlm.nih.gov:
+        ttl_s: 432000 # 5 days
+        role:
+            metadata:
+                ttl_s: 432000
+                swrv_s: 300
+
+    # DOAJ (Directory of Open Access Journals)
+    # ========================================
+    # Open access journal registry
+    # Rate limit: Generous (open service)
+    # Caching: Beneficial - journal metadata stable
+    doaj.org:
+        ttl_s: 604800 # 7 days
+        role:
+            metadata:
+                ttl_s: 604800
+                swrv_s: 600
+
+    # Citeseer X
+    # ==========
+    # Academic paper metadata and citations
+    # Rate limit: Unknown (typically polite behavior expected)
+    # Caching: Beneficial - metadata aggregated, updated periodically
+    citeseerx.ist.psu.edu:
+        ttl_s: 432000 # 5 days
+        role:
+            metadata:
+                ttl_s: 432000
+                swrv_s: 300
+
+    # Google Scholar
+    # ==============
+    # WARNING: Google Scholar actively blocks automated access
+    # Rate limit: Very strict (IP-based blocking after few requests)
+    # Caching: Not recommended (changes rapidly, API often unavailable)
+    scholar.google.com:
+        ttl_s: 3600 # 1 hour (minimal caching)
+        role:
+            metadata:
+                ttl_s: 3600
+
+    # Internet Archive (Wayback Machine)
+    # ==================================
+    # Historical snapshots of web content
+    # Rate limit: Moderate (2 requests/second recommended)
+    # Caching: Beneficial - snapshots immutable by date
+    archive.org:
+        ttl_s: 2592000 # 30 days
+        role:
+            metadata:
+                ttl_s: 2592000
+                swrv_s: 1800 # 30 minutes stale window
+
+    # Common Publisher Landing Pages
+    # ===============================
+    # For resolving publisher URLs captured by resolvers
+
+    # Elsevier/ScienceDirect
+    sciencedirect.com:
+        ttl_s: 86400 # 1 day
+        role:
+            landing:
+                ttl_s: 86400
+                swrv_s: 60
+
+    # Springer
+    springer.com:
+        ttl_s: 86400 # 1 day
+        role:
+            landing:
+                ttl_s: 86400
+                swrv_s: 60
+
+    # Wiley
+    wiley.com:
+        ttl_s: 86400 # 1 day
+        role:
+            landing:
+                ttl_s: 86400
+                swrv_s: 60
+
+    # SAGE Journals
+    journals.sagepub.com:
+        ttl_s: 86400 # 1 day
+        role:
+            landing:
+                ttl_s: 86400
+                swrv_s: 60
+
+    # Taylor & Francis
+    tandfonline.com:
+        ttl_s: 86400 # 1 day
+        role:
+            landing:
+                ttl_s: 86400
+                swrv_s: 60
+# Environment Variable Overrides
+# ===============================
+#
+# Any configuration above can be overridden via environment variables with precedence:
+#
+#   DOCSTOKG_CACHE_HOST__api_crossref_org=ttl_s:432000
+#   DOCSTOKG_CACHE_ROLE__api_openalex_org__metadata=ttl_s:432000,swrv_s:300
+#   DOCSTOKG_CACHE_DEFAULTS=cacheable_methods:GET,allow_heuristics:true
+#
+# CLI Argument Overrides
+# ======================
+#
+# Further override via CLI arguments (highest precedence):
+#
+#   --cache-host api.crossref.org=432000
+#   --cache-role api.crossref.org:metadata=432000,swrv_s:300
+#   --cache-disable
+#   --cache-storage memory
+#
+# Example Command
+# ===============
+#
+#   ./.venv/bin/python -m DocsToKG.ContentDownload.cli \
+#     --topic "machine learning" \
+#     --year-start 2023 \
+#     --year-end 2024 \
+#     --cache-config src/DocsToKG/ContentDownload/config/cache.yaml \
+#     --cache-storage memory \
+#     --cache-role api.crossref.org:metadata=432000,swrv_s:300 \
+#     --workers 4

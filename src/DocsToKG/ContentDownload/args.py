@@ -81,6 +81,8 @@ from DocsToKG.ContentDownload.ratelimit import (
 from DocsToKG.ContentDownload.resolvers import DEFAULT_RESOLVER_ORDER, default_resolvers
 from DocsToKG.ContentDownload.telemetry import ManifestUrlIndex
 from DocsToKG.ContentDownload.urls import configure_url_policy, parse_param_allowlist_spec
+from DocsToKG.ContentDownload.cache_loader import CacheConfig, load_cache_config
+from DocsToKG.ContentDownload.cache_policy import CacheRouter
 
 __all__ = [
     "ResolvedConfig",
@@ -131,6 +133,8 @@ class ResolvedConfig:
     retry_after_cap: float
     rate_policies: Mapping[str, RolePolicy]
     rate_backend: BackendConfig
+    cache_config: Optional[Any] = None  # CacheConfig from cache_loader
+    cache_disabled: bool = False  # If True, bypass all caching
 
 
 def bootstrap_run_environment(resolved: ResolvedConfig) -> None:
@@ -547,6 +551,62 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="Override the Accept header sent with resolver HTTP requests.",
+    )
+
+    # HTTP caching arguments
+    cache_group = parser.add_argument_group("HTTP caching (RFC 9111)")
+    cache_group.add_argument(
+        "--cache-config",
+        dest="cache_config_path",
+        type=Path,
+        default=None,
+        help="Path to cache configuration YAML file (see cache.yaml for examples).",
+    )
+    cache_group.add_argument(
+        "--cache-host",
+        dest="cache_host_overrides",
+        action="append",
+        default=[],
+        metavar="HOST=TTL_S",
+        help=(
+            "Override cache policy for a host (e.g., --cache-host api.crossref.org=259200 "
+            "or --cache-host example.com=0 to disable)."
+        ),
+    )
+    cache_group.add_argument(
+        "--cache-role",
+        dest="cache_role_overrides",
+        action="append",
+        default=[],
+        metavar="HOST:ROLE=TTL_S",
+        help=(
+            "Override cache policy for a host:role pair (e.g., "
+            "--cache-role api.openalex.org:metadata=259200,swrv_s:180)."
+        ),
+    )
+    cache_group.add_argument(
+        "--cache-defaults",
+        dest="cache_defaults_override",
+        type=str,
+        default=None,
+        metavar="SPEC",
+        help=(
+            "Override cache controller defaults (e.g., "
+            "'cacheable_methods:GET,cacheable_statuses:200,301,allow_heuristics:false')."
+        ),
+    )
+    cache_group.add_argument(
+        "--cache-storage",
+        dest="cache_storage_kind",
+        choices=["file", "memory", "redis", "sqlite", "s3"],
+        default=None,
+        help="Cache storage backend (default: file). Choose 'memory' for ephemeral, or persistent options.",
+    )
+    cache_group.add_argument(
+        "--cache-disable",
+        dest="cache_disabled",
+        action="store_true",
+        help="Disable HTTP caching (bypass all cache checks, use raw HTTP client).",
     )
 
     parser.set_defaults(head_precheck=True, global_url_dedup=None, _sleep_explicit=False)
@@ -1217,6 +1277,39 @@ def resolve_config(
 
     rate_policies = configured_policies
 
+    cache_config_path = _expand_path(args.cache_config_path)
+    cache_disabled = bool(getattr(args, "cache_disabled", False))
+
+    if cache_disabled:
+        cache_config = None
+        LOGGER.info("HTTP caching disabled via --cache-disable")
+    elif cache_config_path:
+        try:
+            cache_config = load_cache_config(
+                cache_config_path,
+                env=os.environ,
+                cli_host_overrides=getattr(args, "cache_host_overrides", []),
+                cli_role_overrides=getattr(args, "cache_role_overrides", []),
+                cli_defaults_override=getattr(args, "cache_defaults_override", None),
+            )
+            cache_router = CacheRouter(cache_config)
+            LOGGER.info(
+                "Loaded cache configuration from %s with %d hosts",
+                cache_config_path,
+                len(cache_config.hosts),
+            )
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug("Cache policy table:\n%s", cache_router.print_effective_policy())
+        except Exception as exc:
+            LOGGER.warning(
+                "Failed to load cache configuration from %s: %s; continuing without caching",
+                cache_config_path,
+                exc,
+            )
+            cache_config = None
+    else:
+        cache_config = None
+
     return ResolvedConfig(
         args=args,
         run_id=run_id,
@@ -1241,6 +1334,8 @@ def resolve_config(
         retry_after_cap=args.retry_after_cap,
         rate_policies=rate_policies,
         rate_backend=backend_config,
+        cache_config=cache_config,
+        cache_disabled=cache_disabled,
     )
 
 

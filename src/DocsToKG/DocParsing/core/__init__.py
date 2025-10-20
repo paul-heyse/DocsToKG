@@ -63,7 +63,6 @@ from DocsToKG.DocParsing.logging import (
 )
 
 from .batching import Batcher
-from .cli import CLI_DESCRIPTION, app, build_doctags_parser, main
 from .cli_utils import CLIOption, build_subcommand, detect_mode
 from .concurrency import ReservedPort, acquire_lock, find_free_port, set_spawn_or_warn
 from .discovery import (
@@ -186,10 +185,6 @@ __all__ = [
     "load_structural_marker_profile",
     "load_structural_marker_config",
     "detect_mode",
-    "CLI_DESCRIPTION",
-    "app",
-    "build_doctags_parser",
-    "main",
     "StagePlan",
     "WorkItem",
     "ItemOutcome",

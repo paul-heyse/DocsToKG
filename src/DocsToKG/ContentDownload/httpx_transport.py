@@ -37,8 +37,13 @@ from typing import Dict, Iterable, Mapping, MutableMapping, Optional
 
 import certifi
 import httpx
-from hishel import CacheTransport, FileStorage
 
+from DocsToKG.ContentDownload.cache_loader import load_cache_config
+from DocsToKG.ContentDownload.cache_policy import CacheRouter
+from DocsToKG.ContentDownload.cache_transport_wrapper import (
+    RoleAwareCacheTransport,
+    build_role_aware_cache_transport,
+)
 from DocsToKG.ContentDownload.ratelimit import (
     RateLimitedTransport,
     get_rate_limiter_manager,
@@ -49,6 +54,7 @@ LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 _CLIENT_LOCK = threading.RLock()
 _HTTP_CLIENT: Optional[httpx.Client] = None
 _CURRENT_OVERRIDES: Dict[str, object] = {}
+_CACHE_ROUTER: Optional[CacheRouter] = None
 
 _DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=30.0, pool=5.0)
 _DEFAULT_LIMITS = httpx.Limits(
@@ -189,33 +195,91 @@ def _close_client_unlocked() -> None:
     _HTTP_CLIENT = None
 
 
+def _load_or_create_cache_router() -> CacheRouter:
+    """Load cache configuration and create CacheRouter instance.
+
+    Strategy:
+    1. Load from cache.yaml if it exists in ContentDownload/config/
+    2. Apply environment variable overrides
+    3. Create CacheRouter with loaded config
+
+    Returns:
+        CacheRouter instance for role-aware cache decisions
+
+    Notes:
+        - Caches router in module-level _CACHE_ROUTER
+        - Conservative defaults: unknown hosts not cached
+        - Graceful fallback if config missing
+    """
+    global _CACHE_ROUTER
+
+    if _CACHE_ROUTER is not None:
+        return _CACHE_ROUTER
+
+    # Try to load cache.yaml from ContentDownload/config/
+    cache_yaml = Path(__file__).parent / "config" / "cache.yaml"
+    cache_yaml_path = str(cache_yaml) if cache_yaml.exists() else None
+
+    try:
+        config = load_cache_config(
+            cache_yaml_path,
+            env=os.environ,
+        )
+        _CACHE_ROUTER = CacheRouter(config)
+        LOGGER.info("Cache configuration loaded from %s", cache_yaml_path or "defaults")
+    except Exception as e:
+        LOGGER.warning("Failed to load cache configuration: %s; using defaults", e)
+        # Create minimal config with conservative defaults
+        from DocsToKG.ContentDownload.cache_loader import (
+            CacheConfig,
+            CacheControllerDefaults,
+            CacheDefault,
+            CacheStorage,
+            StorageKind,
+        )
+
+        minimal_config = CacheConfig(
+            storage=CacheStorage(kind=StorageKind.FILE, path=str(_resolve_cache_dir())),
+            controller=CacheControllerDefaults(default=CacheDefault.DO_NOT_CACHE),
+            hosts={},
+        )
+        _CACHE_ROUTER = CacheRouter(minimal_config)
+
+    return _CACHE_ROUTER
+
+
 def _create_client_unlocked() -> None:
     global _HTTP_CLIENT
 
     cache_dir = _resolve_cache_dir()
-    storage = FileStorage(base_path=cache_dir)
 
     limiter_manager = get_rate_limiter_manager()
-    base_transport = _CURRENT_OVERRIDES.get("transport")
-    if isinstance(base_transport, CacheTransport):
+    base_transport: Optional[httpx.BaseTransport] = _CURRENT_OVERRIDES.get("transport")  # type: ignore[assignment]
+
+    # Load cache router for role-aware caching
+    cache_router = _load_or_create_cache_router()
+
+    if isinstance(base_transport, RoleAwareCacheTransport):
+        # Already wrapped, use as-is
         cache_transport = base_transport
-        inner_transport = getattr(cache_transport, "transport", None)
-        if inner_transport is not None and not isinstance(inner_transport, RateLimitedTransport):
-            # Ensure the limiter sits beneath Hishel so cache hits avoid consuming quota.
-            cache_transport.transport = RateLimitedTransport(
-                inner_transport, manager=limiter_manager
-            )
     else:
+        # Create role-aware cache transport with nested rate limiter
         base_transport = base_transport or httpx.HTTPTransport(retries=0)
         if not isinstance(base_transport, RateLimitedTransport):
-            # Wrap the raw transport so every cache miss/revalidation flows through the limiter.
+            # Wrap with rate limiter
             base_transport = RateLimitedTransport(base_transport, manager=limiter_manager)
-        cache_transport = CacheTransport(transport=base_transport, storage=storage)
+
+        # Wrap with role-aware cache transport
+        cache_transport = build_role_aware_cache_transport(
+            cache_router,
+            base_transport,
+            cache_dir,
+        )
 
     event_hooks = _build_event_hooks(_CURRENT_OVERRIDES.get("event_hooks"))  # type: ignore[arg-type]
 
     mounts: Optional[Mapping[str, httpx.BaseTransport]]
-    override_mounts = _CURRENT_OVERRIDES.get("proxy_mounts")
+    override_mounts = _CURRENT_OVERRIDES.get("proxy_mounts")  # type: ignore[assignment]
     if override_mounts:
         mounts = dict(override_mounts)  # type: ignore[arg-type]
     else:

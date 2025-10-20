@@ -1,11 +1,31 @@
 """CLI builder utilities dedicated to the DocParsing chunking stage.
 
+IMPORTANT: This module is INTERNAL CLI INFRASTRUCTURE
+────────────────────────────────────────────────────────────────────────────
+
+This is NOT "legacy code" to be removed. While the unified CLI system
+(cli_unified.py) exists as the primary entry point, it delegates to the
+stage main() functions, which internally use the parsers defined here.
+
+Specifically:
+  1. The new unified CLI calls chunking_runtime.main(args=None)
+  2. chunking_runtime.main() parses sys.argv[1:] using the parser from
+     this module (build_parser() and parse_args() functions)
+  3. The stage main() function then executes the chunking logic
+
+Therefore, this module must be maintained alongside chunking/runtime.py.
+DO NOT DELETE without updating chunking/runtime.py to use the new
+unified configuration system directly.
+
+────────────────────────────────────────────────────────────────────────────
+
 This module combines shared CLI option metadata, argument parsers, and
-subcommand wiring so that both the standalone ``docparse`` CLI and automation
-agents can consistently configure chunking runs. It plugs the chunker-specific
-flags into the core CLI scaffolding, supports preset profiles for common worker
-and tokenizer combinations, and delegates config hydration to the shared
-``parse_args_with_overrides`` helper for parity with other DocParsing stages.
+subcommand wiring so that both the standalone ``docparse`` CLI and
+automation agents can consistently configure chunking runs. It plugs the
+chunker-specific flags into the core CLI scaffolding, supports preset
+profiles for common worker and tokenizer combinations, and delegates
+config hydration to the shared ``parse_args_with_overrides`` helper for
+parity with other DocParsing stages.
 """
 
 from __future__ import annotations
