@@ -228,19 +228,27 @@ def ensure_splade_environment(
 def ensure_qwen_environment(
     *, device: Optional[str] = None, dtype: Optional[str] = None, model_dir: Optional[Path] = None
 ) -> Dict[str, str]:
-    """Bootstrap Qwen/vLLM environment defaults and return resolved settings."""
+    """Bootstrap Qwen/vLLM environment defaults and return resolved settings.
 
-    resolved_device = (
-        device
-        or os.getenv("DOCSTOKG_QWEN_DEVICE")
-        or os.getenv("VLLM_DEVICE")
-        or _detect_cuda_device()
-    )
+    Explicit ``device`` and ``dtype`` arguments take precedence over any existing
+    environment configuration.
+    """
+
+    if device is not None:
+        resolved_device = device
+    else:
+        resolved_device = (
+            os.getenv("DOCSTOKG_QWEN_DEVICE")
+            or os.getenv("VLLM_DEVICE")
+            or _detect_cuda_device()
+        )
     os.environ["DOCSTOKG_QWEN_DEVICE"] = resolved_device
     os.environ["VLLM_DEVICE"] = resolved_device
 
-    resolved_dtype = dtype or os.getenv("DOCSTOKG_QWEN_DTYPE") or "bfloat16"
-    resolved_dtype_str = str(resolved_dtype)
+    if dtype is not None:
+        resolved_dtype_str = str(dtype)
+    else:
+        resolved_dtype_str = os.getenv("DOCSTOKG_QWEN_DTYPE") or "bfloat16"
     os.environ["DOCSTOKG_QWEN_DTYPE"] = resolved_dtype_str
 
     env_info: Dict[str, str] = {"device": resolved_device, "dtype": resolved_dtype_str}
