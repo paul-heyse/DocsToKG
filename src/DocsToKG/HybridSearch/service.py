@@ -3407,26 +3407,56 @@ class HybridSearchValidator:
             batch_size = None
         if batch_size is None or batch_size <= 0:
             batch_size = max(1, len(chunks))
+        embedding_cache: Dict[str, np.ndarray] = {}
+        missing_vectors: set[str] = set()
         for oversample in oversamples:
             hits = 0
-            embedding_cache: Dict[str, np.ndarray] = {}
             top_k = max(1, oversample * 3)
             if chunks:
                 for start in range(0, len(chunks), batch_size):
                     batch_chunks = chunks[start : start + batch_size]
-                    vector_ids = [chunk.vector_id for chunk in batch_chunks]
-                    if not vector_ids:
+                    candidate_pairs: List[tuple[ChunkPayload, str]] = [
+                        (chunk, chunk.vector_id)
+                        for chunk in batch_chunks
+                        if chunk.vector_id not in missing_vectors
+                    ]
+                    if not candidate_pairs:
                         continue
-                    embedding_matrix = self._registry.resolve_embeddings(
-                        vector_ids, cache=embedding_cache
-                    )
+                    vector_ids = [vector_id for _, vector_id in candidate_pairs]
+                    try:
+                        embedding_matrix = self._registry.resolve_embeddings(
+                            vector_ids, cache=embedding_cache
+                        )
+                        valid_chunks = [chunk for chunk, _ in candidate_pairs]
+                    except KeyError:
+                        embedding_rows: list[np.ndarray] = []
+                        valid_chunks = []
+                        for chunk, vector_id in candidate_pairs:
+                            try:
+                                row = self._registry.resolve_embedding(
+                                    vector_id, cache=embedding_cache
+                                )
+                            except KeyError:
+                                missing_vectors.add(vector_id)
+                                continue
+                            embedding_rows.append(np.asarray(row, dtype=np.float32))
+                            valid_chunks.append(chunk)
+                        if not embedding_rows:
+                            continue
+                        embedding_matrix = np.ascontiguousarray(
+                            np.stack(embedding_rows), dtype=np.float32
+                        )
                     if embedding_matrix.size == 0:
                         continue
+                    if hasattr(self._ingestion.faiss_index, "last_vector_ids"):
+                        self._ingestion.faiss_index.last_vector_ids = [
+                            chunk.vector_id for chunk in valid_chunks
+                        ]
                     queries = np.ascontiguousarray(embedding_matrix, dtype=np.float32)
                     batch_hits = self._ingestion.faiss_index.search_batch(queries, top_k)
                     if not batch_hits:
                         continue
-                    for chunk, hits_list in zip(batch_chunks, batch_hits):
+                    for chunk, hits_list in zip(valid_chunks, batch_hits):
                         if hits_list and hits_list[0].vector_id == chunk.vector_id:
                             hits += 1
             accuracy = hits / total_chunks

@@ -21,6 +21,11 @@ from DocsToKG.HybridSearch.config import DenseIndexConfig, RetrievalConfig
 from DocsToKG.HybridSearch.pipeline import Observability
 from DocsToKG.HybridSearch.service import HybridSearchValidator
 from DocsToKG.HybridSearch.store import FaissSearchResult
+from DocsToKG.HybridSearch.types import (
+    ChunkFeatures,
+    ChunkPayload,
+    HybridSearchResult,
+)
 
 
 class _RecordingResources:
@@ -206,6 +211,265 @@ def test_calibration_batches_queries_and_preserves_accuracy():
     validator = HybridSearchValidator(
         ingestion=ingestion,
         service=service,
+        registry=registry,
+        opensearch=SimpleNamespace(),
+    )
+
+    report = validator._run_calibration([])
+
+    expected_accuracy = sum(1 for flag in matches.values() if flag) / max(1, len(matches))
+    dense_results = report.details["dense"]
+    assert all(math.isclose(entry["self_hit_accuracy"], expected_accuracy) for entry in dense_results)
+    assert registry.all_calls == 1
+
+    batches_per_sweep = math.ceil(len(matches) / 2)
+    assert len(index.calls) == len(dense_results) * batches_per_sweep
+    expected_topks = []
+    for oversample in (1, 2, 3):
+        expected_topks.extend([max(1, oversample * 3)] * batches_per_sweep)
+    assert [entry["top_k"] for entry in index.calls] == expected_topks
+    assert report.passed is False
+
+
+def test_calibration_reuses_cached_embeddings_across_oversamples():
+    vector_ids = [f"vec-{idx}" for idx in range(4)]
+    embedding_dim = 3
+    embeddings = {
+        vector_id: np.full(embedding_dim, float(idx + 1), dtype=np.float32)
+        for idx, vector_id in enumerate(vector_ids)
+    }
+
+    class _RecordingStore:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, ...]] = []
+
+        def reconstruct_batch(self, vector_ids):
+            self.calls.append(tuple(vector_ids))
+            rows = [embeddings[vector_id] for vector_id in vector_ids]
+            return np.asarray(rows, dtype=np.float32)
+
+    class _RecordingIndex:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+            self.last_vector_ids: list[str] = []
+
+        def search_batch(self, queries: np.ndarray, top_k: int):
+            assert queries.dtype == np.float32
+            assert queries.flags.c_contiguous
+            self.calls.append({"shape": tuple(queries.shape), "top_k": top_k})
+            results = []
+            for vector_id in self.last_vector_ids:
+                hits = [FaissSearchResult(vector_id=vector_id, score=1.0)]
+                for extra in range(1, top_k):
+                    hits.append(
+                        FaissSearchResult(
+                            vector_id=f"noise-{vector_id}-{extra}", score=0.0
+                        )
+                    )
+                results.append(hits)
+            return results
+
+    class _RecordingRegistry:
+        def __init__(self, store: _RecordingStore, index: _RecordingIndex) -> None:
+            self._store = store
+            self._index = index
+            self._chunks = [SimpleNamespace(vector_id=vector_id) for vector_id in vector_ids]
+
+        def all(self):
+            return list(self._chunks)
+
+        def resolve_embeddings(self, vector_ids, *, cache=None, dtype=np.float32):
+            dtype = np.dtype(dtype)
+            results = [None] * len(vector_ids)
+            missing = []
+            missing_positions = []
+            if cache is not None:
+                for idx, vector_id in enumerate(vector_ids):
+                    cached = cache.get(vector_id)
+                    if cached is not None:
+                        results[idx] = np.asarray(cached, dtype=np.float32)
+                    else:
+                        missing.append(vector_id)
+                        missing_positions.append(idx)
+            else:
+                missing = list(vector_ids)
+                missing_positions = list(range(len(vector_ids)))
+            if missing:
+                reconstructed = self._store.reconstruct_batch(missing)
+                if reconstructed.shape[0] != len(missing):
+                    raise RuntimeError(
+                        "Dense store returned mismatched reconstruction rows "
+                        f"(expected {len(missing)}, received {reconstructed.shape[0]})"
+                    )
+                for offset, idx in enumerate(missing_positions):
+                    row = np.asarray(reconstructed[offset], dtype=np.float32)
+                    results[idx] = row
+                    if cache is not None:
+                        cache[vector_ids[idx]] = row
+            resolved = []
+            missing_ids = []
+            for idx, candidate in enumerate(results):
+                if candidate is None:
+                    missing_ids.append(vector_ids[idx])
+                else:
+                    resolved.append(candidate)
+            if missing_ids:
+                raise KeyError(f"Embeddings missing for {missing_ids!r}")
+            matrix = np.ascontiguousarray(np.stack(resolved), dtype=dtype)
+            self._index.last_vector_ids = list(vector_ids)
+            return matrix
+
+        def resolve_embedding(self, vector_id: str, *, cache=None, dtype=np.float32):
+            matrix = self.resolve_embeddings([vector_id], cache=cache, dtype=dtype)
+            return matrix[0]
+
+    store = _RecordingStore()
+    index = _RecordingIndex()
+    registry = _RecordingRegistry(store, index)
+
+    ingestion = SimpleNamespace(faiss_index=index)
+    config = SimpleNamespace(retrieval=RetrievalConfig(dense_calibration_batch_size=2))
+    service = SimpleNamespace(_config_manager=SimpleNamespace(get=lambda: config))
+
+    validator = HybridSearchValidator(
+        ingestion=ingestion,
+        service=service,
+        registry=registry,
+        opensearch=SimpleNamespace(),
+    )
+
+    report = validator._run_calibration([])
+
+    expected_batches = math.ceil(len(vector_ids) / 2)
+    assert len(store.calls) == expected_batches
+    assert store.calls == [tuple(vector_ids[i : i + 2]) for i in range(0, len(vector_ids), 2)]
+    dense_results = report.details["dense"]
+    assert len(dense_results) == 3
+    assert all(math.isclose(entry["self_hit_accuracy"], 1.0) for entry in dense_results)
+
+
+def test_calibration_skips_missing_vectors_without_redundant_reconstruction():
+    vector_ids = ["vec-available", "vec-missing"]
+    embeddings = {
+        "vec-available": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+    }
+
+    class _PartiallyMissingStore:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, ...]] = []
+
+        def reconstruct_batch(self, vector_ids):
+            self.calls.append(tuple(vector_ids))
+            for vector_id in vector_ids:
+                if vector_id not in embeddings:
+                    raise KeyError(vector_id)
+            rows = [embeddings[vector_id] for vector_id in vector_ids]
+            return np.asarray(rows, dtype=np.float32)
+
+    class _RecordingIndex:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+            self.last_vector_ids: list[str] = []
+
+        def search_batch(self, queries: np.ndarray, top_k: int):
+            assert queries.dtype == np.float32
+            assert queries.flags.c_contiguous
+            self.calls.append({"shape": tuple(queries.shape), "top_k": top_k})
+            results = []
+            for vector_id in self.last_vector_ids:
+                hits = [FaissSearchResult(vector_id=vector_id, score=1.0)]
+                for extra in range(1, top_k):
+                    hits.append(
+                        FaissSearchResult(
+                            vector_id=f"noise-{vector_id}-{extra}", score=0.0
+                        )
+                    )
+                results.append(hits)
+            return results
+
+    class _RecordingRegistry:
+        def __init__(self, store: _PartiallyMissingStore, index: _RecordingIndex) -> None:
+            self._store = store
+            self._index = index
+            self._chunks = [SimpleNamespace(vector_id=vector_id) for vector_id in vector_ids]
+
+        def all(self):
+            return list(self._chunks)
+
+        def resolve_embeddings(self, vector_ids, *, cache=None, dtype=np.float32):
+            dtype = np.dtype(dtype)
+            results = [None] * len(vector_ids)
+            missing = []
+            missing_positions = []
+            if cache is not None:
+                for idx, vector_id in enumerate(vector_ids):
+                    cached = cache.get(vector_id)
+                    if cached is not None:
+                        results[idx] = np.asarray(cached, dtype=np.float32)
+                    else:
+                        missing.append(vector_id)
+                        missing_positions.append(idx)
+            else:
+                missing = list(vector_ids)
+                missing_positions = list(range(len(vector_ids)))
+            if missing:
+                reconstructed = self._store.reconstruct_batch(missing)
+                if reconstructed.shape[0] != len(missing):
+                    raise RuntimeError(
+                        "Dense store returned mismatched reconstruction rows "
+                        f"(expected {len(missing)}, received {reconstructed.shape[0]})"
+                    )
+                for offset, idx in enumerate(missing_positions):
+                    row = np.asarray(reconstructed[offset], dtype=np.float32)
+                    results[idx] = row
+                    if cache is not None:
+                        cache[vector_ids[idx]] = row
+            resolved = []
+            missing_ids = []
+            for idx, candidate in enumerate(results):
+                if candidate is None:
+                    missing_ids.append(vector_ids[idx])
+                else:
+                    resolved.append(candidate)
+            if missing_ids:
+                raise KeyError(f"Embeddings missing for {missing_ids!r}")
+            matrix = np.ascontiguousarray(np.stack(resolved), dtype=dtype)
+            self._index.last_vector_ids = list(vector_ids)
+            return matrix
+
+        def resolve_embedding(self, vector_id: str, *, cache=None, dtype=np.float32):
+            matrix = self.resolve_embeddings([vector_id], cache=cache, dtype=dtype)
+            return matrix[0]
+
+    store = _PartiallyMissingStore()
+    index = _RecordingIndex()
+    registry = _RecordingRegistry(store, index)
+
+    ingestion = SimpleNamespace(faiss_index=index)
+    config = SimpleNamespace(retrieval=RetrievalConfig(dense_calibration_batch_size=1))
+    service = SimpleNamespace(_config_manager=SimpleNamespace(get=lambda: config))
+
+    validator = HybridSearchValidator(
+        ingestion=ingestion,
+        service=service,
+        registry=registry,
+        opensearch=SimpleNamespace(),
+    )
+
+    report = validator._run_calibration([])
+
+    assert store.calls[0] == tuple(vector_ids)
+    assert store.calls.count(("vec-available",)) == 1
+    assert store.calls.count(("vec-missing",)) == 1
+    assert len(store.calls) == 3
+    dense_results = report.details["dense"]
+    assert len(dense_results) == 3
+    expected_accuracy = 1 / max(1, len(vector_ids))
+    assert all(
+        math.isclose(entry["self_hit_accuracy"], expected_accuracy) for entry in dense_results
+    )
+
+
 @pytest.fixture
 def duplicate_namespace_registry() -> tuple[SimpleNamespace, list[ChunkPayload], dict[str, np.ndarray]]:
     research_embedding = np.array([1.0, 0.0, 0.0], dtype=np.float32)
@@ -263,20 +527,6 @@ def test_embeddings_for_results_respect_namespace(duplicate_namespace_registry):
         opensearch=SimpleNamespace(),
     )
 
-    report = validator._run_calibration([])
-
-    expected_accuracy = sum(1 for flag in matches.values() if flag) / max(1, len(matches))
-    dense_results = report.details["dense"]
-    assert all(math.isclose(entry["self_hit_accuracy"], expected_accuracy) for entry in dense_results)
-    assert registry.all_calls == 1
-
-    batches_per_sweep = math.ceil(len(matches) / 2)
-    assert len(index.calls) == len(dense_results) * batches_per_sweep
-    expected_topks = []
-    for oversample in (1, 2, 3):
-        expected_topks.extend([max(1, oversample * 3)] * batches_per_sweep)
-    assert [entry["top_k"] for entry in index.calls] == expected_topks
-    assert report.passed is False
     chunk_lookup = {
         (chunk.namespace, chunk.doc_id, chunk.chunk_id): chunk for chunk in registry.all()
     }
