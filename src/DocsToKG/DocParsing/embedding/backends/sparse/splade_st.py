@@ -118,6 +118,7 @@ class SpladeSTProvider(SparseEmbeddingBackend):
         self._cfg_spec = config
         self._ctx: ProviderContext | None = None
         self._splade_cfg: SpladeCfg | None = None
+        self._lock = threading.Lock()
 
     def open(self, context: ProviderContext) -> None:
         self._ctx = context
@@ -169,13 +170,14 @@ class SpladeSTProvider(SparseEmbeddingBackend):
         encoder = _get_encoder(self._splade_cfg)
         token_lists: List[List[Tuple[str, float]]] = []
         batch_size = self._splade_cfg.batch_size
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-            s = encoder.encode(batch)
-            for r in range(s.shape[0]):
-                nnz = s[r].coalesce().values().numel()
-                decoded = encoder.decode(s[r], top_k=int(nnz))
-                token_lists.append([(str(tok), float(weight)) for tok, weight in decoded])
+        with self._lock:
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i : i + batch_size]
+                s = encoder.encode(batch)
+                for r in range(s.shape[0]):
+                    nnz = s[r].coalesce().values().numel()
+                    decoded = encoder.decode(s[r], top_k=int(nnz))
+                    token_lists.append([(str(tok), float(weight)) for tok, weight in decoded])
         if self._ctx:
             self._ctx.emit(
                 self.identity,

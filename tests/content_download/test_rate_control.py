@@ -2,18 +2,28 @@
 
 from __future__ import annotations
 
+import os
+import types
+from pathlib import Path
+
 import httpx
 import pytest
-from pathlib import Path
 from pyrate_limiter import Duration, Rate
+from pyrate_limiter.buckets import InMemoryBucket
 
+from DocsToKG.ContentDownload import httpx_transport
 from DocsToKG.ContentDownload.core import Classification, WorkArtifact
-from DocsToKG.ContentDownload.errors import RateLimitError
 from DocsToKG.ContentDownload.download import build_download_outcome
+from DocsToKG.ContentDownload.errors import RateLimitError
+from DocsToKG.ContentDownload.networking import request_with_retries
 from DocsToKG.ContentDownload.ratelimit import (
     BackendConfig,
     LimiterManager,
+    RateLimitedTransport,
     RolePolicy,
+    clone_policies,
+    configure_rate_limits,
+    get_rate_limiter_manager,
     serialize_policy,
 )
 
@@ -113,3 +123,337 @@ def test_build_download_outcome_includes_rate_limiter_metadata():
     assert outcome.metadata["rate_limiter"]["backend"] == "memory"
     assert outcome.metadata["rate_limiter"]["mode"] == "wait"
     assert outcome.metadata["rate_limiter"]["role"] == "artifact"
+
+
+def _clone_backend_config(manager) -> BackendConfig:
+    options = manager.backend.options
+    return BackendConfig(
+        backend=manager.backend.backend,
+        options=dict(options) if isinstance(options, dict) else dict(options or {}),
+    )
+
+
+def test_cache_hit_skips_rate_limiter_tokens(tmp_path: Path, monkeypatch) -> None:
+    manager = get_rate_limiter_manager()
+    original_policies = clone_policies(manager.policies())
+    original_backend = _clone_backend_config(manager)
+
+    try:
+        configure_rate_limits(
+            policies={
+                "example.org": RolePolicy(
+                    rates={"metadata": [Rate(5, Duration.SECOND)]},
+                    max_delay_ms={"metadata": 250},
+                    mode={"metadata": "wait"},
+                    count_head={"metadata": False},
+                    weight={"metadata": 1},
+                )
+            },
+            backend=BackendConfig(backend="memory", options={}),
+        )
+
+        acquire_calls: list[tuple[str, str, str]] = []
+        original_acquire = manager.acquire
+
+        def _spy_acquire(*, host: str, role: str, method: str):
+            acquire_calls.append((host, role, method))
+            return original_acquire(host=host, role=role, method=method)
+
+        monkeypatch.setattr(manager, "acquire", _spy_acquire)
+
+        request_count = 0
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal request_count
+            request_count += 1
+            return httpx.Response(
+                200,
+                headers={
+                    "Cache-Control": "public, max-age=60",
+                    "Content-Type": "text/plain",
+                },
+                content=b"cached",
+                request=request,
+            )
+
+        monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+        httpx_transport.reset_http_client_for_tests()
+        httpx_transport.configure_http_client(transport=httpx.MockTransport(handler))
+        client = httpx_transport.get_http_client()
+
+        response1 = client.get("https://example.org/resource")
+        assert response1.status_code == 200
+        response1.close()
+
+        response2 = client.get("https://example.org/resource")
+        assert response2.status_code == 200
+        assert response2.extensions.get("from_cache") is True
+        response2.close()
+
+        assert request_count == 1
+        assert len(acquire_calls) == 1
+        assert acquire_calls[0] == ("example.org", "metadata", "GET")
+    finally:
+        httpx_transport.reset_http_client_for_tests()
+        configure_rate_limits(
+            policies=clone_policies(original_policies),
+            backend=original_backend,
+        )
+
+
+def test_multi_window_waits_when_fast_window_exhausted() -> None:
+    policy = RolePolicy(
+        rates={"metadata": [Rate(2, 200), Rate(5, Duration.SECOND)]},
+        max_delay_ms={"metadata": 1000},
+        mode={"metadata": "wait"},
+        count_head={"metadata": False},
+        weight={"metadata": 1},
+    )
+    manager = LimiterManager(policies={"example.com": policy}, backend_config=BackendConfig())
+
+    first = manager.acquire(host="example.com", role="metadata", method="GET")
+    assert first.wait_ms >= 0
+
+    second = manager.acquire(host="example.com", role="metadata", method="GET")
+    assert second.wait_ms >= 0
+
+    third = manager.acquire(host="example.com", role="metadata", method="GET")
+    assert third.wait_ms > 0
+    assert third.wait_ms <= policy.max_delay_ms["metadata"]
+
+    snapshot = manager.metrics_snapshot()
+    stats = snapshot["example.com"]["metadata"]
+    assert stats["acquire_total"] == 3
+    assert stats["wait_ms_count"] >= 1
+
+
+def test_role_specific_max_delay_behaviour(tmp_path: Path, monkeypatch) -> None:
+    manager = get_rate_limiter_manager()
+    original_policies = clone_policies(manager.policies())
+    original_backend = _clone_backend_config(manager)
+
+    try:
+        policy = RolePolicy(
+            rates={
+                "metadata": [Rate(1, 200)],
+                "artifact": [Rate(1, 200)],
+            },
+            max_delay_ms={
+                "metadata": 0,
+                "artifact": 500,
+            },
+            mode={
+                "metadata": "raise",
+                "artifact": "wait",
+            },
+            count_head={
+                "metadata": False,
+                "artifact": False,
+            },
+            weight={
+                "metadata": 1,
+                "artifact": 1,
+            },
+        )
+        configure_rate_limits(
+            policies={"example.org": policy},
+            backend=BackendConfig(backend="memory", options={}),
+        )
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.extensions.get("role") == "artifact":
+                return httpx.Response(
+                    200,
+                    headers={"Content-Type": "application/pdf"},
+                    stream=iter([b"%PDF-1.4\n"]),
+                    request=request,
+                )
+            return httpx.Response(
+                200,
+                headers={"Content-Type": "application/json"},
+                content=b"{}",
+                request=request,
+            )
+
+        monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+        httpx_transport.reset_http_client_for_tests()
+        httpx_transport.configure_http_client(transport=httpx.MockTransport(handler))
+
+        # Metadata request succeeds once then raises on immediate retry due to raise mode.
+        response = request_with_retries(
+            None,
+            "GET",
+            "https://example.org/meta",
+            role="metadata",
+            max_retries=0,
+        )
+        response.close()
+
+        with pytest.raises(RateLimitError) as exc_info:
+            request_with_retries(
+                None,
+                "GET",
+                "https://example.org/meta",
+                role="metadata",
+                max_retries=0,
+            )
+
+        assert exc_info.value.mode == "raise"
+        assert exc_info.value.waited_ms >= 0
+
+        # Artifact streaming request waits within allowance on second attempt.
+        with request_with_retries(
+            None,
+            "GET",
+            "https://example.org/artifact",
+            role="artifact",
+            stream=True,
+            max_retries=0,
+        ) as stream_response:
+            list(stream_response.iter_bytes())
+
+        with request_with_retries(
+            None,
+            "GET",
+            "https://example.org/artifact",
+            role="artifact",
+            stream=True,
+            max_retries=0,
+        ) as stream_response:
+            meta = stream_response.request.extensions.get("docs_network_meta", {})
+            wait_ms = meta.get("rate_limiter_wait_ms", 0)
+            assert wait_ms > 0
+            assert wait_ms <= policy.max_delay_ms["artifact"]
+            list(stream_response.iter_bytes())
+    finally:
+        httpx_transport.reset_http_client_for_tests()
+        configure_rate_limits(
+            policies=clone_policies(original_policies),
+            backend=original_backend,
+        )
+
+
+@pytest.mark.parametrize(
+    "backend_name, options_factory",
+    [
+        ("memory", lambda _tmp: {}),
+        ("multiprocess", lambda _tmp: {}),
+        ("sqlite", lambda tmp: {"path": str(tmp / "rate-limit.sqlite"), "use_file_lock": False}),
+    ],
+)
+def test_rate_limited_transport_smoke_backends(
+    tmp_path: Path, backend_name: str, options_factory
+) -> None:
+    policy = RolePolicy(
+        rates={"metadata": [Rate(5, Duration.SECOND)]},
+        max_delay_ms={"metadata": 250},
+        mode={"metadata": "wait"},
+        count_head={"metadata": False},
+        weight={"metadata": 1},
+    )
+    manager = LimiterManager(
+        policies={"example.com": policy},
+        backend_config=BackendConfig(backend=backend_name, options=options_factory(tmp_path)),
+    )
+
+    transport = RateLimitedTransport(
+        httpx.MockTransport(lambda request: httpx.Response(200, request=request)),
+        manager=manager,
+    )
+    request = httpx.Request("GET", "https://example.com/resource")
+    response = transport.handle_request(request)
+    assert response.status_code == 200
+    response.close()
+    transport.close()
+
+
+@pytest.mark.skipif(
+    os.environ.get("DOCSTOKG_TEST_REDIS") != "1",
+    reason="Set DOCSTOKG_TEST_REDIS=1 to enable Redis backend smoke test.",
+)
+def test_rate_limited_transport_smoke_redis_backend(monkeypatch) -> None:
+    pytest.importorskip("redis")
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.ratelimit.RedisBucket.init",
+        lambda rates, client, key: InMemoryBucket(list(rates)),
+        raising=False,
+    )
+
+    class _StubRedis:
+        @staticmethod
+        def from_url(_url: str) -> object:
+            return object()
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.ratelimit.Redis",
+        _StubRedis,
+        raising=False,
+    )
+
+    policy = RolePolicy(
+        rates={"metadata": [Rate(5, Duration.SECOND)]},
+        max_delay_ms={"metadata": 250},
+        mode={"metadata": "wait"},
+        count_head={"metadata": False},
+        weight={"metadata": 1},
+    )
+    manager = LimiterManager(
+        policies={"example.com": policy},
+        backend_config=BackendConfig(
+            backend="redis",
+            options={"url": "redis://localhost:6379/0", "namespace": "docstokg:test"},
+        ),
+    )
+    transport = RateLimitedTransport(
+        httpx.MockTransport(lambda request: httpx.Response(200, request=request)),
+        manager=manager,
+    )
+    request = httpx.Request("GET", "https://example.com/resource")
+    response = transport.handle_request(request)
+    assert response.status_code == 200
+    response.close()
+    transport.close()
+
+
+@pytest.mark.skipif(
+    os.environ.get("DOCSTOKG_TEST_POSTGRES") != "1",
+    reason="Set DOCSTOKG_TEST_POSTGRES=1 to enable Postgres backend smoke test.",
+)
+def test_rate_limited_transport_smoke_postgres_backend(monkeypatch) -> None:
+    pytest.importorskip("psycopg")
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.ratelimit.PostgresBucket.init",
+        lambda conn, rates, table=None: InMemoryBucket(list(rates)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.ratelimit.connect",
+        lambda dsn: types.SimpleNamespace(close=lambda: None),
+        raising=False,
+    )
+
+    policy = RolePolicy(
+        rates={"metadata": [Rate(5, Duration.SECOND)]},
+        max_delay_ms={"metadata": 250},
+        mode={"metadata": "wait"},
+        count_head={"metadata": False},
+        weight={"metadata": 1},
+    )
+    manager = LimiterManager(
+        policies={"example.com": policy},
+        backend_config=BackendConfig(
+            backend="postgres",
+            options={"dsn": "postgresql://user:secret@localhost:5432/ratelimit", "table": "rl"},
+        ),
+    )
+    transport = RateLimitedTransport(
+        httpx.MockTransport(lambda request: httpx.Response(200, request=request)),
+        manager=manager,
+    )
+    request = httpx.Request("GET", "https://example.com/resource")
+    response = transport.handle_request(request)
+    assert response.status_code == 200
+    response.close()
+    transport.close()

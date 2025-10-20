@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from DocsToKG.ContentDownload.core import ReasonCode
 from DocsToKG.ContentDownload.statistics import (
     BandwidthTracker,
     DownloadStatistics,
@@ -198,6 +199,33 @@ class TestDownloadStatistics:
         stats.record_attempt(success=False)
 
         assert stats.get_success_rate() == 50.0
+
+    def test_rate_limiter_metrics_tracking(self):
+        """Rate limiter metrics aggregate wait and block counts."""
+        stats = DownloadStatistics()
+        stats.record_attempt(
+            resolver="openalex",
+            success=True,
+            domain="example.org",
+            rate_limiter_wait_ms=25.0,
+            rate_limiter_backend="memory",
+            rate_limiter_role="metadata",
+            metadata={"rate_limiter": {"wait_ms": 25.0}},
+        )
+        stats.record_attempt(
+            resolver="openalex",
+            success=False,
+            reason=ReasonCode.RATE_LIMITED.value,
+            domain="example.org",
+            rate_limiter_backend="memory",
+            rate_limiter_role="metadata",
+            rate_limiter_blocked=True,
+        )
+
+        snapshot = stats.rate_limiter_metrics_snapshot()
+        assert snapshot["example.org"]["metadata"]["acquire_total"] == 2
+        assert snapshot["example.org"]["metadata"]["blocked_total"] == 1
+        assert snapshot["example.org"]["metadata"]["wait_ms_sum"] == 25.0
 
         # Test with zero attempts
         empty_stats = DownloadStatistics()

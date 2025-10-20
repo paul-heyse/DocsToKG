@@ -1,8 +1,8 @@
 """Testing utilities for exercising the ontology downloader end-to-end.
 
-Provides a harness that fakes HTTP servers, toggles pyrate vs. legacy rate
-limiters, and exposes helpers for temporarily registering resolvers/validators
-during unit tests.
+Provides a harness that fakes HTTP servers and supplies deterministic test
+limiters, plus helpers for temporarily registering resolvers/validators during
+unit tests.
 """
 
 from __future__ import annotations
@@ -207,7 +207,6 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         ] = {}
         self._env_overrides: Dict[str, Optional[str]] = {}
         self._registered = False
-        self.rate_limiter_mode: str = "pyrate"
 
     # --- Context manager protocol -------------------------------------------------
 
@@ -515,16 +514,13 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         """Return a download configuration bound to this harness.
 
         The returned configuration uses the harness-managed bucket provider and
-        honours ``rate_limiter_mode`` so tests can exercise both pyrate and
-        legacy implementations deterministically.
+        uses a harness-controlled stub limiter so tests can exercise
+        deterministic behaviour.
         """
 
         config = DownloadConfiguration()
         config.set_bucket_provider(self._bucket_provider)
-        try:
-            config.rate_limiter = self.rate_limiter_mode  # type: ignore[assignment]
-        except ValueError:
-            config.rate_limiter = "pyrate"
+        config.rate_limiter = "pyrate"
         if self._http_host:
             allowed = [self._http_host]
             if self._http_port is not None:
@@ -616,15 +612,16 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         key = (service, host)
         bucket = self._bucket_state.get(key)
         if bucket is None:
-            legacy_cls = getattr(rate_mod, "_LegacyTokenBucket")
-            bucket = legacy_cls(rate_per_sec=10.0, capacity=10.0)
+            bucket = _TestLimiter()
             self._bucket_state[key] = bucket
         return bucket
 
-    def use_legacy_rate_limiter(self) -> None:
-        """Force subsequent configs to use the legacy token bucket implementation."""
 
-        self.rate_limiter_mode = "legacy"
+class _TestLimiter:
+    """Simple limiter used in testing harness to avoid touching global manager."""
+
+    def consume(self, tokens: float = 1.0) -> None:  # noqa: D401 - trivial stub
+        return
 
 
 class _StorageShim(_StorageBackend):

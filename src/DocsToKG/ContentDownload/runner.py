@@ -37,18 +37,16 @@ import contextlib
 import inspect
 import json
 import logging
-import random
 import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 import httpx
 from pyalex import Works
+from tenacity import Retrying, retry_if_exception_type, stop_after_attempt, wait_random_exponential
 
 from DocsToKG.ContentDownload.args import ResolvedConfig
 from DocsToKG.ContentDownload.core import (
@@ -77,6 +75,11 @@ from DocsToKG.ContentDownload.pipeline import (
 )
 from DocsToKG.ContentDownload.providers import OpenAlexWorkProvider, WorkProvider
 from DocsToKG.ContentDownload.summary import RunResult, build_summary_record
+from DocsToKG.ContentDownload.networking import (
+    DEFAULT_RETRYABLE_STATUSES,
+    RetryAfterJitterWait,
+    request_with_retries,
+)
 from DocsToKG.ContentDownload.telemetry import (
     AttemptSink,
     CsvSink,
@@ -98,6 +101,98 @@ from DocsToKG.ContentDownload.telemetry import (
 __all__ = ["DownloadRun", "iterate_openalex", "run"]
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
+
+
+_OPENALEX_RETRYABLE_EXCEPTIONS = (httpx.HTTPError,)
+
+
+def _openalex_headers_from_config() -> Dict[str, str]:
+    """Return polite headers derived from the active pyalex configuration."""
+
+    try:
+        from pyalex import api as pyalex_api  # type: ignore
+    except Exception:
+        return {}
+
+    config = getattr(pyalex_api, "config", None)
+    if config is None:
+        return {}
+
+    headers: Dict[str, str] = {}
+    api_key = getattr(config, "api_key", None)
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    email = getattr(config, "email", None)
+    if email:
+        headers["From"] = email
+
+    user_agent = getattr(config, "user_agent", None)
+    if user_agent:
+        headers["User-Agent"] = user_agent
+
+    return headers
+
+
+class _OpenAlexTenacitySession:
+    """Adapter that executes pyalex session calls via `request_with_retries`."""
+
+    __slots__ = (
+        "_client",
+        "_max_retries",
+        "_backoff_factor",
+        "_backoff_max",
+        "_retry_after_cap",
+    )
+
+    def __init__(
+        self,
+        *,
+        client: httpx.Client,
+        max_retries: int,
+        backoff_factor: float,
+        backoff_max: Optional[float],
+        retry_after_cap: Optional[float],
+    ) -> None:
+        self._client = client
+        self._max_retries = max_retries
+        self._backoff_factor = backoff_factor
+        self._backoff_max = backoff_max
+        self._retry_after_cap = retry_after_cap
+
+    def get(
+        self,
+        url: str,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        timeout: Optional[float] = None,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        request_headers: Dict[str, str] = dict(_openalex_headers_from_config())
+        if headers:
+            request_headers.update(headers)
+
+        # Discard requests-specific kwargs that httpx does not understand.
+        kwargs.pop("allow_redirects", None)
+        kwargs.pop("stream", None)
+        kwargs.pop("auth", None)
+
+        return request_with_retries(
+            self._client,
+            "GET",
+            url,
+            role="metadata",
+            max_retries=self._max_retries,
+            backoff_factor=self._backoff_factor,
+            backoff_max=self._backoff_max,
+            retry_after_cap=self._retry_after_cap,
+            respect_retry_after=True,
+            retry_statuses=DEFAULT_RETRYABLE_STATUSES,
+            params=params,
+            headers=request_headers or None,
+            timeout=timeout,
+            **kwargs,
+        )
 
 
 @dataclass
@@ -736,12 +831,12 @@ class DownloadRun:
         finally:
             self.close()
 
-        return RunResult(
-            run_id=self.resolved.run_id,
-            processed=state.processed if state else 0,
-            saved=state.saved if state else 0,
-            html_only=state.html_only if state else 0,
-            xml_only=state.xml_only if state else 0,
+    return RunResult(
+        run_id=self.resolved.run_id,
+        processed=state.processed if state else 0,
+        saved=state.saved if state else 0,
+        html_only=state.html_only if state else 0,
+        xml_only=state.xml_only if state else 0,
             skipped=state.skipped if state else 0,
             worker_failures=state.worker_failures if state else 0,
             bytes_downloaded=state.downloaded_bytes if state else 0,
@@ -770,9 +865,6 @@ def _calculate_equal_jitter_delay(
         return 0.0
 
     half = capped_base / 2.0
-    return half + random.uniform(0.0, half)
-
-
 def iterate_openalex(
     query: Works,
     per_page: int,
@@ -785,117 +877,74 @@ def iterate_openalex(
 ) -> Iterable[Dict[str, Any]]:
     """Iterate over OpenAlex works respecting pagination, limits, and retry policy.
 
-    Retries honour ``Retry-After`` headers while applying an equal-jitter
-    exponential backoff capped by ``retry_max_delay`` to avoid unbounded sleeps.
+    Pagination runs through pyalex while delegating retry cadence to the shared
+    Tenacity policy used elsewhere in ContentDownload. When running against the
+    real pyalex client the paginator's internal requests session is replaced
+    with a shim that calls :func:`request_with_retries`; lightweight test stubs
+    fall back to a Retrying controller wrapped around the iterator itself.
     """
 
-    def _retry_after_seconds(exc: Exception) -> Optional[float]:
-        response = getattr(exc, "response", None)
-        if response is None:
-            return None
-        try:
-            header_value = response.headers.get("Retry-After")
-        except Exception:
-            return None
-        if not header_value:
-            return None
-        text = str(header_value).strip()
-        if not text:
-            return None
-        try:
-            seconds = float(text)
-        except (TypeError, ValueError):
-            try:
-                retry_dt = parsedate_to_datetime(text)
-            except (TypeError, ValueError, OverflowError):
-                return None
-            if retry_dt is None:
-                return None
-            if retry_dt.tzinfo is None:
-                retry_dt = retry_dt.replace(tzinfo=timezone.utc)
-            now = datetime.now(timezone.utc)
-            seconds = (retry_dt - now).total_seconds()
-        return max(0.0, float(seconds))
-
     max_retries = max(0, int(retry_attempts))
-    retry_backoff = max(0.0, float(retry_backoff))
-    max_delay = max(0.0, float(retry_max_delay)) if retry_max_delay is not None else 0.0
+    backoff_factor = max(0.0, float(retry_backoff))
+    backoff_cap = (
+        None
+        if retry_max_delay is None
+        else max(0.0, float(retry_max_delay))
+    )
+    retry_after_limit = (
+        None if retry_after_cap is None else max(0.0, float(retry_after_cap))
+    )
 
     pager = query.paginate(
         per_page=per_page, n_max=max_results if max_results is not None else None
     )
     pager_iter = iter(pager)
+
+    client = get_http_client()
+    if hasattr(pager, "_session"):
+        pager._session = _OpenAlexTenacitySession(
+            client=client,
+            max_retries=max_retries,
+            backoff_factor=backoff_factor,
+            backoff_max=backoff_cap,
+            retry_after_cap=retry_after_limit,
+        )
+
+    fallback_wait = wait_random_exponential(
+        multiplier=backoff_factor, max=backoff_cap
+    )
+    wait_strategy = RetryAfterJitterWait(
+        respect_retry_after=True,
+        retry_after_cap=retry_after_limit,
+        backoff_max=backoff_cap,
+        retry_statuses=DEFAULT_RETRYABLE_STATUSES,
+        fallback_wait=fallback_wait,
+    )
+    retrying = Retrying(
+        retry=retry_if_exception_type(_OPENALEX_RETRYABLE_EXCEPTIONS),
+        wait=wait_strategy,
+        stop=stop_after_attempt(max_retries + 1),
+        sleep=time.sleep,
+        reraise=True,
+    )
+
     retrieved = 0
-
     while True:
-        attempt = 0
-        while True:
-            try:
-                page = next(pager_iter)
-            except StopIteration:
-                return
-            except Exception as exc:
-                is_httpx_error = isinstance(exc, httpx.HTTPError)
-                is_requests_like = exc.__class__.__name__ in {"HTTPError", "RequestException"}
-                if not (is_httpx_error or is_requests_like):
-                    raise
-                if attempt >= max_retries:
-                    LOGGER.error(
-                        "OpenAlex pagination failed with no retries remaining (allowed=%s).",
-                        max_retries,
-                        exc_info=True,
-                    )
-                    raise
-                attempt += 1
-                retry_after = _retry_after_seconds(exc)
-                jitter_delay = 0.0
-                if retry_backoff > 0:
-                    base_attempt = max(attempt - 1, 0)
-                    backoff_cap = max_delay if max_delay > 0 else retry_backoff * (2**base_attempt)
-                    jitter_delay = _calculate_equal_jitter_delay(
-                        base_attempt,
-                        backoff_factor=retry_backoff,
-                        backoff_max=backoff_cap,
-                    )
+        try:
+            page = retrying.call(next, pager_iter)
+        except StopIteration:
+            break
+        except _OPENALEX_RETRYABLE_EXCEPTIONS as exc:
+            LOGGER.error(
+                "OpenAlex pagination failed after %s attempt(s): %s",
+                max_retries + 1,
+                exc,
+                exc_info=True,
+            )
+            raise
 
-                bounded_retry_after: Optional[float] = None
-                if retry_after is not None:
-                    bounded_retry_after = retry_after
-                    if retry_after_cap is not None and retry_after_cap > 0:
-                        bounded_retry_after = min(bounded_retry_after, retry_after_cap)
-                    if max_delay > 0:
-                        bounded_retry_after = min(bounded_retry_after, max_delay)
-
-                delay = max(jitter_delay, bounded_retry_after or 0.0)
-
-                if bounded_retry_after is not None:
-                    effective_limit: Optional[float] = None
-                    if retry_after_cap is not None and retry_after_cap > 0:
-                        effective_limit = retry_after_cap
-                    if max_delay > 0:
-                        if effective_limit is None:
-                            effective_limit = max_delay
-                        else:
-                            effective_limit = min(effective_limit, max_delay)
-                    if effective_limit is not None:
-                        delay = min(delay, effective_limit)
-                elif max_delay > 0:
-                    delay = min(delay, max_delay)
-                delay = max(0.0, delay)
-                LOGGER.warning(
-                    "OpenAlex pagination error (%s/%s retries): %s. Retrying in %.2fs.",
-                    attempt,
-                    max_retries,
-                    exc,
-                    delay,
-                )
-                if delay > 0:
-                    time.sleep(delay)
-                continue
-            else:
-                break
-
-        for work in page:
+        page_iterable = page if isinstance(page, Iterable) else [page]
+        for work in page_iterable:
             yield work
             retrieved += 1
             if max_results is not None and retrieved >= max_results:

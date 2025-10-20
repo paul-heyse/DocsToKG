@@ -286,15 +286,6 @@ def test_iterate_openalex_retries_with_retry_after_headers(
         "DocsToKG.ContentDownload.runner.time.sleep",
         lambda seconds: sleeps.append(seconds),
     )
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.runner.random.uniform",
-        lambda _low, _high: 0.0,
-    )
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.runner.base_backoff",
-        2.0,
-        raising=False,
-    )
 
     results = list(
         iterate_openalex(

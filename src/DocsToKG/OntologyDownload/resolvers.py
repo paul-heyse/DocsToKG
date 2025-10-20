@@ -112,17 +112,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Protocol, Tuple
 from urllib.parse import urlparse
 
-import requests
+import httpx
 
 from . import io
 from .cancellation import CancellationToken
 from .errors import ResolverError, UserConfigError
-from .io import (
-    get_bucket,
-    is_retryable_error,
-    retry_with_backoff,
-    validate_url_security,
-)
+from .io import get_bucket, get_http_client, is_retryable_error, retry_with_backoff, validate_url_security
 from .plugins import ensure_resolver_plugins, register_plugin_registry
 from .settings import DownloadConfiguration, ResolvedConfig, get_pystow
 
@@ -372,16 +367,16 @@ class BaseResolver:
                 jitter=backoff_base,
                 callback=_on_retry,
             )
-        except requests.Timeout as exc:
+        except httpx.TimeoutException as exc:
             raise ResolverError(
                 f"{name} API timeout after {config.defaults.http.timeout_sec}s"
             ) from exc
-        except requests.HTTPError as exc:
+        except httpx.HTTPStatusError as exc:
             status = exc.response.status_code if exc.response is not None else None
             if status in {401, 403}:
                 raise UserConfigError(f"{name} API rejected credentials ({status})") from exc
             raise ResolverError(f"{name} API error {status}: {exc}") from exc
-        except requests.ConnectionError as exc:
+        except httpx.RequestError as exc:
             raise ResolverError(f"{name} API connection error: {exc}") from exc
 
     def _extract_correlation_id(self, logger: logging.Logger) -> Optional[str]:
@@ -404,7 +399,7 @@ class BaseResolver:
 
     @staticmethod
     def _apply_headers_to_session(session: Any, headers: Dict[str, str]) -> None:
-        """Apply polite headers to a client session when supported."""
+        """Apply polite headers to third-party client sessions when supported."""
 
         if session is None:
             return
@@ -417,6 +412,7 @@ class BaseResolver:
         elif isinstance(mapping, dict):  # pragma: no cover - defensive branch
             mapping.update(headers)
 
+    @staticmethod
     def _request_with_retry(
         self,
         *,
@@ -425,11 +421,10 @@ class BaseResolver:
         config: ResolvedConfig,
         logger: logging.Logger,
         service: Optional[str],
-        session: Optional[requests.Session] = None,
         headers: Optional[Mapping[str, str]] = None,
         timeout: Optional[int] = None,
         **kwargs,
-    ) -> requests.Response:
+    ) -> httpx.Response:
         """Issue an HTTP request with polite headers and retry semantics."""
 
         final_headers: Dict[str, str] = dict(self._build_polite_headers(config, logger))
@@ -438,24 +433,18 @@ class BaseResolver:
 
         timeout_value = timeout if timeout is not None else config.defaults.http.timeout_sec
         request_kwargs = dict(kwargs)
-        request_kwargs.setdefault("headers", final_headers)
-        request_kwargs.setdefault("timeout", timeout_value)
 
-        method_name = method.lower()
+        client = get_http_client(config.defaults.http)
         method_upper = method.upper()
 
-        def _perform() -> requests.Response:
-            if session is not None:
-                requester = getattr(session, "request", None)
-                if callable(requester):
-                    response = requester(method=method_upper, url=url, **request_kwargs)
-                else:
-                    method_func = getattr(session, method_name, None)
-                    if not callable(method_func):
-                        raise AttributeError(f"session lacks '{method}' request method")
-                    response = method_func(url, **request_kwargs)
-            else:
-                response = requests.request(method_upper, url, **request_kwargs)
+        def _perform() -> httpx.Response:
+            response = client.request(
+                method_upper,
+                url,
+                headers=final_headers,
+                timeout=timeout_value,
+                **request_kwargs,
+            )
             response.raise_for_status()
             return response
 
@@ -781,9 +770,6 @@ class LOVResolver(BaseResolver):
 
     API_ROOT = "https://lov.linkeddata.es/dataset/lov/api/v2"
 
-    def __init__(self, session: Optional[requests.Session] = None) -> None:
-        self.session = session or requests.Session()
-
     @staticmethod
     def _iter_dicts(payload: Any) -> Iterable[Dict[str, Any]]:
         if isinstance(payload, dict):
@@ -808,19 +794,13 @@ class LOVResolver(BaseResolver):
         if not uri:
             raise UserConfigError("LOV resolver requires 'extras.uri'")
 
-        headers = self._build_polite_headers(config, logger)
-        self._apply_headers_to_session(self.session, headers)
-
-        timeout = max(1, config.defaults.http.timeout_sec)
         response = self._request_with_retry(
             method="GET",
             url=f"{self.API_ROOT}/vocabulary/info",
             config=config,
             logger=logger,
             service="lov",
-            session=self.session,
-            headers=headers,
-            timeout=timeout,
+            headers=self._build_polite_headers(config, logger),
             params={"uri": uri},
         )
         metadata = response.json()

@@ -303,13 +303,16 @@ class RetryAfterJitterWait(wait_base):
         *,
         respect_retry_after: bool,
         retry_after_cap: Optional[float],
-        backoff_max: float,
+        backoff_max: Optional[float],
         retry_statuses: Set[int],
         fallback_wait: wait_base,
     ) -> None:
         self._respect_retry_after = respect_retry_after
         self._retry_after_cap = retry_after_cap
-        self._backoff_max = float(max(backoff_max, 0.0))
+        if backoff_max is None:
+            self._backoff_max: Optional[float] = None
+        else:
+            self._backoff_max = float(max(backoff_max, 0.0))
         self._retry_statuses = set(retry_statuses)
         self._fallback_wait = fallback_wait
 
@@ -328,16 +331,30 @@ class RetryAfterJitterWait(wait_base):
         if self._retry_after_cap is not None:
             retry_after = min(retry_after, self._retry_after_cap)
 
-        return min(retry_after, self._backoff_max) if self._backoff_max else retry_after
+        if self._backoff_max is not None and self._backoff_max > 0.0:
+            retry_after = min(retry_after, self._backoff_max)
+
+        return retry_after
 
     def __call__(self, retry_state: RetryCallState) -> float:
         fallback_delay = float(self._fallback_wait(retry_state))
 
         outcome = retry_state.outcome
-        if outcome is None or outcome.failed:
+        if outcome is None:
             return max(0.0, fallback_delay)
 
-        response = outcome.result()
+        response: Optional[httpx.Response]
+        if outcome.failed:
+            exc = outcome.exception()
+            response = getattr(exc, "response", None) if exc is not None else None
+            if response is None:
+                return max(0.0, fallback_delay)
+        else:
+            result = outcome.result()
+            if not isinstance(result, httpx.Response):
+                return max(0.0, fallback_delay)
+            response = result
+
         if not isinstance(response, httpx.Response):
             return max(0.0, fallback_delay)
 
@@ -396,6 +413,7 @@ def _before_sleep_close_response(retry_state: RetryCallState) -> None:
             f"/{max_attempts}" if max_attempts else "",
             delay,
         )
+        _close_response_safely(getattr(exc, "response", None))
         return
 
     response = outcome.result()
@@ -431,7 +449,7 @@ def _build_retrying_controller(
     max_retries: int,
     retry_statuses: Set[int],
     backoff_factor: float,
-    backoff_max: float,
+    backoff_max: Optional[float],
     respect_retry_after: bool,
     retry_after_cap: Optional[float],
     max_retry_duration: Optional[float],
@@ -534,7 +552,7 @@ def request_with_retries(
     retry_after_cap: Optional[float] = None,
     content_policy: Optional[Mapping[str, Any]] = None,
     max_retry_duration: Optional[float] = None,
-    backoff_max: float = 60.0,
+    backoff_max: Optional[float] = 60.0,
     **kwargs: Any,
 ) -> httpx.Response:
     """Execute an HTTP request using a Tenacity-backed retry controller."""
@@ -549,7 +567,7 @@ def request_with_retries(
         raise ValueError("max_retries must be non-negative")
     if backoff_factor < 0:
         raise ValueError("backoff_factor must be non-negative")
-    if backoff_max < 0:
+    if backoff_max is not None and backoff_max < 0:
         raise ValueError("backoff_max must be non-negative")
     if retry_after_cap is not None and retry_after_cap < 0:
         raise ValueError("retry_after_cap must be non-negative when provided")
@@ -564,7 +582,7 @@ def request_with_retries(
         max_retry_duration = float(max_retry_duration)
 
     backoff_factor = float(backoff_factor)
-    backoff_max = float(backoff_max)
+    normalized_backoff_max = float(backoff_max) if backoff_max is not None else None
 
     retry_statuses = (
         set(retry_statuses) if retry_statuses is not None else set(DEFAULT_RETRYABLE_STATUSES)
@@ -620,7 +638,7 @@ def request_with_retries(
         max_retries=max_retries,
         retry_statuses=retry_statuses,
         backoff_factor=backoff_factor,
-        backoff_max=backoff_max,
+        backoff_max=normalized_backoff_max,
         respect_retry_after=respect_retry_after,
         retry_after_cap=retry_after_cap,
         max_retry_duration=max_retry_duration,

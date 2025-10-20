@@ -28,6 +28,7 @@ class QwenVLLMConfig:
     """Configuration for the Qwen/vLLM provider."""
 
     model_dir: Path
+    model_id: Optional[str] = None
     dtype: str = "bfloat16"
     tensor_parallelism: int = 1
     gpu_memory_utilization: float = 0.60
@@ -220,6 +221,8 @@ class QwenVLLMProvider(DenseEmbeddingBackend):
     def open(self, context: ProviderContext) -> None:
         self._ctx = context
         model_dir = self._cfg_spec.model_dir.expanduser().resolve()
+        if self._cfg_spec.model_id:
+            os.environ["DOCSTOKG_QWEN_MODEL_ID"] = self._cfg_spec.model_id
         ensure_qwen_environment(
             device=context.device if context.device != "auto" else None,
             dtype=context.dtype if context.dtype != "auto" else None,

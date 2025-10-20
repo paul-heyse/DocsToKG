@@ -87,6 +87,7 @@ import warnings
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 from tests.conftest import PatchManager
 
@@ -168,7 +169,7 @@ def _reload_core_cli():
     module_names = [
         "DocsToKG.DocParsing.chunking.runtime",
         "DocsToKG.DocParsing.embedding.runtime",
-        "DocsToKG.DocParsing.core",
+        "DocsToKG.DocParsing.core.cli",
     ]
     reloaded = None
     for name in module_names:
@@ -371,7 +372,7 @@ def test_doctags_served_model_names_normalized(
 
     caplog.set_level(logging.INFO, logger="DocsToKG.DocParsing.core.cli")
 
-    exit_code = module.doctags(
+    exit_code = module._execute_doctags(
         [
             "--mode",
             "pdf",
@@ -427,7 +428,7 @@ def test_scripts_respect_data_root(tmp_path: Path) -> None:
 
 
 def test_plan_command_omits_all_starting_log(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     """docparse plan should not emit the docparse-all start telemetry."""
 
@@ -453,11 +454,11 @@ def test_plan_command_omits_all_starting_log(
 
     core_module = _reload_core_cli()
 
-    exit_code = core_module.plan([])
-    captured = capsys.readouterr()
+    runner = CliRunner()
+    result = runner.invoke(core_module.app, ["plan"])
 
-    assert exit_code == 0
-    assert "docparse all plan" in captured.out
+    assert result.exit_code == 0
+    assert "docparse all plan" in result.stdout
 
     messages = [record.getMessage() for record in caplog.records]
     assert "docparse all starting" not in messages

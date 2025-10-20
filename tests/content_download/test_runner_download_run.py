@@ -224,63 +224,26 @@ def test_iterate_openalex_retries_then_succeeds(patcher):
     assert slept and slept[0] >= 1.0
 
 
-def test_iterate_openalex_uses_equal_jitter(patcher):
-    class _JitterPager:
-        def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
-            self._pages = [list(page) for page in pages]
-            self._raised = False
-            self._index = 0
-
-        def __iter__(self) -> "_JitterPager":
-            return self
-
-        def __next__(self) -> Iterable[Dict[str, object]]:
-            if not self._raised:
-                self._raised = True
-                raise httpx.RequestError(
-                    "temporary failure", request=httpx.Request("GET", "https://api.openalex.org/works")
-                )
-            if self._index >= len(self._pages):
-                raise StopIteration
-            page = self._pages[self._index]
-            self._index += 1
-            return list(page)
-
-    class _JitterWorks:
-        def __init__(self, pages: Sequence[Iterable[Dict[str, object]]]) -> None:
-            self._pages = [list(page) for page in pages]
-
-        def paginate(
-            self, per_page: int, n_max: Optional[int] = None
-        ) -> Iterable[Iterable[Dict[str, object]]]:
-            return _JitterPager(self._pages)
-
-    works = _JitterWorks([[{"id": "W1"}]])
-    sleeps: List[float] = []
-
-    patcher.setattr(
-        "DocsToKG.ContentDownload.runner.random.uniform",
-        lambda _a, half: 0.0,
-    )
-    patcher.setattr(
-        "DocsToKG.ContentDownload.runner.time.sleep",
-        lambda value: sleeps.append(value),
-    )
-
+def test_iterate_openalex_uses_configured_backoff(patcher):
     works = FlakyWorks([[{"id": "W1"}]], retry_after=None)
-    slept: List[float] = []
+    sleeps: List[float] = []
+    captured_wait: Dict[str, Optional[float]] = {}
+
+    def _fake_wait_random_exponential(*, multiplier: float, max: Optional[float]):
+        from tenacity import wait_fixed
+
+        captured_wait["multiplier"] = multiplier
+        captured_wait["max"] = max
+        return wait_fixed(1.0)
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.runner.wait_random_exponential",
+        _fake_wait_random_exponential,
+    )
     patcher.setattr(
         "DocsToKG.ContentDownload.runner.time.sleep",
-        lambda seconds: slept.append(seconds),
+        lambda seconds: sleeps.append(seconds),
     )
-
-    uniform_calls: List[Tuple[float, float]] = []
-
-    def _uniform(low: float, high: float) -> float:
-        uniform_calls.append((low, high))
-        return 0.0
-
-    patcher.setattr("DocsToKG.ContentDownload.runner.random.uniform", _uniform)
 
     results = list(
         iterate_openalex(
@@ -294,10 +257,9 @@ def test_iterate_openalex_uses_equal_jitter(patcher):
     )
 
     assert [item["id"] for item in results] == ["W1"]
-    assert uniform_calls
-    assert uniform_calls[0][0] == pytest.approx(0.0)
-    assert uniform_calls[0][1] == pytest.approx(1.0)
-    assert slept and slept[0] == pytest.approx(1.0)
+    assert sleeps == [pytest.approx(1.0)]
+    assert captured_wait["multiplier"] == pytest.approx(2.0)
+    assert captured_wait["max"] == pytest.approx(10.0)
 
 
 def test_iterate_openalex_retry_after_exceeds_cap(patcher):

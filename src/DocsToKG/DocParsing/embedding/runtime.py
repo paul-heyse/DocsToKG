@@ -182,6 +182,8 @@ except Exception:  # pragma: no cover - fallback when tqdm is unavailable
 from DocsToKG.DocParsing.cli_errors import EmbeddingCLIValidationError, format_cli_error
 from DocsToKG.DocParsing.config import annotate_cli_overrides, parse_args_with_overrides
 from DocsToKG.DocParsing.context import ParsingContext
+from contextlib import ExitStack
+
 from DocsToKG.DocParsing.core import (
     DEFAULT_TOKENIZER,
     UUID_NAMESPACE,
@@ -197,6 +199,12 @@ from DocsToKG.DocParsing.core import (
     derive_doc_id_and_vectors_path,
     iter_chunks,
     should_skip_output,
+)
+from DocsToKG.DocParsing.embedding.backends import (
+    ProviderBundle,
+    ProviderError,
+    ProviderFactory,
+    ProviderIdentity,
 )
 from DocsToKG.DocParsing.env import (
     data_chunks,
@@ -1617,41 +1625,36 @@ def _iter_vector_rows(path: Path, fmt: str, *, batch_size: int = 4096) -> Iterat
 def process_chunk_file_vectors(
     chunk_file: Path,
     out_path: Path,
-    stats: Optional[BM25Stats] = None,
-    args: Optional[argparse.Namespace] = None,
-    validator: Optional[SPLADEValidator] = None,
-    logger=None,
+    bundle: ProviderBundle,
+    cfg: EmbedCfg,
+    stats: BM25Stats,
+    validator: SPLADEValidator,
+    logger,
     *,
     content_hasher: Optional[StreamingContentHasher] = None,
+    vector_format: str = "jsonl",
 ) -> Tuple[int, List[int], List[float]]:
-    """Generate vectors for a single chunk file and persist them to disk.
-
-    Args:
-        chunk_file: Chunk JSONL file to process.
-        out_path: Destination path for vectors.
-        stats: Precomputed BM25 statistics.
-        args: Parsed CLI arguments with runtime configuration.
-        validator: SPLADE validator for sparsity metrics.
-        logger: Logger for structured output.
-
-    Returns:
-        Tuple of ``(vector_count, splade_nnz_list, qwen_norms)``.
-
-    Raises:
-        ValueError: Propagated if vector dimensions or norms fail validation.
-    """
-
-    if not isinstance(stats, BM25Stats) or args is None or validator is None:
-        raise TypeError("process_chunk_file_vectors received invalid arguments")
+    """Generate vectors for a single chunk file and persist them to disk."""
 
     if not isinstance(out_path, Path):
         raise TypeError("out_path must be a Path")
     resolved_out_path = out_path
     resolved_out_path.parent.mkdir(parents=True, exist_ok=True)
-    vector_format = str(getattr(args, "vector_format", "jsonl")).lower()
+    vector_format = str(vector_format or "jsonl").lower()
 
-    # Determine batch size for streaming
-    batch_size = max(args.batch_size_qwen, args.batch_size_splade)
+    dense_provider = bundle.dense
+    sparse_provider = bundle.sparse
+    lexical_provider = bundle.lexical
+    if dense_provider is None or sparse_provider is None or lexical_provider is None:
+        raise ProviderError(
+            provider="runtime",
+            category="init",
+            detail="Dense, sparse, and lexical providers must be configured.",
+            retryable=False,
+        )
+
+    provider_identities = bundle.identities()
+    row_batch_size = bundle.context.batch_hint or max(cfg.batch_size_qwen, cfg.batch_size_splade)
 
     total_count = 0
     nnz_all: List[int] = []
@@ -1659,92 +1662,61 @@ def process_chunk_file_vectors(
 
     with create_vector_writer(resolved_out_path, vector_format) as writer:
         if content_hasher is None:
-            row_batches: Iterator[List[dict]] = iter_rows_in_batches(
-                chunk_file,
-                batch_size,
-            )
+            row_batches: Iterator[List[dict]] = iter_rows_in_batches(chunk_file, row_batch_size)
         else:
             row_batches = iter_rows_in_batches_with_hash(
                 chunk_file,
-                batch_size,
+                row_batch_size,
                 content_hasher=content_hasher,
             )
+
         for rows in row_batches:
             if not rows:
                 continue
 
             uuids: List[str] = []
             texts: List[str] = []
-            lengths: List[int] = []
             for index, row in enumerate(rows, start=1):
                 ensure_chunk_schema(row, context=f"{chunk_file}:{index}")
                 uuid_value = row.get("uuid")
                 if not uuid_value:
                     raise ValueError(f"Chunk row missing UUID in {chunk_file}")
-                uuids.append(uuid_value)
-                text_value = str(row.get("text", ""))
-                texts.append(text_value)
-                length_val = row.get("num_tokens")
-                if length_val is None:
-                    length_val = len(text_value.split())
-                lengths.append(int(max(0, length_val)))
+                uuids.append(str(uuid_value))
+                texts.append(str(row.get("text", "")))
 
-            indices = list(range(len(texts)))
+            lexical_vectors: List[Tuple[Sequence[str], Sequence[float]]] = []
+            for text in texts:
+                terms, weights = lexical_provider.vector(text, stats)
+                lexical_vectors.append((list(terms), list(weights)))
 
-            splade_tokens_by_idx: List[Sequence[str]] = [()] * len(texts)
-            splade_weights_by_idx: List[Sequence[float]] = [()] * len(texts)
-            for batch_indices in Batcher(
-                indices,
-                args.batch_size_splade,
-                policy="length",
-                lengths=lengths,
-            ):
-                batch_texts = [texts[i] for i in batch_indices]
-                tokens_batch, weights_batch = splade_encode(
-                    args.splade_cfg, batch_texts, batch_size=args.batch_size_splade
-                )
-                for local_idx, global_idx in enumerate(batch_indices):
-                    splade_tokens_by_idx[global_idx] = tokens_batch[local_idx]
-                    splade_weights_by_idx[global_idx] = weights_batch[local_idx]
+            sparse_encoded = sparse_provider.encode(texts)
+            sparse_vectors: List[Tuple[Sequence[str], Sequence[float]]] = []
+            for entry in sparse_encoded:
+                tokens = [str(token) for token, _weight in entry]
+                weights = [float(weight) for _token, weight in entry]
+                sparse_vectors.append((tokens, weights))
 
-            qwen_vectors_by_idx: List[Sequence[float]] = [()] * len(texts)
+            dense_batch_hint = (
+                bundle.context.batch_hint
+                or cfg.embedding_batch_size
+                or cfg.dense_qwen_vllm_batch_size
+                or cfg.batch_size_qwen
+            )
+            dense_vectors = dense_provider.embed(texts, batch_hint=dense_batch_hint)
 
-            def _embed_batch(batch_texts: List[str]) -> Sequence[Sequence[float]]:
-                """Run Qwen embeddings using either a queue or direct invocation."""
-
-                qwen_queue = getattr(args, "qwen_queue", None)
-                if qwen_queue is not None:
-                    return qwen_queue.embed(batch_texts, int(args.batch_size_qwen))
-                return qwen_embed(args.qwen_cfg, batch_texts, batch_size=args.batch_size_qwen)
-
-            for batch_indices in Batcher(
-                indices,
-                args.batch_size_qwen,
-                policy="length",
-                lengths=lengths,
-            ):
-                batch_texts = [texts[i] for i in batch_indices]
-                qwen_batch = _embed_batch(batch_texts)
-                for local_idx, global_idx in enumerate(batch_indices):
-                    qwen_vectors_by_idx[global_idx] = qwen_batch[local_idx]
-
-            splade_results: List[Tuple[Sequence[str], Sequence[float]]] = [
-                (splade_tokens_by_idx[idx], splade_weights_by_idx[idx]) for idx in indices
-            ]
-            qwen_results = [qwen_vectors_by_idx[idx] for idx in indices]
-
-            # Write vectors for this batch immediately
             count, nnz, norms = write_vectors(
                 writer,
                 uuids,
                 texts,
-                splade_results,
-                qwen_results,
+                lexical_vectors,
+                sparse_vectors,
+                dense_vectors,
                 stats,
-                args,
+                cfg,
                 rows=rows,
                 validator=validator,
                 logger=logger,
+                provider_identities=provider_identities,
                 output_path=resolved_out_path,
                 vector_format=vector_format,
             )
@@ -1770,69 +1742,91 @@ def write_vectors(
     writer: VectorWriter,
     uuids: Sequence[str],
     texts: Sequence[str],
+    lexical_results: Sequence[Tuple[Sequence[str], Sequence[float]]],
     splade_results: Sequence[Tuple[Sequence[str], Sequence[float]]],
-    qwen_results: Sequence[Sequence[float]],
+    dense_results: Sequence[Sequence[float]],
     stats: BM25Stats,
-    args: argparse.Namespace,
+    cfg: EmbedCfg,
     *,
     rows: Sequence[dict],
     validator: SPLADEValidator,
     logger,
+    provider_identities: Dict[str, ProviderIdentity],
     output_path: Optional[Path] = None,
     vector_format: str = "jsonl",
 ) -> Tuple[int, List[int], List[float]]:
-    """Write validated vector rows to disk with schema enforcement.
+    """Write validated vector rows to disk with schema enforcement."""
 
-    Args:
-        writer: Vector writer responsible for persisting rows.
-        uuids: Sequence of chunk UUIDs aligned with the other inputs.
-        texts: Chunk text bodies.
-        splade_results: SPLADE token and weight pairs per chunk.
-        qwen_results: Dense embedding vectors per chunk.
-        stats: BM25 statistics used to generate sparse vectors.
-        args: Parsed CLI arguments for runtime configuration.
-        rows: Original chunk row dictionaries.
-        validator: SPLADE validator capturing sparsity data.
-        logger: Logger used to emit structured diagnostics.
+    if not (
+        len(uuids)
+        == len(texts)
+        == len(lexical_results)
+        == len(splade_results)
+        == len(dense_results)
+        == len(rows)
+    ):
+        raise ValueError("Mismatch between chunk text and provider result lengths")
 
-    Returns:
-        Tuple containing the number of vectors written, SPLADE nnz counts,
-        and Qwen vector norms.
+    bm25_k1 = float(cfg.lexical_local_bm25_k1)
+    bm25_b = float(cfg.lexical_local_bm25_b)
+    dense_expected_dim = int(cfg.dense_qwen_vllm_dimension or cfg.qwen_dim)
+    dense_model_id = cfg.dense_qwen_vllm_model_id or DEFAULT_TOKENIZER
+    dense_batch_size = int(cfg.dense_qwen_vllm_batch_size or cfg.batch_size_qwen)
+    sparse_batch_size = int(cfg.sparse_splade_st_batch_size or cfg.batch_size_splade)
+    sparse_attn = cfg.sparse_splade_st_attn_backend
 
-    Raises:
-        ValueError: If vector lengths are inconsistent or fail validation.
-    """
+    dense_identity = provider_identities.get("dense")
+    sparse_identity = provider_identities.get("sparse")
+    lexical_identity = provider_identities.get("lexical")
 
-    if not (len(uuids) == len(texts) == len(splade_results) == len(qwen_results) == len(rows)):
-        raise ValueError("Mismatch between chunk, SPLADE, or Qwen result lengths")
+    dense_metadata = {
+        "provider": dense_identity.name if dense_identity else None,
+        "version": dense_identity.version if dense_identity else None,
+        "model_id": dense_model_id,
+        "batch_size": dense_batch_size,
+        "dtype": cfg.qwen_dtype,
+    }
+    sparse_metadata = {
+        "provider": sparse_identity.name if sparse_identity else None,
+        "version": sparse_identity.version if sparse_identity else None,
+        "batch_size": sparse_batch_size,
+        "attn_backend": sparse_attn,
+        "max_active_dims": cfg.sparse_splade_st_max_active_dims,
+    }
+    lexical_metadata = {
+        "provider": lexical_identity.name if lexical_identity else None,
+        "version": lexical_identity.version if lexical_identity else None,
+        "k1": bm25_k1,
+        "b": bm25_b,
+    }
 
-    bm25_k1 = float(args.bm25_k1)
-    bm25_b = float(args.bm25_b)
     splade_nnz: List[int] = []
-    qwen_norms: List[float] = []
-
+    dense_norms: List[float] = []
     output_ref = output_path or getattr(writer, "path", None)
     payloads: List[dict] = []
-    for uuid_value, text, splade_pair, qwen_vector, row in zip(
-        uuids, texts, splade_results, qwen_results, rows
-    ):
-        tokens_list = list(splade_pair[0])
-        weight_list = [float(w) for w in splade_pair[1]]
-        validator.validate(uuid_value, tokens_list, weight_list)
-        nnz = sum(1 for weight in weight_list if weight > 0)
-        splade_nnz.append(nnz)
 
-        if len(qwen_vector) != int(args.qwen_dim):
+    for uuid_value, text, lexical_pair, splade_pair, dense_vector_raw, row in zip(
+        uuids, texts, lexical_results, splade_results, dense_results, rows
+    ):
+        lex_terms = [str(term) for term in lexical_pair[0]]
+        lex_weights = [float(weight) for weight in lexical_pair[1]]
+        splade_tokens = [str(token) for token in splade_pair[0]]
+        splade_weights = [float(weight) for weight in splade_pair[1]]
+        validator.validate(uuid_value, splade_tokens, splade_weights)
+        splade_nnz.append(sum(1 for weight in splade_weights if weight > 0))
+
+        dense_vector = [float(value) for value in dense_vector_raw]
+        if dense_expected_dim and len(dense_vector) != dense_expected_dim:
             message = (
-                f"Qwen dimension mismatch for UUID={uuid_value}: expected {int(args.qwen_dim)}, "
-                f"got {len(qwen_vector)}"
+                f"Dense dimension mismatch for UUID={uuid_value}: expected {dense_expected_dim}, "
+                f"got {len(dense_vector)}"
             )
             raise ValueError(message)
 
-        norm = math.sqrt(sum(float(x) * float(x) for x in qwen_vector))
+        norm = math.sqrt(sum(value * value for value in dense_vector))
         if norm <= 0:
             doc_id = row.get("doc_id", "unknown")
-            message = f"Invalid Qwen vector (zero norm) for UUID={uuid_value}"
+            message = f"Invalid dense vector (zero norm) for UUID={uuid_value}"
             log_event(
                 logger,
                 "error",
@@ -1850,7 +1844,7 @@ def write_vectors(
             log_event(
                 logger,
                 "warning",
-                "Qwen vector norm outside expected tolerance",
+                "Dense vector norm outside expected tolerance",
                 stage=EMBED_STAGE,
                 doc_id=doc_id,
                 input_hash=row.get("input_hash") if isinstance(row, dict) else None,
@@ -1860,33 +1854,29 @@ def write_vectors(
                 expected=1.0,
                 tolerance=0.01,
             )
-        qwen_norms.append(norm)
-
-        terms, weights = bm25_vector(text, stats, k1=bm25_k1, b=bm25_b)
+        dense_norms.append(norm)
 
         try:
             vector_row = _build_vector_row(
                 UUID=uuid_value,
                 BM25=_build_bm25_vector(
-                    terms=terms,
-                    weights=weights,
+                    terms=lex_terms,
+                    weights=lex_weights,
                     k1=bm25_k1,
                     b=bm25_b,
                     avgdl=stats.avgdl,
                     N=stats.N,
                 ),
-                SPLADEv3=_build_splade_vector(tokens=tokens_list, weights=weight_list),
+                SPLADEv3=_build_splade_vector(tokens=splade_tokens, weights=splade_weights),
                 Qwen3_4B=_build_dense_vector(
-                    model_id=DEFAULT_TOKENIZER,
-                    vector=[float(x) for x in qwen_vector],
-                    dimension=int(args.qwen_dim),
+                    model_id=dense_model_id,
+                    vector=dense_vector,
+                    dimension=dense_expected_dim,
                 ),
                 model_metadata={
-                    "splade": {"batch_size": args.batch_size_splade},
-                    "qwen": {
-                        "dtype": args.qwen_dtype,
-                        "batch_size": args.batch_size_qwen,
-                    },
+                    "dense": dict(dense_metadata),
+                    "sparse": dict(sparse_metadata),
+                    "lexical": dict(lexical_metadata),
                 },
             )
         except Exception as exc:
@@ -1939,7 +1929,7 @@ def write_vectors(
             )
         raise
 
-    return len(uuids), splade_nnz, qwen_norms
+    return len(uuids), splade_nnz, dense_norms
 
 
 def _handle_embedding_quarantine(
@@ -2598,24 +2588,20 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         elif cfg.resume:
             logger.info("Resume mode enabled: unchanged chunk files will be skipped")
 
-        attn_impl = None if args.splade_attn == "auto" else args.splade_attn
-        args.splade_cfg = SpladeCfg(
-            model_dir=splade_model_dir,
-            cache_folder=model_root,
-            batch_size=args.batch_size_splade,
-            max_active_dims=args.splade_max_active_dims,
-            attn_impl=attn_impl,
-            local_files_only=bool(args.offline),
-        )
-        args.qwen_cfg = QwenCfg(
-            model_dir=qwen_model_dir,
-            dtype=args.qwen_dtype,
-            tp=int(args.tp),
-            batch_size=int(args.batch_size_qwen),
-            quantization=args.qwen_quant,
-            dim=int(args.qwen_dim),
-            cache_enabled=not bool(cfg.no_cache),
-        )
+        try:
+            provider_bundle = ProviderFactory.create(cfg)
+        except ProviderError as exc:
+            log_event(
+                logger,
+                "error",
+                "Failed to initialise embedding providers",
+                stage=EMBED_STAGE,
+                error=str(exc),
+            )
+            raise
+
+        exit_stack = ExitStack()
+        bundle = exit_stack.enter_context(provider_bundle)
 
         if plan_only:
             stats = BM25Stats(N=0, avgdl=0.0, df={})
@@ -2769,14 +2755,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                 logger, "info", "File-level parallelism enabled", files_parallel=files_parallel
             )
 
-        qwen_queue: QwenEmbeddingQueue | None = None
         try:
-            if files_parallel > 1 and file_entries:
-                qwen_queue = QwenEmbeddingQueue(args.qwen_cfg, maxsize=files_parallel * 2)
-                args.qwen_queue = qwen_queue
-            else:
-                args.qwen_queue = None
-
             def _process_entry(
                 entry: Tuple[Path, Path, str, str],
             ) -> Tuple[int, List[int], List[float], float, bool, str]:
@@ -2792,11 +2771,13 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         count, nnz, norms = process_chunk_file_vectors(
                             chunk_path,
                             vectors_path,
+                            bundle,
+                            cfg,
                             stats,
-                            args,
                             validator,
                             logger,
                             content_hasher=hasher,
+                            vector_format=vector_format,
                         )
                 except ValueError as exc:
                     duration = time.perf_counter() - start
@@ -2970,9 +2951,7 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
                         vector_format=vector_format,
                     )
         finally:
-            args.qwen_queue = None
-            if qwen_queue is not None:
-                qwen_queue.shutdown()
+            exit_stack.close()
 
         if quarantined_files:
             log_event(

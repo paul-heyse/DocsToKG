@@ -359,11 +359,7 @@ async def guarded_call(user_id: str):
 * `DocsToKG.OntologyDownload` now defaults to a pyrate-limiter manager. Each
   limiter key is normalised as `"{service or '_'}:{host or 'default'}"` and
   backed by `Rate` objects parsed from `per_host_rate_limit` and
-  `rate_limits[...]` strings.
-* The configuration flag `defaults.http.rate_limiter` (or
-  `ONTOFETCH_RATE_LIMITER`) toggles between the new manager (`"pyrate"`) and the
-  legacy token bucket (`"legacy"`). Use the legacy mode only when rolling back a
-  deployment or bisecting regressions.
+  `rate_limits[...]` strings. Legacy token buckets have been removed.
 * When `defaults.http.shared_rate_limit_dir` is provided, the limiter manager
   persists counters in `<shared_rate_limit_dir>/ratelimit.sqlite` via
   `SQLiteBucket.init_from_file(..., use_file_lock=True)`. Otherwise an

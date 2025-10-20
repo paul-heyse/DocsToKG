@@ -25,7 +25,9 @@ import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, Mapping, Optional, List, Tuple
+
+from DocsToKG.ContentDownload.core import ReasonCode
 
 __all__ = (
     "DownloadStatistics",
@@ -160,6 +162,19 @@ class DownloadStatistics:
         # Size statistics
         self.sizes_mb: List[float] = []
 
+        # Rate limiter statistics: host -> role -> stats
+        self._rate_limiter_metrics: Dict[str, Dict[str, Dict[str, Any]]] = defaultdict(
+            lambda: defaultdict(
+                lambda: {
+                    "acquire_total": 0,
+                    "blocked_total": 0,
+                    "wait_ms_sum": 0.0,
+                    "wait_ms_count": 0,
+                    "backend": None,
+                }
+            )
+        )
+
     def record_attempt(
         self,
         resolver: Optional[str] = None,
@@ -169,6 +184,12 @@ class DownloadStatistics:
         bytes_downloaded: Optional[int] = None,
         elapsed_ms: Optional[float] = None,
         domain: Optional[str] = None,
+        metadata: Optional[Mapping[str, Any]] = None,
+        rate_limiter_wait_ms: Optional[float] = None,
+        rate_limiter_backend: Optional[str] = None,
+        rate_limiter_role: Optional[str] = None,
+        from_cache: Optional[bool] = None,
+        rate_limiter_blocked: bool = False,
     ) -> None:
         """Record a download attempt with all relevant metrics.
 
@@ -180,6 +201,12 @@ class DownloadStatistics:
             bytes_downloaded: Number of bytes downloaded
             elapsed_ms: Time taken in milliseconds
             domain: Domain of the download URL
+            metadata: Optional metadata payload attached to the attempt
+            rate_limiter_wait_ms: Time spent waiting for limiter capacity
+            rate_limiter_backend: Backend used for limiting (e.g., memory, redis)
+            rate_limiter_role: Role associated with the request (metadata/landing/artifact)
+            from_cache: Indicates whether the response was served from cache
+            rate_limiter_blocked: Explicit marker that the request was blocked by the limiter
         """
         with self._lock:
             self.total_attempts += 1
@@ -201,6 +228,41 @@ class DownloadStatistics:
                 self.bandwidth_tracker.record(bytes_downloaded)
                 size_mb = bytes_downloaded / (1024 * 1024)
                 self.sizes_mb.append(size_mb)
+
+            rate_info = {}
+            if isinstance(metadata, Mapping):
+                candidate = metadata.get("rate_limiter")
+                if isinstance(candidate, Mapping):
+                    rate_info = candidate
+
+            resolver_backend = rate_limiter_backend or rate_info.get("backend")
+            resolver_role = rate_limiter_role or rate_info.get("role")
+            if isinstance(resolver_role, str):
+                resolver_role = resolver_role.lower()
+            blocked = (
+                rate_limiter_blocked
+                or bool(rate_info.get("blocked"))
+                or (reason == ReasonCode.RATE_LIMITED.value)
+            )
+            wait_value = rate_limiter_wait_ms
+            if wait_value is None:
+                wait_raw = rate_info.get("wait_ms")
+                if isinstance(wait_raw, (int, float)):
+                    wait_value = float(wait_raw)
+
+            host = (domain or rate_info.get("host") or "unknown").lower()
+            role_key = resolver_role or "unknown"
+
+            if resolver_backend or wait_value is not None or blocked:
+                metrics_entry = self._rate_limiter_metrics[host][role_key]
+                metrics_entry["acquire_total"] += 1
+                if wait_value is not None:
+                    metrics_entry["wait_ms_sum"] += float(wait_value)
+                    metrics_entry["wait_ms_count"] += 1
+                if resolver_backend:
+                    metrics_entry["backend"] = resolver_backend
+                if blocked:
+                    metrics_entry["blocked_total"] += 1
 
             if elapsed_ms and elapsed_ms > 0:
                 self.total_time_ms += elapsed_ms
@@ -312,6 +374,24 @@ class DownloadStatistics:
             )
         return sorted_domains[:limit]
 
+    def rate_limiter_metrics_snapshot(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+        """Return a snapshot of aggregated rate limiter metrics."""
+
+        with self._lock:
+            snapshot: Dict[str, Dict[str, Dict[str, Any]]] = {}
+            for host, roles in self._rate_limiter_metrics.items():
+                host_view: Dict[str, Dict[str, Any]] = {}
+                for role, stats in roles.items():
+                    host_view[role] = {
+                        "acquire_total": stats["acquire_total"],
+                        "blocked_total": stats["blocked_total"],
+                        "wait_ms_sum": stats["wait_ms_sum"],
+                        "wait_ms_count": stats["wait_ms_count"],
+                        "backend": stats.get("backend"),
+                    }
+                snapshot[host] = host_view
+            return snapshot
+
     def format_summary(self) -> str:
         """Format comprehensive statistics summary.
 
@@ -416,6 +496,28 @@ class DownloadStatistics:
             for reason, count in sorted_failures:
                 pct = (count / total_failures * 100) if total_failures > 0 else 0
                 lines.append(f"  {reason}: {count} ({pct:.1f}% of failures)")
+
+        limiter_snapshot = self.rate_limiter_metrics_snapshot()
+        if limiter_snapshot:
+            lines.extend(["", "Rate Limiter:"])
+            for host in sorted(limiter_snapshot):
+                for role in sorted(limiter_snapshot[host]):
+                    stats = limiter_snapshot[host][role]
+                    wait_sum = float(stats.get("wait_ms_sum", 0.0))
+                    wait_count = stats.get("wait_ms_count", 0)
+                    avg_wait = wait_sum / wait_count if wait_count else 0.0
+                    backend = stats.get("backend") or ""
+                    lines.append(
+                        "  {}.{}: acquire={} blocked={} wait_sum={:.1f}ms avg_wait={:.1f}ms backend={}".format(
+                            host,
+                            role,
+                            stats.get("acquire_total", 0),
+                            stats.get("blocked_total", 0),
+                            wait_sum,
+                            avg_wait,
+                            backend,
+                        )
+                    )
 
         if resolver_stats_snapshot:
             lines.extend(["", "Resolver Performance:"])

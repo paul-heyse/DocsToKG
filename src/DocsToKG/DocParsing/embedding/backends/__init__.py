@@ -6,9 +6,11 @@ from .base import (
     ProviderContext,
     ProviderError,
     ProviderIdentity,
+    ProviderTelemetryEmitter,
     ProviderTelemetryEvent,
     SparseEmbeddingBackend,
 )
+from .factory import ProviderBundle, ProviderFactory
 
 __all__ = [
     "DenseEmbeddingBackend",
@@ -16,6 +18,9 @@ __all__ = [
     "ProviderContext",
     "ProviderError",
     "ProviderIdentity",
+    "ProviderTelemetryEmitter",
     "ProviderTelemetryEvent",
     "SparseEmbeddingBackend",
+    "ProviderBundle",
+    "ProviderFactory",
 ]

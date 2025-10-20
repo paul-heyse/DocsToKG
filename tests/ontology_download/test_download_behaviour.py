@@ -20,11 +20,9 @@ import hashlib
 import io
 import logging
 import tarfile
-import time
 import zipfile
 from pathlib import Path
 from unittest import mock
-from urllib.parse import urlparse
 
 import pytest
 
@@ -33,7 +31,6 @@ from DocsToKG.OntologyDownload.errors import ConfigError, DownloadFailure, Polic
 from DocsToKG.OntologyDownload.io import filesystem as fs_mod
 from DocsToKG.OntologyDownload.io import get_http_client
 from DocsToKG.OntologyDownload.io import network as network_mod
-from DocsToKG.OntologyDownload.io import rate_limit as rate_mod
 from DocsToKG.OntologyDownload.testing import ResponseSpec
 
 
@@ -243,7 +240,6 @@ def test_head_request_includes_polite_and_conditional_headers(ontology_env, tmp_
 
     config = ontology_env.build_download_config()
     destination = tmp_path / "hp-conditional.owl"
-    expected_headers = config.polite_http_headers()
     previous_manifest = {
         "etag": 'W/"conditional-etag"',
         "last_modified": "Wed, 21 Oct 2015 07:28:00 GMT",
@@ -847,12 +843,3 @@ def test_sanitize_filename_normalises(tmp_path):
 
     assert fs_mod.sanitize_filename("../evil.owl") == "evil.owl"
     assert fs_mod.sanitize_filename("..\\..\\windows?.owl") == "windows_.owl"
-
-def test_testing_environment_legacy_mode(ontology_env):
-    ontology_env.use_legacy_rate_limiter()
-    config = ontology_env.build_download_config()
-    assert config.rate_limiter == "legacy"
-    provider = config.get_bucket_provider()
-    assert provider is not None
-    bucket = provider("test", config, "legacy.example")
-    assert isinstance(bucket, getattr(rate_mod, "_LegacyTokenBucket"))

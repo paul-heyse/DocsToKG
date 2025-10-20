@@ -47,7 +47,7 @@ def test_docparse_doctags_forwards_arguments(monkeypatch) -> None:
         captured["argv"] = argv
         return 5
 
-    monkeypatch.setattr(core_cli, "doctags", fake_doctags)
+    monkeypatch.setattr(core_cli, "_execute_doctags", fake_doctags)
     result = runner.invoke(core_cli.app, ["doctags", "--mode", "pdf", "--resume"])
     assert result.exit_code == 5
     assert captured["argv"] == ["--mode", "pdf", "--resume"]
@@ -62,7 +62,7 @@ def test_docparse_plan_receives_none_when_no_args(monkeypatch) -> None:
         captured["argv"] = argv
         return 0
 
-    monkeypatch.setattr(core_cli, "run_all", fake_plan)
+    monkeypatch.setattr(core_cli, "_execute_run_all", fake_plan)
     result = runner.invoke(core_cli.app, ["plan"])
     assert result.exit_code == 0
     assert captured["argv"] == ["--plan"]

@@ -42,7 +42,7 @@ from DocsToKG.DocParsing.core import (
     normalize_http_timeout,
     should_skip_output,
 )
-from DocsToKG.DocParsing.core import cli as core_cli
+import DocsToKG.DocParsing.core.cli as core_cli
 from DocsToKG.DocParsing.core.cli_utils import merge_args, preview_list
 from DocsToKG.DocParsing.core.http import get_http_session
 from DocsToKG.DocParsing.core.planning import (
@@ -472,7 +472,7 @@ def test_chunk_cli_validation_failure(
     patcher.setitem(docparsing_pkg._MODULE_CACHE, "chunking", stub_chunking)
     patcher.setattr(docparsing_pkg, "chunking", stub_chunking, raising=False)
 
-    exit_code = core_cli.chunk(["--min-tokens", "-1"])
+    exit_code = core_cli._execute_chunk(["--min-tokens", "-1"])
     captured = capsys.readouterr()
     assert exit_code == 2
     assert "chunk" in captured.err
@@ -509,7 +509,7 @@ def test_chunk_runtime_unknown_config_fields(
 def test_embed_cli_validation_failure(capsys: pytest.CaptureFixture[str]) -> None:
     """Embedding CLI reports conflicting flag usage cleanly."""
 
-    exit_code = core_cli.embed(["--plan-only", "--validate-only"])
+    exit_code = core_cli._execute_embed(["--plan-only", "--validate-only"])
     captured = capsys.readouterr()
     assert exit_code == 2
     assert "embed" in captured.err
@@ -606,7 +606,7 @@ def test_embed_plan_only_stops_after_summary(
         ),
     )
 
-    exit_code = core_cli.embed(
+    exit_code = core_cli._execute_embed(
         [
             "--plan-only",
             "--chunks-dir",
@@ -642,16 +642,16 @@ def test_run_all_forwards_zero_token_bounds(patcher: PatchManager, tmp_path: Pat
 
         return _capture
 
-    patcher.setattr(core_cli, "doctags", _stage("doctags"))
-    patcher.setattr(core_cli, "chunk", _stage("chunk"))
-    patcher.setattr(core_cli, "embed", _stage("embed"))
+    patcher.setattr(core_cli, "_execute_doctags", _stage("doctags"))
+    patcher.setattr(core_cli, "_execute_chunk", _stage("chunk"))
+    patcher.setattr(core_cli, "_execute_embed", _stage("embed"))
 
     doctags_out_dir = tmp_path / "DocTagsFiles"
     chunk_out_dir = tmp_path / "ChunkedDocTagFiles"
     doctags_out_dir.mkdir()
     chunk_out_dir.mkdir()
 
-    exit_code = core_cli.run_all(
+    exit_code = core_cli._execute_run_all(
         [
             "--doctags-out-dir",
             str(doctags_out_dir),
@@ -736,7 +736,7 @@ def test_run_all_plan_reports_log_level(
     patcher.setattr(core_cli, "plan_chunk", _fake_plan_chunk)
     patcher.setattr(core_cli, "plan_embed", _fake_plan_embed)
 
-    exit_code = core_cli.run_all(
+    exit_code = core_cli._execute_run_all(
         [
             "--mode",
             "html",
@@ -774,7 +774,7 @@ def test_token_profiles_missing_transformers(
 
     patcher.setattr("builtins.__import__", fake_import)
 
-    exit_code = core_cli.token_profiles([])
+    exit_code = core_cli._execute_token_profiles([])
     captured = capsys.readouterr()
 
     assert exit_code == 1
@@ -801,7 +801,7 @@ def test_chunk_missing_transformers_dependency(
 
     patcher.setattr("builtins.__import__", fake_import)
 
-    exit_code = core_cli.chunk([])
+    exit_code = core_cli._execute_chunk([])
     captured = capsys.readouterr()
 
     assert exit_code == 1

@@ -245,6 +245,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="BACKEND[:key=value,…]",
         help="Select limiter backend (memory, multiprocess, sqlite:path=/tmp/rl.db, redis:url=...).",
     )
+    rate_group.add_argument(
+        "--rate-disable",
+        dest="rate_disable",
+        action="store_true",
+        help="Bypass the centralized rate limiter (pilot fallback; disables quota enforcement).",
+    )
     parser.add_argument(
         "--log-rotate",
         type=_parse_size,
@@ -525,6 +531,8 @@ def _apply_rate_env_overrides(args: argparse.Namespace) -> None:
         args.rate_mode_override = []
     if not hasattr(args, "rate_max_delay_override"):
         args.rate_max_delay_override = []
+    if not hasattr(args, "rate_disable"):
+        args.rate_disable = False
 
     _extend_list(args.rate_override, "DOCSTOKG_RATE")
     _extend_list(args.rate_mode_override, "DOCSTOKG_RATE_MODE")
@@ -534,6 +542,20 @@ def _apply_rate_env_overrides(args: argparse.Namespace) -> None:
         env_backend = os.environ.get("DOCSTOKG_RATE_BACKEND")
         if env_backend:
             args.rate_backend_spec = env_backend.strip()
+
+    env_disable = os.environ.get("DOCSTOKG_RATE_DISABLED")
+    if env_disable:
+        token = env_disable.strip().lower()
+        if token in {"1", "true", "yes", "on"}:
+            args.rate_disable = True
+        elif token in {"0", "false", "no", "off"}:
+            if not getattr(args, "rate_disable", False):
+                args.rate_disable = False
+        else:
+            LOGGER.warning(
+                "Ignoring unrecognised DOCSTOKG_RATE_DISABLED value %r (expected true/false).",
+                env_disable,
+            )
 
 
 def _parse_rate_override_spec(value: str) -> Tuple[str, Optional[str], List[Rate]]:
@@ -985,84 +1007,123 @@ def resolve_config(
     except argparse.ArgumentTypeError as exc:
         parser.error(str(exc))
 
+    rate_disabled = bool(getattr(args, "rate_disable", False))
+
     legacy_notice_emitted = False
 
-    if getattr(args, "domain_min_interval", None):
-        for domain, interval in args.domain_min_interval:
-            if interval > 0:
-                interval_ms = int(math.ceil(interval * Duration.SECOND))
-                rate_override_specs.append((domain, "artifact", [Rate(1, interval_ms)]))
-                legacy_notice_emitted = True
-        args.domain_min_interval = []
+    if rate_disabled:
+        conflicting_flags: List[str] = []
+        if rate_override_specs:
+            conflicting_flags.append("--rate")
+        if rate_mode_specs:
+            conflicting_flags.append("--rate-mode")
+        if rate_delay_specs:
+            conflicting_flags.append("--rate-max-delay")
+        if getattr(args, "rate_backend_spec", None):
+            conflicting_flags.append("--rate-backend")
+        if getattr(args, "domain_min_interval", None):
+            conflicting_flags.append("--domain-min-interval")
+        if getattr(args, "domain_token_bucket", None):
+            conflicting_flags.append("--domain-token-bucket")
+        if getattr(config, "domain_min_interval_s", None):
+            conflicting_flags.append("resolver_config.domain_min_interval_s")
+        if getattr(config, "domain_token_buckets", None):
+            conflicting_flags.append("resolver_config.domain_token_buckets")
+        if conflicting_flags:
+            parser.error(
+                "--rate-disable cannot be combined with rate override options (%s)."
+                % ", ".join(conflicting_flags)
+            )
 
-    if getattr(args, "domain_token_bucket", None):
-        for domain, spec in args.domain_token_bucket:
-            rate = max(spec.get("rate_per_second", 0.0), 0.0)
-            capacity = max(spec.get("capacity", 0.0), 0.0)
-            rates: List[Rate] = []
-            if rate > 0:
-                rates.append(Rate(int(math.ceil(rate)), Duration.SECOND))
-            if capacity > rate and capacity > 0:
-                rates.append(Rate(int(math.ceil(capacity)), Duration.MINUTE))
-            if rates:
-                rate_override_specs.append((domain, "artifact", rates))
-                legacy_notice_emitted = True
-        args.domain_token_bucket = []
+        configure_rate_limits(
+            policies={},
+            backend=BackendConfig(backend="disabled", options={}),
+        )
+        LOGGER.info(
+            "Centralized rate limiter disabled; HTTP requests will bypass quota enforcement."
+        )
+        configured_policies: Dict[str, RolePolicy] = {}
+        backend_config = BackendConfig(backend="disabled", options={})
+    else:
+        if getattr(args, "domain_min_interval", None):
+            for domain, interval in args.domain_min_interval:
+                if interval > 0:
+                    interval_ms = int(math.ceil(interval * Duration.SECOND))
+                    rate_override_specs.append((domain, "artifact", [Rate(1, interval_ms)]))
+                    legacy_notice_emitted = True
+            args.domain_min_interval = []
 
-    if getattr(config, "domain_min_interval_s", None):
-        for domain, interval in list(config.domain_min_interval_s.items()):
-            if interval > 0:
-                interval_ms = int(math.ceil(interval * Duration.SECOND))
-                rate_override_specs.append((domain, "artifact", [Rate(1, interval_ms)]))
-                legacy_notice_emitted = True
-        config.domain_min_interval_s = {}
+        if getattr(args, "domain_token_bucket", None):
+            for domain, spec in args.domain_token_bucket:
+                rate = max(spec.get("rate_per_second", 0.0), 0.0)
+                capacity = max(spec.get("capacity", 0.0), 0.0)
+                rates: List[Rate] = []
+                if rate > 0:
+                    rates.append(Rate(int(math.ceil(rate)), Duration.SECOND))
+                if capacity > rate and capacity > 0:
+                    rates.append(Rate(int(math.ceil(capacity)), Duration.MINUTE))
+                if rates:
+                    rate_override_specs.append((domain, "artifact", rates))
+                    legacy_notice_emitted = True
+            args.domain_token_bucket = []
 
-    if getattr(config, "domain_token_buckets", None):
-        for domain, spec in list(config.domain_token_buckets.items()):
-            rate = max(spec.get("rate_per_second", 0.0), 0.0)
-            capacity = max(spec.get("capacity", 0.0), 0.0)
-            rates: List[Rate] = []
-            if rate > 0:
-                rates.append(Rate(int(math.ceil(rate)), Duration.SECOND))
-            if capacity > rate and capacity > 0:
-                rates.append(Rate(int(math.ceil(capacity)), Duration.MINUTE))
-            if rates:
-                rate_override_specs.append((domain, "artifact", rates))
-                legacy_notice_emitted = True
-        config.domain_token_buckets = {}
+        if getattr(config, "domain_min_interval_s", None):
+            for domain, interval in list(config.domain_min_interval_s.items()):
+                if interval > 0:
+                    interval_ms = int(math.ceil(interval * Duration.SECOND))
+                    rate_override_specs.append((domain, "artifact", [Rate(1, interval_ms)]))
+                    legacy_notice_emitted = True
+            config.domain_min_interval_s = {}
 
-    if legacy_notice_emitted:
-        LOGGER.warning(
-            "Legacy domain throttling options detected; converted to centralized rate limiter policies."
+        if getattr(config, "domain_token_buckets", None):
+            for domain, spec in list(config.domain_token_buckets.items()):
+                rate = max(spec.get("rate_per_second", 0.0), 0.0)
+                capacity = max(spec.get("capacity", 0.0), 0.0)
+                rates: List[Rate] = []
+                if rate > 0:
+                    rates.append(Rate(int(math.ceil(rate)), Duration.SECOND))
+                if capacity > rate and capacity > 0:
+                    rates.append(Rate(int(math.ceil(capacity)), Duration.MINUTE))
+                if rates:
+                    rate_override_specs.append((domain, "artifact", rates))
+                    legacy_notice_emitted = True
+            config.domain_token_buckets = {}
+
+        if legacy_notice_emitted:
+            LOGGER.warning(
+                "Legacy domain throttling options detected; converted to centralized rate limiter policies."
+            )
+
+        policies = merge_rate_overrides(
+            manager.policies(),
+            rate_overrides=rate_override_specs,
+            mode_overrides=rate_mode_specs,
+            delay_overrides=rate_delay_specs,
         )
 
-    policies = merge_rate_overrides(
-        manager.policies(),
-        rate_overrides=rate_override_specs,
-        mode_overrides=rate_mode_specs,
-        delay_overrides=rate_delay_specs,
-    )
+        backend_config = None
+        try:
+            backend_config = _parse_backend_spec(getattr(args, "rate_backend_spec", None))
+        except argparse.ArgumentTypeError as exc:
+            parser.error(str(exc))
 
-    backend_config = None
-    try:
-        backend_config = _parse_backend_spec(getattr(args, "rate_backend_spec", None))
-    except argparse.ArgumentTypeError as exc:
-        parser.error(str(exc))
+        if backend_config is None:
+            base_backend = manager.backend
+            backend_config = BackendConfig(
+                backend=base_backend.backend,
+                options=dict(base_backend.options)
+                if isinstance(base_backend.options, Mapping)
+                else {},
+            )
 
-    if backend_config is None:
-        base_backend = manager.backend
-        backend_config = BackendConfig(
-            backend=base_backend.backend,
-            options=dict(base_backend.options) if isinstance(base_backend.options, Mapping) else {},
-        )
+        try:
+            validate_policies(policies)
+        except ValueError as exc:
+            parser.error(str(exc))
 
-    try:
-        validate_policies(policies)
-    except ValueError as exc:
-        parser.error(str(exc))
+        configured_policies = clone_policies(policies)
+        configure_rate_limits(policies=policies, backend=backend_config)
 
-    configured_policies = clone_policies(policies)
-    configure_rate_limits(policies=policies, backend=backend_config)
     rate_policies = configured_policies
 
     return ResolvedConfig(

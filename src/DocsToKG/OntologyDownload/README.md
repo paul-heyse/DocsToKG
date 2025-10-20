@@ -156,7 +156,6 @@ defaults:
     download_timeout_sec: 300
     backoff_factor: 0.5
     per_host_rate_limit: "4/second"
-    rate_limiter: "pyrate"
     rate_limits:
       ols: "5/second"
       bioportal: "1/second"
@@ -186,12 +185,9 @@ ontologies:
       url: https://op.europa.eu/o/opportal-service/euvoc-download-handler?cellarURI=http%3A%2F%2Fpublications.europa.eu%2Fresource%2Fauthority%2Feurovoc
 ```
 
-The `defaults.http.rate_limiter` flag selects the throttling backend. Use the
-default (`"pyrate"`) to route all requests through the pyrate-limiter manager,
-which persists shared quotas in SQLite when `shared_rate_limit_dir` is set, or
-switch to `"legacy"` to temporarily fall back to the legacy token bucket while
-rolling out changes. `ONTOFETCH_RATE_LIMITER` exposes the same toggle for
-environment-based overrides.
+The downloader always uses the pyrate-limiter backend; legacy token buckets
+have been removed, so `defaults.http.rate_limiter` should remain at its default
+value.
 
 Validator concurrency is pooled across all requests whenever
 `validation.max_concurrent_validators` is configured: the scheduler inspects
@@ -216,7 +212,6 @@ Key environment variables and overrides:
 | `ONTOFETCH_LOG_DIR` | Redirect JSONL/rotated logs produced by `logging_utils`. | `${PYSTOW_HOME}/ontology-fetcher/logs` |
 | `ONTOFETCH_STORAGE_URL` | Switch storage backend to fsspec (e.g., `file:///mnt/shared`, `s3://bucket/prefix`). | Local filesystem under `LOCAL_ONTOLOGY_DIR` |
 | `ONTOFETCH_SHARED_RATE_LIMIT_DIR` | Directory for cross-process token buckets. | `${CACHE_DIR}/rate-limits` |
-| `ONTOFETCH_RATE_LIMITER` | Selects the limiter backend (`pyrate` or `legacy`). | `pyrate` |
 | `ONTOFETCH_MAX_RETRIES`, `ONTOFETCH_TIMEOUT_SEC`, `ONTOFETCH_DOWNLOAD_TIMEOUT_SEC`, `ONTOFETCH_PER_HOST_RATE_LIMIT`, `ONTOFETCH_BACKOFF_FACTOR`, `ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB`, `ONTOFETCH_LOG_LEVEL` | Override download/logging configuration fields without editing YAML. | Values from `defaults.http` / `defaults.logging` |
 | Resolver credentials (e.g., `BIOPORTAL_API_KEY`, `EUROPE_PMC_API_KEY`) | Injected into resolver extras via `settings.get_env_overrides`. | Required per resolver |
 

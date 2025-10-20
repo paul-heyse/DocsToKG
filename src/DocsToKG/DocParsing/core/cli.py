@@ -1276,7 +1276,7 @@ def _execute_run_all(argv: Sequence[str] | None = None) -> int:
         display_plan(plans, stream=sys.stdout)
         return 0
 
-    exit_code = doctags(doctags_args)
+    exit_code = _execute_doctags(doctags_args)
     if exit_code != 0:
         log_event(
             logger,
@@ -1290,7 +1290,7 @@ def _execute_run_all(argv: Sequence[str] | None = None) -> int:
         )
         return exit_code
 
-    exit_code = chunk(chunk_args)
+    exit_code = _execute_chunk(chunk_args)
     if exit_code != 0:
         log_event(
             logger,
@@ -1304,7 +1304,7 @@ def _execute_run_all(argv: Sequence[str] | None = None) -> int:
         )
         return exit_code
 
-    exit_code = embed(embed_args)
+    exit_code = _execute_embed(embed_args)
     if exit_code != 0:
         log_event(
             logger,
@@ -1523,7 +1523,7 @@ def _doctags_cli(
         verify_hash,
         overwrite,
     )
-    exit_code = doctags(argv)
+    exit_code = _execute_doctags(argv)
     raise typer.Exit(code=exit_code)
 
 
@@ -1721,7 +1721,7 @@ def _chunk_cli(
         force,
         verify_hash,
     )
-    exit_code = chunk(argv)
+    exit_code = _execute_chunk(argv)
     raise typer.Exit(code=exit_code)
 
 
@@ -1982,7 +1982,7 @@ def _embed_cli(
         force,
         verify_hash,
     )
-    exit_code = embed(argv)
+    exit_code = _execute_embed(argv)
     raise typer.Exit(code=exit_code)
 
 
@@ -2088,7 +2088,7 @@ def _token_profiles_cli(
         window_max,
         log_level,
     )
-    exit_code = token_profiles(argv)
+    exit_code = _execute_token_profiles(argv)
     raise typer.Exit(code=exit_code)
 
 
@@ -2138,7 +2138,7 @@ def _manifest_cli(
 ) -> None:
     """Typer command implementation for `docparse manifest`."""
     argv = _build_manifest_cli_args(stages or [], data_root, tail, summarize, raw)
-    exit_code = manifest(argv)
+    exit_code = _execute_manifest(argv)
     raise typer.Exit(code=exit_code)
 
 
@@ -2363,7 +2363,7 @@ def _plan_cli(
         embed_no_cache,
         plan_only=True,
     )
-    exit_code = run_all(argv)
+    exit_code = _execute_plan(argv)
     raise typer.Exit(code=exit_code)
 
 
@@ -2596,7 +2596,7 @@ def _all_cli(
         embed_no_cache,
         plan_only,
     )
-    exit_code = run_all(argv)
+    exit_code = _execute_run_all(argv)
     raise typer.Exit(code=exit_code)
 
 

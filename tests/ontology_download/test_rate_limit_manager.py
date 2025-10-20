@@ -76,8 +76,3 @@ def test_custom_bucket_provider_bypasses_manager():
 
     handle.consume(3.0)
     assert stub.calls == [3.0]
-
-def test_legacy_mode_returns_legacy_bucket():
-    config = DownloadConfiguration(rate_limiter="legacy")
-    bucket = rate_mod.get_bucket(http_config=config, service="legacy", host="example")
-    assert isinstance(bucket, getattr(rate_mod, "_LegacyTokenBucket"))

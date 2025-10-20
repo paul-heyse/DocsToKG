@@ -1212,7 +1212,7 @@ def _doctor_report() -> Dict[str, object]:
     except (PydanticValidationError, ValueError) as exc:
         rate_limit_errors.append(f"Failed to load default rate limits: {exc}")
     else:
-        rate_limits["mode"] = getattr(defaults.defaults.http, "rate_limiter", "legacy")
+        rate_limits["mode"] = getattr(defaults.defaults.http, "rate_limiter", "pyrate")
         rate_limits["effective"] = defaults.defaults.http.rate_limits
     config_path = CONFIG_DIR / "sources.yaml"
     if config_path.exists():
@@ -1223,12 +1223,8 @@ def _doctor_report() -> Dict[str, object]:
         else:
             http_section = raw.get("defaults", {}).get("http") if isinstance(raw, dict) else None
             configured_mode = http_section.get("rate_limiter") if isinstance(http_section, dict) else None
-            if configured_mode is not None:
-                mode_text = str(configured_mode).strip().lower()
-                if mode_text in {"pyrate", "legacy"}:
-                    rate_limits["configured_mode"] = mode_text
-                else:
-                    rate_limits["invalid_mode"] = str(configured_mode)
+            if configured_mode is not None and str(configured_mode).strip():
+                rate_limits["configured_mode"] = str(configured_mode).strip()
             configured = http_section.get("rate_limits") if isinstance(http_section, dict) else None
             if isinstance(configured, dict):
                 valid: Dict[str, Dict[str, object]] = {}
@@ -1464,19 +1460,10 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
     rate_limits = report["rate_limits"]
     mode = rate_limits.get("mode")
     configured_mode = rate_limits.get("configured_mode")
-    invalid_mode = rate_limits.get("invalid_mode")
-    if mode or configured_mode or invalid_mode:
-        if mode:
-            print(f"Rate limiter: {mode}")
-        if configured_mode and configured_mode != mode:
-            print(f"  Configured override: {configured_mode}")
-        elif configured_mode and not mode:
-            print(f"Rate limiter: {configured_mode} (configured)")
-        if invalid_mode:
-            print(
-                f"  Invalid rate_limiter value in config: {invalid_mode} "
-                "(expected 'pyrate' or 'legacy')"
-            )
+    if mode:
+        print(f"Rate limiter: {mode}")
+    if configured_mode and configured_mode != mode:
+        print(f"  Configured override: {configured_mode}")
     configured = rate_limits.get("configured", {})
     if configured:
         print("Rate limits:")

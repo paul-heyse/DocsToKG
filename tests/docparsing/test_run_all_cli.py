@@ -18,7 +18,7 @@ from typing import Dict, List
 import pytest
 
 from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
-from DocsToKG.DocParsing.core import cli as core_cli
+import DocsToKG.DocParsing.core.cli as core_cli
 from tests.conftest import PatchManager
 
 
@@ -45,11 +45,11 @@ def test_run_all_forwards_sparsity_warn_threshold_pct(
 
         return _runner
 
-    patcher.setattr(module, "doctags", _stage("doctags"))
-    patcher.setattr(module, "chunk", _stage("chunk"))
-    patcher.setattr(module, "embed", _stage("embed"))
+    patcher.setattr(module, "_execute_doctags", _stage("doctags"))
+    patcher.setattr(module, "_execute_chunk", _stage("chunk"))
+    patcher.setattr(module, "_execute_embed", _stage("embed"))
 
-    exit_code = module.run_all(
+    exit_code = module._execute_run_all(
         [
             "--sparsity-warn-threshold-pct",
             "12.5",
@@ -99,14 +99,14 @@ def test_run_all_chunk_workers_zero_triggers_validation(
 
     patcher.setitem(sys.modules, "DocsToKG.DocParsing.chunking", stub_chunking)
 
-    original_chunk = module.chunk
+    original_chunk = module._execute_chunk
 
     def _chunk(argv: List[str]) -> int:
         stage_args["chunk"] = list(argv)
         return original_chunk(argv)
 
-    patcher.setattr(module, "doctags", _doctags)
-    patcher.setattr(module, "chunk", _chunk)
+    patcher.setattr(module, "_execute_doctags", _doctags)
+    patcher.setattr(module, "_execute_chunk", _chunk)
 
     data_root = tmp_path / "Data"
     doctags_dir = data_root / "DocTagsFiles"
@@ -114,7 +114,7 @@ def test_run_all_chunk_workers_zero_triggers_validation(
     chunks_dir.mkdir(parents=True)
     doctags_dir.mkdir(parents=True)
 
-    exit_code = module.run_all(
+    exit_code = module._execute_run_all(
         [
             "--data-root",
             str(data_root),
@@ -162,7 +162,7 @@ def test_doctags_forwards_vllm_wait_timeout(patcher: PatchManager, tmp_path: Pat
     out_dir.mkdir()
 
     timeout_s = 432
-    exit_code = module.doctags(
+    exit_code = module._execute_doctags(
         [
             "--mode",
             "pdf",
@@ -206,7 +206,7 @@ def test_doctags_normalizes_served_model_names(
     out_dir.mkdir(parents=True)
     pdf_dir.mkdir(parents=True)
 
-    exit_code = module.doctags(
+    exit_code = module._execute_doctags(
         [
             "--mode",
             "pdf",

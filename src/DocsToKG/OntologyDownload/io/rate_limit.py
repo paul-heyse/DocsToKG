@@ -20,12 +20,10 @@ processes respect shared quotas.
 
 from __future__ import annotations
 
-import json
 import logging
 import math
 import re
 import threading
-import time
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
@@ -101,7 +99,7 @@ def _normalise_shared_dir(shared_dir: Optional[Path]) -> Optional[Path]:
 
 
 class _LimiterAdapter(RateLimiterHandle):
-    """Thin wrapper providing the legacy ``consume`` interface and cleanup hooks."""
+    """Thin wrapper providing the ``consume`` interface and cleanup hooks."""
 
     __slots__ = ("_limiter", "_name")
 
@@ -304,6 +302,8 @@ class _PyrateLimiterManager:
 
 
 
+
+_PYRATE_MANAGER = _PyrateLimiterManager()
 
 def get_bucket(
     *,

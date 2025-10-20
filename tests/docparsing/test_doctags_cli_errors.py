@@ -161,7 +161,7 @@ def test_docparse_doctags_auto_detection_defaults(
 
     core_cli = importlib.import_module("DocsToKG.DocParsing.core.cli")
 
-    exit_code = core_cli._run_stage(core_cli.doctags, [])
+    exit_code = core_cli._run_stage(core_cli._execute_doctags, [])
     assert exit_code == 2
 
     captured = capsys.readouterr()
@@ -190,7 +190,7 @@ def test_docparse_doctags_auto_detection_with_mixed_input(
 
     core_cli = importlib.import_module("DocsToKG.DocParsing.core.cli")
 
-    exit_code = core_cli._run_stage(core_cli.doctags, ["--input", str(input_dir)])
+    exit_code = core_cli._run_stage(core_cli._execute_doctags, ["--input", str(input_dir)])
     assert exit_code == 2
 
     captured = capsys.readouterr()
@@ -254,7 +254,7 @@ def test_doctags_cli_structured_auto_detection_errors(
 
     core_cli = importlib.import_module("DocsToKG.DocParsing.core.cli")
 
-    exit_code = core_cli.doctags([])
+    exit_code = core_cli._execute_doctags([])
     assert exit_code == 2
 
     captured = capsys.readouterr()
