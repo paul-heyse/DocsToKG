@@ -2897,6 +2897,8 @@ def _auto_block_rows(
     resources: "faiss.StandardGpuResources",
     device: int,
     dim: int,
+    *,
+    use_fp16: bool = False,
 ) -> tuple[int, Optional[dict[str, int]]]:
     """Estimate a safe block row count from GPU memory metrics."""
 
@@ -2909,7 +2911,8 @@ def _auto_block_rows(
         logger.debug("cosine_topk_blockwise: unable to read GPU memory info", exc_info=True)
         return _COSINE_TOPK_DEFAULT_BLOCK_ROWS, None
 
-    row_width = max(np.dtype(np.float32).itemsize * max(dim, 1), 1)
+    dtype = np.dtype(np.float16 if use_fp16 else np.float32)
+    row_width = max(dtype.itemsize * max(dim, 1), 1)
     permitted = max(
         int((free_bytes * _COSINE_TOPK_AUTO_MEM_FRACTION) // row_width),
         1,
@@ -3007,7 +3010,12 @@ def cosine_topk_blockwise(
     requested_block_rows = block_rows
     memory_snapshot: Optional[dict[str, int]] = None
     if block_rows == _COSINE_TOPK_AUTO_BLOCK_ROWS_SENTINEL:
-        block_rows, memory_snapshot = _auto_block_rows(resources, device, C.shape[1])
+        block_rows, memory_snapshot = _auto_block_rows(
+            resources,
+            device,
+            C.shape[1],
+            use_fp16=use_fp16,
+        )
     if block_rows <= 0:
         raise ValueError("block_rows must be positive")
 
