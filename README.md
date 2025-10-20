@@ -236,6 +236,8 @@ back to the original `GET` attempt to avoid false negatives.
 - `--resolver-config config.yaml`: load advanced options such as
   `max_concurrent_resolvers` and `resolver_head_precheck` (see
   `docs/resolver-configuration.md`).
+- `--log-level {debug,info,warning,error,critical}`: control CLI logging verbosity without
+  reinitialising existing logging handlers (default: INFO).
 
 ### Resolver Enhancements
 

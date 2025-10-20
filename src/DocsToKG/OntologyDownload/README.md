@@ -185,12 +185,12 @@ parallelism.
 
 ### Strict validation mode
 
-Setting `defaults.continue_on_error: false` enables strict validation. When any
-validator reports a failure in this mode the planner now deletes the downloaded
-file, extracted archive directory (if one was created), and the associated
-content-addressable mirror before raising an error. Lenient mode retains these
-artefacts for troubleshooting, so operators who need to inspect intermediate
-outputs should temporarily flip strict mode off.
+Setting `defaults.continue_on_error: false` enables strict validation mode. When
+any validator reports a failure the downloader raises immediately **and**
+purges artefacts produced during the attempt (the downloaded file, extracted
+archives, and any CAS mirror entries) so the ontology version directory remains
+empty. Run in lenient mode (`continue_on_error: true`) when you need to inspect
+intermediate files from failing validators.
 
 Key environment variables and overrides:
 

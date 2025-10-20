@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable, ClassVar, Dict, Optional
 
 from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
-from DocsToKG.DocParsing.config import StageConfigBase
+from DocsToKG.DocParsing.config import ConfigLoadError, StageConfigBase
 from DocsToKG.DocParsing.core import DEFAULT_SERIALIZER_PROVIDER, DEFAULT_TOKENIZER
 from DocsToKG.DocParsing.env import data_chunks, data_doctags, detect_data_root
 
@@ -111,7 +111,13 @@ class ChunkerCfg(StageConfigBase):
         cfg = cls.from_env(defaults=defaults)
         config_path = getattr(args, "config", None)
         if config_path:
-            cfg.update_from_file(Path(config_path))
+            try:
+                cfg.update_from_file(Path(config_path))
+            except ConfigLoadError as exc:
+                raise ChunkingCLIValidationError(
+                    option="--config",
+                    message=str(exc),
+                ) from exc
         cfg.apply_args(args)
         cfg.finalize()
         return cfg

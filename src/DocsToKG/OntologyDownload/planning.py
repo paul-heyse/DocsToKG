@@ -70,6 +70,8 @@ from .errors import (
     PolicyError,
     ResolverError,
     ValidationError,
+    RetryableValidationError,
+    ValidationFailure,
 )
 from .io import (
     RDF_MIME_ALIASES,
@@ -1548,43 +1550,61 @@ def _mirror_to_cas_if_enabled(
     return cas_path
 
 
-def _cleanup_validation_failure_artifacts(
+def _cleanup_failed_validation_artifacts(
     *,
     destination: Path,
     extraction_dir: Optional[Path],
     cas_path: Optional[Path],
+    base_dir: Path,
     logger: logging.LoggerAdapter,
 ) -> None:
-    """Remove artefacts created before a strict validation failure is raised."""
+    """Remove artefacts produced before a strict-mode validation failure."""
 
-    def _remove_path(path: Path, *, artifact: str) -> None:
+    cleanup_targets: List[Tuple[Optional[Path], str, bool]] = [
+        (destination, "downloaded file", False),
+        (extraction_dir, "extracted archive", True),
+        (cas_path, "cas mirror", False),
+    ]
+
+    for path, description, is_directory in cleanup_targets:
+        if path is None:
+            continue
         try:
-            if path.is_dir():
+            exists = path.exists()
+        except OSError as exc:
+            logger.warning(
+                "cleanup skipped due to access error",
+                extra={"stage": "cleanup", "path": str(path), "error": str(exc)},
+            )
+            continue
+        if not exists:
+            continue
+        try:
+            if is_directory:
                 shutil.rmtree(path)
             else:
                 path.unlink()
         except FileNotFoundError:
-            return
-        except Exception as exc:  # pragma: no cover - defensive logging
+            continue
+        except OSError as exc:
             logger.warning(
-                "validation cleanup failed",
+                "cleanup failed after validation error",
                 extra={
                     "stage": "cleanup",
-                    "artifact": artifact,
                     "path": str(path),
                     "error": str(exc),
+                    "resource": description,
                 },
             )
 
-    targets: List[Tuple[str, Optional[Path]]] = [
-        ("download", destination),
-        ("extraction", extraction_dir),
-        ("cas", cas_path),
-    ]
-    for artifact, path in targets:
-        if path is None:
-            continue
-        _remove_path(path, artifact=artifact)
+    try:
+        if base_dir.exists() and not any(entry.is_file() for entry in base_dir.rglob("*")):
+            shutil.rmtree(base_dir)
+    except OSError as exc:
+        logger.warning(
+            "cleanup failed for ontology workspace",
+            extra={"stage": "cleanup", "path": str(base_dir), "error": str(exc)},
+        )
 
 
 def _build_destination(
@@ -1970,6 +1990,7 @@ def fetch_one(
                         "validators": failed_validators,
                         "strict": not active_config.defaults.continue_on_error,
                     }
+                    attempt_record["validators"] = list(failed_validators)
                     if active_config.defaults.continue_on_error:
                         adapter.warning(
                             "validation failures ignored", extra=log_payload
@@ -1978,15 +1999,22 @@ def fetch_one(
                         adapter.error(
                             "validation failures detected", extra=log_payload
                         )
-                        _cleanup_validation_failure_artifacts(
+                        _cleanup_failed_validation_artifacts(
                             destination=destination,
                             extraction_dir=extraction_dir,
                             cas_path=cas_path,
+                            base_dir=base_dir,
                             logger=adapter,
                         )
                         raise OntologyDownloadError(
+                        raise RetryableValidationError(
                             "Validation failed for "
-                            f"'{effective_spec.id}' via {', '.join(failed_validators)}"
+                            f"'{effective_spec.id}' via {', '.join(failed_validators)}",
+                            validators=tuple(failed_validators),
+                        raise ValidationFailure(
+                            "Validation failed for "
+                            f"'{effective_spec.id}' via {', '.join(failed_validators)}",
+                            retryable=True,
                         )
 
                 normalized_hash = None
@@ -2113,6 +2141,37 @@ def fetch_one(
 
         try:
             return _execute_candidate()
+        except ValidationError as exc:
+            last_error = exc
+            attempt_record.update({"status": "failed", "error": str(exc)})
+            validators = getattr(exc, "validators", None)
+            if validators:
+                attempt_record["validators"] = list(validators)
+            resolver_attempts.append(dict(attempt_record))
+            adapter.warning(
+                "validation attempt failed",
+                extra={
+                    "stage": "validate",
+                    "resolver": candidate.resolver,
+                    "attempt": attempt_number,
+                    "error": str(exc),
+                },
+            )
+            retryable = getattr(exc, "retryable", False)
+            if retryable:
+                adapter.info(
+                    "trying fallback resolver",
+                    extra={
+                        "stage": "download",
+                        "stage": "validate",
+                        "resolver": candidate.resolver,
+                        "attempt": attempt_number,
+                    },
+                )
+                continue
+            raise OntologyDownloadError(
+                f"Validation failed for '{pending_spec.id}': {exc}"
+            ) from exc
         except (ConfigError, DownloadFailure) as exc:
             attempt_record.update({"status": "failed", "error": str(exc)})
             resolver_attempts.append(dict(attempt_record))

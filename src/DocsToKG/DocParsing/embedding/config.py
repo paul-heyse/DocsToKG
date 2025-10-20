@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Callable, ClassVar, Dict, Optional
 
 from DocsToKG.DocParsing.cli_errors import EmbeddingCLIValidationError
-from DocsToKG.DocParsing.config import StageConfigBase
+from DocsToKG.DocParsing.config import ConfigLoadError, StageConfigBase
 from DocsToKG.DocParsing.env import data_chunks, data_vectors, detect_data_root
 
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT: float = 1.0
@@ -180,7 +180,13 @@ class EmbedCfg(StageConfigBase):
         cfg = cls.from_env(defaults=defaults)
         config_path = getattr(args, "config", None)
         if config_path:
-            cfg.update_from_file(Path(config_path))
+            try:
+                cfg.update_from_file(Path(config_path))
+            except ConfigLoadError as exc:
+                raise EmbeddingCLIValidationError(
+                    option="--config",
+                    message=str(exc),
+                ) from exc
         cfg.apply_args(args)
         cfg.finalize()
         return cfg
