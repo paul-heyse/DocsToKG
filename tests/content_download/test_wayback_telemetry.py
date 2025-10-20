@@ -21,6 +21,7 @@ from DocsToKG.ContentDownload.telemetry_wayback import (
     TelemetrySink,
     TelemetryWayback,
 )
+from DocsToKG.ContentDownload.telemetry_wayback_queries import rate_smoothing_p95
 from DocsToKG.ContentDownload.telemetry_wayback_sqlite import SQLiteSink, SQLiteTuning
 
 
@@ -657,3 +658,61 @@ class TestAttemptContext:
         ms = ctx.monotonic_ms_since_start()
         assert ms >= 0
         assert ms < 100  # Should be very small for immediate call
+
+
+class TestWaybackQueryAggregations:
+    """Tests for analytics helpers that read the SQLite sink."""
+
+    def test_rate_smoothing_p95_filters_by_role(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "telemetry.sqlite3"
+        sink = SQLiteSink(db_path)
+
+        run_id = "run-role"
+        base_ts = datetime.now(timezone.utc).isoformat()
+
+        role_payloads = {
+            "metadata": ("attempt-meta", [100, 200, 300, 400, 500]),
+            "landing": ("attempt-landing", [1000, 2000, 3000, 4000, 5000]),
+        }
+
+        for role, (attempt_id, delays) in role_payloads.items():
+            sink.emit(
+                {
+                    "event_type": "wayback_attempt",
+                    "event": "start",
+                    "attempt_id": attempt_id,
+                    "run_id": run_id,
+                    "work_id": f"work-{role}",
+                    "artifact_id": f"artifact-{role}",
+                    "resolver": "wayback",
+                    "schema": "1",
+                    "original_url": "https://example.org/article",
+                    "canonical_url": "https://example.org/article",
+                    "publication_year": 2024,
+                    "ts": base_ts,
+                }
+            )
+
+            for idx, delay in enumerate(delays, start=1):
+                sink.emit(
+                    {
+                        "event_type": "wayback_discovery",
+                        "attempt_id": attempt_id,
+                        "ts": base_ts,
+                        "monotonic_ms": idx * 10,
+                        "stage": "availability",
+                        "query_url": f"https://example.org/query/{role}/{idx}",
+                        "rate_delay_ms": delay,
+                        "rate_limiter_role": role if role == "metadata" else role.upper(),
+                    }
+                )
+
+        sink.close()
+
+        metadata_p95 = rate_smoothing_p95(db_path, run_id, "metadata")
+        landing_p95 = rate_smoothing_p95(db_path, run_id, "landing")
+        unknown_p95 = rate_smoothing_p95(db_path, run_id, "artifact")
+
+        assert metadata_p95 == 500
+        assert landing_p95 == 5000
+        assert unknown_p95 is None

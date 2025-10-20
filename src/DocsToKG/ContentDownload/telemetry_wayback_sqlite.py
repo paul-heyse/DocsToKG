@@ -73,7 +73,7 @@ class SQLiteSink:
         tuning: SQLiteTuning | None = None,
         lock_ctx=default_sqlite_lock,  # pass your locks.sqlite_lock here
         auto_commit_every: int = 1,  # commit after N events (>=1)
-        schema_version: str = "1",  # bump if you change shapes
+        schema_version: str = "2",  # bump if you change shapes
         enable_metrics: bool = True,  # track performance metrics
         backpressure_threshold_ms: float = 50.0,  # warn if emit takes > X ms
     ) -> None:
@@ -377,9 +377,17 @@ class SQLiteSink:
             retry_after_s INTEGER,
             retry_count INTEGER,
             error TEXT,
+            rate_limiter_role TEXT,
             FOREIGN KEY(attempt_id) REFERENCES wayback_attempts(attempt_id) ON DELETE CASCADE
         );
         """)
+
+        self._ensure_column_exists(
+            c,
+            table="wayback_discoveries",
+            column="rate_limiter_role",
+            ddl="ALTER TABLE wayback_discoveries ADD COLUMN rate_limiter_role TEXT",
+        )
 
         # Candidates evaluated
         c.execute("""
@@ -498,6 +506,9 @@ class SQLiteSink:
             "CREATE INDEX IF NOT EXISTS idx_emits_mode ON wayback_emits(source_mode, memento_ts);"
         )
         c.execute("CREATE INDEX IF NOT EXISTS idx_discovery_stage ON wayback_discoveries(stage);")
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_wayback_disc_role ON wayback_discoveries(rate_limiter_role);"
+        )
 
         # Partial index for successful attempts (SQLite >= 3.8.0)
         try:
@@ -507,6 +518,16 @@ class SQLiteSink:
         except sqlite3.OperationalError:
             # Partial indexes not supported
             pass
+
+    def _ensure_column_exists(
+        self, cur: sqlite3.Cursor, *, table: str, column: str, ddl: str
+    ) -> None:
+        """Add a column if it is missing from an existing database."""
+
+        cur.execute(f"PRAGMA table_info({table});")
+        columns = {row[1] for row in cur.fetchall()}
+        if column not in columns:
+            cur.execute(ddl)
 
     # ────────────────────────────────────────────────────────────────────────────
     # Per-event writers
@@ -573,9 +594,10 @@ class SQLiteSink:
             INSERT INTO wayback_discoveries (
                 attempt_id, ts, monotonic_ms, stage, query_url, year_window,
                 "limit", returned, first_ts, last_ts, http_status,
-                from_cache, revalidated, rate_delay_ms, retry_after_s, retry_count, error
+                from_cache, revalidated, rate_delay_ms, retry_after_s, retry_count, error,
+                rate_limiter_role
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 e["attempt_id"],
@@ -595,6 +617,7 @@ class SQLiteSink:
                 e.get("retry_after_s"),
                 e.get("retry_count"),
                 e.get("error"),
+                _normalize_role(e.get("rate_limiter_role") or e.get("role")),
             ),
         )
 
@@ -717,6 +740,14 @@ def _b(v: Optional[bool]) -> Optional[int]:
     if v is None:
         return None
     return 1 if bool(v) else 0
+
+
+def _normalize_role(role: Optional[Any]) -> Optional[str]:
+    """Normalize limiter role strings for consistent storage."""
+
+    if isinstance(role, str):
+        return role.strip().lower() or None
+    return None
 
 
 __all__ = [
