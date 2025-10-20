@@ -1275,8 +1275,16 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
         path = Path(info.get("path", ""))
         if not path:
             continue
-        if not path.exists():
+        if path.exists():
+            if path.is_dir():
+                continue
+            actions.append(f"Skipped creating directory {path}: path exists and is not a directory")
+            continue
+        try:
             path.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            actions.append(f"Failed to create directory {path}: {exc}")
+        else:
             actions.append(f"Created directory {path}")
 
     # Import LOG_DIR at runtime to respect TestingEnvironment patches
