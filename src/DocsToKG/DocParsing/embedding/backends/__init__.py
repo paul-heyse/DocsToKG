@@ -10,7 +10,10 @@ from .base import (
     ProviderTelemetryEvent,
     SparseEmbeddingBackend,
 )
+from .dense.fallback import DenseFallbackProvider
 from .factory import ProviderBundle, ProviderFactory
+from .lexical.pyserini import PyseriniBM25Provider
+from .nulls import NullDenseProvider, NullLexicalProvider, NullSparseProvider
 
 __all__ = [
     "DenseEmbeddingBackend",
@@ -23,4 +26,9 @@ __all__ = [
     "SparseEmbeddingBackend",
     "ProviderBundle",
     "ProviderFactory",
+    "NullDenseProvider",
+    "NullSparseProvider",
+    "NullLexicalProvider",
+    "DenseFallbackProvider",
+    "PyseriniBM25Provider",
 ]

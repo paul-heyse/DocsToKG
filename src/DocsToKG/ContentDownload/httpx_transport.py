@@ -39,7 +39,6 @@ import certifi
 import httpx
 from hishel import CacheTransport, FileStorage
 
-from DocsToKG.ContentDownload.core import normalize_url
 from DocsToKG.ContentDownload.ratelimit import (
     RateLimitedTransport,
     get_rate_limiter_manager,
@@ -79,17 +78,21 @@ def _build_ssl_context() -> ssl.SSLContext:
 
 
 def _request_hook(request: httpx.Request) -> None:
-    # Normalise the target URL for cache key stability.
-    try:
-        canonical = normalize_url(str(request.url))
-    except Exception:  # pragma: no cover - defensive guard
-        canonical = str(request.url)
-    if canonical != str(request.url):
-        request.url = httpx.URL(canonical)
+    canonical_url = request.extensions.get("docs_canonical_url")
+    if isinstance(canonical_url, str) and canonical_url and canonical_url != str(request.url):
+        request.url = httpx.URL(canonical_url)
 
     meta: MutableMapping[str, object] = request.extensions.setdefault("docs_network_meta", {})  # type: ignore[assignment]
     meta["client"] = "httpx"
     meta["start_time"] = time.perf_counter()
+    if canonical_url:
+        meta["canonical_url"] = canonical_url
+    original_url = request.extensions.get("docs_original_url")
+    if isinstance(original_url, str) and original_url:
+        meta["original_url"] = original_url
+    canonical_index = request.extensions.get("docs_canonical_index")
+    if isinstance(canonical_index, str) and canonical_index:
+        meta["canonical_index"] = canonical_index
     attempt = meta.get("attempt")
     if isinstance(attempt, int):
         meta["attempt"] = attempt + 1

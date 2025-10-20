@@ -48,6 +48,7 @@ import httpx
 from pyalex import Works
 from tenacity import Retrying, retry_if_exception_type, stop_after_attempt, wait_random_exponential
 
+from DocsToKG.ContentDownload import locks
 from DocsToKG.ContentDownload.args import ResolvedConfig
 from DocsToKG.ContentDownload.core import (
     Classification,
@@ -306,6 +307,7 @@ class DownloadRun:
 
         sinks: List[AttemptSink] = []
         manifest_path = self.resolved.manifest_path
+        locks.configure_lock_root(manifest_path.parent)
         log_format = getattr(self.args, "log_format", None)
         if isinstance(log_format, str):
             log_format = log_format.lower()
@@ -822,10 +824,11 @@ class DownloadRun:
             metrics_path = self.resolved.manifest_path.with_suffix(".metrics.json")
             try:
                 ensure_dir(metrics_path.parent)
-                atomic_write_text(
-                    metrics_path,
-                    json.dumps(summary_record, indent=2, sort_keys=True) + "\n",
-                )
+                with locks.summary_lock(metrics_path):
+                    atomic_write_text(
+                        metrics_path,
+                        json.dumps(summary_record, indent=2, sort_keys=True) + "\n",
+                    )
             except Exception:
                 LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
         finally:

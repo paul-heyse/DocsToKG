@@ -61,6 +61,8 @@ LOGGER = logging.getLogger("DocsToKG.OntologyDownload.net")
 # --- Constants & globals -------------------------------------------------------
 
 HTTP_CACHE_DIR: Path = CACHE_DIR / "http" / "ontology"
+CACHE_TIME_TO_LIVE = 12 * 60 * 60  # 12 hours before cleaning storage
+CACHE_SWEEP_INTERVAL = 30 * 60  # sweep every 30 minutes
 _CLIENT_LOCK = threading.RLock()
 _HTTP_CLIENT: Optional[httpx.Client] = None
 _CLIENT_FACTORY: Optional[Callable[[], Optional[httpx.Client]]] = None
@@ -88,7 +90,7 @@ def _controller() -> Controller:
         cacheable_status_codes=[200, 203, 300, 301, 308, 404, 410, 416],
         cache_private=True,
         allow_heuristics=False,
-        always_revalidate=True,
+        always_revalidate=False,
     )
 
 
@@ -216,7 +218,11 @@ def _build_http_client(cache_root: Path, config: Optional[DownloadConfiguration]
         )
         return CacheTransport(
             transport=base_transport,
-            storage=FileStorage(base_path=cache_root),
+            storage=FileStorage(
+                base_path=cache_root,
+                ttl=CACHE_TIME_TO_LIVE,
+                check_ttl_every=CACHE_SWEEP_INTERVAL,
+            ),
             controller=_controller(),
         )
 

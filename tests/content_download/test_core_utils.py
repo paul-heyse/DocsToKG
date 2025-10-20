@@ -1,10 +1,11 @@
 """Property and unit tests for core utility helpers.
 
-Coverage spans canonicalisation helpers (`normalize_url`, identifier normalisers,
-`dedupe`), payload sniffing (`classify_payload`, tail inspection), and the atomic
-write helpers used by the download pipeline. The suite combines deterministic
-cases with Hypothesis-generated inputs to guard against regressions in edge-case
-encoding, tracking parameter stripping, and file IO semantics.
+Coverage spans canonicalisation helpers (``canonical_for_index`` /
+``canonical_for_request``), identifier normalisers, ``dedupe``, payload sniffing
+(``classify_payload``, tail inspection), and the atomic write helpers used by
+the download pipeline. The suite combines deterministic cases with
+Hypothesis-generated inputs to guard against regressions in edge-case encoding,
+tracking parameter filtering, and file IO semantics.
 """
 
 import string
@@ -28,11 +29,11 @@ from DocsToKG.ContentDownload.core import (
     classify_payload,
     dedupe,
     has_pdf_eof,
-    normalize_url,
     parse_size,
     tail_contains_html,
     update_tail_buffer,
 )
+from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 
 
 def test_parse_size_parses_units():
@@ -43,10 +44,38 @@ def test_parse_size_parses_units():
         parse_size("bad")
 
 
-def test_normalize_url_strips_utm_and_lowercases():
+def test_canonical_for_index_lowercases_and_preserves_query():
     url = "HTTPS://Example.COM/Path?utm_source=abc&b=1&UTM_campaign=s"
-    normalized = normalize_url(url)
-    assert normalized == "https://example.com/Path?b=1"
+    canonical = canonical_for_index(url)
+    parts = urlsplit(canonical)
+    assert parts.scheme == "https"
+    assert parts.netloc == "example.com"
+    assert parts.path == "/Path"
+    # Query parameters are preserved for index canonicalisation.
+    assert parse_qsl(parts.query, keep_blank_values=True) == [
+        ("utm_source", "abc"),
+        ("b", "1"),
+        ("UTM_campaign", "s"),
+    ]
+
+
+def test_canonical_for_request_filters_tracking_on_landing():
+    url = "https://example.com/p.pdf?utm_source=x&ref=tw&q=test"
+    landing = canonical_for_request(url, role="landing")
+    landing_parts = urlsplit(landing)
+    assert landing_parts.netloc == "example.com"
+    assert parse_qsl(landing_parts.query, keep_blank_values=True) == [
+        ("ref", "tw"),
+        ("q", "test"),
+    ]
+
+    metadata = canonical_for_request(url, role="metadata")
+    metadata_parts = urlsplit(metadata)
+    assert parse_qsl(metadata_parts.query, keep_blank_values=True) == [
+        ("utm_source", "x"),
+        ("ref", "tw"),
+        ("q", "test"),
+    ]
 
 
 def test_dedupe_preserves_first_occurrence():
@@ -144,7 +173,7 @@ def _url_components(draw):
 
 
 @given(_url_components())
-def test_normalize_url_property_idempotent_and_strips_tracking(components):
+def test_canonical_for_index_property_idempotent(components):
     scheme, host, path, query_pairs, fragment = components
     query = urlencode(query_pairs, doseq=True)
     url = f"{scheme}://{host}{path}"
@@ -153,17 +182,29 @@ def test_normalize_url_property_idempotent_and_strips_tracking(components):
     if fragment:
         url = f"{url}#{fragment}"
 
-    normalized = normalize_url(url)
-    assert normalize_url(normalized) == normalized
+    canonical = canonical_for_index(url)
+    assert canonical_for_index(canonical) == canonical
 
-    parts = urlsplit(normalized)
+    parts = urlsplit(canonical)
     assert parts.scheme == parts.scheme.lower()
     assert parts.netloc == parts.netloc.lower()
     assert parts.fragment == ""
-    assert all(
-        not key.lower().startswith("utm_")
-        for key, _ in parse_qsl(parts.query, keep_blank_values=True)
-    )
+
+
+@given(_url_components())
+def test_canonical_for_request_landing_drops_tracking(components):
+    scheme, host, path, query_pairs, fragment = components
+    query = urlencode(query_pairs, doseq=True)
+    url = f"{scheme}://{host}{path}"
+    if query:
+        url = f"{url}?{query}"
+    if fragment:
+        url = f"{url}#{fragment}"
+
+    landing = canonical_for_request(url, role="landing")
+    assert canonical_for_request(landing, role="landing") == landing
+    landing_pairs = parse_qsl(urlsplit(landing).query, keep_blank_values=True)
+    assert all(not key.lower().startswith("utm_") for key, _ in landing_pairs)
 
 
 @given(

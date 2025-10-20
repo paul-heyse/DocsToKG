@@ -115,6 +115,7 @@ class EmbedCfg(StageConfigBase):
     dense_sentence_transformers_model_id: Optional[str] = None
     dense_sentence_transformers_batch_size: Optional[int] = None
     dense_sentence_transformers_normalize_l2: Optional[bool] = None
+    dense_fallback_backend: Optional[str] = None
     sparse_backend: str = "splade_st"
     sparse_splade_st_model_dir: Optional[Path] = None
     sparse_splade_st_batch_size: Optional[int] = None
@@ -172,6 +173,7 @@ class EmbedCfg(StageConfigBase):
         "dense_sentence_transformers_model_id": "DOCSTOKG_SENTENCE_TRANSFORMERS_MODEL",
         "dense_sentence_transformers_batch_size": "DOCSTOKG_SENTENCE_TRANSFORMERS_BATCH",
         "dense_sentence_transformers_normalize_l2": "DOCSTOKG_SENTENCE_TRANSFORMERS_NORMALIZE",
+        "dense_fallback_backend": "DOCSTOKG_DENSE_FALLBACK",
         "sparse_backend": "DOCSTOKG_SPARSE_BACKEND",
         "sparse_splade_st_model_dir": "DOCSTOKG_SPLADE_DIR",
         "sparse_splade_st_batch_size": "DOCSTOKG_EMBED_BATCH_SIZE_SPLADE",
@@ -233,6 +235,7 @@ class EmbedCfg(StageConfigBase):
         "dense_sentence_transformers_model_id": StageConfigBase._coerce_str,
         "dense_sentence_transformers_batch_size": StageConfigBase._coerce_int,
         "dense_sentence_transformers_normalize_l2": StageConfigBase._coerce_bool,
+        "dense_fallback_backend": StageConfigBase._coerce_str,
         "sparse_backend": StageConfigBase._coerce_str,
         "sparse_splade_st_model_dir": StageConfigBase._coerce_optional_path,
         "sparse_splade_st_batch_size": StageConfigBase._coerce_int,
@@ -377,6 +380,8 @@ class EmbedCfg(StageConfigBase):
         self.embedding_telemetry_tags = self._coerce_str_dict(self.embedding_telemetry_tags)
 
         self.dense_backend = (self.dense_backend or "qwen_vllm").strip().lower() or "qwen_vllm"
+        if self.dense_fallback_backend:
+            self.dense_fallback_backend = self.dense_fallback_backend.strip().lower()
         if not self.dense_qwen_vllm_model_id:
             self.dense_qwen_vllm_model_id = "Qwen/Qwen3-Embedding-4B"
         if self.dense_qwen_vllm_download_dir is None and self.qwen_model_dir is not None:
@@ -561,6 +566,7 @@ class EmbedCfg(StageConfigBase):
             },
             "dense": {
                 "backend": self.dense_backend,
+                "fallback": self.dense_fallback_backend,
                 "qwen_vllm": {
                     "model_id": self.dense_qwen_vllm_model_id,
                     "download_dir": self.dense_qwen_vllm_download_dir,

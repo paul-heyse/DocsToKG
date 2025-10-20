@@ -19,6 +19,7 @@ from DocsToKG.DocParsing.env import (
 )
 
 from ..base import DenseEmbeddingBackend, ProviderContext, ProviderError, ProviderIdentity
+from ..utils import bounded_batch_size, resolve_device
 
 HF_HOME, MODEL_ROOT = ensure_model_environment()
 
@@ -223,14 +224,15 @@ class QwenVLLMProvider(DenseEmbeddingBackend):
         model_dir = self._cfg_spec.model_dir.expanduser().resolve()
         if self._cfg_spec.model_id:
             os.environ["DOCSTOKG_QWEN_MODEL_ID"] = self._cfg_spec.model_id
-        ensure_qwen_environment(
-            device=context.device if context.device != "auto" else None,
+        device_hint = resolve_device(context.device, default="auto")
+        env = ensure_qwen_environment(
+            device=None if device_hint == "auto" else device_hint,
             dtype=context.dtype if context.dtype != "auto" else None,
             model_dir=model_dir,
         )
         self._qwen_cfg = QwenCfg(
             model_dir=model_dir,
-            dtype=self._cfg_spec.dtype if self._cfg_spec.dtype else ensure_qwen_environment()["dtype"],
+            dtype=self._cfg_spec.dtype if self._cfg_spec.dtype else env["dtype"],
             tp=int(self._cfg_spec.tensor_parallelism),
             gpu_mem_util=float(self._cfg_spec.gpu_memory_utilization),
             batch_size=int(self._cfg_spec.batch_size),
@@ -271,7 +273,10 @@ class QwenVLLMProvider(DenseEmbeddingBackend):
                 detail="Provider has not been opened before use.",
                 retryable=False,
             )
-        batch_size = batch_hint or self._qwen_cfg.batch_size
+        batch_size = bounded_batch_size(
+            preferred=batch_hint or self._qwen_cfg.batch_size,
+            fallback=self._qwen_cfg.batch_size,
+        )
         vectors = self._queue.embed(texts, batch_size=batch_size)
         if self._ctx:
             self._ctx.emit(

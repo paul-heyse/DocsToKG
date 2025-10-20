@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Sequence
 
 from ..base import DenseEmbeddingBackend, ProviderContext, ProviderError, ProviderIdentity
+from ..utils import bounded_batch_size, normalise_vectors, resolve_device
 
 
 @dataclass(slots=True)
@@ -39,8 +40,8 @@ class SentenceTransformersProvider(DenseEmbeddingBackend):
                 wrapped=exc,
             ) from exc
 
-        device = context.device if context.device != "auto" else None
-        kwargs = {"device": device} if device else {}
+        device_hint = resolve_device(context.device)
+        kwargs = {"device": device_hint} if device_hint else {}
         kwargs["trust_remote_code"] = bool(self._cfg.trust_remote_code)
         kwargs["local_files_only"] = context.offline
         self._model = SentenceTransformer(self._cfg.model_id, **kwargs)
@@ -64,16 +65,19 @@ class SentenceTransformersProvider(DenseEmbeddingBackend):
                 detail="Provider has not been opened before use.",
                 retryable=False,
             )
-        batch_size = batch_hint or self._cfg.batch_size or 32
+        batch_size = bounded_batch_size(
+            preferred=batch_hint or self._cfg.batch_size,
+            fallback=32,
+        )
         vectors = self._model.encode(  # type: ignore[call-arg]
             list(texts),
             batch_size=batch_size,
             convert_to_numpy=True,
             normalize_embeddings=self._cfg.normalize_l2 if self._cfg.normalize_l2 else False,
         )
-        results: List[List[float]] = []
-        for embedding in vectors:
-            results.append([float(x) for x in embedding])
+        results: List[List[float]] = [[float(x) for x in embedding] for embedding in vectors]
+        if self._ctx and self._ctx.normalize_l2 and not self._cfg.normalize_l2:
+            results = normalise_vectors(results, normalise=True)
         if self._ctx:
             self._ctx.emit(
                 self.identity,

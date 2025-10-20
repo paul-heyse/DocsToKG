@@ -195,6 +195,9 @@ from DocsToKG.DocParsing.embedding.backends import (
     ProviderIdentity,
     ProviderTelemetryEvent,
 )
+from DocsToKG.DocParsing.embedding.backends.dense.qwen_vllm import (
+    _get_vllm_components as _VLLM_COMPONENTS,
+)
 from DocsToKG.DocParsing.env import (
     data_chunks,
     data_vectors,
@@ -429,6 +432,7 @@ __all__ = (
     "write_vectors",
     "flush_llm_cache",
     "close_all_qwen",
+    "_VLLM_COMPONENTS",
 )
 
 

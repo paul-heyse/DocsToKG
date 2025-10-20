@@ -934,6 +934,9 @@ class DownloadOutcome:
     retry_after: Optional[float] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
+    canonical_url: Optional[str] = None
+    canonical_index: Optional[str] = None
+    original_url: Optional[str] = None
 
     @property
     def is_pdf(self) -> bool:
@@ -962,6 +965,13 @@ class DownloadOutcome:
         elif not isinstance(metadata_value, dict):
             self.metadata = dict(metadata_value)
 
+        if self.original_url is None:
+            self.original_url = self.canonical_url
+        if self.canonical_url is None and self.original_url is not None:
+            self.canonical_url = self.original_url
+        if self.canonical_index is None:
+            self.canonical_index = self.canonical_url or self.original_url
+
 
 @dataclass
 class PipelineResult:
@@ -983,6 +993,9 @@ class PipelineResult:
     success: bool
     resolver_name: Optional[str] = None
     url: Optional[str] = None
+    canonical_url: Optional[str] = None
+    canonical_index: Optional[str] = None
+    original_url: Optional[str] = None
     outcome: Optional[DownloadOutcome] = None
     html_paths: List[str] = field(default_factory=list)
     failed_urls: List[str] = field(default_factory=list)
@@ -990,6 +1003,12 @@ class PipelineResult:
     reason_detail: Optional[str] = None
 
     def __post_init__(self) -> None:
+        if self.canonical_url is None:
+            self.canonical_url = self.url
+        if self.original_url is None:
+            self.original_url = self.canonical_url
+        if self.canonical_index is None:
+            self.canonical_index = self.canonical_url
         if isinstance(self.reason, ReasonCode):
             self.reason = self.reason.value.replace("_", "-")
 
@@ -2178,7 +2197,7 @@ class ResolverPipeline:
             resolver_name=resolver_name,
             resolver_order=order_index,
             url=url,
-            canonical_url=url,
+            canonical_url=outcome.canonical_url or url,
             original_url=original_url,
             status=outcome.classification,
             http_status=outcome.http_status,
@@ -2218,6 +2237,9 @@ class ResolverPipeline:
                     success=True,
                     resolver_name=resolver_name,
                     url=url,
+                    canonical_url=outcome.canonical_url or url,
+                    canonical_index=outcome.canonical_index or url,
+                    original_url=outcome.original_url or original_url,
                     outcome=outcome,
                     html_paths=list(state.html_paths),
                     failed_urls=list(state.failed_urls),
@@ -2230,6 +2252,9 @@ class ResolverPipeline:
                     success=False,
                     resolver_name=resolver_name,
                     url=url,
+                    canonical_url=outcome.canonical_url or url,
+                    canonical_index=outcome.canonical_index or url,
+                    original_url=outcome.original_url or original_url,
                     outcome=outcome,
                     html_paths=list(state.html_paths),
                     failed_urls=list(state.failed_urls),

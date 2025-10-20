@@ -111,7 +111,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Mapping, Optional, Set, Union
+from typing import Any, Callable, Dict, Mapping, Optional, Set, Union, cast
+from urllib.parse import urlparse
 
 import httpx
 from tenacity import (
@@ -133,6 +134,7 @@ from DocsToKG.ContentDownload.httpx_transport import (
     purge_http_cache,
 )
 from DocsToKG.ContentDownload.ratelimit import DEFAULT_ROLE
+from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 
 # --- Globals ---
 
@@ -538,6 +540,8 @@ def request_with_retries(
     url: str,
     *,
     role: str = DEFAULT_ROLE,
+    origin_host: Optional[str] = None,
+    original_url: Optional[str] = None,
     max_retries: int = 3,
     retry_statuses: Optional[Set[int]] = None,
     backoff_factor: float = 0.75,
@@ -568,6 +572,28 @@ def request_with_retries(
         raise ValueError("max_retry_duration must be positive when provided")
 
     role_token = (role or DEFAULT_ROLE).lower()
+    policy_role = role_token if role_token in {"landing", "artifact"} else "metadata"
+    url_role = cast(str, policy_role)
+    source_url = original_url or url
+
+    host_hint = origin_host
+    if host_hint is None:
+        try:
+            parsed_original = urlparse(source_url)
+        except Exception:
+            parsed_original = None
+        if parsed_original is not None:
+            host_hint = (parsed_original.hostname or parsed_original.netloc or "").lower() or None
+
+    try:
+        request_url = canonical_for_request(source_url, role=url_role, origin_host=host_hint)
+    except Exception:
+        request_url = source_url
+
+    try:
+        canonical_index = canonical_for_index(source_url)
+    except Exception:
+        canonical_index = request_url
 
     if retry_after_cap is not None:
         retry_after_cap = float(retry_after_cap)
@@ -618,6 +644,9 @@ def request_with_retries(
     else:
         extensions = dict(extensions)
     extensions.setdefault("role", role_token)
+    extensions.setdefault("docs_original_url", source_url)
+    extensions.setdefault("docs_canonical_url", request_url)
+    extensions.setdefault("docs_canonical_index", canonical_index)
     kwargs["extensions"] = extensions
 
     def request_func(*, method: str, url: str, **call_kwargs: Any) -> httpx.Response:
@@ -627,7 +656,7 @@ def request_with_retries(
 
     controller = _build_retrying_controller(
         method=method,
-        url=url,
+        url=request_url,
         max_retries=max_retries,
         retry_statuses=retry_statuses,
         backoff_factor=backoff_factor,
@@ -641,7 +670,7 @@ def request_with_retries(
         response = controller(
             request_func,
             method=method,
-            url=url,
+            url=request_url,
             **kwargs,
         )
     except RetryError as exc:  # pragma: no cover - defensive safety net
@@ -656,13 +685,13 @@ def request_with_retries(
     LOGGER.debug(
         "Completed %s %s after %s attempt(s) with %.2fs cumulative sleep",
         method,
-        url,
+        request_url,
         attempts,
         total_sleep,
     )
 
     try:
-        _enforce_content_policy(response, content_policy, method=method, url=url)
+        _enforce_content_policy(response, content_policy, method=method, url=request_url)
     except AttributeError:  # response lacks headers/status
         LOGGER.debug(
             "Response object %s lacks headers for content policy evaluation.",
@@ -674,7 +703,7 @@ def request_with_retries(
             "Response object of type %s lacks status_code; treating as success for %s %s.",
             type(response).__name__,
             method,
-            url,
+            request_url,
         )
         return response
 

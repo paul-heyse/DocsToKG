@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Sequence
 import httpx
 
 from ..base import DenseEmbeddingBackend, ProviderContext, ProviderError, ProviderIdentity
+from ..utils import bounded_batch_size, normalise_vectors
 
 
 @dataclass(slots=True)
@@ -124,11 +125,20 @@ class TEIProvider(DenseEmbeddingBackend):
                     retryable=False,
                 )
             vectors.append([float(x) for x in vector])
+        if self._ctx and self._ctx.normalize_l2:
+            vectors = normalise_vectors(vectors, normalise=True)
         if self._ctx:
+            batch_size = bounded_batch_size(
+                preferred=self._ctx.batch_hint,
+                fallback=len(texts) or 1,
+            )
             self._ctx.emit(
                 self.identity,
                 phase="embed",
-                data={"vector_count": len(vectors), "batch_size_effective": len(texts)},
+                data={
+                    "vector_count": len(vectors),
+                    "batch_size_effective": batch_size,
+                },
             )
         return vectors
 

@@ -57,6 +57,7 @@ from urllib.robotparser import RobotFileParser
 import httpcore
 import httpx
 
+from DocsToKG.ContentDownload import locks
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
@@ -401,6 +402,9 @@ class DownloadStrategyContext:
     retry_after: Optional[float] = None
     classification_hint: Optional[Classification] = None
     response: Optional[httpx.Response] = None
+    canonical_url: Optional[str] = None
+    canonical_index: Optional[str] = None
+    original_url: Optional[str] = None
     skip_outcome: Optional[DownloadOutcome] = None
 
 
@@ -559,6 +563,9 @@ def prepare_candidate_download(
                 elapsed_ms=0.0,
                 reason=ReasonCode.ROBOTS_DISALLOWED,
                 reason_detail="robots-disallowed",
+                canonical_url=url,
+                canonical_index=canonical_index,
+                original_url=effective_original,
             )
 
     head_precheck_state = head_precheck_passed or ctx.head_precheck_passed
@@ -608,7 +615,7 @@ def prepare_candidate_download(
         context=ctx,
         base_headers=dict(headers),
         content_policy=content_policy,
-        canonical_url=url,
+        canonical_url=canonical_index,
         canonical_index=canonical_index,
         original_url=effective_original,
         origin_host=plan_origin_host,
@@ -718,6 +725,8 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                     headers=headers,
                     retry_after_cap=retry_after_cap,
                     content_policy=content_policy,
+                    original_url=plan.original_url,
+                    origin_host=plan.origin_host,
                 )
             except ContentPolicyViolation as exc:
                 elapsed_ms = (time.monotonic() - start_request) * 1000.0
@@ -754,6 +763,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                         last_modified=None,
                         extracted_text_path=None,
                         retry_after=None,
+                        canonical_url=plan.canonical_url,
+                        canonical_index=plan.canonical_index,
+                        original_url=plan.original_url,
                     )
                 )
 
@@ -800,6 +812,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                             last_modified=None,
                             extracted_text_path=None,
                             retry_after=retry_after_hint,
+                            canonical_url=plan.canonical_url,
+                            canonical_index=plan.canonical_index,
+                            original_url=plan.original_url,
                         )
                     )
 
@@ -825,6 +840,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                                 last_modified=None,
                                 extracted_text_path=None,
                                 retry_after=retry_after_hint,
+                                canonical_url=plan.canonical_url,
+                                canonical_index=plan.canonical_index,
+                                original_url=plan.original_url,
                             )
                         )
 
@@ -882,6 +900,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                         last_modified=cached.last_modified,
                         extracted_text_path=None,
                         retry_after=retry_after_hint,
+                        canonical_url=plan.canonical_url,
+                        canonical_index=plan.canonical_index,
+                        original_url=plan.original_url,
                     )
                     outcome.metadata["cache_validation_mode"] = validation_mode
                     if ctx.extra.get("resume_disabled"):
@@ -910,6 +931,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                                 last_modified=None,
                                 extracted_text_path=None,
                                 retry_after=retry_after_hint,
+                                canonical_url=plan.canonical_url,
+                                canonical_index=plan.canonical_index,
+                                original_url=plan.original_url,
                             )
                         )
                     LOGGER.info(
@@ -960,6 +984,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                             last_modified=None,
                             extracted_text_path=None,
                             retry_after=retry_after_hint,
+                            canonical_url=plan.canonical_url,
+                            canonical_index=plan.canonical_index,
+                            original_url=plan.original_url,
                         )
                     )
 
@@ -1015,6 +1042,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                                 etag=response.headers.get("ETag"),
                                 last_modified=response.headers.get("Last-Modified"),
                                 extracted_text_path=None,
+                                canonical_url=plan.canonical_url,
+                                canonical_index=plan.canonical_index,
+                                original_url=plan.original_url,
                             )
                         )
 
@@ -1082,6 +1112,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                             reason=ReasonCode.UNKNOWN,
                             reason_detail="classifier-unknown",
                             retry_after=retry_after_hint,
+                            canonical_url=plan.canonical_url,
+                            canonical_index=plan.canonical_index,
+                            original_url=plan.original_url,
                         )
                     )
 
@@ -1091,6 +1124,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                 strategy = strategy_factory(detected)
                 strategy_context = DownloadStrategyContext(
                     download_context=ctx,
+                    canonical_url=plan.canonical_url,
+                    canonical_index=plan.canonical_index,
+                    original_url=plan.original_url,
                     content_type=content_type,
                     disposition=disposition,
                     elapsed_ms=elapsed_ms,
@@ -1114,6 +1150,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                                 elapsed_ms=elapsed_ms,
                                 reason=ReasonCode.UNKNOWN,
                                 reason_detail="strategy-skip",
+                                canonical_url=plan.canonical_url,
+                                canonical_index=plan.canonical_index,
+                                original_url=plan.original_url,
                             )
                         )
                     strategy_context.retry_after = retry_after_hint
@@ -1158,6 +1197,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                             elapsed_ms=elapsed_ms,
                             reason=ReasonCode.UNKNOWN,
                             reason_detail="strategy-skip",
+                            canonical_url=plan.canonical_url,
+                            canonical_index=plan.canonical_index,
+                            original_url=plan.original_url,
                         )
                     )
                 ensure_dir(dest_path.parent)
@@ -1213,93 +1255,107 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                         except Exception as exc:
                             LOGGER.debug("Final progress callback failed: %s", exc)
 
-                try:
-                    atomic_write(
-                        dest_path,
-                        _stream_chunks(),
-                        hasher=hasher,
-                        keep_partial_on_error=True,
-                    )
-                except (httpx.HTTPError, httpcore.ProtocolError, AttributeError) as exc:
-                    LOGGER.warning(
-                        "Streaming download failed for %s: %s",
-                        url,
-                        exc,
-                        extra={"extra_fields": {"work_id": artifact.work_id}},
-                    )
-                    classification_hint = (
-                        detected
-                        if detected in {Classification.PDF, Classification.HTML, Classification.XML}
-                        else Classification.PDF
-                    )
-                    resume_supported_flag = bool(resume_bytes_offset) or bool(
-                        getattr(ctx, "enable_range_resume", False)
-                    )
-                    cleanup_sidecar_files(
-                        artifact,
-                        classification_hint,
-                        ctx,
-                        resume_supported=resume_supported_flag,
-                    )
-                    seen_attempts = ctx.stream_retry_attempts
-                    if seen_attempts < 1:
-                        ctx.stream_retry_attempts = seen_attempts + 1
-                        attempt_conditional = False
-                        LOGGER.info("Retrying download for %s after stream failure", url)
-                        continue
-                    elapsed_err = (time.monotonic() - start) * 1000.0
-                    return DownloadStreamResult(
-                        outcome=DownloadOutcome(
-                            classification=Classification.HTTP_ERROR,
-                            path=None,
-                            http_status=response.status_code,
-                            content_type=content_type,
-                            elapsed_ms=elapsed_err,
-                            reason=ReasonCode.REQUEST_EXCEPTION,
-                            reason_detail=f"stream-error: {exc}",
-                            sha256=None,
-                            content_length=None,
-                            etag=modified_result.etag,
-                            last_modified=modified_result.last_modified,
-                            extracted_text_path=None,
-                            retry_after=retry_after_hint,
-                        )
-                    )
-
                 sha256: Optional[str] = None
                 content_length: Optional[int] = None
-                if hasher is not None:
-                    sha256 = hasher.hexdigest()
-                    content_length = byte_count
-                if (
-                    dest_path
-                    and ctx.content_addressed
-                    and sha256
-                    and detected is Classification.PDF
-                ):
-                    dest_path = _apply_content_addressed_storage(dest_path, sha256)
-                tail_snapshot: Optional[bytes] = bytes(tail_buffer) if tail_buffer else None
-
+                tail_snapshot: Optional[bytes] = None
                 extracted_text_path: Optional[str] = None
-                if dest_path and detected == Classification.HTML and extract_html_text:
+                artifact_lock_cm: contextlib.AbstractContextManager[None]
+                if dest_path and not dry_run:
+                    artifact_lock_cm = locks.artifact_lock(dest_path)
+                else:
+                    artifact_lock_cm = contextlib.nullcontext()
+
+                with artifact_lock_cm:
                     try:
-                        import trafilatura  # type: ignore
-                    except ImportError:
-                        LOGGER.warning(
-                            "HTML text extraction requested but trafilatura is not installed."
+                        atomic_write(
+                            dest_path,
+                            _stream_chunks(),
+                            hasher=hasher,
+                            keep_partial_on_error=True,
                         )
-                    else:
-                        try:
-                            text = trafilatura.extract(
-                                dest_path.read_text(encoding="utf-8", errors="ignore")
+                    except (httpx.HTTPError, httpcore.ProtocolError, AttributeError) as exc:
+                        LOGGER.warning(
+                            "Streaming download failed for %s: %s",
+                            url,
+                            exc,
+                            extra={"extra_fields": {"work_id": artifact.work_id}},
+                        )
+                        classification_hint = (
+                            detected
+                            if detected
+                            in {Classification.PDF, Classification.HTML, Classification.XML}
+                            else Classification.PDF
+                        )
+                        resume_supported_flag = bool(resume_bytes_offset) or bool(
+                            getattr(ctx, "enable_range_resume", False)
+                        )
+                        cleanup_sidecar_files(
+                            artifact,
+                            classification_hint,
+                            ctx,
+                            resume_supported=resume_supported_flag,
+                        )
+                        seen_attempts = ctx.stream_retry_attempts
+                        if seen_attempts < 1:
+                            ctx.stream_retry_attempts = seen_attempts + 1
+                            attempt_conditional = False
+                            LOGGER.info("Retrying download for %s after stream failure", url)
+                            continue
+                        elapsed_err = (time.monotonic() - start) * 1000.0
+                        return DownloadStreamResult(
+                            outcome=DownloadOutcome(
+                                classification=Classification.HTTP_ERROR,
+                                path=None,
+                                http_status=response.status_code,
+                                content_type=content_type,
+                                elapsed_ms=elapsed_err,
+                                reason=ReasonCode.REQUEST_EXCEPTION,
+                                reason_detail=f"stream-error: {exc}",
+                                sha256=None,
+                                content_length=None,
+                                etag=modified_result.etag,
+                                last_modified=modified_result.last_modified,
+                                extracted_text_path=None,
+                                retry_after=retry_after_hint,
+                                canonical_url=plan.canonical_url,
+                                canonical_index=plan.canonical_index,
+                                original_url=plan.original_url,
                             )
-                        except Exception as exc:
-                            LOGGER.warning("Failed to extract HTML text for %s: %s", dest_path, exc)
+                        )
+
+                    if hasher is not None:
+                        sha256 = hasher.hexdigest()
+                        content_length = byte_count
+                    if (
+                        dest_path
+                        and ctx.content_addressed
+                        and sha256
+                        and detected is Classification.PDF
+                    ):
+                        dest_path = _apply_content_addressed_storage(dest_path, sha256)
+                    tail_snapshot = bytes(tail_buffer) if tail_buffer else None
+
+                    if dest_path and detected == Classification.HTML and extract_html_text:
+                        try:
+                            import trafilatura  # type: ignore
+                        except ImportError:
+                            LOGGER.warning(
+                                "HTML text extraction requested but trafilatura is not installed."
+                            )
                         else:
-                            if text:
-                                text_path = dest_path.with_suffix(dest_path.suffix + ".txt")
-                                atomic_write_text(text_path, text)
-                                extracted_text_path = str(text_path)
+                            try:
+                                text = trafilatura.extract(
+                                    dest_path.read_text(encoding="utf-8", errors="ignore")
+                                )
+                            except Exception as exc:
+                                LOGGER.warning(
+                                    "Failed to extract HTML text for %s: %s", dest_path, exc
+                                )
+                            else:
+                                if text:
+                                    text_path = dest_path.with_suffix(dest_path.suffix + ".txt")
+                                    atomic_write_text(text_path, text)
+                                    extracted_text_path = str(text_path)
 
                 ctx.stream_retry_attempts = 0
                 strategy_context.dest_path = dest_path
@@ -1371,6 +1427,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                 retry_after=exc.retry_after,
                 metadata=outcome_metadata,
                 error=str(exc),
+                canonical_url=plan.canonical_url,
+                canonical_index=plan.canonical_index,
+                original_url=plan.original_url,
             )
         )
 
@@ -1403,6 +1462,9 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                 etag=None,
                 last_modified=None,
                 extracted_text_path=None,
+                canonical_url=plan.canonical_url,
+                canonical_index=plan.canonical_index,
+                original_url=plan.original_url,
             )
         )
 
@@ -1569,6 +1631,9 @@ class _BaseDownloadStrategy:
             tail_check_bytes=context.tail_check_bytes,
             retry_after=context.retry_after,
             options=context.download_context,
+            canonical_url=context.canonical_url,
+            canonical_index=context.canonical_index,
+            original_url=context.original_url,
         )
 
 
@@ -2057,11 +2122,23 @@ def build_download_outcome(
     tail_check_bytes: int,
     retry_after: Optional[float],
     options: Optional[Union[DownloadConfig, DownloadOptions, DownloadContext]] = None,
+    canonical_url: Optional[str] = None,
+    canonical_index: Optional[str] = None,
+    original_url: Optional[str] = None,
 ) -> DownloadOutcome:
     """Compose a :class:`DownloadOutcome` with shared validation logic."""
 
     status_code = response.status_code if response is not None else None
     headers = response.headers if response is not None else httpx.Headers()
+
+    canonical_value = canonical_url
+    if canonical_value is None and response is not None:
+        try:
+            canonical_value = str(response.request.url)
+        except AttributeError:
+            canonical_value = None
+    canonical_index_value = canonical_index or canonical_value
+    original_value = original_url or canonical_value
 
     classification_code = (
         classification
@@ -2096,6 +2173,9 @@ def build_download_outcome(
                 last_modified=last_modified,
                 extracted_text_path=extracted_text_path,
                 retry_after=retry_after,
+                canonical_url=canonical_value,
+                canonical_index=canonical_index_value,
+                original_url=original_value,
             )
 
         if tail_contains_html(tail_bytes):
@@ -2115,6 +2195,9 @@ def build_download_outcome(
                 last_modified=last_modified,
                 extracted_text_path=extracted_text_path,
                 retry_after=retry_after,
+                canonical_url=canonical_value,
+                canonical_index=canonical_index_value,
+                original_url=original_value,
             )
 
         if not has_pdf_eof(dest_path, window_bytes=tail_check_bytes):
@@ -2134,6 +2217,9 @@ def build_download_outcome(
                 last_modified=last_modified,
                 extracted_text_path=extracted_text_path,
                 retry_after=retry_after,
+                canonical_url=canonical_value,
+                canonical_index=canonical_index_value,
+                original_url=original_value,
             )
 
     if isinstance(options, DownloadContext):
@@ -2158,6 +2244,9 @@ def build_download_outcome(
             last_modified=last_modified,
             extracted_text_path=extracted_text_path,
             retry_after=retry_after,
+            canonical_url=canonical_value,
+            canonical_index=canonical_index_value,
+            original_url=original_value,
         )
 
     try:
@@ -2212,6 +2301,9 @@ def build_download_outcome(
         extracted_text_path=normalized_text_path,
         retry_after=retry_after,
         metadata=metadata,
+        canonical_url=canonical_value,
+        canonical_index=canonical_index_value,
+        original_url=original_value,
     )
 
 

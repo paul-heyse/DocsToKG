@@ -18,10 +18,13 @@ from .base import (
     ProviderTelemetryEmitter,
     SparseEmbeddingBackend,
 )
+from .dense.fallback import DenseFallbackProvider
 from .dense.qwen_vllm import QwenVLLMConfig, QwenVLLMProvider
 from .dense.sentence_transformers import SentenceTransformersConfig, SentenceTransformersProvider
 from .dense.tei import TEIConfig, TEIProvider
 from .lexical.local_bm25 import LocalBM25Config, LocalBM25Provider
+from .lexical.pyserini import PyseriniBM25Provider
+from .nulls import NullDenseProvider, NullLexicalProvider, NullSparseProvider
 from .sparse.splade_st import SpladeSTConfig, SpladeSTProvider
 
 
@@ -94,15 +97,25 @@ class ProviderFactory:
 
     @staticmethod
     def _build_dense(cfg: EmbedCfg, dense_settings: Dict[str, Any]) -> Optional[DenseEmbeddingBackend]:
+        fallback_backend = dense_settings.get("fallback")
+        try:
+            return ProviderFactory._build_dense_inner(cfg, dense_settings)
+        except ProviderError as original_error:
+            if not fallback_backend:
+                raise
+            fallback_settings = dict(dense_settings)
+            fallback_settings["backend"] = fallback_backend
+            fallback_settings.pop("fallback", None)
+            return ProviderFactory._build_dense(cfg, fallback_settings)
+
+    @staticmethod
+    def _build_dense_inner(cfg: EmbedCfg, dense_settings: Dict[str, Any]) -> Optional[DenseEmbeddingBackend]:
         backend = dense_settings.get("backend") or "qwen_vllm"
         backend = backend.lower()
         if backend in {"none", "null"}:
-            raise ProviderError(
-                provider="dense",
-                category="validation",
-                detail="Dense backend cannot be 'none' under the current vector schema.",
-                retryable=False,
-            )
+            return NullDenseProvider()
+        if backend == "fallback":
+            return DenseFallbackProvider()
         if backend == "qwen_vllm":
             qwen_cfg = dense_settings.get("qwen_vllm", {})
             download_dir = qwen_cfg.get("download_dir") or cfg.qwen_model_dir
@@ -163,6 +176,11 @@ class ProviderFactory:
                 ),
             )
             return SentenceTransformersProvider(config)
+        if backend == "tei" and dense_settings.get("fallback"):
+            # handled above to avoid recursion when fallback targets TEI again
+            dense_settings = dict(dense_settings)
+            dense_settings.pop("fallback", None)
+            return ProviderFactory._build_dense(cfg, dense_settings)
         raise ProviderError(
             provider="dense",
             category="validation",
@@ -175,12 +193,7 @@ class ProviderFactory:
         backend = sparse_settings.get("backend") or "splade_st"
         backend = backend.lower()
         if backend in {"none", "null"}:
-            raise ProviderError(
-                provider="sparse",
-                category="validation",
-                detail="Sparse backend cannot be 'none' under the current vector schema.",
-                retryable=False,
-            )
+            return NullSparseProvider()
         if backend != "splade_st":
             raise ProviderError(
                 provider="sparse",
@@ -213,12 +226,9 @@ class ProviderFactory:
         backend = lexical_settings.get("backend") or "local_bm25"
         backend = backend.lower()
         if backend in {"none", "null"}:
-            raise ProviderError(
-                provider="lexical",
-                category="validation",
-                detail="Lexical backend cannot be 'none' under the current vector schema.",
-                retryable=False,
-            )
+            return NullLexicalProvider()
+        if backend == "pyserini":
+            return PyseriniBM25Provider()
         if backend != "local_bm25":
             raise ProviderError(
                 provider="lexical",

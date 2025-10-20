@@ -229,6 +229,15 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
         },
     ),
     CLIOption(
+        ("--dense-fallback-backend",),
+        {
+            "type": str,
+            "default": None,
+            "dest": "dense_fallback_backend",
+            "help": "Optional dense backend fallback to try when the primary fails.",
+        },
+    ),
+    CLIOption(
         ("--dense-qwen-model-id",),
         {
             "type": str,

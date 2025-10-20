@@ -31,6 +31,7 @@ from DocsToKG.DocParsing.core import cli as core_cli
 from typer.testing import CliRunner
 
 
+
 def _get_runtime():
     """Return the current embedding runtime module instance."""
 
@@ -179,3 +180,59 @@ def test_docparse_embed_missing_chunks_warns_and_exits(tmp_path, patcher, vector
     warning_fields = [fields for _, message, fields in events if message == "No chunk files found"]
     assert warning_fields, "Expected 'No chunk files found' warning"
     assert warning_fields[-1]["chunks_dir"] == str(missing_chunks.resolve())
+
+
+def test_docparse_embed_dense_none_errors(tmp_path, patcher):
+    runtime = _get_runtime()
+    importlib.reload(runtime)
+
+    data_root = tmp_path / "Data"
+    model_root = tmp_path / "models"
+    qwen_dir = model_root / "qwen"
+    splade_dir = model_root / "splade"
+    chunks_dir = data_root / "ChunkedDocTagFiles"
+    vectors_dir = data_root / "Embeddings"
+    chunks_dir.mkdir(parents=True)
+    vectors_dir.mkdir(parents=True)
+    qwen_dir.mkdir(parents=True)
+    splade_dir.mkdir(parents=True)
+
+    chunk_path = chunks_dir / "doc-1.chunks.jsonl"
+    chunk_path.write_text(
+        "{" "\"uuid\": \"chunk-1\", \"doc_id\": \"doc-1\", \"text\": \"hello\", "
+        "\"schema_version\": \"docparse/1.0.0\", \"num_tokens\": 1 }\n"
+    )
+
+    patcher.setattr(runtime, "ensure_model_environment", lambda: (model_root, model_root))
+    patcher.setattr(runtime, "expand_path", lambda candidate: Path(candidate or model_root).resolve())
+    patcher.setattr(runtime, "_resolve_qwen_dir", lambda _root: qwen_dir)
+    patcher.setattr(runtime, "_resolve_splade_dir", lambda _root: splade_dir)
+    patcher.setattr(runtime, "ensure_splade_environment", lambda **_: {"device": "cpu"})
+    patcher.setattr(
+        runtime, "ensure_qwen_environment", lambda **_: {"device": "cpu", "dtype": "bfloat16"}
+    )
+    patcher.setattr(runtime, "_ensure_pyarrow_vectors", lambda: (object(), object()))
+    patcher.setattr(runtime, "prepare_data_root", lambda override, detected: Path(override or detected))
+    patcher.setattr(runtime, "detect_data_root", lambda: data_root)
+    patcher.setattr(runtime, "data_chunks", lambda root, ensure=False: root / "ChunkedDocTagFiles")
+    patcher.setattr(runtime, "data_vectors", lambda root, ensure=False: root / "Embeddings")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        core_cli.app,
+        [
+            "embed",
+            "--data-root",
+            str(data_root),
+            "--chunks-dir",
+            str(chunks_dir),
+            "--out-dir",
+            str(vectors_dir),
+            "--dense-backend",
+            "none",
+            "--sparse-backend",
+            "none",
+        ],
+    )
+
+    assert result.exit_code != 0

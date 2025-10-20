@@ -117,7 +117,8 @@ class CrossrefResolver(ApiResolverBase):
                 continue
             seen.add(normalized)
             yield ResolverResult(
-                url=normalized,
+                url=url,
+                canonical_url=normalized,
                 metadata={
                     "source": "crossref",
                     "content-version": meta.get("content-version") or meta.get("content_version"),
