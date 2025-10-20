@@ -1930,6 +1930,8 @@ class PaginationCheckResult:
     Attributes:
         cursor_chain: Sequence of pagination cursors encountered.
         duplicate_detected: True when duplicate results were observed.
+        termination_reason: Description explaining why pagination inspection
+            stopped.
 
     Examples:
         >>> result = PaginationCheckResult(cursor_chain=["cursor1"], duplicate_detected=False)
@@ -1939,6 +1941,7 @@ class PaginationCheckResult:
 
     cursor_chain: Sequence[str]
     duplicate_detected: bool
+    termination_reason: str = "cursor_exhausted"
 
 
 # --- Public Functions ---
@@ -1967,8 +1970,14 @@ def build_stats_snapshot(
     }
 
 
+_DEFAULT_PAGINATION_PAGE_LIMIT = 32
+
+
 def verify_pagination(
-    service: HybridSearchService, request: HybridSearchRequest
+    service: HybridSearchService,
+    request: HybridSearchRequest,
+    *,
+    max_pages: Optional[int] = None,
 ) -> PaginationCheckResult:
     """Ensure pagination cursors produce non-duplicated results.
 
@@ -1985,9 +1994,31 @@ def verify_pagination(
     next_request = request
     duplicate = False
     seen_cursors: set[str] = set()
+    inspected_pages = 0
+    termination_reason = "cursor_exhausted"
+
+    page_limit = max_pages
+    if page_limit is None:
+        try:
+            config = service._config_manager.get()  # type: ignore[attr-defined]
+        except Exception:
+            config = None
+        if config is not None:
+            try:
+                mmr_pool = getattr(config.retrieval, "mmr_pool_size", None)
+                page_size = max(1, int(getattr(request, "page_size", 1)))
+            except Exception:
+                mmr_pool = None
+                page_size = 1
+            else:
+                if isinstance(mmr_pool, (int, float)) and mmr_pool > 0:
+                    page_limit = max(1, math.ceil(mmr_pool / page_size))
+    if page_limit is None:
+        page_limit = _DEFAULT_PAGINATION_PAGE_LIMIT
 
     while True:
         response = service.search(next_request)
+        inspected_pages += 1
         for result in response.results:
             key = (result.doc_id, result.chunk_id)
             if key in seen:
@@ -1995,7 +2026,14 @@ def verify_pagination(
             seen.add(key)
 
         next_cursor = response.next_cursor
-        if not next_cursor or next_cursor in seen_cursors:
+        if not next_cursor:
+            termination_reason = "cursor_exhausted"
+            break
+        if next_cursor in seen_cursors:
+            termination_reason = "cursor_cycle"
+            break
+        if inspected_pages >= page_limit:
+            termination_reason = "max_pages_reached"
             break
 
         cursor_chain.append(next_cursor)
@@ -2011,7 +2049,11 @@ def verify_pagination(
             recall_first=request.recall_first,
         )
 
-    return PaginationCheckResult(cursor_chain=cursor_chain, duplicate_detected=duplicate)
+    return PaginationCheckResult(
+        cursor_chain=cursor_chain,
+        duplicate_detected=duplicate,
+        termination_reason=termination_reason,
+    )
 
 
 def should_rebuild_index(
