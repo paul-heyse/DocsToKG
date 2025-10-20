@@ -1270,6 +1270,8 @@ def test_execute_dense_uses_range_search_for_recall_first_without_score_floor() 
     class RecordingRegistry:
         def __init__(self, payload: ChunkPayload) -> None:
             self._payloads = {payload.vector_id: payload}
+            self._dim = int(payload.features.embedding.shape[-1])
+            self.resolve_embeddings_calls: List[Tuple[str, ...]] = []
 
         def bulk_get(self, vector_ids: Sequence[str]) -> Sequence[ChunkPayload]:
             return [
@@ -1278,10 +1280,35 @@ def test_execute_dense_uses_range_search_for_recall_first_without_score_floor() 
                 if vector_id in self._payloads
             ]
 
-        def resolve_embedding(
-            self, vector_id: str, *, cache: Optional[Dict[str, np.ndarray]] = None
+        def resolve_embeddings(
+            self,
+            vector_ids: Sequence[str],
+            *,
+            cache: Optional[Dict[str, np.ndarray]] = None,
+            dtype: np.dtype = np.float32,
         ) -> np.ndarray:
-            return self._payloads[vector_id].features.embedding
+            self.resolve_embeddings_calls.append(tuple(vector_ids))
+            rows: List[np.ndarray] = []
+            for vector_id in vector_ids:
+                embedding = np.asarray(
+                    self._payloads[vector_id].features.embedding, dtype=np.float32
+                )
+                rows.append(embedding)
+                if cache is not None:
+                    cache[vector_id] = embedding
+            if not rows:
+                return np.empty((0, self._dim), dtype=dtype)
+            return np.ascontiguousarray(np.stack(rows), dtype=dtype)
+
+        def resolve_embedding(
+            self,
+            vector_id: str,
+            *,
+            cache: Optional[Dict[str, np.ndarray]] = None,
+            dtype: np.dtype = np.float32,
+        ) -> np.ndarray:
+            matrix = self.resolve_embeddings([vector_id], cache=cache, dtype=dtype)
+            return matrix[0]
 
     class RecordingDenseStore:
         def __init__(self, hits: Sequence[FaissSearchResult]) -> None:
@@ -1322,6 +1349,9 @@ def test_execute_dense_uses_range_search_for_recall_first_without_score_floor() 
     assert isinstance(result, service_module.ChannelResults)
     assert [candidate.chunk.vector_id for candidate in result.candidates] == ["vec-0"]
     assert timings["dense_ms"] >= 0.0
+    assert registry.resolve_embeddings_calls == [("vec-0",)]
+    assert result.embeddings is not None
+    np.testing.assert_allclose(result.embeddings, chunk_features.embedding[None, :])
 
 
 # --- test_hybrid_search.py ---

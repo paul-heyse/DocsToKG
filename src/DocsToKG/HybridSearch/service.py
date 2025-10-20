@@ -1548,25 +1548,27 @@ class HybridSearchService:
                 )
             candidates: List[FusionCandidate] = []
             scores: Dict[str, float] = {}
-            embedding_rows: List[np.ndarray] = []
             embedding_cache_local: Dict[str, np.ndarray] = {}
-            for idx, hit in enumerate(filtered):
+            resolved_hits: List[tuple[FaissSearchResult, ChunkPayload]] = []
+            for hit in filtered:
                 chunk = payloads.get(hit.vector_id)
                 if chunk is None:
                     continue
+                resolved_hits.append((hit, chunk))
+
+            vector_ids = [chunk.vector_id for _, chunk in resolved_hits]
+            if vector_ids:
+                embedding_matrix = self._registry.resolve_embeddings(
+                    vector_ids, cache=embedding_cache_local
+                )
+            else:
+                embedding_matrix = None
+
+            for idx, (hit, chunk) in enumerate(resolved_hits):
                 candidates.append(
                     FusionCandidate(source="dense", score=hit.score, chunk=chunk, rank=idx + 1)
                 )
                 scores[hit.vector_id] = hit.score
-                embedding_rows.append(
-                    self._registry.resolve_embedding(
-                        chunk.vector_id, cache=embedding_cache_local
-                    )
-                )
-            if embedding_rows:
-                embedding_matrix = np.ascontiguousarray(np.stack(embedding_rows), dtype=np.float32)
-            else:
-                embedding_matrix = None
             return ChannelResults(candidates=candidates, scores=scores, embeddings=embedding_matrix)
 
         def run_dense_search(current_k: int) -> list[FaissSearchResult]:
