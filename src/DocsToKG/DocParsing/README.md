@@ -92,7 +92,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli embed --help
 
 # Focused reruns
 direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --input Data/PDFs/doc-001.pdf --force
-direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --resume
+direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --resume          # append --verify-hash when DocTags may have drifted (extra reads)
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only --format parquet
 
@@ -100,7 +100,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only --for
 direnv exec . python -m DocsToKG.DocParsing.core.cli plan --data-root Data --mode auto    # stage preview
 direnv exec . python -m DocsToKG.DocParsing.core.cli manifest --stage chunk --tail 20     # inspect manifests
 direnv exec . python -m DocsToKG.DocParsing.core.cli token-profiles --doctags-dir Data/DocTagsFiles
-direnv exec . python -m DocsToKG.DocParsing.core.cli all --resume                         # orchestrate all stages
+direnv exec . python -m DocsToKG.DocParsing.core.cli all --resume                         # stage-level --verify-hash remains available on individual reruns
 direnv exec . python -m DocsToKG.DocParsing.core.cli plan-diff --lock-output baseline.json --ids hp --mode auto
 ```
 
@@ -119,11 +119,16 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli plan-diff --lock-output bas
 - **Developer tooling** – `core.manifest`, `core.token_profiles`, and `testing` harnesses surface manifest diffs, tokenizer statistics, and dependency fakes for reliable local and CI execution.
 
 ### CLI command matrix
+> `--verify-hash` is available on stage-level commands to recompute input hashes
+> before skipping resumed work. Enable it when storage drift is possible; expect
+> additional reads against the source directories (and object stores) compared to
+> the default fast-path resume.
+
 | Command | Description | Core flags |
 | --- | --- | --- |
-| `docparse doctags` | Convert HTML/PDF corpora to DocTags with Docling + optional vLLM | `--mode`, `--workers`, `--model`, `--served-model-name`, `--resume`, `--force`, `--vllm-wait-timeout` |
-| `docparse chunk` | Produce topic-aware chunks from DocTags | `--profile`, `--min-tokens`, `--max-tokens`, `--shard-count`, `--validate-only`, `--inject-anchors` |
-| `docparse embed` | Generate BM25, SPLADE, and Qwen vectors | `--profile`, `--offline`, `--files-parallel`, `--no-cache`, `--validate-only`, `--vector-format` |
+| `docparse doctags` | Convert HTML/PDF corpora to DocTags with Docling + optional vLLM | `--mode`, `--workers`, `--model`, `--served-model-name`, `--resume`, `--force`, `--verify-hash`, `--vllm-wait-timeout` |
+| `docparse chunk` | Produce topic-aware chunks from DocTags | `--profile`, `--min-tokens`, `--max-tokens`, `--shard-count`, `--resume`, `--force`, `--verify-hash`, `--validate-only`, `--inject-anchors` |
+| `docparse embed` | Generate BM25, SPLADE, and Qwen vectors | `--profile`, `--offline`, `--files-parallel`, `--resume`, `--force`, `--verify-hash`, `--no-cache`, `--validate-only`, `--vector-format` |
 | `docparse plan` | Classify pending work using manifests + directory scan | `--mode`, `--limit`, `--json`, `--since`, `--plan-only` |
 | `docparse plan-diff` | Compare live plan vs baseline (`--lock-output` optional) | `--baseline`, `--lock`, `--ids`, `--since`, `--with-manifests` |
 | `docparse manifest` | Inspect manifest history safely | `--stage`, `--tail`, `--json`, `--since`, `--filter` |
@@ -206,6 +211,10 @@ sequenceDiagram
 ### Content hashing defaults
 - **Current default:** `compute_content_hash`, `compute_chunk_uuid`, and `resolve_hash_algorithm()` use SHA-256 by default. SHA-1 remains available via `DOCSTOKG_HASH_ALG=sha1` or explicit function arguments for legacy resume scenarios.
 - **Operational impact:** Switching digest algorithms changes manifest `input_hash` values and chunk UUIDs. Set `DOCSTOKG_HASH_ALG=sha1` temporarily when resuming runs generated with the previous default, then revert to SHA-256 once caught up.
+- **Resume validation:** Pass `--verify-hash` with `--resume` on DocTags, chunk, or embed commands when artifacts may have been
+  modified outside the pipeline or restored from object storage. The flag recomputes hashes for every candidate input before
+  trusting manifest skips, which safeguards against silent drift at the cost of re-reading entire source files (including remote
+  mounts) and slowing cold cache runs.
 
 ## Data contracts & schemas
 - Schemas: `formats.CHUNK_ROW_SCHEMA`, `formats.VECTOR_ROW_SCHEMA`, DocTags manifest rows emitted via `telemetry.ManifestEntry`.
@@ -260,7 +269,9 @@ direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # optional
 
 ## FAQ
 - Q: How do I resume after a failure?
-  A: Use `--resume` on the affected stage; manifests mark completed docs. Combine with `--force` (or per-doc overrides) for targeted reruns.
+  A: Use `--resume` on the affected stage; manifests mark completed docs. Add `--verify-hash` when inputs may have changed while
+  the job was paused so the pipeline re-hashes files before skipping. Combine with `--force` (or per-doc overrides) for targeted
+  reruns.
 
 - Q: How do I validate outputs without writing new files?
   A: Run `chunk` or `embed` with `--validate-only` to check existing JSONL artifacts and exit with status.
