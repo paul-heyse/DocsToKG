@@ -21,6 +21,7 @@ from DocsToKG.HybridSearch.config import DenseIndexConfig, RetrievalConfig
 from DocsToKG.HybridSearch.pipeline import Observability
 from DocsToKG.HybridSearch.service import HybridSearchValidator
 from DocsToKG.HybridSearch.store import FaissSearchResult
+from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload
 
 
 class _RecordingResources:
@@ -206,6 +207,11 @@ def test_calibration_batches_queries_and_preserves_accuracy():
     validator = HybridSearchValidator(
         ingestion=ingestion,
         service=service,
+        registry=registry,
+        opensearch=SimpleNamespace(),
+    )
+
+
 @pytest.fixture
 def duplicate_namespace_registry() -> tuple[SimpleNamespace, list[ChunkPayload], dict[str, np.ndarray]]:
     research_embedding = np.array([1.0, 0.0, 0.0], dtype=np.float32)
@@ -265,7 +271,7 @@ def test_embeddings_for_results_respect_namespace(duplicate_namespace_registry):
 
     report = validator._run_calibration([])
 
-    expected_accuracy = sum(1 for flag in matches.values() if flag) / max(1, len(matches))
+    expected_accuracy = sum(1 for flag in matches.values() if flag) / len(matches)
     dense_results = report.details["dense"]
     assert all(math.isclose(entry["self_hit_accuracy"], expected_accuracy) for entry in dense_results)
     assert registry.all_calls == 1
@@ -314,3 +320,18 @@ def test_embeddings_for_results_respect_namespace(duplicate_namespace_registry):
 
     assert np.array_equal(resolved[0], embeddings["vec-research"])
     assert np.array_equal(resolved[1], embeddings["vec-support"])
+
+
+def test_calibration_short_circuits_when_registry_empty():
+    validator = HybridSearchValidator(
+        ingestion=SimpleNamespace(faiss_index=SimpleNamespace()),
+        service=SimpleNamespace(),
+        registry=SimpleNamespace(all=lambda: []),
+        opensearch=SimpleNamespace(),
+    )
+
+    report = validator._run_calibration([])
+
+    assert report.passed is True
+    assert report.details["dense"] == []
+    assert "no chunks" in report.details["note"].lower()
