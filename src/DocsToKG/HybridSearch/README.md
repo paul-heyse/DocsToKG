@@ -8,7 +8,7 @@ last_updated: 2025-02-15
 
 ## Table of Contents
 - [DocsToKG • HybridSearch](#docstokg--hybridsearch)
-  - [⚠️ Required Prereading: FAISS GPU Wheel & Library](#️-required-prereading-faiss-gpu-wheel--library)
+  - [⚠️ Mandatory Pre-Read: FAISS/cuVS Stack](#️-mandatory-pre-read-faisscuvs-stack)
   - [Prerequisites & dependencies](#prerequisites--dependencies)
   - [Data inputs & expected layout](#data-inputs--expected-layout)
   - [Quickstart](#quickstart)
@@ -33,16 +33,16 @@ last_updated: 2025-02-15
   - [Agent guardrails](#agent-guardrails)
   - [FAQ](#faq)
 
-### ⚠️ Required Prereading: FAISS GPU Wheel & Library
+### ⚠️ Mandatory Pre-Read: FAISS/cuVS Stack
 
-Before modifying or operating HybridSearch, read the entire [`faiss-gpu-wheel-reference.md`](./faiss-gpu-wheel-reference.md) and inspect the installed FAISS package at `.venv/lib/python3.13/site-packages/faiss`:
+Before modifying or operating HybridSearch, complete the FAISS/cuVS reading stack in this order:
 
-- **Customized wheel** – The repository ships a bespoke `faiss-1.12.0` CUDA 12 wheel with cuVS integration, altered loader behaviour, and environment knobs (`FAISS_OPT_LEVEL`, cuVS toggles). The reference file documents runtime prerequisites, memory pooling, index variants, and known pitfalls not covered by upstream FAISS docs.
-- **Mathematically intensive kernels** – FAISS GPU search relies on optimized L2/IP distance kernels, IVF/PQ quantization, and cuVS acceleration; understanding tiling, batching, and resource heuristics (e.g., `GpuDistanceParams`, `StandardGpuResources`) is essential when tuning performance or diagnosing accuracy/regression issues.
-- **CUDA-specific workflows** – The wheel exposes GPU helper functions (`knn_gpu`, `pairwise_distance_gpu`, `GpuMultipleClonerOptions`) and stream management APIs. Reviewing the actual Python bindings/array wrappers in `.venv/.../faiss` clarifies dtype/layout expectations, memory limits, and error handling paths used by `store.py`.
-- **Operational safety** – Misconfiguring memory pools, replica strategies, or snapshot flows can corrupt indexes or exhaust GPU VRAM. The reference plus source code review equips agents with the guardrails needed to modify HybridSearch responsibly.
+1. **[`faiss-gpu-wheel-reference.md`](./faiss-gpu-wheel-reference.md)** — Primary guide to the custom `faiss-1.12.0` CUDA wheel. Details runtime prerequisites, environment knobs (`FAISS_OPT_LEVEL`, `use_cuvs`), GPU index types, tiling heuristics, and the mathematically intensive kernels that underpin HybridSearch.
+2. **Inspect FAISS modules** under `.venv/lib/python3.13/site-packages/faiss` — Study `swigfaiss.py`, `gpu_wrappers.py`, `class_wrappers.py`, and contrib helpers to internalize dtype/layout expectations, stream semantics, and no-index helpers (`knn_gpu`, `pairwise_distance_gpu`).
+3. **[`cuvs-reference.md`](./cuvs-reference.md)** — Documents the cuVS Python toolkit (ANN algorithms, clustering, distance utilities), its dependency on RAPIDS RAFT/RMM, and HybridSearch’s loader preloads. Useful for experiments and planning future FAISS builds with cuVS enabled.
+4. **[`libcuvs-reference.md`](./libcuvs-reference.md)** — Explains the shared-library loader chain (`libcuvs`, `libraft`, `librmm`, `rapids_logger`), environment switches, and HybridSearch integration hooks (`_ensure_cuvs_loader_path`, `resolve_cuvs_state`, `AdapterStats.cuvs_*`). Critical for diagnosing loader-path or RAPIDS memory-manager issues.
 
-The `.venv/.../faiss` package contains SWIG bindings (`swigfaiss.py`), GPU helpers (`gpu_wrappers.py`), class wrappers, contrib modules (Torch utilities, array conversions), and loader logic. Read these modules after the reference to internalize the exposed API surface, dtype requirements, and optional cuVS pathways leveraged by HybridSearch.
+Together these documents explain how FAISS, cuVS, and the RAPIDS allocator/logging stack interoperate (and why cuVS kernels are currently disabled in the FAISS build) so you understand the guardrails HybridSearch enforces on GPU indexes.
 
 # DocsToKG • HybridSearch
 

@@ -38,12 +38,12 @@ handles = load_library()  # returns list of ctypes.CDLL objects
 `libcuvs.load.load_library()`:
 
 1. **Loads dependencies**:
-   - Tries to import `libraft` and `librmm` (both RAPIDS wheels). If found, calls their respective `load_library()` helpers so `libraft.so`, `librmm.so`, and `librapids_logger.so` are resident.
+   - Tries to import `libraft` and `librmm` (both RAPIDS wheels). If found, calls their respective `load_library()` helpers so `libraft.so`, `librmm.so`, and `librapids_logger.so` (plus the RAPIDS memory manager’s initialization routines) are resident. This bootstraps the RAPIDS Memory Manager (`rmm`) which cuVS (and FAISS when cuVS is enabled) relies on for device allocations.
    - If those modules are missing (conda/system installs), it assumes the libraries are on the system loader path.
 2. **Honours `RAPIDS_LIBCUVS_PREFER_SYSTEM_LIBRARY`**:
    - If set to anything other than `false`, it prefers `ctypes.CDLL('libcuvs.so')` before falling back to the wheel’s copy at `libcuvs/lib64/libcuvs.so`.
    - Default behaviour loads the wheel’s bundled `.so` files first; if they’re absent (e.g., prebuilt install), it falls back to system copies.
-3. **Loads the pair**: `libcuvs.so` (C++ API) and `libcuvs_c.so` (C shim used by Python bindings).
+3. **Loads the pair**: `libcuvs.so` (C++ API) and `libcuvs_c.so` (C shim used by Python bindings). Both libraries are linked against RMM, the RAPIDS logging stack, CUDA, and NCCL, so keeping those dependencies preloaded is essential.
 4. Returns the `ctypes.CDLL` handles so callers can inspect `._name` or other metadata if desired.
 
 Importing `cuvs` automatically calls `libcuvs.load_library()` (see `cuvs/__init__.py`), so `libcuvs` is the underlying mechanism that makes cuVS usable in Python environments.
@@ -74,7 +74,7 @@ FAISS integrates with cuVS via optional GPU kernels (cuVS “fast distance” ro
 
 - `faiss.should_use_cuvs(GpuDistanceParams)` returns `True` or `False` depending on dtype/layout and whether cuVS kernels are compiled in; `should_use_cuvs(GpuIndexConfig)` returns `False`.
 - Calling `faiss.knn_gpu(..., use_cuvs=True)` raises `RuntimeError: cuVS has not been compiled into the current version so it cannot be used.` No cuVS kernels are linked into `_swigfaiss.so`.
-- HybridSearch’s `resolve_cuvs_state()` uses `faiss.should_use_cuvs` to decide whether cuVS is available and records the outcome in `AdapterStats` (`cuvs_enabled`, `cuvs_available`, `cuvs_applied`, etc.).
+- HybridSearch’s `resolve_cuvs_state()` uses `faiss.should_use_cuvs` to decide whether cuVS is available and records the outcome in `AdapterStats` (`cuvs_enabled`, `cuvs_available`, `cuvs_applied`, etc.). Keeping `librmm.so` preloaded ensures the RAPIDS memory pool is ready if future FAISS wheels route allocations through RMM when cuVS kernels become available.
 - Despite the disabled kernels, FAISS still links against `libcuvs` for symbol resolution (the interface exists even if the implementation is stubbed). That is why ensuring `libcuvs` is loadable matters even when cuVS execution is disabled.
 
 When FAISS is rebuilt with cuVS kernels:

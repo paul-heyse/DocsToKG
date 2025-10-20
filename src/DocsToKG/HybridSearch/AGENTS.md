@@ -10,7 +10,7 @@
 - [6) “Absolutely no installs” policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
 - [7) Fallback (only with **explicit approval** to install)](#7-fallback-only-with-explicit-approval-to-install)
 - [8) One-page quick reference (copy/paste safe)](#8-one-page-quick-reference-copy-paste-safe)
-- [🚨 Mandatory Pre-Read: FAISS GPU Wheel & Library Walkthrough](#-mandatory-pre-read-faiss-gpu-wheel--library-walkthrough)
+- [🚨 Mandatory Pre-Read: FAISS/cuVS Stack Walkthrough](#-mandatory-pre-read-faisscuvs-stack-walkthrough)
 - [Mission and Scope](#mission-and-scope)
 - [Runtime prerequisites](#runtime-prerequisites)
 - [Module architecture](#module-architecture)
@@ -24,20 +24,16 @@
 - [Ownership & change management](#ownership-change-management)
 - [Coding Standards & Module Organization](#coding-standards-module-organization)
 
-# 🚨 Mandatory Pre-Read: FAISS GPU Wheel & Library Walkthrough
+# 🚨 Mandatory Pre-Read: FAISS/cuVS Stack Walkthrough
 
-Before executing or modifying any HybridSearch code, you **must**:
+Before executing or modifying any HybridSearch code, you **must** complete the following sequence:
 
-1. Read the entire [`faiss-gpu-wheel-reference.md`](./faiss-gpu-wheel-reference.md).
-2. Inspect the installed FAISS package under `.venv/lib/python3.13/site-packages/faiss`.
+1. **Read [`faiss-gpu-wheel-reference.md`](./faiss-gpu-wheel-reference.md).** This is the authoritative guide to the custom `faiss-1.12.0` CUDA wheel. It covers runtime prerequisites, environment knobs (`FAISS_OPT_LEVEL`, `use_cuvs`), GPU index families, tiling heuristics, and the mathematically heavy kernels that underpin HybridSearch. Treat it as mandatory before touching ingestion, routing, or search code.
+2. **Inspect the FAISS package** under `.venv/lib/python3.13/site-packages/faiss`. Review `swigfaiss.py`, `gpu_wrappers.py`, `class_wrappers.py`, and contrib utilities to understand dtype/layout expectations, stream semantics, and the no-index helpers (`knn_gpu`, `pairwise_distance_gpu`) that HybridSearch relies on.
+3. **Read [`cuvs-reference.md`](./cuvs-reference.md).** The cuVS toolkit supplies GPU ANN, clustering, and distance primitives built on RAPIDS RAFT/RMM. The reference documents algorithm APIs, loader prerequisites, and how HybridSearch preloads the libraries even though FAISS currently cannot enable cuVS kernels.
+4. **Read [`libcuvs-reference.md`](./libcuvs-reference.md).** This explains the shared-library loader chain (`libcuvs`, `libraft`, `librmm`, `rapids_logger`), environment switches, and HybridSearch integration hooks (`_ensure_cuvs_loader_path`, `resolve_cuvs_state`, `AdapterStats.cuvs_*`). Essential for diagnosing loader-path or RAPIDS memory-manager issues.
 
-This prerequisite matters because HybridSearch depends on a **custom** `faiss-1.12.0` CUDA 12 wheel with cuVS integration, bespoke loader behaviour, and GPU resource heuristics. The reference explains:
-
-- Runtime prerequisites, environment knobs (`FAISS_OPT_LEVEL`, cuVS toggles), memory pooling, and supported GPU index types beyond upstream FAISS docs.
-- Mathematical underpinnings of FAISS GPU kernels (L2/IP distance functions, IVF/PQ quantisation, tiling and batching strategies) needed when tuning performance or debugging recall.
-- CUDA-specific APIs (e.g., `knn_gpu`, `pairwise_distance_gpu`, `GpuMultipleClonerOptions`, `StandardGpuResources`) that must be respected to avoid memory corruption or kernel sync issues.
-
-The `.venv/.../faiss` package contains SWIG bindings (`swigfaiss.py`), GPU helpers (`gpu_wrappers.py`), class wrappers, array conversions, and contrib utilities (Torch integration). Reviewing these modules clarifies dtype/layout expectations, cuVS pathways, and error handling used throughout `store.py`, ensuring agents understand the exact surface area exposed by the customised wheel before touching ingestion, routing, or search code.
+Completing these steps ensures you understand how FAISS, cuVS, and the RAPIDS memory/logging stack interoperate today, why cuVS is currently disabled in the custom FAISS build, and what guardrails HybridSearch enforces when operating on GPU indexes.
 
 # Project Environment — **No-Install** Runbook (for AI agents)
 

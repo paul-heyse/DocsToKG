@@ -20,7 +20,7 @@
 **Version**: `25.10.00` (see `cuvs/VERSION`)  
 **Companion libs**: `libcuvs` (CUDA shared objects), `librmm`, `rapids_logger`, CUDA 12 toolchain
 
-This guide documents the NVIDIA cuVS components shipped in the DocsToKG environment and how they relate to HybridSearch. Read it when you need to understand the GPU primitives that FAISS can dispatch to, or when you want to experiment with cuVS directly (either within DocsToKG or in external notebooks/scripts).
+This guide documents the NVIDIA cuVS components shipped in the DocsToKG environment and how they relate to HybridSearch. Read it when you need to understand the GPU primitives that FAISS can dispatch to, or when you want to experiment with cuVS directly (either within DocsToKG or in external notebooks/scripts). Because cuVS is layered on RAPIDS RAFT and the RAPIDS Memory Manager (`rmm`/`librmm`), we also summarize the allocator/stream interactions that the cuVS wheel expects.
 
 > **Reminder**: the current custom FAISS wheel was built **without** cuVS kernels. Attempting to call `faiss.knn_gpu(..., use_cuvs=True)` raises `RuntimeError: cuVS has not been compiled into the current version so it cannot be used.` HybridSearch therefore treats cuVS as *optional* and reports the disabled state via `AdapterStats`. This document still covers the cuVS surface so the team can assess future wheel upgrades or use cuVS as a standalone ANN toolkit.
 
@@ -37,7 +37,7 @@ cuVS Python extensions (`cuvs/neighbors/*.so`, `cuvs/cluster/kmeans/*.so`, etc.)
 - CUDA runtime/toolchain: `libcudart.so.12`, `libcublas(.so/.so.12)`, `libcublasLt.so.12`, `libcusolver.so.11`, `libcusparse.so.12`, `libcurand.so.10`, `libnvJitLink.so.12`
 - NCCL: `.venv/lib/python3.13/site-packages/nvidia/nccl/lib/libnccl.so.2`
 
-The cuVS package’s `__init__.py` calls `libcuvs.load_library()` when the wheel is installed, but the RAPIDS libraries above are not on the default loader path. DocsToKG therefore preloads them in `DocsToKG.HybridSearch.store._ensure_cuvs_loader_path()` and amends `LD_LIBRARY_PATH` before importing FAISS/cuVS. If you access cuVS outside HybridSearch, replicate the same directory additions.
+cuVS inherits RAPIDS memory and logging infrastructure: importing `cuvs` triggers `libcuvs.load_library()`, which in turn calls `librmm.load_library()` (and `libraft.load_library()` when present) so the GPU memory manager and logging stacks (`rmm`, `rapids_logger`) are initialized. Because the wheel locates these shared objects under package-relative `lib64/` directories, DocsToKG preloads them in `DocsToKG.HybridSearch.store._ensure_cuvs_loader_path()` and amends `LD_LIBRARY_PATH` before importing FAISS/cuVS. If you access cuVS outside HybridSearch, replicate the same directory additions or call the loader helpers yourself before touching cuVS APIs.
 
 ---
 
@@ -202,7 +202,7 @@ These utilities ensure zero-copy data transfers across GPU-aware libraries.
 ## 10) Testing & troubleshooting
 
 - Run `python -m pytest cuvs/tests` inside the virtualenv to exercise all algorithms (requires GPU with CUDA 12 + sufficient VRAM).
-- If you see `OSError: libcuvs_c.so: cannot open shared object file`, ensure the loader path fixes are applied (importing `DocsToKG.HybridSearch.store` once per process is sufficient) or manually prepend the required directories to `LD_LIBRARY_PATH`.
+- If you see `OSError: libcuvs_c.so: cannot open shared object file`, ensure the loader path fixes are applied (importing `DocsToKG.HybridSearch.store` once per process is sufficient) or manually prepend the required directories to `LD_LIBRARY_PATH`. When troubleshooting allocator behaviour, you can also call `rmm.reinitialize(...)` to adjust pool settings before invoking cuVS routines.
 - `RuntimeError: cuVS has not been compiled into the current version` indicates the FAISS wheel lacks cuVS kernels. HybridSearch already guards this path; standalone scripts should catch the error and retry with cuVS disabled.
 - Verify CUDA compatibility via `nvidia-smi` and ensure the CUDA toolkit on the host matches the versions required by cuVS (12.x).
 
