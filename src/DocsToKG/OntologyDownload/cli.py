@@ -1079,11 +1079,22 @@ def _doctor_report() -> Dict[str, object]:
         "logs": LOG_DIR,
         "ontologies": ontology_dir,
     }.items():
+        is_dir = path.is_dir()
+        write_allowed = os.access(path, os.W_OK)
         entry = {
             "path": str(path),
             "exists": path.exists(),
-            "writable": os.access(path, os.W_OK),
+            "writable": False,
+            "write_permission": write_allowed,
         }
+        if is_dir:
+            execute_allowed = os.access(path, os.X_OK)
+            entry["execute_permission"] = execute_allowed
+            entry["writable"] = os.access(path, os.W_OK | os.X_OK)
+            entry["directory"] = True
+        else:
+            entry["writable"] = write_allowed
+            entry["directory"] = False
         if name == "ontologies" and created_for_diagnostics:
             entry["created_for_diagnostics"] = True
         directories[name] = entry
@@ -1323,15 +1334,20 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
 
     print("Directories:")
     for name, info in report["directories"].items():
-        status = []
-        if info["exists"]:
-            status.append("exists")
+        status = ["exists" if info.get("exists") else "missing"]
+
+        permission_labels: List[str] = []
+        if info.get("writable"):
+            permission_labels.append("writable")
         else:
-            status.append("missing")
-        if info["writable"]:
-            status.append("writable")
-        else:
-            status.append("read-only")
+            if info.get("write_permission") is False:
+                permission_labels.append("read-only")
+            if info.get("directory") and info.get("execute_permission") is False:
+                permission_labels.append("no execute permission")
+            if not permission_labels:
+                permission_labels.append("restricted")
+
+        status.extend(permission_labels)
         print(f"  - {name}: {', '.join(status)} ({info['path']})")
 
     disk = report["disk"]
