@@ -135,6 +135,26 @@ def test_pull_spec_cli_target_formats_override(tmp_path: Path) -> None:
     assert tuple(spec.target_formats) == ("ttl", "owl")
 
 
+def test_spec_without_ids_uses_cli_target_formats(tmp_path: Path) -> None:
+    """Target formats from CLI replace spec formats when no IDs are provided."""
+
+    config_path = _write_sources_yaml(tmp_path / "sources.yaml")
+    args = _make_args(
+        command="pull",
+        ids=[],
+        spec=config_path,
+        target_formats="ttl",
+    )
+
+    config, specs = cli_module._resolve_specs_from_args(args, base_config=None)
+
+    assert len(specs) == 1
+    spec = specs[0]
+    assert spec.id == "hp"
+    assert tuple(spec.target_formats) == ("ttl",)
+    assert tuple(config.specs[0].target_formats) == ("ttl",)
+
+
 def test_resolver_override_validated(tmp_path: Path) -> None:
     """Unknown resolver overrides should raise configuration errors."""
 

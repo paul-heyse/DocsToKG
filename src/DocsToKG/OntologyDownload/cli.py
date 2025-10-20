@@ -663,6 +663,21 @@ def _resolve_specs_from_args(
     if resolver_override and resolver_override not in RESOLVERS:
         raise ConfigError("Unknown resolver(s) specified: " + resolver_override)
 
+    def apply_target_override(specs: Sequence[FetchSpec]) -> List[FetchSpec]:
+        """Replace ``target_formats`` when CLI overrides are provided."""
+
+        if not target_formats:
+            return list(specs)
+        return [
+            FetchSpec(
+                id=spec.id,
+                resolver=spec.resolver,
+                extras=dict(spec.extras),
+                target_formats=tuple(target_formats),
+            )
+            for spec in specs
+        ]
+
     def apply_resolver_override(specs: Sequence[FetchSpec]) -> List[FetchSpec]:
         """Force all ``specs`` to use the resolver override when one is provided.
 
@@ -760,8 +775,9 @@ def _resolve_specs_from_args(
         return config, apply_resolver_override(resolved_specs)
 
     if config.specs:
-        specs = apply_resolver_override(config.specs)
-        if resolver_override:
+        specs = apply_target_override(config.specs)
+        specs = apply_resolver_override(specs)
+        if resolver_override or target_formats:
             config.specs = specs
         return config, specs
 
