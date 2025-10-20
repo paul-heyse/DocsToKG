@@ -69,6 +69,7 @@ class CancellationTokenGroup:
         """Initialize an empty token group."""
         self._tokens: list[CancellationToken] = []
         self._lock = threading.Lock()
+        self._cancelled = False
 
     def add_token(self, token: CancellationToken) -> None:
         """Add a token to this group.
@@ -78,6 +79,8 @@ class CancellationTokenGroup:
         """
         with self._lock:
             self._tokens.append(token)
+            if self._cancelled:
+                token.cancel()
 
     def create_token(self) -> CancellationToken:
         """Create a new token and add it to this group.
@@ -108,6 +111,7 @@ class CancellationTokenGroup:
     def cancel_all(self) -> None:
         """Cancel all tokens in this group."""
         with self._lock:
+            self._cancelled = True
             for token in self._tokens:
                 token.cancel()
 

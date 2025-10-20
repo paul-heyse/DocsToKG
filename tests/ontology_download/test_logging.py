@@ -14,6 +14,12 @@
 #       "name": "test_setup_logging_emits_structured_json",
 #       "anchor": "function-test-setup-logging-emits-structured-json",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "test-setup-logging-expands-env-log-dir",
+#       "name": "test_setup_logging_expands_env_log_dir",
+#       "anchor": "function-test-setup-logging-expands-env-log-dir",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -45,8 +51,10 @@ Usage:
 """
 
 import json
+import logging
 import os
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -129,8 +137,9 @@ def test_setup_logging_emits_structured_json(tmp_path):
         log_dir=tmp_path,
     )
     try:
+        message = "download complete – café ☕"
         logger.info(
-            "download complete",
+            message,
             extra={
                 "correlation_id": "abc123",
                 "ontology_id": "hp",
@@ -147,10 +156,11 @@ def test_setup_logging_emits_structured_json(tmp_path):
             handler.flush()
         log_files = sorted(tmp_path.glob("*.jsonl"))
         assert log_files, "expected a JSON log file"
-        payload = log_files[0].read_text().strip()
-        assert payload, "log file should contain an entry"
-        record = json.loads(payload)
-        assert record["message"] == "download complete"
+        payload_bytes = log_files[0].read_bytes()
+        decoded = payload_bytes.decode("utf-8").strip()
+        assert decoded, "log file should contain an entry"
+        record = json.loads(decoded)
+        assert record["message"] == message
         assert record["level"] == "INFO"
         assert record["correlation_id"] == "abc123"
         assert record["ontology_id"] == "hp"
@@ -165,6 +175,41 @@ def test_setup_logging_emits_structured_json(tmp_path):
         for handler in list(logger.handlers):
             handler.close()
             logger.removeHandler(handler)
+
+
+def test_setup_logging_expands_env_log_dir(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("ONTOFETCH_LOG_DIR", "~/ontofetch-logs")
+
+    logger = setup_logging()
+    try:
+        logger.info("env log directory expansion test")
+        for handler in logger.handlers:
+            handler.flush()
+        file_handler = _get_file_handler(logger)
+        log_path = Path(file_handler.baseFilename)
+        expected_dir = (tmp_path / "ontofetch-logs").resolve()
+        assert log_path.parent == expected_dir
+        assert expected_dir.exists()
+    finally:
+        _cleanup_logger(logger)
+def test_json_formatter_uses_record_created_timestamp():
+    formatter = logging_utils_mod.JSONFormatter()
+    record = logging.LogRecord(
+        name="DocsToKG.OntologyDownload",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=123,
+        msg="fixed time",
+        args=(),
+        exc_info=None,
+    )
+    fixed = datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    record.created = fixed.timestamp()
+
+    payload = json.loads(formatter.format(record))
+
+    assert payload["timestamp"] == fixed.isoformat().replace("+00:00", "Z")
 
 
 def _get_file_handler(logger):

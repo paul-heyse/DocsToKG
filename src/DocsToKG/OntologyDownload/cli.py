@@ -38,6 +38,7 @@ import logging
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -46,16 +47,12 @@ from typing import Dict, List, Optional, Sequence, Union
 
 import requests
 import yaml
+from pydantic import ValidationError as PydanticValidationError
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
 from .api import _collect_plugin_details
-from .errors import (
-    ConfigError,
-    ConfigurationError,
-    OntologyDownloadError,
-    UnsupportedPythonError,
-)
+from .errors import ConfigError, ConfigurationError, OntologyDownloadError, UnsupportedPythonError
 from .formatters import (
     PLAN_TABLE_HEADERS,
     format_plan_rows,
@@ -668,6 +665,21 @@ def _resolve_specs_from_args(
     if resolver_override and resolver_override not in RESOLVERS:
         raise ConfigError("Unknown resolver(s) specified: " + resolver_override)
 
+    def apply_target_override(specs: Sequence[FetchSpec]) -> List[FetchSpec]:
+        """Replace ``target_formats`` when CLI overrides are provided."""
+
+        if not target_formats:
+            return list(specs)
+        return [
+            FetchSpec(
+                id=spec.id,
+                resolver=spec.resolver,
+                extras=dict(spec.extras),
+                target_formats=tuple(target_formats),
+            )
+            for spec in specs
+        ]
+
     def apply_resolver_override(specs: Sequence[FetchSpec]) -> List[FetchSpec]:
         """Force all ``specs`` to use the resolver override when one is provided.
 
@@ -765,8 +777,9 @@ def _resolve_specs_from_args(
         return config, apply_resolver_override(resolved_specs)
 
     if config.specs:
-        specs = apply_resolver_override(config.specs)
-        if resolver_override:
+        specs = apply_target_override(config.specs)
+        specs = apply_resolver_override(specs)
+        if resolver_override or target_formats:
             config.specs = specs
         return config, specs
 
@@ -1084,11 +1097,22 @@ def _doctor_report() -> Dict[str, object]:
         "logs": LOG_DIR,
         "ontologies": ontology_dir,
     }.items():
+        is_dir = path.is_dir()
+        write_allowed = os.access(path, os.W_OK)
         entry = {
             "path": str(path),
             "exists": path.exists(),
-            "writable": os.access(path, os.W_OK),
+            "writable": False,
+            "write_permission": write_allowed,
         }
+        if is_dir:
+            execute_allowed = os.access(path, os.X_OK)
+            entry["execute_permission"] = execute_allowed
+            entry["writable"] = os.access(path, os.W_OK | os.X_OK)
+            entry["directory"] = True
+        else:
+            entry["writable"] = write_allowed
+            entry["directory"] = False
         if name == "ontologies" and created_for_diagnostics:
             entry["created_for_diagnostics"] = True
         directories[name] = entry
@@ -1181,15 +1205,20 @@ def _doctor_report() -> Dict[str, object]:
             result.update({"ok": False, "detail": str(exc)})
         network[name] = result
 
-    rate_limits: Dict[str, object] = {
-        "effective": ResolvedConfig.from_defaults().defaults.http.rate_limits,
-    }
+    rate_limits: Dict[str, object] = {}
+    rate_limit_errors: List[str] = []
+    try:
+        defaults = ResolvedConfig.from_defaults()
+    except (PydanticValidationError, ValueError) as exc:
+        rate_limit_errors.append(f"Failed to load default rate limits: {exc}")
+    else:
+        rate_limits["effective"] = defaults.defaults.http.rate_limits
     config_path = CONFIG_DIR / "sources.yaml"
     if config_path.exists():
         try:
             raw = yaml.safe_load(config_path.read_text()) or {}
         except Exception as exc:  # pragma: no cover - YAML errors depend on file contents
-            rate_limits["error"] = f"Failed to parse {config_path}: {exc}"  # type: ignore[assignment]
+            rate_limit_errors.append(f"Failed to parse {config_path}: {exc}")
         else:
             http_section = raw.get("defaults", {}).get("http") if isinstance(raw, dict) else None
             configured = http_section.get("rate_limits") if isinstance(http_section, dict) else None
@@ -1210,6 +1239,12 @@ def _doctor_report() -> Dict[str, object]:
                     rate_limits["configured"] = valid
                 if invalid:
                     rate_limits["invalid"] = invalid
+
+    if rate_limit_errors:
+        message = "; ".join(error.strip() for error in rate_limit_errors)
+        rate_limits["error"] = message
+        if len(rate_limit_errors) > 1:
+            rate_limits["errors"] = rate_limit_errors
 
     schema_report: Dict[str, object] = {"version": MANIFEST_SCHEMA_VERSION}
     try:
@@ -1271,6 +1306,30 @@ def _doctor_report() -> Dict[str, object]:
     return report
 
 
+def _ensure_owner_only_permissions(path: Path, actions: List[str]) -> None:
+    """Restrict placeholder files to owner read/write when supported."""
+
+    desired_mode = stat.S_IRUSR | stat.S_IWUSR
+    chmod = getattr(os, "chmod", None)
+
+    if chmod is None or os.name == "nt":
+        return
+
+    try:
+        current_mode = stat.S_IMODE(path.stat().st_mode)
+    except OSError as exc:  # pragma: no cover - stat failures are rare but logged
+        actions.append(f"Failed to inspect permissions for {path}: {exc}")
+        return
+
+    if current_mode | desired_mode == desired_mode:
+        return
+
+    try:
+        chmod(path, desired_mode)
+    except OSError as exc:
+        actions.append(f"Failed to update permissions for {path}: {exc}")
+
+
 def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
     """Attempt to remediate common doctor issues and return action notes."""
 
@@ -1296,12 +1355,19 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
     from DocsToKG.OntologyDownload.settings import LOG_DIR as runtime_log_dir
 
     if runtime_log_dir.exists():
-        retention_days = ResolvedConfig.from_defaults().defaults.logging.retention_days
         try:
-            rotations = _cleanup_logs(runtime_log_dir, retention_days)
-            actions.extend(rotations)
-        except OSError as exc:
-            actions.append(f"Failed to rotate logs in {runtime_log_dir}: {exc}")
+            retention_days = ResolvedConfig.from_defaults().defaults.logging.retention_days
+        except (PydanticValidationError, ValueError) as exc:
+            actions.append(
+                "Skipped log rotation: failed to load default configuration "
+                f"values ({str(exc).strip()})"
+            )
+        else:
+            try:
+                rotations = _cleanup_logs(runtime_log_dir, retention_days)
+                actions.extend(rotations)
+            except OSError as exc:
+                actions.append(f"Failed to rotate logs in {runtime_log_dir}: {exc}")
 
     placeholders = {
         CONFIG_DIR / "bioportal_api_key.txt": "Add your BioPortal API key here\n",
@@ -1313,6 +1379,7 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content)
                 actions.append(f"Ensured placeholder {path.name}")
+                _ensure_owner_only_permissions(path, actions)
         except OSError as exc:
             actions.append(f"Failed to update {path}: {exc}")
 
@@ -1328,15 +1395,20 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
 
     print("Directories:")
     for name, info in report["directories"].items():
-        status = []
-        if info["exists"]:
-            status.append("exists")
+        status = ["exists" if info.get("exists") else "missing"]
+
+        permission_labels: List[str] = []
+        if info.get("writable"):
+            permission_labels.append("writable")
         else:
-            status.append("missing")
-        if info["writable"]:
-            status.append("writable")
-        else:
-            status.append("read-only")
+            if info.get("write_permission") is False:
+                permission_labels.append("read-only")
+            if info.get("directory") and info.get("execute_permission") is False:
+                permission_labels.append("no execute permission")
+            if not permission_labels:
+                permission_labels.append("restricted")
+
+        status.extend(permission_labels)
         print(f"  - {name}: {', '.join(status)} ({info['path']})")
 
     disk = report["disk"]
@@ -1395,7 +1467,11 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
         print("  Invalid rate limits detected:")
         for service, value in rate_limits["invalid"].items():
             print(f"    * {service}: '{value}' (expected <number>/<unit>)")
-    if rate_limits.get("error"):
+    errors = rate_limits.get("errors")
+    if errors:
+        for message in errors:
+            print(f"Rate limit check error: {message}")
+    elif rate_limits.get("error"):
         print(f"Rate limit check error: {rate_limits['error']}")
 
     schema = report.get("manifest_schema", {})
@@ -1520,7 +1596,11 @@ def _handle_validate(args, config: ResolvedConfig) -> dict:
         max_log_size_mb=logging_config.max_log_size_mb,
     )
     results = run_validators(requests, logger)
-    manifest["validation"] = {name: result.to_dict() for name, result in results.items()}
+    existing_validation = dict(manifest.get("validation", {}))
+    existing_validation.update(
+        {name: result.to_dict() for name, result in results.items()}
+    )
+    manifest["validation"] = existing_validation
     write_json_atomic(manifest_path, manifest)
     return manifest["validation"]
 
@@ -1712,20 +1792,29 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(arg_list)
     try:
-        base_config = get_default_config(copy=True)
-        base_config.defaults.logging.level = args.log_level
-        logging_config = base_config.defaults.logging
-        logger = setup_logging(
-            level=logging_config.level,
-            retention_days=logging_config.retention_days,
-            max_log_size_mb=logging_config.max_log_size_mb,
-        )
+        try:
+            base_config = get_default_config(copy=True)
+        except (PydanticValidationError, ValueError):
+            if args.command != "doctor":
+                raise
+            base_config = None
+            logger = setup_logging(level=args.log_level)
+        else:
+            base_config.defaults.logging.level = args.log_level
+            logging_config = base_config.defaults.logging
+            logger = setup_logging(
+                level=logging_config.level,
+                retention_days=logging_config.retention_days,
+                max_log_size_mb=logging_config.max_log_size_mb,
+            )
+
         if getattr(args, "json", False):
             for handler in logger.handlers:
                 if isinstance(handler, logging.StreamHandler) and not isinstance(
                     handler, logging.FileHandler
                 ):
                     handler.setStream(sys.stderr)
+
         if args.command == "pull":
             if getattr(args, "dry_run", False):
                 plans = _handle_pull(args, base_config, dry_run=True, logger=logger)
@@ -1859,6 +1948,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                         print(f"  - {action}")
         else:  # pragma: no cover - argparse should prevent unknown commands
             parser.error(f"Unsupported command: {args.command}")
+
         return 0
     except BatchPlanningError as exc:
         _emit_batch_failure(exc, args)
