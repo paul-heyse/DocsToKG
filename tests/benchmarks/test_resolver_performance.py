@@ -188,8 +188,29 @@ def test_retry_backoff_timing(patcher: PatchManager) -> None:
     def fake_sleep(value: float) -> None:
         sleeps.append(value)
 
-    patcher.setattr(time, "sleep", fake_sleep)
-    patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.networking.TENACITY_SLEEP",
+        fake_sleep,
+    )
+
+    class _SequenceWait:
+        def __init__(self, values: List[float]) -> None:
+            self._values = values
+            self._index = 0
+            self._last = values[-1] if values else 0.0
+
+        def __call__(self, retry_state) -> float:  # pragma: no cover - exercised via Tenacity
+            if self._index < len(self._values):
+                value = self._values[self._index]
+                self._index += 1
+                self._last = value
+                return value
+            return self._last
+
+    patcher.setattr(
+        "DocsToKG.ContentDownload.networking.wait_random_exponential",
+        lambda *args, **kwargs: _SequenceWait([1.0, 2.0, 4.0]),
+    )
 
     class FakeResponse:
         def __init__(self, status_code: int):
@@ -211,7 +232,8 @@ def test_retry_backoff_timing(patcher: PatchManager) -> None:
         session, "GET", "https://example.org/test", max_retries=3, backoff_factor=1.0
     )
     assert response.status_code == 200
-    assert pytest.approx(sum(sleeps), rel=0.05) == 7.0
+    assert sleeps == [1.0, 2.0, 4.0]
+    assert sum(sleeps) == 7.0
 
 
 def test_memory_usage_large_batch() -> None:
