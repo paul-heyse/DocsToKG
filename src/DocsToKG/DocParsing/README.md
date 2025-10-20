@@ -94,6 +94,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli embed --help
 direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --input Data/PDFs/doc-001.pdf --force
 direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --resume
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only
+direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only --format parquet
 
 # Operational tooling
 direnv exec . python -m DocsToKG.DocParsing.core.cli plan --data-root Data --mode auto    # stage preview
@@ -198,7 +199,8 @@ sequenceDiagram
   - DocTags: `DOCSTOKG_DOCTAGS_*` family (`_INPUT`, `_OUTPUT`, `_MODEL`, `_WORKERS`, `_VLLM_WAIT_TIMEOUT`, etc.).
 - Chunking: `DOCSTOKG_CHUNK_*` toggles for tokenizer, shard count, and validation.
 - Embedding: `DOCSTOKG_EMBED_*` flags plus `DOCSTOKG_QWEN_DIR`, `DOCSTOKG_SPLADE_DIR` for model caches.
-- Vector format negotiation: `DOCSTOKG_EMBED_VECTOR_FORMAT` overrides the default (`jsonl`) for runs launched without an explicit `--format` CLI flag.
+- Vector format negotiation: `DOCSTOKG_EMBED_VECTOR_FORMAT` overrides the default (`jsonl`) for runs launched without an explicit `--format` CLI flag; set it to `parquet` to opt into columnar outputs globally.
+- Validate-only runs reuse the configured `--qwen-dim` (or `DOCSTOKG_EMBED_QWEN_DIM`) when present; omit the override to accept previously generated vectors without enforcing a dimension.
 - Validate configuration: run `python -m DocsToKG.DocParsing.core.cli chunk --validate-only` or `... embed --validate-only` before production runs.
 
 ### Content hashing defaults
@@ -219,7 +221,7 @@ sequenceDiagram
 
 ## Observability
 - Logs: `logging.py` emits structured records (JSON + console) that include `stage`, `doc_id`, elapsed durations, and correlation IDs. Output paths default to stdout plus `${DOCSTOKG_DATA_ROOT}/Logs/docparse-*.jsonl`; override using CLI `--log-level` or `DOCSTOKG_LOG_DIR`.
-- Telemetry: `telemetry.TelemetrySink` writes attempt + manifest JSON lines (`docparse.*.manifest.jsonl`) using advisory locks, ensuring atomic appends even with concurrent workers.
+- Telemetry: `telemetry.TelemetrySink` writes attempt + manifest JSON lines (`docparse.*.manifest.jsonl`) using advisory locks, ensuring atomic appends even with concurrent workers. Manifest rows now capture `vector_format` for success, skip, and validate-only entries so parquet adoption can be audited downstream.
 - Metrics: `logging.telemetry_scope` and `telemetry.StageTelemetry` expose counters and histograms suitable for ingestion by dashboard jobs (see `tests/docparsing/test_chunk_manifest_resume.py` for usage).
 - SLO tracking: maintain ≥99.5 % manifest success across stages and keep embedding validation (`--validate-only`) under 2.2 s P50 per document based on synthetic benchmark fixtures.
 - Health checks: prefer `docparse chunk --validate-only` / `docparse embed --validate-only` when validating environments—these commands read existing JSONL artifacts without mutating outputs.

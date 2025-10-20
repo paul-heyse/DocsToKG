@@ -256,6 +256,7 @@ Last updated: 2025-10-20
   - PDF DocTags (vLLM + Docling extras): `"DocsToKG[docparse-pdf]"`
   - SPLADE sparse embeddings: `sentence-transformers`
   - Qwen dense embeddings: `vllm` + CUDA 12 libraries (`libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, `libgomp.so.1`)
+  - Parquet vector export/validation: `"DocsToKG[docparse-parquet]"` (installs `pyarrow`)
 - Model caches: DocTags `granite-docling-258M` under `${DOCSTOKG_MODEL_ROOT}`; SPLADE/Qwen weights under `${DOCSTOKG_SPLADE_DIR}` / `${DOCSTOKG_QWEN_DIR}`.
 - Data directories (defaults derived from `${DOCSTOKG_DATA_ROOT}` / `--data-root`):
   - `Data/PDFs`, `Data/HTML` inputs
@@ -286,6 +287,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli chunk \
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed \
   --chunks-dir Data/ChunkedDocTagFiles \
   --out-dir Data/Embeddings
+#   --format parquet  # optional: emit columnar vectors when pyarrow is available
 ```
 
 - `docparse all` coordinates stages end-to-end; `--resume` reuses manifests, `--force` regenerates outputs.
@@ -322,6 +324,7 @@ flowchart LR
   - `embed`: `--backend {qwen,splade,bm25}`, `--batch-size-*`, `--validate-only`, `--device`, `--quantization`.
 - Content hashing defaults: `DOCSTOKG_HASH_ALG` (default SHA-256). Switching to SHA-1 is only for legacy resumes; expect manifest diff (`input_hash`, chunk UUID).
 - Validate config with `core.cli chunk --validate-only` or `embed --validate-only`.
+- Vector format defaults: set `DOCSTOKG_EMBED_VECTOR_FORMAT=parquet` (or pass `--format`) to opt into parquet outputs; leave unset for JSONL.
 
 ## Data Contracts & Schemas
 
@@ -333,7 +336,7 @@ flowchart LR
 ## Observability & Operations
 
 - Logs: `logging.py` outputs structured JSONL (`${DOCSTOKG_LOG_DIR:-Data/Logs}/docparse-*.jsonl`) plus console; fields include `stage`, `doc_id`, durations, correlation IDs.
-- Telemetry: `telemetry.StageTelemetry` emits manifest attempts/summaries per stage; parse with `docparse manifest --stage <stage>` or `jq`.
+- Telemetry: `telemetry.StageTelemetry` emits manifest attempts/summaries per stage; parse with `docparse manifest --stage <stage>` or `jq`. Manifest entries now include `vector_format` for success, skip, and validate-only records to monitor parquet adoption.
 - SLO guidance: maintain ≥99.5 % manifest success; keep `embed --validate-only` P50 ≤2.2 s/doc (per README).
 - Operational tooling: `core.cli plan` (stage preview), `manifest` (tail JSONL), `token-profiles` (chunk diagnostics), `all --resume` (pipeline orchestrator).
 
@@ -365,6 +368,7 @@ direnv exec . ruff check src/DocsToKG/DocParsing tests/docparsing
 direnv exec . mypy src/DocsToKG/DocParsing
 direnv exec . pytest tests/docparsing -q
 direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # performance smoke
+direnv exec . pytest tests/docparsing/test_vector_writers.py -q        # parquet writer coverage
 ```
 
 - Golden fixtures: `tests/data/docparsing/golden/` (DocTags/chunk/vector JSONL).
@@ -377,6 +381,7 @@ direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # performa
 | `CUDA error: reinitializing context` | Forked child touching CUDA before spawn | Ensure PDF DocTags workers use spawn; limit workers; configure `CUDA_VISIBLE_DEVICES`. |
 | Chunk count mismatch | Resume skipped DocTags or stale hash | Inspect `docparse.chunks.manifest.jsonl`; rerun chunk with `--force` for affected docs. |
 | Embedding dim mismatch | Wrong backend config or model upgrade | Run `embed --validate-only`; confirm vector dimension vs config. |
+| Validate-only reports zero files | Vector format/dimension mismatch versus existing outputs | Provide `--format`/`DOCSTOKG_EMBED_VECTOR_FORMAT` and explicit `--qwen-dim` when revalidating freshly generated vectors; omit the override to accept historical artifacts. |
 | Slow chunking | Quadratic merges from markers | Profile `HybridChunker.generate_chunks`; adjust merge thresholds. |
 | Manifest corruption | Manual edits or partial writes | Rebuild via CLI; avoid editing JSONL by hand. |
 
@@ -387,6 +392,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --mode pdf --input 
 direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --in-dir Data/DocTagsFiles --out-dir Data/ChunkedDocTagFiles --min-tokens 256 --max-tokens 512
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed --chunks-dir Data/ChunkedDocTagFiles --out-dir Data/Embeddings --batch-size-qwen 24
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only --chunks-dir Data/ChunkedDocTagFiles
+direnv exec . python -m DocsToKG.DocParsing.core.cli embed --format parquet --validate-only --chunks-dir Data/ChunkedDocTagFiles
 direnv exec . python -m DocsToKG.DocParsing.core.cli manifest --stage chunk --tail 20
 ```
 
