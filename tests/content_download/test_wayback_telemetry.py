@@ -5,7 +5,7 @@ import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import Mock, patch
+from typing import Any, Mapping
 
 import pytest
 
@@ -18,10 +18,19 @@ from DocsToKG.ContentDownload.telemetry_wayback import (
     ModeSelected,
     PdfDiscoveryMethod,
     SkipReason,
-    TelemetrySink,
     TelemetryWayback,
 )
 from DocsToKG.ContentDownload.telemetry_wayback_sqlite import SQLiteSink, SQLiteTuning
+
+
+class CollectingSink:
+    """Simple sink to collect emitted events for assertions."""
+
+    def __init__(self) -> None:
+        self.events: list[Mapping[str, Any]] = []
+
+    def emit(self, event: Mapping[str, Any]) -> None:
+        self.events.append(event)
 
 
 class TestTelemetryWayback:
@@ -60,6 +69,8 @@ class TestTelemetryWayback:
         assert ctx.canonical_url == "https://example.com/paper.pdf"
         assert ctx.publication_year == 2023
         assert ctx.attempt_id is not None
+        assert ctx.candidate_count == 0
+        assert ctx.discovery_count == 0
 
     def test_emit_attempt_end(self, telemetry):
         """Test ending an attempt."""
@@ -67,6 +78,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_attempt_end(
@@ -85,6 +97,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_discovery_availability(
@@ -105,6 +118,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_discovery_cdx(
@@ -129,6 +143,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_candidate(
@@ -148,6 +163,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_html_parse(
@@ -168,6 +184,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_pdf_check(
@@ -187,6 +204,7 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_emit(
@@ -202,11 +220,179 @@ class TestTelemetryWayback:
             work_id="work-123",
             artifact_id="artifact-456",
             original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
         )
 
         telemetry.emit_skip(
             ctx, reason=SkipReason.NO_SNAPSHOT, details="No snapshots found for this URL"
         )
+
+    def test_candidate_sampling_resets_each_attempt(self, run_id):
+        """Candidate sampling quotas should reset for every new attempt."""
+        sink = CollectingSink()
+        telemetry = TelemetryWayback(run_id, [sink], sample_candidates=1)
+
+        ctx1 = telemetry.emit_attempt_start(
+            work_id="work-1",
+            artifact_id="artifact-1",
+            original_url="https://example.com/one.pdf",
+            canonical_url="https://example.com/one.pdf",
+        )
+        telemetry.emit_candidate(
+            ctx1,
+            archive_url="https://web.archive.org/web/20230101/https://example.com/one.pdf",
+            memento_ts="20230101000000",
+            statuscode=200,
+            mimetype="application/pdf",
+            source_stage=DiscoveryStage.CDX,
+            decision=CandidateDecision.HEAD_CHECK,
+        )
+        # Second candidate in same attempt should be skipped
+        telemetry.emit_candidate(
+            ctx1,
+            archive_url="https://web.archive.org/web/20230102/https://example.com/one.pdf",
+            memento_ts="20230102000000",
+            statuscode=200,
+            mimetype="application/pdf",
+            source_stage=DiscoveryStage.CDX,
+            decision=CandidateDecision.HEAD_CHECK,
+        )
+
+        ctx2 = telemetry.emit_attempt_start(
+            work_id="work-2",
+            artifact_id="artifact-2",
+            original_url="https://example.com/two.pdf",
+            canonical_url="https://example.com/two.pdf",
+        )
+        telemetry.emit_candidate(
+            ctx2,
+            archive_url="https://web.archive.org/web/20230103/https://example.com/two.pdf",
+            memento_ts="20230103000000",
+            statuscode=200,
+            mimetype="application/pdf",
+            source_stage=DiscoveryStage.CDX,
+            decision=CandidateDecision.HEAD_CHECK,
+        )
+
+        candidate_events = [
+            event
+            for event in sink.events
+            if event.get("event_type") == "wayback_candidate"
+        ]
+        assert len(candidate_events) == 2
+        attempt_ids = {event["attempt_id"] for event in candidate_events}
+        assert attempt_ids == {ctx1.attempt_id, ctx2.attempt_id}
+
+    def test_discovery_sampling_resets_each_attempt(self, run_id):
+        """Discovery sampling quotas should reset for every new attempt."""
+        sink = CollectingSink()
+        telemetry = TelemetryWayback(run_id, [sink], sample_discovery="first,last")
+
+        ctx1 = telemetry.emit_attempt_start(
+            work_id="work-1",
+            artifact_id="artifact-1",
+            original_url="https://example.com/one.pdf",
+            canonical_url="https://example.com/one.pdf",
+        )
+        telemetry.emit_discovery_cdx(
+            ctx1,
+            query_url="https://example.com/one.pdf",
+            year_window="-2..+2",
+            limit=8,
+            http_status=200,
+            returned=2,
+            first_ts="20230101000000",
+            last_ts="20230101010000",
+            from_cache=False,
+            revalidated=False,
+            rate_delay_ms=None,
+            retry_after_s=None,
+            retry_count=0,
+        )
+        # Mid-attempt discovery should be suppressed
+        telemetry.emit_discovery_cdx(
+            ctx1,
+            query_url="https://example.com/one.pdf",
+            year_window="-2..+2",
+            limit=8,
+            http_status=200,
+            returned=3,
+            first_ts="20230101010000",
+            last_ts="20230101020000",
+            from_cache=False,
+            revalidated=False,
+            rate_delay_ms=None,
+            retry_after_s=None,
+            retry_count=0,
+        )
+        telemetry.emit_discovery_cdx(
+            ctx1,
+            query_url="https://example.com/one.pdf",
+            year_window="-2..+2",
+            limit=8,
+            http_status=200,
+            returned=0,
+            first_ts=None,
+            last_ts=None,
+            from_cache=False,
+            revalidated=False,
+            rate_delay_ms=None,
+            retry_after_s=None,
+            retry_count=0,
+        )
+
+        ctx2 = telemetry.emit_attempt_start(
+            work_id="work-2",
+            artifact_id="artifact-2",
+            original_url="https://example.com/two.pdf",
+            canonical_url="https://example.com/two.pdf",
+        )
+        telemetry.emit_discovery_cdx(
+            ctx2,
+            query_url="https://example.com/two.pdf",
+            year_window="-2..+2",
+            limit=8,
+            http_status=200,
+            returned=1,
+            first_ts="20230201000000",
+            last_ts="20230201010000",
+            from_cache=False,
+            revalidated=False,
+            rate_delay_ms=None,
+            retry_after_s=None,
+            retry_count=0,
+        )
+        telemetry.emit_discovery_cdx(
+            ctx2,
+            query_url="https://example.com/two.pdf",
+            year_window="-2..+2",
+            limit=8,
+            http_status=200,
+            returned=0,
+            first_ts=None,
+            last_ts=None,
+            from_cache=False,
+            revalidated=False,
+            rate_delay_ms=None,
+            retry_after_s=None,
+            retry_count=0,
+        )
+
+        discovery_events = [
+            event
+            for event in sink.events
+            if event.get("event_type") == "wayback_discovery"
+            and event.get("stage") == DiscoveryStage.CDX.value
+        ]
+        # Two attempts, each should have first and last discovery events emitted
+        assert len(discovery_events) == 4
+        attempts_to_counts = {}
+        for event in discovery_events:
+            attempts_to_counts.setdefault(event["attempt_id"], 0)
+            attempts_to_counts[event["attempt_id"]] += 1
+
+        assert attempts_to_counts[ctx1.attempt_id] == 2
+        assert attempts_to_counts[ctx2.attempt_id] == 2
 
 
 class TestJsonlSink:
