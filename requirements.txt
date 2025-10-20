@@ -1,4 +1,5 @@
 -e .
+pyyaml>=6
 pytest
 pytest-cov
 pytest-logging

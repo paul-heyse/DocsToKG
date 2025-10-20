@@ -55,6 +55,11 @@ PA_ALEX_KEY=replace-with-api-key
 EOF
 ```
 
+HybridSearch deployments that load YAML configs (the default `config/hybrid_config.yaml`
+in `config/` or any custom path set via `HYBRID_SEARCH_CONFIG`) require
+`pyyaml>=6` so `HybridSearchConfigManager` can parse the file. Ensure the wheel
+is vendored alongside the CUDA FAISS build for air-gapped environments.
+
 Verify the environment:
 
 ```bash
