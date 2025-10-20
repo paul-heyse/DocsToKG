@@ -114,6 +114,7 @@ from pathlib import Path
 from threading import RLock
 from typing import (
     TYPE_CHECKING,
+    Callable,
     Deque,
     Dict,
     Iterable,
@@ -167,6 +168,8 @@ TRAINING_SAMPLE_RNG = np.random.default_rng(13)
 
 _PYARROW_MODULE = None
 _PYARROW_PARQUET = None
+
+_DEFAULT_VECTOR_CACHE_LIMIT = 10_000
 
 
 # --- Public Classes ---
@@ -476,6 +479,8 @@ class ChunkIngestionPipeline:
         opensearch: LexicalIndex,
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
+        vector_cache_limit: int = _DEFAULT_VECTOR_CACHE_LIMIT,
+        vector_cache_stats_hook: Optional[Callable[[int, DocumentInput], None]] = None,
     ) -> None:
         """Initialise the ingestion pipeline with storage backends and instrumentation.
 
@@ -484,6 +489,13 @@ class ChunkIngestionPipeline:
             opensearch: Lexical index handling sparse storage.
             registry: Registry mapping vector identifiers to chunk metadata.
             observability: Optional observability façade for tracing and metrics.
+            vector_cache_limit: Maximum number of unmatched vector artifacts that may
+                remain resident in memory while reconciling chunk/vector streams.
+                Defaults to ``10_000`` which bounds memory growth for misordered
+                artifacts.
+            vector_cache_stats_hook: Optional callback invoked whenever the
+                unmatched vector cache changes size. Observability backends may use
+                this to surface drift in dashboards.
 
         Returns:
             None: Constructors perform initialisation side effects only.
@@ -494,6 +506,10 @@ class ChunkIngestionPipeline:
         self._registry = registry
         self._metrics = IngestMetrics()
         self._observability = observability or Observability()
+        self._vector_cache_limit = int(vector_cache_limit)
+        if self._vector_cache_limit < 1:
+            self._vector_cache_limit = 0
+        self._vector_cache_stats_hook = vector_cache_stats_hook
         self._faiss.set_id_resolver(self._registry.resolve_faiss_id)
         attach = getattr(self._registry, "attach_dense_store", None)
         if callable(attach):
@@ -906,16 +922,54 @@ class ChunkIngestionPipeline:
         chunk_iter = self._iter_jsonl(document.chunk_path)
         vector_iter = self._iter_vector_file(document.vector_path)
         vector_cache: Dict[str, Mapping[str, object]] = {}
+        def _record_vector_cache(size: int) -> None:
+            self._observability.metrics.set_gauge(
+                "vector_cache_resident",
+                float(size),
+                namespace=document.namespace,
+                doc_id=document.doc_id,
+            )
+            hook = self._vector_cache_stats_hook
+            if hook is not None:
+                try:
+                    hook(size, document)
+                except Exception as exc:  # pragma: no cover - defensive instrumentation
+                    self._observability.logger.warning(
+                        "vector-cache-stats-hook-error",
+                        extra={
+                            "event": {
+                                "doc_id": document.doc_id,
+                                "namespace": document.namespace,
+                                "error": str(exc),
+                            }
+                        },
+                    )
+
+        limit = self._vector_cache_limit or None
+        _record_vector_cache(0)
 
         def pop_vector(vector_id: str) -> Optional[Mapping[str, object]]:
             cached = vector_cache.pop(vector_id, None)
             if cached is not None:
+                _record_vector_cache(len(vector_cache))
                 return cached
             for entry in vector_iter:
                 candidate_id = str(entry.get("uuid") or entry.get("UUID"))
                 vector_cache[candidate_id] = entry
+                size = len(vector_cache)
+                _record_vector_cache(size)
+                if limit is not None and size > limit:
+                    raise IngestError(
+                        "Vector cache grew beyond the configured safety limit while "
+                        f"ingesting document '{document.doc_id}' in namespace "
+                        f"'{document.namespace}'. Observed {size} unmatched entries; "
+                        "ensure chunk and vector artifacts are sorted consistently or "
+                        "partitioned by UUID."
+                    )
                 if candidate_id == vector_id:
-                    return vector_cache.pop(candidate_id)
+                    result = vector_cache.pop(candidate_id)
+                    _record_vector_cache(len(vector_cache))
+                    return result
             return None
 
         missing: List[str] = []
