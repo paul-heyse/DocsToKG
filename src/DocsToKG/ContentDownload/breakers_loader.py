@@ -63,7 +63,7 @@ variable and CLI command-line overlays with proper precedence handling.
 Usage:
     from pathlib import Path
     from DocsToKG.ContentDownload.breakers_loader import load_breaker_config
-    
+
     cfg = load_breaker_config(
         yaml_path=os.getenv("DOCSTOKG_BREAKERS_YAML"),
         env=os.environ,
@@ -92,9 +92,16 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
 try:
-    import yaml  # PyYAML
+    import yaml  # PyYAML  # type: ignore[import-untyped]
 except Exception as e:  # pragma: no cover
     raise RuntimeError("PyYAML is required to load breaker YAML configs") from e
+
+try:
+    import idna  # IDNA 2008 with UTS #46 support
+except Exception as e:  # pragma: no cover
+    raise RuntimeError("idna is required for proper hostname normalization") from e
+
+import logging
 
 from DocsToKG.ContentDownload.breakers import (
     BreakerClassification,
@@ -105,6 +112,8 @@ from DocsToKG.ContentDownload.breakers import (
     RequestRole,
     RollingWindowPolicy,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 # ------------------------------
 # Parsing helpers
@@ -117,28 +126,63 @@ _ROLE_ALIASES = {
     "artifact": RequestRole.ARTIFACT,
 }
 
+
 def _parse_bool(v: str) -> bool:
     return v.strip().lower() in {"1", "true", "yes", "y", "on"}
+
 
 def _parse_int(v: str) -> int:
     return int(v.strip().replace("_", ""))
 
+
 def _normalize_host_key(host: str) -> str:
     """
-    Normalize a host to the canonical breaker key:
-    - strip whitespace & trailing dot
-    - lowercase
-    - IDNA punycode for internationalized names
+    Normalize a host to the canonical breaker key using IDNA 2008 + UTS #46.
+
+    This function ensures stable, RFC-compliant hostname keys across the system:
+    - Strips whitespace & trailing dots
+    - Converts to lowercase
+    - Applies IDNA 2008 with UTS #46 mapping for internationalized domain names (IDNs)
+    - Falls back gracefully to lowercase-only for edge cases
+
+    Args:
+        host: The hostname to normalize (Unicode or ASCII)
+
+    Returns:
+        Lowercase ASCII-compatible encoding (punycode) of the host, suitable as a dict key
+
+    Examples:
+        >>> _normalize_host_key("Example.COM")
+        'example.com'
+        >>> _normalize_host_key("münchen.example")
+        'xn--mnchen-3ya.example'
+        >>> _normalize_host_key("  api.crossref.org.")
+        'api.crossref.org'
+
+    Notes:
+        - Uses IDNA 2008 with UTS #46 compatibility mapping for user input normalization
+        - IDNA handles internationalized domain names (IDNs) like café.example → xn--caf-dma.example
+        - UTS #46 pre-processes the input to handle case folding and dot-like character normalization
+        - Falls back to simple lowercase if IDNA encoding fails (preserves robustness)
     """
     h = host.strip().rstrip(".")
     if not h:
         return h
+
     try:
-        # idna encoding handles unicode host labels → ascii punycode
-        h_ascii = h.encode("idna").decode("ascii")
+        # Use IDNA 2008 with UTS #46 mapping for maximum compatibility
+        # uts46=True enables compatibility mapping: case-fold, width-normalize, dot-like chars, etc.
+        h_ascii = idna.encode(h, uts46=True).decode("ascii")
+        return h_ascii
+    except idna.IDNAError as e:
+        # Log the IDNA error but fall back to lowercase for robustness
+        # This preserves backward compatibility while attempting IDNA normalization
+        LOGGER.debug(f"IDNA encoding failed for '{h}': {e}; falling back to lowercase")
+        return h.lower()
     except Exception:
-        h_ascii = h
-    return h_ascii.lower()
+        # Final fallback for any other exception (encoding issues, etc.)
+        return h.lower()
+
 
 def _parse_kv_overrides(s: str) -> Dict[str, str]:
     """
@@ -163,6 +207,7 @@ def _parse_kv_overrides(s: str) -> Dict[str, str]:
         out[k.strip()] = v.strip()
     return out
 
+
 def _merge_policy(base: BreakerPolicy, raw: Mapping[str, str]) -> BreakerPolicy:
     """
     Merge simple host-level overrides into a BreakerPolicy.
@@ -173,7 +218,13 @@ def _merge_policy(base: BreakerPolicy, raw: Mapping[str, str]) -> BreakerPolicy:
     reset_timeout_s = int(reset) if reset is not None else base.reset_timeout_s
     rac = raw.get("retry_after_cap") or raw.get("retry_after_cap_s")
     retry_after_cap_s = int(rac) if rac is not None else base.retry_after_cap_s
-    return replace(base, fail_max=fail_max, reset_timeout_s=reset_timeout_s, retry_after_cap_s=retry_after_cap_s)
+    return replace(
+        base,
+        fail_max=fail_max,
+        reset_timeout_s=reset_timeout_s,
+        retry_after_cap_s=retry_after_cap_s,
+    )
+
 
 def _merge_role_policy(base: BreakerRolePolicy, raw: Mapping[str, str]) -> BreakerRolePolicy:
     """
@@ -185,6 +236,7 @@ def _merge_role_policy(base: BreakerRolePolicy, raw: Mapping[str, str]) -> Break
     rs = int(r) if r is not None else base.reset_timeout_s
     tc = int(raw["trial_calls"]) if "trial_calls" in raw else base.trial_calls
     return replace(base, fail_max=fm, reset_timeout_s=rs, trial_calls=tc)
+
 
 def _apply_classify_override(cur: BreakerClassification, s: str) -> BreakerClassification:
     """
@@ -203,7 +255,10 @@ def _apply_classify_override(cur: BreakerClassification, s: str) -> BreakerClass
     if m_neut:
         nums = [int(x) for x in re.split(r"[,\s]+", m_neut.group(2).strip()) if x]
         nset = frozenset(nums)
-    return BreakerClassification(failure_statuses=fset, neutral_statuses=nset, failure_exceptions=cur.failure_exceptions)
+    return BreakerClassification(
+        failure_statuses=fset, neutral_statuses=nset, failure_exceptions=cur.failure_exceptions
+    )
+
 
 def _apply_rolling_override(cur: RollingWindowPolicy, s: str) -> RollingWindowPolicy:
     """
@@ -216,13 +271,17 @@ def _apply_rolling_override(cur: RollingWindowPolicy, s: str) -> RollingWindowPo
     window_s = _parse_int(kv["window"]) if "window" in kv else cur.window_s
     threshold = _parse_int(kv["thresh"]) if "thresh" in kv else cur.threshold_failures
     cooldown_s = _parse_int(kv["cooldown"]) if "cooldown" in kv else cur.cooldown_s
-    return RollingWindowPolicy(enabled=enabled, window_s=window_s, threshold_failures=threshold, cooldown_s=cooldown_s)
+    return RollingWindowPolicy(
+        enabled=enabled, window_s=window_s, threshold_failures=threshold, cooldown_s=cooldown_s
+    )
+
 
 def _role_from_str(s: str) -> RequestRole:
     key = s.strip().lower()
     if key not in _ROLE_ALIASES:
         raise ValueError(f"Unknown role: {s}")
     return _ROLE_ALIASES[key]
+
 
 def _merge_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
     """Deep-merge breaker policy dictionaries preserving nested role maps."""
@@ -236,7 +295,9 @@ def _merge_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[st
         if isinstance(value, Mapping):
             if key == "defaults":
                 existing = dict(result.get("defaults", {}))
-                roles_override = value.get("roles") if isinstance(value.get("roles"), Mapping) else None
+                roles_override = (
+                    value.get("roles") if isinstance(value.get("roles"), Mapping) else None
+                )
                 if roles_override:
                     existing_roles = dict(existing.get("roles", {}))
                     for role_key, role_value in roles_override.items():
@@ -252,7 +313,11 @@ def _merge_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[st
                 for subkey, subval in value.items():
                     if key == "hosts" and isinstance(subval, Mapping):
                         host_entry = dict(existing_map.get(subkey, {}))
-                        roles_override = subval.get("roles") if isinstance(subval.get("roles"), Mapping) else None
+                        roles_override = (
+                            subval.get("roles")
+                            if isinstance(subval.get("roles"), Mapping)
+                            else None
+                        )
                         if roles_override:
                             host_roles = dict(host_entry.get("roles", {}))
                             for role_key, role_value in roles_override.items():
@@ -286,6 +351,7 @@ def merge_breaker_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> 
 # YAML loader & overlays
 # ------------------------------
 
+
 def _load_yaml(path: Optional[str | Path]) -> Dict[str, Any]:
     if not path:
         return {}
@@ -297,6 +363,7 @@ def _load_yaml(path: Optional[str | Path]) -> Dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("Breaker YAML root must be a mapping")
     return data
+
 
 def _config_from_yaml(doc: Dict) -> BreakerConfig:
     # Defaults
@@ -321,8 +388,12 @@ def _config_from_yaml(doc: Dict) -> BreakerConfig:
 
     # Classification
     classify_doc = doc.get("defaults", {}).get("classify", {}) or {}
-    failure_statuses = frozenset(int(x) for x in classify_doc.get("failure_statuses", []) or []) or None
-    neutral_statuses = frozenset(int(x) for x in classify_doc.get("neutral_statuses", []) or []) or None
+    failure_statuses = (
+        frozenset(int(x) for x in classify_doc.get("failure_statuses", []) or []) or None
+    )
+    neutral_statuses = (
+        frozenset(int(x) for x in classify_doc.get("neutral_statuses", []) or []) or None
+    )
     classify = BreakerClassification(
         failure_statuses=failure_statuses or BreakerClassification().failure_statuses,
         neutral_statuses=neutral_statuses or BreakerClassification().neutral_statuses,
@@ -348,8 +419,14 @@ def _config_from_yaml(doc: Dict) -> BreakerConfig:
         key = _normalize_host_key(host)
         pol = BreakerPolicy(
             fail_max=int(hvals.get("fail_max", defaults.fail_max)),
-            reset_timeout_s=int(hvals.get("reset_timeout_s", hvals.get("reset", defaults.reset_timeout_s))),
-            retry_after_cap_s=int(hvals.get("retry_after_cap_s", hvals.get("retry_after_cap", defaults.retry_after_cap_s))),
+            reset_timeout_s=int(
+                hvals.get("reset_timeout_s", hvals.get("reset", defaults.reset_timeout_s))
+            ),
+            retry_after_cap_s=int(
+                hvals.get(
+                    "retry_after_cap_s", hvals.get("retry_after_cap", defaults.retry_after_cap_s)
+                )
+            ),
             roles={},  # fill per-role below if present
         )
         rmap = {}
@@ -368,8 +445,14 @@ def _config_from_yaml(doc: Dict) -> BreakerConfig:
     for res, rvals in (doc.get("resolvers") or {}).items():
         resolvers_map[res] = BreakerPolicy(
             fail_max=int(rvals.get("fail_max", defaults.fail_max)),
-            reset_timeout_s=int(rvals.get("reset_timeout_s", rvals.get("reset", defaults.reset_timeout_s))),
-            retry_after_cap_s=int(rvals.get("retry_after_cap_s", rvals.get("retry_after_cap", defaults.retry_after_cap_s))),
+            reset_timeout_s=int(
+                rvals.get("reset_timeout_s", rvals.get("reset", defaults.reset_timeout_s))
+            ),
+            retry_after_cap_s=int(
+                rvals.get(
+                    "retry_after_cap_s", rvals.get("retry_after_cap", defaults.retry_after_cap_s)
+                )
+            ),
             roles={},  # role overrides for resolvers generally unnecessary
         )
 
@@ -382,14 +465,17 @@ def _config_from_yaml(doc: Dict) -> BreakerConfig:
         resolvers=resolvers_map,
     )
 
+
 def _maybe_int(v) -> Optional[int]:
     if v is None:
         return None
     return int(v)
 
+
 # ------------------------------
 # Env + CLI overlays
 # ------------------------------
+
 
 def _apply_env_overlays(cfg: BreakerConfig, env: Mapping[str, str]) -> BreakerConfig:
     """
@@ -404,15 +490,15 @@ def _apply_env_overlays(cfg: BreakerConfig, env: Mapping[str, str]) -> BreakerCo
     new_cfg = cfg
 
     # Defaults
-    if (s := env.get("DOCSTOKG_BREAKER_DEFAULTS")):
+    if s := env.get("DOCSTOKG_BREAKER_DEFAULTS"):
         new_cfg = replace(new_cfg, defaults=_merge_policy(new_cfg.defaults, _parse_kv_overrides(s)))
 
     # Classification
-    if (s := env.get("DOCSTOKG_BREAKER_CLASSIFY")):
+    if s := env.get("DOCSTOKG_BREAKER_CLASSIFY"):
         new_cfg = replace(new_cfg, classify=_apply_classify_override(new_cfg.classify, s))
 
     # Rolling
-    if (s := env.get("DOCSTOKG_BREAKER_ROLLING")):
+    if s := env.get("DOCSTOKG_BREAKER_ROLLING"):
         new_cfg = replace(new_cfg, rolling=_apply_rolling_override(new_cfg.rolling, s))
 
     # Host overrides
@@ -420,7 +506,7 @@ def _apply_env_overlays(cfg: BreakerConfig, env: Mapping[str, str]) -> BreakerCo
     for k, v in env.items():
         if not k.startswith(prefix):
             continue
-        host = _normalize_host_key(k[len(prefix):])
+        host = _normalize_host_key(k[len(prefix) :])
         pol = new_cfg.hosts.get(host, new_cfg.defaults)
         hosts_map = dict(new_cfg.hosts)
         hosts_map[host] = _merge_policy(pol, _parse_kv_overrides(v))
@@ -431,7 +517,7 @@ def _apply_env_overlays(cfg: BreakerConfig, env: Mapping[str, str]) -> BreakerCo
     for k, v in env.items():
         if not k.startswith(prefix):
             continue
-        tail = k[len(prefix):]  # "<HOST>__<ROLE>"
+        tail = k[len(prefix) :]  # "<HOST>__<ROLE>"
         try:
             host_raw, role_raw = tail.split("__", 1)
         except ValueError:
@@ -452,13 +538,14 @@ def _apply_env_overlays(cfg: BreakerConfig, env: Mapping[str, str]) -> BreakerCo
     for k, v in env.items():
         if not k.startswith(prefix):
             continue
-        res = k[len(prefix):]
+        res = k[len(prefix) :]
         base_pol = new_cfg.resolvers.get(res, new_cfg.defaults)
         resolvers_map = dict(new_cfg.resolvers)
         resolvers_map[res] = _merge_policy(base_pol, _parse_kv_overrides(v))
         new_cfg = replace(new_cfg, resolvers=resolvers_map)
 
     return new_cfg
+
 
 def _apply_cli_overrides(
     cfg: BreakerConfig,
@@ -482,13 +569,20 @@ def _apply_cli_overrides(
     new_cfg = cfg
 
     if cli_defaults_override:
-        new_cfg = replace(new_cfg, defaults=_merge_policy(new_cfg.defaults, _parse_kv_overrides(cli_defaults_override)))
+        new_cfg = replace(
+            new_cfg,
+            defaults=_merge_policy(new_cfg.defaults, _parse_kv_overrides(cli_defaults_override)),
+        )
 
     if cli_classify_override:
-        new_cfg = replace(new_cfg, classify=_apply_classify_override(new_cfg.classify, cli_classify_override))
+        new_cfg = replace(
+            new_cfg, classify=_apply_classify_override(new_cfg.classify, cli_classify_override)
+        )
 
     if cli_rolling_override:
-        new_cfg = replace(new_cfg, rolling=_apply_rolling_override(new_cfg.rolling, cli_rolling_override))
+        new_cfg = replace(
+            new_cfg, rolling=_apply_rolling_override(new_cfg.rolling, cli_rolling_override)
+        )
 
     # Hosts
     for item in cli_host_overrides or ():
@@ -530,9 +624,11 @@ def _apply_cli_overrides(
 
     return new_cfg
 
+
 # ------------------------------
 # Validation
 # ------------------------------
+
 
 def _validate(cfg: BreakerConfig) -> None:
     def _chk_pol(pol: BreakerPolicy, ctx: str) -> None:
@@ -554,9 +650,11 @@ def _validate(cfg: BreakerConfig) -> None:
     for name, pol in cfg.resolvers.items():
         _chk_pol(pol, f"resolver[{name}]")
 
+
 # ------------------------------
 # Public entrypoint
 # ------------------------------
+
 
 def load_breaker_config(
     yaml_path: Optional[str | Path],

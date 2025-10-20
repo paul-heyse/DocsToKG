@@ -101,14 +101,47 @@ class FileRow:
 
 @dataclass
 class ValidationRow:
-    """Validator outcome for a file."""
+    """Validator outcome (SHACL, ROBOT, Arelle, custom, etc.)."""
 
-    validation_id: str  # ULID or sha256(file_id|validator|run_at)
+    validation_id: str  # e.g., ULID or sha256(file_id|validator|run_at)
     file_id: str
-    validator: str  # pySHACL, ROBOT, Arelle, Custom:<name>, etc.
+    validator: str  # 'rdflib', 'ROBOT', 'Arelle', 'Custom:<name>', ...
     passed: bool
     run_at: datetime
     details_json: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class PlanRow:
+    """Cached plan for an ontology specification."""
+
+    plan_id: str  # sha256(ontology_id + resolver + timestamp)
+    ontology_id: str
+    resolver: str
+    version: Optional[str]
+    url: str
+    service: Optional[str]
+    license: Optional[str]
+    media_type: Optional[str]
+    content_length: Optional[int]
+    cached_at: datetime
+    plan_json: Dict[str, Any]  # Full serialized PlannedFetch
+    is_current: bool = False  # Mark as current for plan-diff
+
+
+@dataclass
+class PlanDiffRow:
+    """Historical comparison between two plan runs."""
+
+    diff_id: str  # ULID or sha256(older_plan_id + newer_plan_id)
+    older_plan_id: str
+    newer_plan_id: str
+    ontology_id: str
+    comparison_at: datetime
+    added_count: int
+    removed_count: int
+    modified_count: int
+    diff_json: Dict[str, Any]  # Full diff payload
 
 
 @dataclass
@@ -252,6 +285,58 @@ _MIGRATIONS: List[Tuple[str, str]] = [
             ON events(run_id, ts DESC);
 
         INSERT OR IGNORE INTO schema_version VALUES ('0004_events', now());
+        """,
+    ),
+    (
+        "0005_plans",
+        """
+        -- Cached plans for ontology specifications
+        CREATE TABLE IF NOT EXISTS plans (
+            plan_id TEXT PRIMARY KEY,
+            ontology_id TEXT NOT NULL,
+            resolver TEXT NOT NULL,
+            version TEXT,
+            url TEXT NOT NULL,
+            service TEXT,
+            license TEXT,
+            media_type TEXT,
+            content_length BIGINT,
+            cached_at TIMESTAMP NOT NULL DEFAULT now(),
+            plan_json JSON NOT NULL,
+            is_current BOOLEAN NOT NULL DEFAULT FALSE
+        );
+
+        -- Historical plan diffs
+        CREATE TABLE IF NOT EXISTS plan_diffs (
+            diff_id TEXT PRIMARY KEY,
+            older_plan_id TEXT NOT NULL,
+            newer_plan_id TEXT NOT NULL,
+            ontology_id TEXT NOT NULL,
+            comparison_at TIMESTAMP NOT NULL DEFAULT now(),
+            added_count INTEGER NOT NULL,
+            removed_count INTEGER NOT NULL,
+            modified_count INTEGER NOT NULL,
+            diff_json JSON NOT NULL
+        );
+
+        -- Indexes for plans table
+        CREATE INDEX IF NOT EXISTS idx_plans_ontology_id
+            ON plans(ontology_id);
+
+        CREATE INDEX IF NOT EXISTS idx_plans_is_current
+            ON plans(ontology_id, is_current);
+
+        CREATE INDEX IF NOT EXISTS idx_plans_cached_at
+            ON plans(ontology_id, cached_at DESC);
+
+        -- Indexes for plan_diffs table
+        CREATE INDEX IF NOT EXISTS idx_plan_diffs_ontology
+            ON plan_diffs(ontology_id, comparison_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_plan_diffs_older_plan
+            ON plan_diffs(older_plan_id);
+
+        INSERT OR IGNORE INTO schema_version VALUES ('0005_plans', now());
         """,
     ),
 ]
@@ -781,6 +866,240 @@ class Database:
 
         results = self._connection.execute(query, [scope]).fetchall()
         return results or []
+
+    # ========================================================================
+    # PHASE 4: Plan Caching & Comparison Queries
+    # ========================================================================
+
+    def upsert_plan(
+        self,
+        plan_id: str,
+        ontology_id: str,
+        resolver: str,
+        plan_json: Dict[str, Any],
+        is_current: bool = False,
+    ) -> None:
+        """Store or update a cached plan.
+
+        Args:
+            plan_id: Unique identifier (sha256 hash or ULID)
+            ontology_id: e.g., 'hp', 'chebi'
+            resolver: e.g., 'obo', 'ols', 'bioportal'
+            plan_json: Full serialized PlannedFetch as dictionary
+            is_current: Whether this is the current/latest plan for this ontology
+        """
+
+        assert self._connection is not None
+        version = plan_json.get("version")
+        url = plan_json.get("url", "")
+        service = plan_json.get("service")
+        license_str = plan_json.get("license")
+        media_type = plan_json.get("media_type")
+        content_length = plan_json.get("content_length")
+
+        # Mark previous plans for this ontology as non-current if this one is current
+        if is_current:
+            self._connection.execute(
+                "UPDATE plans SET is_current = FALSE WHERE ontology_id = ?",
+                [ontology_id],
+            )
+
+        # Delete and re-insert to ensure idempotence
+        self._connection.execute("DELETE FROM plans WHERE plan_id = ?", [plan_id])
+        self._connection.execute(
+            """
+            INSERT INTO plans (
+                plan_id, ontology_id, resolver, version, url, service, license,
+                media_type, content_length, plan_json, is_current
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                plan_id,
+                ontology_id,
+                resolver,
+                version,
+                url,
+                service,
+                license_str,
+                media_type,
+                content_length,
+                json.dumps(plan_json),
+                is_current,
+            ],
+        )
+
+    def get_current_plan(self, ontology_id: str) -> Optional[PlanRow]:
+        """Retrieve the current/latest plan for an ontology.
+
+        Args:
+            ontology_id: e.g., 'hp'
+
+        Returns:
+            PlanRow if found, else None
+        """
+
+        assert self._connection is not None
+        result = self._connection.execute(
+            """
+            SELECT plan_id, ontology_id, resolver, version, url, service, license,
+                   media_type, content_length, cached_at, plan_json, is_current
+            FROM plans
+            WHERE ontology_id = ? AND is_current = TRUE
+            ORDER BY cached_at DESC
+            LIMIT 1
+            """,
+            [ontology_id],
+        ).fetchone()
+
+        if not result:
+            return None
+
+        return PlanRow(
+            plan_id=result[0],
+            ontology_id=result[1],
+            resolver=result[2],
+            version=result[3],
+            url=result[4],
+            service=result[5],
+            license=result[6],
+            media_type=result[7],
+            content_length=result[8],
+            cached_at=result[9],
+            plan_json=json.loads(result[10]) if isinstance(result[10], str) else result[10],
+            is_current=result[11],
+        )
+
+    def list_plans(self, ontology_id: Optional[str] = None, limit: int = 100) -> List[PlanRow]:
+        """List cached plans, optionally filtered by ontology.
+
+        Args:
+            ontology_id: Optional filter; if None, return all plans
+            limit: Maximum number of results
+
+        Returns:
+            List of PlanRow objects ordered by most recent first
+        """
+
+        assert self._connection is not None
+        if ontology_id:
+            query = """
+                SELECT plan_id, ontology_id, resolver, version, url, service, license,
+                       media_type, content_length, cached_at, plan_json, is_current
+                FROM plans
+                WHERE ontology_id = ?
+                ORDER BY cached_at DESC
+                LIMIT ?
+            """
+            params = [ontology_id, limit]
+        else:
+            query = """
+                SELECT plan_id, ontology_id, resolver, version, url, service, license,
+                       media_type, content_length, cached_at, plan_json, is_current
+                FROM plans
+                ORDER BY cached_at DESC
+                LIMIT ?
+            """
+            params = [limit]
+
+        results = self._connection.execute(query, params).fetchall()
+        return [
+            PlanRow(
+                plan_id=r[0],
+                ontology_id=r[1],
+                resolver=r[2],
+                version=r[3],
+                url=r[4],
+                service=r[5],
+                license=r[6],
+                media_type=r[7],
+                content_length=r[8],
+                cached_at=r[9],
+                plan_json=json.loads(r[10]) if isinstance(r[10], str) else r[10],
+                is_current=r[11],
+            )
+            for r in results
+        ]
+
+    def insert_plan_diff(
+        self,
+        diff_id: str,
+        older_plan_id: str,
+        newer_plan_id: str,
+        ontology_id: str,
+        diff_result: Dict[str, Any],
+    ) -> None:
+        """Store the result of a plan comparison.
+
+        Args:
+            diff_id: Unique identifier for this diff comparison
+            older_plan_id: Plan ID of the baseline
+            newer_plan_id: Plan ID of the current
+            ontology_id: Ontology being compared
+            diff_result: Dict with keys: added (list), removed (list), modified (list)
+        """
+
+        assert self._connection is not None
+        added_count = len(diff_result.get("added", []))
+        removed_count = len(diff_result.get("removed", []))
+        modified_count = len(diff_result.get("modified", []))
+
+        self._connection.execute(
+            """
+            INSERT INTO plan_diffs (
+                diff_id, older_plan_id, newer_plan_id, ontology_id,
+                added_count, removed_count, modified_count, diff_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                diff_id,
+                older_plan_id,
+                newer_plan_id,
+                ontology_id,
+                added_count,
+                removed_count,
+                modified_count,
+                json.dumps(diff_result),
+            ],
+        )
+
+    def get_plan_diff_history(self, ontology_id: str, limit: int = 10) -> List[PlanDiffRow]:
+        """Retrieve historical plan diffs for an ontology.
+
+        Args:
+            ontology_id: e.g., 'hp'
+            limit: Maximum number of diffs to return
+
+        Returns:
+            List of PlanDiffRow objects ordered by most recent first
+        """
+
+        assert self._connection is not None
+        results = self._connection.execute(
+            """
+            SELECT diff_id, older_plan_id, newer_plan_id, ontology_id, comparison_at,
+                   added_count, removed_count, modified_count, diff_json
+            FROM plan_diffs
+            WHERE ontology_id = ?
+            ORDER BY comparison_at DESC
+            LIMIT ?
+            """,
+            [ontology_id, limit],
+        ).fetchall()
+
+        return [
+            PlanDiffRow(
+                diff_id=r[0],
+                older_plan_id=r[1],
+                newer_plan_id=r[2],
+                ontology_id=r[3],
+                comparison_at=r[4],
+                added_count=r[5],
+                removed_count=r[6],
+                modified_count=r[7],
+                diff_json=json.loads(r[8]) if isinstance(r[8], str) else r[8],
+            )
+            for r in results
+        ]
 
 
 # ============================================================================

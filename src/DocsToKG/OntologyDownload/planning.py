@@ -34,7 +34,6 @@ import os
 import re
 import shutil
 import tempfile
-import time
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -941,7 +940,7 @@ def planner_http_probe(
                 suffix = candidate[1:]
                 if hostname_lc.endswith(suffix):
                     return True
-            elif candidate.startswith('.'):
+            elif candidate.startswith("."):
                 if hostname_lc.endswith(candidate):
                     return True
             else:
@@ -1062,7 +1061,9 @@ def planner_http_probe(
         result = _issue(primary_method)
     except Exception as exc:  # pragma: no cover - exercised via tests
         failure_extra = dict(base_extra)
-        failure_extra.update({"method": primary_method, "error": str(exc), "event": "planner_probe_failed"})
+        failure_extra.update(
+            {"method": primary_method, "error": str(exc), "event": "planner_probe_failed"}
+        )
         _log_with_extra(logger, logging.WARNING, "planner probe failed", failure_extra)
         if isinstance(exc, (PolicyError, ConfigError)):
             raise
@@ -1087,7 +1088,9 @@ def planner_http_probe(
             result = _issue("GET")
         except Exception as exc:  # pragma: no cover - exercised via tests
             failure_extra = dict(base_extra)
-            failure_extra.update({"method": "GET", "error": str(exc), "event": "planner_probe_failed"})
+            failure_extra.update(
+                {"method": "GET", "error": str(exc), "event": "planner_probe_failed"}
+            )
             _log_with_extra(logger, logging.WARNING, "planner probe failed", failure_extra)
             if isinstance(exc, (PolicyError, ConfigError)):
                 raise
@@ -1108,6 +1111,7 @@ def planner_http_probe(
     _log_with_extra(logger, logging.INFO, "planner probe complete", completion_extra)
 
     return result
+
 
 def _populate_plan_metadata(
     planned: PlannedFetch,
@@ -1451,112 +1455,6 @@ def _write_manifest(manifest_path: Path, manifest: Manifest) -> None:
     """
     payload = _validate_manifest(manifest)
     _atomic_write_json(manifest_path, payload)
-
-
-def _append_index_entry(
-    ontology_dir: Path,
-    entry: Dict[str, Any],
-    *,
-    logger: Optional[logging.Logger] = None,
-) -> None:
-    """Append or update the ontology-level ``index.json`` with ``entry`` safely."""
-
-    log = logger or logging.getLogger("DocsToKG.OntologyDownload")
-    base_extra: Dict[str, object] = {"ontology_index": ontology_dir.name}
-    adapter_extra = getattr(log, "extra", None)
-    if isinstance(adapter_extra, dict):
-        for key, value in adapter_extra.items():
-            base_extra.setdefault(key, value)
-    base_extra.setdefault("stage", "download")
-
-    with _ontology_index_lock(ontology_dir, logger=log, extra=base_extra):
-        index_path = ontology_dir / "index.json"
-        try:
-            existing = json.loads(index_path.read_text())
-            if not isinstance(existing, list):
-                existing = []
-        except FileNotFoundError:
-            existing = []
-        except json.JSONDecodeError:
-            existing = []
-
-        filtered: List[Dict[str, Any]] = []
-        for item in existing:
-            if not isinstance(item, dict):
-                continue
-            same_version = item.get("version") == entry.get("version")
-            same_hash = item.get("sha256") == entry.get("sha256")
-            if same_version and same_hash:
-                continue
-            filtered.append(item)
-
-        filtered.insert(0, entry)
-        _atomic_write_json(index_path, filtered)
-
-
-@contextmanager
-def _ontology_index_lock(
-    ontology_dir: Path,
-    *,
-    logger: Optional[logging.Logger] = None,
-    extra: Optional[Mapping[str, object]] = None,
-) -> Iterator[None]:
-    """Serialize ontology index mutations across versions for the same ontology."""
-
-    lock_root = CACHE_DIR / "locks" / "ontology-index"
-    lock_root.mkdir(parents=True, exist_ok=True)
-    token_source = ontology_dir.name or ontology_dir.as_posix()
-    token = _safe_lock_component(token_source)
-    lock_path = lock_root / f"{token}.lock"
-
-    wait_start = time.monotonic()
-    if logger:
-        wait_extra = dict(extra or {})
-        wait_extra.setdefault("stage", "download")
-        wait_extra["event"] = "ontology_index_lock_wait"
-        wait_extra["lock_path"] = str(lock_path)
-        _log_with_extra(logger, logging.DEBUG, "waiting for ontology index lock", wait_extra)
-
-    with lock_path.open("a+b") as handle:
-        handle.seek(0, os.SEEK_END)
-        if handle.tell() == 0:
-            handle.write(b"0")
-            handle.flush()
-
-        if fcntl is not None:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        elif msvcrt is not None:
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
-        else:  # pragma: no cover - fallback when no locking backend available
-            yield
-            return
-
-        wait_duration = time.monotonic() - wait_start
-        if logger:
-            acquired_extra = dict(extra or {})
-            acquired_extra.setdefault("stage", "download")
-            acquired_extra["event"] = "ontology_index_lock_acquired"
-            acquired_extra["lock_path"] = str(lock_path)
-            acquired_extra["wait_sec"] = round(wait_duration, 3)
-            _log_with_extra(logger, logging.INFO, "ontology index lock acquired", acquired_extra)
-
-        try:
-            yield
-        finally:
-            if fcntl is not None:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-            elif msvcrt is not None:
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-            if logger:
-                release_extra = dict(extra or {})
-                release_extra.setdefault("stage", "download")
-                release_extra["event"] = "ontology_index_lock_released"
-                release_extra["lock_path"] = str(lock_path)
-                _log_with_extra(
-                    logger, logging.DEBUG, "ontology index lock released", release_extra
-                )
 
 
 def _mirror_to_cas_if_enabled(
@@ -2153,7 +2051,6 @@ def fetch_one(
                     index_entry["expected_checksum"] = expected_checksum.to_mapping()
                 if cas_path:
                     index_entry["cas_path"] = str(cas_path)
-                _append_index_entry(base_dir.parent, index_entry, logger=adapter)
                 STORAGE.finalize_version(effective_spec.id, version, base_dir)
 
                 adapter.info(

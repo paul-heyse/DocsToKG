@@ -584,7 +584,7 @@ def _build_embed_cli_args(
     _append_option(argv, "--shard-index", shard_index, default=0)
     _append_option(argv, "--chunks-dir", chunks_dir, formatter=str)
     _append_option(argv, "--out-dir", out_dir, formatter=str)
-    _append_option(argv, "--vector-format", vector_format, default="jsonl")
+    _append_option(argv, "--vector-format", vector_format, default="parquet")
     _append_option(argv, "--bm25-k1", bm25_k1)
     _append_option(argv, "--bm25-b", bm25_b)
     _append_option(argv, "--lexical-local-bm25-k1", bm25_k1)
@@ -1906,15 +1906,6 @@ def _embed_cli(
             file_okay=False,
         ),
     ] = None,
-    vector_format: Annotated[
-        VectorFormatOption,
-        typer.Option(
-            "--vector-format",
-            "--format",
-            help="Vector output format.",
-            show_default=True,
-        ),
-    ] = "parquet",
     bm25_k1: Annotated[
         float,
         typer.Option("--bm25-k1", help="BM25 k1 parameter.", show_default=True, min=0.0),

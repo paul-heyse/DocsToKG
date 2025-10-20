@@ -50,7 +50,7 @@ Scope boundary: Handles conversion, chunking, embedding, and telemetry; does not
   - `Data/PDFs`, `Data/HTML` – raw corpora.
   - `Data/DocTagsFiles` – `*.doctags.jsonl`.
   - `Data/ChunkedDocTagFiles` – `*.chunk.jsonl`.
-  - `Data/Embeddings` – `*.vectors.jsonl` (default) or `*.vectors.parquet` when `--format parquet` is selected.
+  - `Data/Embeddings` – `*.vectors.parquet` (Parquet columnar format, exclusive).
   - `Data/Manifests` – `docparse.*.manifest.jsonl`.
 - **Environment overrides**: `DOCSTOKG_*` variables configure stage-specific defaults (`DOCSTOKG_DOCTAGS_INPUT`, `DOCSTOKG_CHUNK_MIN_TOKENS`, `DOCSTOKG_EMBED_QWEN_DIR`, etc.); see “Configuration” below for details.
 
@@ -81,7 +81,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli chunk \
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed \
   --chunks-dir Data/ChunkedDocTagFiles \
   --out-dir Data/Embeddings
-#   --format parquet  # optional: emit columnar parquet vectors when pyarrow is installed
+#   (Parquet is the only format for embedding vectors - no flag needed)
 ```
 
 ## Common commands
@@ -95,7 +95,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli embed --help
 direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --input Data/PDFs/doc-001.pdf --force
 direnv exec . python -m DocsToKG.DocParsing.core.cli chunk --resume          # append --verify-hash when DocTags may have drifted (extra reads)
 direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only
-direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only --format parquet
+direnv exec . python -m DocsToKG.DocParsing.core.cli embed --validate-only
 
 # Operational tooling
 direnv exec . python -m DocsToKG.DocParsing.core.cli plan --data-root Data --mode auto    # stage preview
@@ -200,13 +200,13 @@ sequenceDiagram
 
 ## Configuration
 - Config sources: environment (`DOCSTOKG_DATA_ROOT`, `DOCSTOKG_MODEL_ROOT`, optional `DOCSTOKG_SPLADE_DEVICE`, `DOCSTOKG_QWEN_DEVICE`, etc.), YAML/TOML via `config_loaders`.
-- CLI flags: shared `--resume`, `--force`, `--log-level`; stage-specific `--min-tokens`, `--max-tokens`, `--shard-count/index`, `--batch-size-*`, `--tokenizer-model`, `--format`, etc. PDF DocTags runs additionally accept `--vllm-wait-timeout` (mirrored by `docparse all`) so operators can extend the readiness window for vLLM backends.
+- CLI flags: shared `--resume`, `--force`, `--log-level`; stage-specific `--min-tokens`, `--max-tokens`, `--shard-count/index`, `--batch-size-*`, `--tokenizer-model`, etc. (note: vector format is Parquet only, no flag) PDF DocTags runs additionally accept `--vllm-wait-timeout` (mirrored by `docparse all`) so operators can extend the readiness window for vLLM backends.
 - Environment overrides:
   - DocTags: `DOCSTOKG_DOCTAGS_*` family (`_INPUT`, `_OUTPUT`, `_MODEL`, `_WORKERS`, `_VLLM_WAIT_TIMEOUT`, etc.).
   - Worker sizing: DocTags auto-sizes `--workers` to `max(1, min(12, cpu_count - 4))`, ensuring at least one process is scheduled even when `os.cpu_count()` reports very small values.
 - Chunking: `DOCSTOKG_CHUNK_*` toggles for tokenizer, shard count, and validation.
 - Embedding: `DOCSTOKG_EMBED_*` flags plus `DOCSTOKG_QWEN_DIR`, `DOCSTOKG_SPLADE_DIR` for model caches.
-- Vector format negotiation: `DOCSTOKG_EMBED_VECTOR_FORMAT` overrides the default (`jsonl`) for runs launched without an explicit `--format` CLI flag; set it to `parquet` to opt into columnar outputs globally.
+- Vector format: Parquet is the only format for embedding vectors. Environment variable `DOCSTOKG_EMBED_VECTOR_FORMAT` is ignored for embeddings (always uses Parquet).
 - Validate-only runs reuse the configured `--qwen-dim` (or `DOCSTOKG_EMBED_QWEN_DIM`) when present; omit the override to accept previously generated vectors without enforcing a dimension.
 - Validate configuration: run `python -m DocsToKG.DocParsing.core.cli chunk --validate-only` or `... embed --validate-only` before production runs.
 
@@ -284,7 +284,7 @@ direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # optional
   - Bypass manifests or resume logic (tools depend on accurate entries).
 - Danger zone:
   - `rm -rf Data/DocTagsFiles` or manually editing manifests may break resume; use CLI `--force` and allow pipeline to rebuild artifacts.
-  - Changing embedding formats (`--format`) requires updating `formats` validators and downstream loaders.
+  - Embedding vectors use Parquet exclusively; no format selection needed.
   - Terminating vLLM/Qwen worker processes manually can leave stale lock files; use CLI cancel/resume flags to let the shared `FileLock` helper (via `concurrency.acquire_lock`) release resources cleanly.
 
 ## FAQ

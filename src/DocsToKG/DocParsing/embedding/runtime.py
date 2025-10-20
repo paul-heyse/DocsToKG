@@ -62,14 +62,21 @@ Generates BM25, SPLADE, and Qwen embeddings for DocsToKG chunk files while
 maintaining manifest entries, UUID hygiene, and data quality metrics. The
 pipeline runs in two passes: the first ensures chunk UUID integrity and builds
 BM25 corpus statistics; the second executes SPLADE and Qwen models to emit
-vector JSONL artefacts ready for downstream search.
+vector Parquet artifacts ready for downstream search.
 
 Key Features:
 - Auto-detect DocsToKG data directories and manage resume/force semantics
 - Stream SPLADE sparse encoding and Qwen dense embeddings from local caches
+- Write all embedding vectors in Parquet columnar format (exclusive)
 - Validate vector schemas, norms, and dimensions before writing outputs
 - Record manifest metadata for observability and auditing
 - Explain SPLADE attention backend fallbacks (auto→FlashAttention2→SDPA→eager)
+
+Output Format:
+- All embedding vectors written as Parquet files exclusively
+- Schemas versioned with semantic versioning
+- Atomic writes with fsync durability and footer metadata
+- Support for dense (Qwen), sparse (SPLADE), and lexical (BM25) vectors
 
 Usage:
     python -m DocsToKG.DocParsing.core embed --resume
@@ -77,6 +84,7 @@ Usage:
 Dependencies:
 - sentence_transformers (optional): Provides SPLADE sparse encoders.
 - vllm (optional): Hosts the Qwen embedding model with pooling support.
+- pyarrow (optional): Required for Parquet vector output.
 - tqdm: Surface user-friendly progress bars across pipeline phases.
 """
 
@@ -1640,9 +1648,7 @@ def _build_embedding_plan(
         )
         manifest_entry = resume_controller.entry(doc_id) if resume_controller.resume else None
         vectors_exist = vector_path.exists()
-        entry_format = (
-            str(manifest_entry.get("vector_format") or "jsonl").lower() if manifest_entry else None
-        )
+        entry_format = str(manifest_entry.get("vector_format")).lower() if manifest_entry else None
         format_mismatch = bool(manifest_entry) and entry_format != fmt
 
         input_hash = ""
@@ -2326,13 +2332,12 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
     args.shard_index = shard_index
 
     vector_format = str(cfg.vector_format or "parquet").lower()
-    if vector_format not in {"jsonl", "parquet"}:
+    if vector_format != "parquet":
         raise EmbeddingCLIValidationError(
-            option="--format",
-            message="must be one of: jsonl, parquet",
+            option="--vector-format",
+            message="must be: parquet (JSONL embeddings no longer supported)",
         )
-    if vector_format == "parquet":
-        _ensure_pyarrow_vectors()
+    _ensure_pyarrow_vectors()
     cfg.vector_format = vector_format
     args.vector_format = vector_format
 

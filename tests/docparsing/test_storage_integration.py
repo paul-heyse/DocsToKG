@@ -1,8 +1,8 @@
 """
 Integration tests for storage layer with embedding stage.
 
-Tests round-trip data flow through the new storage layer, validates
-Parquet footer metadata, and ensures backward compatibility with JSONL format.
+Tests round-trip data flow through the new storage layer and validates
+Parquet footer metadata and schema enforcement.
 """
 
 import json
@@ -23,34 +23,6 @@ except ImportError:
 @pytest.mark.skipif(not HAS_PYARROW, reason="pyarrow not available")
 class TestStorageIntegration:
     """Test storage layer integration."""
-
-    def test_unified_vector_writer_jsonl_format(self, tmp_path: Path) -> None:
-        """Test writing vectors in JSONL format using unified writer."""
-        from DocsToKG.DocParsing.storage.embedding_integration import (
-            create_unified_vector_writer,
-        )
-
-        output_file = tmp_path / "vectors.jsonl"
-        test_rows = [
-            {
-                "UUID": "uuid-1",
-                "BM25": {"terms": ["hello"], "weights": [1.0], "avgdl": 10.0, "N": 100},
-                "SPLADEv3": {"tokens": ["hello"], "weights": [0.5]},
-                "Qwen3-4B": {"model_id": "qwen", "vector": [0.1, 0.2], "dimension": 2},
-                "model_metadata": "{}",
-                "schema_version": "1.0.0",
-            }
-        ]
-
-        with create_unified_vector_writer(output_file, fmt="jsonl") as writer:
-            writer.write_rows(test_rows)
-
-        # Verify JSONL was written
-        assert output_file.exists()
-        with open(output_file) as f:
-            line = f.readline()
-            row = json.loads(line)
-            assert row["UUID"] == "uuid-1"
 
     @pytest.mark.skipif(not HAS_PYARROW, reason="pyarrow not available")
     def test_unified_vector_writer_parquet_format(self, tmp_path: Path) -> None:
@@ -81,8 +53,8 @@ class TestStorageIntegration:
         assert table.column("UUID")[0].as_py() == "uuid-1"
 
     @pytest.mark.skipif(not HAS_PYARROW, reason="pyarrow not available")
-    def test_roundtrip_jsonl_to_parquet(self, tmp_path: Path) -> None:
-        """Test round-trip: write JSONL, read as Parquet."""
+    def test_roundtrip_parquet_to_parquet(self, tmp_path: Path) -> None:
+        """Test round-trip: write Parquet, read as Parquet."""
         from DocsToKG.DocParsing.storage.embedding_integration import (
             create_unified_vector_writer,
             iter_vector_rows,
@@ -160,7 +132,7 @@ class TestStorageIntegration:
         )
 
         output_file = tmp_path / "vectors.invalid"
-        with pytest.raises(ValueError, match="Unsupported vector format"):
+        with pytest.raises(ValueError, match="Parquet is the only supported format"):
             create_unified_vector_writer(output_file, fmt="invalid")
 
 
