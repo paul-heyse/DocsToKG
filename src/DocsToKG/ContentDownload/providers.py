@@ -63,7 +63,7 @@ class OpenAlexWorkProvider:
         max_results: Optional[int] = None,
         retry_attempts: int = 3,
         retry_backoff: float = 1.0,
-        retry_max_delay: float = 75.0,
+        retry_max_delay: Optional[float] = 75.0,
         retry_after_cap: Optional[float] = None,
         iterate_openalex_func: Optional[Callable[..., Iterable[Dict[str, Any]]]] = None,
     ) -> None:
@@ -75,7 +75,10 @@ class OpenAlexWorkProvider:
         self._pdf_dir = pdf_dir
         self._html_dir = html_dir
         self._xml_dir = xml_dir
-        self._per_page = max(1, per_page)
+        normalized_per_page = int(per_page)
+        if not 1 <= normalized_per_page <= 200:
+            raise ValueError("OpenAlex per_page must be between 1 and 200")
+        self._per_page = normalized_per_page
         if max_results is None:
             self._max_results = None
         elif max_results < 0:
@@ -84,7 +87,9 @@ class OpenAlexWorkProvider:
             self._max_results = max_results
         self._retry_attempts = max(0, int(retry_attempts))
         self._retry_backoff = max(0.0, float(retry_backoff))
-        self._retry_max_delay = float(retry_max_delay)
+        self._retry_max_delay = (
+            float(retry_max_delay) if retry_max_delay is not None else None
+        )
         self._retry_after_cap = (
             float(retry_after_cap) if retry_after_cap is not None else None
         )
