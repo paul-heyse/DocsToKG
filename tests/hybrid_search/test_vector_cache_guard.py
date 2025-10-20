@@ -39,14 +39,7 @@ def _write_jsonl(path: Path, entries: List[dict]) -> None:
     path.write_text(payload, encoding="utf-8")
 
 
-def test_streaming_vector_cache_guard_raises(tmp_path: Path) -> None:
-    """Shuffled vector artifacts should trigger the safety guard."""
-
-    chunk_dir = tmp_path / "chunks"
-    vector_dir = tmp_path / "vectors"
-    chunk_dir.mkdir()
-    vector_dir.mkdir()
-
+def _misordered_document(tmp_path: Path) -> DocumentInput:
     vector_ids = ["vec-0", "vec-1", "vec-2"]
     chunk_entries = [
         {
@@ -98,18 +91,29 @@ def test_streaming_vector_cache_guard_raises(tmp_path: Path) -> None:
         },
     ]
 
+    chunk_dir = tmp_path / "chunks"
+    vector_dir = tmp_path / "vectors"
+    chunk_dir.mkdir()
+    vector_dir.mkdir()
+
     chunk_path = chunk_dir / "doc.chunks.jsonl"
     vector_path = vector_dir / "doc.vectors.jsonl"
     _write_jsonl(chunk_path, chunk_entries)
     _write_jsonl(vector_path, vector_entries)
 
-    document = DocumentInput(
+    return DocumentInput(
         doc_id="doc",
         namespace="ns",
         chunk_path=chunk_path,
         vector_path=vector_path,
         metadata={},
     )
+
+
+def test_streaming_vector_cache_guard_raises(tmp_path: Path) -> None:
+    """Shuffled vector artifacts should trigger the safety guard."""
+
+    document = _misordered_document(tmp_path)
 
     stats: List[Tuple[int, str]] = []
 
@@ -130,6 +134,10 @@ def test_streaming_vector_cache_guard_raises(tmp_path: Path) -> None:
     assert any(size > 1 for size, doc_id in stats if doc_id == "doc")
 
 
+def test_vector_cache_guard_zero_limit_fails_fast(tmp_path: Path) -> None:
+    """A zero cache limit should fail immediately when drift is detected."""
+
+    document = _misordered_document(tmp_path)
 def test_vector_cache_stats_hook_tracks_cache_shrink(tmp_path: Path) -> None:
     """Vector cache observers should see both growth and shrink events."""
 
@@ -194,6 +202,14 @@ def test_vector_cache_stats_hook_tracks_cache_shrink(tmp_path: Path) -> None:
         opensearch=_StubLexical(),
         registry=_StubRegistry(),
         observability=Observability(),
+        vector_cache_limit=0,
+        vector_cache_stats_hook=lambda size, doc: stats.append((size, doc.doc_id)),
+    )
+
+    with pytest.raises(IngestError, match="Vector cache grew beyond the configured safety limit"):
+        list(pipeline._load_precomputed_chunks(document))
+
+    assert stats == [(1, "doc")]
         vector_cache_limit=10,
         vector_cache_stats_hook=lambda size, doc: stats.append((size, doc.doc_id)),
     )
