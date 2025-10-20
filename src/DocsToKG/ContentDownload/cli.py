@@ -80,6 +80,11 @@ from DocsToKG.ContentDownload.telemetry import (
     load_previous_manifest,
 )
 
+# Phase 4/5: Breaker CLI integration
+from DocsToKG.ContentDownload.cli_breakers import install_breaker_cli
+from DocsToKG.ContentDownload.cli_breaker_advisor import install_breaker_advisor_cli
+from DocsToKG.ContentDownload.breakers import BreakerRegistry
+
 __all__ = (
     "AttemptSink",
     "CsvSink",
@@ -128,6 +133,42 @@ __all__ = (
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
 oa_config = ConfigProxy()
+
+
+def _make_breaker_registry():
+    """Factory function for breaker CLI commands (Phase 4/5 integration).
+
+    Creates a BreakerRegistry with SQLite cooldown store for CLI operations.
+    In Phase 10+, this will be integrated with the actual DownloadRun config.
+
+    Returns
+    -------
+    tuple[BreakerRegistry, list[str]]
+        Tuple of (registry, known_hosts) for use by breaker CLI subcommands.
+        Returns (None, []) if breaker system not fully initialized.
+
+    Notes
+    -----
+    This is a Phase 6 placeholder. Full integration with resolver config
+    and runtime configuration happens in Phase 10 (runner integration).
+    """
+    try:
+        from DocsToKG.ContentDownload.breakers import BreakerConfig
+        from DocsToKG.ContentDownload.sqlite_cooldown_store import SQLiteCooldownStore
+        from pathlib import Path
+        import tempfile
+
+        # Create minimal config for CLI-only operations
+        cfg = BreakerConfig()
+        tmp_dir = Path(tempfile.gettempdir()) / "docstokg_breakers"
+        tmp_dir.mkdir(exist_ok=True)
+        store = SQLiteCooldownStore(tmp_dir / "cooldowns.sqlite")
+        registry = BreakerRegistry(cfg, cooldown_store=store)
+        known_hosts = sorted(cfg.hosts.keys()) if cfg.hosts else []
+        return registry, known_hosts
+    except Exception:
+        # Graceful fallback if breaker system not fully initialized
+        return None, []
 
 
 def main(argv: Optional[Sequence[str]] = None) -> RunResult:

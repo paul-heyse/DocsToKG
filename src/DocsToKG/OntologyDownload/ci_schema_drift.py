@@ -94,8 +94,18 @@ def check_schema_drift(
     else:
         print(f"   ⚠️  Top-level schema not found: {top_schema_path}")
 
-    for domain in ["http", "cache", "retry", "logging", "telemetry", "security",
-                   "ratelimit", "extraction", "storage", "duckdb"]:
+    for domain in [
+        "http",
+        "cache",
+        "retry",
+        "logging",
+        "telemetry",
+        "security",
+        "ratelimit",
+        "extraction",
+        "storage",
+        "duckdb",
+    ]:
         sub_path = expected_dir / f"settings.{domain}.subschema.json"
         if sub_path.exists():
             expected_sub[domain] = json.loads(sub_path.read_text())

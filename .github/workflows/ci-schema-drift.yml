@@ -1,67 +1,67 @@
 name: Schema Drift Detection
 
 on:
-  pull_request:
-    paths:
-      - 'src/DocsToKG/OntologyDownload/settings.py'
-      - 'src/DocsToKG/OntologyDownload/settings_schema.py'
-      - 'docs/schemas/**'
-      - '.github/workflows/ci-schema-drift.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'src/DocsToKG/OntologyDownload/settings.py'
-      - 'src/DocsToKG/OntologyDownload/settings_schema.py'
-      - 'docs/schemas/**'
+    pull_request:
+        paths:
+            - "src/DocsToKG/OntologyDownload/settings.py"
+            - "src/DocsToKG/OntologyDownload/settings_schema.py"
+            - "docs/schemas/**"
+            - ".github/workflows/ci-schema-drift.yml"
+    push:
+        branches:
+            - main
+        paths:
+            - "src/DocsToKG/OntologyDownload/settings.py"
+            - "src/DocsToKG/OntologyDownload/settings_schema.py"
+            - "docs/schemas/**"
 
 jobs:
-  schema-drift:
-    name: Check Schema Drift
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+    schema-drift:
+        name: Check Schema Drift
+        runs-on: ubuntu-latest
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.13'
-          cache: 'pip'
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 1
 
-      - name: Install dependencies
-        run: |
-          python -m pip install -e .
-          pip install pydantic pydantic-settings typer
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                  python-version: "3.13"
+                  cache: "pip"
 
-      - name: Check schema drift
-        run: |
-          python -m DocsToKG.OntologyDownload.ci_schema_drift \
-            --expected-dir docs/schemas/ \
-            --fail-on-drift \
-            --verbose
-        id: drift_check
-        continue-on-error: true
+            - name: Install dependencies
+              run: |
+                  python -m pip install -e .
+                  pip install pydantic pydantic-settings typer
 
-      - name: Report drift
-        if: steps.drift_check.outcome == 'failure'
-        run: |
-          echo "❌ Schema drift detected!"
-          echo ""
-          echo "This means the settings configuration has changed."
-          echo "Please review the changes above and ensure they are intentional."
-          echo ""
-          echo "To update the committed schemas, run:"
-          echo "  python -m DocsToKG.OntologyDownload.cli_settings_commands settings schema"
-          echo "  git add docs/schemas/"
-          echo "  git commit -m 'Update settings schemas'"
-          exit 1
+            - name: Check schema drift
+              run: |
+                  python -m DocsToKG.OntologyDownload.ci_schema_drift \
+                    --expected-dir docs/schemas/ \
+                    --fail-on-drift \
+                    --verbose
+              id: drift_check
+              continue-on-error: true
 
-      - name: Success message
-        if: steps.drift_check.outcome == 'success'
-        run: |
-          echo "✅ Schema drift check passed!"
-          echo "Configuration schemas are consistent with committed versions."
+            - name: Report drift
+              if: steps.drift_check.outcome == 'failure'
+              run: |
+                  echo "❌ Schema drift detected!"
+                  echo ""
+                  echo "This means the settings configuration has changed."
+                  echo "Please review the changes above and ensure they are intentional."
+                  echo ""
+                  echo "To update the committed schemas, run:"
+                  echo "  python -m DocsToKG.OntologyDownload.cli_settings_commands settings schema"
+                  echo "  git add docs/schemas/"
+                  echo "  git commit -m 'Update settings schemas'"
+                  exit 1
+
+            - name: Success message
+              if: steps.drift_check.outcome == 'success'
+              run: |
+                  echo "✅ Schema drift check passed!"
+                  echo "Configuration schemas are consistent with committed versions."

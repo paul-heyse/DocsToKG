@@ -1,8 +1,8 @@
 # Hishel HTTP Caching Configuration (RFC 9111 Compliant)
 # =========================================================
-# 
+#
 # This configuration file controls HTTP caching behavior for the ContentDownload module.
-# 
+#
 # Configuration Precedence (Highest to Lowest):
 #   1. CLI arguments (--cache-config, --cache-host, etc.)
 #   2. Environment variables (DOCSTOKG_CACHE_*)
@@ -28,102 +28,102 @@
 # Storage Configuration
 # ====================
 storage:
-  # Storage backend: file, memory, redis, sqlite, s3
-  # Production recommendation: redis (distributed, scalable)
-  kind: file
-  
-  # File storage path (used when kind: file)
-  path: "${DOCSTOKG_DATA_ROOT}/cache/http"
-  
-  # Time-to-live for cache entries (seconds)
-  # Default: 259200 (3 days)
-  # Entries older than this are automatically removed
-  ttl: 259200
-  
-  # How often to check for expired entries (seconds)
-  # Default: 600 (10 minutes)
-  check_ttl_every: 600
-  
-  # Redis configuration (used when kind: redis)
-  # IMPORTANT: Only used if storage.kind is set to 'redis'
-  # redis:
-  #   host: localhost
-  #   port: 6379
-  #   db: 0
-  #   password: null  # Set from environment if needed
-  #   ssl: false
-  #   timeout: 5.0
+    # Storage backend: file, memory, redis, sqlite, s3
+    # Production recommendation: redis (distributed, scalable)
+    kind: file
+
+    # File storage path (used when kind: file)
+    path: "${DOCSTOKG_DATA_ROOT}/cache/http"
+
+    # Time-to-live for cache entries (seconds)
+    # Default: 259200 (3 days)
+    # Entries older than this are automatically removed
+    ttl: 259200
+
+    # How often to check for expired entries (seconds)
+    # Default: 600 (10 minutes)
+    check_ttl_every: 600
+
+    # Redis configuration (used when kind: redis)
+    # IMPORTANT: Only used if storage.kind is set to 'redis'
+    # redis:
+    #   host: localhost
+    #   port: 6379
+    #   db: 0
+    #   password: null  # Set from environment if needed
+    #   ssl: false
+    #   timeout: 5.0
 
 # HTTP Controller Configuration
 # =============================
 controller:
-  # HTTP methods that are cacheable
-  cacheable_methods:
-    - GET
-    - HEAD
-  
-  # HTTP status codes that are cacheable
-  # Production: 200 (OK), 301 (Moved Permanently), 308 (Permanent Redirect)
-  cacheable_statuses:
-    - 200
-    - 301
-    - 308
-  
-  # Allow heuristic freshness (RFC 7234 Section 4.2.3)
-  # When true, allows caching of responses without explicit cache directives
-  allow_heuristics: false
-  
-  # Default caching policy for responses without cache directives
-  # Options: CACHE, DO_NOT_CACHE
-  # Production: CACHE (cache by default, safer for performance)
-  default: CACHE
-  
-  # Allow serving stale responses when origin is unreachable
-  # Production: false (ensure freshness)
-  allow_stale: false
-  
-  # Always revalidate before using cached response
-  # Production: false (use freshness from headers)
-  always_revalidate: false
-  
-  # Cache private responses (marked with Cache-Control: private)
-  # Production: true (cache user-specific data)
-  cache_private: true
+    # HTTP methods that are cacheable
+    cacheable_methods:
+        - GET
+        - HEAD
+
+    # HTTP status codes that are cacheable
+    # Production: 200 (OK), 301 (Moved Permanently), 308 (Permanent Redirect)
+    cacheable_statuses:
+        - 200
+        - 301
+        - 308
+
+    # Allow heuristic freshness (RFC 7234 Section 4.2.3)
+    # When true, allows caching of responses without explicit cache directives
+    allow_heuristics: false
+
+    # Default caching policy for responses without cache directives
+    # Options: CACHE, DO_NOT_CACHE
+    # Production: CACHE (cache by default, safer for performance)
+    default: CACHE
+
+    # Allow serving stale responses when origin is unreachable
+    # Production: false (ensure freshness)
+    allow_stale: false
+
+    # Always revalidate before using cached response
+    # Production: false (use freshness from headers)
+    always_revalidate: false
+
+    # Cache private responses (marked with Cache-Control: private)
+    # Production: true (cache user-specific data)
+    cache_private: true
 
 # Statistics Collection (Phase 4A)
 # ================================
 statistics:
-  # Enable real-time metrics collection
-  enabled: true
-  
-  # Export interval (seconds)
-  # Metrics are aggregated and exported periodically
-  export_interval_s: 300
+    # Enable real-time metrics collection
+    enabled: true
+
+    # Export interval (seconds)
+    # Metrics are aggregated and exported periodically
+    export_interval_s: 300
 
 # Optimization (Phase 4B)
 # =======================
 optimization:
-  # Enable auto-tuning of TTL based on hit rates
-  # Phase 4B: In development, recommend manual review mode first
-  enabled: false
-  
-  # Automatically apply optimizations without review
-  # Production: Enable after 24-hour validation period
-  auto_apply: false
-  
-  # Minimum number of requests before considering optimization
-  min_requests: 100
-  
-  # Minimum efficiency improvement to apply changes (%)
-  efficiency_threshold: 10
-  
-  # How often to check for optimization opportunities (seconds)
-  update_interval_s: 3600
+    # Enable auto-tuning of TTL based on hit rates
+    # Phase 4B: In development, recommend manual review mode first
+    enabled: false
+
+    # Automatically apply optimizations without review
+    # Production: Enable after 24-hour validation period
+    auto_apply: false
+
+    # Minimum number of requests before considering optimization
+    min_requests: 100
+
+    # Minimum efficiency improvement to apply changes (%)
+    efficiency_threshold: 10
+
+    # How often to check for optimization opportunities (seconds)
+    update_interval_s: 3600
 
 # Host-Specific Policies
 # ======================
 # Format: hostname: policy
-# 
+#
 # Each host can have:
 #   - ttl_s: Time-to-live override (seconds)
 #   - role: Role-specific policies (metadata, landing, artifact)
@@ -134,105 +134,104 @@ optimization:
 #   - artifact: Artifacts (PDFs, binaries) - typically not cached
 
 hosts:
-  # Crossref API
-  # High-volume API, stable metadata, safe to cache for 3 days
-  api.crossref.org:
-    ttl_s: 259200
-    role:
-      metadata:
+    # Crossref API
+    # High-volume API, stable metadata, safe to cache for 3 days
+    api.crossref.org:
         ttl_s: 259200
-        swrv_s: 180  # Serve stale while revalidating for 3 minutes
-      landing:
-        ttl_s: 86400
-        swrv_s: 60
+        role:
+            metadata:
+                ttl_s: 259200
+                swrv_s: 180 # Serve stale while revalidating for 3 minutes
+            landing:
+                ttl_s: 86400
+                swrv_s: 60
 
-  # OpenAlex API
-  # Comprehensive metadata, can cache for 3 days
-  api.openalex.org:
-    ttl_s: 259200
-    role:
-      metadata:
+    # OpenAlex API
+    # Comprehensive metadata, can cache for 3 days
+    api.openalex.org:
         ttl_s: 259200
-        swrv_s: 180
-      landing:
-        ttl_s: 86400
-        swrv_s: 60
+        role:
+            metadata:
+                ttl_s: 259200
+                swrv_s: 180
+            landing:
+                ttl_s: 86400
+                swrv_s: 60
 
-  # Unpaywall API
-  # Open access metadata, cache for 2 days
-  api.unpaywall.org:
-    ttl_s: 172800
-    role:
-      metadata:
+    # Unpaywall API
+    # Open access metadata, cache for 2 days
+    api.unpaywall.org:
         ttl_s: 172800
-        swrv_s: 120
-      landing:
-        ttl_s: 86400
-        swrv_s: 60
+        role:
+            metadata:
+                ttl_s: 172800
+                swrv_s: 120
+            landing:
+                ttl_s: 86400
+                swrv_s: 60
 
-  # arXiv API
-  # Stable metadata, cache for 3 days
-  export.arxiv.org:
-    ttl_s: 259200
-    role:
-      metadata:
+    # arXiv API
+    # Stable metadata, cache for 3 days
+    export.arxiv.org:
         ttl_s: 259200
-        swrv_s: 180
+        role:
+            metadata:
+                ttl_s: 259200
+                swrv_s: 180
 
-  # Semantic Scholar API
-  # Comprehensive metadata, cache for 3 days
-  api.semanticscholar.org:
-    ttl_s: 259200
-    role:
-      metadata:
+    # Semantic Scholar API
+    # Comprehensive metadata, cache for 3 days
+    api.semanticscholar.org:
         ttl_s: 259200
-        swrv_s: 180
+        role:
+            metadata:
+                ttl_s: 259200
+                swrv_s: 180
 
-  # PubMed/NCBI
-  # Biomedical metadata, cache for 3 days
-  eutils.ncbi.nlm.nih.gov:
-    ttl_s: 259200
-    role:
-      metadata:
+    # PubMed/NCBI
+    # Biomedical metadata, cache for 3 days
+    eutils.ncbi.nlm.nih.gov:
         ttl_s: 259200
-        swrv_s: 180
+        role:
+            metadata:
+                ttl_s: 259200
+                swrv_s: 180
 
-  # DOAJ (Directory of Open Access Journals)
-  # Journal metadata, cache for 3 days
-  doaj.org:
-    ttl_s: 259200
-    role:
-      metadata:
+    # DOAJ (Directory of Open Access Journals)
+    # Journal metadata, cache for 3 days
+    doaj.org:
         ttl_s: 259200
-        swrv_s: 180
+        role:
+            metadata:
+                ttl_s: 259200
+                swrv_s: 180
 
-  # CiteSeerX
-  # Research metadata, cache for 2 days
-  csxdoi.org:
-    ttl_s: 172800
-    role:
-      metadata:
+    # CiteSeerX
+    # Research metadata, cache for 2 days
+    csxdoi.org:
         ttl_s: 172800
-        swrv_s: 120
+        role:
+            metadata:
+                ttl_s: 172800
+                swrv_s: 120
 
-  # Google Scholar (if supported)
-  # Note: Google may block caching - verify cache headers
-  scholar.google.com:
-    ttl_s: 86400
-    role:
-      metadata:
+    # Google Scholar (if supported)
+    # Note: Google may block caching - verify cache headers
+    scholar.google.com:
         ttl_s: 86400
-        swrv_s: 60
+        role:
+            metadata:
+                ttl_s: 86400
+                swrv_s: 60
 
-  # Internet Archive
-  # Wayback Machine API, cache for 7 days (data is stable)
-  archive.org:
-    ttl_s: 604800
-    role:
-      metadata:
+    # Internet Archive
+    # Wayback Machine API, cache for 7 days (data is stable)
+    archive.org:
         ttl_s: 604800
-        swrv_s: 300
-
+        role:
+            metadata:
+                ttl_s: 604800
+                swrv_s: 300
 # Production Deployment Notes
 # ===========================
 #
