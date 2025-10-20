@@ -220,6 +220,13 @@ class DownloadConfiguration(BaseModel):
             " Defaults to False to prevent accidental SSRF via misconfigured DNS."
         ),
     )
+    allow_plain_http_for_host_allowlist: bool = Field(
+        default=False,
+        description=(
+            "When true, allowlisted hosts may be fetched over HTTP without automatic upgrades to HTTPS."
+            " Defaults to False so host allowlists continue to enforce TLS unless explicitly opted in."
+        ),
+    )
     allowed_ports: Optional[List[int]] = Field(default=None)
     polite_headers: Dict[str, str] = Field(
         default_factory=lambda: {
