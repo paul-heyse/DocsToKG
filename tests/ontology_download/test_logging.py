@@ -14,6 +14,12 @@
 #       "name": "test_setup_logging_emits_structured_json",
 #       "anchor": "function-test-setup-logging-emits-structured-json",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "test-setup-logging-expands-env-log-dir",
+#       "name": "test_setup_logging_expands_env_log_dir",
+#       "anchor": "function-test-setup-logging-expands-env-log-dir",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -169,6 +175,22 @@ def test_setup_logging_emits_structured_json(tmp_path):
             logger.removeHandler(handler)
 
 
+def test_setup_logging_expands_env_log_dir(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("ONTOFETCH_LOG_DIR", "~/ontofetch-logs")
+
+    logger = setup_logging()
+    try:
+        logger.info("env log directory expansion test")
+        for handler in logger.handlers:
+            handler.flush()
+        file_handler = _get_file_handler(logger)
+        log_path = Path(file_handler.baseFilename)
+        expected_dir = (tmp_path / "ontofetch-logs").resolve()
+        assert log_path.parent == expected_dir
+        assert expected_dir.exists()
+    finally:
+        _cleanup_logger(logger)
 def test_json_formatter_uses_record_created_timestamp():
     formatter = logging_utils_mod.JSONFormatter()
     record = logging.LogRecord(
