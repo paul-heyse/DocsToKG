@@ -248,7 +248,13 @@ def ensure_qwen_environment(
     if dtype is not None:
         resolved_dtype_str = str(dtype)
     else:
-        resolved_dtype_str = os.getenv("DOCSTOKG_QWEN_DTYPE") or "bfloat16"
+        existing_dtype = os.getenv("DOCSTOKG_QWEN_DTYPE")
+        if existing_dtype is not None:
+            resolved_dtype_str = existing_dtype
+        elif resolved_device == "cpu":
+            resolved_dtype_str = "float32"
+        else:
+            resolved_dtype_str = "bfloat16"
     os.environ["DOCSTOKG_QWEN_DTYPE"] = resolved_dtype_str
 
     env_info: Dict[str, str] = {"device": resolved_device, "dtype": resolved_dtype_str}
