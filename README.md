@@ -332,6 +332,7 @@ python -m DocsToKG.DocParsing.core.cli chunk --min-tokens 256 --max-tokens 512
 
 # Generate hybrid embeddings (BM25 + SPLADE + Qwen)
 python -m DocsToKG.DocParsing.core.cli embed --resume
+# (Optional) Append --verify-hash on reruns when storage or manifests might have drifted; expect extra hashing I/O
 
 ```
 
