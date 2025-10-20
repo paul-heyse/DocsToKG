@@ -177,6 +177,12 @@ ontologies:
       ontology_id: EFO
 ```
 
+Validator concurrency is pooled across all requests: the scheduler inspects every
+`ValidationRequest` and applies the tightest `max_concurrent_validators`
+constraint (clamped between 1 and 8). A single ontology capped at `1` will keep
+the shared worker pool at that size even if other requests allow higher
+parallelism.
+
 Key environment variables and overrides:
 
 | Variable | Purpose | Default |

@@ -1267,13 +1267,17 @@ def run_validators(
         return {}
 
     def _determine_max_workers() -> int:
+        limits: List[int] = []
         for request in request_list:
             validation_config = getattr(request.config.defaults, "validation", None)
-            if validation_config is not None and hasattr(
+            if validation_config is None or not hasattr(
                 validation_config, "max_concurrent_validators"
             ):
-                value = int(validation_config.max_concurrent_validators)
-                return max(1, min(8, value))
+                continue
+            value = int(validation_config.max_concurrent_validators)
+            limits.append(max(1, min(8, value)))
+        if limits:
+            return min(limits)
         return 2
 
     max_workers = _determine_max_workers()
