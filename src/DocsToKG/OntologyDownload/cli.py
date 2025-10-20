@@ -1474,6 +1474,7 @@ def _handle_init(path: Path) -> None:
     Raises:
         ConfigError: If the target file already exists.
     """
+    path = path.expanduser().resolve()
     if path.exists():
         raise ConfigError(f"Refusing to overwrite existing file {path}")
     path.write_text(EXAMPLE_SOURCES_YAML)
