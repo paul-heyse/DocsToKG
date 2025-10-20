@@ -35,7 +35,7 @@ Scope boundary: Handles conversion, chunking, embedding, and telemetry; does not
 ---
 
 ## Prerequisites & optional dependencies
-- **Runtime**: Linux, Python 3.10 or newer. GPU strongly recommended for PDF DocTags (vLLM) and Qwen embeddings; CPU-only execution is supported with lower throughput.
+- **Runtime**: Linux, Python 3.13 or newer. GPU strongly recommended for PDF DocTags (vLLM) and Qwen embeddings; CPU-only execution is supported with lower throughput.
 - **Installation extras**:
   - Core pipeline: `pip install "DocsToKG[docparse]"`.
   - Runtime primitives: `filelock>=3.20.0` and `jsonlines>=4.0.0` are installed with the core extra; verify downstream environments vendor these libraries because locking and JSONL streaming now depend on them.

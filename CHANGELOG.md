@@ -38,6 +38,7 @@ All notable changes to DocsToKG are documented in this file.
 - Content download outcomes now leave `reason` unset for fresh downloads, retain `conditional_not_modified` for genuine 304s, and tag voluntary skips with the dedicated `skip_large_download` code.
 - HTTP range resume is hard-disabled; resolver hints prefixed with `resume_` are stripped and telemetry annotates ignored requests via `resume_disabled=true`.
 - Manifest warm-up defaults to a lazy `ManifestUrlIndex`, with `--warm-manifest-cache` offered solely for small datasets.
+- Raised the documented Python interpreter minimum to 3.13 to align with packaging metadata and deployment tooling.
 - Content download networking now consolidates on a shared HTTPX client wrapped in Hishel caching (`DocsToKG.ContentDownload.httpx_transport`), removing the legacy `ThreadLocalSessionFactory`/`create_session` helpers. Transport overrides use `configure_http_client()` and `purge_http_cache()`, Tenacity sleeps are patched via `DocsToKG.ContentDownload.networking.time.sleep`, and all retries operate on `httpx.Response` semantics.
 - `_validate_cached_artifact` short-circuits on matching size/mtime and only recomputes digests when `verify_cache_digest=True`, backed by an in-process LRU cache.
 

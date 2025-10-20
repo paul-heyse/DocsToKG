@@ -52,7 +52,7 @@ Scope boundary: Ingests chunked documents, maintains FAISS/OpenSearch-style inde
 ---
 
 ## Prerequisites & dependencies
-- **Runtime**: Linux with CUDA 12-capable NVIDIA GPUs; Python 3.10+. CPU-only usage is possible (fallback to FAISS CPU) but sacrifices latency/fusion quality.
+- **Runtime**: Linux with CUDA 12-capable NVIDIA GPUs; Python 3.13+. CPU-only usage is possible (fallback to FAISS CPU) but sacrifices latency/fusion quality.
 - **Packages**: Install `DocsToKG[hybrid-search]` plus the bundled `faiss-gpu` wheel. The wheel surface area, CUDA/OpenBLAS requirements, and GPU helper APIs are documented in [faiss-gpu-wheel-reference.md](./faiss-gpu-wheel-reference.md); keep that file handy whenever you upgrade drivers or CUDA runtimes. Optional extras:
   - `torch` / `sentence-transformers` when running lexical transformers externally.
   - `uvicorn` / FastAPI (or similar) when embedding the service in an API server.
