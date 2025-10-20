@@ -1,128 +1,110 @@
 # 1. Module: cli
 
 Reference for ``DocsToKG.DocParsing.core.cli`` – the Typer-based command line
-suite that fronts the DocParsing stages and preserves the legacy argparse
-surfaces for downstream automation.
+suite that now drives the DocParsing stages through typed wrappers while
+preserving the legacy helpers for downstream automation.
 
 ## 1. Overview
 
-The module now exports a single `typer.Typer` application (`app`) that routes
-subcommands (`doctags`, `chunk`, `embed`, `token-profiles`, `plan`, `manifest`,
-`all`) through the existing stage orchestrators. Each subcommand keeps the
-argparse parser it used before the refactor so `--help` output, defaults, and
-validation remain unchanged.
+The module exposes a single `typer.Typer` application (`app`) plus a collection
+of helper utilities that translate typed Typer options into the `argv` lists the
+existing stage helpers expect. Every subcommand keeps the underlying argparse
+parsers intact so `doctags()`, `chunk()`, `embed()`, `run_all()` and friends
+continue to accept `Sequence[str] | None` and return integer exit codes exactly
+as before. Typer supplies the surface UX (help output, type conversion, flag
+aliases) while the helpers ensure parity with the legacy argparse behaviour.
 
 ## 2. Functions
 
+### `_append_option(argv, flag, value, *, formatter=str, default=_DEFAULT_SENTINEL)`
+Append an option/value pair to ``argv`` when ``value`` is set and differs from
+``default``. Used by the subcommand builders to avoid altering legacy defaults.
+
+### `_append_flag(argv, flag, enabled)`
+Append ``flag`` to ``argv`` when ``enabled`` is ``True``.
+
+### `_append_multi_values(argv, flag, values, *, formatter=str)`
+Append ``flag`` for each entry in ``values`` (used for repeatable options).
+
+### `_build_doctags_cli_args(...)`
+Return the legacy ``docparse doctags`` argv list based on the typed Typer
+parameters (mode, directories, vLLM options, resume flags, etc.).
+
+### `_build_chunk_cli_args(...)`
+Translate Typer inputs for ``docparse chunk`` into the argv list consumed by the
+chunker helper.
+
+### `_build_embed_cli_args(...)`
+Translate Typer inputs for ``docparse embed`` into the argv list consumed by the
+embedding helper (including planning, cache, and sharding flags).
+
+### `_build_token_profiles_cli_args(...)`
+Compose the argv list for ``docparse token-profiles`` while honouring optional
+repeatable ``--tokenizer`` values.
+
+### `_build_manifest_cli_args(...)`
+Build the argv list for ``docparse manifest`` (stages, tail, summary flags).
+
+### `_build_run_all_cli_args(...)`
+Build the shared argv list for ``docparse all`` / ``docparse plan`` so the
+orchestrator helper continues to orchestrate doctags → chunk → embed.
+
 ### `_run_stage(handler, argv)`
-Execute a stage handler while normalising DocParsing `CLIValidationError`
-exceptions.
+Execute a stage helper while normalising DocParsing ``CLIValidationError``
+exceptions to match legacy error formatting.
 
 ### `build_doctags_parser(prog)`
-Return the argparse parser for the DocTags conversion command.
+Return the argparse parser for the DocTags conversion command (still used by the
+legacy helper).
 
-### `_doctags_help_text()`
-Render the legacy `docparse doctags` help text used by the Typer wrapper.
+### `doctags(argv)`, `chunk(argv)`, `embed(argv)`, `token_profiles(argv)`,
+`plan(argv)`, `manifest(argv)`, `run_all(argv)`
+Unchanged legacy entry points – now shared by the Typer commands and downstream
+automation.
 
-### `_resolve_doctags_paths(args)`
-Resolve mode, input, and output directories for the DocTags stage.
+### `_import_chunk_module()` / `_chunk_import_error_messages(exc)`
+Retained helpers that lazily import the optional chunker module and render
+friendly dependency errors.
 
-### `doctags(argv)`
-Invoke the DocTags conversion workflow, returning the exit code.
+## 3. Typer Commands
 
-### `_chunk_import_error_messages(exc)`
-Produce the user-facing messages shown when optional chunking dependencies are
-missing.
+Each command accepts typed parameters via `typing_extensions.Annotated` +
+`typer.Option(...)`, maps them to the legacy argv list via the helper functions
+above, and then calls the existing stage helper so behaviour (exit codes,
+validation, optional dependency handling) remains unchanged.
 
-### `_import_chunk_module()`
-Reload and return the chunking module, refreshing the package cache.
+### `_doctags_cli(...)`
+Typer surface for ``docparse doctags`` (includes hidden ``--pdf`` / ``--html``
+aliases for the old mode shortcuts).
 
-### `_chunk_help_text()`
-Render the legacy `docparse chunk` help output (or dependency guidance).
+### `_chunk_cli(...)`
+Typer surface for ``docparse chunk`` with typed options for presets, directories
+and resume flags.
 
-### `chunk(argv)`
-Execute the Docling hybrid chunker subcommand.
+### `_embed_cli(...)`
+Typer surface for ``docparse embed`` covering cache controls, sharding options,
+format selection, and planning flags.
 
-### `embed(argv)`
-Run the embedding pipeline subcommand.
+### `_token_profiles_cli(...)`
+Typer surface for ``docparse token-profiles`` with repeatable ``--tokenizer``
+options.
 
-### `_embed_help_text()`
-Render the legacy `docparse embed` help output.
+### `_manifest_cli(...)`
+Typer surface for ``docparse manifest`` – mirrors the legacy parser flags for
+stage filtering, tailing, and formatting.
 
-### `token_profiles(argv)`
-Execute the tokenizer profiling subcommand.
+### `_plan_cli(...)`
+Typer surface for ``docparse plan`` that injects the ``--plan`` flag while
+respecting all orchestrator options.
 
-### `_token_profiles_help_text()`
-Render the legacy `docparse token-profiles` help output (or dependency guidance).
-
-### `plan(argv)`
-Display the doctags → chunk → embed plan without executing any stages.
-
-### `manifest(argv)`
-Inspect pipeline manifest artifacts via CLI.
-
-### `_build_manifest_parser()`
-Construct the argparse parser shared by the manifest command and help wrapper.
-
-### `_manifest_help_text()`
-Render the legacy `docparse manifest` help output.
-
-### `_manifest_main(argv)`
-Implementation backing the `docparse manifest` subcommand.
-
-### `_build_run_all_parser()`
-Construct the argparse parser used by both `docparse all` and `docparse plan`.
-
-### `_run_all_help_text()`
-Render the legacy `docparse all` help output.
-
-### `_plan_help_text()`
-Render the legacy `docparse plan` help output.
-
-### `_build_stage_args(args)`
-Construct doctags/chunk/embed argument lists for the `docparse all` orchestrator.
-
-### `run_all(argv)`
-Run doctags → chunk → embed sequentially, respecting resume/force flags.
-
-### `_forward_with_context(ctx, handler)`
-Bridge Typer context arguments into the legacy argparse handlers and exit with
-their status codes.
-
-### `_doctags_cli(ctx)`
-Typer callback for the `docparse doctags` command.
-
-### `_chunk_cli(ctx)`
-Typer callback for the `docparse chunk` command.
-
-### `_embed_cli(ctx)`
-Typer callback for the `docparse embed` command.
-
-### `_token_profiles_cli(ctx)`
-Typer callback for the `docparse token-profiles` command.
-
-### `_plan_cli(ctx)`
-Typer callback for the `docparse plan` command.
-
-### `_manifest_cli(ctx)`
-Typer callback for the `docparse manifest` command.
-
-### `_all_cli(ctx)`
-Typer callback for the `docparse all` command.
+### `_all_cli(...)`
+Typer surface for ``docparse all`` including the ``--plan/--plan-only`` flag to
+mimic legacy behaviour.
 
 ### `main(argv)`
-Entry point used by ``python -m DocsToKG.DocParsing.core.cli``; runs the Typer
-application with the provided argument list and returns the resulting exit code.
-
-## 3. Classes
-
-### `_ParserHelpCommand`
-Custom Typer command subclass that appends the legacy argparse help text to the
-Typer-generated help output.
-
-### `_ManifestHelpFormatter`
-ArgumentDefaultsHelpFormatter variant that preserves hyphenated aliases on a
-single line.
+Entry point used by ``python -m DocsToKG.DocParsing.core.cli``; forwards the
+argument list to the Typer app so help output triggers ``SystemExit`` the same as
+argparse while keeping programmatic imports intact.
 
 ## 4. Variables
 

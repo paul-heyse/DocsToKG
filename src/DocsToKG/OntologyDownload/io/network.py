@@ -506,6 +506,7 @@ class DownloadResult:
     last_modified: Optional[str]
     content_type: Optional[str]
     content_length: Optional[int]
+    cache_status: Optional[Mapping[str, object]] = None
 
 
 def _parse_retry_after(value: Optional[str]) -> Optional[float]:
@@ -666,6 +667,7 @@ class _StreamOutcome:
     content_type: Optional[str]
     content_length: Optional[int]
     from_cache: bool
+    cache_status: Optional[Mapping[str, object]] = None
 
 
 def _conditional_headers_from_manifest(
@@ -1034,6 +1036,9 @@ def _download_once(
                 extensions=extensions,
             ) as response:
                 status_code = response.status_code
+                cache_status = response.extensions.get("ontology_cache_status")
+                if not isinstance(cache_status, Mapping):
+                    cache_status = None
                 if status_code in {429, 503}:
                     retry_delay = _apply_retry_after_from_response(
                         response=response,
@@ -1065,6 +1070,7 @@ def _download_once(
                         content_type=content_type_hint,
                         content_length=content_length_hint,
                         from_cache=True,
+                        cache_status=cache_status,
                     )
                 response.raise_for_status()
                 content_type_header = response.headers.get("Content-Type")
@@ -1127,6 +1133,9 @@ def _download_once(
             extensions=extensions,
         ) as response:
             status_code = response.status_code
+            cache_status = response.extensions.get("ontology_cache_status")
+            if not isinstance(cache_status, Mapping):
+                cache_status = None
             logger.info(
                 "download GET response status=%s resume_position=%s",
                 status_code,
@@ -1179,6 +1188,7 @@ def _download_once(
                     content_type=content_type_hint,
                     content_length=content_length_hint,
                     from_cache=True,
+                    cache_status=cache_status,
                 )
 
             response.raise_for_status()
@@ -1218,6 +1228,7 @@ def _download_once(
                 content_type=response.headers.get("Content-Type") or content_type_hint,
                 content_length=raw_length,
                 from_cache=False,
+                cache_status=cache_status,
             )
 
 def _safe_int(value: Optional[str]) -> Optional[int]:
@@ -1469,6 +1480,7 @@ def download_stream(
             last_modified=last_modified,
             content_type=content_type,
             content_length=content_length,
+            cache_status=outcome.cache_status,
         )
 
     raise OntologyDownloadError(

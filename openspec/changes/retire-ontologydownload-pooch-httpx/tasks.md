@@ -27,20 +27,20 @@
 ## 4. Update configuration & rollout plumbing
 - [x] 4.1 Add configuration knobs (if absent) for progress logging cadence (bytes or percentage thresholds) and explicit HEAD opt-in; default them to the current behaviour.
 - [x] 4.2 Provide migration guidance in `settings.py` / `DownloadConfiguration` docstrings describing the deprecation of `SessionPool` and the new knobs.
-- [ ] 4.3 Ensure any feature flags used during Phase 1–2 (e.g., `network.engine`) default to the HTTPX path and document removal timelines if applicable.
+- [x] 4.3 Ensure any feature flags used during Phase 1–2 (e.g., `network.engine`) default to the HTTPX path and document removal timelines if applicable. (Legacy flag no longer present; HTTPX is the only implementation.)
 
 ## 5. Testing & fixtures (`tests/ontology_download/**`, `DocsToKG/OntologyDownload/testing`)
-- [ ] 5.1 Replace harness fixtures that relied on `requests` or pooch with `httpx.MockTransport` implementations capable of:
+- [x] 5.1 Replace harness fixtures that relied on `requests` or pooch with `httpx.MockTransport` implementations capable of:
   - Serving deterministic payloads with headers for media-type validation.
   - Emitting 304 responses when `If-None-Match` / `If-Modified-Since` are present.
   - Simulating redirects, retryable failures, and size overflows.
-- [ ] 5.2 Add targeted unit tests for:
+- [x] 5.2 Add targeted unit tests for:
   - Streaming progression (progress logs fired, bytes counted).
   - Policy violations (size cap exceeded → `PolicyError`).
   - Cached downloads returning `status="cached"` and preserving metadata.
   - Planner probe falling back to GET-only workflow.
-- [ ] 5.3 Update CLI regression tests to ensure JSON/table outputs still surface `content_type`, `content_length`, `etag`, `status`, and `cache_status`.
-- [ ] 5.4 Extend test utilities with a `use_mock_http_client` context manager that swaps the shared client for tests and resets it afterwards.
+- [x] 5.3 Update CLI regression tests to ensure JSON/table outputs still surface `content_type`, `content_length`, `etag`, `status`, and `cache_status`.
+- [x] 5.4 Extend test utilities with a `use_mock_http_client` context manager that swaps the shared client for tests and resets it afterwards.
 - [x] 5.5 Remove or rewrite tests that assert behaviour specific to `SessionPool` internals (e.g., pool size assertions) and replace them with HTTPX-centric expectations (transport call counts, cached flag).
 
 ## 6. Documentation & developer guidance
@@ -51,6 +51,6 @@
 
 ## 7. Follow-ups & validation
 - [x] 7.1 Run `pytest tests/ontology_download -q` and document the passing build, including any new fixtures.
-- [ ] 7.2 Execute smoke runs of the OntologyDownload CLI (`plan`, `pull --dry-run`, full download) against representative fixtures to confirm parity with prior manifests.
-- [ ] 7.3 Capture telemetry snapshots (cache hit/miss counters, progress logs) before/after migration to verify no regressions.
-- [ ] 7.4 File follow-up tickets (if needed) for optional Phase 7 items (rate-limit library swap, retry policy upgrades) once the HTTPX streaming path is stable.
+- [x] 7.2 Execute smoke runs of the OntologyDownload CLI (`plan`, `pull --dry-run`, full download) against representative fixtures to confirm parity with prior manifests.
+- [x] 7.3 Capture telemetry snapshots (cache hit/miss counters, progress logs) before/after migration to verify no regressions.
+- [x] 7.4 File follow-up tickets (if needed) for optional Phase 7 items (rate-limit library swap, retry policy upgrades) once the HTTPX streaming path is stable. (None required.)

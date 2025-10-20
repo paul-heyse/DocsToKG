@@ -555,6 +555,67 @@ def test_download_stream_uses_cached_manifest(ontology_env, tmp_path):
     assert destination.stat().st_mtime == pytest.approx(initial_mtime)
 
 
+def test_download_stream_logs_progress(ontology_env, tmp_path, caplog):
+    """Streaming should emit progress telemetry based on configured cadence."""
+
+    fixture_url = ontology_env.register_fixture(
+        "progress.owl",
+        b"progress-body",
+        media_type="application/rdf+xml",
+        repeats=2,
+    )
+    config = ontology_env.build_download_config()
+    config.progress_log_bytes_threshold = 1
+    config.progress_log_percent_step = 0.0
+
+    destination = tmp_path / "progress.owl"
+    with caplog.at_level(logging.INFO):
+        network_mod.download_stream(
+            url=fixture_url,
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=ontology_env.cache_dir,
+            logger=_logger(),
+            expected_media_type="application/rdf+xml",
+            service="obo",
+        )
+
+    progress_entries = [record for record in caplog.records if record.getMessage() == "download progress"]
+    assert progress_entries, "Expected download progress logs to be emitted"
+
+
+def test_download_stream_enforces_size_limit(ontology_env, tmp_path):
+    """Downloads exceeding the max uncompressed size should raise PolicyError."""
+
+    large_payload = b"x" * 4096
+    fixture_url = ontology_env.register_fixture(
+        "oversized.owl",
+        large_payload,
+        media_type="application/rdf+xml",
+        repeats=1,
+    )
+    config = ontology_env.build_download_config()
+    config.max_uncompressed_size_gb = 1e-6  # ~1 KB
+
+    destination = tmp_path / "oversized.owl"
+    with pytest.raises(PolicyError):
+        network_mod.download_stream(
+            url=fixture_url,
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=ontology_env.cache_dir,
+            logger=_logger(),
+            expected_media_type="application/rdf+xml",
+            service="obo",
+        )
+
+    assert not destination.exists(), "Oversized download should be cleaned up"
+
+
 def test_download_stream_resumes_and_streams_hash(ontology_env, tmp_path):
     """Resume downloads should stitch content and report streamed hashes."""
 

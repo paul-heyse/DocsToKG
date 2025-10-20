@@ -98,9 +98,9 @@ export UNPAYWALL_EMAIL=you@example.org
 - `cli.py` – entry point wiring argument parsing, configuration resolution, run orchestration, and console summaries. Thin shim so automation can call `main(argv)` directly.
 - `args.py` – CLI surface, validation rules, `ResolvedConfig` creation (resolver instantiation, manifest planning, polite header injection).
 - `runner.py` – `DownloadRun` lifecycle (telemetry sinks, worker pools, resume hydration, OpenAlex pagination, shared HTTPX client, metrics emission).
-- `pipeline.py` – resolver registry, `ResolverConfig`, concurrency controls (token buckets, semaphores, circuit breakers), attempt logging, `ResolverMetrics`.
+- `pipeline.py` – resolver registry, `ResolverConfig`, centralized rate limiter integration, circuit breakers, attempt logging, `ResolverMetrics`.
 - `download.py` – download strategies, cache validation, robots enforcement, payload classification, manifest emission, resume logic, conditional request handling.
-- `networking.py` – shared Tenacity-backed retry controller (`request_with_retries`), conditional request helpers, polite head prechecks, telemetry hooks, and legacy token bucket/circuit breaker primitives.
+- `networking.py` – shared Tenacity-backed retry controller (`request_with_retries`), centralized pyrate-limiter transport, conditional request helpers, polite head prechecks, and telemetry hooks.
 - `httpx_transport.py` – singleton HTTPX/Hishel client factory with transport overrides, cache purge utilities, and HTTP/2 fallback logic.
 - `telemetry.py` – manifest schemas, sink implementations (`JsonlSink`, `RotatingJsonlSink`, `CsvSink`, `LastAttemptCsvSink`, `ManifestIndexSink`, `SqliteSink`, `SummarySink`, `MultiSink`), resume helpers, `RunTelemetry`.
 - `providers.py` – `WorkProvider` protocol and `OpenAlexWorkProvider` which wraps `iterate_openalex()` with retry-aware pagination and artifact normalisation.
@@ -146,7 +146,7 @@ flowchart LR
 ## Configuration Surfaces
 
 - **CLI**: `args.build_parser()` defines the public surface; validation ensures numeric bounds (`per_page`, `workers`, `concurrent_resolvers`, etc.) and enforces topic/topic-id requirements.
-- **Resolver configuration**: `pipeline.ResolverConfig` captures resolver ordering, toggles, polite headers, timeout overrides, per-domain token buckets, min-interval throttles, host Accept overrides, HEAD precheck toggles, global URL dedupe (`global_url_dedup_cap`), and resolver/domain circuit breakers. Unknown keys raise `ValueError`.
+- **Resolver configuration**: `pipeline.ResolverConfig` captures resolver ordering, toggles, polite headers, timeout overrides, and polite metadata (Accept overrides, HEAD precheck toggles, global URL dedupe caps, resolver/domain circuit breakers). Legacy throttling knobs (`domain_min_interval_s`, `domain_token_buckets`) are still parsed but mapped onto the centralized rate limiter with deprecation warnings. Unknown keys raise `ValueError`.
 - **Download configuration**: `download.DownloadConfig` normalises resume lookups, HTML extraction, robots enforcement (`RobotsCache`), content-addressed storage, digest verification, domain content rules, Accept overrides, optional chunk sizing, and exposes a `.to_context()` adapter for strategies.
 - **Mailto/polite headers**: `pyalex_shim.apply_mailto()` updates the live `pyalex.config` object when CLI or resolver config supplies a contact email.
 
@@ -159,7 +159,7 @@ flowchart LR
 - Tests can stub retry pacing by patching `DocsToKG.ContentDownload.networking.time.sleep`, or inject deterministic transports via `DocsToKG.ContentDownload.httpx_transport.configure_http_client()`.
 - When `stream=True` is requested, the helper returns an object usable as a context manager; for plain `httpx.Response` instances the module wraps them in `contextlib.nullcontext` so call sites can always use `with` blocks without inspecting types.
 - **Environment variables**: `UNPAYWALL_EMAIL`, `CORE_API_KEY`, `S2_API_KEY`, `DOAJ_API_KEY` populate resolver credentials; `PIP_REQUIRE_VIRTUALENV`, `PIP_NO_INDEX`, `PYTHONNOUSERSITE` keep the managed environment immutable.
-- **Concurrency safety**: The runner logs a warning when `workers * max_concurrent_resolvers > 32` but still honours token buckets, host semaphores, and circuit breakers to protect upstream services.
+- **Concurrency safety**: The runner logs a warning when `workers * max_concurrent_resolvers > 32` but still honours the centralized rate limiter and circuit breakers to protect upstream services.
 
 ## Telemetry & Data Contracts
 
@@ -181,6 +181,7 @@ flowchart LR
 - `core.ReasonCode` enumerates failure/skip classifications consumed by telemetry and summaries (`resolver_breaker_open`, `domain_breaker_open`, `robots_blocked`, `pdf_too_small`, etc.). Extend enums cautiously and keep analytics teams informed.
 - `download.validate_classification()` ensures resolver-reported classifications align with configuration (PDF vs HTML/XML expectations) and returns detailed `ValidationResult` objects.
 - `statistics.ResolverMetrics` and `statistics.DownloadStatistics` aggregate per-resolver attempts, successes, reasons, latency distributions, and bandwidth tracking; `summary.emit_console_summary()` mirrors `manifest.metrics.json`.
+- Rate limiter counters surface in run summaries under `rate_limiter`: backend configuration, active policies, per-host/role acquisition counts, wait averages, and block reasons.
 - Worker crashes are recorded via a synthetic `worker-crash://` manifest entry to prevent silent drops; the runner tracks `worker_failures` for visibility.
 
 ## Networking, Rate Limiting, and Politeness
@@ -189,7 +190,8 @@ flowchart LR
 - `request_with_retries()` delegates to Tenacity for capped exponential backoff with jitter, honours `Retry-After`, integrates domain content rules, and returns structured results differentiating cached vs modified responses.
 - `head_precheck()` performs HEAD or conditional GET probes, classifying likely PDFs before downloading full payloads; resolvers can disable HEAD per host via configuration.
 - `ConditionalRequestHelper` constructs `If-None-Match`/`If-Modified-Since` headers and interprets 304 responses as cache hits via `CachedResult`/`ModifiedResult`.
-- `TokenBucket`, `CircuitBreaker`, domain semaphores, and per-resolver spacing maintain concurrency discipline. Resolver and domain breakers share telemetry; thresholds/cooldowns are configurable.
+- Centralized rate limiting is provided by `DocsToKG.ContentDownload.ratelimit`, which layers a pyrate-limiter transport beneath Hishel so only cache misses consume quota. Each request tags limiter role (`metadata`, `landing`, `artifact`) and the transport records wait/block statistics exposed in manifests and run summaries. Circuit breakers remain in place for failure suppression.
+- CLI overrides (`--rate`, `--rate-mode`, `--rate-max-delay`, `--rate-backend`) and matching environment variables (`DOCSTOKG_RATE*`) configure host/role policies. Legacy flags such as `--domain-token-bucket` and `--domain-min-interval` are mapped to the centralized limiter and emit deprecation warnings.
 - `download.RobotsCache` caches robots.txt results per origin, respecting TTLs and user-agent configuration. When `--ignore-robots` is used the cache is bypassed entirely.
 
 ## Interactions with Other Packages
@@ -203,8 +205,8 @@ flowchart LR
 
 ### ResolverPipeline
 
-- `ResolverPipeline` stores resolvers by name, applies ordering overrides, and coordinates execution through per-resolver locks, global URL dedupe sets, and host-level semaphores.
-- Domain policies: `resolver_min_interval_s`, `domain_min_interval_s`, and `domain_token_buckets` combine to throttle traffic while `resolver_circuit_breakers` and host breakers shed load after repeated failures.
+- `ResolverPipeline` stores resolvers by name, applies ordering overrides, and coordinates execution through per-resolver locks and global URL dedupe sets.
+- Resolver throttling is enforced via the centralized rate limiter; legacy options (`domain_min_interval_s`, `domain_token_buckets`) are translated into limiter policies and will be removed in a future release. `resolver_circuit_breakers` and host breakers still shed load after repeated failures.
 - Attempt logging uses `AttemptRecord` to include resolver order, status, HTTP status, elapsed time, retry hints, and reason codes. Metrics track attempts, successes, skips, failures, latency percentiles, and error reasons per resolver.
 - Global dedupe consults `ManifestUrlIndex` first, then updates in-memory sets under thread locks to prevent duplicate downloads across workers.
 
@@ -250,7 +252,7 @@ python -m DocsToKG.ContentDownload.cli --topic "vision" --year-start 2024 --year
 - Preserve manifest schemas (`MANIFEST_SCHEMA_VERSION`, `SQLITE_SCHEMA_VERSION`) and bump them in lockstep with downstream tooling when introducing breaking changes.
 - Register new resolvers via `resolvers/__init__.py` so toggles and ordering remain centralised; follow `ApiResolverBase` conventions for retry/backoff integration.
 - Maintain `ResolvedConfig` immutability; introduce helper constructors rather than mutating at runtime. Mutations should flow through `DownloadRun` or explicit helpers.
-- Keep rate limits polite—adjust token buckets, min-intervals, and circuit breakers via configuration rather than hard sleeps. Document any relaxations before merging.
+- Keep rate limits polite—adjust limiter policies (`--rate*`), legacy min-interval overrides, and circuit breakers via configuration rather than hard sleeps. Document any relaxations before merging.
 - Avoid disabling robots enforcement or polite headers in committed code paths; bypass only with explicit operator approval.
 - Danger zone commands: `rm -rf runs/content` (deletes cached artifacts/resume history) and `python -m DocsToKG.ContentDownload.cli --ignore-robots` (bypasses robots protections).
 

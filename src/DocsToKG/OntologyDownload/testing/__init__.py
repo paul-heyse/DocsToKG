@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import socket
+from email.utils import parsedate_to_datetime
 import threading
 import time
 from collections import defaultdict, deque
@@ -378,6 +379,34 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
 
         env = self
 
+        def _should_return_not_modified(
+            request: httpx.Request, headers: Mapping[str, str]
+        ) -> bool:
+            response_etag = headers.get("ETag")
+            if_none_match = request.headers.get("if-none-match")
+            if if_none_match and response_etag:
+                candidates = [token.strip() for token in if_none_match.split(",") if token.strip()]
+                normalized = response_etag.strip()
+                weak = normalized[2:] if normalized.startswith("W/") else normalized
+                for token in candidates:
+                    if token == "*":
+                        return True
+                    unquoted = token.strip('"')
+                    if unquoted == normalized.strip('"') or unquoted == weak.strip('"'):
+                        return True
+
+            if_modified_since = request.headers.get("if-modified-since")
+            last_modified = headers.get("Last-Modified")
+            if if_modified_since and last_modified:
+                try:
+                    request_time = parsedate_to_datetime(if_modified_since)
+                    response_time = parsedate_to_datetime(last_modified)
+                except (TypeError, ValueError, IndexError):
+                    return if_modified_since.strip() == last_modified.strip()
+                if request_time and response_time and response_time <= request_time:
+                    return True
+            return False
+
         def _handler(request: httpx.Request) -> httpx.Response:
             path = request.url.path or "/"
             normalized_headers = {
@@ -400,6 +429,19 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
                 time.sleep(spec.delay_sec)
 
             headers = dict(spec.headers)
+            cache_key = (request.method.upper(), path)
+            if _should_return_not_modified(request, headers):
+                env._responses[cache_key].appendleft(spec)
+                limited_headers = {
+                    key: value
+                    for key, value in headers.items()
+                    if key in {"ETag", "Last-Modified", "Cache-Control"}
+                }
+                return httpx.Response(
+                    304,
+                    headers=limited_headers,
+                    request=request,
+                )
             if spec.stream:
 
                 def iterator() -> Iterable[bytes]:
@@ -465,7 +507,12 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
     # --- Configuration helpers ----------------------------------------------------
 
     def build_download_config(self) -> DownloadConfiguration:
-        """Return a download configuration bound to this harness."""
+        """Return a download configuration bound to this harness.
+
+        The returned configuration uses the harness-managed bucket provider and
+        honours ``rate_limiter_mode`` so tests can exercise both pyrate and
+        legacy implementations deterministically.
+        """
 
         config = DownloadConfiguration()
         config.set_bucket_provider(self._bucket_provider)

@@ -1,0 +1,40 @@
+- [ ] 1.1 Inventory current embedding runtime coupling.
+  - [ ] 1.1.1 Trace every import and helper in `src/DocsToKG/DocParsing/embedding/runtime.py` that pulls vLLM, sentence-transformers, SPLADE, or BM25 internals (e.g., `_get_vllm_components`, `_QWEN_LLM_CACHE`, `QwenEmbeddingQueue`, `_get_sparse_encoder_cls`); document call sites and data passed to each backend.
+  - [ ] 1.1.2 Record existing CLI flags, env vars, and `EmbedCfg` fields that govern dense, sparse, lexical settings so they can be mapped into the new provider keys.
+  - [ ] 1.1.3 Capture baseline telemetry/manifest fields produced by the embed pipeline for later parity checks.
+- [ ] 1.2 Scaffold the provider package.
+  - [ ] 1.2.1 Create `DocsToKG/DocParsing/embedding/backends/__init__.py` and `base.py` with `DenseEmbeddingBackend`, `SparseEmbeddingBackend`, `LexicalEmbeddingBackend` protocols (or ABCs), plus a `ProviderError` dataclass carrying `provider`, `category`, `detail`, and `retryable` fields.
+  - [ ] 1.2.2 Implement a `ProviderFactory` module that accepts `EmbedCfg`, resolves `dense/sparse/lexical` backend selections, and yields ready-to-use provider instances without importing concrete backends until needed.
+  - [ ] 1.2.3 Add lightweight utility hooks (e.g., device hints, normalization helpers) that providers can share without re-introducing runtime coupling.
+- [ ] 1.3 Implement dense providers.
+  - [ ] 1.3.1 Port the existing sentence-transformers dense embedding path into `dense/sentence_transformers.py`, respecting `embedding.batch_size`, per-backend overrides, cache directory hints, normalization, and offline mode.
+  - [ ] 1.3.2 Build `dense/tei.py` with HTTP session management, URL validation, TLS defaults, inflight concurrency caps, retry taxonomy, and a configurable timeout adapter.
+  - [ ] 1.3.3 Migrate the Qwen/vLLM logic into `dense/qwen_vllm.py`, folding `_QWEN_LLM_CACHE`, `QwenEmbeddingQueue`, queue depth configuration, warmup, and model directory handling inside the provider.
+  - [ ] 1.3.4 Ensure each dense provider reports `provider_name`, `model_id@rev`, `device`, `dtype`, batch/concurrency hints, open/embed latency, and normalization status via telemetry callbacks supplied by the runtime/factory.
+- [ ] 1.4 Implement sparse and lexical providers.
+  - [ ] 1.4.1 Wrap SPLADE sentence-transformers usage in `sparse/splade_st.py`, moving dependency checks (`_ensure_splade_dependencies`), attention backend selection, and sparsity thresholds into provider-local code.
+  - [ ] 1.4.2 Rehost the BM25 stats accumulator/vectorization logic inside `lexical/local_bm25.py`, ensuring stats accumulation and vectorization share tokenization, respect `k1`/`b` settings, and expose deterministic ordering.
+  - [ ] 1.4.3 Provide shims (or `NotImplementedError`) for future providers (`dense.fallback`, `lexical.pyserini`) so the factory has explicit placeholders and test coverage for `backend=none`.
+- [ ] 1.5 Rework configuration and CLI plumbing.
+  - [ ] 1.5.1 Update `EmbedCfg` (and related Pydantic/dataclass loaders) to introduce `embedding.*`, `dense.*`, `sparse.*`, and `lexical.*` keys with defaults from the provider spec; maintain structured validation errors with remediation hints.
+  - [ ] 1.5.2 Implement precedence logic: config file → env var → CLI, with CLI winning, and ensure each source populates the nested keys.
+  - [ ] 1.5.3 Wire legacy flags/env vars (`--bm25-k1`, `DOCSTOKG_QWEN_DIR`, etc.) into the new keys, emitting one-line deprecation warnings and ensuring “new key wins” when both present.
+  - [ ] 1.5.4 Extend the Typer CLI (`DocsToKG.DocParsing.core.embed`) to expose `--dense-backend`, `--sparse-backend`, `--lexical-backend`, and provider-specific options while still accepting legacy flags.
+- [ ] 1.6 Integrate providers into the runtime.
+  - [ ] 1.6.1 Replace runtime calls to `_get_vllm_components`, `_get_sparse_encoder_cls`, `_QWEN_LLM_CACHE`, and `QwenEmbeddingQueue` with provider instances from `ProviderFactory`.
+  - [ ] 1.6.2 Ensure `process_pass_a`/`process_chunk_file_vectors` request providers once per run (`open`), use them for every batch, and call `close()` in `finally` blocks even when errors occur.
+  - [ ] 1.6.3 Remove backend-specific globals, queues, and caches from `embedding.runtime`, keeping only orchestration, manifest writing, and vector writer seams.
+  - [ ] 1.6.4 Confirm dense-disabled (`dense.backend=none`), sparse-disabled, and lexical-disabled configurations skip the corresponding work without writing empty vectors or breaking telemetry.
+- [ ] 1.7 Telemetry and error handling.
+  - [ ] 1.7.1 Standardize telemetry emission so vector manifests/logs include `provider_name`, version/model revision, `device`, `dtype`, effective batch size, max inflight requests, timings, normalization flag, and fallback usage.
+  - [ ] 1.7.2 Route backend failures through `ProviderError`, mapping categories (init, validation, network, runtime) to structured telemetry and CLI messaging.
+  - [ ] 1.7.3 Add optional hooks so providers can register fallback attempts (e.g., switch from Qwen to TEI) and expose that outcome to calling code.
+- [ ] 1.8 Testing & parity verification.
+  - [ ] 1.8.1 Write unit tests for the factory covering every backend selection (`qwen_vllm`, `tei`, `sentence_transformers`, `splade_st`, `local_bm25`, `none`) including config precedence and legacy alias mapping.
+  - [ ] 1.8.2 Add provider-specific tests: dense outputs normalized and dimensionally correct, TEI URL validation, SPLADE non-negative weights, BM25 stats/vector determinism.
+  - [ ] 1.8.3 Create golden parity tests that run the embed pipeline with default config and assert JSONL/Parquet vectors match pre-refactor expectations (or float-close within tolerance).
+  - [ ] 1.8.4 Ensure optional dependency tests skip gracefully when vLLM/TEI libraries are absent, maintaining CI stability.
+- [ ] 1.9 Documentation & migration notes.
+  - [ ] 1.9.1 Update DocParsing README/API references to list available providers, required keys, offline expectations, and examples (`dense.backend=tei` with `DOCSTOKG_TEI_URL`).
+  - [ ] 1.9.2 Extend `docs-instruct` provider guides with best practices for adding new providers, linking to ProviderOverview cleanly.
+  - [ ] 1.9.3 Document deprecation timeline for legacy flags/envs and suggest migration plans for downstream automation.

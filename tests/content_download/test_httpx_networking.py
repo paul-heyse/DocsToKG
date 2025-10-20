@@ -17,6 +17,7 @@ from DocsToKG.ContentDownload.download import (
     RobotsCache,
     download_candidate,
 )
+from DocsToKG.ContentDownload.errors import RateLimitError
 from DocsToKG.ContentDownload.networking import ConditionalRequestHelper, request_with_retries
 
 
@@ -185,3 +186,27 @@ def test_robots_cache_reuses_shared_client(install_mock_http_client) -> None:
     assert not cache.is_allowed(client, "https://example.org/forbidden", timeout=2.0)
     assert not cache.is_allowed(client, "https://example.org/forbidden", timeout=2.0)
     assert calls == 1
+
+
+def test_request_with_retries_does_not_retry_rate_limit_error() -> None:
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        raise RateLimitError("blocked", host="example.org", role="metadata")
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    with pytest.raises(RateLimitError):
+        request_with_retries(
+            client,
+            "GET",
+            "https://example.org/resource",
+            max_retries=5,
+            backoff_factor=0.0,
+            backoff_max=0.0,
+        )
+
+    client.close()
+    assert attempts == 1

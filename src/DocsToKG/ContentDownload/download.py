@@ -2114,6 +2114,21 @@ def build_download_outcome(
         normalize_manifest_path(extracted_text_path) if extracted_text_path else None
     )
 
+    metadata: Dict[str, Any] = {}
+    if response is not None:
+        req_meta = response.request.extensions.get("docs_network_meta")
+        if isinstance(req_meta, Mapping):
+            metadata["network"] = dict(req_meta)
+            rl_snapshot = {
+                "wait_ms": req_meta.get("rate_limiter_wait_ms"),
+                "backend": req_meta.get("rate_limiter_backend"),
+                "mode": req_meta.get("rate_limiter_mode"),
+                "role": req_meta.get("rate_limiter_role"),
+            }
+            cleaned = {k: v for k, v in rl_snapshot.items() if v is not None}
+            if cleaned:
+                metadata["rate_limiter"] = cleaned
+
     return DownloadOutcome(
         classification=classification_code,
         path=path_str,
@@ -2128,6 +2143,7 @@ def build_download_outcome(
         last_modified=last_modified,
         extracted_text_path=normalized_text_path,
         retry_after=retry_after,
+        metadata=metadata,
     )
 
 

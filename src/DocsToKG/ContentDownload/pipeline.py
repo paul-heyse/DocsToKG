@@ -2110,20 +2110,20 @@ class ResolverPipeline:
 
         retry_after_hint = outcome.retry_after
 
-            metadata_payload: Dict[str, Any] = {}
-            resolver_metadata = getattr(result, "metadata", None)
-            if isinstance(resolver_metadata, dict):
-                metadata_payload.update(resolver_metadata)
-            outcome_metadata = getattr(outcome, "metadata", None)
-            if isinstance(outcome_metadata, dict):
-                metadata_payload.update(outcome_metadata)
-            extra_context = getattr(download_context, "extra", None)
-            if isinstance(extra_context, dict) and extra_context.get("resume_disabled"):
-                metadata_payload["resume_disabled"] = True
-            # Strip any legacy resume hints to avoid re-enabling deprecated range flows.
-            for key in list(metadata_payload):
-                if key.startswith("resume_") and key != "resume_disabled":
-                    metadata_payload.pop(key, None)
+        metadata_payload: Dict[str, Any] = {}
+        resolver_metadata = getattr(result, "metadata", None)
+        if isinstance(resolver_metadata, dict):
+            metadata_payload.update(resolver_metadata)
+        outcome_metadata = getattr(outcome, "metadata", None)
+        if isinstance(outcome_metadata, dict):
+            metadata_payload.update(outcome_metadata)
+        extra_context = getattr(download_context, "extra", None)
+        if isinstance(extra_context, dict) and extra_context.get("resume_disabled"):
+            metadata_payload["resume_disabled"] = True
+        # Strip any legacy resume hints to avoid re-enabling deprecated range flows.
+        for key in list(metadata_payload):
+            if key.startswith("resume_") and key != "resume_disabled":
+                metadata_payload.pop(key, None)
 
             self._emit_attempt(
                 AttemptRecord(

@@ -14,7 +14,7 @@
 ## 2. Verification
 - [x] 2.1 Add unit tests for the new manager covering key normalisation, rate override refresh, backend selection (in-memory vs SQLite), and cache reset behaviour. Use a temp directory for SQLite tests.
 - [x] 2.2 Add a regression test in `tests/ontology_download` that simulates a Retry-After response and asserts the retry loop sleeps before acquiring the limiter again without direct state mutation.
-- [ ] 2.3 Add resolver-focused tests ensuring per-service overrides still apply (e.g., OLS vs default host), and that shared buckets throttle multiple resolver calls.
+- [x] 2.3 Add resolver-focused tests ensuring per-service overrides still apply (e.g., OLS vs default host), and that shared buckets throttle multiple resolver calls.
 - [x] 2.4 Ensure `DocsToKG.OntologyDownload.testing` exposes helpers to swap between `"pyrate"` and `"legacy"` modes; add tests that verify custom `get_bucket_provider` hooks continue to work.
-- [ ] 2.5 Run `./.venv/bin/pytest tests/ontology_download -q` (both default and with `ONTOfetch_RATE_LIMITER=legacy` if exposed), plus `./.venv/bin/ruff check`, `./.venv/bin/mypy`, and documentation validators to satisfy CI parity.
-- [ ] 2.6 Execute `./.venv/bin/python -m DocsToKG.OntologyDownload.cli doctor --json` and capture the updated HTTP diagnostics for release notes (showing the new `rate_limiter` field and backend per host).
+- [x] 2.5 Run `./.venv/bin/pytest tests/ontology_download -q` (both default and with `ONTOfetch_RATE_LIMITER=legacy` if exposed), plus `./.venv/bin/ruff check`, `./.venv/bin/mypy`, and documentation validators to satisfy CI parity.
+- [x] 2.6 Execute `./.venv/bin/python -m DocsToKG.OntologyDownload.cli doctor --json` and capture the updated HTTP diagnostics for release notes (showing the new `rate_limiter` field and backend per host).

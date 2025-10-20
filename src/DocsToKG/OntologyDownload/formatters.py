@@ -10,9 +10,10 @@ presentation semantics.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
 from .planning import FetchResult, PlannedFetch
+from .io import format_bytes
 
 PlanRow = Tuple[str, str, str, str, str, str, str, str]
 
@@ -31,6 +32,10 @@ RESULT_TABLE_HEADERS: Tuple[str, ...] = (
     "id",
     "resolver",
     "status",
+    "content_type",
+    "bytes",
+    "etag",
+    "cache",
     "sha256",
     "expected_checksum",
     "file",
@@ -100,7 +105,7 @@ def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[PlanRow]:
 def format_results_table(results: Iterable[FetchResult]) -> str:
     """Render download results as a table summarizing status and file paths."""
 
-    rows: List[Tuple[str, str, str, str, str, str]] = []
+    rows: List[Tuple[str, str, str, str, str, str, str, str, str, str]] = []
     for result in results:
         checksum_text = ""
         checksum_obj = getattr(result, "expected_checksum", None)
@@ -119,11 +124,30 @@ def format_results_table(results: Iterable[FetchResult]) -> str:
                     checksum_text = (
                         f"{algo}:{value[:12]}…" if len(value) > 12 else f"{algo}:{value}"
                     )
+        content_type = getattr(result, "content_type", "") or ""
+        content_length = getattr(result, "content_length", None)
+        bytes_text = (
+            format_bytes(int(content_length)) if isinstance(content_length, int) else ""
+        )
+        etag = getattr(result, "etag", "") or ""
+        cache_info = getattr(result, "cache_status", None)
+        cache_label = ""
+        if isinstance(cache_info, Mapping):
+            if cache_info.get("from_cache"):
+                cache_label = "hit"
+                if cache_info.get("revalidated"):
+                    cache_label += " (revalidated)"
+            elif cache_info:
+                cache_label = "miss"
         rows.append(
             (
                 result.spec.id,
                 result.spec.resolver,
                 result.status,
+                content_type,
+                bytes_text,
+                etag,
+                cache_label,
                 result.sha256,
                 checksum_text,
                 str(result.local_path),

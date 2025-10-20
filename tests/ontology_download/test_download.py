@@ -7,7 +7,9 @@ policies during real downloads.
 
 import logging
 import time
+from contextlib import contextmanager
 
+import httpx
 import pytest
 
 from DocsToKG.OntologyDownload.errors import DownloadFailure, PolicyError
@@ -410,9 +412,6 @@ def test_stream_timeout_removes_partial_files(ontology_env, tmp_path):
     assert not list(ontology_env.cache_dir.rglob("*.part"))
 
 def test_retry_after_triggers_sleep(tmp_path):
-    import httpx
-    from contextlib import contextmanager
-
     delays: list[float] = []
 
     def fake_sleep(seconds: float) -> None:

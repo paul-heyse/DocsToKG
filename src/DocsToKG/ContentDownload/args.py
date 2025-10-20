@@ -39,7 +39,7 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from itertools import islice
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 from pyalex import Topics, Works
 
@@ -709,6 +709,53 @@ def _parse_delay_ms(value: str) -> int:
     return _parse_interval_ms(value)
 
 
+def merge_rate_overrides(
+    base_policies: Mapping[str, RolePolicy],
+    *,
+    rate_overrides: Iterable[Tuple[str, Optional[str], List[Rate]]],
+    mode_overrides: Iterable[Tuple[str, Optional[str], str, Optional[int]]],
+    delay_overrides: Iterable[Tuple[str, str, int]],
+) -> Dict[str, RolePolicy]:
+    """Merge CLI/env overrides into cloned host policies."""
+
+    policies = clone_policies(base_policies)
+    default_template = policies.get("default")
+
+    def _ensure_policy(hostname: str) -> RolePolicy:
+        key = hostname.lower()
+        if key in policies:
+            return policies[key]
+        if default_template is not None:
+            policies[key] = clone_role_policy(default_template)
+        else:
+            policies[key] = RolePolicy()
+        return policies[key]
+
+    for host, role, rates in rate_overrides:
+        policy = _ensure_policy(host)
+        targets = ROLE_ORDER if role is None else (role,)
+        for target_role in targets:
+            policy.rates[target_role] = list(rates)
+
+    for host, role, mode, delay in mode_overrides:
+        policy = _ensure_policy(host)
+        targets = ROLE_ORDER if role is None else (role,)
+        for target_role in targets:
+            policy.mode[target_role] = mode
+            if mode == "raise":
+                policy.max_delay_ms[target_role] = 0
+            elif delay is not None:
+                policy.max_delay_ms[target_role] = delay
+            elif target_role not in policy.max_delay_ms:
+                policy.max_delay_ms[target_role] = 250
+
+    for host, role, delay_ms in delay_overrides:
+        policy = _ensure_policy(host)
+        policy.max_delay_ms[role] = delay_ms
+
+    return policies
+
+
 def resolve_config(
     args: argparse.Namespace,
     parser: argparse.ArgumentParser,
@@ -858,6 +905,22 @@ def resolve_config(
     if mailto_value:
         apply_mailto(mailto_value)
 
+    explicit_max_host = getattr(args, "max_concurrent_per_host", None)
+    if explicit_max_host is None:
+        if config.max_concurrent_per_host > 0:
+            LOGGER.warning(
+                "Disabling max_concurrent_per_host=%s in favour of centralized limiter wait budgets.",
+                config.max_concurrent_per_host,
+            )
+        config.max_concurrent_per_host = 0
+    else:
+        config.max_concurrent_per_host = explicit_max_host
+        if explicit_max_host > 0:
+            LOGGER.warning(
+                "max_concurrent_per_host=%s remains enabled; consider relying on rate limiter wait budgets instead.",
+                explicit_max_host,
+            )
+
     concurrency_product = max(args.workers, 1) * max(config.max_concurrent_resolvers, 1)
     if concurrency_product > 32:
         LOGGER.warning(
@@ -907,18 +970,6 @@ def resolve_config(
         robots_checker = RobotsCache(user_agent)
 
     manager = get_rate_limiter_manager()
-    policies = clone_policies(manager.policies())
-    default_template = policies.get("default")
-
-    def _ensure_policy(hostname: str) -> RolePolicy:
-        key = hostname.lower()
-        if key in policies:
-            return policies[key]
-        if default_template is not None:
-            policies[key] = clone_role_policy(default_template)
-        else:
-            policies[key] = RolePolicy()
-        return policies[key]
 
     try:
         rate_override_specs = [
@@ -985,27 +1036,12 @@ def resolve_config(
             "Legacy domain throttling options detected; converted to centralized rate limiter policies."
         )
 
-    for host, role, rates in rate_override_specs:
-        policy = _ensure_policy(host)
-        targets = ROLE_ORDER if role is None else (role,)
-        for target_role in targets:
-            policy.rates[target_role] = list(rates)
-
-    for host, role, mode, delay in rate_mode_specs:
-        policy = _ensure_policy(host)
-        targets = ROLE_ORDER if role is None else (role,)
-        for target_role in targets:
-            policy.mode[target_role] = mode
-            if mode == "raise":
-                policy.max_delay_ms[target_role] = 0
-            elif delay is not None:
-                policy.max_delay_ms[target_role] = delay
-            elif target_role not in policy.max_delay_ms:
-                policy.max_delay_ms[target_role] = 250
-
-    for host, role, delay_ms in rate_delay_specs:
-        policy = _ensure_policy(host)
-        policy.max_delay_ms[role] = delay_ms
+    policies = merge_rate_overrides(
+        manager.policies(),
+        rate_overrides=rate_override_specs,
+        mode_overrides=rate_mode_specs,
+        delay_overrides=rate_delay_specs,
+    )
 
     backend_config = None
     try:

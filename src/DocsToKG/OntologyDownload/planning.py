@@ -401,6 +401,11 @@ class FetchResult:
     manifest_path: Path
     artifacts: Sequence[str]
     expected_checksum: Optional[ExpectedChecksum] = None
+    etag: Optional[str] = None
+    last_modified: Optional[str] = None
+    content_type: Optional[str] = None
+    content_length: Optional[int] = None
+    cache_status: Optional[Mapping[str, object]] = None
 
 
 ResolvedConfig.model_rebuild()
@@ -2168,6 +2173,11 @@ def fetch_one(
                     manifest_path=manifest_path,
                     artifacts=artifacts,
                     expected_checksum=expected_checksum,
+                    etag=result.etag,
+                    last_modified=result.last_modified,
+                    content_type=content_type,
+                    content_length=content_length,
+                    cache_status=result.cache_status,
                 )
 
         try:

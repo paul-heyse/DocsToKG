@@ -179,14 +179,16 @@ class LimiterCache:
             self._entries.clear()
 
 
-def _build_inmemory_limiter(config: RoleConfig) -> Limiter:
+def _build_inmemory_limiter(config: RoleConfig, _: Mapping[str, Any]) -> Limiter:
+    """Return an in-memory limiter for single-process workloads."""
     bucket = InMemoryBucket(list(config.rates))
     max_delay = None if config.mode == "raise" else config.max_delay_ms
     limiter = Limiter(bucket, max_delay=max_delay)
     return limiter
 
 
-def _build_multiprocess_limiter(config: RoleConfig) -> Limiter:
+def _build_multiprocess_limiter(config: RoleConfig, _: Mapping[str, Any]) -> Limiter:
+    """Return a limiter backed by MultiprocessBucket for shared-process quotas."""
     bucket = MultiprocessBucket.init(list(config.rates))
     max_delay = None if config.mode == "raise" else config.max_delay_ms
     limiter = Limiter(bucket, max_delay=max_delay)
@@ -194,6 +196,7 @@ def _build_multiprocess_limiter(config: RoleConfig) -> Limiter:
 
 
 def _build_sqlite_limiter(config: RoleConfig, options: Mapping[str, Any]) -> Limiter:
+    """Return a limiter persisted to SQLite (options: path, table, use_file_lock)."""
     table = options.get("table", "docstokg_rate_bucket")
     db_path = options.get("path")
     use_file_lock = bool(options.get("use_file_lock", False))
@@ -211,6 +214,7 @@ def _build_sqlite_limiter(config: RoleConfig, options: Mapping[str, Any]) -> Lim
 
 
 def _build_redis_limiter(config: RoleConfig, options: Mapping[str, Any]) -> Limiter:
+    """Return a limiter backed by Redis (options: url, namespace)."""
     try:
         from redis import Redis
         from redis.asyncio import Redis as AsyncRedis  # noqa: F401 - imported for typing
@@ -236,6 +240,7 @@ def _build_redis_limiter(config: RoleConfig, options: Mapping[str, Any]) -> Limi
 
 
 def _build_postgres_limiter(config: RoleConfig, options: Mapping[str, Any]) -> Limiter:
+    """Return a limiter persisted to Postgres (options: dsn/url, table)."""
     dsn = options.get("dsn") or options.get("url")
     if not dsn:
         raise ValueError("Postgres backend requires 'dsn' (connection string) option.")
@@ -714,23 +719,56 @@ class RateLimitedTransport(httpx.BaseTransport):
         self._manager = manager or get_rate_limiter_manager()
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
+        metadata = self._before_send(request)
+        response = self._inner.handle_request(request)
+        self._attach_metadata(request, metadata)
+        return response
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        metadata = self._before_send(request)
+        handler = getattr(self._inner, "handle_async_request", None)
+        if handler is not None:
+            response = await handler(request)  # type: ignore[awaitable-return]
+        else:  # pragma: no cover - sync fallback for transports without async support
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(None, self._inner.handle_request, request)
+        self._attach_metadata(request, metadata)
+        return response
+
+    def _before_send(self, request: httpx.Request) -> Dict[str, Any]:
         host = request.url.host or ""
         role = str(request.extensions.get("role") or DEFAULT_ROLE).lower()
         method = request.method.upper()
+        outcome = self._manager.acquire(host=host, role=role, method=method)
+        if outcome.backend != "disabled":
+            LOGGER.debug(
+                "rate-acquire",
+                extra={
+                    "extra_fields": {
+                        "host": host,
+                        "role": outcome.role,
+                        "wait_ms": outcome.wait_ms,
+                        "mode": outcome.mode,
+                        "backend": outcome.backend,
+                    }
+                },
+            )
+        return {
+            "rate_limiter_wait_ms": outcome.wait_ms,
+            "rate_limiter_backend": outcome.backend,
+            "rate_limiter_mode": outcome.mode,
+            "rate_limiter_role": outcome.role,
+        }
 
-        try:
-            outcome = self._manager.acquire(host=host, role=role, method=method)
-        except RateLimitError as exc:
-            raise
-        else:
-            meta: MutableMapping[str, Any] = request.extensions.setdefault(
-                "docs_network_meta", {}
-            )  # type: ignore[assignment]
-            meta["rate_limiter_wait_ms"] = outcome.wait_ms
-            meta["rate_limiter_backend"] = outcome.backend
-            meta["rate_limiter_mode"] = outcome.mode
-            meta["rate_limiter_role"] = outcome.role
-            return self._inner.handle_request(request)
+    def _attach_metadata(self, request: httpx.Request, metadata: Mapping[str, Any]) -> None:
+        if not metadata:
+            return
+        meta: MutableMapping[str, Any] = request.extensions.setdefault(
+            "docs_network_meta", {}
+        )  # type: ignore[assignment]
+        for key, value in metadata.items():
+            if value is not None:
+                meta[key] = value
 
     def close(self) -> None:
         close = getattr(self._inner, "close", None)

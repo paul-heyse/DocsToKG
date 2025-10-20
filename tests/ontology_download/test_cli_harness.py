@@ -47,6 +47,7 @@ def test_cli_pull_json_uses_harness(ontology_env, capsys):
     """`ontofetch pull` should download via the temporary resolver and emit JSON."""
 
     resolver_name, resolver = _static_resolver_for(ontology_env, name="hp", filename="hp.owl")
+    allowed_hosts = _allowed_hosts_arg(ontology_env)
     with temporary_resolver(resolver_name, resolver):
         exit_code = cli_module.cli_main(
             [
@@ -55,15 +56,39 @@ def test_cli_pull_json_uses_harness(ontology_env, capsys):
                 "--resolver",
                 resolver_name,
                 "--allowed-hosts",
-                _allowed_hosts_arg(ontology_env),
+                allowed_hosts,
+                "--json",
+            ]
+        )
+
+        assert exit_code == 0
+        first_payload = json.loads(capsys.readouterr().out)
+        first_record = first_payload[0]
+        assert first_record["id"] == "hp"
+        assert first_record["status"] in {"fresh", "updated", "cached"}
+        assert first_record["content_type"] == "application/rdf+xml"
+        assert first_record["content_length"] == len("hp fixture\n")
+        assert isinstance(first_record.get("cache_status"), dict)
+
+        # run again to validate cached metadata is exposed
+        exit_code = cli_module.cli_main(
+            [
+                "pull",
+                "hp",
+                "--resolver",
+                resolver_name,
+                "--allowed-hosts",
+                allowed_hosts,
                 "--json",
             ]
         )
 
     assert exit_code == 0
-    output = json.loads(capsys.readouterr().out)
-    assert output[0]["id"] == "hp"
-    assert output[0]["status"] in {"fresh", "updated", "cached"}
+    second_payload = json.loads(capsys.readouterr().out)
+    cached_record = second_payload[0]
+    cache_meta = cached_record.get("cache_status") or {}
+    assert isinstance(cache_meta, dict)
+    assert "from_cache" in cache_meta
 
 
 def test_cli_defaults_to_pull_when_subcommand_missing(ontology_env, capsys):
@@ -88,8 +113,35 @@ def test_cli_defaults_to_pull_when_subcommand_missing(ontology_env, capsys):
 
     assert exit_code == 0
     output = json.loads(capsys.readouterr().out)
-    assert output[0]["id"] == "hp"
-    assert output[0]["status"] in {"fresh", "updated", "cached"}
+    record = output[0]
+    assert record["id"] == "hp"
+    assert record["status"] in {"fresh", "updated", "cached"}
+    for key in ("content_type", "content_length", "etag", "cache_status"):
+        assert key in record
+
+
+def test_cli_pull_dry_run_json(ontology_env, capsys):
+    """`ontofetch pull --dry-run` should emit plan metadata as JSON."""
+
+    resolver_name, resolver = _static_resolver_for(ontology_env, name="hp-dry-run", filename="hp.owl")
+    with temporary_resolver(resolver_name, resolver):
+        exit_code = cli_module.cli_main(
+            [
+                "pull",
+                "hp",
+                "--resolver",
+                resolver_name,
+                "--allowed-hosts",
+                _allowed_hosts_arg(ontology_env),
+                "--dry-run",
+                "--json",
+            ]
+        )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload[0]["spec"]["id"] == "hp"
+    assert payload[0]["plan"]["url"].startswith("http://")
 
 
 def test_cli_plan_json_respects_resolver(ontology_env, capsys, tmp_path):

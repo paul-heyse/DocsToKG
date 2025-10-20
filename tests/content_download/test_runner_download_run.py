@@ -44,6 +44,11 @@ from DocsToKG.ContentDownload.telemetry import (
     SummarySink,
     load_previous_manifest,
 )
+from DocsToKG.ContentDownload.ratelimit import (
+    BackendConfig,
+    clone_policies,
+    get_rate_limiter_manager,
+)
 
 
 class DummyWorks:
@@ -158,6 +163,7 @@ def make_resolved_config(
     sqlite_path = manifest_dir / "manifest.sqlite"
     resolver_config = SimpleNamespace(polite_headers={})
     query = DummyWorks(works_pages)
+    limiter_manager = get_rate_limiter_manager()
     return ResolvedConfig(
         args=args,
         run_id="run-123",
@@ -180,6 +186,11 @@ def make_resolved_config(
         openalex_retry_backoff=args.openalex_retry_backoff,
         retry_after_cap=args.retry_after_cap,
         openalex_retry_max_delay=args.openalex_retry_max_delay,
+        rate_policies=clone_policies(limiter_manager.policies()),
+        rate_backend=BackendConfig(
+            backend=limiter_manager.backend.backend,
+            options=dict(limiter_manager.backend.options),
+        ),
     )
 
 
@@ -1335,6 +1346,7 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, p
 
     args = _build_args()
     args.resume_from = resume_target
+    limiter_manager = get_rate_limiter_manager()
 
     resolved = ResolvedConfig(
         args=args,
@@ -1358,6 +1370,11 @@ def test_setup_download_state_detects_cached_artifact_from_other_cwd(tmp_path, p
         openalex_retry_backoff=args.openalex_retry_backoff,
         retry_after_cap=args.retry_after_cap,
         openalex_retry_max_delay=args.openalex_retry_max_delay,
+        rate_policies=clone_policies(limiter_manager.policies()),
+        rate_backend=BackendConfig(
+            backend=limiter_manager.backend.backend,
+            options=dict(limiter_manager.backend.options),
+        ),
     )
 
     bootstrap_run_environment(resolved)
@@ -1923,5 +1940,3 @@ def test_worker_crash_records_manifest_reason(patcher, tmp_path, worker_count):
     assert failure_record["classification"] == Classification.SKIPPED.value
     assert failure_record["reason"] == ReasonCode.WORKER_EXCEPTION.value
     assert failure_record["reason_detail"] == "worker-crash"
-
-

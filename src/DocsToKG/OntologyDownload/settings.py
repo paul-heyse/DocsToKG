@@ -15,11 +15,12 @@
 """Configuration, optional dependency, and storage utilities for ontology downloads.
 
 This module defines the typed settings models used by the CLI, environment
-overrides that surface as ``ONTOFETCH_*`` variables, rate-limit parsing, local
-cache layout, and optional dependency wiring.  It also exposes helpers for
-validating interpreter support, selecting local or fsspec storage (including CAS
-mirrors), and coercing user-provided configuration into strongly typed
-structures that downstream planners and resolvers can consume safely.
+overrides that surface as ``ONTOFETCH_*`` variables, rate-limit parsing (including
+the `rate_limiter` backend switch), local cache layout, and optional dependency
+wiring.  It also exposes helpers for validating interpreter support, selecting
+local or fsspec storage (including CAS mirrors), and coercing user-provided
+configuration into strongly typed structures that downstream planners and
+resolvers can consume safely.
 """
 
 from __future__ import annotations
@@ -44,10 +45,10 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Literal,
     Mapping,
     Optional,
     Protocol,
-    Literal,
     Set,
     Tuple,
 )
@@ -178,6 +179,9 @@ class DownloadConfiguration(BaseModel):
     The configuration now drives the HTTPX-based streaming pipeline (`io.network.download_stream`):
     * `perform_head_precheck` toggles the optional HEAD probe before issuing the GET.
     * `progress_log_percent_step` / `progress_log_bytes_threshold` control progress telemetry cadence.
+    * HTTPX + Hishel is the only supported engine (legacy `SessionPool`/requests fallbacks and the
+      `network.engine` feature flag were removed; custom clients should be installed via
+      :func:`DocsToKG.OntologyDownload.net.configure_http_client`).
     """
 
     _session_factory: Optional[Callable[[], Any]] = PrivateAttr(default=None)

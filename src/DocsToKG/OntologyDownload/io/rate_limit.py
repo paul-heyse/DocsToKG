@@ -3,6 +3,7 @@
 #   "module": "DocsToKG.OntologyDownload.io.rate_limit",
 #   "purpose": "Expose pyrate-limiter backed throttling for ontology downloads with a legacy fallback",
 #   "sections": [
+#     {"id": "interfaces", "name": "Limiter Handle Interface", "anchor": "IFC", "kind": "api"},
 #     {"id": "pyrate-manager", "name": "Pyrate Limiter Manager", "anchor": "PRT", "kind": "api"},
 #     {"id": "legacy-implementation", "name": "Legacy Token Buckets", "anchor": "LEG", "kind": "api"},
 #     {"id": "public-api", "name": "Facade & Helpers", "anchor": "API", "kind": "helpers"}
@@ -13,11 +14,11 @@
 """Rate limiting façade for ontology downloads.
 
 This module front-loads a pyrate-limiter manager that hands back blocking
-limiter handles keyed by ``(service, host)``.  The limiter instances derive
-their quotas from :class:`DownloadConfiguration`, optionally persisting state in
-SQLite so multiple processes respect shared quotas.  A legacy token-bucket
-registry is retained for ``rate_limiter='legacy'`` to support short-term roll
-backs while the pyrate-backed implementation is validated.
+handles keyed by ``(service, host)``.  The limits are derived from
+:class:`DownloadConfiguration`, optionally persisted in SQLite so multiple
+processes respect shared quotas.  A legacy token-bucket registry is retained for
+``rate_limiter='legacy'`` to support short-term rollbacks while the pyrate-backed
+implementation is validated.
 """
 
 from __future__ import annotations
@@ -68,7 +69,7 @@ _BUFFER_MS = 0
 
 
 class RateLimiterHandle(Protocol):
-    """Minimal interface shared by pyrate and legacy limiter handles."""
+    """Minimal interface that pyrate and legacy limiter adapters expose."""
 
     def consume(self, tokens: float = 1.0) -> None:
         """Acquire tokens, blocking until the limiter admits the request."""
@@ -113,7 +114,7 @@ def _normalise_shared_dir(shared_dir: Optional[Path]) -> Optional[Path]:
 
 
 class _LimiterAdapter(RateLimiterHandle):
-    """Thin wrapper providing the legacy ``consume`` interface on top of a Limiter."""
+    """Thin wrapper providing the legacy ``consume`` interface and cleanup hooks."""
 
     __slots__ = ("_limiter", "_name")
 
@@ -123,20 +124,43 @@ class _LimiterAdapter(RateLimiterHandle):
 
     def consume(self, tokens: float = 1.0) -> None:
         weight = max(1, math.ceil(tokens))
-        while True:
-            result = self._limiter.try_acquire(self._name, weight=weight)
-            if isinstance(result, bool):
-                if result:
-                    return
-                # Defensive fallback: the limiter should block internally, but guard just in case.
-                time.sleep(0.05)
-                continue
-            raise RuntimeError("Limiter produced an asynchronous result in a synchronous context")
+        result = self._limiter.try_acquire(self._name, weight=weight)
+        if isinstance(result, bool):
+            if result:
+                return
+            raise RuntimeError(
+                "Limiter returned without blocking; verify rate limiter configuration"
+            )
+        raise RuntimeError("Limiter produced an asynchronous result in a synchronous context")
+
+    def dispose(self, bucket: InMemoryBucket | SQLiteBucket) -> None:
+        """Release any background leakers and close bucket resources."""
+
+        factory = getattr(self._limiter, "bucket_factory", None)
+        leaker = getattr(factory, "_leaker", None)
+        if leaker is not None:
+            if hasattr(leaker, "deregister"):
+                try:
+                    leaker.deregister(bucket)  # type: ignore[arg-type]
+                except Exception:  # pragma: no cover - defensive cleanup
+                    pass
+            if hasattr(leaker, "join"):
+                try:
+                    leaker.join(timeout=1)  # type: ignore[attr-defined]
+                except Exception:  # pragma: no cover - defensive cleanup
+                    pass
+        dispose = getattr(self._limiter, "dispose", None)
+        if callable(dispose):
+            try:
+                dispose(bucket)
+            except Exception:  # pragma: no cover - defensive cleanup
+                pass
 
 
 @dataclass(slots=True)
 class _LimiterEntry:
     adapter: _LimiterAdapter
+    bucket: InMemoryBucket | SQLiteBucket
     rate_signature: str
     backend_signature: str
 
@@ -156,6 +180,7 @@ class _PyrateLimiterManager:
         service: Optional[str],
         host: Optional[str],
     ) -> RateLimiterHandle:
+        """Return a cached limiter handle for ``(service, host)``."""
         service_key = (service or "_").lower()
         host_key = (host or "default").lower()
         limiter_name = f"{service_key}:{host_key}"
@@ -174,15 +199,18 @@ class _PyrateLimiterManager:
             ):
                 return entry.adapter
 
-            adapter, actual_backend_signature = self._build_adapter(
+            adapter, bucket, actual_backend_signature = self._build_adapter(
                 limit_text=limit_text,
                 http_config=http_config,
                 service_key=service_key,
                 host_key=host_key,
                 limiter_name=limiter_name,
             )
+            if entry is not None:
+                entry.adapter.dispose(entry.bucket)
             self._limiters[key] = _LimiterEntry(
                 adapter=adapter,
+                bucket=bucket,
                 rate_signature=limit_text,
                 backend_signature=actual_backend_signature,
             )
@@ -190,6 +218,8 @@ class _PyrateLimiterManager:
 
     def reset(self) -> None:
         with self._lock:
+            for entry in self._limiters.values():
+                entry.adapter.dispose(entry.bucket)
             self._limiters.clear()
             self._logged.clear()
 
@@ -226,7 +256,7 @@ class _PyrateLimiterManager:
         )
         adapter = _LimiterAdapter(limiter, limiter_name)
         self._log_backend_once(limiter_name, limit_text, backend_signature)
-        return adapter, backend_signature
+        return adapter, bucket, backend_signature
 
     def _create_bucket(
         self,
@@ -462,6 +492,7 @@ class _LegacyRateLimiterRegistry:
                 or entry.capacity != capacity
                 or entry.shared_path != shared_path
             ):
+                bucket: _LegacyTokenBucket
                 if shared_path is not None:
                     bucket = _LegacySharedTokenBucket(
                         rate_per_sec=rate,
