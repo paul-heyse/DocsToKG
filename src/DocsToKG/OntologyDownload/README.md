@@ -173,12 +173,13 @@ Validate the effective configuration at any time:
 
 ```bash
 direnv exec . python -m DocsToKG.OntologyDownload.cli config show --spec configs/sources.yaml
+direnv exec . python -m DocsToKG.OntologyDownload.cli config show --defaults --json
 direnv exec . python -m DocsToKG.OntologyDownload.cli config validate --spec configs/sources.yaml
 ```
 
-> **Note:** A dedicated `config show` subcommand is not yet available. To review the
-> active settings, inspect `configs/sources.yaml` (or your override file) directly,
-> or rely on the JSON emitted by `config validate --json` for a resolved snapshot.
+`config show` prints a summary table, any active environment overrides, and the
+fully resolved configuration rendered as YAML. Secrets such as API keys are masked
+by default; pass `--no-redact-secrets` to inspect the raw values.
 
 ## Data contracts & schemas
 - Ontology manifest schema and helpers: `src/DocsToKG/OntologyDownload/manifests.py` (schema version 1.0).

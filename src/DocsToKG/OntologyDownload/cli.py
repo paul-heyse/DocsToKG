@@ -87,6 +87,7 @@ from .settings import (
     STORAGE,
     ResolvedConfig,
     get_default_config,
+    get_env_overrides,
     load_config,
     parse_rate_limit_to_rps,
     validate_config,
@@ -95,6 +96,9 @@ from .validation import (
     ValidationRequest,
     run_validators,
 )
+
+
+_SENSITIVE_KEY_PATTERN = re.compile(r"(token|key|secret|password|credential)", re.IGNORECASE)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -323,6 +327,34 @@ def _build_parser() -> argparse.ArgumentParser:
 
     config_cmd = subparsers.add_parser("config", help="Configuration utilities")
     config_sub = config_cmd.add_subparsers(dest="config_command", required=True)
+    config_show = config_sub.add_parser(
+        "show",
+        help="Display the resolved configuration",
+        description="Show the effective configuration, masking credential-like fields by default.",
+    )
+    config_show.add_argument(
+        "--spec",
+        type=Path,
+        default=CONFIG_DIR / "sources.yaml",
+        help="Path to configuration file (default: ~/.data/ontology-fetcher/configs/sources.yaml)",
+    )
+    config_show.add_argument(
+        "--defaults",
+        action="store_true",
+        help="Ignore configuration files and display built-in defaults",
+    )
+    config_show.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit resolved configuration details as JSON",
+    )
+    config_show.add_argument(
+        "--redact-secrets",
+        dest="redact_secrets",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Mask values for keys that resemble credentials (default: enabled)",
+    )
     config_validate = config_sub.add_parser("validate", help="Validate a configuration file")
     config_validate.add_argument(
         "--spec",
@@ -1490,11 +1522,125 @@ def _handle_config_validate(path: Path) -> dict:
         Dictionary describing validation status, ontology count, and file path.
     """
     config = validate_config(path)
+
     return {
         "ok": True,
         "ontologies": len(config.specs),
         "path": str(path),
     }
+
+
+def _serialize_fetch_spec(spec: FetchSpec) -> Dict[str, object]:
+    """Return a JSON-serialisable representation of a :class:`FetchSpec`."""
+
+    return {
+        "id": spec.id,
+        "resolver": spec.resolver,
+        "extras": dict(spec.extras),
+        "target_formats": list(spec.target_formats),
+    }
+
+
+def _json_default_serializer(value):
+    """Serialize non-standard values when dumping configuration to JSON."""
+
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, set):
+        return sorted(value)
+    if isinstance(value, tuple):
+        return list(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serialisable")
+
+
+def _resolved_config_to_dict(config: ResolvedConfig) -> Dict[str, object]:
+    """Convert a resolved configuration into JSON-friendly primitives."""
+
+    if hasattr(config, "model_dump"):
+        data = config.model_dump(mode="json", exclude_none=False)
+    else:  # pragma: no cover - compatibility path for Pydantic v1
+        data = config.dict()
+    data["specs"] = [_serialize_fetch_spec(spec) for spec in config.specs]
+    return json.loads(json.dumps(data, default=_json_default_serializer))
+
+
+def _redact_sensitive_values(payload):
+    """Recursively redact values whose keys appear credential-like."""
+
+    if isinstance(payload, dict):
+        redacted: Dict[str, object] = {}
+        for key, value in payload.items():
+            if _SENSITIVE_KEY_PATTERN.search(str(key)):
+                redacted[key] = "***"
+            else:
+                redacted[key] = _redact_sensitive_values(value)
+        return redacted
+    if isinstance(payload, list):
+        return [_redact_sensitive_values(item) for item in payload]
+    return payload
+
+
+def _handle_config_show(
+    spec_path: Optional[Path], *, defaults_only: bool, redact: bool
+) -> Dict[str, object]:
+    """Produce a structured report describing the effective configuration."""
+
+    if defaults_only:
+        config = get_default_config(copy=True)
+        resolved_path: Optional[Path] = None
+        source = "defaults"
+    else:
+        if spec_path is None:
+            raise ConfigError("Please supply --spec or pass --defaults")
+        resolved_path = spec_path.expanduser().resolve()
+        if not resolved_path.exists():
+            raise ConfigError(f"Configuration file not found: {resolved_path}")
+        config = load_config(resolved_path)
+        source = "file"
+
+    payload = _resolved_config_to_dict(config)
+    if redact:
+        payload = _redact_sensitive_values(payload)
+
+    return {
+        "ok": True,
+        "source": source,
+        "path": str(resolved_path) if resolved_path else None,
+        "spec_count": len(config.specs),
+        "env_overrides": get_env_overrides(),
+        "config": payload,
+        "redacted": bool(redact),
+    }
+
+
+def _print_config_report(report: Dict[str, object]) -> None:
+    """Render a human-readable configuration report to stdout."""
+
+    path = report.get("path") or "<defaults>"
+    source = report.get("source", "defaults")
+    print(f"Configuration source: {path} [{source}]")
+    print(f"Ontology specs: {report.get('spec_count', 0)}")
+    print(f"Secrets redacted: {'yes' if report.get('redacted') else 'no'}")
+
+    overrides = report.get("env_overrides") or {}
+    if overrides:
+        print("Environment overrides:")
+        for key in sorted(overrides):
+            print(f"  {key}={overrides[key]}")
+    else:
+        print("Environment overrides: (none)")
+
+    config_payload = report.get("config") or {}
+    if config_payload:
+        print("
+Resolved configuration:")
+        config_yaml = yaml.safe_dump(config_payload, sort_keys=False)
+        print(config_yaml.rstrip())
+    else:
+        print("
+Resolved configuration: {}")
 
 
 # --- Error handling helpers ---
@@ -1647,6 +1793,17 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                 print(format_validation_summary(summary))
         elif args.command == "init":
             _handle_init(args.path)
+        elif args.command == "config" and args.config_command == "show":
+            report = _handle_config_show(
+                getattr(args, "spec", None),
+                defaults_only=getattr(args, "defaults", False),
+                redact=getattr(args, "redact_secrets", True),
+            )
+            if args.json:
+                json.dump(report, sys.stdout, indent=2)
+                sys.stdout.write("\n")
+            else:
+                _print_config_report(report)
         elif args.command == "config" and args.config_command == "validate":
             report = _handle_config_validate(args.spec)
             if args.json:
