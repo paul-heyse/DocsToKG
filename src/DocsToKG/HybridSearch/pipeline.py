@@ -109,6 +109,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from collections import defaultdict, deque
 from contextlib import contextmanager
@@ -809,19 +810,20 @@ class ChunkIngestionPipeline:
                     "source_path": entry.get("source_path"),
                 }
             )
+            text = str(entry.get("text", ""))
             payloads.append(
                 ChunkPayload(
                     doc_id=document.doc_id,
                     chunk_id=str(entry.get("chunk_id")),
                     vector_id=vector_id,
                     namespace=document.namespace,
-                    text=str(entry.get("text", "")),
+                    text=text,
                     metadata=metadata,
                     features=features,
                     token_count=int(entry.get("num_tokens", 0)),
                     source_chunk_idxs=tuple(int(idx) for idx in entry.get("source_chunk_idxs", [])),
                     doc_items_refs=tuple(str(ref) for ref in entry.get("doc_items_refs", [])),
-                    char_offset=(0, len(str(entry.get("text", "")))),
+                    char_offset=self._resolve_char_offset(entry, text),
                 )
             )
         if missing:
@@ -829,6 +831,83 @@ class ChunkIngestionPipeline:
                 "Missing vector entries for chunk UUIDs: " + ", ".join(sorted(set(missing)))
             )
         return payloads
+
+    def _resolve_char_offset(
+        self, entry: Mapping[str, object], text: str
+    ) -> Tuple[int, int]:
+        """Determine the character span for ``entry`` if metadata is present."""
+
+        span_fields = (
+            "char_offset",
+            "char_offsets",
+            "char_range",
+            "char_ranges",
+            "text_char_range",
+            "text_char_offsets",
+        )
+        for field in span_fields:
+            if field in entry:
+                span = self._normalise_char_span(entry[field])
+                if span is not None:
+                    return span
+        return (0, len(text))
+
+    @staticmethod
+    def _normalise_char_span(span: object) -> Optional[Tuple[int, int]]:
+        """Normalise heterogeneous span payloads into a ``(start, end)`` tuple."""
+
+        def _coerce(value: object) -> Optional[int]:
+            if isinstance(value, bool):
+                return None
+            try:
+                result = int(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return None
+            if result < 0:
+                return None
+            return result
+
+        if isinstance(span, (list, tuple)):
+            if len(span) >= 2:
+                start = _coerce(span[0])
+                end = _coerce(span[1])
+                if start is not None and end is not None and end >= start:
+                    return (start, end)
+            return None
+
+        if isinstance(span, Mapping):
+            start: Optional[int] = None
+            for key in ("start", "begin", "offset", "char_start"):
+                if key in span:
+                    start = _coerce(span.get(key))
+                if start is not None:
+                    break
+            end: Optional[int] = None
+            for key in ("end", "stop", "finish", "char_end"):
+                if key in span:
+                    end = _coerce(span.get(key))
+                if end is not None:
+                    break
+            if start is not None and end is not None and end >= start:
+                return (start, end)
+            if start is not None and "length" in span:
+                length = _coerce(span.get("length"))
+                if length is not None:
+                    end = start + length
+                    if end >= start:
+                        return (start, end)
+            return None
+
+        if isinstance(span, str):
+            matches = re.findall(r"-?\d+", span)
+            if len(matches) >= 2:
+                start = _coerce(matches[0])
+                end = _coerce(matches[1])
+                if start is not None and end is not None and end >= start:
+                    return (start, end)
+            return None
+
+        return None
 
     def _delete_existing_for_doc(self, doc_id: str, namespace: str) -> None:
         """Remove previously ingested chunks for a document/namespace pair.
