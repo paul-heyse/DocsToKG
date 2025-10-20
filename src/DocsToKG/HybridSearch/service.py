@@ -1702,6 +1702,7 @@ class HybridSearchService:
             normalized_filters,
             int(request.page_size),
             cursor,
+            bool(request.recall_first),
         )
 
     def _normalize_signature_value(self, value: object) -> object:
