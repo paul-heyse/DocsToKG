@@ -38,6 +38,7 @@ import logging
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -1266,6 +1267,30 @@ def _doctor_report() -> Dict[str, object]:
     return report
 
 
+def _ensure_owner_only_permissions(path: Path, actions: List[str]) -> None:
+    """Restrict placeholder files to owner read/write when supported."""
+
+    desired_mode = stat.S_IRUSR | stat.S_IWUSR
+    chmod = getattr(os, "chmod", None)
+
+    if chmod is None or os.name == "nt":
+        return
+
+    try:
+        current_mode = stat.S_IMODE(path.stat().st_mode)
+    except OSError as exc:  # pragma: no cover - stat failures are rare but logged
+        actions.append(f"Failed to inspect permissions for {path}: {exc}")
+        return
+
+    if current_mode | desired_mode == desired_mode:
+        return
+
+    try:
+        chmod(path, desired_mode)
+    except OSError as exc:
+        actions.append(f"Failed to update permissions for {path}: {exc}")
+
+
 def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
     """Attempt to remediate common doctor issues and return action notes."""
 
@@ -1308,6 +1333,7 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content)
                 actions.append(f"Ensured placeholder {path.name}")
+                _ensure_owner_only_permissions(path, actions)
         except OSError as exc:
             actions.append(f"Failed to update {path}: {exc}")
 
