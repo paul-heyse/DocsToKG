@@ -292,7 +292,7 @@ from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Dict, List, Mapping, Sequence
+from typing import Callable, Dict, List, Mapping, Sequence, Tuple
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import numpy as np
@@ -1194,6 +1194,202 @@ def test_chunk_registry_lazy_embeddings_roundtrip(tmp_path: Path) -> None:
     first = registry.resolve_embedding(sample_id, cache=cache)
     second = registry.resolve_embedding(sample_id, cache=cache)
     np.testing.assert_allclose(first, second, rtol=1e-5, atol=1e-6)
+
+
+@pytest.fixture
+def large_registry_fixture() -> SimpleNamespace:
+    dim = 8
+    target_doc = "doc-target"
+    target_namespace = "ns-heavy"
+    target_specs = [
+        SimpleNamespace(
+            vector_id=f"{target_doc}-vec-{idx}",
+            chunk_id=str(idx),
+            base=float(idx + 1),
+            position=idx,
+            text=f"target chunk {idx}",
+        )
+        for idx in range(96)
+    ]
+
+    def make_chunk(
+        doc_id: str,
+        namespace: str,
+        *,
+        vector_id: str,
+        chunk_id: str,
+        base: float,
+        position: int,
+        text: str,
+    ) -> ChunkPayload:
+        embedding = np.full((dim,), (base % 11) + 1.0, dtype=np.float32)
+        features = ChunkFeatures(
+            bm25_terms={"token": base},
+            splade_weights={"token": base * 2.0},
+            embedding=embedding,
+        )
+        return ChunkPayload(
+            doc_id=doc_id,
+            chunk_id=chunk_id,
+            vector_id=vector_id,
+            namespace=namespace,
+            text=text,
+            metadata={},
+            features=features,
+            token_count=position,
+            source_chunk_idxs=(position,),
+            doc_items_refs=(f"{doc_id}:{chunk_id}",),
+        )
+
+    background: Dict[tuple[str, str], List[ChunkPayload]] = {}
+    base = 1.0
+    for doc_idx in range(28):
+        doc_id = f"doc-{doc_idx}"
+        namespace = f"ns-{doc_idx % 7}"
+        entries: List[ChunkPayload] = []
+        for chunk_idx in range(18):
+            entries.append(
+                make_chunk(
+                    doc_id,
+                    namespace,
+                    vector_id=f"{doc_id}-vec-{chunk_idx}",
+                    chunk_id=str(chunk_idx),
+                    base=base + chunk_idx,
+                    position=chunk_idx,
+                    text=f"chunk {chunk_idx} of {doc_id}",
+                )
+            )
+        background[(doc_id, namespace)] = entries
+        base += 19.0
+
+    def make_target_chunks() -> List[ChunkPayload]:
+        return [
+            make_chunk(
+                target_doc,
+                target_namespace,
+                vector_id=spec.vector_id,
+                chunk_id=spec.chunk_id,
+                base=spec.base,
+                position=spec.position,
+                text=spec.text,
+            )
+            for spec in target_specs
+        ]
+
+    return SimpleNamespace(
+        dim=dim,
+        background=background,
+        target_doc=target_doc,
+        target_namespace=target_namespace,
+        make_target_chunks=make_target_chunks,
+    )
+
+
+def test_delete_existing_for_doc_uses_registry_index(
+    large_registry_fixture: SimpleNamespace, patcher: PatchManager
+) -> None:
+    class _RecordingLexicalIndex:
+        def __init__(self) -> None:
+            self.deleted_batches: List[Tuple[str, ...]] = []
+
+        def bulk_upsert(self, chunks: Sequence[ChunkPayload]) -> None:  # pragma: no cover - stub
+            self._last_upsert = [chunk.vector_id for chunk in chunks]
+
+        def bulk_delete(self, vector_ids: Sequence[str]) -> None:
+            self.deleted_batches.append(tuple(vector_ids))
+
+    class _RecordingDenseStore:
+        def __init__(self, dim: int) -> None:
+            self._dim = dim
+            self._store: Dict[str, np.ndarray] = {}
+            self.removed_batches: List[Tuple[str, ...]] = []
+
+        @property
+        def dim(self) -> int:
+            return self._dim
+
+        def set_id_resolver(self, resolver) -> None:  # pragma: no cover - stub
+            self._resolver = resolver
+
+        def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
+            for vector, vector_id in zip(vectors, vector_ids):
+                self._store[str(vector_id)] = np.asarray(vector, dtype=np.float32)
+
+        def remove(self, vector_ids: Sequence[str]) -> None:
+            batch = tuple(vector_ids)
+            self.removed_batches.append(batch)
+            for vector_id in vector_ids:
+                self._store.pop(str(vector_id), None)
+
+        def reconstruct_batch(self, vector_ids: Sequence[str]) -> np.ndarray:  # pragma: no cover - stub
+            return np.stack([self._store[str(vid)] for vid in vector_ids], dtype=np.float32)
+
+    data = large_registry_fixture
+    faiss_store = _RecordingDenseStore(data.dim)
+    opensearch = _RecordingLexicalIndex()
+    registry = ChunkRegistry()
+    pipeline = ChunkIngestionPipeline(
+        faiss_index=faiss_store,
+        opensearch=opensearch,
+        registry=registry,
+        observability=Observability(),
+    )
+
+    background_total = 0
+    for (doc_id, namespace), chunks in data.background.items():
+        pipeline.faiss_index.add(
+            [chunk.features.embedding for chunk in chunks],
+            [chunk.vector_id for chunk in chunks],
+        )
+        registry.upsert(chunks)
+        background_total += len(chunks)
+
+    target_chunks = data.make_target_chunks()
+    pipeline.faiss_index.add(
+        [chunk.features.embedding for chunk in target_chunks],
+        [chunk.vector_id for chunk in target_chunks],
+    )
+    registry.upsert(target_chunks)
+
+    expected_vector_ids = {chunk.vector_id for chunk in target_chunks}
+
+    original_vector_ids_for = registry.vector_ids_for
+    call_count = 0
+
+    def spy_vector_ids_for(doc_id: str, namespace: str):
+        nonlocal call_count
+        call_count += 1
+        return original_vector_ids_for(doc_id, namespace)
+
+    def fail_all():  # pragma: no cover - defensive guard
+        raise AssertionError("ChunkRegistry.all() should not be used for targeted deletions")
+
+    patcher.setattr(registry, "vector_ids_for", spy_vector_ids_for)
+    patcher.setattr(registry, "all", fail_all)
+
+    for iteration in range(3):
+        before = call_count
+        pipeline._delete_existing_for_doc(data.target_doc, data.target_namespace)
+        assert call_count == before + 1
+        assert opensearch.deleted_batches, "Expected lexical index deletes to be recorded"
+        assert faiss_store.removed_batches, "Expected dense store deletes to be recorded"
+        assert set(opensearch.deleted_batches[-1]) == expected_vector_ids
+        assert set(faiss_store.removed_batches[-1]) == expected_vector_ids
+        assert not tuple(original_vector_ids_for(data.target_doc, data.target_namespace))
+
+        if iteration < 2:
+            refreshed = data.make_target_chunks()
+            pipeline.faiss_index.add(
+                [chunk.features.embedding for chunk in refreshed],
+                [chunk.vector_id for chunk in refreshed],
+            )
+            registry.upsert(refreshed)
+
+    assert registry.count() == background_total
+    assert len(faiss_store.removed_batches) == 3
+    assert len(opensearch.deleted_batches) == 3
+    sample_doc, sample_namespace = next(iter(data.background))
+    assert tuple(original_vector_ids_for(sample_doc, sample_namespace))
 
 
 # --- test_hybrid_search_real_vectors.py ---

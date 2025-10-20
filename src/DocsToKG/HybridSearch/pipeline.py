@@ -793,11 +793,7 @@ class ChunkIngestionPipeline:
         Returns:
             None
         """
-        existing_vector_ids = [
-            chunk.vector_id
-            for chunk in self._registry.all()
-            if chunk.doc_id == doc_id and chunk.namespace == namespace
-        ]
+        existing_vector_ids = tuple(self._registry.vector_ids_for(doc_id, namespace))
         if existing_vector_ids:
             self.delete_chunks(existing_vector_ids)
 
