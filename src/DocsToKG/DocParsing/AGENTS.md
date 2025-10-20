@@ -250,7 +250,7 @@ Last updated: 2025-10-20
 
 ## Prerequisites & Optional Dependencies (aligns with README)
 
-- Python 3.10+, Linux recommended; GPU strongly suggested for PDF DocTags (vLLM) and Qwen embeddings.
+- Python 3.13+, Linux recommended; GPU strongly suggested for PDF DocTags (vLLM) and Qwen embeddings.
 - Extras (`pip install`):
   - Core pipeline: `"DocsToKG[docparse]"` (installs `filelock>=3.20.0` and `jsonlines>=4.0.0` for locking/streaming primitives)
   - PDF DocTags (vLLM + Docling extras): `"DocsToKG[docparse-pdf]"`
