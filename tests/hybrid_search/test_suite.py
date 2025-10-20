@@ -1229,6 +1229,7 @@ def test_operations_snapshot_and_restore_roundtrip(
     request = HybridSearchRequest(query="faiss", namespace="research", filters={}, page_size=2)
     pagination_result = verify_pagination(service, request)
     assert not pagination_result.duplicate_detected
+    assert pagination_result.termination_reason == "cursor_exhausted"
 
     assert not should_rebuild_index(registry, deleted_since_snapshot=0, threshold=0.5)
     assert should_rebuild_index(
@@ -1325,8 +1326,65 @@ def test_verify_pagination_preserves_recall_first() -> None:
 
     assert pagination.cursor_chain == ["cursor-1", "cursor-2"]
     assert not pagination.duplicate_detected
+    assert pagination.termination_reason == "cursor_exhausted"
     assert len(service.requests) == 3
     assert all(call.recall_first for call in service.requests)
+
+
+def test_verify_pagination_enforces_page_limit() -> None:
+    responses = []
+    for idx in range(6):
+        next_cursor = f"cursor-{idx + 1}" if idx < 5 else None
+        responses.append(
+            HybridSearchResponse(
+                results=[
+                    HybridSearchResult(
+                        doc_id=f"doc-{idx}",
+                        chunk_id=f"chunk-{idx}",
+                        vector_id=f"vec-{idx}",
+                        namespace="test",
+                        score=1.0,
+                        fused_rank=idx,
+                        text=f"page {idx}",
+                        highlights=(),
+                        provenance_offsets=(),
+                        diagnostics=HybridSearchDiagnostics(),
+                        metadata={},
+                    )
+                ],
+                next_cursor=next_cursor,
+                total_candidates=1,
+                timings_ms={},
+            )
+        )
+
+    class RecordingService:
+        def __init__(self, pages: Sequence[HybridSearchResponse]) -> None:
+            self._pages = list(pages)
+            self._index = 0
+            self.requests: list[HybridSearchRequest] = []
+
+        def search(self, search_request: HybridSearchRequest) -> HybridSearchResponse:
+            self.requests.append(search_request)
+            page = self._pages[self._index]
+            self._index += 1
+            return page
+
+    service = RecordingService(responses)
+    request = HybridSearchRequest(
+        query="recall",
+        namespace="demo",
+        filters={},
+        page_size=1,
+    )
+
+    pagination = verify_pagination(service, request, max_pages=3)
+
+    assert pagination.cursor_chain == ["cursor-1", "cursor-2"]
+    assert pagination.termination_reason == "max_pages_reached"
+    assert not pagination.duplicate_detected
+    assert len(service.requests) == 3
+    assert service.requests[-1].cursor == "cursor-2"
 
 
 def test_recall_first_dense_signature_isolated(
@@ -2983,6 +3041,7 @@ def test_real_fixture_reingest_and_reports(
     )
     pagination = verify_pagination(service, request)
     assert not pagination.duplicate_detected
+    assert pagination.termination_reason == "cursor_exhausted"
 
     assert not should_rebuild_index(registry, deleted_since_snapshot=0, threshold=0.5)
 
