@@ -401,15 +401,16 @@ class BreakerRegistry:
 
     # ── Query helpers (optional, useful for telemetry) ────────────────────────
 
-    def current_state(self, host: str, *, resolver: Optional[str] = None) -> str:
-        """Return 'closed' | 'open' | 'half_open' for host (and optionally resolver)."""
+    def current_state(self, host: str, *, resolver: Optional[str] = None) -> Dict[str, str]:
+        """Return breaker states for host and optional resolver."""
+
         host_key = host.lower()
         with self._lock:
             h_state = self._state_name(self._get_or_create_host_breaker(host_key))
+            snapshot = {"host": h_state}
             if resolver:
-                r_state = self._state_name(self._get_or_create_resolver_breaker(resolver))
-                return f"host:{h_state},resolver:{r_state}"
-            return f"host:{h_state}"
+                snapshot["resolver"] = self._state_name(self._get_or_create_resolver_breaker(resolver))
+            return snapshot
 
     # ── Internals ─────────────────────────────────────────────────────────────
 

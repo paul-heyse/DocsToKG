@@ -18,11 +18,12 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, Iterable, List
+from typing import TYPE_CHECKING, Iterable, List, Mapping
 
 import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
+from DocsToKG.ContentDownload.networking import BreakerOpenError
 
 from .base import (
     RegisteredResolver,
@@ -94,6 +95,18 @@ class OpenAireResolver(RegisteredResolver):
                 retry_after_cap=config.retry_after_cap,
             )
             resp.raise_for_status()
+        except BreakerOpenError as exc:
+            meta = {"doi": doi, "error": str(exc)}
+            breaker_meta = getattr(exc, "breaker_meta", None)
+            if isinstance(breaker_meta, Mapping):
+                meta["breaker"] = dict(breaker_meta)
+            yield ResolverResult(
+                url=None,
+                event=ResolverEvent.ERROR,
+                event_reason=ResolverEventReason.BREAKER_OPEN,
+                metadata=meta,
+            )
+            return
         except httpx.TimeoutException as exc:
             yield ResolverResult(
                 url=None,

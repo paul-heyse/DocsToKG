@@ -19,12 +19,12 @@ from __future__ import annotations
 import logging
 import re
 import xml.etree.ElementTree as ET
-from typing import TYPE_CHECKING, Iterable, List, Optional
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional
 
 import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi, normalize_pmcid
-from DocsToKG.ContentDownload.networking import request_with_retries
+from DocsToKG.ContentDownload.networking import BreakerOpenError, request_with_retries
 
 from .base import (
     RegisteredResolver,
@@ -83,6 +83,9 @@ class PmcResolver(RegisteredResolver):
             )
             resp.raise_for_status()
             data = resp.json()
+        except BreakerOpenError as exc:
+            LOGGER.debug("Breaker open during PMC ID lookup: %s", exc)
+            return []
         except httpx.TimeoutException as exc:
             LOGGER.debug("PMC ID lookup timed out: %s", exc)
             return []
@@ -198,6 +201,18 @@ class PmcResolver(RegisteredResolver):
                                 url=_absolute_url(oa_url, href),
                                 metadata={"pmcid": pmcid, "source": "oa"},
                             )
+            except BreakerOpenError as exc:
+                meta: Dict[str, Any] = {"pmcid": pmcid, "error": str(exc)}
+                breaker_meta = getattr(exc, "breaker_meta", None)
+                if isinstance(breaker_meta, Mapping):
+                    meta["breaker"] = dict(breaker_meta)
+                yield ResolverResult(
+                    url=None,
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.BREAKER_OPEN,
+                    metadata=meta,
+                )
+                return
             except httpx.TimeoutException as exc:
                 yield ResolverResult(
                     url=None,

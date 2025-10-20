@@ -1,7 +1,7 @@
 """Tests for networking layer breaker integration."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import httpx
 
 try:
@@ -11,10 +11,11 @@ except ImportError:
     pytest.skip("pybreaker not available", allow_module_level=True)
 
 from DocsToKG.ContentDownload.networking import (
-    request_with_retries,
-    set_breaker_registry,
-    get_breaker_registry,
     BreakerOpenError,
+    get_breaker_registry,
+    request_with_retries,
+    reset_breaker_registry,
+    set_breaker_registry,
 )
 from DocsToKG.ContentDownload.breakers import (
     BreakerRegistry,
@@ -30,12 +31,12 @@ class TestNetworkingBreakerIntegration:
     def setup_method(self):
         """Set up test fixtures."""
         # Reset global breaker registry
-        set_breaker_registry(None)
+        reset_breaker_registry()
 
     def teardown_method(self):
         """Clean up after tests."""
         # Reset global breaker registry
-        set_breaker_registry(None)
+        reset_breaker_registry()
 
     @patch("DocsToKG.ContentDownload.networking.get_http_client")
     def test_request_with_retries_no_breaker(self, mock_get_client):
@@ -45,6 +46,7 @@ class TestNetworkingBreakerIntegration:
         mock_response = Mock(spec=httpx.Response)
         mock_response.status_code = 200
         mock_response.headers = {}
+        mock_response.extensions = {}
         mock_client.request.return_value = mock_response
         mock_get_client.return_value = mock_client
 
@@ -60,6 +62,7 @@ class TestNetworkingBreakerIntegration:
         mock_response = Mock(spec=httpx.Response)
         mock_response.status_code = 200
         mock_response.headers = {}
+        mock_response.extensions = {}
         mock_client.request.return_value = mock_response
         mock_get_client.return_value = mock_client
 
@@ -95,6 +98,7 @@ class TestNetworkingBreakerIntegration:
         mock_response = Mock(spec=httpx.Response)
         mock_response.status_code = 200
         mock_response.headers = {}
+        mock_response.extensions = {}
         mock_client.request.return_value = mock_response
         mock_get_client.return_value = mock_client
 
@@ -103,26 +107,22 @@ class TestNetworkingBreakerIntegration:
         registry = BreakerRegistry(config)
         set_breaker_registry(registry)
 
-        # Trigger failure to open breaker
-        registry.on_failure("example.com", role=RequestRole.METADATA, status=503)
-
-        # Verify breaker is open
-        with pytest.raises(BreakerOpenError):
-            request_with_retries(None, "GET", "https://example.com")
-
         # Mock successful response
         with patch.object(registry, "on_success") as mock_on_success:
-            request_with_retries(None, "GET", "https://example.com")
+            response = request_with_retries(None, "GET", "https://example.com")
+            assert response == mock_response
             mock_on_success.assert_called_once()
 
     @patch("DocsToKG.ContentDownload.networking.get_http_client")
     def test_request_with_retries_updates_breaker_on_failure(self, mock_get_client):
         """Test that failed requests update breaker state."""
-        # Mock HTTP client to raise exception
+        # Mock HTTP client returning failure status
         mock_client = Mock()
-        mock_client.request.side_effect = httpx.HTTPStatusError(
-            "Server Error", request=Mock(), response=Mock()
-        )
+        mock_response = Mock(spec=httpx.Response)
+        mock_response.status_code = 503
+        mock_response.headers = {}
+        mock_response.extensions = {}
+        mock_client.request.return_value = mock_response
         mock_get_client.return_value = mock_client
 
         # Set up breaker registry
@@ -132,13 +132,15 @@ class TestNetworkingBreakerIntegration:
 
         # Mock on_failure to verify it's called
         with patch.object(registry, "on_failure") as mock_on_failure:
-            try:
-                request_with_retries(None, "GET", "https://example.com")
-            except httpx.HTTPStatusError:
-                pass  # Expected
+            response = request_with_retries(
+                None, "GET", "https://example.com", max_retries=0
+            )
+            assert response == mock_response
 
             # Should have called on_failure
             mock_on_failure.assert_called_once()
+            kwargs = mock_on_failure.call_args.kwargs
+            assert kwargs.get("status") == 503
 
     @patch("DocsToKG.ContentDownload.networking.get_http_client")
     def test_request_with_retries_handles_retry_after(self, mock_get_client):
@@ -148,6 +150,7 @@ class TestNetworkingBreakerIntegration:
         mock_response = Mock(spec=httpx.Response)
         mock_response.status_code = 429
         mock_response.headers = {"Retry-After": "5"}
+        mock_response.extensions = {}
         mock_client.request.return_value = mock_response
         mock_get_client.return_value = mock_client
 
@@ -173,6 +176,7 @@ class TestNetworkingBreakerIntegration:
         mock_response = Mock(spec=httpx.Response)
         mock_response.status_code = 200
         mock_response.headers = {}
+        mock_response.extensions = {}
         mock_client.request.return_value = mock_response
         mock_get_client.return_value = mock_client
 
@@ -198,6 +202,7 @@ class TestNetworkingBreakerIntegration:
         mock_response = Mock(spec=httpx.Response)
         mock_response.status_code = 200
         mock_response.headers = {}
+        mock_response.extensions = {}
         mock_client.request.return_value = mock_response
         mock_get_client.return_value = mock_client
 

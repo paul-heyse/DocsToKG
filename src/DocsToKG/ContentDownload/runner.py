@@ -93,7 +93,9 @@ from DocsToKG.ContentDownload.summary import RunResult, build_summary_record
 from DocsToKG.ContentDownload.networking import (
     DEFAULT_RETRYABLE_STATUSES,
     RetryAfterJitterWait,
+    configure_breaker_registry,
     request_with_retries,
+    reset_breaker_registry,
     set_breaker_registry,
 )
 from DocsToKG.ContentDownload.telemetry import (
@@ -493,6 +495,8 @@ class DownloadRun:
         # Set global breaker registry for networking layer
         if breaker_registry is not None:
             set_breaker_registry(breaker_registry)
+        else:
+            reset_breaker_registry()
 
         client = http_client or get_http_client()
         state = DownloadRunState(
@@ -720,7 +724,6 @@ class DownloadRun:
                 # Initialize breaker registry
                 breaker_registry = None
                 try:
-                    from DocsToKG.ContentDownload.breakers import BreakerRegistry, BreakerConfig
                     from DocsToKG.ContentDownload.breakers_loader import load_breaker_config
                     from DocsToKG.ContentDownload.networking_breaker_listener import (
                         NetworkBreakerListener,
@@ -755,7 +758,7 @@ class DownloadRun:
                             )
                         return None
 
-                    breaker_registry = BreakerRegistry(
+                    breaker_registry = configure_breaker_registry(
                         breaker_config, listener_factory=listener_factory
                     )
                 except ImportError:
