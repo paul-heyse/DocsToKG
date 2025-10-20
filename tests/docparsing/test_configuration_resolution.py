@@ -117,6 +117,12 @@ def test_resolve_pdf_model_path():
             result = resolve_pdf_model_path()
             assert result == str(model_dir)
 
+        # Test with DOCLING_PDF_MODEL pointing at a Hugging Face repo ID
+        hf_repo = "ibm-granite/test-docling"
+        with patch.dict(os.environ, {"DOCLING_PDF_MODEL": hf_repo}):
+            result = resolve_pdf_model_path()
+            assert result == hf_repo
+
         # Test with DOCSTOKG_MODEL_ROOT environment variable
         with patch.dict(os.environ, {"DOCSTOKG_MODEL_ROOT": str(tmp_path)}):
             result = resolve_pdf_model_path()
@@ -191,6 +197,13 @@ def test_path_resolution_edge_cases():
         non_existent = tmp_path / "non_existent"
         result = resolve_pdf_model_path(cli_value=str(non_existent))
         assert result == str(non_existent)
+
+        # Test DOCLING_PDF_MODEL with filesystem-like value expands to absolute path
+        env_path = tmp_path / "env_model"
+        env_path.mkdir()
+        with patch.dict(os.environ, {"DOCLING_PDF_MODEL": str(env_path)}):
+            result = resolve_pdf_model_path()
+            assert result == str(env_path.resolve())
 
         # Test with relative path
         relative_path = "relative/path"
