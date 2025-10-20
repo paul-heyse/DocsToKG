@@ -3411,17 +3411,24 @@ class HybridSearchValidator:
         oversamples = [1, 2, 3]
         results: List[Mapping[str, object]] = []
         chunks = list(self._registry.all())
-        if not chunks:
-            return ValidationReport(
-                name="calibration_sweep",
-                passed=True,
-                details={
-                    "dense": [],
-                    "note": "Skipped calibration because no chunks are registered.",
-                },
-            )
+        total_chunks = max(1, len(chunks))
 
-        total_chunks = len(chunks)
+        # Derive a defensible clamp for calibration batch sizing. The FAISS GPU
+        # wheel comfortably serves ~8 MiB of query vectors per sweep, so clamp
+        # the batch size according to embedding dimensionality and registry
+        # cardinality. This prevents misconfiguration from issuing oversized
+        # batches that could exhaust device memory.
+        embedding_dim = getattr(self._ingestion.faiss_index, "_dim", 0)
+        safe_min_batch = 1
+        default_ceiling = 512
+        if isinstance(embedding_dim, int) and embedding_dim > 0:
+            bytes_per_vector = max(1, embedding_dim * 4)
+            approx_limit = (8 * 1024 * 1024) // bytes_per_vector
+            default_ceiling = max(safe_min_batch, min(512, approx_limit))
+        available_chunks = len(chunks)
+        safe_max_batch = min(default_ceiling, available_chunks) if available_chunks else default_ceiling
+        safe_max_batch = max(safe_min_batch, safe_max_batch)
+
         config_manager = getattr(self._service, "_config_manager", None)
         retrieval_cfg = None
         if config_manager is not None:
@@ -3433,11 +3440,12 @@ class HybridSearchValidator:
             else None
         )
         try:
-            batch_size = int(batch_size_raw) if batch_size_raw is not None else None
+            candidate_batch = int(batch_size_raw) if batch_size_raw is not None else None
         except (TypeError, ValueError):
-            batch_size = None
-        if batch_size is None or batch_size <= 0:
-            batch_size = max(1, len(chunks))
+            candidate_batch = None
+        if candidate_batch is None:
+            candidate_batch = safe_max_batch
+        batch_size = max(safe_min_batch, min(candidate_batch, safe_max_batch))
         for oversample in oversamples:
             hits = 0
             embedding_cache: Dict[str, np.ndarray] = {}

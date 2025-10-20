@@ -21,7 +21,7 @@ from DocsToKG.HybridSearch.config import DenseIndexConfig, RetrievalConfig
 from DocsToKG.HybridSearch.pipeline import Observability
 from DocsToKG.HybridSearch.service import HybridSearchValidator
 from DocsToKG.HybridSearch.store import FaissSearchResult
-from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload
+from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload, HybridSearchResult
 
 
 class _RecordingResources:
@@ -213,7 +213,7 @@ def test_calibration_batches_queries_and_preserves_accuracy():
 
 
 @pytest.fixture
-def duplicate_namespace_registry() -> tuple[SimpleNamespace, list[ChunkPayload], dict[str, np.ndarray]]:
+def duplicate_namespace_registry() -> tuple[list[ChunkPayload], dict[str, np.ndarray]]:
     research_embedding = np.array([1.0, 0.0, 0.0], dtype=np.float32)
     support_embedding = np.array([0.0, 1.0, 0.0], dtype=np.float32)
 
@@ -249,22 +249,87 @@ def duplicate_namespace_registry() -> tuple[SimpleNamespace, list[ChunkPayload],
         "vec-support": support_embedding,
     }
 
-    class _Registry(SimpleNamespace):
-        def all(self):  # type: ignore[override]
-            return chunks
-
-        def resolve_embedding(self, vector_id: str, *, cache=None, dtype=np.float32):
-            return embeddings[vector_id]
-
-    return _Registry(), chunks, embeddings
+    return chunks, embeddings
 
 
 def test_embeddings_for_results_respect_namespace(duplicate_namespace_registry):
-    registry, _chunks, embeddings = duplicate_namespace_registry
+    chunks, embeddings = duplicate_namespace_registry
+    matches = {
+        chunk.vector_id: (idx % 2 == 0) for idx, chunk in enumerate(chunks)
+    }
+    embedding_dim = len(next(iter(embeddings.values())))
+
+    class _RecordingFaissIndex:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+            self.last_vector_ids: list[str] = []
+            self._dim = embedding_dim
+
+        def search_batch(self, queries: np.ndarray, top_k: int):
+            assert queries.dtype == np.float32
+            assert queries.flags.c_contiguous
+            self.calls.append({"shape": tuple(queries.shape), "top_k": top_k})
+            results = []
+            for vector_id in self.last_vector_ids:
+                hits = []
+                if matches.get(vector_id, True):
+                    hits.append(FaissSearchResult(vector_id=vector_id, score=1.0))
+                else:
+                    hits.append(
+                        FaissSearchResult(vector_id=f"miss-{vector_id}", score=1.0)
+                    )
+                for extra in range(1, top_k):
+                    hits.append(
+                        FaissSearchResult(
+                            vector_id=f"noise-{vector_id}-{extra}", score=0.0
+                        )
+                    )
+                results.append(hits)
+            return results
+
+        def search(self, *_args, **_kwargs):  # pragma: no cover - defensive
+            raise AssertionError("batch search must be used during calibration")
+
+    class _Registry:
+        def __init__(self, index: _RecordingFaissIndex) -> None:
+            self._index = index
+            self._chunks = list(chunks)
+            self._embeddings = embeddings
+            self._dim = embedding_dim
+            self.all_calls = 0
+
+        def all(self):
+            self.all_calls += 1
+            return list(self._chunks)
+
+        def resolve_embeddings(self, vector_ids, *, cache=None, dtype=np.float32):
+            if not vector_ids:
+                return np.empty((0, self._dim), dtype=dtype)
+            matrix = np.asarray(
+                [self._embeddings[vid] for vid in vector_ids], dtype=np.float32
+            )
+            if cache is not None:
+                for vid, row in zip(vector_ids, matrix, strict=False):
+                    cache[vid] = row
+            self._index.last_vector_ids = list(vector_ids)
+            return matrix
+
+        def resolve_embedding(self, vector_id: str, *, cache=None, dtype=np.float32):
+            vector = self._embeddings[vector_id]
+            if cache is not None:
+                cache[vector_id] = vector
+            return vector
+
+    index = _RecordingFaissIndex()
+    registry = _Registry(index)
+    ingestion = SimpleNamespace(faiss_index=index)
+    config = SimpleNamespace(retrieval=RetrievalConfig(dense_calibration_batch_size=2))
+    config_manager = SimpleNamespace(get=lambda: config)
+    service = SimpleNamespace(_config_manager=config_manager)
 
     validator = HybridSearchValidator(
-        ingestion=SimpleNamespace(),
-        service=SimpleNamespace(),
+        ingestion=ingestion,
+        service=service,
         registry=registry,
         opensearch=SimpleNamespace(),
     )
@@ -283,6 +348,7 @@ def test_embeddings_for_results_respect_namespace(duplicate_namespace_registry):
         expected_topks.extend([max(1, oversample * 3)] * batches_per_sweep)
     assert [entry["top_k"] for entry in index.calls] == expected_topks
     assert report.passed is False
+
     chunk_lookup = {
         (chunk.namespace, chunk.doc_id, chunk.chunk_id): chunk for chunk in registry.all()
     }
@@ -322,16 +388,89 @@ def test_embeddings_for_results_respect_namespace(duplicate_namespace_registry):
     assert np.array_equal(resolved[1], embeddings["vec-support"])
 
 
-def test_calibration_short_circuits_when_registry_empty():
+def test_calibration_clamps_large_registry_batches():
+    total_chunks = 1025
+    embedding_dim = 32
+
+    class _RecordingFaissIndex:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+            self.last_vector_ids: list[str] = []
+            self._dim = embedding_dim
+
+        def search_batch(self, queries: np.ndarray, top_k: int):
+            assert queries.dtype == np.float32
+            assert queries.shape[1] == embedding_dim
+            assert queries.flags.c_contiguous
+            self.calls.append({"shape": tuple(queries.shape), "top_k": top_k})
+            results = []
+            for vector_id in self.last_vector_ids:
+                hits = [FaissSearchResult(vector_id=vector_id, score=1.0)]
+                for extra in range(1, top_k):
+                    hits.append(
+                        FaissSearchResult(vector_id=f"noise-{vector_id}-{extra}", score=0.0)
+                    )
+                results.append(hits)
+            return results
+
+        def search(self, *_args, **_kwargs):  # pragma: no cover - defensive
+            raise AssertionError("batch search must be used during calibration")
+
+    class _LargeRegistry:
+        def __init__(self, index: _RecordingFaissIndex) -> None:
+            self._index = index
+            self._dim = embedding_dim
+            self._chunks = [SimpleNamespace(vector_id=f"vec-{idx}") for idx in range(total_chunks)]
+            self._embeddings = {
+                chunk.vector_id: np.full(self._dim, float(idx + 1), dtype=np.float32)
+                for idx, chunk in enumerate(self._chunks)
+            }
+            self.all_calls = 0
+
+        def all(self):
+            self.all_calls += 1
+            return list(self._chunks)
+
+        def resolve_embeddings(self, vector_ids, *, cache=None, dtype=np.float32):
+            matrix = np.asarray(
+                [self._embeddings[vid] for vid in vector_ids], dtype=np.float32
+            )
+            if cache is not None:
+                for vid, row in zip(vector_ids, matrix, strict=False):
+                    cache[vid] = row
+            self._index.last_vector_ids = list(vector_ids)
+            return matrix
+
+    index = _RecordingFaissIndex()
+    registry = _LargeRegistry(index)
+    ingestion = SimpleNamespace(faiss_index=index)
+    config = SimpleNamespace(retrieval=RetrievalConfig(dense_calibration_batch_size=4096))
+    config_manager = SimpleNamespace(get=lambda: config)
+    service = SimpleNamespace(_config_manager=config_manager)
+
     validator = HybridSearchValidator(
-        ingestion=SimpleNamespace(faiss_index=SimpleNamespace()),
-        service=SimpleNamespace(),
-        registry=SimpleNamespace(all=lambda: []),
+        ingestion=ingestion,
+        service=service,
+        registry=registry,
         opensearch=SimpleNamespace(),
     )
 
     report = validator._run_calibration([])
 
-    assert report.passed is True
-    assert report.details["dense"] == []
-    assert "no chunks" in report.details["note"].lower()
+    oversamples = [1, 2, 3]
+    assert report.details["dense"]
+    assert registry.all_calls == 1
+    assert len(index.calls) == len(oversamples) * math.ceil(total_chunks / 512)
+
+    max_batch = max(entry["shape"][0] for entry in index.calls)
+    assert max_batch == 512
+
+    batches_per_sweep = [min(max_batch, total_chunks - start) for start in range(0, total_chunks, max_batch)]
+    expected_batches: list[int] = []
+    expected_topks: list[int] = []
+    for oversample in oversamples:
+        expected_batches.extend(batches_per_sweep)
+        expected_topks.extend([max(1, oversample * 3)] * len(batches_per_sweep))
+
+    assert [entry["shape"][0] for entry in index.calls] == expected_batches
+    assert [entry["top_k"] for entry in index.calls] == expected_topks
