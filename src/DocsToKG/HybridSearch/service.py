@@ -301,7 +301,13 @@ class DenseSearchStrategy:
                 self._cache.move_to_end(signature)
             return (min(target, self._MAX_K), oversample, overfetch)
 
-    def observe_pass_rate(self, signature: Tuple[object, ...], observed: float) -> float:
+    def observe_pass_rate(
+        self,
+        signature: Tuple[object, ...],
+        observed: float,
+        *,
+        update_global: bool = True,
+    ) -> float:
         """Blend ``observed`` into the running EMA and return the updated value."""
 
         with self._lock:
@@ -311,9 +317,11 @@ class DenseSearchStrategy:
                 1e-3, min(1.0, self._alpha * bounded + (1.0 - self._alpha) * local_prev)
             )
             self._signature_pass[signature] = local_rate
-            self._pass_rate = max(
-                1e-3, min(1.0, self._alpha * bounded + (1.0 - self._alpha) * self._pass_rate)
-            )
+            if update_global:
+                self._pass_rate = max(
+                    1e-3,
+                    min(1.0, self._alpha * bounded + (1.0 - self._alpha) * self._pass_rate),
+                )
             self._dirty = True
             return local_rate
 
@@ -1502,13 +1510,18 @@ class HybridSearchService:
 
         score_floor = float(getattr(config.retrieval, "dense_score_floor", 0.0))
         use_score_floor = score_floor > 0.0
-        use_range = bool(getattr(request, "recall_first", False)) or use_score_floor
+        recall_first = bool(getattr(request, "recall_first", False))
+        use_range = recall_first or use_score_floor
         if use_range:
             hits = list(store.range_search(queries[0], score_floor, limit=None))
             self._observability.metrics.observe("faiss_search_batch_size", 1.0, channel="dense")
             filtered, payloads = self._filter_dense_hits(hits, filters, score_floor)
             observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
-            blended_pass = strategy.observe_pass_rate(signature, observed)
+            blended_pass = strategy.observe_pass_rate(
+                signature,
+                observed,
+                update_global=not recall_first,
+            )
             strategy.remember(signature, max(len(filtered), len(hits)))
             filtered.sort(key=lambda hit: (-hit.score, hit.vector_id))
             effective_k = len(hits)

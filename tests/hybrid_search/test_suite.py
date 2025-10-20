@@ -1170,6 +1170,70 @@ def test_recall_first_dense_signature_isolated(
     assert service._dense_strategy.has_cache(normal_signature)
     assert normal_signature in service._dense_strategy._signature_pass
     assert normal_signature != recall_signature
+
+
+def test_recall_first_does_not_mutate_global_pass_rate(
+    stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
+    dataset: Sequence[Mapping[str, object]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ingestion, service, _, _, _, _ = stack()
+    documents = _to_documents(dataset)
+    ingestion.upsert_documents(documents)
+
+    strategy = service._dense_strategy
+    initial_pass = strategy.current_pass_rate()
+
+    recall_request = HybridSearchRequest(
+        query="hybrid retrieval faiss",
+        namespace="research",
+        filters={"author": "Unknown"},
+        page_size=3,
+        recall_first=True,
+    )
+
+    service.search(recall_request)
+
+    assert strategy.current_pass_rate() == pytest.approx(initial_pass)
+
+    standard_request = replace(recall_request, filters={}, recall_first=False)
+    observed_pass_rates: List[float] = []
+    original_plan = strategy.plan
+
+    def capture_plan(
+        signature: tuple[object, ...],
+        *,
+        page_size: int,
+        retrieval_cfg: "RetrievalConfig",
+        dense_cfg: "DenseIndexConfig",
+        min_k: int = 0,
+    ) -> tuple[int, float, float]:
+        observed_pass_rates.append(strategy.current_pass_rate())
+        return original_plan(
+            signature,
+            page_size=page_size,
+            retrieval_cfg=retrieval_cfg,
+            dense_cfg=dense_cfg,
+            min_k=min_k,
+        )
+
+    monkeypatch.setattr(strategy, "plan", capture_plan)
+    service.search(standard_request)
+
+    assert observed_pass_rates, "planner should execute for standard request"
+    assert observed_pass_rates[0] == pytest.approx(initial_pass)
+
+
 def test_cursor_rejects_when_recall_first_mismatch() -> None:
     service = object.__new__(HybridSearchService)
     page_size = 2
