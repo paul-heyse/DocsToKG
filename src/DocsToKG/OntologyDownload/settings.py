@@ -2248,6 +2248,38 @@ class OntologyDownloadSettings(BaseModel):
         config_json = json.dumps(config_dict, sort_keys=True, default=str)
         return hashlib.sha256(config_json.encode()).hexdigest()
 
+    @property
+    def source_fingerprint(self) -> Dict[str, str]:
+        """Return mapping of field names to their configuration sources.
+        
+        This property exposes the source attribution map built by TracingSettingsSource
+        during settings initialization. It shows which source (CLI, environment,
+        config file, .env, or default) provided each field value.
+        
+        Returns:
+            Dictionary where keys are field names and values are source names:
+            - "cli": provided via CLI/programmatic arguments
+            - "env": provided via ONTOFETCH_* environment variables
+            - "config:/path/to/file": provided via config file
+            - ".env.ontofetch": provided via .env.ontofetch file
+            - ".env": provided via .env file
+            - "default": using built-in default value
+        
+        Example:
+            >>> settings = get_settings()
+            >>> fp = settings.source_fingerprint
+            >>> print(fp)
+            {'http__timeout_read': 'env', 'security__allowed_hosts': 'cli', 'db__path': 'default'}
+        
+        Note:
+            The fingerprint is populated during settings initialization only.
+            Use get_source_fingerprint() directly to access the context.
+        """
+        from .settings_sources import get_source_fingerprint
+        
+        return get_source_fingerprint()
+
+
 
 # Global settings instance cache
 _settings_instance: Optional[OntologyDownloadSettings] = None
