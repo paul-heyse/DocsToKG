@@ -920,6 +920,20 @@ class _DummyCfg(doc_config.StageConfigBase):
     }
 
 
+def test_update_from_file_unknown_field_raises_config_load_error(tmp_path: Path) -> None:
+    """Stage config surfaces ConfigLoadError when config includes unknown keys."""
+
+    config_path = tmp_path / "config.json"
+    config_path.write_text('{"extra": 1}', encoding="utf-8")
+
+    cfg = _DummyCfg()
+    with pytest.raises(doc_config.ConfigLoadError) as excinfo:
+        cfg.update_from_file(config_path)
+
+    assert "Unknown configuration fields" in str(excinfo.value)
+    assert "extra" in str(excinfo.value)
+
+
 def test_apply_args_skips_parser_defaults() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--value", type=int, default=256)

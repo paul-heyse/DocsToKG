@@ -298,7 +298,7 @@ class StageConfigBase:
         unknown_keys = [key for key in mapping if not hasattr(self, key)]
         if unknown_keys:
             joined = ", ".join(sorted(unknown_keys))
-            raise ValueError(
+            raise ConfigLoadError(
                 f"Unknown configuration fields for {self.__class__.__name__}: {joined}"
             )
         for key, value in mapping.items():
