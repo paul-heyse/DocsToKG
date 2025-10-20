@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import heapq
+import io
 import json
 import logging
 import os
@@ -34,6 +35,8 @@ from typing import (
     TextIO,
     Tuple,
 )
+
+import jsonlines
 
 from .env import data_manifests
 
@@ -114,7 +117,7 @@ def iter_jsonl(
 ) -> Iterator[dict]:
     """Stream JSONL records from ``path`` without materialising the full file."""
 
-    yield from _iter_jsonl_records(
+    yield from _iter_jsonl_stream(
         path,
         start=start,
         end=end,
@@ -330,7 +333,7 @@ def iter_doctags(directory: Path) -> Iterator[Path]:
         yield candidate
 
 
-def _iter_jsonl_records(
+def _iter_jsonl_stream(
     path: Path,
     *,
     start: Optional[int],
@@ -342,46 +345,60 @@ def _iter_jsonl_records(
 
     logger = logging.getLogger(__name__)
     errors = 0
-    with path.open("rb") as handle:
+    with path.open("rb") as raw_handle:
         if start:
-            handle.seek(start)
+            raw_handle.seek(start)
             if start != 0:
-                handle.readline()
-        while True:
-            pos = handle.tell()
-            if end is not None and pos >= end:
-                break
-            raw = handle.readline()
-            if not raw:
-                break
-            line = raw.decode("utf-8", errors="replace").strip()
-            if not line:
-                continue
-            try:
-                yield json.loads(line)
-            except json.JSONDecodeError as exc:
-                if skip_invalid:
-                    errors += 1
-                    if errors >= max_errors:
-                        logger.error(
-                            "Too many JSON errors",
-                            extra={
-                                "extra_fields": {
-                                    "stage": "core",
-                                    "doc_id": "__system__",
-                                    "input_hash": None,
-                                    "error_code": "JSONL_ERROR_LIMIT",
-                                    "path": str(path),
-                                    "errors": errors,
-                                    "start": start,
-                                    "end": end,
-                                    "exception": str(exc),
-                                }
-                            },
-                        )
-                        break
-                    continue
-                raise ValueError(f"Invalid JSON in {path} at byte offset {pos}: {exc}") from exc
+                raw_handle.readline()
+
+        text_handle = io.TextIOWrapper(raw_handle, encoding="utf-8", newline="")
+        reader = jsonlines.Reader(text_handle)
+
+        try:
+            while True:
+                pos = raw_handle.tell()
+                if end is not None and pos >= end:
+                    break
+
+                try:
+                    record = reader.read()
+                except EOFError:
+                    break
+                except jsonlines.InvalidLineError as exc:
+                    if skip_invalid:
+                        errors += 1
+                        if errors >= max_errors:
+                            logger.error(
+                                "Too many JSON errors",
+                                extra={
+                                    "extra_fields": {
+                                        "stage": "core",
+                                        "doc_id": "__system__",
+                                        "input_hash": None,
+                                        "error_code": "JSONL_ERROR_LIMIT",
+                                        "path": str(path),
+                                        "errors": errors,
+                                        "start": start,
+                                        "end": end,
+                                        "exception": str(exc),
+                                    }
+                                },
+                            )
+                            break
+                        continue
+                    raise ValueError(
+                        f"Invalid JSON in {path} at byte offset {pos}: {exc}"
+                    ) from exc
+
+                if record is None:
+                    break
+
+                yield record
+        finally:
+            reader.close()
+            with contextlib.suppress(Exception):
+                text_handle.detach()
+
     if errors:
         logger.warning(
             "Skipped invalid JSON lines",

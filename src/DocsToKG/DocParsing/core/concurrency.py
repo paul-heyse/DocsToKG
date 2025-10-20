@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
-import random
 import socket
 import time
 from pathlib import Path
 from typing import Iterator, Optional
+
+from filelock import FileLock, Timeout
 
 from DocsToKG.DocParsing.logging import get_logger, log_event
 
@@ -29,147 +29,26 @@ __all__ = [
 
 
 LOGGER = get_logger(__name__, base_fields={"stage": "core"})
-_STALE_LOCK_JITTER_RANGE = (0.01, 0.05)
 
 
 @contextlib.contextmanager
 def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
-    """Acquire an advisory lock using ``.lock`` sentinel files."""
+    """Acquire an advisory lock using :mod:`filelock` primitives."""
 
     lock_path = path.with_suffix(path.suffix + ".lock")
-    lock_dir = lock_path.parent
-    start = time.time()
-    lock_dir.mkdir(parents=True, exist_ok=True)
-    owning_pid = str(os.getpid())
-    acquired = False
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    file_lock = FileLock(str(lock_path))
 
     try:
-        while True:
-            try:
-                fd = os.open(
-                    lock_path,
-                    os.O_CREAT | os.O_EXCL | os.O_WRONLY,
-                    0o644,
-                )
-            except FileExistsError:
-                existing_pid, raw_pid = _read_lock_owner(lock_path)
+        file_lock.acquire(timeout=timeout)
+    except Timeout as exc:  # pragma: no cover - rare contention path
+        raise TimeoutError(f"Could not acquire lock on {path} after {timeout}s") from exc
 
-                if raw_pid == "":
-                    try:
-                        age = time.time() - lock_path.stat().st_mtime
-                    except FileNotFoundError:
-                        continue
-                    if age < 0.1:
-                        time.sleep(0.01)
-                        continue
-                    _evict_stale_lock(
-                        lock_path,
-                        reason="invalid-pid",
-                        raw_pid=raw_pid,
-                    )
-                    continue
-
-                if raw_pid is not None and existing_pid is None:
-                    _evict_stale_lock(
-                        lock_path,
-                        reason="invalid-pid",
-                        raw_pid=raw_pid,
-                    )
-                    continue
-
-                if existing_pid is not None and not _pid_is_running(existing_pid):
-                    _evict_stale_lock(
-                        lock_path,
-                        reason="stale-pid",
-                        raw_pid=raw_pid,
-                    )
-                    continue
-
-                if time.time() - start > timeout:
-                    raise TimeoutError(f"Could not acquire lock on {path} after {timeout}s")
-
-                time.sleep(0.1)
-                lock_dir.mkdir(parents=True, exist_ok=True)
-                continue
-
-            try:
-                os.write(fd, f"{owning_pid}\n".encode("utf-8"))
-            finally:
-                os.close(fd)
-            acquired = True
-            break
-
+    try:
         yield True
     finally:
-        if acquired:
-            try:
-                pid_text = lock_path.read_text(encoding="utf-8").strip()
-            except OSError:
-                pid_text = ""
-
-            if pid_text == owning_pid:
-                lock_path.unlink(missing_ok=True)
-
-
-def _pid_is_running(pid: int) -> bool:
-    """Return ``True`` if a process with the given PID appears to be alive."""
-
-    if pid is None or pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:  # pragma: no cover - platform specific
-        return True
-    except OSError:  # pragma: no cover - defensive guard
-        return False
-    return True
-
-
-def _read_lock_owner(lock_path: Path) -> tuple[Optional[int], Optional[str]]:
-    """Read the PID stored in ``lock_path`` and return both the parsed and raw forms."""
-
-    try:
-        pid_text = lock_path.read_text(encoding="utf-8").strip()
-    except OSError:
-        return None, None
-
-    if not pid_text:
-        return None, ""
-
-    try:
-        return int(pid_text), pid_text
-    except ValueError:
-        return None, pid_text
-
-
-def _evict_stale_lock(
-    lock_path: Path,
-    *,
-    reason: str,
-    raw_pid: Optional[str],
-) -> None:
-    """Remove a stale lock file after a brief jitter to avoid thundering herds."""
-
-    if reason == "invalid-pid":
-        log_event(
-            LOGGER,
-            "warning",
-            "Lock file contained invalid PID; treating as stale.",
-            doc_id="__system__",
-            input_hash=None,
-            error_code="LOCK_INVALID_PID",
-            lock_path=str(lock_path),
-            raw_pid=raw_pid or "",
-        )
-
-    jitter = random.uniform(*_STALE_LOCK_JITTER_RANGE)
-    time.sleep(jitter)
-    try:
-        lock_path.unlink()
-    except FileNotFoundError:
-        return
+        with contextlib.suppress(RuntimeError):
+            file_lock.release()
 
 
 def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:

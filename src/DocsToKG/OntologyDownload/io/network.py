@@ -56,7 +56,6 @@ from typing import (
 from urllib.parse import ParseResult, urljoin, urlparse, urlunparse
 
 import httpx
-import pooch
 import requests
 from tenacity import Retrying, retry_if_exception, stop_after_attempt
 from tenacity.wait import wait_base
@@ -608,6 +607,8 @@ def request_with_redirect_audit(
                 headers=headers,
                 timeout=timeout,
             )
+            if method.upper() == "HEAD":
+                request.extensions["ontology_skip_status_check"] = True
             if extensions:
                 request.extensions["ontology_headers"] = dict(extensions)
 
@@ -653,7 +654,7 @@ def request_with_redirect_audit(
             response.close()
 
 
-class StreamingDownloader(pooch.HTTPDownloader):
+class _StreamingDownloader:
     """Custom downloader supporting HEAD validation, conditional requests, resume, and caching.
 
     The downloader reuses the shared :mod:`httpx` client so it can issue a HEAD
@@ -676,7 +677,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
     Examples:
         >>> from pathlib import Path
         >>> from DocsToKG.OntologyDownload.settings import DownloadConfiguration
-        >>> downloader = StreamingDownloader(
+        >>> downloader = _StreamingDownloader(
         ...     destination=Path("/tmp/ontology.owl"),
         ...     headers={},
         ...     http_config=DownloadConfiguration(),
@@ -704,7 +705,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
         url_already_validated: bool = False,
         client: Optional[httpx.Client] = None,
     ) -> None:
-        super().__init__(headers={}, progressbar=False, timeout=http_config.timeout_sec)
         self.destination = destination
         self.custom_headers = dict(headers)
         self.http_config = http_config
@@ -1085,13 +1085,12 @@ class StreamingDownloader(pooch.HTTPDownloader):
             },
         )
 
-    def __call__(self, url: str, output_file: str, pooch_logger: logging.Logger) -> None:  # type: ignore[override]
+    def run(self, url: str, cache_path: Path) -> None:
         """Stream ontology content to disk while enforcing download policies.
 
         Args:
             url: Secure download URL resolved by the planner.
-            output_file: Temporary filename managed by pooch during download.
-            pooch_logger: Logger instance supplied by pooch (unused).
+            cache_path: Target file within the cache directory where the download should be written.
 
         Raises:
             PolicyError: If download policies are violated (e.g., invalid URLs or disallowed MIME types).
@@ -1102,6 +1101,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
             None
         """
         self.invoked = True
+
+        output_file = str(cache_path)
 
         manifest_headers: Dict[str, str] = {}
         if self.previous_manifest:
@@ -1584,7 +1585,7 @@ def download_stream(
     merged_headers.update({str(k): str(v) for k, v in headers.items()})
 
     def _resolved_content_metadata(
-        current_downloader: StreamingDownloader,
+        current_downloader: _StreamingDownloader,
         manifest: Optional[Dict[str, object]],
     ) -> tuple[Optional[str], Optional[int]]:
         content_type = (
@@ -1608,7 +1609,6 @@ def download_stream(
 
     expected_algorithm: Optional[str] = None
     expected_digest: Optional[str] = None
-    pooch_known_hash: Optional[str] = None
     if expected_hash:
         parts = expected_hash.split(":", 1)
         if len(parts) == 2:
@@ -1617,8 +1617,6 @@ def download_stream(
             if candidate_algorithm and candidate_digest:
                 expected_algorithm = candidate_algorithm
                 expected_digest = candidate_digest
-                if candidate_algorithm in {"md5", "sha256", "sha512"}:
-                    pooch_known_hash = f"{candidate_algorithm}:{candidate_digest}"
         else:
             logger.warning(
                 "expected checksum malformed",
@@ -1675,7 +1673,7 @@ def download_stream(
 
     def _resolve_digests(
         *,
-        current_downloader: StreamingDownloader,
+        current_downloader: _StreamingDownloader,
         manifest: Optional[Dict[str, object]],
         artifact_path: Path,
     ) -> Dict[str, str]:
@@ -1705,7 +1703,7 @@ def download_stream(
     manifest_for_attempt = previous_manifest
 
     for attempt in range(1, max_checksum_attempts + 1):
-        downloader = StreamingDownloader(
+        downloader = _StreamingDownloader(
             destination=destination,
             headers=merged_headers,
             http_config=http_config,
@@ -1722,16 +1720,9 @@ def download_stream(
         )
         attempt_start = time.monotonic()
         try:
-            cached_path = Path(
-                pooch.retrieve(
-                    secure_url,
-                    path=cache_dir,
-                    fname=cache_key,
-                    known_hash=pooch_known_hash,
-                    downloader=downloader,
-                    progressbar=False,
-                )
-            )
+            cached_path = cache_dir / cache_key
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            downloader.run(secure_url, cached_path)
         except (requests.HTTPError, httpx.HTTPStatusError) as exc:
             status_code = getattr(getattr(exc, "response", None), "status_code", None)
             message = f"HTTP error while downloading {secure_url}: {exc}"
@@ -1763,9 +1754,9 @@ def download_stream(
             raise
         except DownloadFailure:
             raise
-        except Exception as exc:  # pragma: no cover - defensive catch for pooch errors
+        except Exception as exc:  # pragma: no cover - defensive catch
             logger.error(
-                "pooch download error",
+                "unexpected download error",
                 extra={"stage": "download", "url": secure_url, "error": str(exc)},
             )
             raise OntologyDownloadError(f"Download failed for {secure_url}: {exc}") from exc

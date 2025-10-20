@@ -38,6 +38,7 @@ Scope boundary: Handles conversion, chunking, embedding, and telemetry; does not
 - **Runtime**: Linux, Python 3.10 or newer. GPU strongly recommended for PDF DocTags (vLLM) and Qwen embeddings; CPU-only execution is supported with lower throughput.
 - **Installation extras**:
   - Core pipeline: `pip install "DocsToKG[docparse]"`.
+  - Runtime primitives: `filelock>=3.20.0` and `jsonlines>=4.0.0` are installed with the core extra; verify downstream environments vendor these libraries because locking and JSONL streaming now depend on them.
   - PDF DocTags (vLLM + Docling PDF extras): `pip install "DocsToKG[docparse-pdf]"`.
   - SPLADE sparse embeddings: `pip install sentence-transformers`.
   - Qwen dense embeddings: `pip install vllm` plus CUDA 12 runtime libraries (`libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, `libgomp.so.1`). CPU-only runs automatically fall back to a `float32` dtype when neither CLI nor `DOCSTOKG_QWEN_DTYPE` override is set, ensuring vLLM receives a CPU-safe precision.
@@ -239,7 +240,7 @@ sequenceDiagram
   }
   ```
 - Resume contract: [`core.manifest.ResumeController`](core/manifest.py) compares `status` and `input_hash` to decide whether to skip work, so metadata fields supplied by `StageTelemetry` (for example, `vector_format` in embedding runs) must stay in sync with their corresponding writers.
-- `telemetry.StageTelemetry` acquires advisory locks via [`core.concurrency.acquire_lock`](core/concurrency.py) before appending JSON lines, guaranteeing atomic writes even with concurrent processes.
+- `telemetry.StageTelemetry` writes through a shared `FileLock` helper (wrapping [`core.concurrency.acquire_lock`](core/concurrency.py)) before appending JSON lines, guaranteeing atomic writes even with concurrent processes.
 
 ## Interactions with other packages
 - Upstream: consumes raw documents, optional DocTags produced by external systems.
@@ -248,7 +249,7 @@ sequenceDiagram
 
 ## Observability
 - Logs: `logging.py` emits structured records (JSON + console) that include `stage`, `doc_id`, elapsed durations, and correlation IDs. Output paths default to stdout plus `${DOCSTOKG_DATA_ROOT}/Logs/docparse-*.jsonl`; override using CLI `--log-level` or `DOCSTOKG_LOG_DIR`.
-- Telemetry: `telemetry.TelemetrySink` writes attempt + manifest JSON lines (`docparse.*.attempts.jsonl` / `docparse.*.manifest.jsonl`) using advisory locks, ensuring atomic appends even with concurrent workers. Manifest rows now capture `vector_format` for success, skip, and validate-only entries so parquet adoption can be audited downstream.
+- Telemetry: `telemetry.TelemetrySink` writes attempt + manifest JSON lines (`docparse.*.attempts.jsonl` / `docparse.*.manifest.jsonl`) through a shared `FileLock` writer that wraps `jsonl_append_iter(..., atomic=True)`, ensuring atomic appends even with concurrent workers. Manifest rows now capture `vector_format` for success, skip, and validate-only entries so parquet adoption can be audited downstream.
 - Metrics: `logging.telemetry_scope` and `telemetry.StageTelemetry` expose counters and histograms suitable for ingestion by dashboard jobs (see `tests/docparsing/test_chunk_manifest_resume.py` for usage).
 - SLO tracking: maintain ≥99.5 % manifest success across stages and keep embedding validation (`--validate-only`) under 2.2 s P50 per document based on synthetic benchmark fixtures.
 - Health checks: prefer `docparse chunk --validate-only` / `docparse embed --validate-only` when validating environments—these commands read existing JSONL artifacts without mutating outputs.
@@ -284,7 +285,7 @@ direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # optional
 - Danger zone:
   - `rm -rf Data/DocTagsFiles` or manually editing manifests may break resume; use CLI `--force` and allow pipeline to rebuild artifacts.
   - Changing embedding formats (`--format`) requires updating `formats` validators and downstream loaders.
-  - Terminating vLLM/Qwen worker processes manually can leave stale lock files; use CLI cancel/resume flags so `concurrency.acquire_lock` can tidy state.
+  - Terminating vLLM/Qwen worker processes manually can leave stale lock files; use CLI cancel/resume flags to let the shared `FileLock` helper (via `concurrency.acquire_lock`) release resources cleanly.
 
 ## FAQ
 - Q: How do I resume after a failure?

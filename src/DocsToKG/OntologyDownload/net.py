@@ -137,7 +137,10 @@ def _request_hook(request: httpx.Request) -> None:
 
 
 def _response_hook(response: httpx.Response) -> None:
-    response.raise_for_status()
+    if response.status_code >= 400 and not response.request.extensions.get(
+        "ontology_skip_status_check"
+    ):
+        response.raise_for_status()
 
     meta: MutableMapping[str, object] = response.request.extensions.setdefault(  # type: ignore[assignment]
         "ontology_meta", {}

@@ -1,15 +1,13 @@
 """Stress-test advisory lock behaviour used throughout DocParsing.
 
-The chunking and embedding pipelines rely on `acquire_lock` to guard manifest
-writes and temporary resources. These tests spawn real processes to ensure the
-lock enforces mutual exclusion, cleans up stale lock files, and honours timeout
-semantics. By exercising cross-platform edge cases we keep concurrency bugs from
-creeping into production pipelines.
+The chunking and embedding pipelines rely on ``acquire_lock`` (wrapping
+``filelock.FileLock``) to guard manifest writes and temporary resources. These
+tests spawn real processes to ensure the lock enforces mutual exclusion, keeps
+its `.lock` file tidy, and honours timeout semantics.
 """
 
 from __future__ import annotations
 
-import logging
 import multiprocessing
 import os
 import time
@@ -118,29 +116,11 @@ def test_acquire_lock_recovers_from_invalid_pid(tmp_path: Path, raw_pid: str) ->
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path.write_text(raw_pid, encoding="utf-8")
 
-    records: List[logging.LogRecord] = []
-
-    class _Capture(logging.Handler):
-        def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - simple hook
-            records.append(record)
-
-    capture_handler = _Capture()
-    capture_handler.setLevel(logging.WARNING)
-    logger = logging.getLogger("DocsToKG.DocParsing.core.concurrency")
-    logger.addHandler(capture_handler)
-
     timeout = 0.5
     start = time.time()
-    try:
-        with acquire_lock(target_path, timeout=timeout):
-            assert lock_path.exists()
-        elapsed = time.time() - start
-    finally:
-        logger.removeHandler(capture_handler)
+    with acquire_lock(target_path, timeout=timeout):
+        assert lock_path.exists()
+    elapsed = time.time() - start
 
     assert elapsed < timeout - 0.1
     assert not lock_path.exists()
-    assert any(
-        getattr(record, "extra_fields", {}).get("error_code") == "LOCK_INVALID_PID"
-        for record in records
-    )

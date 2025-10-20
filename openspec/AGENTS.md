@@ -941,3 +941,4 @@ Remember: Specs are truth. Changes are proposals. Keep them in sync.
 - Follow the documentation in [CODE_ANNOTATION_STANDARDS.md](../docs/CODE_ANNOTATION_STANDARDS.md) when annotating code or updating NAVMAP headers.
 - Structure modules according to [MODULE_ORGANIZATION_GUIDE.md.txt](../docs/html/_sources/MODULE_ORGANIZATION_GUIDE.md.txt) so imports, dataclasses, and public APIs remain predictable for downstream agents.
 - DocParsing schemas now live in `DocsToKG.DocParsing.formats`; treat `DocsToKG.DocParsing.schemas` as a warning-emitting shim scheduled for removal in DocsToKG 0.3.0.
+- DocParsing runtime installs now include `filelock>=3.20.0` and `jsonlines>=4.0.0`; ensure sandbox environments retain these libraries because locking and JSONL streaming rely on them.

@@ -9,11 +9,10 @@ multiple processes report progress concurrently.
 
 from __future__ import annotations
 
-import contextlib
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Iterable, Optional
 
 from DocsToKG.DocParsing.io import jsonl_append_iter
 
@@ -25,12 +24,13 @@ __all__ = [
 ]
 
 
-def _acquire_lock_for(path: Path) -> contextlib.AbstractContextManager[bool]:
-    """Return an advisory lock context manager for ``path``."""
+def _default_writer(path: Path, rows: Iterable[Dict[str, Any]]) -> int:
+    """Append ``rows`` to ``path`` under the shared FileLock."""
 
     from DocsToKG.DocParsing.core import acquire_lock
 
-    return acquire_lock(path)
+    with acquire_lock(path):
+        return jsonl_append_iter(path, rows, atomic=True)
 
 
 @dataclass(slots=True)
@@ -65,36 +65,65 @@ class ManifestEntry:
 class TelemetrySink:
     """Persistence helper for attempt and manifest telemetry."""
 
-    def __init__(self, attempts_path: Path, manifest_path: Path) -> None:
+    def __init__(
+        self,
+        attempts_path: Path,
+        manifest_path: Path,
+        *,
+        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+    ) -> None:
         """Initialise sink paths and ensure parent directories exist."""
 
         self._attempts_path = attempts_path
         self._manifest_path = manifest_path
         self._attempts_path.parent.mkdir(parents=True, exist_ok=True)
         self._manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        self._writer = writer or _default_writer
 
-    def _append_payload(self, path: Path, payload: Dict[str, Any]) -> None:
-        """Append ``payload`` to ``path`` under a file lock."""
+    @property
+    def writer(self) -> Callable[[Path, Iterable[Dict[str, Any]]], int | None]:
+        """Return the default writer for this sink."""
 
-        with _acquire_lock_for(path):
-            jsonl_append_iter(path, [payload], atomic=True)
+        return self._writer
 
-    def write_attempt(self, attempt: Attempt) -> None:
+    def _append_payload(
+        self,
+        path: Path,
+        payload: Dict[str, Any],
+        *,
+        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+    ) -> None:
+        """Append ``payload`` to ``path`` using the provided writer."""
+
+        active_writer = writer or self._writer
+        active_writer(path, [payload])
+
+    def write_attempt(
+        self,
+        attempt: Attempt,
+        *,
+        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+    ) -> None:
         """Append ``attempt`` to the attempts log."""
 
         payload = asdict(attempt)
         metadata = dict(payload.pop("metadata", {}) or {})
         payload.update(metadata)
-        self._append_payload(self._attempts_path, payload)
+        self._append_payload(self._attempts_path, payload, writer=writer)
 
-    def write_manifest_entry(self, entry: ManifestEntry) -> None:
+    def write_manifest_entry(
+        self,
+        entry: ManifestEntry,
+        *,
+        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+    ) -> None:
         """Append ``entry`` to the manifest log."""
 
         payload = asdict(entry)
         metadata = dict(payload.pop("metadata", {}) or {})
         payload.update(metadata)
         payload.setdefault("doc_id", entry.file_id)
-        self._append_payload(self._manifest_path, payload)
+        self._append_payload(self._manifest_path, payload, writer=writer)
 
 
 def _input_bytes(path: Path | str) -> int:
@@ -109,12 +138,20 @@ def _input_bytes(path: Path | str) -> int:
 class StageTelemetry:
     """Lightweight helper binding a sink to a specific stage/run."""
 
-    def __init__(self, sink: TelemetrySink, *, run_id: str, stage: str) -> None:
+    def __init__(
+        self,
+        sink: TelemetrySink,
+        *,
+        run_id: str,
+        stage: str,
+        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+    ) -> None:
         """Bind the telemetry sink to a specific run identifier and stage."""
 
         self._sink = sink
         self._run_id = run_id
         self._stage = stage
+        self._writer = writer or sink.writer
 
     def record_attempt(
         self,
@@ -141,7 +178,7 @@ class StageTelemetry:
             bytes=_input_bytes(input_path),
             metadata=metadata or {},
         )
-        self._sink.write_attempt(payload)
+        self._sink.write_attempt(payload, writer=self._writer)
 
     def write_manifest(
         self,
@@ -165,7 +202,7 @@ class StageTelemetry:
             duration_s=duration_s,
             metadata=metadata or {},
         )
-        self._sink.write_manifest_entry(entry)
+        self._sink.write_manifest_entry(entry, writer=self._writer)
 
     def log_success(
         self,

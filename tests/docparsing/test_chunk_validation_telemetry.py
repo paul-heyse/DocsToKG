@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 import sys
 import types
+from pathlib import Path
+from typing import Any, Dict, Iterable
 
 if "transformers" not in sys.modules:
     transformers_stub = types.ModuleType("transformers")
@@ -116,3 +118,43 @@ def test_log_skip_preserves_null_schema_version(tmp_path) -> None:
     assert manifest_record["schema_version"] is None
     assert manifest_record["hash_alg"] == metadata["hash_alg"]
     assert manifest_record["skip_reason"] == metadata["skip_reason"]
+
+
+def test_stage_telemetry_supports_custom_writer(tmp_path) -> None:
+    """Telemetry should allow injection of a custom writer callable."""
+
+    attempts_path = tmp_path / "attempts.jsonl"
+    manifest_path = tmp_path / "manifest.jsonl"
+    calls: list[tuple[Path, list[dict[str, Any]]]] = []
+
+    def fake_writer(path: Path, rows: Iterable[Dict[str, Any]]) -> int:
+        payload = [dict(row) for row in rows]
+        calls.append((path, payload))
+        return len(payload)
+
+    sink = TelemetrySink(attempts_path, manifest_path)
+    telemetry = StageTelemetry(sink, run_id="run-1", stage="chunk", writer=fake_writer)
+
+    input_path = tmp_path / "input.jsonl"
+    input_path.write_text("{}\n", encoding="utf-8")
+
+    telemetry.record_attempt(
+        doc_id="doc-1",
+        input_path=input_path,
+        status="success",
+        metadata={"extra": "attempt"},
+    )
+    telemetry.write_manifest(
+        doc_id="doc-1",
+        output_path=tmp_path / "output.jsonl",
+        schema_version="v1",
+        duration_s=0.1,
+        metadata={"extra": "manifest"},
+    )
+
+    assert len(calls) == 2
+    attempt_call, manifest_call = calls
+    assert attempt_call[0] == attempts_path
+    assert manifest_call[0] == manifest_path
+    assert attempt_call[1][0]["extra"] == "attempt"
+    assert manifest_call[1][0]["extra"] == "manifest"

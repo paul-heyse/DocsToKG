@@ -197,7 +197,7 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
     config = ontology_env.build_download_config()
     destination = tmp_path / "hp-malformed-length.owl"
     expected_user_agent = config.polite_http_headers().get("User-Agent")
-    downloader = network_mod.StreamingDownloader(
+    downloader = network_mod._StreamingDownloader(
         destination=destination,
         headers={},
         http_config=config,
@@ -281,7 +281,7 @@ def test_preliminary_head_check_cancels_retry_sleep(ontology_env, tmp_path):
     )
     token = CancellationToken()
     parsed_url = urlparse(url)
-    downloader = network_mod.StreamingDownloader(
+    downloader = network_mod._StreamingDownloader(
         destination=destination,
         headers=expected_headers,
         http_config=config,
@@ -399,7 +399,7 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
 
     config = ontology_env.build_download_config()
     destination = tmp_path / "hp-retry.owl"
-    downloader = network_mod.StreamingDownloader(
+    downloader = network_mod._StreamingDownloader(
         destination=destination,
         headers={},
         http_config=config,

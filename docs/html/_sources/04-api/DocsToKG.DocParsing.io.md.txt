@@ -69,9 +69,9 @@ when they are symbolic links. Files that resolve to the same on-disk target
 are emitted once, preferring concrete files over symlinks and ordering the
 results lexicographically by their logical (relative) path.
 
-### `_iter_jsonl_records(path)`
+### `_iter_jsonl_stream(path)`
 
-Yield JSON-decoded records between optional byte offsets.
+Yield JSON-decoded records between optional byte offsets using the library-backed reader.
 
 ### `_sanitise_stage(stage)`
 

@@ -85,9 +85,9 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="acquire-lock-for-path">
-<h3><code class="docutils literal notranslate"><span class="pre">_acquire_lock_for(path)</span></code><a class="headerlink" href="#acquire-lock-for-path" title="Link to this heading"></a></h3>
-<p>Return an advisory lock context manager for <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
+<section id="default-writer-path-rows">
+<h3><code class="docutils literal notranslate"><span class="pre">_default_writer(path,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#default-writer-path-rows" title="Link to this heading"></a></h3>
+<p>Append <code class="docutils literal notranslate"><span class="pre">rows</span></code> to <code class="docutils literal notranslate"><span class="pre">path</span></code> through the shared FileLock-backed writer.</p>
 </section>
 <section id="input-bytes-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_input_bytes(path)</span></code><a class="headerlink" href="#input-bytes-path" title="Link to this heading"></a></h3>
@@ -95,7 +95,7 @@
 </section>
 <section id="append-payload-self-path-payload">
 <h3><code class="docutils literal notranslate"><span class="pre">_append_payload(self,</span> <span class="pre">path,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#append-payload-self-path-payload" title="Link to this heading"></a></h3>
-<p>Append <code class="docutils literal notranslate"><span class="pre">payload</span></code> to <code class="docutils literal notranslate"><span class="pre">path</span></code> under a file lock.</p>
+<p>Append <code class="docutils literal notranslate"><span class="pre">payload</span></code> to <code class="docutils literal notranslate"><span class="pre">path</span></code> using either the supplied writer or the sink default.</p>
 </section>
 <section id="write-attempt-self-attempt">
 <h3><code class="docutils literal notranslate"><span class="pre">write_attempt(self,</span> <span class="pre">attempt)</span></code><a class="headerlink" href="#write-attempt-self-attempt" title="Link to this heading"></a></h3>

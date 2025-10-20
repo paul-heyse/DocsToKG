@@ -8,9 +8,9 @@ Telemetry sink interfaces for DocParsing pipelines.
 
 ## 2. Functions
 
-### `_acquire_lock_for(path)`
+### `_default_writer(path, rows)`
 
-Return an advisory lock context manager for ``path``.
+Append ``rows`` to ``path`` through the shared FileLock-backed writer.
 
 ### `_input_bytes(path)`
 
@@ -18,7 +18,7 @@ Best-effort size lookup for ``path`` returning zero on failure.
 
 ### `_append_payload(self, path, payload)`
 
-Append ``payload`` to ``path`` under a file lock.
+Append ``payload`` to ``path`` using either the supplied writer or the sink default.
 
 ### `write_attempt(self, attempt)`
 

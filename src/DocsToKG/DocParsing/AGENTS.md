@@ -252,7 +252,7 @@ Last updated: 2025-10-20
 
 - Python 3.10+, Linux recommended; GPU strongly suggested for PDF DocTags (vLLM) and Qwen embeddings.
 - Extras (`pip install`):
-  - Core pipeline: `"DocsToKG[docparse]"`
+  - Core pipeline: `"DocsToKG[docparse]"` (installs `filelock>=3.20.0` and `jsonlines>=4.0.0` for locking/streaming primitives)
   - PDF DocTags (vLLM + Docling extras): `"DocsToKG[docparse-pdf]"`
   - SPLADE sparse embeddings: `sentence-transformers`
   - Qwen dense embeddings: `vllm` + CUDA 12 libraries (`libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, `libgomp.so.1`)
