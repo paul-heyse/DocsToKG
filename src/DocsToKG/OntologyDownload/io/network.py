@@ -1135,33 +1135,33 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 except OSError:
                     pass
 
-            def _raise_timeout(elapsed: float) -> None:
-                _clear_partial_files()
-                timeout_sec = timeout_limit
-                self.logger.error(
-                    "download timeout",
-                    extra={
-                        "stage": "download",
-                        "error": "timeout",
-                        "elapsed_sec": round(elapsed, 2),
-                        "timeout_sec": timeout_sec,
-                        "service": self.service,
-                        "host": self.origin_host,
-                    },
-                )
-                raise DownloadFailure(
-                    (
-                        f"Download exceeded timeout of {timeout_sec:.2f} seconds "
-                        f"(elapsed {elapsed:.2f} seconds)"
-                    ),
-                    retryable=False,
-                )
+        def _raise_timeout(elapsed: float) -> None:
+            _clear_partial_files()
+            timeout_sec = timeout_limit
+            self.logger.error(
+                "download timeout",
+                extra={
+                    "stage": "download",
+                    "error": "timeout",
+                    "elapsed_sec": round(elapsed, 2),
+                    "timeout_sec": timeout_sec,
+                    "service": self.service,
+                    "host": self.origin_host,
+                },
+            )
+            raise DownloadFailure(
+                (
+                    f"Download exceeded timeout of {timeout_sec:.2f} seconds "
+                    f"(elapsed {elapsed:.2f} seconds)"
+                ),
+                retryable=False,
+            )
 
-            def _remaining_budget() -> float:
-                return timeout_limit - (time.monotonic() - overall_start)
+        def _remaining_budget() -> float:
+            return timeout_limit - (time.monotonic() - overall_start)
 
-            def _fail_for_timeout() -> None:
-                _raise_timeout(time.monotonic() - overall_start)
+        def _fail_for_timeout() -> None:
+            _raise_timeout(time.monotonic() - overall_start)
 
         head_content_type, head_content_length = self._preliminary_head_check(
             url,

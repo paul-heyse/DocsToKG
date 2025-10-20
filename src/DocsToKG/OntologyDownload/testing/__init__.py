@@ -29,8 +29,6 @@ from typing import (
 )
 from urllib.parse import urljoin
 
-import requests
-
 from ..io import rate_limit as rate_mod
 from ..io import sanitize_filename
 from ..plugins import (
@@ -66,8 +64,9 @@ def use_mock_http_client(transport: "httpx.BaseTransport", **client_kwargs):
 
     from ..net import configure_http_client, reset_http_client
 
+    default_config = client_kwargs.pop("default_config", None)
     client = httpx.Client(transport=transport, **client_kwargs)
-    configure_http_client(client=client)
+    configure_http_client(client=client, default_config=default_config)
     try:
         yield client
     finally:
@@ -367,6 +366,54 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
             return None
         return responses.popleft()
 
+    def build_httpx_transport(self) -> "httpx.MockTransport":
+        """Return an HTTPX transport that serves responses from this environment."""
+
+        import httpx
+
+        env = self
+
+        def _handler(request: httpx.Request) -> httpx.Response:
+            path = request.url.path or "/"
+            record = RequestRecord(
+                method=request.method,
+                path=path,
+                headers={key: value for key, value in request.headers.items()},
+                body=request.content or b"",
+            )
+            env._request_log.append(record)
+
+            spec = env._dequeue_response(method=request.method.upper(), path=path)
+            if spec is None:
+                return httpx.Response(404, request=request, content=b"")
+
+            if spec.delay_sec:
+                time.sleep(spec.delay_sec)
+
+            headers = dict(spec.headers)
+            if spec.stream:
+
+                def iterator() -> Iterable[bytes]:
+                    for chunk in spec.stream or []:
+                        yield chunk if isinstance(chunk, bytes) else chunk.encode("utf-8")
+
+                return httpx.Response(
+                    spec.status,
+                    headers=headers,
+                    stream=iterator(),
+                    request=request,
+                )
+
+            body = spec.serialise_body()
+            return httpx.Response(
+                spec.status,
+                headers=headers,
+                content=body,
+                request=request,
+            )
+
+        return httpx.MockTransport(_handler)
+
     # --- Fixture helpers ----------------------------------------------------------
 
     def register_fixture(
@@ -412,7 +459,6 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         """Return a download configuration bound to this harness."""
 
         config = DownloadConfiguration()
-        config.set_session_factory(self._session_factory)
         config.set_bucket_provider(self._bucket_provider)
         if self._http_host:
             allowed = [self._http_host]
@@ -495,11 +541,6 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         return list(self._request_log)
 
     # --- Custom session/bucket providers -----------------------------------------
-
-    def _session_factory(self) -> requests.Session:
-        session = requests.Session()
-        session.headers.update({"User-Agent": "DocsToKG-TestHarness/1.0"})
-        return session
 
     def _bucket_provider(
         self,

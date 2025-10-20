@@ -22,7 +22,8 @@ import pytest
 from DocsToKG.OntologyDownload.cancellation import CancellationToken
 from DocsToKG.OntologyDownload.errors import ConfigError, DownloadFailure
 from DocsToKG.OntologyDownload.io import filesystem as fs_mod
-from DocsToKG.OntologyDownload.io import network as network_mod, get_http_client
+from DocsToKG.OntologyDownload.io import get_http_client
+from DocsToKG.OntologyDownload.io import network as network_mod
 from DocsToKG.OntologyDownload.testing import ResponseSpec
 
 

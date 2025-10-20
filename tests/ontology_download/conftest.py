@@ -9,9 +9,12 @@ import sys
 import types
 from pathlib import Path
 
+import httpx
 import pytest
+from hishel import CacheTransport, FileStorage
 
-from DocsToKG.OntologyDownload.testing import TestingEnvironment
+from DocsToKG.OntologyDownload import net as net_mod
+from DocsToKG.OntologyDownload.testing import TestingEnvironment, use_mock_http_client
 
 
 @pytest.fixture
@@ -103,7 +106,34 @@ def ontology_env():
     """Provision an isolated ontology download environment for tests."""
 
     with TestingEnvironment() as env:
-        yield env
+        transport = env.build_httpx_transport()
+        cache_root = env.cache_dir / "http" / "ontology"
+        cache_root.mkdir(parents=True, exist_ok=True)
+        cache_transport = CacheTransport(transport=transport, storage=FileStorage(base_path=cache_root))
+        config = env.build_download_config()
+        timeout = httpx.Timeout(
+            connect=config.connect_timeout_sec,
+            read=config.timeout_sec,
+            write=config.timeout_sec,
+            pool=config.pool_timeout_sec,
+        )
+        limits = httpx.Limits(
+            max_connections=config.max_httpx_connections,
+            max_keepalive_connections=config.max_keepalive_connections,
+            keepalive_expiry=config.keepalive_expiry_sec,
+        )
+        event_hooks = {"request": [net_mod._request_hook], "response": [net_mod._response_hook]}
+        with use_mock_http_client(
+            cache_transport,
+            timeout=timeout,
+            limits=limits,
+            http2=False,
+            trust_env=True,
+            follow_redirects=False,
+            event_hooks=event_hooks,
+            default_config=config,
+        ):
+            yield env
 
 
 @pytest.fixture(scope="function")

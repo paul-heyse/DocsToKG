@@ -65,7 +65,7 @@
   - `@contextmanager def use_mock_http_client(transport: httpx.MockTransport, **client_kwargs): ...` that installs a temporary client via `configure_http_client(client=httpx.Client(transport=transport, **client_kwargs))` and restores the prior client on exit.
 
 ## 5. Tests & QA
-- [ ] 5.1 Update all tests referencing `SESSION_POOL`:
+- [x] 5.1 Update all tests referencing `SESSION_POOL`:
   - `tests/ontology_download/test_download_behaviour.py` should assert `net.get_http_client()` reuse by inspecting transport call counts instead of pool size.
   - Replace `requests` monkeypatches with `httpx.MockTransport` that returns deterministic responses (including redirect and 304 cases).
 - [ ] 5.2 Add focused unit tests for `net.py` covering:

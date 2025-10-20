@@ -12,9 +12,9 @@
 
 ## 2. Networking module migration
 - [ ] 2.1 Delete `ThreadLocalSessionFactory`, `create_session`, and `TENACITY_SLEEP` exposure of `time.sleep` in `src/DocsToKG/ContentDownload/networking.py`. Replace internal helpers with imports from `httpx_transport` (`get_http_client`, `purge_http_cache`); keep the public module exports intact.
-- [ ] 2.2 Update `request_with_retries` so the Tenacity predicates handle `httpx.TimeoutException`, `httpx.TransportError`, and `httpx.ProtocolError`, and the result predicate accepts `httpx.Response`. Ensure `_close_response_safely` accepts HTTPX responses and that elapsed sleep tracking continues to surface in logging.
-- [ ] 2.3 Refactor `head_precheck`, `_head_precheck_via_get`, and `RobotsCache._fetch` to call `httpx` via `request_with_retries`, passing explicit timeout/backoff parameters and ensuring 304/conditional logic is honoured through Hishel. Remove any `.close()` calls that assumed `requests.Response`.
-- [ ] 2.4 Update `stream_candidate_payload` and related downloader helpers to use `with httpx_client.stream("GET", …)` writing into the existing temp-file flow. Confirm progress callbacks, range/resume guards, and telemetry behave as before.
+- [x] 2.2 Update `request_with_retries` so the Tenacity predicates handle `httpx.TimeoutException`, `httpx.TransportError`, and `httpx.ProtocolError`, and the result predicate accepts `httpx.Response`. Ensure `_close_response_safely` accepts HTTPX responses and that elapsed sleep tracking continues to surface in logging.
+- [x] 2.3 Refactor `head_precheck`, `_head_precheck_via_get`, and `RobotsCache._fetch` to call `httpx` via `request_with_retries`, passing explicit timeout/backoff parameters and ensuring 304/conditional logic is honoured through Hishel. Remove any `.close()` calls that assumed `requests.Response`.
+- [x] 2.4 Update `stream_candidate_payload` and related downloader helpers to use `with httpx_client.stream("GET", …)` writing into the existing temp-file flow. Confirm progress callbacks, range/resume guards, and telemetry behave as before.
 - [ ] 2.5 Remove residual imports of `requests` in ContentDownload modules; add defensive shims so legacy tests trying to patch `create_session` raise a clear `RuntimeError` pointing to `httpx_transport`.
 
 ## 3. Call-site and test updates

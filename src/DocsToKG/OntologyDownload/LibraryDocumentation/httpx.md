@@ -508,6 +508,14 @@ class AsyncHttpClient:
 
 ---
 
+## DocsToKG integration
+
+* `DocsToKG.OntologyDownload.net` provides the authoritative synchronous `httpx.Client`, already wrapped with Hishel caching. Always call `get_http_client()` from planner probes, checksum fetchers, and the streaming downloader so connection pooling, cache directories, and timeout settings remain consistent.
+* Tests and fixtures can swap in a deterministic transport through `configure_http_client(client=...)` or the `use_mock_http_client(...)` helper in `DocsToKG.OntologyDownload.testing`, which installs an `httpx.MockTransport` and restores defaults via `reset_http_client()`.
+* Per-request header overrides flow through `request.extensions["ontology_headers"]`; set that extension with polite header overrides (correlation IDs, custom agents) instead of mutating `Request.headers` directly so the shared hooks can merge them reliably.
+
+---
+
 ## Sources and further reading
 
 * Official docs: quickstart, advanced usage (timeouts, proxies, limits, transports, SSL, auth, event hooks), async support, logging, requests‑compatibility. ([HTTPX][7])

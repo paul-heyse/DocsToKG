@@ -360,7 +360,15 @@ The host’s `load_setuptools_entrypoints("eggsample")` picks this up automatica
 * **Register specs before plugins** to validate early (you *can* add later, but then validation is delayed). ([Pluggy][1])
 * **Avoid name collisions** by picking a **unique** `project_name` and an entry point group like `"yourapp.plugins"`. ([Pluggy][2])
 * **Order management**: Combine `tryfirst/trylast` with **registration order** for precise pipelines; when you need per‑call exclusions use `subset_hook_caller`. ([Pluggy][1])
-* **Wrappers in a mixed world**: New‑ and old‑style wrappers interoperate, but use **one style per plugin** for clarity. ([Pluggy][1])
+* **Wrappers in a mixed world**: New- and old-style wrappers interoperate, but use **one style per plugin** for clarity. ([Pluggy][1])
+
+---
+
+## DocsToKG integration
+
+* `DocsToKG.OntologyDownload.net` wraps the shared HTTPX client with Hishel using `CacheTransport` + `FileStorage` under `${CACHE_DIR}/http/ontology`. This gives ontology downloads RFC‑9111 caching (validators, revalidation) without bespoke ETag plumbing.
+* Requests that need polite headers or per-call overrides should pass `request.extensions["ontology_headers"]`; the shared hooks merge polite headers, correlation IDs, and service-specific metadata before sending.
+* Tests rely on `use_mock_http_client` to swap in `httpx.MockTransport` instances. The helper calls `configure_http_client` so Hishel metadata still flows, and `reset_http_client()` restores the default cache-backed client afterwards.
 
 ---
 

@@ -211,7 +211,7 @@ def configure_http_client(
         raise ValueError("provide either a client or factory, not both")
 
     with _CLIENT_LOCK:
-        global _CLIENT_FACTORY, _EXTRA_REQUEST_HOOKS, _EXTRA_RESPONSE_HOOKS, _DEFAULT_CONFIG
+        global _HTTP_CLIENT, _CLIENT_FACTORY, _EXTRA_REQUEST_HOOKS, _EXTRA_RESPONSE_HOOKS, _DEFAULT_CONFIG
 
         if default_config is not None:
             _DEFAULT_CONFIG = default_config
