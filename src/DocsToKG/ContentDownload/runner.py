@@ -50,7 +50,6 @@ import contextlib
 import inspect
 import json
 import logging
-import os
 import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
@@ -724,27 +723,19 @@ class DownloadRun:
                 breaker_registry = None
                 try:
                     from DocsToKG.ContentDownload.breakers import BreakerRegistry, BreakerConfig
-                    from DocsToKG.ContentDownload.breakers_loader import load_breaker_config
                     from DocsToKG.ContentDownload.networking_breaker_listener import (
                         NetworkBreakerListener,
                         BreakerListenerConfig,
                     )
-
-                    # Load breaker configuration
-                    breaker_config = load_breaker_config(
-                        yaml_path=getattr(self.args, "breaker_config_path", None),
-                        env=os.environ,
-                        cli_host_overrides=getattr(self.args, "breaker_host_overrides", None),
-                        cli_role_overrides=getattr(self.args, "breaker_role_overrides", None),
-                        cli_resolver_overrides=getattr(
-                            self.args, "breaker_resolver_overrides", None
-                        ),
-                        cli_defaults_override=getattr(self.args, "breaker_defaults_override", None),
-                        cli_classify_override=getattr(self.args, "breaker_classify_override", None),
-                        cli_rolling_override=getattr(self.args, "breaker_rolling_override", None),
+                except ImportError:
+                    LOGGER.debug("pybreaker not available, circuit breakers disabled")
+                else:
+                    breaker_config_obj = getattr(
+                        self.resolved.resolver_config, "breaker_config", None
                     )
+                    if not isinstance(breaker_config_obj, BreakerConfig):
+                        breaker_config_obj = BreakerConfig()
 
-                    # Create listener factory
                     def listener_factory(host: str, scope: str, resolver: Optional[str]):
                         if self.attempt_logger is not None:
                             return NetworkBreakerListener(
@@ -758,14 +749,12 @@ class DownloadRun:
                             )
                         return None
 
-                    breaker_registry = BreakerRegistry(
-                        breaker_config, listener_factory=listener_factory
-                    )
-                except ImportError:
-                    # pybreaker not available, continue without breakers
-                    LOGGER.debug("pybreaker not available, circuit breakers disabled")
-                except Exception as e:
-                    LOGGER.warning("Failed to initialize circuit breakers: %s", e)
+                    try:
+                        breaker_registry = BreakerRegistry(
+                            breaker_config_obj, listener_factory=listener_factory
+                        )
+                    except Exception as e:
+                        LOGGER.warning("Failed to initialize circuit breakers: %s", e)
 
                 state = self.setup_download_state(
                     http_client, self.resolved.robots_checker, breaker_registry

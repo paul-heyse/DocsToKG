@@ -89,7 +89,7 @@ import re
 import ssl
 from dataclasses import replace
 from pathlib import Path
-from typing import Dict, Iterable, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
 try:
     import yaml  # PyYAML
@@ -224,11 +224,69 @@ def _role_from_str(s: str) -> RequestRole:
         raise ValueError(f"Unknown role: {s}")
     return _ROLE_ALIASES[key]
 
+def _merge_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
+    """Deep-merge breaker policy dictionaries preserving nested role maps."""
+
+    if not override:
+        return dict(base)
+
+    result: Dict[str, Any] = dict(base)
+
+    for key, value in override.items():
+        if isinstance(value, Mapping):
+            if key == "defaults":
+                existing = dict(result.get("defaults", {}))
+                roles_override = value.get("roles") if isinstance(value.get("roles"), Mapping) else None
+                if roles_override:
+                    existing_roles = dict(existing.get("roles", {}))
+                    for role_key, role_value in roles_override.items():
+                        existing_roles[role_key] = role_value
+                    if existing_roles:
+                        existing["roles"] = existing_roles
+                    value = {k: v for k, v in value.items() if k != "roles"}
+                existing.update(value)
+                result["defaults"] = existing
+                continue
+            if key in {"hosts", "resolvers"}:
+                existing_map = dict(result.get(key, {}))
+                for subkey, subval in value.items():
+                    if key == "hosts" and isinstance(subval, Mapping):
+                        host_entry = dict(existing_map.get(subkey, {}))
+                        roles_override = subval.get("roles") if isinstance(subval.get("roles"), Mapping) else None
+                        if roles_override:
+                            host_roles = dict(host_entry.get("roles", {}))
+                            for role_key, role_value in roles_override.items():
+                                host_roles[role_key] = role_value
+                            if host_roles:
+                                host_entry["roles"] = host_roles
+                            subval = {k: v for k, v in subval.items() if k != "roles"}
+                        host_entry.update(subval)
+                        existing_map[subkey] = host_entry
+                    else:
+                        existing_map[subkey] = subval
+                result[key] = existing_map
+                continue
+            if key == "advanced":
+                existing_adv = dict(result.get("advanced", {}))
+                existing_adv.update(value)
+                result["advanced"] = existing_adv
+                continue
+        result[key] = value
+
+    return result
+
+
+def merge_breaker_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
+    """Public helper to merge breaker policy documents."""
+
+    return _merge_docs(base, override)
+
+
 # ------------------------------
 # YAML loader & overlays
 # ------------------------------
 
-def _load_yaml(path: Optional[str | Path]) -> Dict:
+def _load_yaml(path: Optional[str | Path]) -> Dict[str, Any]:
     if not path:
         return {}
     p = Path(path)
@@ -364,7 +422,9 @@ def _apply_env_overlays(cfg: BreakerConfig, env: Mapping[str, str]) -> BreakerCo
             continue
         host = _normalize_host_key(k[len(prefix):])
         pol = new_cfg.hosts.get(host, new_cfg.defaults)
-        new_cfg.hosts = {**new_cfg.hosts, host: _merge_policy(pol, _parse_kv_overrides(v))}
+        hosts_map = dict(new_cfg.hosts)
+        hosts_map[host] = _merge_policy(pol, _parse_kv_overrides(v))
+        new_cfg = replace(new_cfg, hosts=hosts_map)
 
     # Role overrides per host
     prefix = "DOCSTOKG_BREAKER_ROLE__"
@@ -381,10 +441,11 @@ def _apply_env_overlays(cfg: BreakerConfig, env: Mapping[str, str]) -> BreakerCo
         base_pol = new_cfg.hosts.get(host, new_cfg.defaults)
         cur_role_pol = base_pol.roles.get(role, BreakerRolePolicy())
         merged_role = _merge_role_policy(cur_role_pol, _parse_kv_overrides(v))
-        # persist
         roles_updated = dict(base_pol.roles)
         roles_updated[role] = merged_role
-        new_cfg.hosts = {**new_cfg.hosts, host: replace(base_pol, roles=roles_updated)}
+        hosts_map = dict(new_cfg.hosts)
+        hosts_map[host] = replace(base_pol, roles=roles_updated)
+        new_cfg = replace(new_cfg, hosts=hosts_map)
 
     # Resolver overrides
     prefix = "DOCSTOKG_BREAKER_RESOLVER__"
@@ -393,7 +454,9 @@ def _apply_env_overlays(cfg: BreakerConfig, env: Mapping[str, str]) -> BreakerCo
             continue
         res = k[len(prefix):]
         base_pol = new_cfg.resolvers.get(res, new_cfg.defaults)
-        new_cfg.resolvers = {**new_cfg.resolvers, res: _merge_policy(base_pol, _parse_kv_overrides(v))}
+        resolvers_map = dict(new_cfg.resolvers)
+        resolvers_map[res] = _merge_policy(base_pol, _parse_kv_overrides(v))
+        new_cfg = replace(new_cfg, resolvers=resolvers_map)
 
     return new_cfg
 
@@ -434,7 +497,9 @@ def _apply_cli_overrides(
         host_raw, settings = item.split("=", 1)
         host = _normalize_host_key(host_raw)
         base_pol = new_cfg.hosts.get(host, new_cfg.defaults)
-        new_cfg.hosts = {**new_cfg.hosts, host: _merge_policy(base_pol, _parse_kv_overrides(settings))}
+        hosts_map = dict(new_cfg.hosts)
+        hosts_map[host] = _merge_policy(base_pol, _parse_kv_overrides(settings))
+        new_cfg = replace(new_cfg, hosts=hosts_map)
 
     # Host role
     for item in cli_role_overrides or ():
@@ -449,7 +514,9 @@ def _apply_cli_overrides(
         merged_role = _merge_role_policy(cur_role_pol, _parse_kv_overrides(settings))
         roles_updated = dict(base_pol.roles)
         roles_updated[role] = merged_role
-        new_cfg.hosts = {**new_cfg.hosts, host: replace(base_pol, roles=roles_updated)}
+        hosts_map = dict(new_cfg.hosts)
+        hosts_map[host] = replace(base_pol, roles=roles_updated)
+        new_cfg = replace(new_cfg, hosts=hosts_map)
 
     # Resolver
     for item in cli_resolver_overrides or ():
@@ -457,7 +524,9 @@ def _apply_cli_overrides(
             raise ValueError(f"Invalid --breaker-resolver (expected NAME=...): {item}")
         name, settings = item.split("=", 1)
         base_pol = new_cfg.resolvers.get(name, new_cfg.defaults)
-        new_cfg.resolvers = {**new_cfg.resolvers, name: _merge_policy(base_pol, _parse_kv_overrides(settings))}
+        resolvers_map = dict(new_cfg.resolvers)
+        resolvers_map[name] = _merge_policy(base_pol, _parse_kv_overrides(settings))
+        new_cfg = replace(new_cfg, resolvers=resolvers_map)
 
     return new_cfg
 
@@ -499,6 +568,8 @@ def load_breaker_config(
     cli_defaults_override: Optional[str] = None,
     cli_classify_override: Optional[str] = None,
     cli_rolling_override: Optional[str] = None,
+    base_doc: Optional[Mapping[str, Any]] = None,
+    extra_yaml_paths: Sequence[str | Path] | None = None,
 ) -> BreakerConfig:
     """
     Load breaker configuration with precedence:
@@ -508,8 +579,16 @@ def load_breaker_config(
     - Role strings are case-insensitive (meta/metadata, landing, artifact).
     - Validates basic invariants (fail_max >=1, reset>0, caps>0).
     """
-    doc = _load_yaml(yaml_path)
-    cfg = _config_from_yaml(doc)
+    merged_doc: Dict[str, Any] = {}
+    if base_doc:
+        merged_doc = merge_breaker_docs(merged_doc, base_doc)
+
+    merged_doc = merge_breaker_docs(merged_doc, _load_yaml(yaml_path))
+
+    for extra in extra_yaml_paths or ():
+        merged_doc = merge_breaker_docs(merged_doc, _load_yaml(extra))
+
+    cfg = _config_from_yaml(merged_doc)
     cfg = _apply_env_overlays(cfg, env)
     cfg = _apply_cli_overrides(
         cfg,
@@ -523,7 +602,10 @@ def load_breaker_config(
 
     # Ensure all host keys are normalized (handles cases where YAML/env were mixed)
     if cfg.hosts:
-        cfg.hosts = { _normalize_host_key(h): pol for h, pol in cfg.hosts.items() }
+        cfg = replace(
+            cfg,
+            hosts={_normalize_host_key(h): pol for h, pol in cfg.hosts.items()},
+        )
 
     _validate(cfg)
     return cfg

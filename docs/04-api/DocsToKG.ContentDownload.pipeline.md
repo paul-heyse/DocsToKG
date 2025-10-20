@@ -404,7 +404,7 @@ mailto: Contact email appended to polite headers and user agent string.
 max_concurrent_resolvers: Upper bound on concurrent resolver threads per work.
 enable_global_url_dedup: Enable global URL deduplication across works when True.
 domain_content_rules: Mapping of hostname to MIME allow-lists.
-resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
+breaker_config: Fully resolved circuit breaker policies shared with networking.
 
 Notes:
 ``enable_head_precheck`` toggles inexpensive HEAD lookups before downloads

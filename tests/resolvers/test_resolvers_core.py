@@ -1290,6 +1290,82 @@ def test_load_resolver_config_expands_user_path(
     assert config.resolver_order == ["beta", "alpha"]
 
 
+def test_load_resolver_config_builds_breaker_config(tmp_path: Path) -> None:
+    config_path = tmp_path / "resolver-config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "breaker_config": {
+                    "defaults": {"fail_max": 7, "retry_after_cap_s": 300},
+                    "hosts": {
+                        "Example.COM": {"reset_timeout_s": 45},
+                        "bücher.ch": {"fail_max": 2},
+                    },
+                    "resolvers": {"landing_page": {"fail_max": 4}},
+                }
+            }
+        )
+    )
+
+    args = Namespace(
+        resolver_config=str(config_path),
+        unpaywall_email=None,
+        core_api_key=None,
+        semantic_scholar_api_key=None,
+        doaj_api_key=None,
+        mailto=None,
+        max_resolver_attempts=None,
+        resolver_timeout=None,
+        disable_resolver=[],
+        enable_resolver=[],
+        resolver_order=None,
+        log_format="jsonl",
+        resume_from=None,
+        breaker_host_overrides=["example.com=fail_max:9"],
+        breaker_role_overrides=[],
+        breaker_resolver_overrides=[],
+        breaker_defaults_override=None,
+        breaker_classify_override=None,
+        breaker_rolling_override=None,
+        breaker_config_path=None,
+    )
+
+    config = load_resolver_config(args, ["landing_page", "crossref"], None)
+
+    assert config.breaker_config.defaults.fail_max == 7
+    assert config.breaker_config.defaults.retry_after_cap_s == 300
+    assert config.breaker_config.resolvers["landing_page"].fail_max == 4
+    assert config.breaker_config.hosts["example.com"].reset_timeout_s == 45
+    assert config.breaker_config.hosts["example.com"].fail_max == 9
+    assert "xn--bcher-kva.ch" in config.breaker_config.hosts
+    assert config.breaker_config.hosts["xn--bcher-kva.ch"].fail_max == 2
+
+
+def test_load_resolver_config_honours_breaker_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DOCSTOKG_BREAKER__api.crossref.org", "fail_max:1,reset:30")
+
+    args = Namespace(
+        resolver_config=None,
+        unpaywall_email=None,
+        core_api_key=None,
+        semantic_scholar_api_key=None,
+        doaj_api_key=None,
+        mailto=None,
+        max_resolver_attempts=None,
+        resolver_timeout=None,
+        disable_resolver=[],
+        enable_resolver=[],
+        resolver_order=None,
+        log_format="jsonl",
+        resume_from=None,
+    )
+
+    config = load_resolver_config(args, ["unpaywall"], None)
+
+    assert config.breaker_config.hosts["api.crossref.org"].fail_max == 1
+    assert config.breaker_config.hosts["api.crossref.org"].reset_timeout_s == 30
+
+
 # --- test_resolver_config.py ---
 
 
