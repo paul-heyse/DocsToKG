@@ -672,6 +672,55 @@ def test_run_validators_mixed_pools_respects_budget(tmp_path, config):
                 assert artifact.exists()
 
 
+def _process_pool_stub_validator(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
+    """Simple validator used to exercise process pools."""
+
+    return ValidationResult(ok=True, details={"validator": request.name}, output_files=[])
+
+
+def test_run_validators_process_pool_stub_success(tmp_path, config):
+    if multiprocessing.get_start_method(allow_none=True) == "spawn":
+        pytest.skip("spawn start method breaks validator patching for this test")
+
+    config = config.model_copy(deep=True)
+    config.defaults.validation.use_process_pool = True
+    config.defaults.validation.process_pool_validators = ["process_stub"]
+    config.defaults.validation.max_concurrent_validators = 1
+
+    file_path = tmp_path / "stub.owl"
+    file_path.write_text("@prefix ex: <http://example.org/> .")
+
+    request = ValidationRequest(
+        "process_stub",
+        file_path,
+        tmp_path / "norm-stub",
+        tmp_path / "val-stub",
+        config,
+    )
+
+    validators = {"process_stub": _process_pool_stub_validator}
+
+    records: list[logging.LogRecord] = []
+
+    class _RecordingHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - trivial
+            records.append(record)
+
+    logger = logging.getLogger("DocsToKG.TestProcessPool")
+    handler = _RecordingHandler()
+    logger.addHandler(handler)
+
+    try:
+        with patch.object(validation_mod, "VALIDATORS", validators):
+            results = run_validators([request], logger)
+    finally:
+        logger.removeHandler(handler)
+
+    assert "process_stub" in results
+    assert results["process_stub"].ok
+    assert all(record.getMessage() != "validator crashed" for record in records)
+
+
 def test_run_validators_matches_sequential(tmp_path, config):
     config_seq = config.model_copy(deep=True)
     config_seq.defaults.validation.max_concurrent_validators = 1
