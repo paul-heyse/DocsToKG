@@ -133,9 +133,16 @@ oa_config = ConfigProxy()
 def main(argv: Optional[Sequence[str]] = None) -> RunResult:
     """CLI entry point that orchestrates parsing, execution, and reporting."""
 
-    logging.basicConfig(level=logging.INFO)
     parser = build_parser()
     args = parse_args(parser, argv)
+    log_level_name = getattr(args, "log_level", "info").upper()
+    log_level = getattr(logging, log_level_name, logging.INFO)
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        root_logger.setLevel(log_level)
+    else:
+        logging.basicConfig(level=log_level)
+    LOGGER.setLevel(log_level)
     resolved = resolve_config(args, parser, resolver_factory=default_resolvers)
     bootstrap_run_environment(resolved)
     download_run = DownloadRun(resolved)
