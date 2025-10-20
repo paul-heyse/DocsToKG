@@ -262,7 +262,7 @@ def _ensure_cuvs_loader_path() -> None:
         candidates.append(rapids_logger_root / "lib64" / "librapids_logger.so")
 
     loaded_any = False
-    search_dirs: set[str] = set()
+    search_dirs: list[str] = []
 
     for path in candidates:
         if not path.exists():
@@ -270,7 +270,9 @@ def _ensure_cuvs_loader_path() -> None:
         try:
             ctypes.CDLL(str(path))
             loaded_any = True
-            search_dirs.add(str(path.parent))
+            parent = str(path.parent)
+            if parent not in search_dirs:
+                search_dirs.append(parent)
         except OSError:
             log.debug(
                 "Unable to preload cuVS dependency",
@@ -278,11 +280,16 @@ def _ensure_cuvs_loader_path() -> None:
                 exc_info=True,
             )
 
-    if search_dirs:
-        existing = os.environ.get("LD_LIBRARY_PATH")
-        dirs = set(filter(None, (existing or "").split(":")))
-        dirs.update(search_dirs)
-        os.environ["LD_LIBRARY_PATH"] = ":".join(sorted(dirs))
+    if not loaded_any:
+        log.info("No cuVS shared objects were preloaded; continuing without GPU shims")
+        return
+
+    existing = os.environ.get("LD_LIBRARY_PATH")
+    existing_dirs = [part for part in (existing or "").split(":") if part]
+    new_dirs = [directory for directory in search_dirs if directory not in existing_dirs]
+    if new_dirs:
+        updated = existing_dirs + new_dirs
+        os.environ["LD_LIBRARY_PATH"] = ":".join(updated)
 
     _CUVS_LIBRARIES_LOADED = True
 
