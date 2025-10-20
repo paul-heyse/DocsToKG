@@ -297,10 +297,7 @@ class DenseSearchStrategy:
             )
             cached = self._cache.get(signature)
             if cached is not None:
-                if min_k == 0:
-                    target = max(int(cached), int(min_k))
-                else:
-                    target = max(target, int(cached))
+                target = max(target, int(cached))
                 self._cache.move_to_end(signature)
             return (min(target, self._MAX_K), oversample, overfetch)
 

@@ -91,6 +91,10 @@ Inferred embedding dimensionality, defaulting to 2560 when unknown.
 
 Return the requested ``k`` and oversampling knobs for a dense search.
 
+When a cached depth exists for ``signature`` it is treated as a lower bound
+only. The planner still honours runtime knobs such as
+``RetrievalConfig.dense_top_k`` by returning ``max(computed_k, cached_k)``.
+
 ### `observe_pass_rate(self, signature, observed)`
 
 Blend ``observed`` into the running EMA and return the updated value.
