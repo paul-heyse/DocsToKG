@@ -352,6 +352,7 @@ from DocsToKG.HybridSearch.types import (
     HybridSearchRequest,
     HybridSearchResponse,
     HybridSearchResult,
+    ValidationReport,
 )
 from tests.conftest import PatchManager
 
@@ -3085,6 +3086,44 @@ def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -
 # --- test_hybrid_search_scale.py ---
 
 
+@pytest.fixture
+def scale_dense_metrics_report(
+    scale_stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FaissVectorStore,
+            OpenSearchSimulator,
+        ],
+    ],
+    scale_dataset: Sequence[Mapping[str, object]],
+) -> ValidationReport:
+    ingestion, _, _, validator, _, _ = scale_stack()
+    documents = [
+        DocumentInput(
+            doc_id=str(entry["document"]["doc_id"]),
+            namespace=str(entry["document"]["namespace"]),
+            chunk_path=Path(entry["document"]["chunk_file"]),
+            vector_path=Path(entry["document"]["vector_file"]),
+            metadata=dict(entry["document"].get("metadata", {})),
+        )
+        for entry in scale_dataset
+    ]
+    ingestion.upsert_documents(documents)
+    report = validator._scale_dense_metrics(  # pylint: disable=protected-access
+        service_module.DEFAULT_SCALE_THRESHOLDS,
+        random.Random(4242),
+    )
+    assert report.details.get("sampled_chunks", 0) > 0
+    return report
+
+
+# --- test_hybrid_search_scale.py ---
+
+
 @pytest.mark.real_vectors
 @pytest.mark.scale_vectors
 def test_hybrid_scale_suite(
@@ -3152,6 +3191,13 @@ def test_hybrid_scale_suite(
         delta_gib < 0.5
     ), f"scale_dense_metrics should not increase RSS by >=0.5 GiB (observed {delta_gib:.2f} GiB)"
     assert dense_report.details.get("sampled_chunks", 0) > 0
+
+
+@pytest.mark.real_vectors
+@pytest.mark.scale_vectors
+def test_scale_dense_metrics_fixture(scale_dense_metrics_report: ValidationReport) -> None:
+    assert scale_dense_metrics_report.name == "scale_dense_metrics"
+    assert scale_dense_metrics_report.details.get("sampled_chunks", 0) > 0
 
 
 # --- test_hybridsearch_gpu_only.py ---
