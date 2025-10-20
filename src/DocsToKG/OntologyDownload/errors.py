@@ -57,6 +57,11 @@ class RetryableValidationError(ValidationError):
     ) -> None:
         super().__init__(message)
         self.validators = tuple(validators or ())
+class ValidationFailure(ValidationError):
+    """Raised when validation results should be treated as a failed attempt."""
+
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(message)
         self.retryable = retryable
 
 

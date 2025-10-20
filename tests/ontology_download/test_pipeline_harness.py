@@ -137,6 +137,79 @@ def test_fetch_all_strict_mode_raises_on_validation_failure(ontology_env):
     assert not manifest_paths
 
 
+def test_fetch_all_strict_mode_validation_failure_uses_fallback(ontology_env):
+    """Strict mode should try fallback resolvers when validation fails."""
+
+    primary_url = ontology_env.register_fixture(
+        "validation-primary.owl",
+        "validation primary content\n",
+        media_type="application/rdf+xml",
+        repeats=3,
+    )
+    fallback_url = ontology_env.register_fixture(
+        "validation-fallback.owl",
+        "validation fallback content\n",
+        media_type="application/rdf+xml",
+        repeats=3,
+    )
+    primary_name = "bioregistry"
+    fallback_name = "obo"
+    primary_resolver = ontology_env.static_resolver(
+        name=primary_name,
+        fixture_url=primary_url,
+        filename="validation.owl",
+        media_type="application/rdf+xml",
+        service="test",
+    )
+    fallback_resolver = ontology_env.static_resolver(
+        name=fallback_name,
+        fixture_url=fallback_url,
+        filename="validation.owl",
+        media_type="application/rdf+xml",
+        service="test",
+    )
+    spec = FetchSpec(
+        id="validation-fallback", resolver=primary_name, extras={}, target_formats=("owl",)
+    )
+
+    config = _resolved_config(ontology_env)
+    config.defaults.continue_on_error = False
+
+    validator_names = ("rdflib", "pronto", "owlready2", "robot", "arelle")
+
+    def _conditional_validator(request, logger):  # type: ignore[override]
+        text = request.file_path.read_text()
+        ok = "primary" not in text
+        return ValidationResult(
+            ok=ok,
+            details={"content": text.strip(), "validator": "rdflib"},
+            output_files=[],
+        )
+
+    def _passing_validator(request, logger):  # type: ignore[override]
+        return ValidationResult(ok=True, details={}, output_files=[])
+
+    with ExitStack() as stack:
+        stack.enter_context(temporary_resolver(primary_name, primary_resolver))
+        stack.enter_context(temporary_resolver(fallback_name, fallback_resolver))
+        config.defaults.prefer_source = [fallback_name]
+        for name in validator_names:
+            validator = _conditional_validator if name == "rdflib" else _passing_validator
+            stack.enter_context(temporary_validator(name, validator))
+        results = fetch_all([spec], config=config, logger=_logger(), force=True)
+
+    assert len(results) == 1
+    result = results[0]
+    assert result.spec.resolver == fallback_name
+    manifest_payload = json.loads(result.manifest_path.read_text())
+    attempts = manifest_payload["resolver_attempts"]
+    assert [entry["resolver"] for entry in attempts] == [primary_name, fallback_name]
+    assert attempts[0]["status"] == "failed"
+    assert "Validation failed" in attempts[0]["error"]
+    assert attempts[1]["status"] == "success"
+    assert manifest_payload["resolver"] == fallback_name
+
+
 def test_fetch_all_lenient_mode_logs_validation_failure(ontology_env):
     """Lenient mode should record validator failures while continuing."""
 

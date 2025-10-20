@@ -70,6 +70,7 @@ from .errors import (
     ResolverError,
     ValidationError,
     RetryableValidationError,
+    ValidationFailure,
 )
 from .io import (
     RDF_MIME_ALIASES,
@@ -1943,6 +1944,9 @@ def fetch_one(
                             "Validation failed for "
                             f"'{effective_spec.id}' via {', '.join(failed_validators)}",
                             validators=tuple(failed_validators),
+                        raise ValidationFailure(
+                            "Validation failed for "
+                            f"'{effective_spec.id}' via {', '.join(failed_validators)}",
                             retryable=True,
                         )
 
@@ -2092,12 +2096,15 @@ def fetch_one(
                     "trying fallback resolver",
                     extra={
                         "stage": "download",
+                        "stage": "validate",
                         "resolver": candidate.resolver,
                         "attempt": attempt_number,
                     },
                 )
                 continue
-            raise
+            raise OntologyDownloadError(
+                f"Validation failed for '{pending_spec.id}': {exc}"
+            ) from exc
         except (ConfigError, DownloadFailure) as exc:
             attempt_record.update({"status": "failed", "error": str(exc)})
             resolver_attempts.append(dict(attempt_record))
