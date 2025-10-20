@@ -166,7 +166,12 @@ def ensure_qwen_dependencies(import_error: Exception | None = None) -> None:
 def ensure_splade_environment(
     *, device: Optional[str] = None, cache_dir: Optional[Path] = None
 ) -> Dict[str, str]:
-    """Bootstrap SPLADE-related environment defaults and return resolved settings."""
+    """Bootstrap SPLADE defaults and persist the resolved environment settings.
+
+    When ``cache_dir`` is supplied the resolved path seeds both
+    ``DOCSTOKG_SPLADE_DIR`` and the legacy ``DOCSTOKG_SPLADE_MODEL_DIR`` for
+    backwards compatibility.
+    """
 
     resolved_device = (
         device
@@ -181,8 +186,10 @@ def ensure_splade_environment(
 
     if cache_dir is not None:
         cache_path = Path(cache_dir).expanduser().resolve()
-        os.environ.setdefault("DOCSTOKG_SPLADE_MODEL_DIR", str(cache_path))
-        env_info["model_dir"] = str(cache_path)
+        cache_value = str(cache_path)
+        os.environ.setdefault("DOCSTOKG_SPLADE_DIR", cache_value)
+        os.environ.setdefault("DOCSTOKG_SPLADE_MODEL_DIR", cache_value)
+        env_info["model_dir"] = cache_value
 
     return env_info
 
