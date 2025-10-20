@@ -196,6 +196,8 @@ class AttemptContext:
     original_url: str = ""
     canonical_url: str = ""
     publication_year: Optional[int] = None
+    candidate_count: int = 0
+    discovery_count: int = 0
 
     def monotonic_ms_since_start(self) -> int:
         return int((time.monotonic() - self.start_monotonic) * 1000)
@@ -250,9 +252,7 @@ class TelemetryWayback:
         )
         self.sample_discovery = sample_discovery or os.environ.get("WAYBACK_SAMPLE_DISCOVERY", "")
 
-        # Track sampling state
-        self._candidate_count = 0
-        self._discovery_count = 0
+        # Track sampling state per attempt via the AttemptContext
 
     # ── Envelope helpers ────────────────────────────────────────────────────────
 
@@ -384,9 +384,9 @@ class TelemetryWayback:
     ) -> None:
         # Apply discovery sampling
         if self.sample_discovery == "first,last":
-            self._discovery_count += 1
+            ctx.discovery_count += 1
             # Only emit first and last CDX batches
-            if self._discovery_count > 1 and returned is not None and returned > 0:
+            if ctx.discovery_count > 1 and returned is not None and returned > 0:
                 # This is not the first batch, skip unless it's the last
                 return
 
@@ -427,8 +427,8 @@ class TelemetryWayback:
     ) -> None:
         # Apply candidate sampling
         if self.sample_candidates > 0:
-            self._candidate_count += 1
-            if self._candidate_count > self.sample_candidates:
+            ctx.candidate_count += 1
+            if ctx.candidate_count > self.sample_candidates:
                 return
 
         self._emit(
