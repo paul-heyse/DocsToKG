@@ -129,6 +129,59 @@ def test_apply_use_cuvs_parameter_never_sets_true_when_probe_false(
     assert store._last_applied_cuvs is False
 
 
+def test_adapter_stats_preserves_probe_available_when_last_applied_false(
+    patcher: "PatchManager",
+) -> None:
+    """cuVS availability should continue to reflect probe success even if disabled."""
+
+    patcher.setattr(store_module, "_FAISS_AVAILABLE", True, raising=False)
+    stub_faiss = SimpleNamespace(
+        knn_gpu=object(),
+        should_use_cuvs=lambda *_args, **_kwargs: True,
+    )
+    patcher.setattr(store_module, "faiss", stub_faiss, raising=False)
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._config = SimpleNamespace(  # type: ignore[attr-defined]
+        use_cuvs=False,
+        flat_use_fp16=False,
+        index_type="flat",
+        nprobe=1,
+        device=0,
+    )
+    store._multi_gpu_mode = "single"  # type: ignore[attr-defined]
+    store._replicated = False  # type: ignore[attr-defined]
+    store._gpu_resources = None  # type: ignore[attr-defined]
+    store._last_applied_cuvs = False  # type: ignore[attr-defined]
+    store._dim = 4  # type: ignore[attr-defined]
+    store._observability = SimpleNamespace(  # type: ignore[attr-defined]
+        trace=lambda *_args, **_kwargs: _NullContext(),
+        metrics=SimpleNamespace(increment=lambda *_a, **_k: None, set_gauge=lambda *_a, **_k: None),
+        logger=logging.getLogger(__name__),
+    )
+    store._index = SimpleNamespace(ntotal=0)  # type: ignore[attr-defined]
+
+    patcher.setattr(
+        FaissVectorStore,
+        "_describe_index",
+        lambda self, _index: "stub-index",
+        raising=False,
+    )
+    patcher.setattr(
+        store,
+        "_current_nprobe_value",
+        MethodType(lambda self: 1, store),
+        raising=False,
+    )
+
+    stats = store.adapter_stats
+
+    assert stats.cuvs_enabled is False
+    assert stats.cuvs_available is True
+    assert stats.cuvs_reported is True
+    assert stats.cuvs_applied is False
+
+
 def test_faiss_vector_store_search_batch_preserves_queries(
     patcher: "PatchManager",
 ) -> None:
