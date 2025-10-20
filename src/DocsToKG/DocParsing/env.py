@@ -277,7 +277,7 @@ def ensure_qwen_environment(
 def _looks_like_data_root(candidate: Path, expected_dirs: Sequence[str]) -> bool:
     """Return ``True`` when ``candidate`` resembles the DocsToKG data root."""
 
-    if candidate.name == "Data":
+    if candidate.name == "Data" and candidate.is_dir():
         return True
     return any((candidate / directory).is_dir() for directory in expected_dirs)
 

@@ -15,7 +15,7 @@ import logging
 import time
 from threading import Event, RLock, Thread
 from types import MethodType, SimpleNamespace
-from typing import Sequence
+from typing import Optional, Sequence
 
 import numpy as np
 import pytest
@@ -61,6 +61,72 @@ def test_resolve_cuvs_state_handles_missing_should_use(patcher: "PatchManager") 
     enabled, available, reported = store_module.resolve_cuvs_state(requested=None)
 
     assert (enabled, available, reported) == (False, False, None)
+
+
+def test_resolve_cuvs_state_overrides_requested_when_probe_false(
+    patcher: "PatchManager",
+) -> None:
+    """A `False` cuVS probe must disable cuVS even when requested."""
+
+    patcher.setattr(store_module, "_FAISS_AVAILABLE", True, raising=False)
+    stub_faiss = SimpleNamespace(knn_gpu=object(), should_use_cuvs=lambda: False)
+    patcher.setattr(store_module, "faiss", stub_faiss, raising=False)
+
+    enabled, available, reported = store_module.resolve_cuvs_state(requested=True)
+
+    assert not enabled
+    assert not available
+    assert reported is False
+
+
+def test_apply_use_cuvs_parameter_never_sets_true_when_probe_false(
+    patcher: "PatchManager",
+) -> None:
+    """The cuVS flag must not be applied when FAISS rejects the probe."""
+
+    patcher.setattr(store_module, "_FAISS_AVAILABLE", True, raising=False)
+    created_spaces: list[object] = []
+
+    class RecordingGpuParameterSpace:
+        def __init__(self) -> None:
+            self.calls: list[tuple[object, str, bool]] = []
+            self._value: Optional[bool] = None
+            created_spaces.append(self)
+
+        def initialize(self, _index: object) -> None:
+            return None
+
+        def set_index_parameter(self, index: object, name: str, value: bool) -> None:
+            self.calls.append((index, name, bool(value)))
+            self._value = bool(value)
+
+        def get_index_parameter(self, _index: object, _name: str) -> Optional[bool]:
+            return self._value
+
+    stub_faiss = SimpleNamespace(
+        knn_gpu=object(),
+        should_use_cuvs=lambda: False,
+        GpuParameterSpace=RecordingGpuParameterSpace,
+    )
+    patcher.setattr(store_module, "faiss", stub_faiss, raising=False)
+
+    store = FaissVectorStore.__new__(FaissVectorStore)
+    store._config = SimpleNamespace(use_cuvs=True)  # type: ignore[attr-defined]
+    patcher.setattr(
+        store,
+        "_iter_gpu_index_variants",
+        MethodType(lambda self, root: [root], store),
+        raising=False,
+    )
+
+    index = SimpleNamespace()
+    store._apply_use_cuvs_parameter(index)
+
+    assert created_spaces, "GpuParameterSpace should have been constructed"
+    recorded_calls = created_spaces[0].calls
+    assert recorded_calls, "use_cuvs should be set via GpuParameterSpace"
+    assert all(call[2] is False for call in recorded_calls)
+    assert store._last_applied_cuvs is False
 
 
 def test_faiss_vector_store_search_batch_preserves_queries(

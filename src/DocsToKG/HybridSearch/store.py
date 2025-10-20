@@ -344,21 +344,22 @@ def resolve_cuvs_state(requested: Optional[bool]) -> tuple[bool, bool, Optional[
     should_use = getattr(faiss, "should_use_cuvs", None)
     if callable(should_use):
         try:
-            reported_available = bool(should_use())
+            reported = should_use()
         except Exception:  # pragma: no cover - defensive best effort
             reported_available = None
+        else:
+            reported_available = bool(reported) if reported is not None else None
     else:
         reported_available = None
 
+    cuvs_possible = reported_available is True
     if requested is None:
-        enabled = bool(reported_available)
+        requested_enabled = cuvs_possible
     else:
-        enabled = bool(requested)
+        requested_enabled = bool(requested)
 
-    enabled = bool(knn_runner) and enabled
-    available = bool(knn_runner) and (
-        bool(reported_available) if reported_available is not None else False
-    )
+    enabled = bool(knn_runner) and cuvs_possible and requested_enabled
+    available = bool(knn_runner) and cuvs_possible
     return enabled, available, reported_available
 
 
@@ -2289,10 +2290,7 @@ class FaissVectorStore(DenseVectorStore):
             self._last_applied_cuvs = None
             return
         requested = getattr(self._config, "use_cuvs", None)
-        cuvs_enabled, cuvs_available, _ = resolve_cuvs_state(requested)
-        if not cuvs_available and requested is False:
-            # Respect explicit opt-out even when FAISS reports no availability.
-            cuvs_enabled = False
+        cuvs_enabled, _, _ = resolve_cuvs_state(requested)
         if not hasattr(faiss, "GpuParameterSpace"):
             self._last_applied_cuvs = cuvs_enabled if requested is not None else None
             return
@@ -2949,7 +2947,7 @@ def cosine_topk_blockwise(
     if q.ndim == 1:
         q = q.reshape(1, -1)
     q = np.array(q, dtype=np.float32, copy=True, order="C")
-    C = np.ascontiguousarray(C, dtype=np.float32)
+    C = np.array(C, dtype=np.float32, copy=True, order="C")
 
     if q.shape[1] != C.shape[1]:
         raise ValueError("q and C must have same dimensionality")
@@ -2974,9 +2972,10 @@ def cosine_topk_blockwise(
     knn_runner = getattr(faiss, "knn_gpu", None)
     if knn_runner is not None:
         try:
-            corpus_copy = np.array(C, dtype=np.float32, copy=True, order="C")
-            faiss.normalize_L2(corpus_copy)
-            corpus_view = corpus_copy.astype(np.float16, copy=False) if use_fp16 else corpus_copy
+            for start in range(0, C.shape[0], block_rows):
+                block = C[start : min(C.shape[0], start + block_rows)]
+                faiss.normalize_L2(block)
+            corpus_view = C.astype(np.float16, copy=False) if use_fp16 else C
             row_bytes = np.dtype(np.float32).itemsize * C.shape[1]
             vector_limit = int(block_rows) * row_bytes
             query_rows = max(int(block_rows), q.shape[0])

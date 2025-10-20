@@ -66,6 +66,7 @@ def _make_faiss_stub(
 
     def normalize_L2(arr: np.ndarray) -> None:
         view = np.asarray(arr, dtype=np.float32)
+        state.setdefault("normalize_shapes", []).append(tuple(view.shape))
         if view.ndim == 1:
             norm = np.linalg.norm(view)
             if norm:
@@ -175,6 +176,49 @@ def test_cosine_topk_blockwise_prefers_knn_gpu(patcher):
     assert kwargs["vectorsMemoryLimit"] == vector_limit
     assert kwargs["queriesMemoryLimit"] == query_limit
     assert "use_cuvs" not in kwargs
+
+
+def test_cosine_topk_blockwise_knn_normalizes_blocks_without_extra_copy(patcher):
+    stub, state = _make_faiss_stub(enable_knn=True)
+    patcher.setattr(store_module, "faiss", stub, raising=False)
+
+    q = np.random.default_rng(42).random((4, 8), dtype=np.float32)
+    C = np.random.default_rng(43).random((65, 8), dtype=np.float32)
+    block_rows = 16
+
+    original_array = store_module.np.array
+    copy_shapes: list[tuple[int, ...]] = []
+
+    def tracking_array(*args, **kwargs):
+        result = original_array(*args, **kwargs)
+        if kwargs.get("copy"):
+            copy_shapes.append(tuple(result.shape))
+        return result
+
+    patcher.setattr(store_module.np, "array", tracking_array)
+
+    cosine_topk_blockwise(
+        q,
+        C,
+        k=5,
+        device=0,
+        resources=object(),
+        block_rows=block_rows,
+    )
+
+    # ``np.array`` should only copy the query and corpus inputs once each.
+    assert len(copy_shapes) == 2
+    assert copy_shapes[0] == q.shape
+    assert copy_shapes[1] == C.shape
+
+    expected_block_shapes = [
+        (min(block_rows, C.shape[0] - start), C.shape[1])
+        for start in range(0, C.shape[0], block_rows)
+    ]
+    # The first normalize call covers the query; subsequent calls should align to blocks.
+    assert state.get("normalize_shapes")
+    assert state["normalize_shapes"][0] == q.shape
+    assert state["normalize_shapes"][1:] == expected_block_shapes
 
 
 def test_cosine_topk_blockwise_falls_back_without_knn(patcher):
