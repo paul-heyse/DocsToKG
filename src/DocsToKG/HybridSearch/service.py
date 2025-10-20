@@ -3283,7 +3283,7 @@ class HybridSearchValidator:
                 [(result.doc_id, round(result.score, 6)) for result in response.results[:15]]
             )
 
-        restore_state(self._ingestion.faiss_index, snapshot)
+        restore_state(self._ingestion.faiss_index, snapshot, registry=self._registry)
 
         mismatches = 0
         for (_, query_payload), expected in zip(sampled_pairs, baseline_results):

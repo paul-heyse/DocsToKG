@@ -161,6 +161,13 @@ and throttled attempts (labelled by reason and whether the refresh was forced),
 while the gauge `faiss_snapshot_age_seconds` surfaces the age of the cached CPU
 replica for dashboards and alerts.
 
+Cold restores should now call `DocsToKG.HybridSearch.store.restore_state`
+with the active `ChunkRegistry` (``restore_state(..., registry=registry)``).
+The helper applies the serialized ``vector_ids`` sequence to
+``ChunkRegistry`` before handing the byte stream to FAISS, ensuring UUID
+bridges remain consistent with the rehydrated index while you reload chunk
+metadata from durable storage.
+
 #### Ingestion workflow validation
 
 The hybrid ingestion pipeline now enforces a strict 1:1 mapping between chunk
