@@ -399,6 +399,16 @@ def test_infer_embedding_dim_returns_after_first_valid_vector(tmp_path: Path) ->
     assert infer_embedding_dim(dataset) == 3
 
 
+def test_infer_embedding_dim_handles_underscore_key(tmp_path: Path) -> None:
+    vector_path = tmp_path / "mock_vectors_underscore.jsonl"
+    with vector_path.open("w", encoding="utf-8") as handle:
+        handle.write(json.dumps({"Qwen3_4B": {"vector": [0.0, 1.0, 2.0, 3.0]}}) + "\n")
+
+    dataset = [{"document": {"vector_file": str(vector_path)}}]
+
+    assert infer_embedding_dim(dataset) == 4
+
+
 # --- test_hybrid_search.py ---
 
 

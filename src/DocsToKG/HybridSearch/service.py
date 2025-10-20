@@ -3752,7 +3752,12 @@ def infer_embedding_dim(dataset: Sequence[Mapping[str, object]]) -> int:
                     if not line:
                         continue
                     payload = json.loads(line)
-                    vector = payload.get("Qwen3-4B", {}).get("vector")
+                    vector_payload = (
+                        payload.get("Qwen3-4B")
+                        or payload.get("Qwen3_4B")
+                        or {}
+                    )
+                    vector = vector_payload.get("vector")
                     if isinstance(vector, list) and vector:
                         return len(vector)
     return 2560
