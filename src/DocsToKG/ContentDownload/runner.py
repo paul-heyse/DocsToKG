@@ -491,10 +491,13 @@ class DownloadRun:
 
         # Set global breaker registry for networking layer
         if breaker_registry is not None:
+            from DocsToKG.ContentDownload.networking import set_breaker_registry
+
             set_breaker_registry(breaker_registry)
 
         if self.pipeline is not None:
-            self.pipeline.set_breaker_registry(breaker_registry)
+            # Legacy pipeline breaker registry call removed - now handled by networking layer
+            pass
 
         client = http_client or get_http_client()
         state = DownloadRunState(
@@ -753,6 +756,10 @@ class DownloadRun:
                         breaker_registry = BreakerRegistry(
                             breaker_config_obj, listener_factory=listener_factory
                         )
+                        # Register breaker registry with networking layer
+                        from DocsToKG.ContentDownload.networking import set_breaker_registry
+
+                        set_breaker_registry(breaker_registry)
                     except Exception as e:
                         LOGGER.warning("Failed to initialize circuit breakers: %s", e)
 

@@ -633,6 +633,24 @@ _DEFAULT_CONFIG_CACHE: Optional[ResolvedConfig] = None
 _HAS_PYDANTIC_SETTINGS = hasattr(BaseSettings, "model_dump")
 
 
+def _rebuild_pydantic_models() -> None:
+    """Rebuild Pydantic models that have forward references to types defined in other modules.
+
+    ResolvedConfig has a forward reference to FetchSpec (defined in planning.py).
+    This function must be called after all referenced types are imported to ensure
+    the model is fully constructed and can be instantiated without errors.
+
+    Deferred until first config access to avoid circular imports at module load time.
+    """
+    try:
+        from . import planning  # noqa: F401  # Ensure FetchSpec is imported
+
+        ResolvedConfig.model_rebuild()
+    except ImportError:
+        # If planning fails to import, rebuild will be attempted on next call
+        pass
+
+
 def _read_env_value(name: str) -> Optional[str]:
     """Fetch and normalise an environment variable, treating empty values as absent."""
 
@@ -671,6 +689,8 @@ def get_default_config(*, copy: bool = False) -> ResolvedConfig:
 
     with _DEFAULT_CONFIG_LOCK:
         if _DEFAULT_CONFIG_CACHE is None:
+            # Rebuild models on first access to resolve forward references
+            _rebuild_pydantic_models()
             _DEFAULT_CONFIG_CACHE = ResolvedConfig.from_defaults()
         cached = _DEFAULT_CONFIG_CACHE
     if copy:

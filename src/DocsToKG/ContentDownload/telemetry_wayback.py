@@ -259,12 +259,25 @@ class AttemptContext:
     publication_year: Optional[int] = None
     monotonic: Callable[[], float] = field(default=time.monotonic, repr=False)
     start_monotonic: float = field(init=False)
+    _last_monotonic: float = field(init=False, repr=False)
+    candidate_count: int = field(default=0, init=False)
+    discovery_count: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
         self.start_monotonic = self.monotonic()
+        self._last_monotonic = self.start_monotonic
 
     def monotonic_ms_since_start(self) -> int:
-        return int((self.monotonic() - self.start_monotonic) * 1000)
+        current = self.monotonic()
+        delta = max(0.0, current - self._last_monotonic)
+        self._last_monotonic = current
+        return int(delta * 1000)
+
+    def monotonic_total_ms(self) -> int:
+        current = self.monotonic()
+        total = max(0.0, current - self.start_monotonic)
+        self._last_monotonic = current
+        return int(total * 1000)
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -338,7 +351,7 @@ class TelemetryWayback:
             "artifact_id": ctx.artifact_id,
             "attempt_id": ctx.attempt_id,
             "ts": self._now().isoformat(),
-            "monotonic_ms": ctx.monotonic_ms_since_start(),
+            "monotonic_ms": ctx.monotonic_total_ms(),
         }
 
     def _emit(self, ctx: AttemptContext, event_type: str, body: Mapping[str, Any]) -> None:
@@ -400,7 +413,7 @@ class TelemetryWayback:
             "mode_selected": mode_selected.value,
             "result": result.value,
             "candidates_scanned": int(candidates_scanned),
-            "total_duration_ms": ctx.monotonic_ms_since_start(),
+            "total_duration_ms": ctx.monotonic_total_ms(),
         }
         if extra:
             body.update(extra)

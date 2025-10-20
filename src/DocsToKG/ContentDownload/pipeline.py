@@ -158,7 +158,7 @@ from urllib.parse import urlparse, urlsplit
 
 import httpx
 
-from DocsToKG.ContentDownload.breakers import BreakerConfig
+from DocsToKG.ContentDownload.breakers import BreakerConfig, BreakerOpenError, RequestRole
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
@@ -642,9 +642,7 @@ def load_resolver_config(
         if isinstance(value, (str, os.PathLike)):
             breaker_yaml_paths.append(Path(value).expanduser().resolve(strict=False))
             return
-        raise ValueError(
-            "breaker_config entries must be mappings, sequences, or filesystem paths"
-        )
+        raise ValueError("breaker_config entries must be mappings, sequences, or filesystem paths")
 
     if DEFAULT_RESOLVER_CREDENTIALS_PATH.is_file():
         config_paths.append(DEFAULT_RESOLVER_CREDENTIALS_PATH)
@@ -675,9 +673,7 @@ def load_resolver_config(
     cli_classify_override = getattr(args, "breaker_classify_override", None)
     cli_rolling_override = getattr(args, "breaker_rolling_override", None)
 
-    env_has_breaker_overrides = any(
-        key.startswith("DOCSTOKG_BREAKER") for key in os.environ
-    )
+    env_has_breaker_overrides = any(key.startswith("DOCSTOKG_BREAKER") for key in os.environ)
 
     breaker_overrides_requested = bool(
         breaker_fragments
@@ -1307,11 +1303,6 @@ class ResolverPipeline:
         initial_seen_urls: Optional[Set[str]] = None,
         global_manifest_index: Optional[Dict[str, Dict[str, Any]]] = None,
         run_id: Optional[str] = None,
-        *,
-        breaker_registry: Optional[Any] = None,
-        breaker_allow: Optional[
-            Callable[[str, "RequestRole", Optional[str]], None]
-        ] = None,
     ) -> None:
         """Create a resolver pipeline with ordering, download, and metric hooks.
 
@@ -1321,10 +1312,7 @@ class ResolverPipeline:
             download_func: Callable responsible for downloading resolved URLs.
             logger: Logger that records resolver attempt metadata.
             metrics: Optional metrics collector used for resolver telemetry.
-            breaker_registry: Optional registry providing breaker allow/deny checks.
-            breaker_allow: Optional callable override for breaker allow checks.
-
-        Returns:
+            Returns:
             None
         """
 
@@ -1338,38 +1326,11 @@ class ResolverPipeline:
         self._global_seen_urls: set[str] = set(initial_seen_urls or ())
         self._global_manifest_index = global_manifest_index or {}
         self._global_lock = threading.Lock()
-        self._breaker_registry: Optional[Any] = None
-        self._breaker_allow_override = breaker_allow
-        self._breaker_allow: Optional[
-            Callable[[str, RequestRole, Optional[str]], None]
-        ] = breaker_allow
-        if breaker_registry is not None:
-            self.set_breaker_registry(breaker_registry)
+        # Legacy breaker initialization removed - now handled by pybreaker-based BreakerRegistry
         self._download_accepts_context = _callable_accepts_argument(download_func, "context")
         self._download_accepts_head_flag = _callable_accepts_argument(
             download_func, "head_precheck_passed"
         )
-
-    def set_breaker_registry(self, breaker_registry: Optional[Any]) -> None:
-        """Attach or clear the breaker registry consulted before downloads."""
-
-        self._breaker_registry = breaker_registry
-        if breaker_registry is None:
-            self._breaker_allow = self._breaker_allow_override
-            return
-
-        allow = getattr(breaker_registry, "allow", None)
-        if not callable(allow):
-            raise TypeError("breaker_registry must provide a callable allow() method")
-
-        def _bound_allow(
-            host: str,
-            role: RequestRole,
-            resolver: Optional[str] = None,
-        ) -> None:
-            allow(host, role=role, resolver=resolver)
-
-        self._breaker_allow = _bound_allow
 
     def _emit_attempt(
         self,
@@ -1428,84 +1389,6 @@ class ResolverPipeline:
             detail_text = str(detail_token)
         if detail_text and detail_text != reason_text:
             self.metrics.record_skip(resolver_name, detail_text)
-
-    # Legacy breaker methods removed - now handled by pybreaker-based BreakerRegistry
-
-    # Legacy breaker methods removed - now handled by pybreaker-based BreakerRegistry
-
-    # Legacy breaker update method removed - now handled by pybreaker-based BreakerRegistry
-
-    def _breaker_preflight(
-        self,
-        host: Optional[str],
-        resolver_name: str,
-        *,
-        role: RequestRole = RequestRole.ARTIFACT,
-    ) -> Optional[Tuple[str, str, Optional[float]]]:
-        """Consult the breaker registry and return skip metadata when blocked."""
-
-        if not host:
-            return None
-        allow = self._breaker_allow
-        if allow is None:
-            return None
-
-        host_key = host.lower()
-        try:
-            allow(host_key, role, resolver_name)
-        except BreakerOpenError as exc:
-            return self._describe_breaker_block(exc, resolver_name, host_key, role)
-        return None
-
-    @staticmethod
-    def _describe_breaker_block(
-        exc: BreakerOpenError,
-        resolver_name: str,
-        host: str,
-        role: RequestRole,
-    ) -> Tuple[str, str, Optional[float]]:
-        """Translate a breaker denial into telemetry reason/detail information."""
-
-        message = str(exc).strip()
-        if "resolver=" in message:
-            reason = "resolver_breaker_open"
-        else:
-            reason = "domain_breaker_open"
-
-        cooldown_ms: Optional[int] = None
-        match = re.search(r"(?:cooldown_)?remaining_ms=(\d+)", message)
-        if match:
-            try:
-                cooldown_ms = int(match.group(1))
-            except ValueError:  # pragma: no cover - defensive guard
-                cooldown_ms = None
-
-        retry_after: Optional[float] = None
-        if cooldown_ms is not None:
-            retry_after = max(cooldown_ms / 1000.0, 0.0)
-            detail = f"cooldown-{retry_after:.1f}s"
-        elif "half-open" in message:
-            role_match = re.search(r"role=([a-z_]+)", message)
-            role_token = role_match.group(1) if role_match else role.value
-            detail = f"half-open-{role_token}"
-        else:
-            detail = message or reason.replace("_", "-")
-
-        LOGGER.debug(
-            "breaker-blocked",
-            extra={
-                "extra_fields": {
-                    "resolver": resolver_name,
-                    "host": host,
-                    "role": role.value,
-                    "reason": reason,
-                    "detail": detail,
-                    "message": message,
-                }
-            },
-        )
-
-        return reason, detail, retry_after
 
     def _should_attempt_head_check(self, resolver_name: str, url: Optional[str]) -> bool:
         """Return ``True`` when a resolver should perform a HEAD preflight request.
@@ -2070,7 +1953,8 @@ class ResolverPipeline:
             head_precheck_passed = True
 
         host_value = (parsed_url.netloc or "").lower()
-        breaker_state = self._breaker_preflight(host_value, resolver_name)
+        # Legacy breaker preflight removed - now handled by pybreaker-based BreakerRegistry in networking layer
+        breaker_state = None
         if breaker_state is not None:
             reason_token, detail_token, retry_after_hint = breaker_state
             self._emit_attempt(

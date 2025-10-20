@@ -118,17 +118,18 @@ class SQLiteSink:
         self.backpressure_threshold_ms = backpressure_threshold_ms
 
         self._conn = sqlite3.connect(
-            self.db_path,
-            isolation_level="DEFERRED",
-            detect_types=0,
-            check_same_thread=False,
+            self.db_path, isolation_level=None, detect_types=0, check_same_thread=False
         )
         self._conn.row_factory = sqlite3.Row
         self._apply_pragmas()
         self._ensure_schema()
-        self._conn.commit()
         self._pending = 0
         self._transaction_open = False
+
+        # Apply schema migrations
+        from DocsToKG.ContentDownload.telemetry_wayback_migrations import migrate_schema
+
+        migrate_schema(self._conn, target_version="2")
 
         # Performance metrics
         self._metrics: Dict[str, Any] = {
@@ -326,12 +327,11 @@ class SQLiteSink:
             logging.error(f"Failed to write to dead letter queue: {e}")
 
     def _cleanup_on_exit(self) -> None:
-        """Perform cleanup operations on exit."""
+        """Run cleanup operations on exit (atexit handler)."""
         if not self._conn:
             return
 
         try:
-            self._commit_transaction()
             c = self._conn.cursor()
             # Run optimization
             c.execute("PRAGMA optimize;")
@@ -340,29 +340,218 @@ class SQLiteSink:
             if self.tuning.journal_mode == "WAL":
                 c.execute("PRAGMA wal_checkpoint(TRUNCATE);")
 
-        except sqlite3.ProgrammingError:
-            return
         except Exception as e:
             import logging
 
             logging.warning(f"Cleanup operations failed: {e}")
 
     def get_metrics(self) -> Dict[str, Any]:
-        """Get current performance metrics."""
+        """Return performance metrics collected during operation."""
         if not self.enable_metrics:
             return {}
 
         metrics = self._metrics.copy()
         emit_times = metrics["emit_times"]
         assert isinstance(emit_times, list)
+
         if emit_times:
             metrics["avg_emit_ms"] = sum(emit_times) / len(emit_times)
-            metrics["p95_emit_ms"] = sorted(emit_times)[int(len(emit_times) * 0.95)]
+            sorted_times = sorted(emit_times)
+            p95_index = int(len(sorted_times) * 0.95)
+            metrics["p95_emit_ms"] = float(sorted_times[p95_index])
         else:
             metrics["avg_emit_ms"] = 0.0
             metrics["p95_emit_ms"] = 0.0
 
         return metrics
+
+    def vacuum(self, incremental: bool = True) -> None:
+        """Run database maintenance (VACUUM or incremental_vacuum).
+
+        Args:
+            incremental: If True, use PRAGMA incremental_vacuum(2000) for online cleanup.
+                        If False, use VACUUM (offline, blocks all access).
+        """
+        try:
+            c = self._conn.cursor()
+            if incremental:
+                c.execute("PRAGMA incremental_vacuum(2000);")
+            else:
+                c.execute("VACUUM;")
+        except Exception as e:
+            import logging
+
+            logging.error(f"Vacuum operation failed: {e}")
+
+    def delete_run(self, run_id: str) -> int:
+        """Delete all telemetry for a specific run (retention policy).
+
+        Args:
+            run_id: Run identifier to delete.
+
+        Returns:
+            Total number of rows deleted.
+        """
+        try:
+            c = self._conn.cursor()
+
+            # Delete from child tables first (due to foreign key constraints)
+            tables_to_delete = [
+                "wayback_discoveries",
+                "wayback_candidates",
+                "wayback_html_parses",
+                "wayback_pdf_checks",
+                "wayback_emits",
+                "wayback_skips",
+                "wayback_attempts",
+            ]
+
+            total_deleted = 0
+            for table in tables_to_delete:
+                c.execute(
+                    f"DELETE FROM {table} WHERE attempt_id IN (SELECT attempt_id FROM wayback_attempts WHERE run_id = ?);",
+                    (run_id,),
+                )
+                total_deleted += c.rowcount
+
+            self._conn.commit()
+            return total_deleted
+        except Exception as e:
+            import logging
+
+            logging.error(f"Failed to delete run {run_id}: {e}")
+            return 0
+
+    def analyze_schema(self) -> None:
+        """Run SQLite ANALYZE to refresh query optimizer statistics."""
+        try:
+            c = self._conn.cursor()
+            c.execute("ANALYZE;")
+            self._conn.commit()
+        except Exception as e:
+            import logging
+
+            logging.error(f"ANALYZE failed: {e}")
+
+    def finalize_run_metrics(self, run_id: str) -> None:
+        """Populate wayback_run_metrics roll-up table with end-of-run aggregations.
+
+        Call this at the end of a run to compute and store metrics for fast dashboards.
+
+        Args:
+            run_id: Run identifier to finalize.
+        """
+        import datetime
+
+        try:
+            c = self._conn.cursor()
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+            # Compute aggregates
+            c.execute(
+                """
+                SELECT
+                    COUNT(*) as attempts,
+                    SUM(CASE WHEN result LIKE 'emitted%' THEN 1 ELSE 0 END) as emits
+                FROM wayback_attempts
+                WHERE run_id = ?
+            """,
+                (run_id,),
+            )
+
+            row = c.fetchone()
+            if not row:
+                return
+
+            attempts = row[0] or 0
+            emits = row[1] or 0
+            yield_pct = (emits / attempts * 100.0) if attempts > 0 else 0.0
+
+            # P95 latency
+            c.execute(
+                """
+                SELECT total_duration_ms FROM wayback_attempts
+                WHERE run_id = ? AND total_duration_ms IS NOT NULL
+                ORDER BY total_duration_ms
+            """,
+                (run_id,),
+            )
+
+            durations = [r[0] for r in c.fetchall()]
+            p95_latency_ms = None
+            if durations:
+                p95_index = int(len(durations) * 0.95)
+                p95_latency_ms = float(durations[p95_index])
+
+            # Cache hit rate
+            c.execute(
+                """
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN from_cache = 1 THEN 1 ELSE 0 END) as cached
+                FROM wayback_discoveries
+                WHERE attempt_id IN (SELECT attempt_id FROM wayback_attempts WHERE run_id = ?)
+            """,
+                (run_id,),
+            )
+
+            row = c.fetchone()
+            cache_hit_pct = 0.0
+            if row and row[0] > 0:
+                cache_hit_pct = (row[1] or 0) / row[0] * 100.0
+
+            # Non-PDF and below-min-size rates
+            c.execute(
+                """
+                SELECT
+                    SUM(CASE WHEN reason = 'non_pdf' THEN 1 ELSE 0 END) as non_pdf,
+                    SUM(CASE WHEN reason = 'below_min_size' THEN 1 ELSE 0 END) as below_min
+                FROM wayback_skips
+                WHERE attempt_id IN (SELECT attempt_id FROM wayback_attempts WHERE run_id = ?)
+            """,
+                (run_id,),
+            )
+
+            row = c.fetchone()
+            total_skips = emits  # Rough approximation
+            non_pdf_rate = ((row[0] or 0) / total_skips * 100.0) if total_skips > 0 else 0.0
+            below_min_size_rate = ((row[1] or 0) / total_skips * 100.0) if total_skips > 0 else 0.0
+
+            # Upsert into roll-up table
+            c.execute(
+                """
+                INSERT INTO wayback_run_metrics
+                (run_id, attempts, emits, yield_pct, p95_latency_ms, cache_hit_pct, non_pdf_rate, below_min_size_rate, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(run_id) DO UPDATE SET
+                    attempts = excluded.attempts,
+                    emits = excluded.emits,
+                    yield_pct = excluded.yield_pct,
+                    p95_latency_ms = excluded.p95_latency_ms,
+                    cache_hit_pct = excluded.cache_hit_pct,
+                    non_pdf_rate = excluded.non_pdf_rate,
+                    below_min_size_rate = excluded.below_min_size_rate,
+                    updated_at = excluded.updated_at
+            """,
+                (
+                    run_id,
+                    attempts,
+                    emits,
+                    yield_pct,
+                    p95_latency_ms,
+                    cache_hit_pct,
+                    non_pdf_rate,
+                    below_min_size_rate,
+                    now,
+                    now,
+                ),
+            )
+
+            self._conn.commit()
+        except Exception as e:
+            import logging
+
+            logging.error(f"Failed to finalize run metrics for {run_id}: {e}")
 
     # ────────────────────────────────────────────────────────────────────────────
     # DDL & PRAGMAs
@@ -591,6 +780,22 @@ class SQLiteSink:
             # Partial indexes not supported
             pass
 
+        # Roll-up table for fast dashboards (fast query of run-level metrics)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS wayback_run_metrics (
+            run_id TEXT PRIMARY KEY,
+            attempts INTEGER DEFAULT 0,
+            emits INTEGER DEFAULT 0,
+            yield_pct REAL DEFAULT 0.0,
+            p95_latency_ms REAL,
+            cache_hit_pct REAL DEFAULT 0.0,
+            non_pdf_rate REAL DEFAULT 0.0,
+            below_min_size_rate REAL DEFAULT 0.0,
+            created_at TEXT,
+            updated_at TEXT
+        );
+        """)
+
     def _ensure_column_exists(
         self, cur: sqlite3.Cursor, *, table: str, column: str, ddl: str
     ) -> None:
@@ -605,9 +810,31 @@ class SQLiteSink:
     # Per-event writers
     # ────────────────────────────────────────────────────────────────────────────
 
+    def _ensure_attempt_stub(self, cur: sqlite3.Cursor, e: Mapping[str, Any]) -> None:
+        attempt_id = e.get("attempt_id")
+        if not attempt_id:
+            return
+        cur.execute(
+            """
+            INSERT OR IGNORE INTO wayback_attempts (
+                attempt_id, run_id, work_id, artifact_id, resolver, schema, start_ts
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                attempt_id,
+                e.get("run_id") or "unknown-run",
+                e.get("work_id") or "unknown-work",
+                e.get("artifact_id") or "unknown-artifact",
+                e.get("resolver", "wayback"),
+                e.get("schema", "1"),
+                e.get("ts"),
+            ),
+        )
+
     def _emit_attempt(self, cur: sqlite3.Cursor, e: Mapping[str, Any]) -> None:
         # Start or end of an attempt; use upsert (insert-or-update)
         ev = e.get("event")
+        self._ensure_attempt_stub(cur, e)
         if ev == "start":
             cur.execute(
                 """
@@ -661,6 +888,7 @@ class SQLiteSink:
             )
 
     def _emit_discovery(self, cur: sqlite3.Cursor, e: Mapping[str, Any]) -> None:
+        self._ensure_attempt_stub(cur, e)
         cur.execute(
             """
             INSERT INTO wayback_discoveries (
@@ -694,6 +922,7 @@ class SQLiteSink:
         )
 
     def _emit_candidate(self, cur: sqlite3.Cursor, e: Mapping[str, Any]) -> None:
+        self._ensure_attempt_stub(cur, e)
         cur.execute(
             """
             INSERT INTO wayback_candidates (
@@ -717,6 +946,7 @@ class SQLiteSink:
         )
 
     def _emit_html_parse(self, cur: sqlite3.Cursor, e: Mapping[str, Any]) -> None:
+        self._ensure_attempt_stub(cur, e)
         cur.execute(
             """
             INSERT INTO wayback_html_parses (
@@ -742,6 +972,7 @@ class SQLiteSink:
         )
 
     def _emit_pdf_check(self, cur: sqlite3.Cursor, e: Mapping[str, Any]) -> None:
+        self._ensure_attempt_stub(cur, e)
         cur.execute(
             """
             INSERT INTO wayback_pdf_checks (
@@ -765,6 +996,7 @@ class SQLiteSink:
         )
 
     def _emit_emit(self, cur: sqlite3.Cursor, e: Mapping[str, Any]) -> None:
+        self._ensure_attempt_stub(cur, e)
         cur.execute(
             """
             INSERT INTO wayback_emits (
@@ -785,6 +1017,7 @@ class SQLiteSink:
         )
 
     def _emit_skip(self, cur: sqlite3.Cursor, e: Mapping[str, Any]) -> None:
+        self._ensure_attempt_stub(cur, e)
         cur.execute(
             """
             INSERT INTO wayback_skips (

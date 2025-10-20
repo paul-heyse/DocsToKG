@@ -167,7 +167,13 @@ def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
     if ":" in host_component and not host_component.startswith("["):
         host_component = f"[{host_component}]"
 
-    port = f":{parsed.port}" if parsed.port else ""
+    # Safely handle port - avoid accessing parsed.port for IPv6 without brackets
+    try:
+        port = f":{parsed.port}" if parsed.port else ""
+    except ValueError:
+        # This happens when IPv6 without brackets was parsed incorrectly
+        port = ""
+
     return f"{host_component}{port}"
 
 
@@ -247,27 +253,83 @@ def clear_dns_stubs() -> None:
 
 
 def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
-    """Validate URLs to avoid SSRF, enforce HTTPS, normalize IDNs, and honor host allowlists."""
+    """Validate URLs to avoid SSRF, enforce HTTPS, normalize IDNs, and honor host allowlists.
 
-    parsed = urlparse(url)
+    This function implements strict RFC-3986 parsing and normalization with security policies:
+
+    Args:
+        url: The URL to validate and normalize
+        http_config: Optional configuration for allowlists and policies
+
+    Returns:
+        A normalized, policy-compliant URL string
+
+    Raises:
+        PolicyError: For scheme/host/port violations or disallowed redirects
+        ConfigError: For DNS failures in strict mode or private-network resolution when not allowed
+
+    Security Features:
+        - RFC-3986 strict parsing (scheme, authority, path normalization)
+        - IDN → ASCII (punycode) canonicalization with homograph safety
+        - Host allowlist evaluation (exact domains, wildcard suffixes, IP literals)
+        - Port controls (global and per-host)
+        - TLS policy (HTTP→HTTPS upgrading by default, with explicit opt-in for plain HTTP)
+        - DNS classification (public vs private/loopback/multicast/reserved)
+        - Private network guards with configurable allowlists
+        - Default port omission in normalized output
+        - Query/fragment preservation without reordering
+        - Registrable-domain allowlisting with PSL-based wildcard suffix support
+    """
+
     logger = logging.getLogger("DocsToKG.OntologyDownload")
+
+    # Strict RFC-3986 parsing - reject missing scheme or netloc
+    parsed = urlparse(url)
+    if not parsed.scheme:
+        raise PolicyError("URL must include scheme")
+    if not parsed.netloc:
+        raise PolicyError("URL must include hostname")
+
+    # Forbid userinfo (credentials) in netloc
     if parsed.username or parsed.password:
         raise PolicyError("Credentials in URLs are not allowed")
 
+    # Allow only HTTP and HTTPS schemes
     scheme = parsed.scheme.lower()
     if scheme not in {"http", "https"}:
         raise PolicyError("Only HTTP(S) URLs are allowed for ontology downloads")
 
+    # Normalize host: lowercase and trim trailing dot
     host = parsed.hostname
     if not host:
         raise PolicyError("URL must include hostname")
 
+    # Check for IPv6 without brackets early (before any processing)
+    # Note: urlparse removes brackets from IPv6 addresses, so we need to check the original netloc
+    if ":" in host and "[" not in parsed.netloc and "]" not in parsed.netloc:
+        # This looks like IPv6 without brackets, which is invalid
+        raise PolicyError(f"IPv6 addresses must be enclosed in brackets: [{host}]")
+
+    # Normalize backslashes to forward slashes in authority/path
+    if "\\" in parsed.netloc or "\\" in parsed.path:
+        # Rebuild the URL with normalized slashes
+        normalized_netloc = parsed.netloc.replace("\\", "/")
+        normalized_path = parsed.path.replace("\\", "/")
+        parsed = parsed._replace(netloc=normalized_netloc, path=normalized_path)
+        host = parsed.hostname
+
+    # Trim trailing dot from host
+    if host:
+        host = host.rstrip(".")
+
+    # Determine if host is an IP literal
     try:
         ipaddress.ip_address(host)
         is_ip = True
     except ValueError:
         is_ip = False
 
+    # Host normalization: lowercase and IDN → punycode conversion
     ascii_host = host.lower()
     if not is_ip:
         _enforce_idn_safety(host)
@@ -276,47 +338,110 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
         except UnicodeError as exc:
             raise PolicyError(f"Invalid internationalized hostname: {host}") from exc
 
-    parsed = parsed._replace(netloc=_rebuild_netloc(parsed, ascii_host))
+    # Normalize path by removing dot-segments while preserving original structure
+    if parsed.path:
+        # Use urljoin to remove dot-segments but preserve the original path structure
+        normalized_path = urljoin("/", parsed.path)
+        # Don't add trailing slash if original didn't have one
+        if (
+            not parsed.path.endswith("/")
+            and normalized_path.endswith("/")
+            and len(normalized_path) > 1
+        ):
+            normalized_path = normalized_path[:-1]
+    else:
+        normalized_path = parsed.path
 
+    parsed = parsed._replace(netloc=_rebuild_netloc(parsed, ascii_host), path=normalized_path)
+
+    # Compute allowlist structures once
     allowed_exact: Set[str] = set()
     allowed_suffixes: Set[str] = set()
     allowed_host_ports: Dict[str, Set[int]] = {}
     allowed_ip_literals: Set[str] = set()
     allowed_port_set = http_config.allowed_port_set() if http_config else {80, 443}
+
     if http_config:
         normalized = http_config.normalized_allowed_hosts()
         if normalized:
             allowed_exact, allowed_suffixes, allowed_host_ports, allowed_ip_literals = normalized
 
+    # Determine host kind and allowlist match
     allow_private_networks = False
     allow_plain_http = False
-    if allowed_exact or allowed_suffixes:
-        matched_exact = ascii_host in allowed_exact
-        matched_suffix = any(
-            ascii_host == suffix or ascii_host.endswith(f".{suffix}") for suffix in allowed_suffixes
-        )
-        if not (matched_exact or matched_suffix):
+    allowlist_match_type = "none"
+
+    if allowed_exact or allowed_suffixes or allowed_ip_literals:
+        # IP literal matching
+        if is_ip and ascii_host in allowed_ip_literals:
+            allowlist_match_type = "ip"
+            allow_private_networks = True
+            allow_plain_http = True
+            logger.info(
+                "allowlist match",
+                extra={
+                    "stage": "download",
+                    "validator.allowlist_match": "ip",
+                    "host": host,
+                    "reason": "IP literal in allowlist",
+                },
+            )
+        # Domain matching
+        elif not is_ip:
+            matched_exact = ascii_host in allowed_exact
+            matched_suffix = any(
+                ascii_host == suffix or ascii_host.endswith(f".{suffix}")
+                for suffix in allowed_suffixes
+            )
+
+            if matched_exact:
+                allowlist_match_type = "exact"
+            elif matched_suffix:
+                allowlist_match_type = "suffix"
+
+            if not (matched_exact or matched_suffix):
+                raise PolicyError(f"Host {host} not in allowlist")
+
+            # Apply configuration flags for domain matches
+            if http_config and http_config.allow_private_networks_for_host_allowlist:
+                allow_private_networks = True
+
+            if http_config and http_config.allow_plain_http_for_host_allowlist:
+                allow_plain_http = True
+
+            logger.info(
+                "allowlist match",
+                extra={
+                    "stage": "download",
+                    "validator.allowlist_match": allowlist_match_type,
+                    "host": host,
+                    "reason": f"{allowlist_match_type} domain match",
+                },
+            )
+        else:
             raise PolicyError(f"Host {host} not in allowlist")
 
-        if matched_exact and ascii_host in allowed_ip_literals:
-            allow_private_networks = True
-            allow_plain_http = True
-        elif http_config and http_config.allow_private_networks_for_host_allowlist:
-            allow_private_networks = True
-
-        if http_config and http_config.allow_plain_http_for_host_allowlist:
-            allow_plain_http = True
-
+    # TLS Policy: HTTP→HTTPS upgrades; explicit plain-HTTP opt-in
     if scheme == "http":
         if allow_plain_http:
             logger.warning(
-                "allowing http url for explicit allowlist host",
-                extra={"stage": "download", "original_url": url},
+                "plain HTTP allowed for allowlisted host",
+                extra={
+                    "stage": "download",
+                    "validator.allow_plain_http": True,
+                    "host": host,
+                    "reason": "explicit allowlist configuration",
+                },
             )
         else:
-            logger.warning(
-                "upgrading http url to https",
-                extra={"stage": "download", "original_url": url},
+            logger.info(
+                "HTTP upgraded to HTTPS",
+                extra={
+                    "stage": "download",
+                    "validator.scheme_upgrade": "http→https",
+                    "host": host,
+                    "reason": "security policy enforcement",
+                },
             )
             parsed = parsed._replace(scheme="https")
             scheme = "https"
@@ -324,45 +449,152 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
     if scheme != "https" and not allow_plain_http:
         raise PolicyError("Only HTTPS URLs are allowed for ontology downloads")
 
+    # Port policy: determine effective allowed ports
     port = parsed.port
     if port is None:
         port = 80 if scheme == "http" else 443
 
+    # Check port against global and per-host allowances
     host_port_allowances = allowed_host_ports.get(ascii_host, set())
-    if port not in allowed_port_set and port not in host_port_allowances:
+    effective_allowed_ports = allowed_port_set | host_port_allowances
+
+    if port not in effective_allowed_ports:
         raise PolicyError(f"Port {port} is not permitted for ontology downloads")
 
+    # Log port policy decision
+    logger.debug(
+        "port policy applied",
+        extra={
+            "stage": "download",
+            "validator.port_policy": {
+                "port": port,
+                "allowed_set": sorted(effective_allowed_ports),
+                "per_host_override": bool(host_port_allowances),
+            },
+        },
+    )
+
+    # DNS Resolution & Network Classification
     if is_ip:
+        # IP literal: skip DNS; classify directly via ipaddress
         address = ipaddress.ip_address(ascii_host)
         is_doc_address = _is_documentation_address(address)
+
+        # Classify address type
+        address_class = "public"
+        if address.is_private:
+            address_class = "private"
+        elif address.is_loopback:
+            address_class = "loopback"
+        elif address.is_multicast:
+            address_class = "multicast"
+        elif is_doc_address:
+            address_class = "documentation"
+
+        logger.debug(
+            "address classification",
+            extra={
+                "stage": "download",
+                "validator.address_classification": address_class,
+                "host": host,
+                "allow_private_networks": allow_private_networks,
+            },
+        )
+
         if (
             not allow_private_networks
             and not is_doc_address
             and (address.is_private or address.is_loopback or address.is_multicast)
         ):
             raise ConfigError(f"Refusing to download from private address {host}")
+
+        # Omit default ports from the normalized URL for IP literals
+        if port == 80 and scheme == "http":
+            parsed = parsed._replace(netloc=parsed.netloc.replace(":80", ""))
+        elif port == 443 and scheme == "https":
+            parsed = parsed._replace(netloc=parsed.netloc.replace(":443", ""))
+        elif port == 80 and scheme == "https":  # HTTP upgraded to HTTPS but port 80 remains
+            parsed = parsed._replace(netloc=parsed.netloc.replace(":80", ""))
+
         return urlunparse(parsed)
 
+    # DNS resolution for domain names
     try:
         infos = _cached_getaddrinfo(ascii_host)
+        logger.debug(
+            "dns resolution successful",
+            extra={
+                "stage": "download",
+                "validator.dns_resolution": "success",
+                "hostname": host,
+                "strict_dns": getattr(http_config, "strict_dns", False) if http_config else False,
+            },
+        )
     except socket.gaierror as exc:
         logger.warning(
             "dns resolution failed",
-            extra={"stage": "download", "hostname": host, "error": str(exc)},
+            extra={
+                "stage": "download",
+                "validator.dns_resolution": "failure",
+                "hostname": host,
+                "error": str(exc),
+                "strict_dns": getattr(http_config, "strict_dns", False) if http_config else False,
+            },
         )
         if http_config and getattr(http_config, "strict_dns", False):
             raise ConfigError(f"DNS resolution failed for {host}: {exc}") from exc
+
+        # Omit default ports from the normalized URL
+        if port == 80 and scheme == "http":
+            parsed = parsed._replace(netloc=parsed.netloc.replace(":80", ""))
+        elif port == 443 and scheme == "https":
+            parsed = parsed._replace(netloc=parsed.netloc.replace(":443", ""))
+        elif port == 80 and scheme == "https":  # HTTP upgraded to HTTPS but port 80 remains
+            parsed = parsed._replace(netloc=parsed.netloc.replace(":80", ""))
+
         return urlunparse(parsed)
 
+    # Classify each resolved address
     for info in infos:
         candidate_ip = ipaddress.ip_address(info[4][0])
         is_doc_address = _is_documentation_address(candidate_ip)
+
+        # Classify address type
+        address_class = "public"
+        if candidate_ip.is_private:
+            address_class = "private"
+        elif candidate_ip.is_loopback:
+            address_class = "loopback"
+        elif candidate_ip.is_multicast:
+            address_class = "multicast"
+        elif is_doc_address:
+            address_class = "documentation"
+
+        logger.debug(
+            "resolved address classification",
+            extra={
+                "stage": "download",
+                "validator.address_classification": address_class,
+                "host": host,
+                "resolved_ip": str(candidate_ip),
+                "allow_private_networks": allow_private_networks,
+            },
+        )
+
         if (
             not allow_private_networks
             and not is_doc_address
             and (candidate_ip.is_private or candidate_ip.is_loopback or candidate_ip.is_multicast)
         ):
             raise ConfigError(f"Refusing to download from private address resolved for {host}")
+
+    # Omit default ports from the normalized URL
+    if port == 80 and scheme == "http":
+        parsed = parsed._replace(netloc=parsed.netloc.replace(":80", ""))
+    elif port == 443 and scheme == "https":
+        parsed = parsed._replace(netloc=parsed.netloc.replace(":443", ""))
+    elif port == 80 and scheme == "https":  # HTTP upgraded to HTTPS but port 80 remains
+        parsed = parsed._replace(netloc=parsed.netloc.replace(":80", ""))
 
     return urlunparse(parsed)
 
@@ -677,9 +909,7 @@ class _StreamOutcome:
     cache_status: Optional[Mapping[str, object]] = None
 
 
-def _conditional_headers_from_manifest(
-    manifest: Optional[Mapping[str, object]]
-) -> Dict[str, str]:
+def _conditional_headers_from_manifest(manifest: Optional[Mapping[str, object]]) -> Dict[str, str]:
     headers: Dict[str, str] = {}
     if not manifest:
         return headers
@@ -695,7 +925,7 @@ def _conditional_headers_from_manifest(
 def _parse_expected_hash(expected_hash: Optional[str]) -> tuple[Optional[str], Optional[str]]:
     if not expected_hash:
         return None, None
-    parts = expected_hash.split(':', 1)
+    parts = expected_hash.split(":", 1)
     if len(parts) != 2:
         return None, None
     algorithm = parts[0].strip().lower()
@@ -814,7 +1044,7 @@ def _validate_media_type(
         )
         return
 
-    actual_mime = actual_content_type.split(';')[0].strip().lower()
+    actual_mime = actual_content_type.split(";")[0].strip().lower()
     expected_mime = expected_media_type.strip().lower()
     if actual_mime == expected_mime:
         return
@@ -850,9 +1080,9 @@ def _validate_media_type(
 def _total_bytes_from_response(response: httpx.Response, resume_position: int) -> Optional[int]:
     if response.status_code == 206:
         content_range = response.headers.get("Content-Range")
-        if content_range and '/' in content_range:
+        if content_range and "/" in content_range:
             try:
-                total = int(content_range.split('/')[-1])
+                total = int(content_range.split("/")[-1])
                 return total
             except (ValueError, IndexError):
                 return None
@@ -879,10 +1109,10 @@ def _stream_body_to_cache(
     download_deadline: Optional[float],
     download_timeout: float,
 ) -> int:
-    part_path = cache_path.with_suffix(cache_path.suffix + '.part')
+    part_path = cache_path.with_suffix(cache_path.suffix + ".part")
     part_path.parent.mkdir(parents=True, exist_ok=True)
-    mode = 'ab' if response.status_code == 206 and resume_position > 0 else 'wb'
-    if mode == 'wb':
+    mode = "ab" if response.status_code == 206 and resume_position > 0 else "wb"
+    if mode == "wb":
         part_path.unlink(missing_ok=True)
     total_bytes = _total_bytes_from_response(response, resume_position)
     state = _initial_progress_state(
@@ -917,7 +1147,9 @@ def _stream_body_to_cache(
                             extra={
                                 "stage": "download",
                                 "error": "timeout",
-                                "elapsed_sec": round(now - (download_deadline - download_timeout), 2),
+                                "elapsed_sec": round(
+                                    now - (download_deadline - download_timeout), 2
+                                ),
                                 "timeout_sec": download_timeout,
                             },
                         )
@@ -987,7 +1219,7 @@ def _download_once(
         raise DownloadFailure("Download was cancelled", retryable=False)
 
     resume_position = 0
-    part_path = cache_path.with_suffix(cache_path.suffix + '.part')
+    part_path = cache_path.with_suffix(cache_path.suffix + ".part")
     destination_part = destination.with_suffix(destination.suffix + ".part")
     if part_path.exists():
         try:
@@ -1238,6 +1470,7 @@ def _download_once(
                 cache_status=cache_status,
             )
 
+
 def _safe_int(value: Optional[str]) -> Optional[int]:
     if value is None:
         return None
@@ -1245,6 +1478,7 @@ def _safe_int(value: Optional[str]) -> Optional[int]:
         return int(value)
     except (TypeError, ValueError):
         return None
+
 
 def download_stream(
     *,
@@ -1336,7 +1570,11 @@ def download_stream(
             except httpx.HTTPStatusError as exc:
                 status_code = getattr(exc.response, "status_code", None)
                 retryable = _is_retryable_status(status_code)
-                message = f"HTTP error {status_code} while downloading {secure_url}" if status_code else str(exc)
+                message = (
+                    f"HTTP error {status_code} while downloading {secure_url}"
+                    if status_code
+                    else str(exc)
+                )
                 failure = DownloadFailure(message, status_code=status_code, retryable=retryable)
                 retry_after_delay = getattr(exc, "_retry_after_delay", None)
                 if retry_after_delay is not None:

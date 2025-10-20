@@ -336,19 +336,25 @@ def test_head_retry_after_honours_delay_before_get(ontology_env, tmp_path):
     )
     head_key = ("HEAD", "/fixtures/hp-retry-after.owl")
     head_queue = ontology_env._responses.setdefault(head_key, [])
-    head_queue.insert(0, ResponseSpec(
-        method="HEAD",
-        status=429,
-        headers={"Retry-After": f"{retry_after_sec:.2f}"},
-    ))
-    head_queue.insert(1, ResponseSpec(
-        method="HEAD",
-        status=200,
-        headers={
-            "Content-Type": "application/rdf+xml",
-            "Content-Length": str(len(payload)),
-        },
-    ))
+    head_queue.insert(
+        0,
+        ResponseSpec(
+            method="HEAD",
+            status=429,
+            headers={"Retry-After": f"{retry_after_sec:.2f}"},
+        ),
+    )
+    head_queue.insert(
+        1,
+        ResponseSpec(
+            method="HEAD",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": str(len(payload)),
+            },
+        ),
+    )
 
     config = ontology_env.build_download_config()
     config.perform_head_precheck = True
@@ -377,7 +383,9 @@ def test_head_retry_after_honours_delay_before_get(ontology_env, tmp_path):
             delay=delay,
         )
 
-    with mock.patch("DocsToKG.OntologyDownload.io.network.apply_retry_after", side_effect=fake_apply_retry_after):
+    with mock.patch(
+        "DocsToKG.OntologyDownload.io.network.apply_retry_after", side_effect=fake_apply_retry_after
+    ):
         with mock.patch.object(network_mod, "retry_with_backoff", side_effect=wrapped_retry):
             result = network_mod.download_stream(
                 url=url,
@@ -587,7 +595,9 @@ def test_download_stream_logs_progress(ontology_env, tmp_path, caplog):
             service="obo",
         )
 
-    progress_entries = [record for record in caplog.records if record.getMessage() == "download progress"]
+    progress_entries = [
+        record for record in caplog.records if record.getMessage() == "download progress"
+    ]
     assert progress_entries, "Expected download progress logs to be emitted"
 
 
@@ -807,8 +817,8 @@ def test_download_stream_respects_validated_url_hint(ontology_env, tmp_path):
     assert destination.read_bytes() == payload
 
 
-def test_extract_zip_rejects_traversal(tmp_path):
-    """Zip extraction should guard against traversal attacks."""
+def test_extract_archive_safe_rejects_zip_traversal(tmp_path):
+    """Extraction should guard against traversal attacks in ZIP archives."""
 
     archive = tmp_path / "traversal.zip"
     with zipfile.ZipFile(archive, "w") as zipf:
@@ -816,11 +826,11 @@ def test_extract_zip_rejects_traversal(tmp_path):
         zipf.writestr(info, "oops")
 
     with pytest.raises(ConfigError):
-        fs_mod.extract_zip_safe(archive, tmp_path / "output", logger=_logger())
+        fs_mod.extract_archive_safe(archive, tmp_path / "output", logger=_logger())
 
 
-def test_extract_tar_rejects_symlink(tmp_path):
-    """Tar extraction should reject symlinks inside the archive."""
+def test_extract_archive_safe_rejects_tar_symlink(tmp_path):
+    """Extraction should reject symlinks inside TAR archives."""
 
     archive = tmp_path / "symlink.tar"
     with tarfile.open(archive, "w") as tar:
@@ -835,7 +845,7 @@ def test_extract_tar_rejects_symlink(tmp_path):
         tar.addfile(link_info)
 
     with pytest.raises(ConfigError):
-        fs_mod.extract_tar_safe(archive, tmp_path / "output", logger=_logger())
+        fs_mod.extract_archive_safe(archive, tmp_path / "output", logger=_logger())
 
 
 def test_sanitize_filename_normalises(tmp_path):

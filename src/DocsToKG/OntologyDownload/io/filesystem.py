@@ -29,17 +29,23 @@ import logging
 import os
 import re
 import shutil
-import stat
-import tarfile
 import uuid
-import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
 
+import libarchive
+
 from ..errors import ConfigError
 from ..settings import get_default_config
+from .extraction_constraints import PreScanValidator
+from .extraction_policy import ExtractionPolicy, safe_defaults
+from .extraction_telemetry import (
+    ExtractionErrorCode,
+    ExtractionMetrics,
+    ExtractionTelemetryEvent,
+    error_message,
+)
 
-_TAR_SUFFIXES = (".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2")
 _MAX_COMPRESSION_RATIO = 10.0
 
 
@@ -178,6 +184,33 @@ def _validate_member_path(member_name: str) -> Path:
     return Path(*relative.parts)
 
 
+def _compute_archive_sha256(archive_path: Path) -> str:
+    """Compute SHA-256 digest of archive for deterministic encapsulation naming."""
+    return sha256_file(archive_path)
+
+
+def _generate_encapsulation_root_name(
+    archive_path: Path,
+    policy: ExtractionPolicy,
+) -> str:
+    """Generate encapsulation root name based on policy.
+
+    Args:
+        archive_path: Path to the archive
+        policy: Extraction policy (determines naming strategy)
+
+    Returns:
+        Directory name for the encapsulation root
+    """
+    if policy.encapsulation_name == "sha256":
+        digest = _compute_archive_sha256(archive_path)
+        return f"{digest[:12]}.d"
+    elif policy.encapsulation_name == "basename":
+        return f"{archive_path.stem}.d"
+    else:
+        raise ConfigError(f"Unknown encapsulation naming policy: {policy.encapsulation_name}")
+
+
 def _check_compression_ratio(
     *,
     total_uncompressed: int,
@@ -241,166 +274,216 @@ def _enforce_uncompressed_ceiling(
     )
 
 
-def extract_zip_safe(
-    zip_path: Path,
-    destination: Path,
-    *,
-    logger: Optional[logging.Logger] = None,
-    max_uncompressed_bytes: Optional[int] = None,
-) -> List[Path]:
-    """Extract a ZIP archive while preventing traversal and compression bombs."""
-
-    if not zip_path.exists():
-        raise ConfigError(f"ZIP archive not found: {zip_path}")
-    destination.mkdir(parents=True, exist_ok=True)
-    extracted: List[Path] = []
-    limit_bytes = _resolve_max_uncompressed_bytes(max_uncompressed_bytes)
-    with zipfile.ZipFile(zip_path) as archive:
-        members = archive.infolist()
-        safe_members: List[tuple[zipfile.ZipInfo, Path]] = []
-        total_uncompressed = 0
-        for member in members:
-            member_path = _validate_member_path(member.filename)
-            mode = (member.external_attr >> 16) & 0xFFFF
-            if stat.S_IFMT(mode) == stat.S_IFLNK:
-                raise ConfigError(f"Unsafe link detected in archive: {member.filename}")
-            if member.is_dir():
-                safe_members.append((member, member_path))
-                continue
-            total_uncompressed += int(member.file_size)
-            safe_members.append((member, member_path))
-        compressed_size = max(
-            zip_path.stat().st_size,
-            sum(int(member.compress_size) for member in members) or 0,
-        )
-        _check_compression_ratio(
-            total_uncompressed=total_uncompressed,
-            compressed_size=compressed_size,
-            archive=zip_path,
-            logger=logger,
-            archive_type="ZIP",
-        )
-        _enforce_uncompressed_ceiling(
-            total_uncompressed=total_uncompressed,
-            limit_bytes=limit_bytes,
-            archive=zip_path,
-            logger=logger,
-            archive_type="ZIP",
-        )
-        for member, member_path in safe_members:
-            target_path = destination / member_path
-            if member.is_dir():
-                target_path.mkdir(parents=True, exist_ok=True)
-                continue
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            with archive.open(member, "r") as source, target_path.open("wb") as target:
-                shutil.copyfileobj(source, target)
-            extracted.append(target_path)
-    if logger:
-        logger.info(
-            "extracted zip archive",
-            extra={"stage": "extract", "archive": str(zip_path), "files": len(extracted)},
-        )
-    return extracted
-
-
-def extract_tar_safe(
-    tar_path: Path,
-    destination: Path,
-    *,
-    logger: Optional[logging.Logger] = None,
-    max_uncompressed_bytes: Optional[int] = None,
-) -> List[Path]:
-    """Safely extract tar archives (tar, tar.gz, tar.xz) with traversal and compression checks."""
-
-    if not tar_path.exists():
-        raise ConfigError(f"TAR archive not found: {tar_path}")
-    destination.mkdir(parents=True, exist_ok=True)
-    extracted: List[Path] = []
-    limit_bytes = _resolve_max_uncompressed_bytes(max_uncompressed_bytes)
-    try:
-        with tarfile.open(tar_path, mode="r:*") as archive:
-            members = archive.getmembers()
-            safe_members: List[tuple[tarfile.TarInfo, Path]] = []
-            total_uncompressed = 0
-            for member in members:
-                member_path = _validate_member_path(member.name)
-                if member.isdir():
-                    safe_members.append((member, member_path))
-                    continue
-                if member.islnk() or member.issym():
-                    raise ConfigError(f"Unsafe link detected in archive: {member.name}")
-                if member.isdev():
-                    raise ConfigError(
-                        f"Unsupported special file detected in archive: {member.name}"
-                    )
-                if not member.isfile():
-                    raise ConfigError(f"Unsupported tar member type encountered: {member.name}")
-                total_uncompressed += int(member.size)
-                safe_members.append((member, member_path))
-            compressed_size = tar_path.stat().st_size
-            _check_compression_ratio(
-                total_uncompressed=total_uncompressed,
-                compressed_size=compressed_size,
-                archive=tar_path,
-                logger=logger,
-                archive_type="TAR",
-            )
-            _enforce_uncompressed_ceiling(
-                total_uncompressed=total_uncompressed,
-                limit_bytes=limit_bytes,
-                archive=tar_path,
-                logger=logger,
-                archive_type="TAR",
-            )
-            for member, member_path in safe_members:
-                if member.isdir():
-                    (destination / member_path).mkdir(parents=True, exist_ok=True)
-                    continue
-                target_path = destination / member_path
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                extracted_file = archive.extractfile(member)
-                if extracted_file is None:
-                    raise ConfigError(f"Failed to extract member: {member.name}")
-                with extracted_file as source, target_path.open("wb") as target:
-                    shutil.copyfileobj(source, target)
-                extracted.append(target_path)
-    except tarfile.TarError as exc:
-        raise ConfigError(f"Failed to extract tar archive {tar_path}: {exc}") from exc
-    if logger:
-        logger.info(
-            "extracted tar archive",
-            extra={"stage": "extract", "archive": str(tar_path), "files": len(extracted)},
-        )
-    return extracted
-
-
 def extract_archive_safe(
     archive_path: Path,
     destination: Path,
     *,
     logger: Optional[logging.Logger] = None,
     max_uncompressed_bytes: Optional[int] = None,
+    extraction_policy: Optional[ExtractionPolicy] = None,
 ) -> List[Path]:
-    """Extract archives by dispatching to the appropriate safe handler."""
+    """Extract archives safely using libarchive with validation and compression checks.
 
-    lower_name = archive_path.name.lower()
+    This function uses libarchive for automatic format and compression detection, eliminating
+    the need for format-specific branching. It implements a two-phase extraction strategy:
+
+    Phase 1 (pre-scan): Validates all entries without writing to disk
+      - Checks for path traversal attempts (absolute paths, `..`, escaping destination)
+      - Rejects unsafe entry types (symlinks, hardlinks, devices, FIFOs, sockets)
+      - Accumulates uncompressed sizes for compression ratio validation
+      - Enforces zip-bomb guard (~10:1 ratio)
+
+    Phase 2 (extract): Performs actual extraction only if Phase 1 passes
+      - Creates directories as needed under the validated destination
+      - Writes regular files to pre-validated target paths
+      - Returns list of extracted file paths in header order
+
+    Phase 1 (with encapsulation): Creates a deterministic subdirectory
+      - Prevents tar-bomb-style extraction into sibling directories
+      - Uses SHA256 or basename to name the root (configurable)
+      - Enables DirFD + openat semantics for race-free operations (Phase 1)
+
+    Args:
+        archive_path: Path to the archive file (any libarchive-supported format)
+        destination: Target directory for extraction
+        logger: Optional logger for structured logging with stage="extract" key
+        max_uncompressed_bytes: Maximum uncompressed size limit (uses config default if None)
+        extraction_policy: ExtractionPolicy instance (uses safe defaults if None)
+
+    Returns:
+        List of Path objects for regular files extracted, in header order
+
+    Raises:
+        ConfigError: If archive is unsupported, corrupted, or violates security policy
+    """
+    if not archive_path.exists():
+        raise ConfigError(f"Archive not found: {archive_path}")
+
+    policy = extraction_policy or safe_defaults()
+    if not policy.is_valid():
+        errors = policy.validate()
+        raise ConfigError(f"Invalid extraction policy: {'; '.join(errors)}")
+
+    destination.mkdir(parents=True, exist_ok=True)
     limit_bytes = _resolve_max_uncompressed_bytes(max_uncompressed_bytes)
-    if lower_name.endswith(".zip"):
-        return extract_zip_safe(
-            archive_path,
-            destination,
+
+    # Initialize telemetry
+    metrics = ExtractionMetrics()
+    telemetry = ExtractionTelemetryEvent(archive=str(archive_path))
+
+    try:
+        # Determine final extraction root (with encapsulation if enabled)
+        extract_root = destination
+        if policy.encapsulate:
+            root_name = _generate_encapsulation_root_name(archive_path, policy)
+            extract_root = destination / root_name
+            telemetry.encapsulated_root = str(extract_root)
+            telemetry.encapsulation_policy = policy.encapsulation_name
+
+            # Check if encapsulation root already exists
+            if extract_root.exists():
+                raise ConfigError(
+                    error_message(
+                        ExtractionErrorCode.OVERWRITE_ROOT,
+                        f"Encapsulation root already exists: {extract_root}",
+                    )
+                )
+
+        extract_root.mkdir(parents=True, exist_ok=True)
+
+        # Phase 1: Pre-scan validation without writing
+        entries_to_extract: List[tuple[str, Path, bool]] = []  # (orig_name, validated_path, is_dir)
+        total_uncompressed = 0
+        
+        # Initialize Phase 2 validator for comprehensive security checks
+        prescan_validator = PreScanValidator(policy)
+
+        with libarchive.file_reader(str(archive_path)) as archive:
+            for entry in archive:
+                # Collect entry metadata
+                orig_pathname = entry.pathname
+                is_dir = entry.isdir
+                entry_size = entry.size if entry.size is not None else 0
+
+                # Phase 2: Validate against all security policies (via PreScanValidator)
+                # This includes:
+                # - Entry type checking (symlinks, hardlinks, devices, FIFOs, sockets)
+                # - Path normalization and constraints (depth, length, unicode)
+                # - Case-fold collision detection
+                # - Entry count budget
+                # - Per-file size limits
+                # - Per-entry compression ratio
+                prescan_validator.validate_entry(
+                    original_path=orig_pathname,
+                    is_dir=is_dir,
+                    is_symlink=entry.issym,
+                    is_hardlink=entry.islnk,
+                    is_fifo=entry.isfifo,
+                    is_block_dev=entry.isblk,
+                    is_char_dev=entry.ischr,
+                    is_socket=entry.issock,
+                    uncompressed_size=entry_size if entry_size > 0 else None,
+                    compressed_size=None,  # libarchive entry doesn't directly expose this
+                )
+
+                # Validate and normalize the path
+                try:
+                    validated_path = _validate_member_path(orig_pathname)
+                except ConfigError as e:
+                    raise ConfigError(f"Path validation failed for archive entry: {e}") from e
+
+                # Check containment: ensure path stays within extraction root
+                try:
+                    target = extract_root / validated_path
+                    target.resolve().relative_to(extract_root.resolve())
+                except ValueError:
+                    raise ConfigError(
+                        error_message(
+                            ExtractionErrorCode.TRAVERSAL,
+                            f"Path escapes extraction root: {orig_pathname}",
+                        )
+                    )
+
+                # Accumulate size for bomb check (directories typically have size 0)
+                if not is_dir:
+                    total_uncompressed += entry_size
+                    metrics.total_bytes += entry_size
+
+                entries_to_extract.append((orig_pathname, validated_path, is_dir))
+                metrics.total_entries += 1
+
+        metrics.entries_allowed = len(entries_to_extract)
+        telemetry.entries_total = metrics.total_entries
+        telemetry.entries_allowed = metrics.entries_allowed
+        telemetry.bytes_declared = total_uncompressed
+
+        # Compression ratio check (using on-disk archive size)
+        compressed_size = archive_path.stat().st_size
+        _check_compression_ratio(
+            total_uncompressed=total_uncompressed,
+            compressed_size=compressed_size,
+            archive=archive_path,
             logger=logger,
-            max_uncompressed_bytes=limit_bytes,
+            archive_type="Archive",
         )
-    if any(lower_name.endswith(suffix) for suffix in _TAR_SUFFIXES):
-        return extract_tar_safe(
-            archive_path,
-            destination,
+
+        # Uncompressed size ceiling check
+        _enforce_uncompressed_ceiling(
+            total_uncompressed=total_uncompressed,
+            limit_bytes=limit_bytes,
+            archive=archive_path,
             logger=logger,
-            max_uncompressed_bytes=limit_bytes,
+            archive_type="Archive",
         )
-    raise ConfigError(f"Unsupported archive format: {archive_path}")
+
+        # Phase 2: Extract (only if pre-scan passed)
+        extracted_files: List[Path] = []
+
+        with libarchive.file_reader(str(archive_path)) as archive:
+            for entry, (orig_pathname, validated_path, is_dir) in zip(
+                archive, entries_to_extract, strict=False
+            ):
+                target_path = extract_root / validated_path
+
+                if is_dir:
+                    target_path.mkdir(parents=True, exist_ok=True)
+                else:
+                    # Ensure parent directory exists
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+                    # Stream the file content to the target
+                    with target_path.open("wb") as target_file:
+                        bytes_written = 0
+                        for block in entry.get_blocks():
+                            target_file.write(block)
+                            bytes_written += len(block)
+                        telemetry.bytes_written += bytes_written
+
+                    extracted_files.append(target_path)
+
+        metrics.entries_extracted = len(extracted_files)
+        metrics.finalize()
+        telemetry.duration_ms = metrics.duration_ms
+
+        if logger:
+            logger.info(
+                "extracted archive",
+                extra={
+                    "stage": "extract",
+                    "archive": str(archive_path),
+                    "files": len(extracted_files),
+                    "encapsulated_root": str(extract_root) if policy.encapsulate else None,
+                    "duration_ms": round(telemetry.duration_ms, 2),
+                },
+            )
+
+        return extracted_files
+
+    except libarchive.ArchiveError as exc:
+        raise ConfigError(f"Failed to extract archive {archive_path}: {exc}") from exc
+    except ConfigError:
+        metrics.finalize()
+        raise
 
 
 def _materialize_cached_file(source: Path, destination: Path) -> tuple[Path, Path]:

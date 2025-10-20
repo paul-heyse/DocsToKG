@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "aiohappyeyeballs>=2.6.1",
+    "libarchive-c>=5.3",
     "aiohttp>=3.13.0",
     "aiosignal>=1.4.0",
     "airium>=0.2.7",

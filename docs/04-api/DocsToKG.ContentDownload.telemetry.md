@@ -41,7 +41,7 @@ Return the current time as an ISO 8601 UTC timestamp.
 
 Ensure the parent directory for ``path`` exists.
 
-### `_manifest_entry_from_sqlite_row(run_id, work_id, url, normalized_url, schema_version, classification, reason, reason_detail, path_value, path_mtime_ns, sha256, content_length, etag, last_modified)`
+### `_manifest_entry_from_sqlite_row(run_id, work_id, url, canonical_url, original_url, schema_version, classification, reason, reason_detail, path_value, path_mtime_ns, sha256, content_length, etag, last_modified)`
 
 Convert a SQLite manifest row into resume metadata.
 
@@ -67,7 +67,7 @@ Yield resume manifest entries lazily, preferring SQLite when available.
 
 ### `load_previous_manifest(path)`
 
-Load manifest entries indexed by work ID and normalised URL.
+Load manifest entries indexed by work ID and canonical URL.
 
 ### `load_resume_completed_from_sqlite(sqlite_path)`
 
@@ -75,7 +75,7 @@ Return work identifiers completed according to the SQLite manifest cache.
 
 ### `load_manifest_url_index(path)`
 
-Return a mapping of normalised URLs to manifest metadata from SQLite.
+Return a mapping of canonical URLs to manifest metadata from SQLite.
 
 ### `build_manifest_entry(artifact, resolver, url, outcome, html_paths)`
 
@@ -102,10 +102,10 @@ Manifest metadata dictionary when found; otherwise ``default``.
 
 ### `items(self)`
 
-Iterate over cached manifest entries keyed by normalized URL.
+Iterate over cached manifest entries keyed by canonical URL.
 
 Returns:
-Iterable of ``(normalized_url, metadata)`` pairs from the cache.
+Iterable of ``(canonical_url, metadata)`` pairs from the cache.
 
 ### `iter_existing_paths(self)`
 
@@ -120,13 +120,13 @@ Yield manifest entries whose artifact paths still exist on disk.
 Return a defensive copy of the manifest cache.
 
 Returns:
-Dictionary of normalized URLs to manifest metadata.
+Dictionary of canonical URLs to manifest metadata.
 
 ### `_ensure_loaded(self)`
 
 *No documentation available.*
 
-### `_fetch_one(self, normalized)`
+### `_fetch_one(self, canonical)`
 
 *No documentation available.*
 
@@ -553,7 +553,7 @@ key: Work identifier to resolve.
 default: Value to return when the work ID is not present.
 
 Returns:
-Optional[Dict[str, Any]]: Mapping of normalized URLs to manifest entries, if available.
+Optional[Dict[str, Any]]: Mapping of canonical URLs to manifest entries, if available.
 
 ### `enable_preload_on_close(self)`
 
@@ -600,7 +600,7 @@ key: Work identifier to fetch from the SQLite manifest cache.
 default: Value to return when the work ID does not exist.
 
 Returns:
-Optional[Dict[str, Any]]: Mapping of normalized URLs to manifest entries, if found.
+Optional[Dict[str, Any]]: Mapping of canonical URLs to manifest entries, if found.
 
 ### `_fetch_work_entries(self, work_id)`
 

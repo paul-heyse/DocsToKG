@@ -409,11 +409,7 @@ class ManifestUrlIndex:
         yield from self.iter_existing_paths()
 
     def as_dict(self) -> Dict[str, Dict[str, Any]]:
-        """Return a defensive copy of the manifest cache.
-
-        Returns:
-            Dictionary of normalized URLs to manifest metadata.
-        """
+        """Return a defensive copy of the manifest cache keyed by canonical URL."""
         self._ensure_loaded()
         return dict(self._cache)
 
@@ -2125,7 +2121,7 @@ def iter_previous_manifest_entries(
                     if not original_value:
                         raise ValueError("Manifest entries must include a non-empty original_url.")
                     canonical_value = data.get("canonical_url") or _canonical_key_or_fallback(original_value) or original_value
-                    normalized_value = data.pop("normalized_url", None)
+                    legacy_normalized = data.pop("normalized_url", None)
                     data["original_url"] = original_value
                     data["canonical_url"] = canonical_value
 
@@ -2162,9 +2158,9 @@ def iter_previous_manifest_entries(
                         if detail == "":
                             data["reason_detail"] = None
 
-                    record_key = normalized_value or canonical_value
-                    record_key = record_key or _canonical_key_or_fallback(original_value) or canonical_value
-                    record = (str(work_id), record_key, data, completed)
+                    canonical_key = legacy_normalized or canonical_value
+                    canonical_key = canonical_key or _canonical_key_or_fallback(original_value) or canonical_value
+                    record = (str(work_id), canonical_key, data, completed)
                     if buffered is not None:
                         buffered.append(record)
                     else:
@@ -2203,17 +2199,17 @@ def load_previous_manifest(
     sqlite_path: Optional[Path] = None,
     allow_sqlite_fallback: bool = False,
 ) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
-    """Load manifest entries indexed by work ID and normalised URL."""
+    """Load manifest entries indexed by work ID and canonical URL."""
 
     per_work: Dict[str, Dict[str, Any]] = {}
     completed: Set[str] = set()
 
-    for work_id, normalized, entry, is_pdf_like in iter_previous_manifest_entries(
+    for work_id, canonical, entry, is_pdf_like in iter_previous_manifest_entries(
         path,
         sqlite_path=sqlite_path,
         allow_sqlite_fallback=allow_sqlite_fallback,
     ):
-        per_work.setdefault(work_id, {})[normalized] = entry
+        per_work.setdefault(work_id, {})[canonical] = entry
         if is_pdf_like:
             completed.add(work_id)
 
@@ -2658,7 +2654,7 @@ def load_resume_completed_from_sqlite(sqlite_path: Path) -> Set[str]:
 
 
 def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
-    """Return a mapping of normalised URLs to manifest metadata from SQLite."""
+    """Return a mapping of canonical URLs to manifest metadata from SQLite."""
 
     if not path or not path.exists():
         return {}

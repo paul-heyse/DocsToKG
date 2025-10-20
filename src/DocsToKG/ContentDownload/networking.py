@@ -156,11 +156,11 @@ __all__ = (
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
-DEFAULT_RETRYABLE_STATUSES: Set[int] = {429, 500, 502, 503, 504}
-_TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
-
 # Global breaker registry (set by runner)
 _breaker_registry: Optional[Any] = None
+
+DEFAULT_RETRYABLE_STATUSES: Set[int] = {429, 500, 502, 503, 504}
+_TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
 
 _DEPRECATED_ATTR_ERRORS: Dict[str, str] = {
     "ThreadLocalSessionFactory": (

@@ -9,10 +9,32 @@ of the codebase.
 
 from ..errors import DownloadFailure
 from ..net import configure_http_client, get_http_client, reset_http_client
+from .extraction_constraints import (
+    CaseCollisionDetector,
+    PreScanValidator,
+    normalize_path_unicode,
+    validate_entry_compression_ratio,
+    validate_entry_count,
+    validate_entry_type,
+    validate_file_size,
+    validate_path_constraints,
+    validate_streaming_file_size,
+)
+from .extraction_policy import (
+    ExtractionPolicy,
+    lenient_defaults,
+    safe_defaults,
+    strict_defaults,
+)
+from .extraction_telemetry import (
+    ExtractionErrorCode,
+    ExtractionMetrics,
+    ExtractionTelemetryEvent,
+    TelemetryKey,
+    error_message,
+)
 from .filesystem import (
     extract_archive_safe,
-    extract_tar_safe,
-    extract_zip_safe,
     format_bytes,
     generate_correlation_id,
     mask_sensitive_data,
@@ -33,8 +55,6 @@ from .rate_limit import RateLimiterHandle, apply_retry_after, get_bucket, reset
 
 __all__ = [
     "extract_archive_safe",
-    "extract_tar_safe",
-    "extract_zip_safe",
     "format_bytes",
     "generate_correlation_id",
     "mask_sensitive_data",
@@ -56,4 +76,24 @@ __all__ = [
     "get_bucket",
     "reset",
     "reset_http_client",
+    # New extraction policy & telemetry
+    "ExtractionPolicy",
+    "safe_defaults",
+    "lenient_defaults",
+    "strict_defaults",
+    "ExtractionErrorCode",
+    "ExtractionTelemetryEvent",
+    "ExtractionMetrics",
+    "TelemetryKey",
+    "error_message",
+    # New extraction constraints (Phase 2)
+    "PreScanValidator",
+    "CaseCollisionDetector",
+    "normalize_path_unicode",
+    "validate_entry_type",
+    "validate_entry_count",
+    "validate_entry_compression_ratio",
+    "validate_file_size",
+    "validate_path_constraints",
+    "validate_streaming_file_size",
 ]
