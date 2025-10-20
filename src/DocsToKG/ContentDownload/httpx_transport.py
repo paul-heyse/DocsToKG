@@ -1,3 +1,28 @@
+"""Shared HTTPX client factory with Hishel caching for ContentDownload.
+
+Responsibilities
+----------------
+- Construct a process-wide :class:`httpx.Client` configured with HTTP/2 (when
+  available), connection pooling limits, timeout budgets, and a Certifi-backed
+  SSL context.
+- Wrap the underlying transport with :class:`hishel.CacheTransport` so metadata
+  requests benefit from RFC-9111 caching while still allowing callers to inject
+  custom transports (e.g., :class:`httpx.MockTransport`) for tests.
+- Expose helpers (:func:`configure_http_client`, :func:`get_http_client`,
+  :func:`reset_http_client_for_tests`, :func:`purge_http_cache`) that make it
+  easy to override transports, event hooks, or proxy mounts without touching
+  module globals directly.
+- Gracefully fall back to HTTP/1.1 when the optional ``h2`` dependency is not
+  installed, ensuring production and test environments remain operational.
+
+Design Notes
+------------
+- Event hooks annotate each request/response with telemetry metadata used by
+  the downloader and resolver pipeline for logging and cache introspection.
+- Cache directories honour ``DOCSTOKG_DATA_ROOT`` to keep test runs isolated
+  while defaulting to ``Data/cache/http/ContentDownload`` during development.
+"""
+
 from __future__ import annotations
 
 import contextlib
@@ -15,6 +40,10 @@ import httpx
 from hishel import CacheTransport, FileStorage
 
 from DocsToKG.ContentDownload.core import normalize_url
+from DocsToKG.ContentDownload.ratelimit import (
+    RateLimitedTransport,
+    get_rate_limiter_manager,
+)
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
@@ -163,11 +192,19 @@ def _create_client_unlocked() -> None:
     cache_dir = _resolve_cache_dir()
     storage = FileStorage(base_path=cache_dir)
 
+    limiter_manager = get_rate_limiter_manager()
     base_transport = _CURRENT_OVERRIDES.get("transport")
     if isinstance(base_transport, CacheTransport):
         cache_transport = base_transport
+        inner_transport = getattr(cache_transport, "transport", None)
+        if inner_transport is not None and not isinstance(inner_transport, RateLimitedTransport):
+            cache_transport.transport = RateLimitedTransport(
+                inner_transport, manager=limiter_manager
+            )
     else:
         base_transport = base_transport or httpx.HTTPTransport(retries=0)
+        if not isinstance(base_transport, RateLimitedTransport):
+            base_transport = RateLimitedTransport(base_transport, manager=limiter_manager)
         cache_transport = CacheTransport(transport=base_transport, storage=storage)
 
     event_hooks = _build_event_hooks(_CURRENT_OVERRIDES.get("event_hooks"))  # type: ignore[arg-type]

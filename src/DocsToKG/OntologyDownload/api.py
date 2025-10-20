@@ -260,6 +260,7 @@ def about() -> Dict[str, object]:
     rate_limits = {
         "per_host": http_cfg.per_host_rate_limit,
         "services": dict(http_cfg.rate_limits),
+        "mode": http_cfg.rate_limiter,
     }
 
     storage_backend = STORAGE

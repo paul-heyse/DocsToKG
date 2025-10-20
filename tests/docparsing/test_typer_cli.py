@@ -32,7 +32,8 @@ def test_docparse_doctags_help_preserves_legacy_flags() -> None:
     assert result.exit_code == 0
     stdout = result.stdout
     # Spot-check a few legacy flags to confirm the passthrough help is rendered.
-    assert "--mode {auto,html,pdf}" in stdout
+    assert "--mode" in stdout
+    assert "[auto|html|pdf]" in stdout
     assert "--served-model-name" in stdout
     assert "--vllm-wait-timeout" in stdout
 
@@ -61,7 +62,7 @@ def test_docparse_plan_receives_none_when_no_args(monkeypatch) -> None:
         captured["argv"] = argv
         return 0
 
-    monkeypatch.setattr(core_cli, "plan", fake_plan)
+    monkeypatch.setattr(core_cli, "run_all", fake_plan)
     result = runner.invoke(core_cli.app, ["plan"])
     assert result.exit_code == 0
-    assert captured["argv"] is None
+    assert captured["argv"] == ["--plan"]

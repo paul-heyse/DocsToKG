@@ -6,6 +6,7 @@ redirect chains, slow responses, or content-length anomalies.
 """
 
 import logging
+from collections import deque
 from urllib.parse import urlparse
 
 import pytest
@@ -14,6 +15,7 @@ from DocsToKG.OntologyDownload.errors import PolicyError
 from DocsToKG.OntologyDownload.planning import planner_http_probe
 from DocsToKG.OntologyDownload.settings import PlannerConfig
 from DocsToKG.OntologyDownload.testing import ResponseSpec
+from tests.conftest import PatchManager
 
 
 def _logger() -> logging.Logger:
@@ -102,22 +104,26 @@ def test_planner_probe_redirect_to_disallowed_scheme(ontology_env):
     assert methods_paths == [("HEAD", "/" + start_path)]
 
 
-def test_planner_probe_applies_retry_after_delay(monkeypatch, ontology_env):
+def test_planner_probe_applies_retry_after_delay(ontology_env, caplog):
     """Retry-After headers should reduce token availability for subsequent attempts."""
+
+    caplog.set_level(logging.INFO)
 
     recorded_delays = []
 
     def _record_retry_after(*, http_config, service, host, delay):
         recorded_delays.append((service, host, delay))
 
-    monkeypatch.setattr(
-        "DocsToKG.OntologyDownload.io.network.apply_retry_after",
+    patcher = PatchManager()
+    patcher.setattr(
+        "DocsToKG.OntologyDownload.planning.apply_retry_after",
         _record_retry_after,
     )
 
     target_path = "fixtures/probe-retry-after.owl"
-    ontology_env.queue_response(
-        target_path,
+    head_key = ("HEAD", f"/{target_path}")
+    existing = ontology_env._responses.get(head_key, [])
+    head_queue = deque([
         ResponseSpec(
             method="HEAD",
             status=429,
@@ -127,9 +133,6 @@ def test_planner_probe_applies_retry_after_delay(monkeypatch, ontology_env):
                 "Content-Length": "123",
             },
         ),
-    )
-    ontology_env.queue_response(
-        target_path,
         ResponseSpec(
             method="HEAD",
             status=200,
@@ -138,21 +141,30 @@ def test_planner_probe_applies_retry_after_delay(monkeypatch, ontology_env):
                 "Content-Length": "123",
             },
         ),
-    )
+        *list(existing),
+    ])
+    ontology_env._responses[head_key] = head_queue
 
     config = ontology_env.build_download_config()
     url = ontology_env.http_url(target_path)
     host = urlparse(url).hostname
     planner_cfg = PlannerConfig(head_precheck_hosts=[host] if host else [])
 
-    result = planner_http_probe(
-        url=url,
-        http_config=config,
-        logger=_logger(),
-        service="test",
-        context={"ontology_id": "retry-after"},
-        planner_config=planner_cfg,
-    )
+    try:
+        result = planner_http_probe(
+            url=url,
+            http_config=config,
+            logger=_logger(),
+            service="test",
+            context={"ontology_id": "retry-after"},
+            planner_config=planner_cfg,
+        )
+    finally:
+        patcher.close()
+
+    if result is None:
+        errors = [getattr(record, "error", None) for record in caplog.records]
+        pytest.fail(f"planner probe failed: {errors}")
 
     assert result is not None
     assert result.status_code == 200

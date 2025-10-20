@@ -59,7 +59,7 @@ class ExpectedChecksum:
     value: str
 
     def to_known_hash(self) -> str:
-        """Return ``algorithm:value`` string suitable for pooch known_hash."""
+        """Return ``algorithm:value`` string suitable for legacy known-hash checks."""
 
         return f"{self.algorithm}:{self.value}"
 
@@ -200,7 +200,7 @@ def _fetch_checksum_from_url(
             if status_code in {429, 503}:
                 retry_delay = _parse_retry_after(response.headers.get("Retry-After"))
                 if retry_delay is not None:
-                    apply_retry_after(
+                    retry_delay = apply_retry_after(
                         http_config=http_config,
                         service=None,
                         host=host,

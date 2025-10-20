@@ -30,13 +30,16 @@ from __future__ import annotations
 
 import argparse
 import logging
+import math
+import os
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
 from itertools import islice
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Set, Tuple
 
 from pyalex import Topics, Works
 
@@ -51,6 +54,17 @@ from DocsToKG.ContentDownload.pipeline import load_resolver_config
 from DocsToKG.ContentDownload.pyalex_shim import apply_mailto
 from DocsToKG.ContentDownload.resolvers import DEFAULT_RESOLVER_ORDER, default_resolvers
 from DocsToKG.ContentDownload.telemetry import ManifestUrlIndex
+from DocsToKG.ContentDownload.ratelimit import (
+    BackendConfig,
+    RolePolicy,
+    clone_policies,
+    clone_role_policy,
+    configure_rate_limits,
+    get_rate_limiter_manager,
+    validate_policies,
+    ROLE_ORDER,
+)
+from pyrate_limiter import Duration, Rate
 
 __all__ = [
     "ResolvedConfig",
@@ -99,6 +113,8 @@ class ResolvedConfig:
     openalex_retry_backoff: float
     openalex_retry_max_delay: float
     retry_after_cap: float
+    rate_policies: Mapping[str, RolePolicy]
+    rate_backend: BackendConfig
 
 
 def bootstrap_run_environment(resolved: ResolvedConfig) -> None:
@@ -192,6 +208,42 @@ def build_parser() -> argparse.ArgumentParser:
         "--ignore-robots",
         action="store_true",
         help="Bypass robots.txt checks (defaults to respecting policies).",
+    )
+    rate_group = parser.add_argument_group("Rate limiting")
+    rate_group.add_argument(
+        "--rate",
+        dest="rate_override",
+        action="append",
+        default=[],
+        metavar="HOST[.ROLE]=LIMIT/INTERVAL[,…]",
+        help=(
+            "Override limiter windows (e.g., --rate api.openalex.org=10/s,5000/h "
+            "or --rate export.arxiv.org.artifact=1/min)."
+        ),
+    )
+    rate_group.add_argument(
+        "--rate-mode",
+        dest="rate_mode_override",
+        action="append",
+        default=[],
+        metavar="HOST[.ROLE]=MODE",
+        help="Set limiter mode per host (raise or wait[:ms], e.g., api.crossref.org=wait:250).",
+    )
+    rate_group.add_argument(
+        "--rate-max-delay",
+        dest="rate_max_delay_override",
+        action="append",
+        default=[],
+        metavar="HOST.ROLE=MS",
+        help="Override maximum wait milliseconds for a specific host role (e.g., host.artifact=5000).",
+    )
+    rate_group.add_argument(
+        "--rate-backend",
+        dest="rate_backend_spec",
+        type=str,
+        default=None,
+        metavar="BACKEND[:key=value,…]",
+        help="Select limiter backend (memory, multiprocess, sqlite:path=/tmp/rl.db, redis:url=...).",
     )
     parser.add_argument(
         "--log-rotate",
@@ -450,7 +502,211 @@ def parse_args(
     parser: argparse.ArgumentParser, argv: Optional[List[str]] = None
 ) -> argparse.Namespace:
     """Parse CLI arguments using ``parser`` and optional argv override."""
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    _apply_rate_env_overrides(args)
+    return args
+
+
+def _apply_rate_env_overrides(args: argparse.Namespace) -> None:
+    """Augment CLI-specified rate overrides with environment variables."""
+
+    def _extend_list(target: List[str], env_var: str) -> None:
+        raw = os.environ.get(env_var)
+        if not raw:
+            return
+        for segment in raw.split(";"):
+            token = segment.strip()
+            if token:
+                target.append(token)
+
+    if not hasattr(args, "rate_override"):
+        args.rate_override = []
+    if not hasattr(args, "rate_mode_override"):
+        args.rate_mode_override = []
+    if not hasattr(args, "rate_max_delay_override"):
+        args.rate_max_delay_override = []
+
+    _extend_list(args.rate_override, "DOCSTOKG_RATE")
+    _extend_list(args.rate_mode_override, "DOCSTOKG_RATE_MODE")
+    _extend_list(args.rate_max_delay_override, "DOCSTOKG_RATE_MAX_DELAY")
+
+    if getattr(args, "rate_backend_spec", None) is None:
+        env_backend = os.environ.get("DOCSTOKG_RATE_BACKEND")
+        if env_backend:
+            args.rate_backend_spec = env_backend.strip()
+
+
+def _parse_rate_override_spec(value: str) -> Tuple[str, Optional[str], List[Rate]]:
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("rate override must use HOST[.role]=rate format.")
+    target, spec = value.split("=", 1)
+    host, role = _split_host_role(target)
+    tokens = [segment.strip() for segment in spec.split(",") if segment.strip()]
+    if not tokens:
+        raise argparse.ArgumentTypeError("rate override requires at least one limit/interval pair.")
+    rates = [_parse_rate_window_token(token) for token in tokens]
+    return host, role, rates
+
+
+def _parse_rate_mode_spec(value: str) -> Tuple[str, Optional[str], str, Optional[int]]:
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("rate mode override must use HOST[.role]=MODE syntax.")
+    target, spec = value.split("=", 1)
+    host, role = _split_host_role(target)
+    spec = spec.strip().lower()
+    if not spec:
+        raise argparse.ArgumentTypeError("rate mode specification cannot be empty.")
+
+    if spec.startswith("wait"):
+        delay_ms: Optional[int] = None
+        if ":" in spec:
+            _, delay_text = spec.split(":", 1)
+            delay_ms = _parse_delay_ms(delay_text.strip())
+        return host, role, "wait", delay_ms
+
+    if spec in {"raise", "block"}:
+        return host, role, "raise", 0
+
+    raise argparse.ArgumentTypeError(
+        "rate mode must be 'raise' or 'wait[:milliseconds]' (e.g., wait:250)."
+    )
+
+
+def _parse_rate_max_delay_spec(value: str) -> Tuple[str, str, int]:
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("rate max delay must use HOST.role=milliseconds syntax.")
+    target, delay_text = value.split("=", 1)
+    host, role = _split_host_role(target)
+    if role is None:
+        raise argparse.ArgumentTypeError("rate max delay requires explicit role (e.g., host.metadata=250).")
+    return host, role, _parse_delay_ms(delay_text.strip())
+
+
+def _parse_backend_spec(value: Optional[str]) -> Optional[BackendConfig]:
+    if value is None:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if ":" not in text:
+        return BackendConfig(backend=text.lower(), options={})
+    backend_name, raw_options = text.split(":", 1)
+    backend_name = backend_name.strip().lower()
+    options: Dict[str, Any] = {}
+    for part in raw_options.split(","):
+        if not part.strip():
+            continue
+        if "=" not in part:
+            raise argparse.ArgumentTypeError(
+                f"backend option '{part}' must use key=value syntax (e.g., path=/tmp/rl.db)."
+            )
+        key, raw_value = part.split("=", 1)
+        options[key.strip()] = _coerce_backend_option(raw_value.strip())
+    return BackendConfig(backend=backend_name, options=options)
+
+
+def _coerce_backend_option(value: str) -> Any:
+    lowered = value.lower()
+    if lowered in {"true", "yes"}:
+        return True
+    if lowered in {"false", "no"}:
+        return False
+    try:
+        if "." in value:
+            return float(value)
+        return int(value)
+    except ValueError:
+        return value
+
+
+def _split_host_role(target: str) -> Tuple[str, Optional[str]]:
+    token = target.strip().lower()
+    if not token:
+        raise argparse.ArgumentTypeError("host identifier cannot be empty.")
+    if "." in token:
+        host_part, role_part = token.split(".", 1)
+        host_part = host_part.strip()
+        role_part = role_part.strip()
+        if not host_part:
+            raise argparse.ArgumentTypeError("host segment cannot be empty.")
+        if role_part not in ROLE_ORDER and role_part != DEFAULT_ROLE:
+            raise argparse.ArgumentTypeError(
+                f"unknown limiter role '{role_part}'. Valid roles: {', '.join(ROLE_ORDER)}"
+            )
+        return host_part, role_part
+    return token, None
+
+
+def _parse_rate_window_token(token: str) -> Rate:
+    if "/" not in token:
+        raise argparse.ArgumentTypeError(
+            f"invalid rate token '{token}'. Expected limit/interval (e.g., 10/s or 300/m)."
+        )
+    limit_text, interval_text = token.split("/", 1)
+    try:
+        limit_value = float(limit_text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid rate limit '{limit_text}'") from exc
+    limit = int(math.ceil(limit_value))
+    if limit <= 0:
+        raise argparse.ArgumentTypeError("rate limits must be positive integers.")
+    interval_ms = _parse_interval_ms(interval_text.strip())
+    return Rate(limit, interval_ms)
+
+
+_INTERVAL_KEYWORDS: Dict[str, int] = {
+    "ms": 1,
+    "millisecond": 1,
+    "milliseconds": 1,
+    "s": Duration.SECOND,
+    "sec": Duration.SECOND,
+    "second": Duration.SECOND,
+    "seconds": Duration.SECOND,
+    "m": Duration.MINUTE,
+    "min": Duration.MINUTE,
+    "minute": Duration.MINUTE,
+    "minutes": Duration.MINUTE,
+    "h": Duration.HOUR,
+    "hr": Duration.HOUR,
+    "hour": Duration.HOUR,
+    "hours": Duration.HOUR,
+    "d": Duration.DAY,
+    "day": Duration.DAY,
+    "days": Duration.DAY,
+    "w": Duration.WEEK,
+    "week": Duration.WEEK,
+    "weeks": Duration.WEEK,
+}
+
+
+def _parse_interval_ms(value: str) -> int:
+    token = value.strip().lower()
+    if not token:
+        raise argparse.ArgumentTypeError("interval component cannot be empty.")
+    if token in _INTERVAL_KEYWORDS:
+        return int(_INTERVAL_KEYWORDS[token])
+
+    match = re.fullmatch(r"(?P<amount>[\d.]+)(?P<unit>[a-z]+)", token)
+    if match:
+        amount = float(match.group("amount"))
+        unit = match.group("unit")
+        if unit not in _INTERVAL_KEYWORDS:
+            raise argparse.ArgumentTypeError(f"unsupported interval unit '{unit}'")
+        base = _INTERVAL_KEYWORDS[unit]
+        return int(math.ceil(amount * base))
+
+    raise argparse.ArgumentTypeError(
+        f"unable to parse interval '{value}'. Use formats like 3s, 1m, or 500ms."
+    )
+
+
+def _parse_delay_ms(value: str) -> int:
+    value = value.strip().lower()
+    if not value:
+        raise argparse.ArgumentTypeError("delay must be a positive duration (e.g., 250 or 0.5s).")
+    if value in {"inf", "infinite"}:
+        raise argparse.ArgumentTypeError("infinite waits are not supported.")
+    return _parse_interval_ms(value)
 
 
 def resolve_config(
@@ -649,6 +905,79 @@ def resolve_config(
     if not args.ignore_robots:
         user_agent = config.polite_headers.get("User-Agent", "DocsToKGDownloader/1.0")
         robots_checker = RobotsCache(user_agent)
+
+    manager = get_rate_limiter_manager()
+    policies = clone_policies(manager.policies())
+    default_template = policies.get("default")
+
+    def _ensure_policy(hostname: str) -> RolePolicy:
+        key = hostname.lower()
+        if key in policies:
+            return policies[key]
+        if default_template is not None:
+            policies[key] = clone_role_policy(default_template)
+        else:
+            policies[key] = RolePolicy()
+        return policies[key]
+
+    try:
+        rate_override_specs = [
+            _parse_rate_override_spec(value) for value in getattr(args, "rate_override", [])
+        ]
+        rate_mode_specs = [
+            _parse_rate_mode_spec(value) for value in getattr(args, "rate_mode_override", [])
+        ]
+        rate_delay_specs = [
+            _parse_rate_max_delay_spec(value)
+            for value in getattr(args, "rate_max_delay_override", [])
+        ]
+    except argparse.ArgumentTypeError as exc:
+        parser.error(str(exc))
+
+    for host, role, rates in rate_override_specs:
+        policy = _ensure_policy(host)
+        targets = ROLE_ORDER if role is None else (role,)
+        for target_role in targets:
+            policy.rates[target_role] = list(rates)
+
+    for host, role, mode, delay in rate_mode_specs:
+        policy = _ensure_policy(host)
+        targets = ROLE_ORDER if role is None else (role,)
+        for target_role in targets:
+            policy.mode[target_role] = mode
+            if mode == "raise":
+                policy.max_delay_ms[target_role] = 0
+            elif delay is not None:
+                policy.max_delay_ms[target_role] = delay
+            elif target_role not in policy.max_delay_ms:
+                policy.max_delay_ms[target_role] = 250
+
+    for host, role, delay_ms in rate_delay_specs:
+        policy = _ensure_policy(host)
+        policy.max_delay_ms[role] = delay_ms
+
+    backend_config = None
+    try:
+        backend_config = _parse_backend_spec(getattr(args, "rate_backend_spec", None))
+    except argparse.ArgumentTypeError as exc:
+        parser.error(str(exc))
+
+    if backend_config is None:
+        base_backend = manager.backend
+        backend_config = BackendConfig(
+            backend=base_backend.backend,
+            options=dict(base_backend.options) if isinstance(base_backend.options, Mapping) else {},
+        )
+
+    try:
+        validate_policies(policies)
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    configured_policies = clone_policies(policies)
+    configure_rate_limits(policies=policies, backend=backend_config)
+    rate_policies = configured_policies
+
     return ResolvedConfig(
         args=args,
         run_id=run_id,
@@ -671,6 +1000,8 @@ def resolve_config(
         openalex_retry_backoff=args.openalex_retry_backoff,
         openalex_retry_max_delay=args.openalex_retry_max_delay,
         retry_after_cap=args.retry_after_cap,
+        rate_policies=rate_policies,
+        rate_backend=backend_config,
     )
 
 

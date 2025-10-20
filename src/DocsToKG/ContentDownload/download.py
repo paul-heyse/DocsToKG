@@ -1719,7 +1719,7 @@ class RobotsCache:
         parser = RobotFileParser()
         parser.set_url(robots_url)
         try:
-            with request_with_retries(
+            response_cm = request_with_retries(
                 client,
                 "GET",
                 robots_url,
@@ -1729,7 +1729,13 @@ class RobotsCache:
                 max_retry_duration=min(timeout, 5.0),
                 backoff_max=min(timeout, 5.0),
                 retry_after_cap=min(timeout, 5.0),
-            ) as response:
+            )
+            if hasattr(response_cm, "__enter__") and hasattr(response_cm, "__exit__"):
+                response_context: contextlib.AbstractContextManager[httpx.Response] = response_cm  # type: ignore[assignment]
+            else:
+                response_context = contextlib.nullcontext(response_cm)
+
+            with response_context as response:
                 if response.status_code and response.status_code >= 400:
                     parser.parse([])
                 else:

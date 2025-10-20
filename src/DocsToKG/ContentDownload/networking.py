@@ -1,26 +1,8 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.ContentDownload.networking",
-#   "purpose": "HTTP session, retry, and conditional request helpers",
+#   "purpose": "HTTPX client helpers, retry orchestration, and conditional caching",
 #   "sections": [
-#     {
-#       "id": "threadlocalsessionfactory",
-#       "name": "ThreadLocalSessionFactory",
-#       "anchor": "class-threadlocalsessionfactory",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "get-thread-session",
-#       "name": "get_thread_session",
-#       "anchor": "function-get-thread-session",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "create-session",
-#       "name": "create_session",
-#       "anchor": "function-create-session",
-#       "kind": "function"
-#     },
 #     {
 #       "id": "parse-retry-after-header",
 #       "name": "parse_retry_after_header",
@@ -34,16 +16,10 @@
 #       "kind": "class"
 #     },
 #     {
-#       "id": "normalise-content-type",
-#       "name": "_normalise_content_type",
-#       "anchor": "function-normalise-content-type",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "enforce-content-policy",
-#       "name": "_enforce_content_policy",
-#       "anchor": "function-enforce-content-policy",
-#       "kind": "function"
+#       "id": "retryafterjitterwait",
+#       "name": "RetryAfterJitterWait",
+#       "anchor": "class-retryafterjitterwait",
+#       "kind": "class"
 #     },
 #     {
 #       "id": "request-with-retries",
@@ -58,16 +34,10 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "looks-like-pdf",
-#       "name": "_looks_like_pdf",
-#       "anchor": "function-looks-like-pdf",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "head-precheck-via-get",
-#       "name": "_head_precheck_via_get",
-#       "anchor": "function-head-precheck-via-get",
-#       "kind": "function"
+#       "id": "conditionalrequesthelper",
+#       "name": "ConditionalRequestHelper",
+#       "anchor": "class-conditionalrequesthelper",
+#       "kind": "class"
 #     },
 #     {
 #       "id": "cachedresult",
@@ -79,12 +49,6 @@
 #       "id": "modifiedresult",
 #       "name": "ModifiedResult",
 #       "anchor": "class-modifiedresult",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "conditionalrequesthelper",
-#       "name": "ConditionalRequestHelper",
-#       "anchor": "class-conditionalrequesthelper",
 #       "kind": "class"
 #     },
 #     {
@@ -113,12 +77,13 @@ Responsibilities
 - Implement resilient request execution through
   :func:`request_with_retries`, delegating to a Tenacity controller that
   combines exponential backoff with jitter, honours ``Retry-After``
-  directives, enforces CLI-provided retry ceilings
-  (``retry_after_cap``/``max_retry_duration``), and performs content-type
-  enforcement.
+  directives, respects CLI ceilings (``retry_after_cap`` /
+  ``max_retry_duration``), and applies content-policy enforcement.
 - Provide conditional request tooling (:class:`ConditionalRequestHelper`,
   :class:`CachedResult`, :class:`ModifiedResult`) so resolvers can revalidate
   cached artifacts without redownloading payloads unnecessarily.
+- Support streaming workflows by surfacing context managers when ``stream=True``
+  so download helpers can iteratively write large payloads without buffering.
 - Offer rate-limit and failure-suppression primitives
   (:class:`TokenBucket`, :class:`CircuitBreaker`) that the pipeline threads
   rely on to avoid overwhelming upstream services.
@@ -174,6 +139,7 @@ from DocsToKG.ContentDownload.httpx_transport import (
     get_http_client,
     purge_http_cache,
 )
+from DocsToKG.ContentDownload.ratelimit import DEFAULT_ROLE
 
 # --- Globals ---
 
@@ -561,6 +527,7 @@ def request_with_retries(
     method: str,
     url: str,
     *,
+    role: str = DEFAULT_ROLE,
     max_retries: int = 3,
     retry_statuses: Optional[Set[int]] = None,
     backoff_factor: float = 0.75,
@@ -589,6 +556,8 @@ def request_with_retries(
         raise ValueError("retry_after_cap must be non-negative when provided")
     if max_retry_duration is not None and max_retry_duration <= 0:
         raise ValueError("max_retry_duration must be positive when provided")
+
+    role_token = (role or DEFAULT_ROLE).lower()
 
     if retry_after_cap is not None:
         retry_after_cap = float(retry_after_cap)
@@ -632,6 +601,14 @@ def request_with_retries(
         kwargs["follow_redirects"] = bool(allow_redirects)
 
     stream_enabled = bool(kwargs.pop("stream", False))
+
+    extensions = kwargs.pop("extensions", None)
+    if extensions is None:
+        extensions = {}
+    else:
+        extensions = dict(extensions)
+    extensions.setdefault("role", role_token)
+    kwargs["extensions"] = extensions
 
     def request_func(*, method: str, url: str, **call_kwargs: Any) -> httpx.Response:
         if stream_enabled:

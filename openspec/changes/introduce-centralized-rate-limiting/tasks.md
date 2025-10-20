@@ -1,39 +1,70 @@
 ## 1. Implementation
-- [ ] 1.1 Create `RatePolicy` and `RolePolicy` dataclasses (or TypedDicts) describing per-role `rates`, `max_delay_ms`, `mode`, and `count_head` flags inside `src/DocsToKG/ContentDownload/networking.py` (or a new `ratelimit.py` helper module).
-- [ ] 1.2 Add a module-level registry `HOST_POLICIES: Dict[str, RolePolicy]` containing default entries for currently-known hosts (OpenAlex, Crossref, arXiv, Unpaywall, publisher domains surfaced in resolver presets).
-- [ ] 1.3 Implement a `validate_policies()` startup hook that iterates every role’s rate list, runs `pyrate_limiter.validate_rate_list`, and raises/logs a fatal error if ordering rules are violated; invoke this during client construction.
-- [ ] 1.4 Build a `get_limiter(host: str, role: str, overrides: RateOverride | None)` helper that caches `Limiter` instances keyed by `(host, role)` and ensures the chosen bucket backend is initialised exactly once per key.
-- [ ] 1.5 Create a `build_bucket(host, role, backend_config)` helper that supports `memory`, `multiprocess`, `sqlite`, `redis`, and `postgres` backends; wire backend-specific parameters (path, DSN, redis URL) from configuration defaults.
-- [ ] 1.6 Implement a `RateLimitedTransport` class that wraps `httpx.Transport`, intercepts every send, resolves `host` and request `extensions["role"]`, acquires tokens (respecting `count_head`), applies `max_delay_ms`, and raises a rich `RateLimitError` when the limiter cannot acquire within budget.
-- [ ] 1.7 Update `httpx_transport.py` (or equivalent client factory) so the Hishel `CacheTransport` is layered above the new `RateLimitedTransport`, ensuring cache hits bypass the limiter while cache misses honour the limiter.
-- [ ] 1.8 Ensure every call site that uses the shared HTTP client sets an explicit `extensions["role"]` value (`"metadata"`, `"landing"`, `"artifact"`) before dispatch; add `metadata` defaulting logic for legacy paths.
-- [ ] 1.9 Remove or refactor existing sleeps, per-host semaphores, and the `TokenBucket` implementation so networking is the single authority; keep compatibility shims when CLI flags are still public.
-- [ ] 1.10 Adjust Tenacity retry wrappers to treat limiter exceptions as non-retryable while continuing to retry upstream 429/503 responses and socket errors.
+- [ ] 1.1 Introduce a new module section `# --- Rate limiting ---` near the top of `src/DocsToKG/ContentDownload/networking.py` (or a sibling `ratelimit.py`) defining `@dataclass class RolePolicy` with fields `rates: Dict[str, List[Rate]]`, `max_delay_ms: Dict[str, int]`, `mode: Dict[str, Literal["wait","raise"]]`, `count_head: Dict[str, bool]`, and optional `weight: Dict[str, int]`; include a helper `RolePolicy.for_role(role)` that returns a typed view for a single role.
+- [ ] 1.2 Add a module-level `HOST_POLICIES: Dict[str, RolePolicy]` populated with defaults for `api.openalex.org`, `api.crossref.org`, `export.arxiv.org`, `api.unpaywall.org`, and the publisher domains referenced in resolver presets; annotate the structure with inline comments describing each rate window (per-second, per-minute, etc.).
+- [ ] 1.3 Implement `def validate_policies(policies: Mapping[str, RolePolicy]) -> None` that iterates each host/role list, calls `validate_rate_list` from `pyrate_limiter`, and logs/raises `ValueError` with the offending host/role when ordering rules fail; invoke this during HTTP client construction so invalid overrides abort early.
+- [ ] 1.4 Add a `LimiterCache` helper (simple dict guarded by `threading.Lock`) that stores `Limiter` instances keyed by `(host, role)` and ensures the limiter is built once per combination. Expose `get_limiter(host, role, *, overrides=None)` that returns the cached limiter and records the selected backend for telemetry.
+- [ ] 1.5 Implement `build_bucket(host, role, backend_config)` that reads a new config structure (see Section 2) and instantiates the correct bucket type: `InMemoryBucket` (default), `MultiprocessBucket` (requires `multiprocessing.Manager` lock), `SQLiteBucket` (accepts file path, file-lock flag), `RedisBucket` (parses redis URL and namespace), `PostgresBucket` (uses psycopg3 connection string). Document required parameters in docstrings and raise friendly errors when dependencies are missing.
+- [ ] 1.6 Create a new class `class RateLimitedTransport(httpx.BaseTransport)` wrapping an inner `httpx.BaseTransport`. Override `handle_request(self, request)` and `handle_async_request` (if async is supported) to:
+  - extract `host = request.url.host` and `role = request.extensions.get("role", "metadata")`,
+  - short-circuit when the policy marks `count_head=False` and the method is `HEAD`,
+  - look up the limiter via `get_limiter`,
+  - call `limiter.try_acquire(host_key, weight=policy.weight.get(role, 1), max_delay_ms=policy.max_delay_ms[role])`,
+  - measure wait time via `Limiter.try_acquire` (use `Limiter` return metadata),
+  - on success, set `request.extensions.setdefault("docs_network_meta", {})["rate_limiter_wait_ms"]`,
+  - on `BucketFullException` or exceeded wait budget, raise `RateLimitError` populated with host, role, waited_ms, `next_allowed_at` timestamp.
+- [ ] 1.7 Update `DocsToKG.ContentDownload.httpx_transport._create_client_unlocked` so the inner `HTTPTransport` is wrapped in `RateLimitedTransport` before being given to Hishel `CacheTransport`. Ensure the cache transport sits above the limiter and existing event hooks still execute.
+- [ ] 1.8 Extend `request_with_retries` to accept a new keyword argument `role: str = "metadata"`; set `request.extensions["role"] = role` before dispatching so the transport can locate the correct limiter. Propagate the role parameter through all internal helper invocations (including streaming paths and head prechecks).
+- [ ] 1.9 Audit the following modules and update every call to `request_with_retries` to pass a role:
+  - `download.py` (artifact downloads → `"artifact"`, metadata/json fetches → `"metadata"`),
+  - `resolvers/base.py` and individual resolvers (HTML/JSON probes → `"landing"` or `"metadata"` as appropriate),
+  - `networking.head_precheck` (HEAD probe → `"metadata"`),
+  - `pipeline.py` download workers when prechecking or fetching landing pages.
+  Add inline comments where role selection is non-obvious.
+- [ ] 1.10 Remove pipeline-level throttles that will be redundant:
+  - delete the `TokenBucket` class in `networking.py` (if still used) and its imports,
+  - remove `_respect_domain_limit`, `_ensure_host_bucket`, `_acquire_host_slot`, and related fields in `ResolverPipeline`,
+  - replace their usage with a lightweight helper that derives `(host, role)` and lets the limiter transport block instead of sleeping.
+- [ ] 1.11 Update Tenacity setup inside `request_with_retries` so the retry predicate treats `RateLimitError` (and any `BucketFullException` raised through wrappers) as non-retryable; only HTTP 429 with server-provided retry-after should continue to retry via Tenacity. Add regression tests to verify behaviour.
+- [ ] 1.12 Extend `DocsToKG.ContentDownload.errors.RateLimitError` to accept `host`, `role`, `waited_ms`, and `next_allowed_at` keyword arguments and expose them via attributes; update `log_download_failure` to include these fields in the emitted metadata dict.
+- [ ] 1.13 Ensure `RateLimitError` instances raised in the transport propagate through pipeline/download call sites without being wrapped in generic exceptions (update except blocks to catch and rethrow when needed).
 
 ## 2. Configuration
-- [ ] 2.1 Introduce CLI flags `--rate host=limits`, `--rate-mode host=mode`, `--rate-backend backend[:params]`, and matching environment variables; document their syntax in `README.md`.
-- [ ] 2.2 Parse CLI overrides into structured objects that merge with defaults and feed into the `HOST_POLICIES` registry before validation.
-- [ ] 2.3 Preserve existing CLI throttling flags by mapping them into the new configuration layer (e.g., `--domain-token-bucket` seeds rates, `--max-concurrent-per-host` converts to limiter wait mode); emit deprecation warnings where behaviour changes.
-- [ ] 2.4 Emit a startup table logging effective host policies (host, role, rates, mode, max delay, backend) so operators can confirm configuration.
+- [ ] 2.1 Add CLI flags in `DocsToKG.ContentDownload.args.build_parser`:
+  - `--rate HOST=WINDOWS` accepts comma-separated windows like `10/s,5000/h`,
+  - `--rate-mode HOST={raise,wait:ms}` controls limiter mode and maximum wait milliseconds,
+  - `--rate-backend backend[:options]` selects `memory`, `multiprocess`, `sqlite:path=/tmp/rl.db`, `redis:url=redis://localhost:6379/0`, or `postgres:dsn=…`,
+  - `--rate-max-delay HOST.role=milliseconds` for fine-grained overrides,
+  - matching `DOCSTOKG_RATE_*` environment variables (document names).
+  Use custom `argparse.Action` classes with clear error messages for bad input.
+- [ ] 2.2 Extend `ResolvedConfig` (and dependent code in `cli.py`/`runner.py`) to carry parsed `RateConfig` objects so downstream modules do not reparse CLI strings. Add tests covering the new dataclass fields.
+- [ ] 2.3 Implement `merge_rate_overrides(defaults, overrides)` that folds CLI/env overrides into `HOST_POLICIES` prior to calling `validate_policies`; ensure overrides honour per-role distinctions and missing hosts create new registry entries.
+- [ ] 2.4 Interpret legacy throttling flags in `resolve_config`:
+  - Map `--sleep` and `resolver_min_interval_s` to resolver-level pacing (retain existing behaviour).
+  - Translate `--domain-token-bucket` and `--domain-min-interval` into rate policies (e.g., convert `3/second` into `Rate(3, Duration.SECOND)` with `raise` mode) and log `DeprecationWarning` instructing users to adopt `--rate`.
+  - Disable `--max-concurrent-per-host` by default and log that concurrency is now governed by the limiter wait budget.
+- [ ] 2.5 Emit a structured policy table at startup from `runner.py` or `cli.py` (before the run begins) showing host, role, ordered rates, mode, max_delay, backend, and count_head flag. Ensure logging respects JSON/structured output when enabled.
 
 ## 3. Telemetry & Observability
-- [ ] 3.1 Add counters for `rate_limiter_acquire_total{host,role}`, `rate_limiter_block_total{host,role}`, and histograms for `rate_limiter_wait_ms{host,role}` in the existing telemetry module.
-- [ ] 3.2 Record limiter events alongside Hishel cache metadata on each attempt so manifests and metrics capture cache-hit vs limited-hit breakdowns.
-- [ ] 3.3 Ensure `RateLimitError` instances propagate host, role, wait duration, and next-available timestamps to manifest/summary logging.
-- [ ] 3.4 Update run summaries to surface limiter statistics (total waits, blocks, average wait duration) next to retry/backoff metrics.
+- [ ] 3.1 Extend `DocsToKG.ContentDownload.telemetry.RunTelemetry` (or the relevant sink writer) to record new metrics: `rate_limiter_acquire_total{host,role}`, `rate_limiter_wait_ms_sum`, `rate_limiter_block_total`, and `rate_limiter_policy_backend{host}` gauges. Ensure metrics are thread-safe.
+- [ ] 3.2 Update `AttemptRecord` (or the manifest payload) to include optional fields `rate_limiter_wait_ms`, `rate_limiter_mode`, `rate_limiter_backend`, and `from_cache` so cached hits and waits can be analysed together.
+- [ ] 3.3 Modify `summary.emit_console_summary` and `statistics.DownloadStatistics` to aggregate limiter waits/blocks, include them in the console report, and persist them in `manifest.metrics.json`.
+- [ ] 3.4 Enhance `log_download_failure` to attach limiter metadata when `RateLimitError` occurs; confirm manifest sinks persist the extra keys without schema violations.
+- [ ] 3.5 Add structured logging (`LOGGER.info("rate-policy", …)`) during startup showing resolved policies and `LOGGER.debug("rate-acquire", …)` for each limiter acquisition when debug logging is enabled.
 
 ## 4. Testing
 - [ ] 4.1 Add unit tests that simulate cache hits versus misses and assert that only misses consume limiter tokens.
 - [ ] 4.2 Add tests for multi-window behaviour by configuring two rates, issuing bursts that violate the fast window but respect the slow window, and asserting waits/blocks match expectations.
-- [ ] 4.3 Test per-role `max_delay_ms` differences by forcing congestion and verifying metadata requests raise quickly while artifact requests wait within allowance.
-- [ ] 4.4 Verify Tenacity does not retry limiter exceptions yet still honours server `Retry-After` by simulating both cases.
-- [ ] 4.5 Add integration tests or contract tests that confirm CLI overrides (rates, backend, mode) alter runtime behaviour and startup logging.
+- [ ] 4.3 Test per-role `max_delay_ms` differences by forcing congestion and verifying metadata requests raise quickly while artifact requests wait within allowance; include both sync and streaming (`client.stream`) calls.
+- [ ] 4.4 Verify Tenacity does not retry limiter exceptions yet still honours server `Retry-After` by simulating both cases inside `request_with_retries` tests.
+- [ ] 4.5 Add integration tests or contract tests that confirm CLI overrides (rates, backend, mode) alter runtime behaviour and startup logging (e.g., using click runner or argparse harness).
 - [ ] 4.6 Provide regression tests covering legacy throttling flags to confirm their new mappings produce equivalent or explicitly documented behaviour.
+- [ ] 4.7 Add smoke tests ensuring `RateLimitedTransport` can be constructed with each backend type (skip redis/postgres tests when dependencies unavailable, but guard with feature flags).
 
 ## 5. Documentation
 - [ ] 5.1 Update `src/DocsToKG/ContentDownload/README.md` networking/politeness sections with the new rate-limiter architecture, configuration flags, telemetry, and migration notes from deprecated options.
 - [ ] 5.2 Add docstrings and inline comments explaining RatePolicy roles, limiter caching, and transport layering so future contributors understand why the limiter sits beneath Hishel.
 - [ ] 5.3 Extend internal runbooks or operations docs to include guidance on choosing backends (memory vs redis vs sqlite) and tuning rates per provider.
+- [ ] 5.4 Update `docs-instruct/DO NOT DELETE - Refactor review/ContentDownload/ContentDownload_pyrate-limiter.md` with implementation notes once complete (if that document remains source of truth).
 
 ## 6. Migration & Rollout
 - [ ] 6.1 Provide a migration checklist to clean up existing run configurations (remove manual sleeps, update CLI invocations) and circulate to operational owners.

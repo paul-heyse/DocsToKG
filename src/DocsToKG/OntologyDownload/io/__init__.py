@@ -29,15 +29,7 @@ from .network import (
     retry_with_backoff,
     validate_url_security,
 )
-from .rate_limit import (
-    REGISTRY,
-    RateLimiterRegistry,
-    SharedTokenBucket,
-    TokenBucket,
-    apply_retry_after,
-    get_bucket,
-    reset,
-)
+from .rate_limit import RateLimiterHandle, apply_retry_after, get_bucket, reset
 
 __all__ = [
     "extract_archive_safe",
@@ -59,10 +51,7 @@ __all__ = [
     "log_memory_usage",
     "retry_with_backoff",
     "validate_url_security",
-    "RateLimiterRegistry",
-    "SharedTokenBucket",
-    "TokenBucket",
-    "REGISTRY",
+    "RateLimiterHandle",
     "apply_retry_after",
     "get_bucket",
     "reset",

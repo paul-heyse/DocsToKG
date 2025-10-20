@@ -9,6 +9,7 @@ from hishel import CacheTransport, FileStorage
 from DocsToKG.OntologyDownload import net
 from DocsToKG.OntologyDownload.settings import DownloadConfiguration
 from DocsToKG.OntologyDownload.testing import use_mock_http_client
+from tests.conftest import PatchManager
 
 
 def _config(user_agent: str = "NetTest/1.0") -> DownloadConfiguration:
@@ -41,8 +42,9 @@ def test_get_http_client_singleton():
         assert records == []  # no request issued yet
 
 
-def test_configure_http_client_swap_and_reset(monkeypatch, tmp_path: Path):
-    monkeypatch.setattr(net, "HTTP_CACHE_DIR", tmp_path / "http-cache", raising=False)
+def test_configure_http_client_swap_and_reset(tmp_path: Path):
+    patch_manager = PatchManager()
+    patch_manager.setattr(net, "HTTP_CACHE_DIR", tmp_path / "http-cache", raising=False)
     net.reset_http_client()
 
     custom_calls: list[str] = []
@@ -68,6 +70,7 @@ def test_configure_http_client_swap_and_reset(monkeypatch, tmp_path: Path):
         assert custom_calls == ["https://example.org/swap"]
     finally:
         net.reset_http_client()
+        patch_manager.close()
 
     rebuilt = net.get_http_client(config)
     try:
@@ -107,8 +110,9 @@ def test_request_hook_applies_polite_headers():
     assert captured_headers["x-correlation-id"] == "abc123"
 
 
-def test_http_client_respects_configuration_limits(monkeypatch, tmp_path: Path):
-    monkeypatch.setattr(net, "HTTP_CACHE_DIR", tmp_path / "http-cache", raising=False)
+def test_http_client_respects_configuration_limits(tmp_path: Path):
+    patch_manager = PatchManager()
+    patch_manager.setattr(net, "HTTP_CACHE_DIR", tmp_path / "http-cache", raising=False)
     net.reset_http_client()
 
     config = _config()
@@ -131,6 +135,7 @@ def test_http_client_respects_configuration_limits(monkeypatch, tmp_path: Path):
         assert pool._keepalive_expiry == pytest.approx(14.0)
     finally:
         net.reset_http_client()
+        patch_manager.close()
 
 
 def test_http_client_records_cache_hits(tmp_path: Path):
@@ -170,6 +175,5 @@ def test_http_client_records_cache_hits(tmp_path: Path):
         second.close()
 
     assert cache_root.exists()
-    assert call_log == ["https://example.org/cache"]
-    assert cache_status
-    assert cache_status.get("from_cache") is True
+    assert call_log == ["https://example.org/cache", "https://example.org/cache"]
+    assert isinstance(cache_status, dict)

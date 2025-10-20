@@ -12,7 +12,6 @@ import pytest
 
 from DocsToKG.OntologyDownload.errors import DownloadFailure, PolicyError
 from DocsToKG.OntologyDownload.io import network as network_mod
-from DocsToKG.OntologyDownload.io.rate_limit import TokenBucket
 from DocsToKG.OntologyDownload.testing import ResponseSpec
 
 
@@ -195,14 +194,13 @@ def test_get_redirect_follows_validated_target(ontology_env, tmp_path):
     ]
 
 
-class _BucketSpy(TokenBucket):
+class _BucketSpy:
     """Deterministic token bucket that records consumption without sleeping."""
 
     def __init__(self) -> None:
-        super().__init__(rate_per_sec=1000.0, capacity=1000.0)
         self.calls: list[float] = []
 
-    def consume(self, tokens: float = 1.0) -> None:  # type: ignore[override]
+    def consume(self, tokens: float = 1.0) -> None:
         self.calls.append(tokens)
 
 

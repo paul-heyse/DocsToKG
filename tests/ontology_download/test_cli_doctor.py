@@ -18,6 +18,7 @@ import pytest
 
 from DocsToKG.OntologyDownload import cli as cli_module
 from DocsToKG.OntologyDownload.testing import TestingEnvironment
+from tests.conftest import PatchManager
 
 
 def test_cli_doctor_handles_missing_ontology_dir(capsys):
@@ -66,12 +67,16 @@ def test_cli_doctor_reports_disk_error(capsys):
         assert "total_bytes" not in disk
 
 
-def test_cli_doctor_reports_invalid_rate_limit_override_json(monkeypatch, capsys):
+def test_cli_doctor_reports_invalid_rate_limit_override_json(capsys):
     """Invalid rate-limit overrides should surface as doctor JSON errors."""
 
-    with TestingEnvironment():
-        monkeypatch.setenv("ONTOFETCH_PER_HOST_RATE_LIMIT", "not-a-limit")
-        exit_code = cli_module.cli_main(["doctor", "--json"])
+    patcher = PatchManager()
+    try:
+        with TestingEnvironment():
+            patcher.setenv("ONTOFETCH_PER_HOST_RATE_LIMIT", "not-a-limit")
+            exit_code = cli_module.cli_main(["doctor", "--json"])
+    finally:
+        patcher.close()
 
     assert exit_code == 0
 
@@ -82,12 +87,16 @@ def test_cli_doctor_reports_invalid_rate_limit_override_json(monkeypatch, capsys
     assert "not-a-limit" in error_message
 
 
-def test_cli_doctor_reports_invalid_rate_limit_override_tty(monkeypatch, capsys):
+def test_cli_doctor_reports_invalid_rate_limit_override_tty(capsys):
     """TTY rendering should include invalid rate-limit override errors."""
 
-    with TestingEnvironment():
-        monkeypatch.setenv("ONTOFETCH_PER_HOST_RATE_LIMIT", "not-a-limit")
-        exit_code = cli_module.cli_main(["doctor"])
+    patcher = PatchManager()
+    try:
+        with TestingEnvironment():
+            patcher.setenv("ONTOFETCH_PER_HOST_RATE_LIMIT", "not-a-limit")
+            exit_code = cli_module.cli_main(["doctor"])
+    finally:
+        patcher.close()
 
     assert exit_code == 0
 

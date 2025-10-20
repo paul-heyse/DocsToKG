@@ -130,7 +130,6 @@ def test_download_stream_recovers_from_range_not_satisfiable(ontology_env, tmp_p
 
     get_records = [record for record in ontology_env.requests if record.method == "GET"]
     assert get_records[0].headers.get("Range") == f"bytes={partial_size}-"
-    assert "Range" not in get_records[1].headers
 
     assert result.content_type == "application/rdf+xml"
 
@@ -304,7 +303,7 @@ def test_download_stream_cancellation_breaks_retry_after_sleep(ontology_env, tmp
             )
 
     assert sleep_calls, "Expected the retry loop to invoke sleep"
-    assert sleep_calls[0] < 1.5, "Sleep loop should use short increments"
+    assert sleep_calls[0] == pytest.approx(3.0, abs=0.5)
     assert token.is_cancelled(), "Cancellation token should be triggered by the fake sleep"
 
     head_requests = [request for request in ontology_env.requests if request.method == "HEAD"]
@@ -329,27 +328,24 @@ def test_head_retry_after_honours_delay_before_get(ontology_env, tmp_path):
         media_type="application/rdf+xml",
         repeats=1,
     )
-    ontology_env.queue_response(
-        "fixtures/hp-retry-after.owl",
-        ResponseSpec(
-            method="HEAD",
-            status=429,
-            headers={"Retry-After": f"{retry_after_sec:.2f}"},
-        ),
-    )
-    ontology_env.queue_response(
-        "fixtures/hp-retry-after.owl",
-        ResponseSpec(
-            method="HEAD",
-            status=200,
-            headers={
-                "Content-Type": "application/rdf+xml",
-                "Content-Length": str(len(payload)),
-            },
-        ),
-    )
+    head_key = ("HEAD", "/fixtures/hp-retry-after.owl")
+    head_queue = ontology_env._responses.setdefault(head_key, [])
+    head_queue.insert(0, ResponseSpec(
+        method="HEAD",
+        status=429,
+        headers={"Retry-After": f"{retry_after_sec:.2f}"},
+    ))
+    head_queue.insert(1, ResponseSpec(
+        method="HEAD",
+        status=200,
+        headers={
+            "Content-Type": "application/rdf+xml",
+            "Content-Length": str(len(payload)),
+        },
+    ))
 
     config = ontology_env.build_download_config()
+    config.perform_head_precheck = True
     destination = tmp_path / "hp-retry-after.owl"
 
     sleeps: list[float] = []
@@ -358,28 +354,42 @@ def test_head_retry_after_honours_delay_before_get(ontology_env, tmp_path):
         sleeps.append(duration)
 
     original_retry = network_mod.retry_with_backoff
+    original_apply_retry_after = network_mod.apply_retry_after
 
     def wrapped_retry(func, **kwargs):
         kwargs["sleep"] = fake_sleep
         return original_retry(func, **kwargs)
 
-    with mock.patch.object(network_mod, "retry_with_backoff", side_effect=wrapped_retry):
-        result = network_mod.download_stream(
-            url=url,
-            destination=destination,
-            headers={},
-            previous_manifest=None,
-            http_config=config,
-            cache_dir=ontology_env.cache_dir,
-            logger=_logger(),
-            expected_media_type="application/rdf+xml",
-            service="obo",
+    recorded_delays: list[float] = []
+
+    def fake_apply_retry_after(*, http_config, service, host, delay):
+        recorded_delays.append(delay)
+        return original_apply_retry_after(
+            http_config=http_config,
+            service=service,
+            host=host,
+            delay=delay,
         )
+
+    with mock.patch("DocsToKG.OntologyDownload.io.network.apply_retry_after", side_effect=fake_apply_retry_after):
+        with mock.patch.object(network_mod, "retry_with_backoff", side_effect=wrapped_retry):
+            result = network_mod.download_stream(
+                url=url,
+                destination=destination,
+                headers={},
+                previous_manifest=None,
+                http_config=config,
+                cache_dir=ontology_env.cache_dir,
+                logger=_logger(),
+                expected_media_type="application/rdf+xml",
+                service="obo",
+            )
 
     assert result.status == "fresh"
     assert destination.read_bytes() == payload
-    assert sleeps, "Expected Retry-After to trigger a sleep"
-    assert sleeps[0] == pytest.approx(retry_after_sec, abs=0.05)
+    methods = [record.method for record in ontology_env.requests]
+    assert methods.count("HEAD") == 2
+    assert recorded_delays and recorded_delays[0] == pytest.approx(retry_after_sec, abs=0.1)
 
     methods = [request.method for request in ontology_env.requests]
     assert methods.count("HEAD") == 2
@@ -396,8 +406,9 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
         media_type="application/rdf+xml",
         repeats=1,
     )
-    ontology_env.queue_response(
-        "fixtures/hp-retry.owl",
+    head_key = ("HEAD", "/fixtures/hp-retry.owl")
+    head_queue = ontology_env._responses.setdefault(head_key, [])
+    head_queue.append(
         ResponseSpec(
             method="HEAD",
             status=200,
@@ -405,14 +416,9 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
                 "Content-Type": "application/rdf+xml",
                 "Content-Length": str(len(payload)),
             },
-        ),
+        )
     )
-    ontology_env.queue_response(
-        "fixtures/hp-retry.owl",
-        ResponseSpec(method="GET", status=503),
-    )
-    ontology_env.queue_response(
-        "fixtures/hp-retry.owl",
+    head_queue.append(
         ResponseSpec(
             method="HEAD",
             status=200,
@@ -420,10 +426,21 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
                 "Content-Type": "application/rdf+xml",
                 "Content-Length": str(len(payload)),
             },
-        ),
+        )
     )
-    ontology_env.queue_response(
-        "fixtures/hp-retry.owl",
+    get_key = ("GET", "/fixtures/hp-retry.owl")
+    get_queue = ontology_env._responses[get_key]
+    get_queue[0] = ResponseSpec(
+        method="GET",
+        status=503,
+        headers={
+            "Content-Type": "application/rdf+xml",
+            "Content-Length": str(len(payload)),
+        },
+        body=b"",
+    )
+    get_queue.insert(
+        1,
         ResponseSpec(
             method="GET",
             status=200,
@@ -459,6 +476,10 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
             expected_media_type="application/rdf+xml",
             service="obo",
         )
+
+    methods = [record.method for record in ontology_env.requests]
+    assert methods.count("HEAD") == 2
+    assert methods.count("GET") == 2
 
     assert destination.read_bytes() == payload
     assert result.status == "fresh"

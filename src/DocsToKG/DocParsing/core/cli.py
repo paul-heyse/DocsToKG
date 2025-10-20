@@ -20,11 +20,7 @@ from pathlib import Path
 from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
 
 import typer
-
-try:  # Compat: TyperCommand moved in Typer 0.14+
-    from typer.main import TyperCommand
-except ImportError:  # pragma: no cover - fallback for newer Typer versions
-    from typer.core import TyperCommand  # type: ignore[attr-defined]
+from typing_extensions import Annotated, Literal
 
 from DocsToKG.DocParsing.cli_errors import (
     CLIValidationError,
@@ -49,31 +45,20 @@ from .cli_utils import (
     directory_contains_suffixes,
     merge_args,
 )
+from .models import DEFAULT_TOKENIZER
 from .planning import display_plan, plan_chunk, plan_doctags, plan_embed
 
 CommandHandler = Callable[[Sequence[str]], int]
 
+try:  # Optional chunking extras may not be installed
+    from DocsToKG.DocParsing.chunking.config import SOFT_BARRIER_MARGIN
+except Exception:  # pragma: no cover - fallback when chunking optional deps missing
+    SOFT_BARRIER_MARGIN = 64
 
-class _ParserHelpCommand(TyperCommand):
-    """Click command wrapper that appends legacy parser help to Typer output."""
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self._parser_help_factory = getattr(self.callback, "__parser_help_factory__", None)
-
-    def get_help(self, ctx: typer.Context) -> str:
-        """Render Typer help combined with the delegated argparse help text."""
-
-        help_text = super().get_help(ctx)
-        if self._parser_help_factory is None:
-            return help_text
-        try:
-            extra_help = self._parser_help_factory()
-        except Exception as exc:  # pragma: no cover - defensive fallback
-            extra_help = f"Unable to render legacy help: {exc}"
-        if not extra_help:
-            return help_text
-        return f"{help_text.rstrip()}\n\n{extra_help.rstrip()}\n"
+try:  # Optional embedding extras may not be installed
+    from DocsToKG.DocParsing.embedding.config import SPLADE_SPARSITY_WARN_THRESHOLD_PCT
+except Exception:  # pragma: no cover - fallback when embedding optional deps missing
+    SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
 
 
 class _ManifestHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
@@ -254,12 +239,6 @@ def build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPar
     return parser
 
 
-def _doctags_help_text() -> str:
-    """Return the legacy argparse help for the DocTags command."""
-
-    return build_doctags_parser().format_help()
-
-
 def _resolve_doctags_paths(args: argparse.Namespace) -> tuple[str, Path, Path, str]:
     """Resolve DocTags input/output directories and mode."""
 
@@ -401,6 +380,266 @@ def doctags(argv: Sequence[str] | None = None) -> int:
     return doctags_module.pdf_main(pdf_args)
 
 
+def _build_doctags_cli_args(
+    mode: str,
+    log_level: str,
+    data_root: Optional[Path],
+    input_dir: Optional[Path],
+    output_dir: Optional[Path],
+    workers: Optional[int],
+    model: Optional[str],
+    vllm_wait_timeout: Optional[int],
+    served_model_names: Sequence[str],
+    gpu_memory_utilization: Optional[float],
+    resume: bool,
+    force: bool,
+    verify_hash: bool,
+    overwrite: bool,
+) -> List[str]:
+    argv: List[str] = []
+    normalized_mode = mode.lower()
+    normalized_log_level = log_level.upper()
+
+    _append_option(argv, "--mode", normalized_mode, default="auto")
+    _append_option(argv, "--log-level", normalized_log_level, default="INFO")
+    _append_option(argv, "--data-root", data_root, formatter=str)
+    _append_option(argv, "--input", input_dir, formatter=str)
+    _append_option(argv, "--output", output_dir, formatter=str)
+    _append_option(argv, "--workers", workers)
+    _append_option(argv, "--model", model)
+    _append_option(argv, "--vllm-wait-timeout", vllm_wait_timeout)
+    _append_multi_values(argv, "--served-model-name", served_model_names)
+    _append_option(argv, "--gpu-memory-utilization", gpu_memory_utilization)
+    _append_flag(argv, "--resume", resume)
+    _append_flag(argv, "--force", force)
+    _append_flag(argv, "--verify-hash", verify_hash)
+    _append_flag(argv, "--overwrite", overwrite)
+    return argv
+
+
+def _build_chunk_cli_args(
+    data_root: Optional[Path],
+    config: Optional[Path],
+    profile: Optional[str],
+    input_dir: Optional[Path],
+    output_dir: Optional[Path],
+    min_tokens: int,
+    max_tokens: int,
+    log_level: str,
+    tokenizer_model: Optional[str],
+    soft_barrier_margin: int,
+    structural_markers: Optional[Path],
+    serializer_provider: Optional[str],
+    workers: int,
+    shard_count: int,
+    shard_index: int,
+    validate_only: bool,
+    inject_anchors: bool,
+    resume: bool,
+    force: bool,
+    verify_hash: bool,
+) -> List[str]:
+    argv: List[str] = []
+    normalized_log_level = log_level.upper()
+
+    _append_option(argv, "--data-root", data_root, formatter=str)
+    _append_option(argv, "--config", config, formatter=str)
+    _append_option(argv, "--profile", profile)
+    _append_option(argv, "--in-dir", input_dir, formatter=str)
+    _append_option(argv, "--out-dir", output_dir, formatter=str)
+    _append_option(argv, "--min-tokens", min_tokens, default=256)
+    _append_option(argv, "--max-tokens", max_tokens, default=512)
+    _append_option(argv, "--log-level", normalized_log_level, default="INFO")
+    _append_option(argv, "--tokenizer-model", tokenizer_model)
+    _append_option(argv, "--soft-barrier-margin", soft_barrier_margin, default=SOFT_BARRIER_MARGIN)
+    _append_option(argv, "--structural-markers", structural_markers, formatter=str)
+    _append_option(argv, "--serializer-provider", serializer_provider)
+    _append_option(argv, "--workers", workers, default=1)
+    _append_option(argv, "--shard-count", shard_count, default=1)
+    _append_option(argv, "--shard-index", shard_index, default=0)
+    _append_flag(argv, "--validate-only", validate_only)
+    _append_flag(argv, "--inject-anchors", inject_anchors)
+    _append_flag(argv, "--resume", resume)
+    _append_flag(argv, "--force", force)
+    _append_flag(argv, "--verify-hash", verify_hash)
+    return argv
+
+
+def _build_embed_cli_args(
+    data_root: Optional[Path],
+    config: Optional[Path],
+    profile: Optional[str],
+    log_level: str,
+    no_cache: bool,
+    shard_count: int,
+    shard_index: int,
+    chunks_dir: Optional[Path],
+    out_dir: Optional[Path],
+    vector_format: str,
+    bm25_k1: float,
+    bm25_b: float,
+    batch_size_splade: int,
+    batch_size_qwen: int,
+    splade_max_active_dims: Optional[int],
+    splade_model_dir: Optional[Path],
+    splade_attn: str,
+    qwen_dtype: str,
+    qwen_quant: Optional[str],
+    qwen_model_dir: Optional[Path],
+    qwen_dim: int,
+    tensor_parallel: int,
+    sparsity_warn_threshold_pct: float,
+    sparsity_report_top_n: int,
+    files_parallel: int,
+    validate_only: bool,
+    plan_only: bool,
+    offline: bool,
+    resume: bool,
+    force: bool,
+    verify_hash: bool,
+) -> List[str]:
+    argv: List[str] = []
+    normalized_log_level = log_level.upper()
+
+    _append_option(argv, "--data-root", data_root, formatter=str)
+    _append_option(argv, "--config", config, formatter=str)
+    _append_option(argv, "--profile", profile)
+    _append_option(argv, "--log-level", normalized_log_level, default="INFO")
+    _append_flag(argv, "--no-cache", no_cache)
+    _append_option(argv, "--shard-count", shard_count, default=1)
+    _append_option(argv, "--shard-index", shard_index, default=0)
+    _append_option(argv, "--chunks-dir", chunks_dir, formatter=str)
+    _append_option(argv, "--out-dir", out_dir, formatter=str)
+    _append_option(argv, "--vector-format", vector_format, default="jsonl")
+    _append_option(argv, "--bm25-k1", bm25_k1, default=1.5)
+    _append_option(argv, "--bm25-b", bm25_b, default=0.75)
+    _append_option(argv, "--batch-size-splade", batch_size_splade, default=32)
+    _append_option(argv, "--batch-size-qwen", batch_size_qwen, default=64)
+    _append_option(argv, "--splade-max-active-dims", splade_max_active_dims)
+    _append_option(argv, "--splade-model-dir", splade_model_dir, formatter=str)
+    _append_option(argv, "--splade-attn", splade_attn, default="auto")
+    _append_option(argv, "--qwen-dtype", qwen_dtype, default="bfloat16")
+    _append_option(argv, "--qwen-quant", qwen_quant)
+    _append_option(argv, "--qwen-model-dir", qwen_model_dir, formatter=str)
+    _append_option(argv, "--qwen-dim", qwen_dim, default=2560)
+    _append_option(argv, "--tp", tensor_parallel, default=1)
+    _append_option(argv, "--sparsity-warn-threshold-pct", sparsity_warn_threshold_pct, default=SPLADE_SPARSITY_WARN_THRESHOLD_PCT)
+    _append_option(argv, "--sparsity-report-top-n", sparsity_report_top_n, default=10)
+    _append_option(argv, "--files-parallel", files_parallel, default=1)
+    _append_flag(argv, "--validate-only", validate_only)
+    _append_flag(argv, "--plan-only", plan_only)
+    _append_flag(argv, "--offline", offline)
+    _append_flag(argv, "--resume", resume)
+    _append_flag(argv, "--force", force)
+    _append_flag(argv, "--verify-hash", verify_hash)
+    return argv
+
+
+def _build_token_profiles_cli_args(
+    data_root: Optional[Path],
+    config: Optional[Path],
+    doctags_dir: Optional[Path],
+    sample_size: int,
+    max_chars: int,
+    baseline: str,
+    tokenizers: Sequence[str],
+    window_min: int,
+    window_max: int,
+    log_level: str,
+) -> List[str]:
+    argv: List[str] = []
+    normalized_log_level = log_level.upper()
+
+    _append_option(argv, "--data-root", data_root, formatter=str)
+    _append_option(argv, "--config", config, formatter=str)
+    _append_option(argv, "--doctags-dir", doctags_dir, formatter=str)
+    _append_option(argv, "--sample-size", sample_size, default=20)
+    _append_option(argv, "--max-chars", max_chars, default=4000)
+    _append_option(argv, "--baseline", baseline, default=DEFAULT_TOKENIZER)
+    _append_multi_values(argv, "--tokenizer", tokenizers)
+    _append_option(argv, "--window-min", window_min, default=256)
+    _append_option(argv, "--window-max", window_max, default=512)
+    _append_option(argv, "--log-level", normalized_log_level, default="INFO")
+    return argv
+
+
+def _build_manifest_cli_args(
+    stages: Sequence[str],
+    data_root: Optional[Path],
+    tail: int,
+    summarize: bool,
+    raw: bool,
+) -> List[str]:
+    argv: List[str] = []
+    for stage in stages:
+        if stage:
+            argv.extend(["--stage", stage])
+    _append_option(argv, "--data-root", data_root, formatter=str)
+    _append_option(argv, "--tail", tail, default=0)
+    _append_flag(argv, "--summarize", summarize)
+    _append_flag(argv, "--raw", raw)
+    return argv
+
+
+def _build_run_all_cli_args(
+    data_root: Optional[Path],
+    log_level: str,
+    resume: bool,
+    force: bool,
+    mode: str,
+    doctags_in_dir: Optional[Path],
+    doctags_out_dir: Optional[Path],
+    overwrite: bool,
+    vllm_wait_timeout: Optional[int],
+    chunk_out_dir: Optional[Path],
+    chunk_workers: Optional[int],
+    chunk_min_tokens: Optional[int],
+    chunk_max_tokens: Optional[int],
+    structural_markers: Optional[Path],
+    chunk_shard_count: Optional[int],
+    chunk_shard_index: Optional[int],
+    embed_out_dir: Optional[Path],
+    embed_offline: bool,
+    embed_validate_only: bool,
+    sparsity_warn_threshold_pct: Optional[float],
+    embed_shard_count: Optional[int],
+    embed_shard_index: Optional[int],
+    embed_format: Optional[str],
+    embed_no_cache: bool,
+    plan_only: bool,
+) -> List[str]:
+    argv: List[str] = []
+    normalized_log_level = log_level.upper()
+    normalized_mode = mode.lower()
+
+    _append_option(argv, "--data-root", data_root, formatter=str)
+    _append_option(argv, "--log-level", normalized_log_level, default="INFO")
+    _append_flag(argv, "--resume", resume)
+    _append_flag(argv, "--force", force)
+    _append_option(argv, "--mode", normalized_mode, default="auto")
+    _append_option(argv, "--doctags-in-dir", doctags_in_dir, formatter=str)
+    _append_option(argv, "--doctags-out-dir", doctags_out_dir, formatter=str)
+    _append_flag(argv, "--overwrite", overwrite)
+    _append_option(argv, "--vllm-wait-timeout", vllm_wait_timeout)
+    _append_option(argv, "--chunk-out-dir", chunk_out_dir, formatter=str)
+    _append_option(argv, "--chunk-workers", chunk_workers)
+    _append_option(argv, "--chunk-min-tokens", chunk_min_tokens)
+    _append_option(argv, "--chunk-max-tokens", chunk_max_tokens)
+    _append_option(argv, "--structural-markers", structural_markers, formatter=str)
+    _append_option(argv, "--chunk-shard-count", chunk_shard_count)
+    _append_option(argv, "--chunk-shard-index", chunk_shard_index)
+    _append_option(argv, "--embed-out-dir", embed_out_dir, formatter=str)
+    _append_flag(argv, "--embed-offline", embed_offline)
+    _append_flag(argv, "--embed-validate-only", embed_validate_only)
+    _append_option(argv, "--sparsity-warn-threshold-pct", sparsity_warn_threshold_pct)
+    _append_option(argv, "--embed-shard-count", embed_shard_count)
+    _append_option(argv, "--embed-shard-index", embed_shard_index)
+    _append_option(argv, "--embed-format", embed_format)
+    _append_flag(argv, "--embed-no-cache", embed_no_cache)
+    _append_flag(argv, "--plan", plan_only)
+    return argv
+
+
 def _chunk_import_error_messages(exc: ImportError) -> List[str]:
     """Return user-facing error lines when the chunking module is unavailable."""
 
@@ -439,18 +678,6 @@ def _import_chunk_module():
     return chunk_module
 
 
-def _chunk_help_text() -> str:
-    """Return help text for the chunk subcommand (or guidance if unavailable)."""
-
-    try:
-        chunk_module = _import_chunk_module()
-    except ImportError as exc:  # pragma: no cover - exercised in environments without extras
-        return "\n".join(_chunk_import_error_messages(exc))
-    parser = chunk_module.build_parser()
-    parser.prog = "docparse chunk"
-    return parser.format_help()
-
-
 def chunk(argv: Sequence[str] | None = None) -> int:
     """Execute the Docling chunker subcommand."""
 
@@ -486,16 +713,6 @@ def embed(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
-def _embed_help_text() -> str:
-    """Return the legacy argparse help for the embed command."""
-
-    from DocsToKG.DocParsing import embedding as embedding_module
-
-    parser = embedding_module.build_parser()
-    parser.prog = "docparse embed"
-    return parser.format_help()
-
-
 def token_profiles(argv: Sequence[str] | None = None) -> int:
     """Execute the tokenizer profiling subcommand."""
 
@@ -519,22 +736,6 @@ def token_profiles(argv: Sequence[str] | None = None) -> int:
     parser.prog = "docparse token-profiles"
     args = parser.parse_args([] if argv is None else list(argv))
     return token_profiles_module.main(args)
-
-
-def _token_profiles_help_text() -> str:
-    """Return the legacy argparse help for the token-profiles command."""
-
-    try:
-        from DocsToKG.DocParsing import token_profiles as token_profiles_module
-    except ImportError as exc:  # pragma: no cover - depends on optional transformers
-        return (
-            "Optional dependency 'transformers' is required for `docparse token-profiles`. "
-            f"Install it with `pip install transformers`.\n\n{exc}"
-        )
-
-    parser = token_profiles_module.build_parser()
-    parser.prog = "docparse token-profiles"
-    return parser.format_help()
 
 
 def plan(argv: Sequence[str] | None = None) -> int:
@@ -596,12 +797,6 @@ def _build_manifest_parser() -> argparse.ArgumentParser:
         help="Output tail entries as JSON instead of human-readable text",
     )
     return parser
-
-
-def _manifest_help_text() -> str:
-    """Return the legacy argparse help for the manifest command."""
-
-    return _build_manifest_parser().format_help()
 
 
 def _manifest_main(argv: Sequence[str]) -> int:
@@ -928,20 +1123,6 @@ def _build_run_all_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _run_all_help_text() -> str:
-    """Return the legacy argparse help for the all command."""
-
-    return _build_run_all_parser().format_help()
-
-
-def _plan_help_text() -> str:
-    """Return the legacy argparse help for the plan command."""
-
-    parser = _build_run_all_parser()
-    parser.prog = "docparse plan"
-    return parser.format_help()
-
-
 def _build_stage_args(args: argparse.Namespace) -> tuple[List[str], List[str], List[str]]:
     """Construct argument lists for doctags/chunk/embed stages."""
 
@@ -1145,112 +1326,1091 @@ def run_all(argv: Sequence[str] | None = None) -> int:
     return 0
 
 
-def _forward_with_context(
-    ctx: typer.Context, handler: Callable[[Sequence[str] | None], int]
-) -> None:
-    """Invoke ``handler`` with the Typer context arguments and exit with its code."""
+_DEFAULT_SENTINEL = object()
 
-    argv = list(ctx.args)
-    exit_code = handler(None if not argv else argv)
+
+def _append_option(
+    argv: List[str],
+    flag: str,
+    value: Any,
+    *,
+    formatter: Callable[[Any], str] = str,
+    default: Any = _DEFAULT_SENTINEL,
+) -> None:
+    """Append an option and value when ``value`` is set and differs from ``default``."""
+
+    if value is None:
+        return
+    if default is not _DEFAULT_SENTINEL and value == default:
+        return
+    argv.extend([flag, formatter(value)])
+
+
+def _append_flag(argv: List[str], flag: str, enabled: bool) -> None:
+    """Append a flag when ``enabled`` is True."""
+
+    if enabled:
+        argv.append(flag)
+
+
+def _append_multi_values(
+    argv: List[str], flag: str, values: Sequence[Any], *, formatter: Callable[[Any], str] = str
+) -> None:
+    """Append an option multiple times for each value."""
+
+    if not values:
+        return
+    for item in values:
+        argv.extend([flag, formatter(item)])
+
+
+LogLevelOption = Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
+DoctagsModeOption = Literal["auto", "html", "pdf"]
+VectorFormatOption = Literal["jsonl", "parquet"]
+SpladeAttnOption = Literal["auto", "flash", "sdpa", "eager"]
+QwenDTypeOption = Literal["float32", "bfloat16", "float16", "int8"]
+ChunkProfileOption = Literal["cpu-small", "gpu-default", "gpu-max", "bert-compat"]
+EmbedProfileOption = Literal["cpu-small", "gpu-default", "gpu-max"]
+
+
+@app.command("doctags")
+def _doctags_cli(
+    mode: Annotated[
+        DoctagsModeOption,
+        typer.Option(
+            "--mode",
+            help="Select conversion backend; auto infers from input directory.",
+        ),
+    ] = "auto",
+    log_level: Annotated[
+        LogLevelOption,
+        typer.Option(
+            "--log-level",
+            help="Logging verbosity applied to the DocTags stage.",
+            show_default=True,
+        ),
+    ] = "INFO",
+    data_root: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--data-root",
+            help="Override DocsToKG Data directory. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT.",
+        ),
+    ] = None,
+    input_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--input",
+            "--in-dir",
+            help="Directory containing HTML or PDF sources (defaults vary by mode).",
+        ),
+    ] = None,
+    output_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--output",
+            "--out-dir",
+            help="Destination for generated .doctags files (defaults vary by mode).",
+        ),
+    ] = None,
+    workers: Annotated[
+        Optional[int],
+        typer.Option(
+            "--workers",
+            help="Worker processes to launch; backend defaults used when omitted.",
+        ),
+    ] = None,
+    model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--model",
+            help="Override vLLM model path or identifier for PDF conversion.",
+        ),
+    ] = None,
+    vllm_wait_timeout: Annotated[
+        Optional[int],
+        typer.Option(
+            "--vllm-wait-timeout",
+            help="Seconds to wait for vLLM readiness before failing (PDF mode only; defaults to the PDF runner setting).",
+        ),
+    ] = None,
+    served_model_name: Annotated[
+        Optional[List[str]],
+        typer.Option(
+            "--served-model-name",
+            metavar="NAME",
+            help="Model alias to expose from vLLM (repeatable).",
+        ),
+    ] = None,
+    gpu_memory_utilization: Annotated[
+        Optional[float],
+        typer.Option(
+            "--gpu-memory-utilization",
+            help="Fraction of GPU memory allocated to the vLLM server.",
+        ),
+    ] = None,
+    resume: Annotated[
+        bool,
+        typer.Option(
+            "--resume",
+            help="Skip documents whose outputs already exist with matching content hash.",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Force reprocessing even when resume criteria are satisfied.",
+        ),
+    ] = False,
+    verify_hash: Annotated[
+        bool,
+        typer.Option(
+            "--verify-hash",
+            help="Recompute input hashes before skipping resumed items. This validates manifest entries at the cost of additional I/O.",
+        ),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            help="Overwrite existing DocTags files (HTML mode only).",
+        ),
+    ] = False,
+) -> None:
+    argv = _build_doctags_cli_args(
+        mode,
+        log_level,
+        data_root,
+        input_dir,
+        output_dir,
+        workers,
+        model,
+        vllm_wait_timeout,
+        served_model_name or [],
+        gpu_memory_utilization,
+        resume,
+        force,
+        verify_hash,
+        overwrite,
+    )
+    exit_code = doctags(argv)
     raise typer.Exit(code=exit_code)
 
 
-@app.command(
-    "doctags",
-    cls=_ParserHelpCommand,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)
-def _doctags_cli(ctx: typer.Context) -> None:
-    """Typer surface for `docparse doctags`."""
+@app.command("chunk")
+def _chunk_cli(
+    data_root: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--data-root",
+            help="DocsToKG data root override used when resolving inputs.",
+        ),
+    ] = None,
+    config: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--config",
+            help="Path to stage config file (JSON/YAML/TOML).",
+        ),
+    ] = None,
+    profile: Annotated[
+        Optional[ChunkProfileOption],
+        typer.Option(
+            "--profile",
+            help="Preset for workers/token windows/tokenizer (cpu-small, gpu-default, gpu-max, bert-compat).",
+        ),
+    ] = None,
+    input_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--in-dir",
+            help="DocTags input directory (defaults to data_root/DocTagsFiles).",
+        ),
+    ] = None,
+    output_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--out-dir",
+            help="Chunk output directory (defaults to data_root/ChunkedDocTagFiles).",
+        ),
+    ] = None,
+    min_tokens: Annotated[
+        int,
+        typer.Option(
+            "--min-tokens",
+            help="Minimum tokens per chunk passed to the chunk stage.",
+            show_default=True,
+        ),
+    ] = 256,
+    max_tokens: Annotated[
+        int,
+        typer.Option(
+            "--max-tokens",
+            help="Maximum tokens per chunk passed to the chunk stage.",
+            show_default=True,
+        ),
+    ] = 512,
+    log_level: Annotated[
+        LogLevelOption,
+        typer.Option(
+            "--log-level",
+            help="Logging verbosity for console output.",
+            show_default=True,
+        ),
+    ] = "INFO",
+    tokenizer_model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--tokenizer-model",
+            help="Tokenizer identifier used to compute token windows (defaults to profile/default).",
+        ),
+    ] = None,
+    soft_barrier_margin: Annotated[
+        int,
+        typer.Option(
+            "--soft-barrier-margin",
+            help="Token margin to retain around soft barriers.",
+            show_default=True,
+        ),
+    ] = SOFT_BARRIER_MARGIN,
+    structural_markers: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--structural-markers",
+            "--heading-markers",
+            help="Optional path to structural marker overrides JSON.",
+        ),
+    ] = None,
+    serializer_provider: Annotated[
+        Optional[str],
+        typer.Option(
+            "--serializer-provider",
+            help="Serializer implementation to persist chunk outputs (default provider).",
+        ),
+    ] = None,
+    workers: Annotated[
+        int,
+        typer.Option(
+            "--workers",
+            help="Worker processes for the chunk stage.",
+            show_default=True,
+        ),
+    ] = 1,
+    shard_count: Annotated[
+        int,
+        typer.Option(
+            "--shard-count",
+            help="Total number of shards for the chunk stage.",
+            show_default=True,
+        ),
+    ] = 1,
+    shard_index: Annotated[
+        int,
+        typer.Option(
+            "--shard-index",
+            help="Zero-based shard index for the chunk stage.",
+            show_default=True,
+        ),
+    ] = 0,
+    validate_only: Annotated[
+        bool,
+        typer.Option(
+            "--validate-only",
+            help="Validate existing outputs and exit.",
+        ),
+    ] = False,
+    inject_anchors: Annotated[
+        bool,
+        typer.Option(
+            "--inject-anchors",
+            help="Inject anchor metadata into outputs.",
+        ),
+    ] = False,
+    resume: Annotated[
+        bool,
+        typer.Option(
+            "--resume",
+            help="Skip DocTags whose chunk outputs already exist with matching hash.",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Force reprocessing even when resume criteria are satisfied.",
+        ),
+    ] = False,
+    verify_hash: Annotated[
+        bool,
+        typer.Option(
+            "--verify-hash",
+            help="Recompute input hashes before skipping resumed items. This validates manifest entries at the cost of additional I/O.",
+        ),
+    ] = False,
+) -> None:
+    argv = _build_chunk_cli_args(
+        data_root,
+        config,
+        profile,
+        input_dir,
+        output_dir,
+        min_tokens,
+        max_tokens,
+        log_level,
+        tokenizer_model,
+        soft_barrier_margin,
+        structural_markers,
+        serializer_provider,
+        workers,
+        shard_count,
+        shard_index,
+        validate_only,
+        inject_anchors,
+        resume,
+        force,
+        verify_hash,
+    )
+    exit_code = chunk(argv)
+    raise typer.Exit(code=exit_code)
 
-    _forward_with_context(ctx, doctags)
+
+@app.command("embed")
+def _embed_cli(
+    data_root: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--data-root",
+            help="DocsToKG data root override passed to the embedding stage.",
+        ),
+    ] = None,
+    config: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--config",
+            help="Path to stage config file (JSON/YAML/TOML).",
+        ),
+    ] = None,
+    profile: Annotated[
+        Optional[EmbedProfileOption],
+        typer.Option(
+            "--profile",
+            help="Preset controlling batch sizes, SPLADE backend, and Qwen settings.",
+        ),
+    ] = None,
+    log_level: Annotated[
+        LogLevelOption,
+        typer.Option(
+            "--log-level",
+            help="Logging verbosity for console output.",
+            show_default=True,
+        ),
+    ] = "INFO",
+    no_cache: Annotated[
+        bool,
+        typer.Option(
+            "--no-cache",
+            help="Disable Qwen LLM caching between batches (debug).",
+        ),
+    ] = False,
+    shard_count: Annotated[
+        int,
+        typer.Option(
+            "--shard-count",
+            help="Total number of shards for distributed runs.",
+            show_default=True,
+        ),
+    ] = 1,
+    shard_index: Annotated[
+        int,
+        typer.Option(
+            "--shard-index",
+            help="Zero-based shard index to process.",
+            show_default=True,
+        ),
+    ] = 0,
+    chunks_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--chunks-dir",
+            help="Override path to chunk files (auto-detected relative to data root).",
+        ),
+    ] = None,
+    out_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--out-dir",
+            "--vectors-dir",
+            help="Directory where vector outputs will be written (auto-detected).",
+        ),
+    ] = None,
+    vector_format: Annotated[
+        VectorFormatOption,
+        typer.Option(
+            "--vector-format",
+            "--format",
+            help="Vector output format.",
+            show_default=True,
+        ),
+    ] = "jsonl",
+    bm25_k1: Annotated[
+        float,
+        typer.Option("--bm25-k1", help="BM25 k1 parameter.", show_default=True),
+    ] = 1.5,
+    bm25_b: Annotated[
+        float,
+        typer.Option("--bm25-b", help="BM25 b parameter.", show_default=True),
+    ] = 0.75,
+    batch_size_splade: Annotated[
+        int,
+        typer.Option(
+            "--batch-size-splade", help="SPLADE batch size.", show_default=True
+        ),
+    ] = 32,
+    batch_size_qwen: Annotated[
+        int,
+        typer.Option("--batch-size-qwen", help="Qwen batch size.", show_default=True),
+    ] = 64,
+    splade_max_active_dims: Annotated[
+        Optional[int],
+        typer.Option(
+            "--splade-max-active-dims",
+            help="Optional SPLADE sparsity cap.",
+        ),
+    ] = None,
+    splade_model_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--splade-model-dir",
+            help="Explicit path to the SPLADE model directory (defaults to DocsToKG cache).",
+        ),
+    ] = None,
+    splade_attn: Annotated[
+        SpladeAttnOption,
+        typer.Option(
+            "--splade-attn",
+            help="SPLADE attention backend preference order.",
+            show_default=True,
+        ),
+    ] = "auto",
+    qwen_dtype: Annotated[
+        QwenDTypeOption,
+        typer.Option("--qwen-dtype", help="Qwen inference dtype.", show_default=True),
+    ] = "bfloat16",
+    qwen_quant: Annotated[
+        Optional[str],
+        typer.Option("--qwen-quant", help="Optional Qwen quantisation preset (nf4, awq, ...)."),
+    ] = None,
+    qwen_model_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--qwen-model-dir",
+            help="Explicit path to the Qwen model directory (defaults to DocsToKG cache).",
+        ),
+    ] = None,
+    qwen_dim: Annotated[
+        int,
+        typer.Option("--qwen-dim", help="Qwen embedding dimension.", show_default=True),
+    ] = 2560,
+    tensor_parallel: Annotated[
+        int,
+        typer.Option("--tp", "--tensor-parallel", help="Tensor parallel degree.", show_default=True),
+    ] = 1,
+    sparsity_warn_threshold_pct: Annotated[
+        float,
+        typer.Option(
+            "--sparsity-warn-threshold-pct",
+            help="Override SPLADE sparsity warning threshold.",
+            show_default=True,
+        ),
+    ] = SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+    sparsity_report_top_n: Annotated[
+        int,
+        typer.Option(
+            "--sparsity-report-top-n",
+            help="Number of SPLADE terms to report in sparsity summaries.",
+            show_default=True,
+        ),
+    ] = 10,
+    files_parallel: Annotated[
+        int,
+        typer.Option(
+            "--files-parallel",
+            help="Process up to N chunk files concurrently during embedding.",
+            show_default=True,
+        ),
+    ] = 1,
+    validate_only: Annotated[
+        bool,
+        typer.Option(
+            "--validate-only",
+            help="Validate existing vectors in --out-dir and exit.",
+        ),
+    ] = False,
+    plan_only: Annotated[
+        bool,
+        typer.Option(
+            "--plan-only",
+            help="Show resume/skip plan and exit without generating embeddings.",
+        ),
+    ] = False,
+    offline: Annotated[
+        bool,
+        typer.Option(
+            "--offline",
+            help="Disable network access by setting TRANSFORMERS_OFFLINE=1. All models must already exist in local caches.",
+        ),
+    ] = False,
+    resume: Annotated[
+        bool,
+        typer.Option(
+            "--resume",
+            help="Skip chunk files whose vector outputs already exist with matching hash.",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Force reprocessing even when resume criteria are satisfied.",
+        ),
+    ] = False,
+    verify_hash: Annotated[
+        bool,
+        typer.Option(
+            "--verify-hash",
+            help="Recompute input hashes before skipping resumed items. This validates manifest entries at the cost of additional I/O.",
+        ),
+    ] = False,
+) -> None:
+    argv = _build_embed_cli_args(
+        data_root,
+        config,
+        profile,
+        log_level,
+        no_cache,
+        shard_count,
+        shard_index,
+        chunks_dir,
+        out_dir,
+        vector_format,
+        bm25_k1,
+        bm25_b,
+        batch_size_splade,
+        batch_size_qwen,
+        splade_max_active_dims,
+        splade_model_dir,
+        splade_attn,
+        qwen_dtype,
+        qwen_quant,
+        qwen_model_dir,
+        qwen_dim,
+        tensor_parallel,
+        sparsity_warn_threshold_pct,
+        sparsity_report_top_n,
+        files_parallel,
+        validate_only,
+        plan_only,
+        offline,
+        resume,
+        force,
+        verify_hash,
+    )
+    exit_code = embed(argv)
+    raise typer.Exit(code=exit_code)
 
 
-_doctags_cli.__parser_help_factory__ = _doctags_help_text
+@app.command("token-profiles")
+def _token_profiles_cli(
+    data_root: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--data-root",
+            help="DocsToKG data root override. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT.",
+        ),
+    ] = None,
+    config: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--config",
+            help="Optional path to JSON/YAML/TOML config.",
+        ),
+    ] = None,
+    doctags_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--doctags-dir",
+            help="Directory containing DocTags files.",
+        ),
+    ] = None,
+    sample_size: Annotated[
+        int,
+        typer.Option(
+            "--sample-size",
+            help="Number of DocTags files to sample (<=0 means all).",
+            show_default=True,
+        ),
+    ] = 20,
+    max_chars: Annotated[
+        int,
+        typer.Option(
+            "--max-chars",
+            help="Trim samples to this many characters (<=0 keeps full text).",
+            show_default=True,
+        ),
+    ] = 4000,
+    baseline: Annotated[
+        str,
+        typer.Option(
+            "--baseline",
+            help="Tokenizer treated as baseline for ratios.",
+            show_default=True,
+        ),
+    ] = DEFAULT_TOKENIZER,
+    tokenizer: Annotated[
+        Optional[List[str]],
+        typer.Option(
+            "--tokenizer",
+            metavar="NAME",
+            help="Additional tokenizer identifier to profile (repeatable).",
+        ),
+    ] = None,
+    window_min: Annotated[
+        int,
+        typer.Option(
+            "--window-min",
+            help="Reference min tokens scaled by observed ratios.",
+            show_default=True,
+        ),
+    ] = 256,
+    window_max: Annotated[
+        int,
+        typer.Option(
+            "--window-max",
+            help="Reference max tokens scaled by observed ratios.",
+            show_default=True,
+        ),
+    ] = 512,
+    log_level: Annotated[
+        LogLevelOption,
+        typer.Option(
+            "--log-level",
+            help="Logging verbosity for structured output.",
+            show_default=True,
+        ),
+    ] = "INFO",
+) -> None:
+    argv = _build_token_profiles_cli_args(
+        data_root,
+        config,
+        doctags_dir,
+        sample_size,
+        max_chars,
+        baseline,
+        tokenizer or [],
+        window_min,
+        window_max,
+        log_level,
+    )
+    exit_code = token_profiles(argv)
+    raise typer.Exit(code=exit_code)
 
 
-@app.command(
-    "chunk",
-    cls=_ParserHelpCommand,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)
-def _chunk_cli(ctx: typer.Context) -> None:
-    """Typer surface for `docparse chunk`."""
-
-    _forward_with_context(ctx, chunk)
-
-
-_chunk_cli.__parser_help_factory__ = _chunk_help_text
-
-
-@app.command(
-    "embed",
-    cls=_ParserHelpCommand,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)
-def _embed_cli(ctx: typer.Context) -> None:
-    """Typer surface for `docparse embed`."""
-
-    _forward_with_context(ctx, embed)
-
-
-_embed_cli.__parser_help_factory__ = _embed_help_text
-
-
-@app.command(
-    "token-profiles",
-    cls=_ParserHelpCommand,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)
-def _token_profiles_cli(ctx: typer.Context) -> None:
-    """Typer surface for `docparse token-profiles`."""
-
-    _forward_with_context(ctx, token_profiles)
-
-
-_token_profiles_cli.__parser_help_factory__ = _token_profiles_help_text
-
-
-@app.command(
-    "plan",
-    cls=_ParserHelpCommand,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)
-def _plan_cli(ctx: typer.Context) -> None:
-    """Typer surface for `docparse plan`."""
-
-    _forward_with_context(ctx, plan)
+@app.command("manifest")
+def _manifest_cli(
+    stages: Annotated[
+        Optional[List[str]],
+        typer.Option(
+            "--stage",
+            help="Manifest stage to inspect (repeatable). Supported stages: doctags-html, doctags-pdf, chunks, embeddings.",
+            metavar="STAGE",
+        ),
+    ] = None,
+    data_root: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--data-root",
+            help="DocsToKG data root override used when resolving manifests.",
+        ),
+    ] = None,
+    tail: Annotated[
+        int,
+        typer.Option("--tail", help="Print the last N manifest entries.", show_default=True),
+    ] = 0,
+    summarize: Annotated[
+        bool,
+        typer.Option(
+            "--summarize",
+            help="Print per-stage status and duration summary.",
+        ),
+    ] = False,
+    raw: Annotated[
+        bool,
+        typer.Option(
+            "--raw",
+            help="Output tail entries as JSON instead of human-readable text.",
+        ),
+    ] = False,
+) -> None:
+    argv = _build_manifest_cli_args(stages or [], data_root, tail, summarize, raw)
+    exit_code = manifest(argv)
+    raise typer.Exit(code=exit_code)
 
 
-_plan_cli.__parser_help_factory__ = _plan_help_text
+@app.command("plan")
+def _plan_cli(
+    data_root: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--data-root",
+            help="DocsToKG data root override passed to all stages.",
+        ),
+    ] = None,
+    log_level: Annotated[
+        LogLevelOption,
+        typer.Option(
+            "--log-level",
+            help="Logging verbosity applied to all stages.",
+            show_default=True,
+        ),
+    ] = "INFO",
+    resume: Annotated[
+        bool,
+        typer.Option(
+            "--resume",
+            help="Resume each stage by skipping outputs with matching manifests.",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Force regeneration in each stage even when outputs exist.",
+        ),
+    ] = False,
+    mode: Annotated[
+        DoctagsModeOption,
+        typer.Option(
+            "--mode",
+            help="DocTags conversion mode.",
+            show_default=True,
+        ),
+    ] = "auto",
+    doctags_in_dir: Annotated[
+        Optional[Path],
+        typer.Option("--doctags-in-dir", help="Override DocTags input directory."),
+    ] = None,
+    doctags_out_dir: Annotated[
+        Optional[Path],
+        typer.Option("--doctags-out-dir", help="Override DocTags output directory."),
+    ] = None,
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            help="Allow rewriting DocTags outputs (HTML mode only).",
+        ),
+    ] = False,
+    vllm_wait_timeout: Annotated[
+        Optional[int],
+        typer.Option(
+            "--vllm-wait-timeout",
+            help="Seconds to wait for vLLM readiness during the DocTags stage.",
+        ),
+    ] = None,
+    chunk_out_dir: Annotated[
+        Optional[Path],
+        typer.Option("--chunk-out-dir", help="Output directory override for chunk JSONL files."),
+    ] = None,
+    chunk_workers: Annotated[
+        Optional[int],
+        typer.Option("--chunk-workers", help="Worker processes for the chunk stage."),
+    ] = None,
+    chunk_min_tokens: Annotated[
+        Optional[int],
+        typer.Option("--chunk-min-tokens", help="Minimum tokens per chunk passed to the chunk stage."),
+    ] = None,
+    chunk_max_tokens: Annotated[
+        Optional[int],
+        typer.Option("--chunk-max-tokens", help="Maximum tokens per chunk passed to the chunk stage."),
+    ] = None,
+    structural_markers: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--structural-markers",
+            help="Structural marker configuration forwarded to the chunk stage.",
+        ),
+    ] = None,
+    chunk_shard_count: Annotated[
+        Optional[int],
+        typer.Option("--chunk-shard-count", help="Total number of shards for the chunk stage."),
+    ] = None,
+    chunk_shard_index: Annotated[
+        Optional[int],
+        typer.Option("--chunk-shard-index", help="Zero-based shard index for the chunk stage."),
+    ] = None,
+    embed_out_dir: Annotated[
+        Optional[Path],
+        typer.Option("--embed-out-dir", help="Output directory override for embedding JSONL files."),
+    ] = None,
+    embed_offline: Annotated[
+        bool,
+        typer.Option(
+            "--embed-offline",
+            help="Run the embedding stage with TRANSFORMERS_OFFLINE=1.",
+        ),
+    ] = False,
+    embed_validate_only: Annotated[
+        bool,
+        typer.Option(
+            "--embed-validate-only",
+            help="Skip embedding generation and only validate existing vectors.",
+        ),
+    ] = False,
+    sparsity_warn_threshold_pct: Annotated[
+        Optional[float],
+        typer.Option(
+            "--sparsity-warn-threshold-pct",
+            help="Override SPLADE sparsity warning threshold for the embed stage.",
+        ),
+    ] = None,
+    embed_shard_count: Annotated[
+        Optional[int],
+        typer.Option(
+            "--embed-shard-count",
+            help="Total number of shards for the embed stage (defaults to chunk shard count).",
+        ),
+    ] = None,
+    embed_shard_index: Annotated[
+        Optional[int],
+        typer.Option(
+            "--embed-shard-index",
+            help="Zero-based shard index for the embed stage (defaults to chunk shard index).",
+        ),
+    ] = None,
+    embed_format: Annotated[
+        Optional[VectorFormatOption],
+        typer.Option("--embed-format", help="Vector output format for the embed stage."),
+    ] = None,
+    embed_no_cache: Annotated[
+        bool,
+        typer.Option(
+            "--embed-no-cache",
+            help="Disable Qwen cache reuse during the embed stage.",
+        ),
+    ] = False,
+) -> None:
+    argv = _build_run_all_cli_args(
+        data_root,
+        log_level,
+        resume,
+        force,
+        mode,
+        doctags_in_dir,
+        doctags_out_dir,
+        overwrite,
+        vllm_wait_timeout,
+        chunk_out_dir,
+        chunk_workers,
+        chunk_min_tokens,
+        chunk_max_tokens,
+        structural_markers,
+        chunk_shard_count,
+        chunk_shard_index,
+        embed_out_dir,
+        embed_offline,
+        embed_validate_only,
+        sparsity_warn_threshold_pct,
+        embed_shard_count,
+        embed_shard_index,
+        embed_format,
+        embed_no_cache,
+        plan_only=True,
+    )
+    exit_code = run_all(argv)
+    raise typer.Exit(code=exit_code)
 
 
-@app.command(
-    "manifest",
-    cls=_ParserHelpCommand,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)
-def _manifest_cli(ctx: typer.Context) -> None:
-    """Typer surface for `docparse manifest`."""
-
-    _forward_with_context(ctx, manifest)
-
-
-_manifest_cli.__parser_help_factory__ = _manifest_help_text
-
-
-@app.command(
-    "all",
-    cls=_ParserHelpCommand,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)
-def _all_cli(ctx: typer.Context) -> None:
-    """Typer surface for `docparse all`."""
-
-    _forward_with_context(ctx, run_all)
-
-
-_all_cli.__parser_help_factory__ = _run_all_help_text
+@app.command("all")
+def _all_cli(
+    data_root: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--data-root",
+            help="DocsToKG data root override passed to all stages.",
+        ),
+    ] = None,
+    log_level: Annotated[
+        LogLevelOption,
+        typer.Option(
+            "--log-level",
+            help="Logging verbosity applied to all stages.",
+            show_default=True,
+        ),
+    ] = "INFO",
+    resume: Annotated[
+        bool,
+        typer.Option(
+            "--resume",
+            help="Resume each stage by skipping outputs with matching manifests.",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Force regeneration in each stage even when outputs exist.",
+        ),
+    ] = False,
+    mode: Annotated[
+        DoctagsModeOption,
+        typer.Option(
+            "--mode",
+            help="DocTags conversion mode.",
+            show_default=True,
+        ),
+    ] = "auto",
+    doctags_in_dir: Annotated[
+        Optional[Path],
+        typer.Option("--doctags-in-dir", help="Override DocTags input directory."),
+    ] = None,
+    doctags_out_dir: Annotated[
+        Optional[Path],
+        typer.Option("--doctags-out-dir", help="Override DocTags output directory."),
+    ] = None,
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            help="Allow rewriting DocTags outputs (HTML mode only).",
+        ),
+    ] = False,
+    vllm_wait_timeout: Annotated[
+        Optional[int],
+        typer.Option(
+            "--vllm-wait-timeout",
+            help="Seconds to wait for vLLM readiness during the DocTags stage.",
+        ),
+    ] = None,
+    chunk_out_dir: Annotated[
+        Optional[Path],
+        typer.Option("--chunk-out-dir", help="Output directory override for chunk JSONL files."),
+    ] = None,
+    chunk_workers: Annotated[
+        Optional[int],
+        typer.Option("--chunk-workers", help="Worker processes for the chunk stage."),
+    ] = None,
+    chunk_min_tokens: Annotated[
+        Optional[int],
+        typer.Option("--chunk-min-tokens", help="Minimum tokens per chunk passed to the chunk stage."),
+    ] = None,
+    chunk_max_tokens: Annotated[
+        Optional[int],
+        typer.Option("--chunk-max-tokens", help="Maximum tokens per chunk passed to the chunk stage."),
+    ] = None,
+    structural_markers: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--structural-markers",
+            help="Structural marker configuration forwarded to the chunk stage.",
+        ),
+    ] = None,
+    chunk_shard_count: Annotated[
+        Optional[int],
+        typer.Option("--chunk-shard-count", help="Total number of shards for the chunk stage."),
+    ] = None,
+    chunk_shard_index: Annotated[
+        Optional[int],
+        typer.Option("--chunk-shard-index", help="Zero-based shard index for the chunk stage."),
+    ] = None,
+    embed_out_dir: Annotated[
+        Optional[Path],
+        typer.Option("--embed-out-dir", help="Output directory override for embedding JSONL files."),
+    ] = None,
+    embed_offline: Annotated[
+        bool,
+        typer.Option(
+            "--embed-offline",
+            help="Run the embedding stage with TRANSFORMERS_OFFLINE=1.",
+        ),
+    ] = False,
+    embed_validate_only: Annotated[
+        bool,
+        typer.Option(
+            "--embed-validate-only",
+            help="Skip embedding generation and only validate existing vectors.",
+        ),
+    ] = False,
+    sparsity_warn_threshold_pct: Annotated[
+        Optional[float],
+        typer.Option(
+            "--sparsity-warn-threshold-pct",
+            help="Override SPLADE sparsity warning threshold for the embed stage.",
+        ),
+    ] = None,
+    embed_shard_count: Annotated[
+        Optional[int],
+        typer.Option(
+            "--embed-shard-count",
+            help="Total number of shards for the embed stage (defaults to chunk shard count).",
+        ),
+    ] = None,
+    embed_shard_index: Annotated[
+        Optional[int],
+        typer.Option(
+            "--embed-shard-index",
+            help="Zero-based shard index for the embed stage (defaults to chunk shard index).",
+        ),
+    ] = None,
+    embed_format: Annotated[
+        Optional[VectorFormatOption],
+        typer.Option("--embed-format", help="Vector output format for the embed stage."),
+    ] = None,
+    embed_no_cache: Annotated[
+        bool,
+        typer.Option(
+            "--embed-no-cache",
+            help="Disable Qwen cache reuse during the embed stage.",
+        ),
+    ] = False,
+    plan_only: Annotated[
+        bool,
+        typer.Option(
+            "--plan",
+            "--plan-only",
+            help="Show a plan of the files each stage would touch instead of running.",
+        ),
+    ] = False,
+) -> None:
+    argv = _build_run_all_cli_args(
+        data_root,
+        log_level,
+        resume,
+        force,
+        mode,
+        doctags_in_dir,
+        doctags_out_dir,
+        overwrite,
+        vllm_wait_timeout,
+        chunk_out_dir,
+        chunk_workers,
+        chunk_min_tokens,
+        chunk_max_tokens,
+        structural_markers,
+        chunk_shard_count,
+        chunk_shard_index,
+        embed_out_dir,
+        embed_offline,
+        embed_validate_only,
+        sparsity_warn_threshold_pct,
+        embed_shard_count,
+        embed_shard_index,
+        embed_format,
+        embed_no_cache,
+        plan_only,
+    )
+    exit_code = run_all(argv)
+    raise typer.Exit(code=exit_code)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

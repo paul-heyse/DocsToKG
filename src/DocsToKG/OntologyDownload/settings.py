@@ -47,6 +47,7 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
+    Literal,
     Set,
     Tuple,
 )
@@ -268,6 +269,13 @@ class DownloadConfiguration(BaseModel):
     shared_rate_limit_dir: Optional[Path] = Field(
         default=None,
         description="Directory used to persist shared token bucket state across processes",
+    )
+    rate_limiter: Literal["pyrate", "legacy"] = Field(
+        default="pyrate",
+        description=(
+            "Selects the rate limiter backend. Use 'pyrate' for the pyrate-limiter manager"
+            " or 'legacy' to fall back to the built-in token bucket."
+        ),
     )
 
     @field_validator("rate_limits")
@@ -689,6 +697,7 @@ if _HAS_PYDANTIC_SETTINGS:
         )
         backoff_factor: Optional[float] = Field(default=None, alias="ONTOFETCH_BACKOFF_FACTOR")
         log_level: Optional[str] = Field(default=None, alias="ONTOFETCH_LOG_LEVEL")
+        rate_limiter: Optional[str] = Field(default=None, alias="ONTOFETCH_RATE_LIMITER")
         shared_rate_limit_dir: Optional[Path] = Field(
             default=None, alias="ONTOFETCH_SHARED_RATE_LIMIT_DIR"
         )
@@ -712,6 +721,7 @@ else:
             self.timeout_sec = _read_env_int("ONTOFETCH_TIMEOUT_SEC")
             self.download_timeout_sec = _read_env_int("ONTOFETCH_DOWNLOAD_TIMEOUT_SEC")
             self.per_host_rate_limit = _read_env_value("ONTOFETCH_PER_HOST_RATE_LIMIT")
+            self.rate_limiter = _read_env_value("ONTOFETCH_RATE_LIMITER")
             self.backoff_factor = _read_env_float("ONTOFETCH_BACKOFF_FACTOR")
             self.log_level = _read_env_value("ONTOFETCH_LOG_LEVEL")
             self.shared_rate_limit_dir = _read_env_path("ONTOFETCH_SHARED_RATE_LIMIT_DIR")
@@ -721,6 +731,7 @@ else:
         timeout_sec: Optional[int]
         download_timeout_sec: Optional[int]
         per_host_rate_limit: Optional[str]
+        rate_limiter: Optional[str]
         backoff_factor: Optional[float]
         log_level: Optional[str]
         shared_rate_limit_dir: Optional[Path]
@@ -743,6 +754,7 @@ else:
                 "timeout_sec": self.timeout_sec,
                 "download_timeout_sec": self.download_timeout_sec,
                 "per_host_rate_limit": self.per_host_rate_limit,
+                "rate_limiter": self.rate_limiter,
                 "backoff_factor": self.backoff_factor,
                 "log_level": self.log_level,
                 "shared_rate_limit_dir": self.shared_rate_limit_dir,
@@ -788,6 +800,21 @@ def _apply_env_overrides(defaults: DefaultsConfig) -> None:
             env.per_host_rate_limit,
             extra={"stage": "config"},
         )
+    if env.rate_limiter is not None:
+        candidate = env.rate_limiter.strip().lower()
+        if candidate not in {"pyrate", "legacy"}:
+            logger.warning(
+                "Ignoring invalid rate_limiter override: %s",
+                env.rate_limiter,
+                extra={"stage": "config"},
+            )
+        else:
+            defaults.http.rate_limiter = candidate  # type: ignore[assignment]
+            logger.info(
+                "Config overridden: rate_limiter=%s",
+                candidate,
+                extra={"stage": "config"},
+            )
     if env.backoff_factor is not None:
         defaults.http.backoff_factor = env.backoff_factor
         logger.info(

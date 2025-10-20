@@ -10,8 +10,9 @@ Responsibilities
   :class:`DownloadRun` context management.
 - Provide resumable execution by hydrating prior manifest/index snapshots and
   skipping already-processed works before dispatching to the resolver pipeline.
-- Hydrate global URL dedupe sets, robots caches, and thread-local HTTP sessions
-  so per-run policies (token buckets, retry caps) are honoured across workers.
+- Hydrate global URL dedupe sets, robots caches, and the shared HTTPX client so
+  retry/caching policies (Hishel, Tenacity, polite headers) are honoured across
+  workers without needing per-thread session pools.
 - Coordinate sequential ``--sleep`` throttling while leaving concurrent worker
   pools free from the default delay unless operators request it explicitly.
 - Surface convenience helpers (:func:`run`, :func:`iterate_openalex`) that are
@@ -22,8 +23,8 @@ Key Components
 --------------
 - ``DownloadRun`` – encapsulates setup, execution, and teardown for a single run.
 - ``DownloadRunState`` – aggregates counters thread-safely for telemetry output.
-- ``ThreadLocalSessionFactory`` – provides pooled HTTP sessions scoped to
-  worker threads and cleaned up at the end of a run.
+- ``get_http_client`` – acquires the cached HTTPX/Hishel client shared across
+  resolver workers.
 - ``iterate_openalex`` – generator that pages through OpenAlex Works queries,
   respecting CLI throttles and polite headers.
 - ``run`` – top-level helper that owns the context-manager lifetime of

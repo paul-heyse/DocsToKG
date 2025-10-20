@@ -247,13 +247,13 @@ This repository’s environment includes **custom wheels and GPU-optimized packa
 
 # Agents Guide - ContentDownload
 
-Last updated: 2025-10-19
+Last updated: 2025-10-21
 
 ## Mission & Scope
 
-- **Mission**: Coordinate resolver-driven acquisition of OpenAlex-derived scholarly artifacts into structured manifests with deterministic retry, resume, and telemetry semantics.
-- **Scope**: Resolver orchestration, download pipeline, caching/resume semantics, manifest generation, telemetry sinks, polite networking safeguards.
-- **Out-of-scope**: Knowledge-graph ingestion, DocTags conversion, ontology-aware fetching, downstream analytics/embedding.
+- **Mission**: Coordinate resolver-driven acquisition of OpenAlex-derived scholarly artifacts into structured manifests with deterministic retry, resumability, and telemetry semantics using a shared HTTPX/Hishel transport.
+- **Scope**: Resolver orchestration, download pipeline, streaming/conditional HTTP semantics, caching/resume flows, manifest generation, telemetry sinks, and polite networking safeguards (robots, token buckets, Tenacity backoff).
+- **Out-of-scope**: Knowledge-graph ingestion, DocTags conversion, ontology-aware fetching, downstream analytics/embedding, or anything that mutates the `.venv`/dependency graph.
 
 ## Quickstart (same as README)
 
@@ -295,8 +295,8 @@ flowchart LR
   Run --> Pipe[ResolverPipeline\npipeline.py]
   Pipe --> Download[download.process_one_work]
   Download --> Net[networking.request_with_retries]
-  Download --> Files[(PDF/HTML/XML + manifest)]
-  Run --> Telemetry[telemetry.MultiSink]
+  Download --> Files[(PDF/HTML/XML + manifests)]
+  Run --> Telemetry[telemetry.RunTelemetry]
   Run --> Provider[providers.OpenAlexWorkProvider]
   Provider --> OA[(OpenAlex API)]
   Pipe --> Resolvers[(Resolver endpoints)]
@@ -304,13 +304,13 @@ flowchart LR
   class OA,Resolvers ext;
 ```
 
-- `cli.main()` wires the frozen `ResolvedConfig` into `DownloadRun`, seeding resolver instances, telemetry factories, and configurable hooks (`download_candidate_func`, sink factories) for tests.
-- `DownloadRun.run()` stages the lifecycle in order: `setup_sinks()` → `setup_resolver_pipeline()` → `setup_work_provider()` → `setup_download_state()` → work execution (sequential or `ThreadPoolExecutor`). The shared HTTPX client from `DocsToKG.ContentDownload.httpx_transport` is reused across workers (tests may override via `configure_http_client()` / `reset_http_client_for_tests()`), and sequential `--sleep` throttles are automatically disabled when `--workers > 1` unless callers opt in explicitly.
-- `DownloadRun.setup_download_state()` hydrates resume metadata from JSONL/CSV manifests or SQLite caches, seeds `DownloadConfig` (robots cache, content-addressed toggle, digest verification, global dedupe sets), and registers cleanup callbacks on the exit stack.
-- `ResolverPipeline.run()` enforces resolver ordering, per-resolver spacing, domain token buckets, circuit breakers, global URL dedupe, and emits structured `AttemptRecord` telemetry while updating `ResolverMetrics`.
-- `download.process_one_work()` normalises work payloads, evaluates resume decisions, coordinates download strategies (PDF/HTML/XML), finalises artifacts atomically, and logs manifest + summary records via `RunTelemetry`.
-- Telemetry fan-out (`RunTelemetry`, `MultiSink`) writes JSONL, optional CSV, SQLite, manifest index, summary, metrics, and last-attempt outputs, keeping rotation and resume surfaces consistent.
-- `providers.OpenAlexWorkProvider` streams `WorkArtifact` objects either from live `pyalex` queries or supplied iterables, reusing `iterate_openalex()` with equal-jitter backoff, optional `Retry-After` cap, per-page bounds, and `--max` truncation for dry-run testing.
+- `cli.main()` produces a frozen `ResolvedConfig` (output directories, resolver instances, polite headers) and hands it to `DownloadRun`. The CLI exposes deterministic hook points (`download_candidate_func`, sink factories, HTTP client overrides) so tests can inject `httpx.MockTransport` or stubbed sink implementations without touching internals.
+- `DownloadRun.run()` orchestrates the full lifecycle: `setup_sinks()` → `setup_resolver_pipeline()` → `setup_work_provider()` → `setup_download_state()` → worker execution. The shared HTTPX/Hishel client from `DocsToKG.ContentDownload.httpx_transport` is acquired once and reused across workers; tests reset or override it via `configure_http_client()` / `reset_http_client_for_tests()`. Sequential polite sleeps default to 0.05s but are skipped automatically when `--workers > 1` unless explicitly provided.
+- `DownloadRun.setup_download_state()` hydrates resume metadata from JSONL/CSV/SQLite, seeds `DownloadConfig` (robots cache, content-addressed storage, digest verification, domain content rules, Accept overrides, dedupe caches), and registers cleanup callbacks on the exit stack so temporary resume snapshots are removed even on failure.
+- `ResolverPipeline.run()` enforces resolver ordering, per-resolver spacing, domain token buckets, host semaphores, circuit breakers, and global URL dedupe before delegating to download strategies. Every attempt logs structured telemetry (`AttemptRecord`) and updates `ResolverMetrics` for later summaries.
+- `download.process_one_work()` normalises work payloads, evaluates resume decisions, coordinates download strategies (PDF/HTML/XML), runs conditional requests, finalises artifacts atomically (with content-addressed promotion when enabled), and logs manifest + summary records via `RunTelemetry`.
+- Telemetry fan-out (`RunTelemetry`, `MultiSink`) writes JSONL, optional CSV, SQLite, manifest index, summary, metrics, and last-attempt outputs so resume tooling (`JsonlResumeLookup` / `SqliteResumeLookup`) and downstream analytics remain in sync even when rotation is enabled.
+- `providers.OpenAlexWorkProvider` streams `WorkArtifact` objects from live `pyalex` queries or supplied iterables, calling `iterate_openalex()` (equal-jitter retry, optional `Retry-After` cap, per-page bounds, `--max` truncation) and deferring HTTP retries to the shared Tenacity policy.
 
 ## Storage Layout & Run Outputs
 
@@ -383,11 +383,11 @@ resolver_circuit_breakers:
 
 ## Networking, Rate Limiting & Politeness
 
-- `DocsToKG.ContentDownload.httpx_transport` provisions a singleton HTTPX client wrapped in Hishel caching; `configure_http_client()` injects transports (e.g., `httpx.MockTransport`) and `purge_http_cache()` clears `${CACHE_DIR}/http/ContentDownload` for ops/testing.
-- `request_with_retries()` delegates to a Tenacity controller that retries `{429, 500, 502, 503, 504}`, honours `Retry-After` headers (bounded by `retry_after_cap` and `backoff_max`), closes intermediate `httpx.Response` objects before sleeping, and surfaces the final response when HTTP retries exhaust. Patch `DocsToKG.ContentDownload.networking.time.sleep` or use `configure_http_client()` in tests to freeze pacing.
+- `DocsToKG.ContentDownload.httpx_transport` provisions a singleton HTTPX client wrapped in Hishel caching. It enables HTTP/2 when the optional `h2` dependency is present and falls back to HTTP/1.1 automatically when it is not. `configure_http_client()` injects transports/event hooks (e.g., `httpx.MockTransport` during tests) and `purge_http_cache()` clears `${CACHE_DIR}/http/ContentDownload` for ops/testing.
+- `request_with_retries()` delegates to a Tenacity controller that retries `{429, 500, 502, 503, 504}`, honours `Retry-After` headers (bounded by `retry_after_cap` and `backoff_max`), closes intermediate `httpx.Response` objects before sleeping, and surfaces the final response when HTTP retries exhaust. Patch `DocsToKG.ContentDownload.networking.time.sleep` or use `configure_http_client()` in tests to freeze pacing. When `stream=True`, the helper returns an object usable as a context manager (plain responses are wrapped via `contextlib.nullcontext`) so call sites can always use `with` blocks safely.
 - Resolver/CLI knobs flow directly into the Tenacity policy: `backoff_factor` controls jitter amplitude, `backoff_max` bounds waits, `retry_after_cap` enforces ceilings, `respect_retry_after` toggles header parsing, and `max_retry_duration` halts retries early.
 - Token buckets/circuit breakers defined in `ResolverConfig` throttle host+resolver concurrency; host semaphores and `CircuitBreaker` instances (`resolver_circuit_breakers`, domain breakers) share telemetry and enforce cooldowns.
-- `download.RobotsCache` enforces robots.txt unless `--ignore-robots`; override only with explicit approval.
+- `download.RobotsCache` enforces robots.txt unless `--ignore-robots`; it reuses `request_with_retries()`, returns deterministic context managers for streaming responses, and is safe to override only with explicit approval.
 - `ConditionalRequestHelper` builds `If-None-Match` / `If-Modified-Since` headers; `head_precheck` downgrades to conditional GETs when HEAD is unsupported.
 - `statistics.BandwidthTracker` (opt-in) can expose throughput for tuning `--workers`.
 

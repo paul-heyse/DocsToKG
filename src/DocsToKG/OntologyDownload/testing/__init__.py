@@ -196,7 +196,9 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         self._http_port: Optional[int] = None
         self._original_paths: Dict[str, Dict[str, object]] = {}
         self._storage: Optional[_StorageBackend] = None
-        self._bucket_state: Dict[Tuple[Optional[str], Optional[str]], rate_mod.TokenBucket] = {}
+        self._bucket_state: Dict[
+            Tuple[Optional[str], Optional[str]], rate_mod.RateLimiterHandle
+        ] = {}
         self._env_overrides: Dict[str, Optional[str]] = {}
         self._registered = False
 
@@ -553,11 +555,12 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         service: Optional[str],
         config: DownloadConfiguration,
         host: Optional[str],
-    ) -> rate_mod.TokenBucket:
+    ) -> rate_mod.RateLimiterHandle:
         key = (service, host)
         bucket = self._bucket_state.get(key)
         if bucket is None:
-            bucket = rate_mod.TokenBucket(rate_per_sec=10.0, capacity=10.0)
+            legacy_cls = getattr(rate_mod, "_LegacyTokenBucket")
+            bucket = legacy_cls(rate_per_sec=10.0, capacity=10.0)
             self._bucket_state[key] = bucket
         return bucket
 

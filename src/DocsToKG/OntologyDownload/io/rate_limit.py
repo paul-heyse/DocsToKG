@@ -1,33 +1,42 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.io.rate_limit",
-#   "purpose": "Implement token bucket primitives and shared registries for ontology download rate limiting",
+#   "purpose": "Expose pyrate-limiter backed throttling for ontology downloads with a legacy fallback",
 #   "sections": [
-#     {"id": "token-buckets", "name": "Token Bucket Primitives", "anchor": "TBK", "kind": "api"},
-#     {"id": "shared-buckets", "name": "Shared Token Buckets", "anchor": "SHR", "kind": "api"},
-#     {"id": "registry", "name": "Rate Limiter Registry", "anchor": "REG", "kind": "api"},
-#     {"id": "public-api", "name": "Registry Helpers & Exports", "anchor": "API", "kind": "helpers"}
+#     {"id": "pyrate-manager", "name": "Pyrate Limiter Manager", "anchor": "PRT", "kind": "api"},
+#     {"id": "legacy-implementation", "name": "Legacy Token Buckets", "anchor": "LEG", "kind": "api"},
+#     {"id": "public-api", "name": "Facade & Helpers", "anchor": "API", "kind": "helpers"}
 #   ]
 # }
 # === /NAVMAP ===
 
-"""Rate limiting primitives for ontology downloads.
+"""Rate limiting façade for ontology downloads.
 
-Resolvers often talk to public APIs with strict quotas.  This module implements
-token-bucket and shared-registry abstractions that throttle requests across
-processes and machines, persisting state when necessary.  It is used by the
-networking layer to honour ``defaults.http`` policies declared in configuration.
+This module front-loads a pyrate-limiter manager that hands back blocking
+limiter handles keyed by ``(service, host)``.  The limiter instances derive
+their quotas from :class:`DownloadConfiguration`, optionally persisting state in
+SQLite so multiple processes respect shared quotas.  A legacy token-bucket
+registry is retained for ``rate_limiter='legacy'`` to support short-term roll
+backs while the pyrate-backed implementation is validated.
 """
 
 from __future__ import annotations
 
 import json
+import logging
+import math
 import re
 import threading
 import time
 from dataclasses import dataclass
+from fractions import Fraction
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Protocol, Set, Tuple
+
+from pyrate_limiter import Duration, Limiter, Rate
+from pyrate_limiter.buckets import InMemoryBucket
+from pyrate_limiter.buckets.sqlite_bucket import SQLiteBucket
+from pyrate_limiter.utils import validate_rate_list
 
 from ..settings import DownloadConfiguration
 
@@ -41,8 +50,246 @@ try:  # pragma: no cover - Windows only
 except ImportError:  # pragma: no cover - POSIX fallback
     msvcrt = None  # type: ignore[assignment]
 
+logger = logging.getLogger("DocsToKG.OntologyDownload.rate_limit")
 
-class TokenBucket:
+_RATE_LIMIT_PATTERN = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$", re.IGNORECASE)
+_UNIT_TO_MILLISECONDS = {
+    "second": int(Duration.SECOND),
+    "sec": int(Duration.SECOND),
+    "s": int(Duration.SECOND),
+    "minute": int(Duration.MINUTE),
+    "min": int(Duration.MINUTE),
+    "m": int(Duration.MINUTE),
+    "hour": int(Duration.HOUR),
+    "h": int(Duration.HOUR),
+}
+_BLOCKING_MAX_DELAY_MS = int(Duration.DAY) * 365  # wait up to ~one year before giving up
+_BUFFER_MS = 0
+
+
+class RateLimiterHandle(Protocol):
+    """Minimal interface shared by pyrate and legacy limiter handles."""
+
+    def consume(self, tokens: float = 1.0) -> None:
+        """Acquire tokens, blocking until the limiter admits the request."""
+
+
+def _table_name_for_key(name: str) -> str:
+    token = re.sub(r"[^A-Za-z0-9_]", "_", name)
+    token = token.strip("_") or "bucket"
+    return f"rl_{token}"
+
+
+def _parse_rate_string(limit_text: str) -> List[Rate]:
+    match = _RATE_LIMIT_PATTERN.match(limit_text.strip())
+    if not match:
+        raise ValueError(
+            f"Invalid rate limit '{limit_text}'. Expected format: <number>/<unit> "
+            "(e.g., '5/second', '60/minute', '1/hour')"
+        )
+    raw_value, unit_token = match.groups()
+    value = float(raw_value)
+    if value <= 0:
+        raise ValueError("Rate limit values must be positive")
+
+    base_ms = _UNIT_TO_MILLISECONDS[unit_token.lower()]
+    fraction = Fraction(value).limit_denominator(1000)
+    limit = max(1, fraction.numerator)
+    interval_ms = int(base_ms * fraction.denominator)
+
+    rates = [Rate(limit, interval_ms)]
+    validate_rate_list(rates)
+    return rates
+
+
+def _normalise_shared_dir(shared_dir: Optional[Path]) -> Optional[Path]:
+    if shared_dir is None:
+        return None
+    base = Path(shared_dir).expanduser()
+    try:
+        return base.resolve(strict=False)
+    except TypeError:  # pragma: no cover - for Python versions without strict kwarg
+        return base.resolve()
+
+
+class _LimiterAdapter(RateLimiterHandle):
+    """Thin wrapper providing the legacy ``consume`` interface on top of a Limiter."""
+
+    __slots__ = ("_limiter", "_name")
+
+    def __init__(self, limiter: Limiter, name: str) -> None:
+        self._limiter = limiter
+        self._name = name
+
+    def consume(self, tokens: float = 1.0) -> None:
+        weight = max(1, math.ceil(tokens))
+        while True:
+            result = self._limiter.try_acquire(self._name, weight=weight)
+            if isinstance(result, bool):
+                if result:
+                    return
+                # Defensive fallback: the limiter should block internally, but guard just in case.
+                time.sleep(0.05)
+                continue
+            raise RuntimeError("Limiter produced an asynchronous result in a synchronous context")
+
+
+@dataclass(slots=True)
+class _LimiterEntry:
+    adapter: _LimiterAdapter
+    rate_signature: str
+    backend_signature: str
+
+
+class _PyrateLimiterManager:
+    """Construct and cache pyrate-limiter handles keyed by (service, host)."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._limiters: Dict[Tuple[str, str], _LimiterEntry] = {}
+        self._logged: Set[str] = set()
+
+    def get_bucket(
+        self,
+        *,
+        http_config: DownloadConfiguration,
+        service: Optional[str],
+        host: Optional[str],
+    ) -> RateLimiterHandle:
+        service_key = (service or "_").lower()
+        host_key = (host or "default").lower()
+        limiter_name = f"{service_key}:{host_key}"
+        key = (service_key, host_key)
+        limit_text = self._resolve_limit_text(http_config, service)
+        backend_signature = self._expected_backend_signature(
+            getattr(http_config, "shared_rate_limit_dir", None), limiter_name
+        )
+
+        with self._lock:
+            entry = self._limiters.get(key)
+            if (
+                entry is not None
+                and entry.rate_signature == limit_text
+                and entry.backend_signature == backend_signature
+            ):
+                return entry.adapter
+
+            adapter, actual_backend_signature = self._build_adapter(
+                limit_text=limit_text,
+                http_config=http_config,
+                service_key=service_key,
+                host_key=host_key,
+                limiter_name=limiter_name,
+            )
+            self._limiters[key] = _LimiterEntry(
+                adapter=adapter,
+                rate_signature=limit_text,
+                backend_signature=actual_backend_signature,
+            )
+            return adapter
+
+    def reset(self) -> None:
+        with self._lock:
+            self._limiters.clear()
+            self._logged.clear()
+
+    def _resolve_limit_text(
+        self, http_config: DownloadConfiguration, service: Optional[str]
+    ) -> str:
+        if service:
+            override = http_config.rate_limits.get(service)
+            if override:
+                return override
+        return http_config.per_host_rate_limit
+
+    def _build_adapter(
+        self,
+        *,
+        limit_text: str,
+        http_config: DownloadConfiguration,
+        service_key: str,
+        host_key: str,
+        limiter_name: str,
+    ) -> Tuple[_LimiterAdapter, str]:
+        rates = _parse_rate_string(limit_text)
+        bucket, backend_signature = self._create_bucket(
+            rates=rates,
+            shared_dir=getattr(http_config, "shared_rate_limit_dir", None),
+            limiter_name=limiter_name,
+        )
+        limiter = Limiter(
+            bucket,
+            raise_when_fail=False,
+            max_delay=_BLOCKING_MAX_DELAY_MS,
+            retry_until_max_delay=True,
+            buffer_ms=_BUFFER_MS,
+        )
+        adapter = _LimiterAdapter(limiter, limiter_name)
+        self._log_backend_once(limiter_name, limit_text, backend_signature)
+        return adapter, backend_signature
+
+    def _create_bucket(
+        self,
+        *,
+        rates: List[Rate],
+        shared_dir: Optional[Path],
+        limiter_name: str,
+    ) -> Tuple[InMemoryBucket | SQLiteBucket, str]:
+        normalised = _normalise_shared_dir(shared_dir)
+        if normalised is None:
+            return InMemoryBucket(rates), "memory"
+
+        normalised.mkdir(parents=True, exist_ok=True)
+        db_path = normalised / "ratelimit.sqlite"
+        try:
+            resolved = db_path.resolve(strict=False)
+        except TypeError:  # pragma: no cover - for Python versions without strict kwarg
+            resolved = db_path.resolve()
+        table_name = _table_name_for_key(limiter_name)
+        bucket = SQLiteBucket.init_from_file(
+            rates,
+            table=table_name,
+            db_path=str(resolved),
+            create_new_table=True,
+            use_file_lock=True,
+        )
+        backend_signature = f"sqlite:{resolved}:{table_name}"
+        return bucket, backend_signature
+
+    def _expected_backend_signature(
+        self, shared_dir: Optional[Path], limiter_name: str
+    ) -> str:
+        normalised = _normalise_shared_dir(shared_dir)
+        if normalised is None:
+            return "memory"
+        db_path = normalised / "ratelimit.sqlite"
+        try:
+            resolved = db_path.resolve(strict=False)
+        except TypeError:  # pragma: no cover
+            resolved = db_path.resolve()
+        table_name = _table_name_for_key(limiter_name)
+        return f"sqlite:{resolved}:{table_name}"
+
+    def _log_backend_once(self, name: str, limit_text: str, backend_signature: str) -> None:
+        if name in self._logged:
+            return
+        backend = "sqlite" if backend_signature.startswith("sqlite:") else "in-memory"
+        logger.debug(
+            "initialised rate limiter",
+            extra={
+                "stage": "rate-limit",
+                "key": name,
+                "backend": backend,
+                "limit": limit_text,
+            },
+        )
+        self._logged.add(name)
+
+
+# --- Legacy implementation kept for rate_limiter="legacy" -------------------------------------
+
+
+class _LegacyTokenBucket:
     """Token bucket used to enforce per-host and per-service rate limits."""
 
     def __init__(self, rate_per_sec: float, capacity: Optional[float] = None) -> None:
@@ -68,7 +315,7 @@ class TokenBucket:
             time.sleep(max(needed / self.rate, 0.0))
 
 
-class SharedTokenBucket(TokenBucket):
+class _LegacySharedTokenBucket(_LegacyTokenBucket):
     """Token bucket backed by a filesystem state file for multi-process usage."""
 
     def __init__(
@@ -163,19 +410,19 @@ def _shared_bucket_path(http_config: DownloadConfiguration, key: str) -> Optiona
 
 
 @dataclass(slots=True)
-class _BucketEntry:
-    bucket: TokenBucket
+class _LegacyBucketEntry:
+    bucket: _LegacyTokenBucket
     rate: float
     capacity: float
     shared_path: Optional[Path]
 
 
-class RateLimiterRegistry:
+class _LegacyRateLimiterRegistry:
     """Manage shared token buckets keyed by (service, host)."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._buckets: Dict[Tuple[str, str], _BucketEntry] = {}
+        self._buckets: Dict[Tuple[str, str], _LegacyBucketEntry] = {}
 
     def _qualify(self, service: Optional[str], host: Optional[str]) -> Tuple[str, str]:
         service_key = (service or "_").lower()
@@ -200,7 +447,7 @@ class RateLimiterRegistry:
         http_config: DownloadConfiguration,
         service: Optional[str],
         host: Optional[str],
-    ) -> TokenBucket:
+    ) -> _LegacyTokenBucket:
         """Return a token bucket for ``service``/``host`` using shared registry."""
 
         key = self._qualify(service, host)
@@ -216,14 +463,14 @@ class RateLimiterRegistry:
                 or entry.shared_path != shared_path
             ):
                 if shared_path is not None:
-                    bucket = SharedTokenBucket(
+                    bucket = _LegacySharedTokenBucket(
                         rate_per_sec=rate,
                         capacity=capacity,
                         state_path=shared_path,
                     )
                 else:
-                    bucket = TokenBucket(rate_per_sec=rate, capacity=capacity)
-                entry = _BucketEntry(
+                    bucket = _LegacyTokenBucket(rate_per_sec=rate, capacity=capacity)
+                entry = _LegacyBucketEntry(
                     bucket=bucket, rate=rate, capacity=capacity, shared_path=shared_path
                 )
                 self._buckets[key] = entry
@@ -252,21 +499,40 @@ class RateLimiterRegistry:
         with self._lock:
             self._buckets.clear()
 
+# --- Public API -------------------------------------------------------------------------------
+
+_PYRATE_MANAGER = _PyrateLimiterManager()
+_LEGACY_REGISTRY = _LegacyRateLimiterRegistry()
+_LEGACY_WARNING_EMITTED = False
+
 
 def get_bucket(
     *,
     http_config: DownloadConfiguration,
     service: Optional[str],
     host: Optional[str],
-) -> TokenBucket:
-    """Return a registry-managed bucket."""
+) -> RateLimiterHandle:
+    """Return the configured rate limiter handle for ``service``/``host``."""
 
     provider_getter = getattr(http_config, "get_bucket_provider", None)
     if callable(provider_getter):
         candidate = provider_getter()
         if candidate is not None:
             return candidate(service, http_config, host)
-    return REGISTRY.get_bucket(http_config=http_config, service=service, host=host)
+
+    if http_config.rate_limiter == "legacy":
+        _warn_legacy_once()
+        return _LEGACY_REGISTRY.get_bucket(
+            http_config=http_config,
+            service=service,
+            host=host,
+        )
+
+    return _PYRATE_MANAGER.get_bucket(
+        http_config=http_config,
+        service=service,
+        host=host,
+    )
 
 
 def apply_retry_after(
@@ -275,21 +541,36 @@ def apply_retry_after(
     service: Optional[str],
     host: Optional[str],
     delay: float,
-) -> None:
-    """Adjust bucket capacity after receiving a Retry-After hint."""
+) -> Optional[float]:
+    """Return the parsed delay and mutate legacy buckets when applicable."""
 
-    REGISTRY.apply_retry_after(
-        http_config=http_config,
-        service=service,
-        host=host,
-        delay=delay,
-    )
+    if delay <= 0:
+        return None
+    if http_config.rate_limiter == "legacy":
+        _LEGACY_REGISTRY.apply_retry_after(
+            http_config=http_config,
+            service=service,
+            host=host,
+            delay=delay,
+        )
+    return delay
 
 
 def reset() -> None:
-    """Clear all buckets (testing hook)."""
+    """Clear cached limiter state (used in tests)."""
 
-    REGISTRY.reset()
+    global _LEGACY_WARNING_EMITTED  # noqa: PLW0603
+
+    _PYRATE_MANAGER.reset()
+    _LEGACY_REGISTRY.reset()
+    _LEGACY_WARNING_EMITTED = False
 
 
-REGISTRY = RateLimiterRegistry()
+def _warn_legacy_once() -> None:
+    global _LEGACY_WARNING_EMITTED  # noqa: PLW0603
+    if not _LEGACY_WARNING_EMITTED:
+        logger.warning(
+            "OntologyDownload rate limiter running in legacy token bucket mode",
+            extra={"stage": "rate-limit"},
+        )
+        _LEGACY_WARNING_EMITTED = True

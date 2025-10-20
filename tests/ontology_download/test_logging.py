@@ -66,6 +66,7 @@ from DocsToKG.OntologyDownload import logging_utils as logging_utils_mod
 from DocsToKG.OntologyDownload.io import mask_sensitive_data
 from DocsToKG.OntologyDownload.logging_utils import setup_logging
 from DocsToKG.OntologyDownload.settings import LoggingConfiguration
+from tests.conftest import PatchManager
 
 # --- Test Cases ---
 
@@ -177,9 +178,10 @@ def test_setup_logging_emits_structured_json(tmp_path):
             logger.removeHandler(handler)
 
 
-def test_setup_logging_expands_env_log_dir(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("ONTOFETCH_LOG_DIR", "~/ontofetch-logs")
+def test_setup_logging_expands_env_log_dir(tmp_path):
+    patcher = PatchManager()
+    patcher.setenv("HOME", str(tmp_path))
+    patcher.setenv("ONTOFETCH_LOG_DIR", "~/ontofetch-logs")
 
     logger = setup_logging()
     try:
@@ -193,6 +195,7 @@ def test_setup_logging_expands_env_log_dir(tmp_path, monkeypatch):
         assert expected_dir.exists()
     finally:
         _cleanup_logger(logger)
+        patcher.close()
 def test_json_formatter_uses_record_created_timestamp():
     formatter = logging_utils_mod.JSONFormatter()
     record = logging.LogRecord(

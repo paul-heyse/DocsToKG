@@ -176,7 +176,7 @@ def test_robots_cache_reuses_shared_client(install_mock_http_client) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal calls
         calls += 1
-        body = b"User-agent: *\nDisallow: /forbidden"
+        body = b"User-agent: TestBot\nDisallow: /forbidden"
         return httpx.Response(200, content=body, request=request)
 
     client = install_mock_http_client(handler)

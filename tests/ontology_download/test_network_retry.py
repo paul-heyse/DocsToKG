@@ -8,9 +8,10 @@ import ssl
 
 from DocsToKG.OntologyDownload.errors import DownloadFailure
 from DocsToKG.OntologyDownload.io.network import is_retryable_error, retry_with_backoff
+from tests.conftest import PatchManager
 
 
-def test_retry_with_backoff_retries_and_records_delays(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_retry_with_backoff_retries_and_records_delays() -> None:
     outcomes = iter(
         [
             ValueError("first"),
@@ -35,56 +36,63 @@ def test_retry_with_backoff_retries_and_records_delays(monkeypatch: pytest.Monke
     def _callback(attempt: int, exc: Exception, delay: float) -> None:
         callbacks.append((attempt, exc, delay))
 
-    monkeypatch.setattr(
-        "DocsToKG.OntologyDownload.io.network.random.uniform",
-        lambda a, b: b,
-    )
+    patcher = PatchManager()
+    try:
+        patcher.setattr(
+            "DocsToKG.OntologyDownload.io.network.random.uniform",
+            lambda a, b: b,
+        )
 
-    result = retry_with_backoff(
-        _fn,
-        retryable=lambda exc: isinstance(exc, ValueError),
-        max_attempts=4,
-        backoff_base=0.5,
-        jitter=0.5,
-        callback=_callback,
-        sleep=_sleep,
-    )
+        result = retry_with_backoff(
+            _fn,
+            retryable=lambda exc: isinstance(exc, ValueError),
+            max_attempts=4,
+            backoff_base=0.5,
+            jitter=0.5,
+            callback=_callback,
+            sleep=_sleep,
+        )
 
-    assert result == "success"
-    assert sleeps == [1.0, 1.5]
-    assert [entry[0] for entry in callbacks] == [1, 2]
-    assert all(isinstance(entry[1], ValueError) for entry in callbacks)
-    assert [round(entry[2], 2) for entry in callbacks] == [1.0, 1.5]
+        assert result == "success"
+        assert sleeps == [1.0, 1.5]
+        assert [entry[0] for entry in callbacks] == [1, 2]
+        assert all(isinstance(entry[1], ValueError) for entry in callbacks)
+        assert [round(entry[2], 2) for entry in callbacks] == [1.0, 1.5]
+    finally:
+        patcher.close()
 
 
-def test_retry_with_backoff_propagates_non_retryable(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_retry_with_backoff_propagates_non_retryable() -> None:
     sleeps: List[float] = []
 
     def _sleep(delay: float) -> None:
         sleeps.append(delay)
-
-    monkeypatch.setattr(
-        "DocsToKG.OntologyDownload.io.network.random.uniform",
-        lambda a, b: b,
-    )
-
-    def _fn() -> None:
-        raise RuntimeError("fatal")
-
-    with pytest.raises(RuntimeError):
-        retry_with_backoff(
-            _fn,
-            retryable=lambda exc: isinstance(exc, ValueError),
-            max_attempts=3,
-            backoff_base=0.5,
-            jitter=0.5,
-            sleep=_sleep,
+    patcher = PatchManager()
+    try:
+        patcher.setattr(
+            "DocsToKG.OntologyDownload.io.network.random.uniform",
+            lambda a, b: b,
         )
 
-    assert sleeps == []
+        def _fn() -> None:
+            raise RuntimeError("fatal")
+
+        with pytest.raises(RuntimeError):
+            retry_with_backoff(
+                _fn,
+                retryable=lambda exc: isinstance(exc, ValueError),
+                max_attempts=3,
+                backoff_base=0.5,
+                jitter=0.5,
+                sleep=_sleep,
+            )
+
+        assert sleeps == []
+    finally:
+        patcher.close()
 
 
-def test_retry_with_backoff_honours_retry_after_hint(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_retry_with_backoff_honours_retry_after_hint() -> None:
     outcomes = iter(
         [
             ValueError("first"),
@@ -117,25 +125,29 @@ def test_retry_with_backoff_honours_retry_after_hint(monkeypatch: pytest.MonkeyP
     def _callback(attempt: int, exc: Exception, delay: float) -> None:
         callbacks.append(delay)
 
-    monkeypatch.setattr(
-        "DocsToKG.OntologyDownload.io.network.random.uniform",
-        lambda a, b: 0.0,
-    )
+    patcher = PatchManager()
+    try:
+        patcher.setattr(
+            "DocsToKG.OntologyDownload.io.network.random.uniform",
+            lambda a, b: 0.0,
+        )
 
-    result = retry_with_backoff(
-        _fn,
-        retryable=lambda exc: isinstance(exc, ValueError),
-        max_attempts=4,
-        backoff_base=0.5,
-        jitter=0.25,
-        retry_after=_retry_after,
-        callback=_callback,
-        sleep=_sleep,
-    )
+        result = retry_with_backoff(
+            _fn,
+            retryable=lambda exc: isinstance(exc, ValueError),
+            max_attempts=4,
+            backoff_base=0.5,
+            jitter=0.25,
+            retry_after=_retry_after,
+            callback=_callback,
+            sleep=_sleep,
+        )
 
-    assert result == "done"
-    assert sleeps == [3.2, 1.4]
-    assert callbacks == [3.2, 1.4]
+        assert result == "done"
+        assert sleeps == [3.2, 1.4]
+        assert callbacks == [3.2, 1.4]
+    finally:
+        patcher.close()
 
 
 @pytest.mark.parametrize(

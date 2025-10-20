@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 __all__ = (
@@ -80,11 +81,29 @@ class RateLimitError(Exception):
     """Raised when rate limiting prevents downloads."""
 
     def __init__(
-        self, message: str, *, retry_after: Optional[float] = None, domain: Optional[str] = None
+        self,
+        message: str,
+        *,
+        host: Optional[str] = None,
+        role: Optional[str] = None,
+        waited_ms: Optional[int] = None,
+        next_allowed_at: Optional[datetime] = None,
+        backend: Optional[str] = None,
+        mode: Optional[str] = None,
+        retry_after: Optional[float] = None,
+        domain: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(message)
+        self.host = host or domain
+        self.domain = domain or host
+        self.role = role
+        self.waited_ms = waited_ms
+        self.next_allowed_at = next_allowed_at
+        self.backend = backend
+        self.mode = mode
         self.retry_after = retry_after
-        self.domain = domain
+        self.details = details or {}
 
 
 def get_actionable_error_message(
@@ -257,6 +276,23 @@ def log_download_failure(
     if exception:
         log_entry["exception_type"] = type(exception).__name__
         log_entry["exception_message"] = str(exception)
+        if isinstance(exception, RateLimitError):
+            if exception.host:
+                log_entry["rate_limit_host"] = exception.host
+            if exception.role:
+                log_entry["rate_limit_role"] = exception.role
+            if exception.backend:
+                log_entry["rate_limit_backend"] = exception.backend
+            if exception.mode:
+                log_entry["rate_limit_mode"] = exception.mode
+            if exception.waited_ms is not None:
+                log_entry["rate_limit_waited_ms"] = exception.waited_ms
+            if exception.retry_after is not None:
+                log_entry["retry_after"] = exception.retry_after
+            if exception.next_allowed_at is not None:
+                log_entry["rate_limit_next_allowed"] = exception.next_allowed_at.isoformat()
+            if exception.details:
+                log_entry["rate_limit_details"] = exception.details
 
     logger.error("Download failed: %s", error_msg, extra={"extra_fields": log_entry})
 

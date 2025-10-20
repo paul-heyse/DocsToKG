@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 from DocsToKG.OntologyDownload import cli as cli_module
 from DocsToKG.OntologyDownload.testing import TestingEnvironment
+from tests.conftest import PatchManager
 
 
 def test_doctor_fix_rotates_jsonl(ontology_env, capsys):
@@ -36,12 +37,16 @@ def test_doctor_fix_rotates_jsonl(ontology_env, capsys):
     assert compressed.exists(), "compressed JSONL log should exist after rotation"
 
 
-def test_doctor_fix_reports_invalid_rate_limit_override(monkeypatch, capsys):
+def test_doctor_fix_reports_invalid_rate_limit_override(capsys):
     """``doctor --fix`` should continue when defaults are invalid."""
 
-    with TestingEnvironment():
-        monkeypatch.setenv("ONTOFETCH_PER_HOST_RATE_LIMIT", "not-a-limit")
-        exit_code = cli_module.cli_main(["doctor", "--fix", "--json"])
+    patcher = PatchManager()
+    try:
+        with TestingEnvironment():
+            patcher.setenv("ONTOFETCH_PER_HOST_RATE_LIMIT", "not-a-limit")
+            exit_code = cli_module.cli_main(["doctor", "--fix", "--json"])
+    finally:
+        patcher.close()
 
     assert exit_code == 0
 

@@ -66,7 +66,7 @@ from ..errors import ConfigError, DownloadFailure, OntologyDownloadError, Policy
 from ..net import get_http_client
 from ..settings import DownloadConfiguration
 from .filesystem import _compute_file_hash, _materialize_cached_file, sanitize_filename, sha256_file
-from .rate_limit import TokenBucket, apply_retry_after, get_bucket
+from .rate_limit import RateLimiterHandle, apply_retry_after, get_bucket
 
 IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
@@ -124,6 +124,8 @@ for canonical, aliases in _RDF_ALIAS_GROUPS.items():
         RDF_MIME_FORMAT_LABELS[alias] = label
 
 _RETRYABLE_HTTP_STATUSES = {408, 409, 416, 425, 429, 500, 502, 503, 504}
+
+_REDIRECT_STATUSES = {300, 301, 302, 303, 307, 308}
 
 T = TypeVar("T")
 
@@ -616,7 +618,7 @@ def request_with_redirect_audit(
             except httpx.RequestError:
                 raise
 
-            if response.is_redirect:
+            if response.status_code in _REDIRECT_STATUSES:
                 redirects += 1
                 if redirects > max_redirects:
                     response.close()
@@ -771,7 +773,7 @@ def _apply_retry_after_from_response(
     retry_after_header = response.headers.get("Retry-After")
     retry_delay = _parse_retry_after(retry_after_header)
     if retry_delay is not None:
-        apply_retry_after(
+        retry_delay = apply_retry_after(
             http_config=http_config,
             service=service,
             host=host,
@@ -961,7 +963,7 @@ def _download_once(
     destination: Path,
     headers: Mapping[str, str],
     http_config: DownloadConfiguration,
-    bucket: Optional[TokenBucket],
+    bucket: Optional[RateLimiterHandle],
     logger: logging.Logger,
     correlation_id: str,
     cancellation_token: Optional[CancellationToken],
@@ -988,6 +990,7 @@ def _download_once(
             try:
                 part_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(destination_part, part_path)
+                destination_part.unlink(missing_ok=True)
             except OSError:
                 pass
             else:
@@ -1083,100 +1086,139 @@ def _download_once(
                 extra={"stage": "download", "error": str(exc), "url": url},
             )
 
-    request_headers = dict(headers)
-    if resume_position > 0:
-        request_headers["Range"] = f"bytes={resume_position}-"
-
-    if bucket is not None:
-        bucket.consume()
-    extensions = {
-        "config": http_config,
-        "headers": request_headers,
-        "correlation_id": correlation_id,
-    }
+    destination_part = Path(str(destination) + ".part")
+    range_request = resume_position > 0
+    base_headers = dict(headers)
     download_deadline: Optional[float] = None
     if download_timeout_value > 0:
         download_deadline = time.monotonic() + download_timeout_value
 
-    with request_with_redirect_audit(
-        client=client,
-        method="GET",
-        url=url,
-        headers=request_headers,
-        timeout=http_config.download_timeout_sec,
-        stream=True,
-        http_config=http_config,
-        assume_url_validated=True,
-        extensions=extensions,
-    ) as response:
-        status_code = response.status_code
-        if status_code in {429, 503}:
-            retry_delay = _apply_retry_after_from_response(
-                response=response,
+    current_resume = resume_position
+    while True:
+        current_headers = dict(base_headers)
+        if range_request and current_resume > 0:
+            current_headers["Range"] = f"bytes={current_resume}-"
+        else:
+            current_headers.pop("Range", None)
+        logger.info(
+            "download resume state resume_position=%s cache_path=%s",
+            current_resume,
+            cache_path,
+            extra={"stage": "download"},
+        )
+
+        if bucket is not None:
+            bucket.consume()
+        extensions = {
+            "config": http_config,
+            "headers": current_headers,
+            "correlation_id": correlation_id,
+        }
+
+        with request_with_redirect_audit(
+            client=client,
+            method="GET",
+            url=url,
+            headers=current_headers,
+            timeout=http_config.download_timeout_sec,
+            stream=True,
+            http_config=http_config,
+            assume_url_validated=True,
+            extensions=extensions,
+        ) as response:
+            status_code = response.status_code
+            logger.info(
+                "download GET response status=%s resume_position=%s",
+                status_code,
+                current_resume,
+                extra={"stage": "download"},
+            )
+            if status_code in {429, 503}:
+                retry_delay = _apply_retry_after_from_response(
+                    response=response,
+                    http_config=http_config,
+                    service=service,
+                    host=host,
+                )
+                if (
+                    download_deadline is not None
+                    and retry_delay is not None
+                    and (time.monotonic() + retry_delay) >= download_deadline
+                ):
+                    raise DownloadFailure(
+                        "Retry-After exceeded download timeout",
+                        retryable=False,
+                    )
+                http_error = httpx.HTTPStatusError(
+                    f"HTTP error {status_code}", request=response.request, response=response
+                )
+                if retry_delay is not None:
+                    setattr(http_error, "_retry_after_delay", retry_delay)
+                raise http_error
+            if status_code == 416 and range_request:
+                logger.info(
+                    "range resume rejected; clearing partial state",
+                    extra={
+                        "stage": "download",
+                        "resume_position": current_resume,
+                        "cache_path": str(cache_path),
+                    },
+                )
+                part_path.unlink(missing_ok=True)
+                destination_part.unlink(missing_ok=True)
+                range_request = False
+                current_resume = 0
+                resume_position = 0
+                raise DownloadFailure("Range request rejected by origin", retryable=True)
+            if status_code == 304:
+                return _StreamOutcome(
+                    status="cached",
+                    cache_path=cache_path,
+                    etag=response.headers.get("ETag") or etag_hint,
+                    last_modified=response.headers.get("Last-Modified") or last_modified_hint,
+                    content_type=content_type_hint,
+                    content_length=content_length_hint,
+                    from_cache=True,
+                )
+
+            response.raise_for_status()
+
+            _validate_media_type(
+                actual_content_type=response.headers.get("Content-Type"),
+                expected_media_type=expected_media_type,
                 http_config=http_config,
-                service=service,
-                host=host,
+                logger=logger,
+                url=url,
             )
-            http_error = httpx.HTTPStatusError(
-                f"HTTP error {status_code}", request=response.request, response=response
+
+            bytes_downloaded = _stream_body_to_cache(
+                response=response,
+                cache_path=cache_path,
+                resume_position=current_resume,
+                http_config=http_config,
+                cancellation_token=cancellation_token,
+                logger=logger,
+                progress_percent_step=progress_percent_step,
+                progress_bytes_threshold=progress_bytes_threshold,
+                download_deadline=download_deadline,
+                download_timeout=download_timeout_value,
             )
-            if retry_delay is not None:
-                setattr(http_error, "_retry_after_delay", retry_delay)
-            raise http_error
-        if status_code == 416 and resume_position > 0:
-            part_path.unlink(missing_ok=True)
-            destination_part.unlink(missing_ok=True)
-            raise DownloadFailure("Range request rejected by origin", retryable=True)
-        if status_code == 304:
+
+            status = "updated" if current_resume > 0 else "fresh"
+            raw_length = _safe_int(response.headers.get("Content-Length"))
+            if raw_length is None:
+                raw_length = content_length_hint
+            if raw_length is None:
+                raw_length = bytes_downloaded if bytes_downloaded >= 0 else None
             return _StreamOutcome(
-                status="cached",
+                status=status,
                 cache_path=cache_path,
                 etag=response.headers.get("ETag") or etag_hint,
                 last_modified=response.headers.get("Last-Modified") or last_modified_hint,
-                content_type=content_type_hint,
-                content_length=content_length_hint,
-                from_cache=True,
+                content_type=response.headers.get("Content-Type") or content_type_hint,
+                content_length=raw_length,
+                from_cache=False,
             )
-
-        response.raise_for_status()
-
-        _validate_media_type(
-            actual_content_type=response.headers.get("Content-Type"),
-            expected_media_type=expected_media_type,
-            http_config=http_config,
-            logger=logger,
-            url=url,
-        )
-
-        bytes_downloaded = _stream_body_to_cache(
-            response=response,
-            cache_path=cache_path,
-            resume_position=resume_position,
-            http_config=http_config,
-            cancellation_token=cancellation_token,
-            logger=logger,
-            progress_percent_step=progress_percent_step,
-            progress_bytes_threshold=progress_bytes_threshold,
-            download_deadline=download_deadline,
-            download_timeout=download_timeout_value,
-        )
-
-        status = "updated" if resume_position > 0 else "fresh"
-        raw_length = _safe_int(response.headers.get("Content-Length"))
-        if raw_length is None:
-            raw_length = content_length_hint
-        if raw_length is None:
-            raw_length = bytes_downloaded if bytes_downloaded >= 0 else None
-        return _StreamOutcome(
-            status=status,
-            cache_path=cache_path,
-            etag=response.headers.get("ETag") or etag_hint,
-            last_modified=response.headers.get("Last-Modified") or last_modified_hint,
-            content_type=response.headers.get("Content-Type") or content_type_hint,
-            content_length=raw_length,
-            from_cache=False,
-        )
-
 
 def _safe_int(value: Optional[str]) -> Optional[int]:
     if value is None:
@@ -1299,6 +1341,8 @@ def download_stream(
                     "url": secure_url,
                 },
             )
+            if isinstance(exc, DownloadFailure):
+                request_headers.pop("Range", None)
 
         try:
             outcome = retry_with_backoff(
@@ -1408,9 +1452,18 @@ def download_stream(
 
         log_memory_usage(logger, stage="download", event="after")
 
+        resolved_status = outcome.status
+        if (
+            resolved_status == "fresh"
+            and manifest_for_attempt
+            and isinstance(manifest_for_attempt.get("sha256"), str)
+            and manifest_for_attempt.get("sha256", "").lower() == sha256
+        ):
+            resolved_status = "cached"
+
         return DownloadResult(
             path=artifact_path,
-            status=outcome.status,
+            status=resolved_status,
             sha256=sha256,
             etag=etag,
             last_modified=last_modified,
