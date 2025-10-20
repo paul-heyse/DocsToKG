@@ -885,8 +885,10 @@ class HybridSearchService:
         self._assert_managed_store(self._faiss)
         self._faiss_router.set_resolver(self._registry.resolve_faiss_id)
         self._dense_strategy = DenseSearchStrategy(cache_path=cache_path)
-        max_workers = config.retrieval.executor_max_workers or 3
+        self._executor_lock = RLock()
+        max_workers = int(config.retrieval.executor_max_workers or 3)
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
+        self._executor_max_workers = max_workers
         schema_manager = None
         for attr in ("schema_manager", "schema", "_schema"):
             candidate = getattr(self._opensearch, attr, None)
@@ -930,6 +932,23 @@ class HybridSearchService:
             self._observability.logger.exception("dense-strategy-persist-failed")
         self._executor.shutdown(wait=False)
 
+    def _ensure_executor_capacity(self, config: HybridSearchConfig) -> None:
+        """Rebuild the executor when ``executor_max_workers`` changes."""
+
+        if getattr(self, "_closed", False):
+            return
+
+        requested = int(getattr(config.retrieval, "executor_max_workers", 0) or 3)
+        old_executor: ThreadPoolExecutor | None = None
+        with self._executor_lock:
+            if requested == self._executor_max_workers:
+                return
+            old_executor = self._executor
+            self._executor = ThreadPoolExecutor(max_workers=requested)
+            self._executor_max_workers = requested
+        if old_executor is not None:
+            old_executor.shutdown(wait=False)
+
     def search(self, request: HybridSearchRequest) -> HybridSearchResponse:
         """Execute a hybrid retrieval round trip for ``request``.
 
@@ -945,6 +964,7 @@ class HybridSearchService:
             RequestValidationError: If ``request`` fails validation checks.
         """
         config = self._config_manager.get()
+        self._ensure_executor_capacity(config)
         self._validate_request(request)
         filters = dict(request.filters)
         if request.namespace:
