@@ -70,6 +70,7 @@ from dataclasses import dataclass, field
 from typing import Iterable, List
 
 import pytest
+import httpx
 
 pytest.importorskip("pytest_benchmark")
 
@@ -188,11 +189,6 @@ def test_retry_backoff_timing(patcher: PatchManager) -> None:
     def fake_sleep(value: float) -> None:
         sleeps.append(value)
 
-    patcher.setattr(
-        "DocsToKG.ContentDownload.networking.TENACITY_SLEEP",
-        fake_sleep,
-    )
-
     class _SequenceWait:
         def __init__(self, values: List[float]) -> None:
             self._values = values
@@ -212,28 +208,28 @@ def test_retry_backoff_timing(patcher: PatchManager) -> None:
         lambda *args, **kwargs: _SequenceWait([1.0, 2.0, 4.0]),
     )
 
-    class FakeResponse:
-        def __init__(self, status_code: int):
-            self.status_code = status_code
-            self.headers = {}
+    response_codes = [503, 503, 503, 200]
 
-    class FakeSession:
-        def __init__(self) -> None:
-            self.calls = 0
+    def handler(request: httpx.Request) -> httpx.Response:
+        if not response_codes:
+            raise AssertionError("unexpected extra request")
+        code = response_codes.pop(0)
+        return httpx.Response(code, request=request)
 
-        def request(self, method, url, **kwargs):
-            self.calls += 1
-            if self.calls < 4:
-                return FakeResponse(503)
-            return FakeResponse(200)
+    client = httpx.Client(transport=httpx.MockTransport(handler))
 
-    session = FakeSession()
+    patcher.setattr(
+        "DocsToKG.ContentDownload.networking.time.sleep",
+        fake_sleep,
+    )
+
     response = request_with_retries(
-        session, "GET", "https://example.org/test", max_retries=3, backoff_factor=1.0
+        client, "GET", "https://example.org/test", max_retries=3, backoff_factor=1.0
     )
     assert response.status_code == 200
     assert sleeps == [1.0, 2.0, 4.0]
     assert sum(sleeps) == 7.0
+    client.close()
 
 
 def test_memory_usage_large_batch() -> None:

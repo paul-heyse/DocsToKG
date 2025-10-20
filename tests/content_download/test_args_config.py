@@ -5,7 +5,6 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
-import requests
 
 from DocsToKG.ContentDownload import args as args_module
 from DocsToKG.ContentDownload.args import (

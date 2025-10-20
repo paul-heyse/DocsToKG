@@ -29,10 +29,11 @@
 
 from __future__ import annotations
 
-from typing import List
-from unittest.mock import Mock, patch
+from collections import deque
+from typing import Deque, List
+from unittest.mock import patch
 
-import requests
+import httpx
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -74,13 +75,15 @@ def test_conditional_request_helper_build_headers(etag, last_modified):
 
 @given(st.lists(st.sampled_from([429, 500, 502, 503, 504]), max_size=4))
 def test_request_with_retries_backoff_sequence(status_codes: List[int]) -> None:
-    responses = [
-        Mock(spec=requests.Response, status_code=code, headers={}) for code in status_codes
-    ]
-    responses.append(Mock(spec=requests.Response, status_code=200, headers={}))
+    response_codes: Deque[int] = deque(status_codes + [200])
 
-    session = Mock(spec=requests.Session)
-    session.request.side_effect = responses
+    def handler(request: httpx.Request) -> httpx.Response:
+        if not response_codes:
+            raise AssertionError("unexpected extra request")
+        code = response_codes.popleft()
+        return httpx.Response(code, request=request)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
 
     class _SequenceWait:
         def __init__(self, values: List[float]) -> None:
@@ -103,10 +106,10 @@ def test_request_with_retries_backoff_sequence(status_codes: List[int]) -> None:
             "DocsToKG.ContentDownload.networking.wait_random_exponential",
             side_effect=lambda *args, **kwargs: _SequenceWait(delays),
         ),
-        patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP") as mock_sleep,
+        patch("DocsToKG.ContentDownload.networking.time.sleep") as mock_sleep,
     ):
         result = request_with_retries(
-            session,
+            client,
             "GET",
             "https://example.org/property",
             max_retries=len(status_codes),
@@ -117,6 +120,7 @@ def test_request_with_retries_backoff_sequence(status_codes: List[int]) -> None:
     assert result.status_code == 200
     observed_delays = [entry.args[0] for entry in mock_sleep.call_args_list]
     assert observed_delays == delays[: len(observed_delays)]
+    client.close()
 
 
 @given(st.lists(st.text(max_size=10)))

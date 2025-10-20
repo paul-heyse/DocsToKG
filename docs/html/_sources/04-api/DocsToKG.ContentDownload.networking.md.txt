@@ -138,12 +138,12 @@ Defaults to ``60.0`` seconds.
 **kwargs: Additional keyword arguments forwarded directly to :meth:`requests.Session.request`.
 
 Returns:
-requests.Response: Successful (or exhausted) response object. Callers are responsible for closing the
+httpx.Response: Successful (or exhausted) response object. Callers are responsible for closing the
 response when streaming content.
 
 Raises:
 ValueError: If ``max_retries`` or ``backoff_factor`` are invalid or ``url``/``method`` are empty.
-requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.
+httpx.HTTPError: If all retry attempts fail due to network errors or the client raises an exception.
 
 Notes:
     The Tenacity controller wires :class:`RetryAfterJitterWait` to prefer
@@ -151,9 +151,9 @@ Notes:
     :func:`tenacity.wait_random_exponential`. Intermediate responses are
     closed via ``_before_sleep_close_response``, cumulative sleep time is
     tracked on the controller (``_docs_retry_sleep``), and tests may patch
-    :data:`TENACITY_SLEEP` to short-circuit waits. Exhausted HTTP retries
-    return the final :class:`requests.Response`, whereas exhausted exception
-    retries raise the underlying :class:`requests.RequestException`.
+    :mod:`DocsToKG.ContentDownload.networking.time.sleep` to short-circuit waits. Exhausted HTTP retries
+    return the final :class:`httpx.Response`, whereas exhausted exception
+    retries raise the underlying :class:`httpx.HTTPError`.
 
 ### `head_precheck(session, url, timeout)`
 

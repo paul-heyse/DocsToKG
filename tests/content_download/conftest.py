@@ -101,17 +101,13 @@ def install_mock_http_client(monkeypatch):
     """Install a deterministic HTTPX client backed by MockTransport."""
 
     created: Deque[httpx.Client] = deque()
-    _install_requests_stub()
 
     def _install(handler: Callable[[httpx.Request], httpx.Response]) -> httpx.Client:
         transport = httpx.MockTransport(handler)
-        client = httpx.Client(transport=transport)
+        httpx_transport.configure_http_client(transport=transport)
+        client = httpx_transport.get_http_client()
         created.append(client)
 
-        def _get_client() -> httpx.Client:
-            return client
-
-        monkeypatch.setattr(httpx_transport, "get_http_client", _get_client)
         return client
 
     yield _install

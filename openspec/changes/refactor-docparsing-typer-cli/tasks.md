@@ -1,0 +1,23 @@
+## 1. Implementation
+- [ ] 1.1 Take an inventory of the current CLI surface.
+  - [ ] 1.1.1 Open `src/DocsToKG/DocParsing/core/cli.py` and list every entry in the `COMMANDS` dictionary along with the parser each command uses (for example `_run_doctags` → `build_doctags_parser`).
+  - [ ] 1.1.2 For each command, copy the existing CLI usage example into your notes and record the exact option names, defaults, and help strings. You will mirror these in Typer.
+  - [ ] 1.1.3 Run `python -m DocsToKG.DocParsing.core.cli <command> --help` for every command and save the output so you can compare it to the Typer help later.
+- [ ] 1.2 Introduce the Typer application scaffold.
+  - [ ] 1.2.1 Add `import typer` and create `app = typer.Typer(help=CLI_DESCRIPTION.strip())` near the top of the module.
+  - [ ] 1.2.2 Delete the `_Command` class, the `COMMANDS` dictionary, and the `argparse` logic that dispatches on `command`. Replace it with `@app.command()` functions named after each command (`doctags`, `chunk`, `embed`, `all`, `plan`, `manifest`, `token_profiles`).
+  - [ ] 1.2.3 For each command, define typed parameters using `typing_extensions.Annotated` + `typer.Option(...)` so that option names, aliases, defaults, and help text match the values gathered in step 1.1. Where the old parser used `choices`, use `typer.Option(..., case_sensitive=False)` with an Enum if appropriate.
+- [ ] 1.3 Rewire handlers to share code with the helpers.
+  - [ ] 1.3.1 Extract the business logic from the legacy `_run_*` functions into reusable private helpers (for example `_doctags_main(parsed_args) -> int`) if that makes the Typer handler cleaner. Keep `_run_stage` to normalise error handling.
+  - [ ] 1.3.2 Make each Typer command build the same configuration objects the legacy parser produced and then call the existing stage orchestrator (`DocsToKG.DocParsing.doctags.run`, `DocsToKG.DocParsing.chunking.run`, etc.).
+  - [ ] 1.3.3 Rewrite the public helpers `doctags()`, `chunk()`, `embed()`, and `run_all()` so they simply call the shared helper used by the Typer command. Ensure they still accept `argv: Sequence[str] | None` and still return `int`.
+  - [ ] 1.3.4 Update `main()` so that it wraps `app()` instead of manually parsing `sys.argv`. Keep `if __name__ == "__main__": raise SystemExit(main())`.
+- [ ] 1.4 Clean up module exports and remove dead code.
+  - [ ] 1.4.1 Delete any imports that were only used by `_Command` or the manual parser.
+  - [ ] 1.4.2 Adjust `__all__` so it contains the Typer entry points (`app`, `main`, helpers) and drop references to the removed `_Command`.
+  - [ ] 1.4.3 Run `python -m ruff check src/DocsToKG/DocParsing/core/cli.py` to verify formatting and imports once the refactor compiles.
+- [ ] 1.5 Update documentation and tests for the new interface.
+  - [ ] 1.5.1 Regenerate the CLI usage examples: run `python -m DocsToKG.DocParsing.core.cli --help` and each `<command> --help`, then paste the relevant snippets into `docs/04-api/DocsToKG.DocParsing.cli.md` and any README sections that describe the CLI.
+  - [ ] 1.5.2 In `tests/DocParsing/core/test_cli.py` (create the file if it does not exist), add Typer `CliRunner` tests for `--help`, `doctags`, `chunk`, `embed`, `all`, and a negative case (bad flag value). Assert the exit codes and error messages match the legacy behaviour captured in step 1.1.
+  - [ ] 1.5.3 Run the existing DocParsing test suite with `.venv/bin/pytest tests/DocParsing` to confirm nothing else regressed.
+  - [ ] 1.5.4 Update any Sphinx or MkDocs configuration that references the CLI so it points to the Typer commands (for example, adjust `docs/conf.py` autodoc targets if necessary).

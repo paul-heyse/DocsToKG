@@ -183,7 +183,7 @@ flowchart LR
 
 ## Networking, Rate Limiting, and Politeness
 
-- `DocsToKG.ContentDownload.httpx_transport` provisions a singleton HTTPX client wrapped in Hishel caching; `configure_http_client()` supports swapping transports (e.g., `httpx.MockTransport`) while `purge_http_cache()` clears `${CACHE_DIR}/http/ContentDownload` between runs.
+- `DocsToKG.ContentDownload.httpx_transport` provisions a singleton HTTPX client wrapped in Hishel caching; `configure_http_client()` swaps transports/event hooks (e.g., `httpx.MockTransport` for tests) while `purge_http_cache()` clears `${CACHE_DIR}/http/ContentDownload` between runs. Event hooks stamp telemetry fields (`network.client=httpx`, cache metadata, attempt numbers), enforce `response.raise_for_status()` once per attempt, and shut down intermediate responses when Tenacity schedules retries.
 - `request_with_retries()` delegates to Tenacity for capped exponential backoff with jitter, honours `Retry-After`, integrates domain content rules, and returns structured results differentiating cached vs modified responses.
 - `head_precheck()` performs HEAD or conditional GET probes, classifying likely PDFs before downloading full payloads; resolvers can disable HEAD per host via configuration.
 - `ConditionalRequestHelper` constructs `If-None-Match`/`If-Modified-Since` headers and interprets 304 responses as cache hits via `CachedResult`/`ModifiedResult`.

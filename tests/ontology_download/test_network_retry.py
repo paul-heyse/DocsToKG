@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import List
 
 import httpx
-
 import pytest
+import ssl
 
 from DocsToKG.OntologyDownload.errors import DownloadFailure
 from DocsToKG.OntologyDownload.io.network import is_retryable_error, retry_with_backoff
@@ -176,6 +176,12 @@ def test_is_retryable_error_preserves_download_failure_retry_flag():
 
     assert is_retryable_error(retryable) is True
     assert is_retryable_error(non_retryable) is False
+
+
+def test_is_retryable_error_handles_ssl_error():
+    """SSL failures should be treated as retryable."""
+
+    assert is_retryable_error(ssl.SSLError("tls error")) is True
 
 
 def test_is_retryable_error_non_retryable_exception():

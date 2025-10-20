@@ -23,7 +23,9 @@ _HTTP_CLIENT: Optional[httpx.Client] = None
 _CURRENT_OVERRIDES: Dict[str, object] = {}
 
 _DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=30.0, pool=5.0)
-_DEFAULT_LIMITS = httpx.Limits(max_connections=128, max_keepalive_connections=32, keepalive_expiry=15.0)
+_DEFAULT_LIMITS = httpx.Limits(
+    max_connections=128, max_keepalive_connections=32, keepalive_expiry=15.0
+)
 
 
 def _resolve_data_root() -> Path:

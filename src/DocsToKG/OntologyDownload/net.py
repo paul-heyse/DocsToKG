@@ -200,19 +200,32 @@ def _limits_for(config: DownloadConfiguration) -> httpx.Limits:
 
 def _build_http_client(cache_root: Path, config: Optional[DownloadConfiguration]) -> httpx.Client:
     cfg = config or _DEFAULT_CONFIG
+    limits = _limits_for(cfg)
+    timeout = _timeout_for(cfg)
     ssl_context = _build_ssl_context()
-    transport = CacheTransport(
-        transport=httpx.HTTPTransport(retries=0),
-        storage=FileStorage(base_path=cache_root),
-        controller=_controller(),
-    )
     http2_enabled = bool(getattr(cfg, "http2_enabled", True))
+
+    def _make_transport(http2_flag: bool) -> CacheTransport:
+        base_transport = httpx.HTTPTransport(
+            verify=ssl_context,
+            trust_env=True,
+            http1=True,
+            http2=http2_flag,
+            limits=limits,
+            retries=0,
+        )
+        return CacheTransport(
+            transport=base_transport,
+            storage=FileStorage(base_path=cache_root),
+            controller=_controller(),
+        )
+
     try:
         return httpx.Client(
             http2=http2_enabled,
-            transport=transport,
-            timeout=_timeout_for(cfg),
-            limits=_limits_for(cfg),
+            transport=_make_transport(http2_enabled),
+            timeout=timeout,
+            limits=limits,
             verify=ssl_context,
             trust_env=True,
             follow_redirects=False,
@@ -225,9 +238,9 @@ def _build_http_client(cache_root: Path, config: Optional[DownloadConfiguration]
             )
             return httpx.Client(
                 http2=False,
-                transport=transport,
-                timeout=_timeout_for(cfg),
-                limits=_limits_for(cfg),
+                transport=_make_transport(False),
+                timeout=timeout,
+                limits=limits,
                 verify=ssl_context,
                 trust_env=True,
                 follow_redirects=False,

@@ -126,8 +126,8 @@ DocsToKG integrates Tenacity inside `DocsToKG.ContentDownload.networking.request
 
 * Requests retry `{429, 500, 502, 503, 504}` via a custom `RetryAfterJitterWait` that honours `Retry-After` headers while capping sleeps with `retry_after_cap`/`backoff_max`.
 * CLI/resolver knobs map directly to the Tenacity controller (`backoff_factor`, `backoff_max`, `retry_after_cap`, `respect_retry_after`, `max_retry_duration`).
-* Exhausted HTTP retries return the final `requests.Response` with a warning, preserving existing telemetry/analytics workflows, while exhausted exception retries still raise thanks to `reraise=True`.
-* Intermediate responses are closed before sleeping, and tests patch `DocsToKG.ContentDownload.networking.TENACITY_SLEEP` instead of `time.sleep` when freezing pacing.
+* Exhausted HTTP retries return the final `httpx.Response` with a warning, preserving existing telemetry/analytics workflows, while exhausted exception retries still raise thanks to `reraise=True`.
+* Intermediate responses are closed before sleeping. Tests patch `DocsToKG.ContentDownload.networking.time.sleep` (or inject deterministic transports via `DocsToKG.ContentDownload.httpx_transport.configure_http_client()`) when they need to freeze pacing.
 
 ## Practical patterns (drop‑in replacements for typical custom logic)
 

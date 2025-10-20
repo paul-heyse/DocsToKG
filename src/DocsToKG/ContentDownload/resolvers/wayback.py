@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Iterable, Optional
 import httpx
 
 from DocsToKG.ContentDownload.networking import request_with_retries
+
 from .base import (
     RegisteredResolver,
     ResolverEvent,
@@ -35,6 +36,8 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 LOGGER = logging.getLogger(__name__)
+
+
 class WaybackResolver(RegisteredResolver):
     """Fallback resolver that queries the Internet Archive Wayback Machine."""
 

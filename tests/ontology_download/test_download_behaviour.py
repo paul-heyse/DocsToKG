@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 import pytest
 
 from DocsToKG.OntologyDownload.cancellation import CancellationToken
-from DocsToKG.OntologyDownload.errors import ConfigError, DownloadFailure
+from DocsToKG.OntologyDownload.errors import ConfigError, DownloadFailure, PolicyError
 from DocsToKG.OntologyDownload.io import filesystem as fs_mod
 from DocsToKG.OntologyDownload.io import get_http_client
 from DocsToKG.OntologyDownload.io import network as network_mod
@@ -442,6 +442,7 @@ def test_download_stream_uses_cached_manifest(ontology_env, tmp_path):
         expected_media_type="application/rdf+xml",
         service="obo",
     )
+    initial_mtime = destination.stat().st_mtime
 
     previous_manifest = {
         "etag": initial.etag,
@@ -482,6 +483,7 @@ def test_download_stream_uses_cached_manifest(ontology_env, tmp_path):
     assert destination.read_bytes() == payload
     assert cached.sha256 == initial.sha256
     assert cached.content_type == initial.content_type
+    assert destination.stat().st_mtime == pytest.approx(initial_mtime)
 
 
 def test_download_stream_resumes_and_streams_hash(ontology_env, tmp_path):
@@ -534,6 +536,103 @@ def test_download_stream_resumes_and_streams_hash(ontology_env, tmp_path):
     assert result.sha256 == hashlib.sha256(payload).hexdigest()
     get_requests = [request for request in ontology_env.requests if request.method == "GET"]
     assert get_requests[-1].headers.get("Range") == f"bytes={resume_offset}-"
+
+
+def test_download_stream_rejects_disallowed_redirect(ontology_env, tmp_path):
+    """Redirect targets outside the allowlist should raise a policy error."""
+
+    start_path = "fixtures/disallowed-redirect.owl"
+    start_url = ontology_env.http_url(start_path)
+    config = ontology_env.build_download_config()
+    destination = tmp_path / "disallowed-redirect.owl"
+
+    ontology_env._responses[("HEAD", "/" + start_path)].append(
+        ResponseSpec(
+            method="HEAD",
+            status=200,
+            headers={"Content-Type": "application/rdf+xml", "Content-Length": "12"},
+        )
+    )
+    ontology_env._responses[("GET", "/" + start_path)].append(
+        ResponseSpec(
+            method="GET",
+            status=302,
+            headers={"Location": "https://malicious.example/ontology.owl"},
+        )
+    )
+
+    initial_len = len(ontology_env.requests)
+    with pytest.raises(PolicyError):
+        network_mod.download_stream(
+            url=start_url,
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=ontology_env.cache_dir,
+            logger=_logger(),
+            expected_media_type="application/rdf+xml",
+            service="obo",
+        )
+
+    new_requests = ontology_env.requests[initial_len:]
+    methods_paths = [(record.method, record.path) for record in new_requests]
+    assert ("GET", "/" + start_path) in methods_paths
+    assert not destination.exists()
+
+
+def test_download_stream_follows_valid_redirect_chain(ontology_env, tmp_path):
+    """Downloader should follow validated redirects and persist the final payload."""
+
+    payload = b"redirect-payload"
+    target_name = "redirect-target.owl"
+    target_rel_path = f"fixtures/{target_name}"
+    ontology_env.register_fixture(
+        target_name,
+        payload,
+        media_type="application/rdf+xml",
+        repeats=1,
+    )
+
+    start_path = "fixtures/redirect-source.owl"
+    start_url = ontology_env.http_url(start_path)
+
+    ontology_env._responses[("HEAD", "/" + start_path)].append(
+        ResponseSpec(
+            method="HEAD",
+            status=302,
+            headers={"Location": f"/{target_rel_path}"},
+        )
+    )
+    ontology_env._responses[("GET", "/" + start_path)].append(
+        ResponseSpec(
+            method="GET",
+            status=302,
+            headers={"Location": f"/{target_rel_path}"},
+        )
+    )
+
+    config = ontology_env.build_download_config()
+    destination = tmp_path / target_name
+    initial_len = len(ontology_env.requests)
+
+    result = network_mod.download_stream(
+        url=start_url,
+        destination=destination,
+        headers={},
+        previous_manifest=None,
+        http_config=config,
+        cache_dir=ontology_env.cache_dir,
+        logger=_logger(),
+        expected_media_type="application/rdf+xml",
+        service="obo",
+    )
+
+    assert destination.read_bytes() == payload
+    assert result.status == "fresh"
+    new_requests = ontology_env.requests[initial_len:]
+    get_paths = [record.path for record in new_requests if record.method == "GET"]
+    assert get_paths == ["/" + start_path, "/" + target_rel_path]
 
 
 def test_download_stream_respects_validated_url_hint(ontology_env, tmp_path):

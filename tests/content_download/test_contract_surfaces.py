@@ -10,12 +10,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import httpx
 import pytest
-
-try:
-    import requests
-except ModuleNotFoundError:
-    pytest.skip("requests is required for these tests", allow_module_level=True)
 
 try:
     from bs4 import BeautifulSoup  # type: ignore
@@ -185,7 +181,12 @@ def test_resolver_event_attempt_contract(tmp_path: Path) -> None:
         run_id="contract-run",
     )
 
-    result = pipeline.run(requests.Session(), artifact)
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, request=request))
+    client = httpx.Client(transport=transport)
+    try:
+        result = pipeline.run(client, artifact)
+    finally:
+        client.close()
     assert result.success is False
     assert len(logger.records) == 1
     record = logger.records[0]

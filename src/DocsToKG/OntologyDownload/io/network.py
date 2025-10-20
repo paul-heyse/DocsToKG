@@ -29,7 +29,9 @@ import contextlib
 import hashlib
 import ipaddress
 import logging
+import os
 import random
+import ssl
 import shutil
 import socket
 import threading
@@ -56,7 +58,6 @@ from typing import (
 from urllib.parse import ParseResult, urljoin, urlparse, urlunparse
 
 import httpx
-import requests
 from tenacity import Retrying, retry_if_exception, stop_after_attempt
 from tenacity.wait import wait_base
 
@@ -466,6 +467,17 @@ def log_memory_usage(
     logger.debug("memory usage", extra=extra)
 
 
+def _extract_correlation_id(logger: logging.Logger) -> Optional[str]:
+    """Return the correlation identifier stored on a logger adapter, when present."""
+
+    extra = getattr(logger, "extra", None)
+    if isinstance(extra, dict):
+        value = extra.get("correlation_id")
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
 @dataclass(slots=True)
 class DownloadResult:
     """Result metadata for a completed download operation.
@@ -529,20 +541,7 @@ def is_retryable_error(exc: BaseException) -> bool:
 
     if isinstance(exc, DownloadFailure):
         return exc.retryable
-    if isinstance(
-        exc,
-        (
-            requests.ConnectionError,
-            requests.Timeout,
-            requests.exceptions.SSLError,
-        ),
-    ):
-        return True
-    if isinstance(exc, requests.HTTPError):
-        response = getattr(exc, "response", None)
-        status = getattr(response, "status_code", None)
-        return _is_retryable_status(status)
-    if isinstance(exc, requests.RequestException):
+    if isinstance(exc, ssl.SSLError):
         return True
     if isinstance(
         exc,
@@ -654,893 +653,475 @@ def request_with_redirect_audit(
             response.close()
 
 
-class _StreamingDownloader:
-    """Custom downloader supporting HEAD validation, conditional requests, resume, and caching.
+@dataclass(slots=True)
+class _StreamOutcome:
+    """Captured outcome metadata for a download attempt."""
 
-    The downloader reuses the shared :mod:`httpx` client so it can issue a HEAD
-    probe prior to streaming content, verifies Content-Type and Content-Length
-    against expectations, and persists ETag/Last-Modified headers for cache-friendly
-    revalidation.
+    status: str
+    cache_path: Path
+    etag: Optional[str]
+    last_modified: Optional[str]
+    content_type: Optional[str]
+    content_length: Optional[int]
+    from_cache: bool
 
-    Attributes:
-        destination: Final location where the ontology will be stored.
-        custom_headers: HTTP headers supplied by the resolver.
-        http_config: Download configuration governing retries and limits.
-        previous_manifest: Manifest from prior runs used for caching.
-        logger: Logger used for structured telemetry.
-        status: Final download status (`fresh`, `updated`, or `cached`).
-        response_etag: ETag returned by the upstream server, if present.
-        response_last_modified: Last-modified timestamp provided by the server.
-        expected_media_type: MIME type provided by the resolver for validation.
-        streamed_digests: Mapping of hash algorithm names to hex digests computed during streaming.
 
-    Examples:
-        >>> from pathlib import Path
-        >>> from DocsToKG.OntologyDownload.settings import DownloadConfiguration
-        >>> downloader = _StreamingDownloader(
-        ...     destination=Path("/tmp/ontology.owl"),
-        ...     headers={},
-        ...     http_config=DownloadConfiguration(),
-        ...     previous_manifest={},
-        ...     logger=logging.getLogger("test"),
-        ... )
-        >>> downloader.status
-        'fresh'
-    """
+def _conditional_headers_from_manifest(
+    manifest: Optional[Mapping[str, object]]
+) -> Dict[str, str]:
+    headers: Dict[str, str] = {}
+    if not manifest:
+        return headers
+    etag = manifest.get("etag") if isinstance(manifest, Mapping) else None
+    if isinstance(etag, str) and etag.strip():
+        headers["If-None-Match"] = etag.strip()
+    last_modified = manifest.get("last_modified") if isinstance(manifest, Mapping) else None
+    if isinstance(last_modified, str) and last_modified.strip():
+        headers["If-Modified-Since"] = last_modified.strip()
+    return headers
 
-    def __init__(
-        self,
-        *,
-        destination: Path,
-        headers: Dict[str, str],
-        http_config: DownloadConfiguration,
-        previous_manifest: Optional[Dict[str, object]],
-        logger: logging.Logger,
-        expected_media_type: Optional[str] = None,
-        service: Optional[str] = None,
-        origin_host: Optional[str] = None,
-        bucket: Optional[TokenBucket] = None,
-        hash_algorithms: Optional[Iterable[str]] = None,
-        cancellation_token: Optional[CancellationToken] = None,
-        url_already_validated: bool = False,
-        client: Optional[httpx.Client] = None,
-    ) -> None:
-        self.destination = destination
-        self.custom_headers = dict(headers)
-        self.http_config = http_config
-        self.previous_manifest = previous_manifest or {}
-        self.logger = logger
-        self.status = "fresh"
-        self.response_etag: Optional[str] = None
-        self.response_last_modified: Optional[str] = None
-        self.expected_media_type = expected_media_type
-        self.head_content_type: Optional[str] = None
-        self.head_content_length: Optional[int] = None
-        self.response_content_type: Optional[str] = None
-        self.response_content_length: Optional[int] = None
-        self.service = service
-        self.origin_host = origin_host
-        self.invoked = False
-        self.bucket = bucket
-        requested_algorithms: List[str] = ["sha256"]
-        if hash_algorithms:
-            for algorithm in hash_algorithms:
-                normalized = algorithm.strip().lower()
-                if normalized and normalized not in requested_algorithms:
-                    requested_algorithms.append(normalized)
-        self._requested_hash_algorithms: Tuple[str, ...] = tuple(requested_algorithms)
-        self._unsupported_hash_algorithms: Set[str] = set()
-        self._hashers: Dict[str, object] = {}
-        self.streamed_digests: Dict[str, str] = {}
-        self.cancellation_token = cancellation_token
-        self._reset_hashers()
-        self._reuse_head_token = False
-        self._assume_url_validated = url_already_validated
-        self._range_supported = True
-        self.client = client or get_http_client(http_config)
 
-    def _reset_hashers(self) -> None:
-        """Initialise hashlib objects for all supported algorithms."""
+def _parse_expected_hash(expected_hash: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    if not expected_hash:
+        return None, None
+    parts = expected_hash.split(':', 1)
+    if len(parts) != 2:
+        return None, None
+    algorithm = parts[0].strip().lower()
+    digest = parts[1].strip().lower()
+    if not algorithm or not digest:
+        return None, None
+    return algorithm, digest
 
-        self.streamed_digests = {}
-        self._hashers = {}
-        for algorithm in self._requested_hash_algorithms:
-            try:
-                self._hashers[algorithm] = hashlib.new(algorithm)
-            except ValueError:
-                if algorithm not in self._unsupported_hash_algorithms:
-                    self.logger.warning(
-                        "unsupported checksum algorithm for streaming",
-                        extra={
-                            "stage": "download",
-                            "algorithm": algorithm,
-                        },
-                    )
-                    self._unsupported_hash_algorithms.add(algorithm)
 
-    def _seed_hashers_from_file(self, path: Path) -> None:
-        """Update hashers with the bytes already present on disk."""
+def _initial_progress_state(
+    *,
+    resume_position: int,
+    total_bytes: Optional[int],
+    percent_step: float,
+) -> Dict[str, object]:
+    state: Dict[str, object] = {"last_bytes": resume_position, "next_percent": None}
+    if total_bytes and total_bytes > 0 and percent_step > 0:
+        progress = resume_position / total_bytes
+        if progress < 1:
+            next_step = ((int(progress / percent_step)) + 1) * percent_step
+            state["next_percent"] = None if next_step >= 1 else next_step
+    return state
 
-        if not self._hashers:
-            return
-        if not path.exists():
-            return
-        try:
-            with path.open("rb") as existing:
-                for chunk in iter(lambda: existing.read(1 << 20), b""):
-                    if not chunk:
-                        continue
-                    for hasher in self._hashers.values():
-                        hasher.update(chunk)
-        except OSError as exc:
-            self.logger.debug(
-                "failed to seed hashers from partial file",
-                extra={"stage": "download", "error": str(exc)},
-            )
 
-    @contextmanager
-    def _request_with_redirect_audit(
-        self,
-        *,
-        method: str,
-        url: str,
-        headers: Dict[str, str],
-        timeout: float,
-        stream: bool,
-    ) -> Iterator[httpx.Response]:
-        """Issue an HTTP request while validating every redirect target."""
-
-        extensions = {
-            "config": self.http_config,
-            "headers": headers,
-            "correlation_id": _extract_correlation_id(self.logger),
-        }
-
-        with request_with_redirect_audit(
-            client=self.client,
-            method=method,
-            url=url,
-            headers=headers,
-            timeout=timeout,
-            stream=stream,
-            http_config=self.http_config,
-            assume_url_validated=self._assume_url_validated,
-            extensions=extensions,
-        ) as response:
-            yield response
-
-    def _sleep_with_cancellation(
-        self,
-        delay: float,
-        *,
-        remaining_budget: Optional[Callable[[], float]] = None,
-        timeout_callback: Optional[Callable[[], None]] = None,
-    ) -> None:
-        """Sleep in short increments while monitoring cancellation state."""
-
-        if delay <= 0:
-            return
-
-        callback_invoked = False
-        deadline = time.monotonic() + delay
-        poll_interval = 0.5
-
-        while True:
-            if self.cancellation_token and self.cancellation_token.is_cancelled():
-                self.logger.info(
-                    "download cancelled during HEAD retry backoff",
-                    extra={
-                        "stage": "download",
-                        "status": "cancelled",
-                    },
-                )
-                raise DownloadFailure(
-                    "Download was cancelled during HEAD retry backoff",
-                    retryable=False,
-                )
-
-            if remaining_budget is not None:
-                budget_remaining = remaining_budget()
-                if timeout_callback is not None and budget_remaining <= 0 and not callback_invoked:
-                    timeout_callback()
-                    callback_invoked = True
-
-            remaining_sleep = deadline - time.monotonic()
-            if remaining_sleep <= 0:
+def _log_stream_progress(
+    *,
+    logger: logging.Logger,
+    bytes_downloaded: int,
+    total_bytes: Optional[int],
+    state: Dict[str, object],
+    percent_step: float,
+    bytes_threshold: int,
+) -> None:
+    if total_bytes and total_bytes > 0 and percent_step > 0:
+        next_percent = state.get("next_percent")
+        while isinstance(next_percent, (int, float)) and total_bytes:
+            progress = bytes_downloaded / total_bytes
+            if progress + 1e-9 < next_percent:
                 break
-
-            time.sleep(min(poll_interval, remaining_sleep))
-
-    def _preliminary_head_check(
-        self,
-        url: str,
-        *,
-        headers: Optional[Mapping[str, str]] = None,
-        token_consumed: bool = False,
-        remaining_budget: Optional[Callable[[], float]] = None,
-        timeout_callback: Optional[Callable[[], None]] = None,
-    ) -> tuple[Optional[str], Optional[int]]:
-        """Probe the origin with HEAD to audit media type and size before downloading.
-
-        The HEAD probe allows the pipeline to abort before streaming large
-        payloads that exceed configured limits and to log early warnings for
-        mismatched Content-Type headers reported by the origin.
-
-        Args:
-            url: Fully qualified download URL resolved by the planner.
-            headers: Headers to include with the HEAD probe. When omitted the
-                downloader will send the polite header set merged with any
-                resolver-supplied headers.
-            token_consumed: Indicates whether the caller already consumed a
-                rate-limit token prior to invoking the HEAD request.
-            remaining_budget: Optional callable returning the remaining time
-                budget (in seconds) before the download timeout is reached.
-            timeout_callback: Optional callable invoked when the requested
-                backoff would exhaust the remaining timeout budget.
-
-        Returns:
-            Tuple ``(content_type, content_length)`` extracted from response
-            headers. Each element is ``None`` when the origin omits it.
-
-        Raises:
-            PolicyError: Propagates download policy errors encountered during the HEAD request.
-            DownloadFailure: Raised when the timeout budget is exhausted prior to completing the HEAD request.
-        """
-
-        # Check for cancellation before HEAD request
-        if self.cancellation_token and self.cancellation_token.is_cancelled():
-            self.logger.info(
-                "download cancelled before HEAD request",
+            logger.info(
+                "download progress",
                 extra={
                     "stage": "download",
-                    "status": "cancelled",
+                    "status": "in-progress",
+                    "event": "download_progress",
+                    "progress": {
+                        "percent": round(min(progress, 1.0) * 100, 1),
+                        "bytes_downloaded": bytes_downloaded,
+                        "total_bytes": total_bytes,
+                    },
                 },
             )
-            raise DownloadFailure(
-                "Download was cancelled before HEAD request",
-                retryable=False,
-            )
+            next_percent += percent_step
+            if next_percent >= 1:
+                next_percent = None
+        state["next_percent"] = next_percent
+        return
 
-        self._reuse_head_token = False
-        consumed_here = False
-        if self.bucket is not None and not token_consumed:
-            self.bucket.consume()
-            token_consumed = True
-            consumed_here = True
-
-        if headers is None:
-            request_headers = self.http_config.polite_http_headers(
-                correlation_id=_extract_correlation_id(self.logger)
-            )
-            request_headers.update(self.custom_headers)
-        else:
-            request_headers = dict(headers)
-
-        if remaining_budget is not None and timeout_callback is not None:
-            remaining = remaining_budget()
-            if remaining <= 0:
-                timeout_callback()
-
-        try:
-            with self._request_with_redirect_audit(
-                method="HEAD",
-                url=url,
-                headers=request_headers,
-                timeout=self.http_config.timeout_sec,
-                stream=False,
-            ) as response:
-                if response.status_code >= 400:
-                    retry_after_header = response.headers.get("Retry-After")
-                    retry_after_delay = _parse_retry_after(retry_after_header)
-                    if retry_after_delay is not None:
-                        self.logger.warning(
-                            "head retry-after",
-                            extra={
-                                "stage": "download",
-                                "method": "HEAD",
-                                "status_code": response.status_code,
-                                "retry_after_sec": round(retry_after_delay, 2),
-                                "service": self.service,
-                                "host": self.origin_host,
-                            },
-                        )
-                        apply_retry_after(
-                            http_config=self.http_config,
-                            service=self.service,
-                            host=self.origin_host,
-                            delay=retry_after_delay,
-                        )
-                        if retry_after_delay > 0:
-                            if remaining_budget is not None and timeout_callback is not None:
-                                remaining = remaining_budget()
-                                if retry_after_delay >= max(remaining, 0.0):
-                                    timeout_callback()
-                            if self.bucket is not None and token_consumed:
-                                self._reuse_head_token = True
-                            self._sleep_with_cancellation(
-                                retry_after_delay,
-                                remaining_budget=remaining_budget,
-                                timeout_callback=timeout_callback,
-                            )
-                    self.logger.debug(
-                        "HEAD request failed, proceeding with GET",
-                        extra={
-                            "stage": "download",
-                            "method": "HEAD",
-                            "status_code": response.status_code,
-                            "url": url,
-                            "headers": self.custom_headers,
-                            "token_consumed": token_consumed,
-                            "consumed_here": consumed_here,
-                        },
-                    )
-                    return None, None
-
-                content_type = response.headers.get("Content-Type")
-                content_length_header = response.headers.get("Content-Length")
-                content_length = None
-                if content_length_header:
-                    try:
-                        content_length = int(content_length_header)
-                    except (TypeError, ValueError):
-                        content_length = None
-
-                return content_type, content_length
-        except httpx.RequestError as exc:
-            self.logger.debug(
-                "HEAD request exception, proceeding with GET",
-                extra={
-                    "stage": "download",
-                    "error": str(exc),
-                    "url": url,
-                    "headers": request_headers,
-                },
-            )
-            return None, None
-
-    def _validate_media_type(
-        self,
-        actual_content_type: Optional[str],
-        expected_media_type: Optional[str],
-        url: str,
-    ) -> None:
-        """Validate that the received ``Content-Type`` header is acceptable, tolerating aliases.
-
-        RDF endpoints often return generic XML or Turtle aliases, so the
-        validator accepts a small set of known MIME variants while still
-        surfacing actionable warnings for unexpected types.
-
-        Args:
-            actual_content_type: Raw header value reported by the origin server.
-            expected_media_type: MIME type declared by resolver metadata.
-            url: Download URL logged when mismatches occur.
-
-        Returns:
-            None
-        """
-
-        if not self.http_config.validate_media_type:
-            return
-        if not expected_media_type:
-            return
-        if not actual_content_type:
-            self.logger.warning(
-                "server did not provide Content-Type header",
-                extra={
-                    "stage": "download",
-                    "expected_media_type": expected_media_type,
-                    "url": url,
-                },
-            )
-            return
-
-        actual_mime = actual_content_type.split(";")[0].strip().lower()
-        expected_mime = expected_media_type.strip().lower()
-        if actual_mime == expected_mime:
-            return
-
-        expected_label = RDF_MIME_FORMAT_LABELS.get(expected_mime)
-        actual_label = RDF_MIME_FORMAT_LABELS.get(actual_mime)
-        if expected_label and actual_label:
-            if expected_label == actual_label:
-                if actual_mime != expected_mime:
-                    self.logger.info(
-                        "acceptable media type variation",
-                        extra={
-                            "stage": "download",
-                            "expected": expected_mime,
-                            "actual": actual_mime,
-                            "label": expected_label,
-                            "url": url,
-                        },
-                    )
-                return
-            variation_hint = {
-                "stage": "download",
-                "expected_media_type": expected_mime,
-                "expected_label": expected_label,
-                "actual_media_type": actual_mime,
-                "actual_label": actual_label,
-                "url": url,
-            }
-            self.logger.warning(
-                "media type mismatch detected",
-                extra={
-                    **variation_hint,
-                    "action": "proceeding with download",
-                    "override_hint": "Set defaults.http.validate_media_type: false to disable validation",
-                },
-            )
-            return
-
-        self.logger.warning(
-            "media type mismatch detected",
+    if bytes_threshold <= 0:
+        return
+    last_bytes = state.get("last_bytes", 0)
+    if bytes_downloaded - last_bytes >= bytes_threshold:
+        logger.info(
+            "download progress",
             extra={
                 "stage": "download",
-                "expected_media_type": expected_mime,
-                "actual_media_type": actual_mime,
-                "url": url,
-                "action": "proceeding with download",
-                "override_hint": "Set defaults.http.validate_media_type: false to disable validation",
+                "status": "in-progress",
+                "event": "download_progress",
+                "progress": {
+                    "bytes_downloaded": bytes_downloaded,
+                },
             },
         )
+        state["last_bytes"] = bytes_downloaded
 
-    def run(self, url: str, cache_path: Path) -> None:
-        """Stream ontology content to disk while enforcing download policies.
 
-        Args:
-            url: Secure download URL resolved by the planner.
-            cache_path: Target file within the cache directory where the download should be written.
+def _apply_retry_after_from_response(
+    *,
+    response: httpx.Response,
+    http_config: DownloadConfiguration,
+    service: Optional[str],
+    host: Optional[str],
+) -> Optional[float]:
+    retry_after_header = response.headers.get("Retry-After")
+    retry_delay = _parse_retry_after(retry_after_header)
+    if retry_delay is not None:
+        apply_retry_after(
+            http_config=http_config,
+            service=service,
+            host=host,
+            delay=retry_delay,
+        )
+    return retry_delay
 
-        Raises:
-            PolicyError: If download policies are violated (e.g., invalid URLs or disallowed MIME types).
-            OntologyDownloadError: If filesystem errors occur.
-            requests.HTTPError: Propagated when HTTP status codes indicate failure.
 
-        Returns:
-            None
-        """
-        self.invoked = True
+def _validate_media_type(
+    *,
+    actual_content_type: Optional[str],
+    expected_media_type: Optional[str],
+    http_config: DownloadConfiguration,
+    logger: logging.Logger,
+    url: str,
+) -> None:
+    if not http_config.validate_media_type:
+        return
+    if not expected_media_type:
+        return
+    if not actual_content_type:
+        logger.warning(
+            "server did not provide Content-Type header",
+            extra={
+                "stage": "download",
+                "expected_media_type": expected_media_type,
+                "url": url,
+            },
+        )
+        return
 
-        output_file = str(cache_path)
+    actual_mime = actual_content_type.split(';')[0].strip().lower()
+    expected_mime = expected_media_type.strip().lower()
+    if actual_mime == expected_mime:
+        return
 
-        manifest_headers: Dict[str, str] = {}
-        if self.previous_manifest:
-            etag_value = self.previous_manifest.get("etag")
-            if isinstance(etag_value, str) and etag_value.strip():
-                manifest_headers["If-None-Match"] = etag_value
-            last_modified_value = self.previous_manifest.get("last_modified")
-            if isinstance(last_modified_value, str) and last_modified_value.strip():
-                manifest_headers["If-Modified-Since"] = last_modified_value
-        base_headers = {**self.custom_headers, **manifest_headers}
-        part_path = Path(output_file + ".part")
-        destination_part_path = Path(str(self.destination) + ".part")
-        if not part_path.exists() and destination_part_path.exists():
-            part_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(destination_part_path, part_path)
-
-        self.head_content_type = None
-        self.head_content_length = None
-        self.response_content_type = None
-        self.response_content_length = None
-
-        overall_start = time.monotonic()
-        timeout_limit = float(self.http_config.download_timeout_sec)
-
-        head_token_consumed = False
-        if self.bucket is not None:
-            self.bucket.consume()
-            head_token_consumed = True
-
-        def _clear_partial_files() -> None:
-            for candidate in (part_path, destination_part_path):
-                try:
-                    candidate.unlink(missing_ok=True)
-                except OSError:
-                    pass
-
-        def _raise_timeout(elapsed: float) -> None:
-            _clear_partial_files()
-            timeout_sec = timeout_limit
-            self.logger.error(
-                "download timeout",
+    expected_label = RDF_MIME_FORMAT_LABELS.get(expected_mime)
+    actual_label = RDF_MIME_FORMAT_LABELS.get(actual_mime)
+    if expected_label and actual_label and expected_label == actual_label:
+        if actual_mime != expected_mime:
+            logger.info(
+                "acceptable media type variation",
                 extra={
                     "stage": "download",
-                    "error": "timeout",
-                    "elapsed_sec": round(elapsed, 2),
-                    "timeout_sec": timeout_sec,
-                    "service": self.service,
-                    "host": self.origin_host,
+                    "expected": expected_mime,
+                    "actual": actual_mime,
+                    "label": expected_label,
+                    "url": url,
                 },
             )
-            raise DownloadFailure(
-                (
-                    f"Download exceeded timeout of {timeout_sec:.2f} seconds "
-                    f"(elapsed {elapsed:.2f} seconds)"
-                ),
-                retryable=False,
-            )
+        return
 
-        def _remaining_budget() -> float:
-            return timeout_limit - (time.monotonic() - overall_start)
+    logger.warning(
+        "media type mismatch detected",
+        extra={
+            "stage": "download",
+            "expected_media_type": expected_mime,
+            "actual_media_type": actual_mime,
+            "url": url,
+            "override_hint": "Set defaults.http.validate_media_type: false to disable validation",
+        },
+    )
 
-        def _fail_for_timeout() -> None:
-            _raise_timeout(time.monotonic() - overall_start)
 
-        head_content_type, head_content_length = self._preliminary_head_check(
-            url,
-            headers=base_headers,
-            token_consumed=head_token_consumed,
-            remaining_budget=_remaining_budget,
-            timeout_callback=_fail_for_timeout,
-        )
-        self.head_content_type = head_content_type
-        self.head_content_length = head_content_length
-        if head_content_type:
-            self._validate_media_type(head_content_type, self.expected_media_type, url)
-
-            resume_position = part_path.stat().st_size if part_path.exists() else 0
-
-            def _enforce_timeout() -> None:
-                elapsed = time.monotonic() - overall_start
-                if elapsed > timeout_limit:
-                    _raise_timeout(elapsed)
-
-            def _stream_once() -> str:
-                nonlocal resume_position
-
-                # Check for cancellation before starting the download
-                if self.cancellation_token and self.cancellation_token.is_cancelled():
-                    self.logger.info(
-                        "download cancelled before request",
-                        extra={
-                            "stage": "download",
-                            "status": "cancelled",
-                        },
-                    )
-                    raise DownloadFailure(
-                        "Download was cancelled before request",
-                        retryable=False,
-                    )
-
-                self._reset_hashers()
-
-                while True:
-                    resume_position = part_path.stat().st_size if part_path.exists() else 0
-
-                    self.logger.debug(
-                        "range state resume=%s range_supported=%s",
-                        resume_position,
-                        self._range_supported,
-                    )
-
-                    if resume_position > 0 and not self._range_supported:
-                        with contextlib.suppress(OSError):
-                            part_path.unlink(missing_ok=True)
-                        resume_position = 0
-
-                    original_resume_position = resume_position
-                    request_headers = dict(base_headers)
-                    if self._range_supported and original_resume_position > 0:
-                        request_headers["Range"] = f"bytes={original_resume_position}-"
-                        want_range = True
-                    else:
-                        request_headers.pop("Range", None)
-                        want_range = False
-
-                    if self.bucket is not None:
-                        if self._reuse_head_token:
-                            self.logger.debug(
-                                "reusing head token after retry-after",
-                                extra={
-                                    "stage": "download",
-                                    "service": self.service,
-                                    "host": self.origin_host,
-                                },
-                            )
-                            self._reuse_head_token = False
-                        else:
-                            self.bucket.consume()
-
-                    request_timeout = self.http_config.timeout_sec
-
-                    if self.cancellation_token and self.cancellation_token.is_cancelled():
-                        self.logger.info(
-                            "download cancelled before GET request",
-                            extra={
-                                "stage": "download",
-                                "status": "cancelled",
-                            },
-                        )
-                        raise DownloadFailure(
-                            "Download was cancelled before GET request",
-                            retryable=False,
-                        )
-
-                    restart_download = False
-
-                    with self._request_with_redirect_audit(
-                        method="GET",
-                        url=url,
-                        headers=request_headers,
-                        timeout=request_timeout,
-                        stream=True,
-                    ) as response:
-                        if response.status_code == 304 and Path(self.destination).exists():
-                            self.status = "cached"
-                            self.response_etag = response.headers.get(
-                                "ETag"
-                            ) or self.previous_manifest.get("etag")
-                            self.response_last_modified = response.headers.get(
-                                "Last-Modified"
-                            ) or self.previous_manifest.get("last_modified")
-                            manifest_type = self.previous_manifest.get("content_type")
-                            self.response_content_type = (
-                                manifest_type if isinstance(manifest_type, str) else None
-                            )
-                            manifest_length = self.previous_manifest.get("content_length")
-                            try:
-                                self.response_content_length = (
-                                    int(manifest_length) if manifest_length is not None else None
-                                )
-                            except (TypeError, ValueError):
-                                self.response_content_length = None
-                            part_path.unlink(missing_ok=True)
-                            return "cached"
-
-                        if response.status_code in {429, 503}:
-                            retry_after_header = response.headers.get("Retry-After")
-                            retry_after_delay = _parse_retry_after(retry_after_header)
-                            if retry_after_delay is not None:
-                                self.logger.warning(
-                                    "download retry-after",
-                                    extra={
-                                        "stage": "download",
-                                        "status_code": response.status_code,
-                                        "retry_after_sec": round(retry_after_delay, 2),
-                                        "service": self.service,
-                                        "host": self.origin_host,
-                                    },
-                                )
-                                apply_retry_after(
-                                    http_config=self.http_config,
-                                    service=self.service,
-                                    host=self.origin_host,
-                                    delay=retry_after_delay,
-                                )
-                            http_error = requests.HTTPError(
-                                f"HTTP error {response.status_code}", response=response
-                            )
-                            setattr(http_error, "_retry_after_delay", retry_after_delay)
-                            response.close()
-                            raise http_error
-
-                    if response.status_code == 416:
-                        self.logger.warning(
-                            "range request rejected; retrying without resume",
-                            extra={
-                                "stage": "download",
-                                "status_code": response.status_code,
-                                "resume_position": original_resume_position,
-                                "service": self.service,
-                                "host": self.origin_host,
-                            },
-                        )
-                        _clear_partial_files()
-                        self._range_supported = False
-                        raise DownloadFailure(
-                            "Range request rejected by origin",
-                            retryable=True,
-                        )
-                    else:
-                            range_honored = response.status_code == 206
-                            if want_range and range_honored:
-                                content_range = response.headers.get("Content-Range")
-                                reported_offset: Optional[int] = None
-                                if content_range and content_range.startswith("bytes "):
-                                    try:
-                                        reported_offset = int(
-                                            content_range.split()[1].split("-")[0]
-                                        )
-                                    except (IndexError, ValueError):
-                                        reported_offset = None
-                                if (
-                                    reported_offset is not None
-                                    and reported_offset != original_resume_position
-                                ):
-                                    self.logger.warning(
-                                        "range resume misaligned; restarting from beginning",
-                                        extra={
-                                            "stage": "download",
-                                            "expected_offset": original_resume_position,
-                                            "reported_offset": reported_offset,
-                                            "status_code": response.status_code,
-                                        },
-                                    )
-                                    _clear_partial_files()
-                                    self._range_supported = False
-                                    restart_download = True
-                            if want_range and not range_honored and not restart_download:
-                                self.logger.warning(
-                                    "range resume not honored; restarting from beginning",
-                                    extra={
-                                        "stage": "download",
-                                        "status_code": response.status_code,
-                                        "resume_position": original_resume_position,
-                                    },
-                                )
-                                _clear_partial_files()
-                                self._range_supported = False
-                                restart_download = True
-
-                            if restart_download:
-                                continue
-
-                            if range_honored:
-                                resume_position = original_resume_position
-                                self.status = "updated"
-                                if resume_position > 0:
-                                    self._seed_hashers_from_file(part_path)
-                            else:
-                                resume_position = 0
-
-                            response.raise_for_status()
-
-                            self._validate_media_type(
-                                response.headers.get("Content-Type"),
-                                self.expected_media_type,
-                                url,
-                            )
-                            self.response_content_type = response.headers.get("Content-Type")
-                            length_header = response.headers.get("Content-Length")
-                            total_bytes: Optional[int] = None
-                            next_progress: Optional[float] = 0.1
-                            parsed_length: Optional[int] = None
-                            if length_header:
-                                try:
-                                    parsed_length = int(length_header)
-                                except ValueError:
-                                    parsed_length = None
-                            self.response_content_length = parsed_length
-                            if parsed_length is not None:
-                                total_bytes = parsed_length
-                            if total_bytes:
-                                completed_fraction = resume_position / total_bytes
-                                if completed_fraction >= 1:
-                                    next_progress = None
-                                else:
-                                    next_progress = ((int(completed_fraction * 10)) + 1) / 10
-                            self.response_etag = response.headers.get("ETag")
-                            self.response_last_modified = response.headers.get("Last-Modified")
-                            mode = "ab" if range_honored else "wb"
-                            bytes_downloaded = resume_position
-                            part_path.parent.mkdir(parents=True, exist_ok=True)
-                            try:
-                                with part_path.open(mode) as fh:
-                                    for chunk in response.iter_bytes(1 << 20):
-                                        _enforce_timeout()
-                                        if not chunk:
-                                            continue
-
-                                        if (
-                                            self.cancellation_token
-                                            and self.cancellation_token.is_cancelled()
-                                        ):
-                                            part_path.unlink(missing_ok=True)
-                                            self.logger.info(
-                                                "download cancelled",
-                                                extra={
-                                                    "stage": "download",
-                                                    "status": "cancelled",
-                                                    "bytes_downloaded": bytes_downloaded,
-                                                },
-                                            )
-                                            raise DownloadFailure(
-                                                "Download was cancelled",
-                                                retryable=False,
-                                            )
-
-                                        fh.write(chunk)
-                                        for hasher in self._hashers.values():
-                                            hasher.update(chunk)
-                                        bytes_downloaded += len(chunk)
-                                        if total_bytes and next_progress:
-                                            progress = bytes_downloaded / total_bytes
-                                            while next_progress and progress >= next_progress:
-                                                self.logger.info(
-                                                    "download progress",
-                                                    extra={
-                                                        "stage": "download",
-                                                        "status": "in-progress",
-                                                        "progress": {
-                                                            "percent": round(
-                                                                min(progress, 1.0) * 100, 1
-                                                            )
-                                                        },
-                                                    },
-                                                )
-                                                next_progress += 0.1
-                                                if next_progress > 1:
-                                                    next_progress = None
-                                                    break
-                            except OSError as exc:
-                                part_path.unlink(missing_ok=True)
-                                self.logger.error(
-                                    "filesystem error during download",
-                                    extra={"stage": "download", "error": str(exc)},
-                                )
-                                if "No space left" in str(exc):
-                                    raise OntologyDownloadError(
-                                        "No space left on device while writing download"
-                                    ) from exc
-                                raise OntologyDownloadError(
-                                    f"Failed to write download: {exc}"
-                                ) from exc
-
-                            if self._hashers:
-                                self.streamed_digests = {
-                                    algorithm: hasher.hexdigest()
-                                    for algorithm, hasher in self._hashers.items()
-                                }
-                            break
-
-                    if restart_download:
-                        continue
-
-                    return "success"
-
-            def _stream_once_with_timeout() -> str:
-                _enforce_timeout()
-                result = _stream_once()
-                _enforce_timeout()
-                return result
-
-            def _retry_after_hint(exc: BaseException) -> Optional[float]:
-                delay = getattr(exc, "_retry_after_delay", None)
-                if delay is not None:
-                    return delay
-                response = getattr(exc, "response", None)
-                if response is not None:
-                    return _parse_retry_after(response.headers.get("Retry-After"))
+def _total_bytes_from_response(response: httpx.Response, resume_position: int) -> Optional[int]:
+    if response.status_code == 206:
+        content_range = response.headers.get("Content-Range")
+        if content_range and '/' in content_range:
+            try:
+                total = int(content_range.split('/')[-1])
+                return total
+            except (ValueError, IndexError):
                 return None
+        return None
+    length_header = response.headers.get("Content-Length")
+    if not length_header:
+        return None
+    try:
+        return int(length_header)
+    except (TypeError, ValueError):
+        return None
 
-            def _on_retry(attempt_number: int, exc: BaseException, delay: float) -> None:
-                self.logger.warning(
-                    "download retry",
-                    extra={
-                        "stage": "download",
-                        "attempt": attempt_number,
-                        "sleep_sec": round(delay, 2),
-                        "error": str(exc),
-                    },
+
+def _stream_body_to_cache(
+    *,
+    response: httpx.Response,
+    cache_path: Path,
+    resume_position: int,
+    http_config: DownloadConfiguration,
+    cancellation_token: Optional[CancellationToken],
+    logger: logging.Logger,
+    progress_percent_step: float,
+    progress_bytes_threshold: int,
+) -> int:
+    part_path = cache_path.with_suffix(cache_path.suffix + '.part')
+    part_path.parent.mkdir(parents=True, exist_ok=True)
+    mode = 'ab' if response.status_code == 206 and resume_position > 0 else 'wb'
+    if mode == 'wb':
+        part_path.unlink(missing_ok=True)
+    total_bytes = _total_bytes_from_response(response, resume_position)
+    state = _initial_progress_state(
+        resume_position=resume_position,
+        total_bytes=total_bytes,
+        percent_step=progress_percent_step,
+    )
+    max_bytes = http_config.max_uncompressed_bytes()
+    bytes_downloaded = resume_position
+    try:
+        with part_path.open(mode) as stream:
+            for chunk in response.iter_bytes(1 << 20):
+                if not chunk:
+                    continue
+                if cancellation_token and cancellation_token.is_cancelled():
+                    raise DownloadFailure("Download was cancelled", retryable=False)
+                stream.write(chunk)
+                bytes_downloaded += len(chunk)
+                if max_bytes and bytes_downloaded > max_bytes:
+                    raise PolicyError(
+                        f"Download exceeded size limit of {http_config.max_uncompressed_size_gb} GB"
+                    )
+                _log_stream_progress(
+                    logger=logger,
+                    bytes_downloaded=bytes_downloaded,
+                    total_bytes=total_bytes,
+                    state=state,
+                    percent_step=progress_percent_step,
+                    bytes_threshold=progress_bytes_threshold,
                 )
+    except DownloadFailure:
+        part_path.unlink(missing_ok=True)
+        raise
+    except PolicyError:
+        part_path.unlink(missing_ok=True)
+        raise
+    except OSError as exc:
+        part_path.unlink(missing_ok=True)
+        logger.error(
+            "filesystem error during download",
+            extra={"stage": "download", "error": str(exc)},
+        )
+        raise OntologyDownloadError(f"Failed to write download: {exc}") from exc
 
-            result_state = retry_with_backoff(
-                _stream_once_with_timeout,
-                retryable=is_retryable_error,
-                max_attempts=max(1, self.http_config.max_retries),
-                backoff_base=self.http_config.backoff_factor,
-                jitter=self.http_config.backoff_factor,
-                callback=_on_retry,
-                retry_after=_retry_after_hint,
+    try:
+        os.replace(part_path, cache_path)
+    except OSError as exc:
+        part_path.unlink(missing_ok=True)
+        logger.error(
+            "filesystem error finalising download",
+            extra={"stage": "download", "error": str(exc)},
+        )
+        raise OntologyDownloadError(f"Failed to finalise download: {exc}") from exc
+    return bytes_downloaded
+
+
+def _download_once(
+    *,
+    client: httpx.Client,
+    url: str,
+    cache_path: Path,
+    headers: Mapping[str, str],
+    http_config: DownloadConfiguration,
+    bucket: Optional[TokenBucket],
+    logger: logging.Logger,
+    correlation_id: str,
+    cancellation_token: Optional[CancellationToken],
+    expected_media_type: Optional[str],
+    progress_percent_step: float,
+    progress_bytes_threshold: int,
+    perform_head: bool,
+    service: Optional[str],
+    host: Optional[str],
+) -> _StreamOutcome:
+    if cancellation_token and cancellation_token.is_cancelled():
+        raise DownloadFailure("Download was cancelled", retryable=False)
+
+    resume_position = 0
+    part_path = cache_path.with_suffix(cache_path.suffix + '.part')
+    if part_path.exists():
+        try:
+            resume_position = part_path.stat().st_size
+        except OSError:
+            resume_position = 0
+    elif cache_path.exists():
+        resume_position = 0
+
+    content_type_hint: Optional[str] = None
+    content_length_hint: Optional[int] = None
+    etag_hint: Optional[str] = None
+    last_modified_hint: Optional[str] = None
+
+    if perform_head:
+        if bucket is not None:
+            bucket.consume()
+        extensions = {
+            "config": http_config,
+            "headers": headers,
+            "correlation_id": correlation_id,
+        }
+        try:
+            with request_with_redirect_audit(
+                client=client,
+                method="HEAD",
+                url=url,
+                headers=headers,
+                timeout=http_config.timeout_sec,
+                stream=False,
+                http_config=http_config,
+                assume_url_validated=True,
+                extensions=extensions,
+            ) as response:
+                status_code = response.status_code
+                if status_code in {429, 503}:
+                    retry_delay = _apply_retry_after_from_response(
+                        response=response,
+                        http_config=http_config,
+                        service=service,
+                        host=host,
+                    )
+                    http_error = httpx.HTTPStatusError(
+                        f"HTTP error {status_code}", request=response.request, response=response
+                    )
+                    if retry_delay is not None:
+                        setattr(http_error, "_retry_after_delay", retry_delay)
+                    raise http_error
+                if status_code == 304:
+                    return _StreamOutcome(
+                        status="cached",
+                        cache_path=cache_path,
+                        etag=response.headers.get("ETag") or etag_hint,
+                        last_modified=response.headers.get("Last-Modified") or last_modified_hint,
+                        content_type=content_type_hint,
+                        content_length=content_length_hint,
+                        from_cache=True,
+                    )
+                response.raise_for_status()
+                content_type_header = response.headers.get("Content-Type")
+                content_length_header = response.headers.get("Content-Length")
+                if content_type_header:
+                    content_type_hint = content_type_header
+                if content_length_header:
+                    try:
+                        content_length_hint = int(content_length_header)
+                    except (TypeError, ValueError):
+                        content_length_hint = None
+                etag_hint = response.headers.get("ETag")
+                last_modified_hint = response.headers.get("Last-Modified")
+        except httpx.HTTPStatusError:
+            raise
+        except httpx.RequestError as exc:
+            logger.debug(
+                "HEAD request exception, proceeding with GET",
+                extra={"stage": "download", "error": str(exc), "url": url},
             )
 
-        if result_state == "cached":
-            destination_part_path.unlink(missing_ok=True)
-            return
+    request_headers = dict(headers)
+    if resume_position > 0:
+        request_headers["Range"] = f"bytes={resume_position}-"
 
-        part_path.replace(Path(output_file))
-        destination_part_path.unlink(missing_ok=True)
+    if bucket is not None:
+        bucket.consume()
+    extensions = {
+        "config": http_config,
+        "headers": request_headers,
+        "correlation_id": correlation_id,
+    }
+
+    with request_with_redirect_audit(
+        client=client,
+        method="GET",
+        url=url,
+        headers=request_headers,
+        timeout=http_config.download_timeout_sec,
+        stream=True,
+        http_config=http_config,
+        assume_url_validated=True,
+        extensions=extensions,
+    ) as response:
+        status_code = response.status_code
+        if status_code in {429, 503}:
+            retry_delay = _apply_retry_after_from_response(
+                response=response,
+                http_config=http_config,
+                service=service,
+                host=host,
+            )
+            http_error = httpx.HTTPStatusError(
+                f"HTTP error {status_code}", request=response.request, response=response
+            )
+            if retry_delay is not None:
+                setattr(http_error, "_retry_after_delay", retry_delay)
+            raise http_error
+        if status_code == 416 and resume_position > 0:
+            part_path.unlink(missing_ok=True)
+            raise DownloadFailure("Range request rejected by origin", retryable=True)
+        if status_code == 304:
+            return _StreamOutcome(
+                status="cached",
+                cache_path=cache_path,
+                etag=response.headers.get("ETag") or etag_hint,
+                last_modified=response.headers.get("Last-Modified") or last_modified_hint,
+                content_type=content_type_hint,
+                content_length=content_length_hint,
+                from_cache=True,
+            )
+
+        response.raise_for_status()
+
+        _validate_media_type(
+            actual_content_type=response.headers.get("Content-Type"),
+            expected_media_type=expected_media_type,
+            http_config=http_config,
+            logger=logger,
+            url=url,
+        )
+
+        bytes_downloaded = _stream_body_to_cache(
+            response=response,
+            cache_path=cache_path,
+            resume_position=resume_position,
+            http_config=http_config,
+            cancellation_token=cancellation_token,
+            logger=logger,
+            progress_percent_step=progress_percent_step,
+            progress_bytes_threshold=progress_bytes_threshold,
+        )
+
+        status = "updated" if resume_position > 0 else "fresh"
+        raw_length = _safe_int(response.headers.get("Content-Length"))
+        if raw_length is None:
+            raw_length = content_length_hint
+        if raw_length is None:
+            raw_length = bytes_downloaded if bytes_downloaded >= 0 else None
+        return _StreamOutcome(
+            status=status,
+            cache_path=cache_path,
+            etag=response.headers.get("ETag") or etag_hint,
+            last_modified=response.headers.get("Last-Modified") or last_modified_hint,
+            content_type=response.headers.get("Content-Type") or content_type_hint,
+            content_length=raw_length,
+            from_cache=False,
+        )
 
 
-def _extract_correlation_id(logger: logging.Logger) -> Optional[str]:
-    extra = getattr(logger, "extra", None)
-    if isinstance(extra, dict):
-        value = extra.get("correlation_id")
-        if isinstance(value, str):
-            return value
-    return None
-
+def _safe_int(value: Optional[str]) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 def download_stream(
     *,
@@ -1557,31 +1138,8 @@ def download_stream(
     cancellation_token: Optional[CancellationToken] = None,
     url_already_validated: bool = False,
 ) -> DownloadResult:
-    """Download ontology content with HEAD validation, rate limiting, caching, retries, and hash checks.
+    """Download ontology content via HTTPX streaming."""
 
-    Args:
-        url: URL of the ontology document to download.
-        destination: Target file path for the downloaded content.
-        headers: HTTP headers forwarded to the download request.
-        previous_manifest: Manifest metadata from a prior run, used for caching.
-        http_config: Download configuration containing timeouts, limits, and rate controls.
-        cache_dir: Directory where intermediary cached files are stored.
-        logger: Logger adapter for structured download telemetry.
-        expected_media_type: Expected Content-Type for validation, if known.
-        service: Logical service identifier for per-service rate limiting.
-        expected_hash: Optional ``<algorithm>:<hex>`` string enforcing a known hash.
-        cancellation_token: Optional token for cooperative cancellation.
-        url_already_validated: When ``True``, assumes *url* has already passed
-            :func:`validate_url_security` checks and skips redundant
-            validations.
-
-    Returns:
-        DownloadResult describing the final artifact and metadata.
-
-    Raises:
-        PolicyError: If policy validation fails or limits are exceeded.
-        OntologyDownloadError: If retryable download mechanisms exhaust or IO fails.
-    """
     secure_url = url if url_already_validated else validate_url_security(url, http_config)
     parsed = urlparse(secure_url)
     host = parsed.hostname
@@ -1589,197 +1147,119 @@ def download_stream(
     http_client = get_http_client(http_config)
 
     log_memory_usage(logger, stage="download", event="before")
-    polite_headers = http_config.polite_http_headers(correlation_id=_extract_correlation_id(logger))
-    merged_headers: Dict[str, str] = dict(polite_headers)
-    merged_headers.update({str(k): str(v) for k, v in headers.items()})
+    correlation_id = _extract_correlation_id(logger)
 
-    def _resolved_content_metadata(
-        current_downloader: _StreamingDownloader,
-        manifest: Optional[Dict[str, object]],
-    ) -> tuple[Optional[str], Optional[int]]:
-        content_type = (
-            current_downloader.response_content_type or current_downloader.head_content_type
+    polite_headers = http_config.polite_http_headers(correlation_id=correlation_id)
+
+    def _build_headers(manifest: Optional[Dict[str, object]]) -> Dict[str, str]:
+        merged: Dict[str, str] = {str(k): str(v) for k, v in polite_headers.items()}
+        for key, value in headers.items():
+            merged[str(key)] = str(value)
+        merged.update(_conditional_headers_from_manifest(manifest))
+        return merged
+
+    progress_percent_step = float(getattr(http_config, "progress_log_percent_step", 0.1) or 0.0)
+    raw_bytes_threshold = getattr(http_config, "progress_log_bytes_threshold", 5 * (1 << 20))
+    progress_bytes_threshold = int(raw_bytes_threshold or 0)
+    perform_head = bool(getattr(http_config, "perform_head_precheck", True))
+
+    expected_algorithm, expected_digest = _parse_expected_hash(expected_hash)
+    if expected_hash and (not expected_algorithm or not expected_digest):
+        logger.warning(
+            "expected checksum malformed",
+            extra={"stage": "download", "checksum": expected_hash, "url": secure_url},
         )
-        if content_type is None and manifest:
-            manifest_type = manifest.get("content_type")
-            if isinstance(manifest_type, str):
-                content_type = manifest_type
-
-        content_length = current_downloader.response_content_length
-        if content_length is None and current_downloader.head_content_length is not None:
-            content_length = current_downloader.head_content_length
-        if content_length is None and manifest:
-            manifest_length = manifest.get("content_length")
-            try:
-                content_length = int(manifest_length) if manifest_length is not None else None
-            except (TypeError, ValueError):
-                content_length = None
-        return content_type, content_length
-
-    expected_algorithm: Optional[str] = None
-    expected_digest: Optional[str] = None
-    if expected_hash:
-        parts = expected_hash.split(":", 1)
-        if len(parts) == 2:
-            candidate_algorithm = parts[0].strip().lower()
-            candidate_digest = parts[1].strip().lower()
-            if candidate_algorithm and candidate_digest:
-                expected_algorithm = candidate_algorithm
-                expected_digest = candidate_digest
-        else:
-            logger.warning(
-                "expected checksum malformed",
-                extra={"stage": "download", "checksum": expected_hash, "url": secure_url},
-            )
 
     cache_dir.mkdir(parents=True, exist_ok=True)
     safe_name = sanitize_filename(destination.name)
     url_hash = hashlib.sha256(secure_url.encode("utf-8")).hexdigest()[:12]
-    cache_key = f"{url_hash}_{safe_name}"
+    cache_path = cache_dir / f"{url_hash}_{safe_name}"
 
-    def _verify_expected_checksum(
-        digests: Dict[str, str],
-        *,
-        artifact_path: Path,
-        cache_path: Optional[Path],
-    ) -> None:
-        if not expected_algorithm or not expected_digest:
-            return
-        try:
-            actual: Optional[str]
-            digest_value = digests.get(expected_algorithm)
-            if digest_value is not None:
-                actual = digest_value.lower()
-            else:
-                actual = _compute_file_hash(artifact_path, expected_algorithm).lower()
-        except ValueError:
-            logger.warning(
-                "unsupported checksum algorithm",
-                extra={
-                    "stage": "download",
-                    "algorithm": expected_algorithm,
-                    "url": secure_url,
-                },
-            )
-            return
-        if actual != expected_digest:
-            logger.error(
-                "checksum mismatch detected",
-                extra={
-                    "stage": "download",
-                    "expected": f"{expected_algorithm}:{expected_digest}",
-                    "actual": actual,
-                    "url": secure_url,
-                },
-            )
-            artifact_path.unlink(missing_ok=True)
-            if cache_path is not None and cache_path != artifact_path:
-                cache_path.unlink(missing_ok=True)
-            raise DownloadFailure(
-                f"Checksum mismatch for {secure_url}",
-                retryable=False,
-            )
-
-    def _resolve_digests(
-        *,
-        current_downloader: _StreamingDownloader,
-        manifest: Optional[Dict[str, object]],
-        artifact_path: Path,
-    ) -> Dict[str, str]:
-        digests = {
-            algorithm: value.lower()
-            for algorithm, value in current_downloader.streamed_digests.items()
-        }
-        if not digests and manifest:
-            manifest_sha = manifest.get("sha256") if manifest else None
-            if isinstance(manifest_sha, str) and manifest_sha:
-                digests.setdefault("sha256", manifest_sha.lower())
-        if "sha256" not in digests:
-            try:
-                digests["sha256"] = _compute_file_hash(artifact_path, "sha256").lower()
-            except ValueError:
-                pass
-        return digests
-
-    raw_attempts = getattr(http_config, "checksum_mismatch_retries", 3)
+    raw_checksum_attempts = getattr(http_config, "checksum_mismatch_retries", 3)
     try:
-        max_checksum_attempts = int(raw_attempts)
+        checksum_attempts = max(1, int(raw_checksum_attempts))
     except (TypeError, ValueError):
-        max_checksum_attempts = 3
-    if max_checksum_attempts < 1:
-        max_checksum_attempts = 1
+        checksum_attempts = 3
 
-    manifest_for_attempt = previous_manifest
+    manifest_for_attempt: Optional[Dict[str, object]] = previous_manifest
 
-    for attempt in range(1, max_checksum_attempts + 1):
-        downloader = _StreamingDownloader(
-            destination=destination,
-            headers=merged_headers,
-            http_config=http_config,
-            previous_manifest=manifest_for_attempt,
-            logger=logger,
-            expected_media_type=expected_media_type,
-            service=service,
-            origin_host=host,
-            bucket=bucket,
-            hash_algorithms=[expected_algorithm] if expected_algorithm else None,
-            cancellation_token=cancellation_token,
-            url_already_validated=True,
-            client=http_client,
-        )
+    def _compute_sha256(path: Path) -> str:
+        return sha256_file(path)
+
+    for attempt in range(1, checksum_attempts + 1):
         attempt_start = time.monotonic()
-        try:
-            cached_path = cache_dir / cache_key
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            downloader.run(secure_url, cached_path)
-        except (requests.HTTPError, httpx.HTTPStatusError) as exc:
-            status_code = getattr(getattr(exc, "response", None), "status_code", None)
-            message = f"HTTP error while downloading {secure_url}: {exc}"
-            retryable = _is_retryable_status(status_code)
-            logger.error(
-                "download request failed",
+        request_headers = _build_headers(manifest_for_attempt)
+
+        def _perform_download() -> _StreamOutcome:
+            try:
+                return _download_once(
+                    client=http_client,
+                    url=secure_url,
+                    cache_path=cache_path,
+                    headers=request_headers,
+                    http_config=http_config,
+                    bucket=bucket,
+                    logger=logger,
+                    correlation_id=correlation_id,
+                    cancellation_token=cancellation_token,
+                    expected_media_type=expected_media_type,
+                    progress_percent_step=progress_percent_step,
+                    progress_bytes_threshold=progress_bytes_threshold,
+                    perform_head=perform_head,
+                    service=service,
+                    host=host,
+                )
+            except httpx.HTTPStatusError as exc:
+                status_code = getattr(exc.response, "status_code", None)
+                retryable = _is_retryable_status(status_code)
+                message = f"HTTP error {status_code} while downloading {secure_url}" if status_code else str(exc)
+                failure = DownloadFailure(message, status_code=status_code, retryable=retryable)
+                retry_after_delay = getattr(exc, "_retry_after_delay", None)
+                if retry_after_delay is not None:
+                    setattr(failure, "_retry_after_delay", retry_after_delay)
+                raise failure from exc
+            except httpx.TransportError as exc:
+                raise DownloadFailure(
+                    f"Network error while downloading {secure_url}: {exc}",
+                    retryable=True,
+                ) from exc
+
+        def _on_retry(attempt_idx: int, exc: Exception, delay: float) -> None:
+            logger.warning(
+                "download retrying",
                 extra={
                     "stage": "download",
-                    "url": secure_url,
+                    "attempt": attempt_idx,
+                    "retry_delay_sec": round(delay, 2),
                     "error": str(exc),
-                    "status_code": status_code,
+                    "url": secure_url,
                 },
             )
-            raise DownloadFailure(message, status_code=status_code, retryable=retryable) from exc
-        except (
-            requests.ConnectionError,
-            requests.Timeout,
-            requests.exceptions.SSLError,
-            httpx.RequestError,
-        ) as exc:
-            logger.error(
-                "download request failed",
-                extra={"stage": "download", "url": secure_url, "error": str(exc)},
+
+        try:
+            outcome = retry_with_backoff(
+                _perform_download,
+                retryable=is_retryable_error,
+                max_attempts=max(1, http_config.max_retries),
+                backoff_base=http_config.backoff_factor,
+                jitter=http_config.backoff_factor,
+                callback=_on_retry,
+                retry_after=lambda exc: getattr(exc, "_retry_after_delay", None),
             )
-            raise DownloadFailure(
-                f"HTTP error while downloading {secure_url}: {exc}", retryable=True
-            ) from exc
-        except PolicyError:
-            raise
         except DownloadFailure:
             raise
-        except Exception as exc:  # pragma: no cover - defensive catch
+        except Exception as exc:  # pragma: no cover - defensive
             logger.error(
                 "unexpected download error",
                 extra={"stage": "download", "url": secure_url, "error": str(exc)},
             )
             raise OntologyDownloadError(f"Download failed for {secure_url}: {exc}") from exc
 
-        if not downloader.invoked and previous_manifest:
-            downloader.status = "cached"
-            etag_value = previous_manifest.get("etag")
-            downloader.response_etag = etag_value if isinstance(etag_value, str) else None
-            last_modified_value = previous_manifest.get("last_modified")
-            downloader.response_last_modified = (
-                last_modified_value if isinstance(last_modified_value, str) else None
-            )
-
-        if downloader.status == "cached":
+        if outcome.from_cache:
+            if not cache_path.exists():
+                raise OntologyDownloadError(
+                    f"Cached file for {secure_url} is missing at {cache_path}"
+                )
             elapsed_cached = (time.monotonic() - attempt_start) * 1000
             logger.info(
                 "cache hit",
@@ -1789,99 +1269,89 @@ def download_stream(
                     "elapsed_ms": round(elapsed_cached, 2),
                 },
             )
-            if destination.exists():
-                artifact_path = destination
-                cache_reference: Optional[Path] = cached_path if cached_path.exists() else None
-            else:
-                artifact_path, cache_reference = _materialize_cached_file(cached_path, destination)
-            digest_map = _resolve_digests(
-                current_downloader=downloader,
-                manifest=manifest_for_attempt,
-                artifact_path=artifact_path,
-            )
-            sha256 = digest_map.get("sha256")
-            if sha256 is None:
-                raise OntologyDownloadError(
-                    f"failed to compute sha256 for cached artifact: {secure_url}"
-                )
-            _verify_expected_checksum(
-                digest_map,
-                artifact_path=artifact_path,
-                cache_path=cache_reference,
-            )
-            log_memory_usage(logger, stage="download", event="after")
-            content_type, content_length = _resolved_content_metadata(
-                downloader, manifest_for_attempt
-            )
-            return DownloadResult(
-                path=artifact_path,
-                status="cached",
-                sha256=sha256,
-                etag=downloader.response_etag,
-                last_modified=downloader.response_last_modified,
-                content_type=content_type,
-                content_length=content_length,
-            )
-
-        artifact_path, cache_reference = _materialize_cached_file(cached_path, destination)
-
-        digest_map = _resolve_digests(
-            current_downloader=downloader,
-            manifest=manifest_for_attempt,
-            artifact_path=artifact_path,
-        )
-        sha256 = digest_map.get("sha256")
-        if sha256 is None:
-            raise OntologyDownloadError(
-                f"failed to compute sha256 for downloaded artifact: {secure_url}"
-            )
-        _verify_expected_checksum(
-            digest_map,
-            artifact_path=artifact_path,
-            cache_path=cache_reference,
-        )
-        previous_sha256 = manifest_for_attempt.get("sha256") if manifest_for_attempt else None
-        if previous_sha256 and previous_sha256 != sha256:
-            logger.error(
-                "sha256 mismatch detected",
+            artifact_path, cache_reference = _materialize_cached_file(cache_path, destination)
+        else:
+            artifact_path, cache_reference = _materialize_cached_file(cache_path, destination)
+            elapsed = (time.monotonic() - attempt_start) * 1000
+            logger.info(
+                "download complete",
                 extra={
                     "stage": "download",
-                    "expected": expected_hash,
-                    "actual": sha256,
-                    "url": secure_url,
+                    "status": outcome.status,
+                    "elapsed_ms": round(elapsed, 2),
                 },
             )
-            artifact_path.unlink(missing_ok=True)
-            if cache_reference != artifact_path:
-                cache_reference.unlink(missing_ok=True)
-            if attempt >= max_checksum_attempts:
-                raise OntologyDownloadError(
-                    f"checksum mismatch after {max_checksum_attempts} attempts: {secure_url}"
-                )
-            manifest_for_attempt = None
-            continue
 
-        elapsed = (time.monotonic() - attempt_start) * 1000
-        logger.info(
-            "download complete",
-            extra={
-                "stage": "download",
-                "status": downloader.status,
-                "elapsed_ms": round(elapsed, 2),
-                "sha256": sha256,
-            },
-        )
+        sha256 = _compute_sha256(artifact_path)
+        expected_value: Optional[str] = None
+        if expected_algorithm:
+            if expected_algorithm == "sha256":
+                expected_value = sha256
+            else:
+                expected_value = _compute_file_hash(artifact_path, expected_algorithm).lower()
+        if expected_algorithm and expected_digest:
+            if expected_value != expected_digest:
+                logger.error(
+                    "checksum mismatch detected",
+                    extra={
+                        "stage": "download",
+                        "expected": expected_hash,
+                        "actual": expected_value,
+                        "url": secure_url,
+                    },
+                )
+                artifact_path.unlink(missing_ok=True)
+                if cache_reference != artifact_path:
+                    cache_reference.unlink(missing_ok=True)
+                cache_path.unlink(missing_ok=True)
+                if attempt < checksum_attempts:
+                    manifest_for_attempt = None
+                    continue
+                raise OntologyDownloadError(
+                    f"checksum mismatch after {checksum_attempts} attempts: {secure_url}"
+                )
+
+        content_type = outcome.content_type
+        if not content_type and manifest_for_attempt:
+            manifest_type = manifest_for_attempt.get("content_type")
+            if isinstance(manifest_type, str):
+                content_type = manifest_type
+
+        content_length = outcome.content_length
+        if content_length is None and manifest_for_attempt:
+            manifest_length = manifest_for_attempt.get("content_length")
+            try:
+                content_length = int(manifest_length) if manifest_length is not None else None
+            except (TypeError, ValueError):
+                content_length = None
+
+        etag = outcome.etag
+        if not etag and manifest_for_attempt:
+            manifest_etag = manifest_for_attempt.get("etag")
+            if isinstance(manifest_etag, str):
+                etag = manifest_etag
+
+        last_modified = outcome.last_modified
+        if not last_modified and manifest_for_attempt:
+            manifest_last_modified = manifest_for_attempt.get("last_modified")
+            if isinstance(manifest_last_modified, str):
+                last_modified = manifest_last_modified
+
         log_memory_usage(logger, stage="download", event="after")
-        content_type, content_length = _resolved_content_metadata(downloader, manifest_for_attempt)
+
         return DownloadResult(
             path=artifact_path,
-            status=downloader.status,
+            status=outcome.status,
             sha256=sha256,
-            etag=downloader.response_etag,
-            last_modified=downloader.response_last_modified,
+            etag=etag,
+            last_modified=last_modified,
             content_type=content_type,
             content_length=content_length,
         )
+
+    raise OntologyDownloadError(
+        f"checksum mismatch after {checksum_attempts} attempts: {secure_url}"
+    )
 
     raise OntologyDownloadError(
         f"checksum mismatch after {max_checksum_attempts} attempts: {secure_url}"

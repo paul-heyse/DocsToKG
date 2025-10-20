@@ -11,19 +11,19 @@
   - close intermediate responses when Tenacity schedules additional attempts.
 
 ## 2. Networking module migration
-- [ ] 2.1 Delete `ThreadLocalSessionFactory`, `create_session`, and `TENACITY_SLEEP` exposure of `time.sleep` in `src/DocsToKG/ContentDownload/networking.py`. Replace internal helpers with imports from `httpx_transport` (`get_http_client`, `purge_http_cache`); keep the public module exports intact.
+- [x] 2.1 Delete `ThreadLocalSessionFactory`, `create_session`, and `TENACITY_SLEEP` exposure of `time.sleep` in `src/DocsToKG/ContentDownload/networking.py`. Replace internal helpers with imports from `httpx_transport` (`get_http_client`, `purge_http_cache`); keep the public module exports intact.
 - [x] 2.2 Update `request_with_retries` so the Tenacity predicates handle `httpx.TimeoutException`, `httpx.TransportError`, and `httpx.ProtocolError`, and the result predicate accepts `httpx.Response`. Ensure `_close_response_safely` accepts HTTPX responses and that elapsed sleep tracking continues to surface in logging.
 - [x] 2.3 Refactor `head_precheck`, `_head_precheck_via_get`, and `RobotsCache._fetch` to call `httpx` via `request_with_retries`, passing explicit timeout/backoff parameters and ensuring 304/conditional logic is honoured through Hishel. Remove any `.close()` calls that assumed `requests.Response`.
 - [x] 2.4 Update `stream_candidate_payload` and related downloader helpers to use `with httpx_client.stream("GET", …)` writing into the existing temp-file flow. Confirm progress callbacks, range/resume guards, and telemetry behave as before.
-- [ ] 2.5 Remove residual imports of `requests` in ContentDownload modules; add defensive shims so legacy tests trying to patch `create_session` raise a clear `RuntimeError` pointing to `httpx_transport`.
+- [x] 2.5 Remove residual imports of `requests` in ContentDownload modules; add defensive shims so legacy tests trying to patch `create_session` raise a clear `RuntimeError` pointing to `httpx_transport`.
 
 ## 3. Call-site and test updates
-- [ ] 3.1 Update resolver modules (`src/DocsToKG/ContentDownload/resolvers/*.py`) so every HTTP operation routes through `request_with_retries` or, where streaming is required, through the new HTTPX streaming helper. Verify JSON decoding uses `response.json()` from HTTPX and closes responses via context managers.
-- [ ] 3.2 Adjust `download.py`, `pipeline.py`, and `tests/content_download` fixtures to obtain the HTTPX client for robots cache, head pre-check, and streaming paths. Ensure conditional 304 results still produce `CachedResult`/`ModifiedResult`.
-- [ ] 3.3 Replace `requests` mocks in tests with `httpx.MockTransport`. Provide fixtures in `tests/conftest.py` to override `get_http_client()` with a deterministic transport; update property-based and benchmark tests to patch the new wait/sleep hooks (`httpx_transport.configure_http_client` or Tenacity’s wait strategy) instead of `networking.random.uniform`.
-- [ ] 3.4 Add regression tests covering: (a) cache hits (304 → `CachedResult`), (b) retry-after driven waits on `httpx.Response`, (c) streaming downloads preserving atomic writes, and (d) robots cache reusing the shared client.
+- [x] 3.1 Update resolver modules (`src/DocsToKG/ContentDownload/resolvers/*.py`) so every HTTP operation routes through `request_with_retries` or, where streaming is required, through the new HTTPX streaming helper. Verify JSON decoding uses `response.json()` from HTTPX and closes responses via context managers.
+- [x] 3.2 Adjust `download.py`, `pipeline.py`, and `tests/content_download` fixtures to obtain the HTTPX client for robots cache, head pre-check, and streaming paths. Ensure conditional 304 results still produce `CachedResult`/`ModifiedResult`.
+- [x] 3.3 Replace `requests` mocks in tests with `httpx.MockTransport`. Provide fixtures in `tests/conftest.py` to override `get_http_client()` with a deterministic transport; update property-based and benchmark tests to patch the new wait/sleep hooks (`httpx_transport.configure_http_client` or Tenacity’s wait strategy) instead of `networking.random.uniform`.
+- [x] 3.4 Add regression tests covering: (a) cache hits (304 → `CachedResult`), (b) retry-after driven waits on `httpx.Response`, (c) streaming downloads preserving atomic writes, and (d) robots cache reusing the shared client.
 
 ## 4. Documentation and rollout
-- [ ] 4.1 Revise `src/DocsToKG/ContentDownload/README.md`, `AGENTS.md`, and the library docs (`httpx.md`, `hishel.md`, transition plan) to explain the HTTPX transport, cache directory, dependency pins, configuration overrides, and testing approach.
-- [ ] 4.2 Update troubleshooting guides to describe how to purge the HTTP cache, diagnose Hishel cache collisions, and interpret new telemetry fields. Note the deprecation of `create_session` and the migration timetable.
-- [ ] 4.3 Coordinate release notes and the changelog: flag the HTTPX/Hishel introduction, mention dependency updates, advise operators to clear legacy session caches, and document any observable retry/caching behaviour changes.
+- [x] 4.1 Revise `src/DocsToKG/ContentDownload/README.md`, `AGENTS.md`, and the library docs (`httpx.md`, `hishel.md`, transition plan) to explain the HTTPX transport, cache directory, dependency pins, configuration overrides, and testing approach.
+- [x] 4.2 Update troubleshooting guides to describe how to purge the HTTP cache, diagnose Hishel cache collisions, and interpret new telemetry fields. Note the deprecation of `create_session` and the migration timetable.
+- [x] 4.3 Coordinate release notes and the changelog: flag the HTTPX/Hishel introduction, mention dependency updates, advise operators to clear legacy session caches, and document any observable retry/caching behaviour changes.

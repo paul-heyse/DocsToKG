@@ -54,8 +54,8 @@ from typing import (
 from urllib.parse import urlparse, urlsplit
 from urllib.robotparser import RobotFileParser
 
-import httpx
 import httpcore
+import httpx
 
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
@@ -85,6 +85,7 @@ from DocsToKG.ContentDownload.core import (
 from DocsToKG.ContentDownload.errors import (
     log_download_failure,
 )
+from DocsToKG.ContentDownload.httpx_transport import get_http_client
 from DocsToKG.ContentDownload.networking import (
     CachedResult,
     ConditionalRequestHelper,
@@ -94,7 +95,6 @@ from DocsToKG.ContentDownload.networking import (
     parse_retry_after_header,
     request_with_retries,
 )
-from DocsToKG.ContentDownload.httpx_transport import get_http_client
 from DocsToKG.ContentDownload.pipeline import (
     AttemptRecord,
     DownloadOutcome,
@@ -551,7 +551,9 @@ def prepare_candidate_download(
 
     head_precheck_state = head_precheck_passed or ctx.head_precheck_passed
     if skip_outcome is None and not head_precheck_state and not ctx.skip_head_precheck:
-        head_precheck_state = head_precheck(http_client, url, timeout, content_policy=content_policy)
+        head_precheck_state = head_precheck(
+            http_client, url, timeout, content_policy=content_policy
+        )
         ctx.head_precheck_passed = head_precheck_state
 
     extract_html_text = ctx.extract_html_text

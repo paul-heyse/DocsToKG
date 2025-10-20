@@ -168,6 +168,7 @@ from tenacity import (
     wait_random_exponential,
 )
 from tenacity.wait import wait_base
+
 from DocsToKG.ContentDownload.httpx_transport import (
     configure_http_client,
     get_http_client,
@@ -505,7 +506,10 @@ def _build_retrying_controller(
         status = getattr(response, "status_code", None)
 
         if duration_cap:
-            if retry_state.seconds_since_start is not None and retry_state.seconds_since_start >= duration_cap:
+            if (
+                retry_state.seconds_since_start is not None
+                and retry_state.seconds_since_start >= duration_cap
+            ):
                 LOGGER.warning(
                     "Exceeded max retry duration %.1fs for %s %s; returning final response",
                     duration_cap,
@@ -552,7 +556,6 @@ def _build_retrying_controller(
     return retrying
 
 
-
 def request_with_retries(
     client: Optional[httpx.Client],
     method: str,
@@ -596,9 +599,7 @@ def request_with_retries(
     backoff_max = float(backoff_max)
 
     retry_statuses = (
-        set(retry_statuses)
-        if retry_statuses is not None
-        else set(DEFAULT_RETRYABLE_STATUSES)
+        set(retry_statuses) if retry_statuses is not None else set(DEFAULT_RETRYABLE_STATUSES)
     )
     retry_statuses = set(retry_statuses)
 
@@ -1129,7 +1130,6 @@ __all__ = [
     "configure_http_client",
     "get_http_client",
     "purge_http_cache",
-    "TENACITY_SLEEP",
     "head_precheck",
     "parse_retry_after_header",
     "request_with_retries",

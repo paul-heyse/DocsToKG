@@ -8,8 +8,8 @@ from email.utils import format_datetime
 from types import TracebackType as _TypesTracebackType
 from typing import Dict, Iterable, List, Optional
 
+import httpx
 import pytest
-import requests
 
 if not hasattr(typing, "TracebackType"):
     typing.TracebackType = _TypesTracebackType  # type: ignore[attr-defined]
@@ -75,7 +75,9 @@ class FlakyRecordingWorks(RecordingWorks):
                 if works.failures_remaining > 0:
                     works.failures_remaining -= 1
                     works.failures_triggered += 1
-                    error = requests.HTTPError("boom")
+                    request = httpx.Request("GET", "https://api.openalex.org/works")
+                    response = httpx.Response(503, request=request)
+                    error = httpx.HTTPStatusError("boom", request=request, response=response)
                     raise error
                 return next(iterator)
 
@@ -246,11 +248,9 @@ def test_iterate_openalex_retries_with_retry_after_headers(
             self.calls += 1
             if self.failures == 0:
                 self.failures += 1
-                response = requests.Response()
-                response.status_code = 429
-                response.headers["Retry-After"] = self._header
-                error = requests.HTTPError("rate limited")
-                error.response = response
+                request = httpx.Request("GET", "https://api.openalex.org/works")
+                response = httpx.Response(429, headers={"Retry-After": self._header}, request=request)
+                error = httpx.HTTPStatusError("rate limited", request=request, response=response)
                 raise error
             if self._index >= len(self._pages):
                 raise StopIteration

@@ -209,6 +209,30 @@ class DownloadConfiguration(BaseModel):
     concurrent_downloads: int = Field(default=1, ge=1, le=10)
     concurrent_plans: int = Field(default=8, ge=1, le=32)
     validate_media_type: bool = Field(default=True)
+    perform_head_precheck: bool = Field(
+        default=True,
+        description=(
+            "When true, downloads issue a HEAD request before GET to collect metadata and "
+            "enforce early policy checks."
+        ),
+    )
+    progress_log_percent_step: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Fractional progress interval used for download telemetry. "
+            "Set to 0 to disable percentage-based progress logs."
+        ),
+    )
+    progress_log_bytes_threshold: int = Field(
+        default=5_242_880,
+        ge=0,
+        description=(
+            "Byte interval for progress logs when the total content length is unknown. "
+            "Set to 0 to disable byte-based progress logging."
+        ),
+    )
     strict_dns: bool = Field(
         default=False,
         description="When true, abort on DNS resolution failures instead of logging a warning.",

@@ -37,6 +37,7 @@ from functools import lru_cache
 from itertools import islice
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
 from pyalex import Topics, Works
 
 from DocsToKG.ContentDownload.core import (

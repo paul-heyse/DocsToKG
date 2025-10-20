@@ -422,9 +422,9 @@ class DownloadRun:
         resume_completed: Set[str]
         cleanup_callback: Optional[Callable[[], None]] = None
 
-        def _build_json_lookup() -> Tuple[
-            Mapping[str, Dict[str, Any]], Set[str], Optional[Callable[[], None]]
-        ]:
+        def _build_json_lookup() -> (
+            Tuple[Mapping[str, Dict[str, Any]], Set[str], Optional[Callable[[], None]]]
+        ):
             json_lookup = JsonlResumeLookup(resume_path)
             completed_ids = set(json_lookup.completed_work_ids)
             return json_lookup, completed_ids, getattr(json_lookup, "close", None)

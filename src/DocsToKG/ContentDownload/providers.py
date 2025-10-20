@@ -91,12 +91,8 @@ class OpenAlexWorkProvider:
             self._max_results = max_results
         self._retry_attempts = max(0, int(retry_attempts))
         self._retry_backoff = max(0.0, float(retry_backoff))
-        self._retry_max_delay = (
-            float(retry_max_delay) if retry_max_delay is not None else None
-        )
-        self._retry_after_cap = (
-            float(retry_after_cap) if retry_after_cap is not None else None
-        )
+        self._retry_max_delay = float(retry_max_delay) if retry_max_delay is not None else None
+        self._retry_after_cap = float(retry_after_cap) if retry_after_cap is not None else None
         if iterate_openalex_func is None:
             from DocsToKG.ContentDownload.runner import iterate_openalex
 
@@ -125,7 +121,9 @@ class OpenAlexWorkProvider:
                     raise TypeError(
                         "OpenAlexWorkProvider expected works to be mapping-like objects."
                     )
-                artifact = self._artifact_factory(work, self._pdf_dir, self._html_dir, self._xml_dir)
+                artifact = self._artifact_factory(
+                    work, self._pdf_dir, self._html_dir, self._xml_dir
+                )
                 yield artifact
                 yielded += 1
                 if self._max_results is not None and yielded >= self._max_results:

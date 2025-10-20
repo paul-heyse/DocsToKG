@@ -207,22 +207,22 @@ max_retry_duration: Maximum total time to spend on retries in seconds. When exce
 the final response after logging a warning. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code> (no limit).
 backoff_max: Maximum delay between retries in seconds. Prevents excessive wait times.
 Defaults to <code class="docutils literal notranslate"><span class="pre">60.0</span></code> seconds.
-<strong>kwargs: Additional keyword arguments forwarded directly to :meth:<code class="docutils literal notranslate"><span class="pre">requests.Session.request</span></code>.</p>
+<strong>kwargs: Additional keyword arguments forwarded directly to :meth:<code class="docutils literal notranslate"><span class="pre">httpx.Client.request</span></code>.</p>
 <p>Returns:
-requests.Response: Successful (or exhausted) response object. Callers are responsible for closing the
+httpx.Response: Successful (or exhausted) response object. Callers are responsible for closing the
 response when streaming content.</p>
 <p>Raises:
 ValueError: If <code class="docutils literal notranslate"><span class="pre">max_retries</span></code> or <code class="docutils literal notranslate"><span class="pre">backoff_factor</span></code> are invalid or <code class="docutils literal notranslate"><span class="pre">url</span></code>/<code class="docutils literal notranslate"><span class="pre">method</span></code> are empty.
-requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.</p>
+httpx.HTTPError: If all retry attempts fail due to network errors or the client raises an exception.</p>
 <p>Notes:
 The Tenacity controller wires <code class="docutils literal notranslate"><span class="pre">RetryAfterJitterWait</span></code> to prefer
 <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> delays before falling back to
 <code class="docutils literal notranslate"><span class="pre">tenacity.wait_random_exponential</span></code>. Intermediate responses are
 closed via <code class="docutils literal notranslate"><span class="pre">_before_sleep_close_response</span></code>, cumulative sleep time is
 tracked on the controller (<code class="docutils literal notranslate"><span class="pre">_docs_retry_sleep</span></code>), and tests may patch
-<code class="docutils literal notranslate"><span class="pre">TENACITY_SLEEP</span></code> to short-circuit waits. Exhausted HTTP retries return
-the final <code class="docutils literal notranslate"><span class="pre">requests.Response</span></code>, whereas exhausted exception retries raise
-the underlying <code class="docutils literal notranslate"><span class="pre">requests.RequestException</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.networking.time.sleep</span></code> to short-circuit waits. Exhausted HTTP retries return
+the final <code class="docutils literal notranslate"><span class="pre">httpx.Response</span></code>, whereas exhausted exception retries raise
+the underlying <code class="docutils literal notranslate"><span class="pre">httpx.HTTPError</span></code>.</p>
 </section>
 <section id="head-precheck-session-url-timeout">
 <h3><code class="docutils literal notranslate"><span class="pre">head_precheck(session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-session-url-timeout" title="Link to this heading"></a></h3>

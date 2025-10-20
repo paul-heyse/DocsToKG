@@ -25,6 +25,7 @@ import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi, normalize_pmcid
 from DocsToKG.ContentDownload.networking import request_with_retries
+
 from .base import (
     RegisteredResolver,
     ResolverEvent,
@@ -39,6 +40,8 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 LOGGER = logging.getLogger(__name__)
+
+
 class PmcResolver(RegisteredResolver):
     """Resolve PubMed Central articles via identifiers and lookups."""
 
@@ -184,7 +187,11 @@ class PmcResolver(RegisteredResolver):
                         mime = (link.attrib.get("type") or "").lower()
                         if not href:
                             continue
-                        if fmt == "pdf" or mime == "application/pdf" or href.lower().endswith(".pdf"):
+                        if (
+                            fmt == "pdf"
+                            or mime == "application/pdf"
+                            or href.lower().endswith(".pdf")
+                        ):
                             yield ResolverResult(
                                 url=_absolute_url(oa_url, href),
                                 metadata={"pmcid": pmcid, "source": "oa"},

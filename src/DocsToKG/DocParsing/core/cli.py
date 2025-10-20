@@ -19,6 +19,9 @@ from collections import Counter, OrderedDict, deque
 from pathlib import Path
 from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
 
+import typer
+from typer.models import TyperCommand
+
 from DocsToKG.DocParsing.cli_errors import (
     CLIValidationError,
     DoctagsCLIValidationError,

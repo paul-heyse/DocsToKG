@@ -1806,7 +1806,7 @@ class ResolverPipeline:
 
                     for result in results:
                         pipeline_result = self._process_result(
-                        client,
+                            client,
                             artifact,
                             resolver_name,
                             order_index,

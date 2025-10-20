@@ -130,6 +130,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List
 
+import httpx
 import pytest
 
 from tests.content_download.stubs import dependency_stubs as install_content_download_stubs
@@ -140,71 +141,15 @@ install_content_download_stubs()
 
 DOWNLOAD_DEPS_AVAILABLE = True
 try:  # pragma: no cover - optional dependency wire-up
-    import requests  # type: ignore
+    import pyalex  # type: ignore  # noqa: F401
 except ModuleNotFoundError:  # pragma: no cover - exercised via skip
-    requests = None  # type: ignore[assignment]
     DOWNLOAD_DEPS_AVAILABLE = False
-else:  # pragma: no branch - simple fallback
-    try:
-        import pyalex  # type: ignore  # noqa: F401
-    except ModuleNotFoundError:  # pragma: no cover - exercised via skip
-        DOWNLOAD_DEPS_AVAILABLE = False
 
-DOWNLOAD_TESTS_SKIP_REASON = "requests and pyalex required for content download atomic write tests"
+DOWNLOAD_TESTS_SKIP_REASON = "pyalex required for content download atomic write tests"
 
 if DOWNLOAD_DEPS_AVAILABLE:
     from DocsToKG.ContentDownload.cli import download_candidate
     from DocsToKG.ContentDownload.core import WorkArtifact
-
-    class _BaseDummyResponse:
-        def __init__(self, status_code: int = 200, headers: Dict[str, str] | None = None) -> None:
-            self.status_code = status_code
-            self.headers: Dict[str, str] = {"Content-Type": "application/pdf"}
-            if headers:
-                self.headers.update(headers)
-
-        def __enter__(self) -> "_BaseDummyResponse":  # noqa: D401 - context manager protocol
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:  # noqa: D401 - context manager protocol
-            return None
-
-        def close(self) -> None:  # pragma: no cover - no resources to release
-            return
-
-    class _DummyHeadResponse(_BaseDummyResponse):
-        def __init__(self) -> None:
-            super().__init__(status_code=200)
-
-    class _FailingResponse(_BaseDummyResponse):
-        def iter_content(self, chunk_size: int):  # noqa: D401 - streaming interface
-            yield b"%PDF-1.4\n"
-            raise requests.exceptions.ChunkedEncodingError("simulated failure")  # type: ignore[arg-type]
-
-    class _SuccessfulResponse(_BaseDummyResponse):
-        def __init__(self, payload: bytes, headers: Dict[str, str] | None = None) -> None:
-            super().__init__(status_code=200, headers=headers)
-            self._payload = payload
-
-        def iter_content(self, chunk_size: int):  # noqa: D401 - streaming interface
-            yield self._payload
-
-    class _DummySession:
-        def __init__(self, response: _BaseDummyResponse) -> None:
-            self._response = response
-
-        def head(self, url: str, **kwargs: Any) -> _BaseDummyResponse:  # noqa: D401
-            return _DummyHeadResponse()
-
-        def get(self, url: str, **kwargs: Any) -> _BaseDummyResponse:  # noqa: D401
-            return self._response
-
-        def request(self, method: str, url: str, **kwargs: Any) -> _BaseDummyResponse:
-            if method == "GET":
-                return self.get(url, **kwargs)
-            if method == "HEAD":
-                return self.head(url, **kwargs)
-            raise AssertionError(f"Unsupported method {method}")
 
     def _make_artifact(tmp_path: Path) -> WorkArtifact:
         pdf_dir = tmp_path / "pdfs"
@@ -231,27 +176,51 @@ if DOWNLOAD_DEPS_AVAILABLE:
             xml_dir=xml_dir,
         )
 
-    def _download_with_session(
-        session: _DummySession, tmp_path: Path, enable_resume: bool = False
+    def _download_with_handler(
+        handler: Any,
+        tmp_path: Path,
+        *,
+        enable_resume: bool = False,
     ) -> tuple[WorkArtifact, Path, Dict[str, Dict[str, Any]], DownloadOutcome]:
         artifact = _make_artifact(tmp_path)
         context: Dict[str, Dict[str, Any]] = {"previous": {}}
         if enable_resume:
             context["enable_range_resume"] = True
-        outcome = download_candidate(
-            session,
-            artifact,
-            "https://example.org/test.pdf",
-            referer=None,
-            timeout=5.0,
-            context=context,
-        )
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        try:
+            outcome = download_candidate(
+                client,
+                artifact,
+                "https://example.org/test.pdf",
+                referer=None,
+                timeout=5.0,
+                context=context,
+            )
+        finally:
+            client.close()
         return artifact, artifact.pdf_dir / "atomic.pdf", context, outcome
 
     @pytest.mark.skipif(not DOWNLOAD_DEPS_AVAILABLE, reason=DOWNLOAD_TESTS_SKIP_REASON)
     def test_partial_download_cleans_part_file(tmp_path: Path) -> None:
-        session = _DummySession(_FailingResponse())
-        artifact, final_path, _, outcome = _download_with_session(session, tmp_path)
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "HEAD":
+                return httpx.Response(200, headers={"Content-Type": "application/pdf"}, request=request)
+            if request.method == "GET":
+                response = httpx.Response(
+                    200,
+                    headers={"Content-Type": "application/pdf"},
+                    request=request,
+                )
+
+                def _iter_bytes(chunk_size: int = 8192):
+                    yield b"%PDF-1.4\n"
+                    raise httpx.ReadError("simulated failure", request=request)
+
+                response.iter_bytes = _iter_bytes  # type: ignore[attr-defined]
+                return response
+            raise AssertionError(f"Unexpected method {request.method}")
+
+        artifact, final_path, _, outcome = _download_with_handler(handler, tmp_path)
 
         part_path = final_path.with_suffix(".pdf.part")
         assert outcome.classification is Classification.HTTP_ERROR
@@ -263,9 +232,33 @@ if DOWNLOAD_DEPS_AVAILABLE:
         body = b"A" * 1500
         payload = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n" + body + b"\n%%EOF\n"
         expected_sha = hashlib.sha256(payload).hexdigest()
-        session = _DummySession(_SuccessfulResponse(payload))
+        chunks = [payload[:10], payload[10:1000], payload[1000:]]
 
-        artifact, final_path, _, outcome = _download_with_session(session, tmp_path)
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "HEAD":
+                return httpx.Response(
+                    200,
+                    headers={
+                        "Content-Type": "application/pdf",
+                        "Content-Length": str(len(payload)),
+                    },
+                    request=request,
+                )
+            if request.method == "GET":
+                response = httpx.Response(
+                    200,
+                    headers={"Content-Type": "application/pdf"},
+                    request=request,
+                )
+
+                def _iter_bytes(chunk_size: int = 8192):
+                    yield from chunks
+
+                response.iter_bytes = _iter_bytes  # type: ignore[attr-defined]
+                return response
+            raise AssertionError(f"Unexpected method {request.method}")
+
+        artifact, final_path, _, outcome = _download_with_handler(handler, tmp_path)
 
         assert outcome.classification is Classification.PDF
         assert outcome.sha256 == expected_sha
