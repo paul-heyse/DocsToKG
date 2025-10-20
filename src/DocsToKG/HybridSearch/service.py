@@ -1818,31 +1818,35 @@ class HybridSearchAPI:
         except Exception as exc:  # pragma: no cover - defensive guard
             return HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)}
 
-        body = {
-            "results": [
-                {
-                    "doc_id": result.doc_id,
-                    "chunk_id": result.chunk_id,
-                    "namespace": result.namespace,
-                    "score": result.score,
-                    "fused_rank": result.fused_rank,
-                    "text": result.text,
-                    "highlights": list(result.highlights),
-                    "provenance_offsets": [list(offset) for offset in result.provenance_offsets],
-                    "metadata": dict(result.metadata),
-                    "diagnostics": {
-                        "bm25": result.diagnostics.bm25_score,
-                        "splade": result.diagnostics.splade_score,
-                        "dense": result.diagnostics.dense_score,
-                        "fusion_weights": (
-                            dict(result.diagnostics.fusion_weights)
-                            if result.diagnostics.fusion_weights is not None
-                            else None
-                        ),
-                    },
+        results: List[Mapping[str, Any]] = []
+        for result in response.results:
+            item: Dict[str, Any] = {
+                "doc_id": result.doc_id,
+                "chunk_id": result.chunk_id,
+                "namespace": result.namespace,
+                "score": result.score,
+                "fused_rank": result.fused_rank,
+                "text": result.text,
+                "highlights": list(result.highlights),
+                "provenance_offsets": [list(offset) for offset in result.provenance_offsets],
+                "metadata": dict(result.metadata),
+            }
+            diagnostics = getattr(result, "diagnostics", None)
+            if request.diagnostics and diagnostics is not None:
+                item["diagnostics"] = {
+                    "bm25": getattr(diagnostics, "bm25_score", None),
+                    "splade": getattr(diagnostics, "splade_score", None),
+                    "dense": getattr(diagnostics, "dense_score", None),
+                    "fusion_weights": (
+                        dict(diagnostics.fusion_weights)
+                        if getattr(diagnostics, "fusion_weights", None) is not None
+                        else None
+                    ),
                 }
-                for result in response.results
-            ],
+            results.append(item)
+
+        body = {
+            "results": results,
             "next_cursor": response.next_cursor,
             "total_candidates": response.total_candidates,
             "timings_ms": dict(response.timings_ms),
