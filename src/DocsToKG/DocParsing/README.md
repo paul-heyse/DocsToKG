@@ -40,7 +40,7 @@ Scope boundary: Handles conversion, chunking, embedding, and telemetry; does not
   - Core pipeline: `pip install "DocsToKG[docparse]"`.
   - PDF DocTags (vLLM + Docling PDF extras): `pip install "DocsToKG[docparse-pdf]"`.
   - SPLADE sparse embeddings: `pip install sentence-transformers`.
-  - Qwen dense embeddings: `pip install vllm` plus CUDA 12 runtime libraries (`libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, `libgomp.so.1`).
+  - Qwen dense embeddings: `pip install vllm` plus CUDA 12 runtime libraries (`libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, `libgomp.so.1`). CPU-only runs automatically fall back to a `float32` dtype when neither CLI nor `DOCSTOKG_QWEN_DTYPE` override is set, ensuring vLLM receives a CPU-safe precision.
   - Parquet vector export & validation: `pip install "DocsToKG[docparse-parquet]"` (installs `pyarrow`).
 - **Model caches**:
   - DocTags PDF model `granite-docling-258M` stored beneath `${DOCSTOKG_MODEL_ROOT}` (defaults to `~/.cache/docs-to-kg/models`).
