@@ -296,6 +296,7 @@ Example manifest excerpt:
 - **Validators**: Implement a callable accepting `ValidationRequest` and returning `ValidationResult`; register it with the `docstokg.ontofetch.validator` entry point or `plugins.register_validator`. Honour `_ValidatorBudget` limits to avoid exhausting resources.
 - **Plugin discovery**: `./.venv/bin/python -m DocsToKG.OntologyDownload.cli plugins --kind all --json` enumerates registered plugins, qualified import paths, and version metadata derived from distributions.
 - **Optional deps**: Add heavy imports to `optdeps.py`/`settings.get_*` helpers so missing dependencies raise actionable guidance rather than import-time crashes.
+- **Networking**: `DocsToKG.OntologyDownload.net` exposes the shared `httpx.Client` wrapped by a Hishel disk cache (`CACHE_DIR/http/ontology`). Call `configure_http_client` to inject a custom client or `httpx.MockTransport` (tests can use `testing.use_mock_http_client`), and `reset_http_client` to restore the default cache-backed configuration. Redirects remain opt-in and flow through `request_with_redirect_audit` to enforce allowlists.
 
 ## Observability
 - Logs: `logging_utils.setup_logging` emits console logs and JSONL files (`LOG_DIR/ontofetch-YYYYMMDD.jsonl`) capturing `stage`, `resolver`, latency, retries, and correlation IDs for downstream ingestion.

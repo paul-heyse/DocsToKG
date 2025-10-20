@@ -4,294 +4,60 @@
 #   "module": "DocsToKG.DocParsing.embedding.runtime",
 #   "purpose": "Embedding pipelines for DocParsing",
 #   "sections": [
-#     {
-#       "id": "build-bm25-vector",
-#       "name": "_build_bm25_vector",
-#       "anchor": "function-build-bm25-vector",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "build-splade-vector",
-#       "name": "_build_splade_vector",
-#       "anchor": "function-build-splade-vector",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "build-dense-vector",
-#       "name": "_build_dense_vector",
-#       "anchor": "function-build-dense-vector",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "build-vector-row",
-#       "name": "_build_vector_row",
-#       "anchor": "function-build-vector-row",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "get-sparse-encoder-cls",
-#       "name": "_get_sparse_encoder_cls",
-#       "anchor": "function-get-sparse-encoder-cls",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "get-vllm-components",
-#       "name": "_get_vllm_components",
-#       "anchor": "function-get-vllm-components",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "shutdown-llm-instance",
-#       "name": "_shutdown_llm_instance",
-#       "anchor": "function-shutdown-llm-instance",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "lrucache",
-#       "name": "_LRUCache",
-#       "anchor": "class-lrucache",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "flush-llm-cache",
-#       "name": "flush_llm_cache",
-#       "anchor": "function-flush-llm-cache",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "close-all-qwen",
-#       "name": "close_all_qwen",
-#       "anchor": "function-close-all-qwen",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "qwen-cache-key",
-#       "name": "_qwen_cache_key",
-#       "anchor": "function-qwen-cache-key",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-qwen-dir",
-#       "name": "_resolve_qwen_dir",
-#       "anchor": "function-resolve-qwen-dir",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-splade-dir",
-#       "name": "_resolve_splade_dir",
-#       "anchor": "function-resolve-splade-dir",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "expand-optional",
-#       "name": "_expand_optional",
-#       "anchor": "function-expand-optional",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-cli-path",
-#       "name": "_resolve_cli_path",
-#       "anchor": "function-resolve-cli-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "percentile",
-#       "name": "_percentile",
-#       "anchor": "function-percentile",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-splade-dependencies",
-#       "name": "_ensure_splade_dependencies",
-#       "anchor": "function-ensure-splade-dependencies",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-qwen-dependencies",
-#       "name": "_ensure_qwen_dependencies",
-#       "anchor": "function-ensure-qwen-dependencies",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-uuid",
-#       "name": "ensure_uuid",
-#       "anchor": "function-ensure-uuid",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "legacy-chunk-uuid",
-#       "name": "_legacy_chunk_uuid",
-#       "anchor": "function-legacy-chunk-uuid",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "tokens",
-#       "name": "tokens",
-#       "anchor": "function-tokens",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "bm25statsaccumulator",
-#       "name": "BM25StatsAccumulator",
-#       "anchor": "class-bm25statsaccumulator",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "print-bm25-summary",
-#       "name": "print_bm25_summary",
-#       "anchor": "function-print-bm25-summary",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "bm25-vector",
-#       "name": "bm25_vector",
-#       "anchor": "function-bm25-vector",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "splade-encode",
-#       "name": "splade_encode",
-#       "anchor": "function-splade-encode",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "detect-splade-backend",
-#       "name": "_detect_splade_backend",
-#       "anchor": "function-detect-splade-backend",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "get-splade-encoder",
-#       "name": "_get_splade_encoder",
-#       "anchor": "function-get-splade-encoder",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "get-splade-backend-used",
-#       "name": "_get_splade_backend_used",
-#       "anchor": "function-get-splade-backend-used",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "spladevalidator",
-#       "name": "SPLADEValidator",
-#       "anchor": "class-spladevalidator",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "qwen-embed-direct",
-#       "name": "_qwen_embed_direct",
-#       "anchor": "function-qwen-embed-direct",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "qwen-embed",
-#       "name": "qwen_embed",
-#       "anchor": "function-qwen-embed",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "qwenembeddingqueue",
-#       "name": "QwenEmbeddingQueue",
-#       "anchor": "class-qwenembeddingqueue",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "embeddingprocessingerror",
-#       "name": "EmbeddingProcessingError",
-#       "anchor": "class-embeddingprocessingerror",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "process-pass-a",
-#       "name": "process_pass_a",
-#       "anchor": "function-process-pass-a",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "iter-rows-in-batches",
-#       "name": "iter_rows_in_batches",
-#       "anchor": "function-iter-rows-in-batches",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "iter-rows-in-batches-with-hash",
-#       "name": "iter_rows_in_batches_with_hash",
-#       "anchor": "function-iter-rows-in-batches-with-hash",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "validate-chunk-file-schema",
-#       "name": "_validate_chunk_file_schema",
-#       "anchor": "function-validate-chunk-file-schema",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "iter-chunk-files",
-#       "name": "iter_chunk_files",
-#       "anchor": "function-iter-chunk-files",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "iter-chunks-or-empty",
-#       "name": "_iter_chunks_or_empty",
-#       "anchor": "function-iter-chunks-or-empty",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "vectorwriter",
-#       "name": "VectorWriter",
-#       "anchor": "class-vectorwriter",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "jsonlvectorwriter",
-#       "name": "JsonlVectorWriter",
-#       "anchor": "class-jsonlvectorwriter",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "create-vector-writer",
-#       "name": "create_vector_writer",
-#       "anchor": "function-create-vector-writer",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "process-chunk-file-vectors",
-#       "name": "process_chunk_file_vectors",
-#       "anchor": "function-process-chunk-file-vectors",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "write-vectors",
-#       "name": "write_vectors",
-#       "anchor": "function-write-vectors",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "handle-embedding-quarantine",
-#       "name": "_handle_embedding_quarantine",
-#       "anchor": "function-handle-embedding-quarantine",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "validate-vectors-for-chunks",
-#       "name": "_validate_vectors_for_chunks",
-#       "anchor": "function-validate-vectors-for-chunks",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "main-inner",
-#       "name": "_main_inner",
-#       "anchor": "function-main-inner",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "function-main",
-#       "kind": "function"
-#     }
+#     {"id": "s1", "name": "_build_bm25_vector", "anchor": "S1", "kind": "function"},
+#     {"id": "s2", "name": "_build_splade_vector", "anchor": "S2", "kind": "function"},
+#     {"id": "s3", "name": "_build_dense_vector", "anchor": "S3", "kind": "function"},
+#     {"id": "s4", "name": "_build_vector_row", "anchor": "S4", "kind": "function"},
+#     {"id": "s5", "name": "_get_sparse_encoder_cls", "anchor": "S5", "kind": "function"},
+#     {"id": "s6", "name": "_get_vllm_components", "anchor": "S6", "kind": "function"},
+#     {"id": "s7", "name": "_shutdown_llm_instance", "anchor": "S7", "kind": "function"},
+#     {"id": "s8", "name": "_LRUCache", "anchor": "S8", "kind": "class"},
+#     {"id": "s9", "name": "flush_llm_cache", "anchor": "S9", "kind": "function"},
+#     {"id": "s10", "name": "close_all_qwen", "anchor": "S10", "kind": "function"},
+#     {"id": "s11", "name": "_qwen_cache_key", "anchor": "S11", "kind": "function"},
+#     {"id": "s12", "name": "_resolve_qwen_dir", "anchor": "S12", "kind": "function"},
+#     {"id": "s13", "name": "_resolve_splade_dir", "anchor": "S13", "kind": "function"},
+#     {"id": "s14", "name": "_expand_optional", "anchor": "S14", "kind": "function"},
+#     {"id": "s15", "name": "_resolve_cli_path", "anchor": "S15", "kind": "function"},
+#     {"id": "s16", "name": "_percentile", "anchor": "S16", "kind": "function"},
+#     {"id": "s17", "name": "_ensure_splade_dependencies", "anchor": "S17", "kind": "function"},
+#     {"id": "s18", "name": "_ensure_qwen_dependencies", "anchor": "S18", "kind": "function"},
+#     {"id": "s19", "name": "ensure_uuid", "anchor": "S19", "kind": "function"},
+#     {"id": "s20", "name": "_legacy_chunk_uuid", "anchor": "S20", "kind": "function"},
+#     {"id": "s21", "name": "tokens", "anchor": "S21", "kind": "function"},
+#     {"id": "s22", "name": "BM25StatsAccumulator", "anchor": "S22", "kind": "class"},
+#     {"id": "s23", "name": "print_bm25_summary", "anchor": "S23", "kind": "function"},
+#     {"id": "s24", "name": "bm25_vector", "anchor": "S24", "kind": "function"},
+#     {"id": "s25", "name": "splade_encode", "anchor": "S25", "kind": "function"},
+#     {"id": "s26", "name": "_detect_splade_backend", "anchor": "S26", "kind": "function"},
+#     {"id": "s27", "name": "_get_splade_encoder", "anchor": "S27", "kind": "function"},
+#     {"id": "s28", "name": "_get_splade_backend_used", "anchor": "S28", "kind": "function"},
+#     {"id": "s29", "name": "SPLADEValidator", "anchor": "S29", "kind": "class"},
+#     {"id": "s30", "name": "_qwen_embed_direct", "anchor": "S30", "kind": "function"},
+#     {"id": "s31", "name": "qwen_embed", "anchor": "S31", "kind": "function"},
+#     {"id": "s32", "name": "QwenEmbeddingQueue", "anchor": "S32", "kind": "class"},
+#     {"id": "s33", "name": "EmbeddingProcessingError", "anchor": "S33", "kind": "class"},
+#     {"id": "s34", "name": "process_pass_a", "anchor": "S34", "kind": "function"},
+#     {"id": "s35", "name": "iter_rows_in_batches", "anchor": "S35", "kind": "function"},
+#     {"id": "s36", "name": "iter_rows_in_batches_with_hash", "anchor": "S36", "kind": "function"},
+#     {"id": "s37", "name": "_validate_chunk_file_schema", "anchor": "S37", "kind": "function"},
+#     {"id": "s38", "name": "iter_chunk_files", "anchor": "S38", "kind": "function"},
+#     {"id": "s39", "name": "_iter_chunks_or_empty", "anchor": "S39", "kind": "function"},
+#     {"id": "s40", "name": "_ensure_pyarrow_vectors", "anchor": "S40", "kind": "function"},
+#     {"id": "s41", "name": "_vector_arrow_schema", "anchor": "S41", "kind": "function"},
+#     {"id": "s42", "name": "_prepare_vector_row_for_arrow", "anchor": "S42", "kind": "function"},
+#     {"id": "s43", "name": "_rows_to_arrow_table", "anchor": "S43", "kind": "function"},
+#     {"id": "s44", "name": "VectorWriter", "anchor": "S44", "kind": "class"},
+#     {"id": "s45", "name": "JsonlVectorWriter", "anchor": "S45", "kind": "class"},
+#     {"id": "s46", "name": "ParquetVectorWriter", "anchor": "S46", "kind": "class"},
+#     {"id": "s47", "name": "create_vector_writer", "anchor": "S47", "kind": "function"},
+#     {"id": "s48", "name": "_iter_vector_rows", "anchor": "S48", "kind": "function"},
+#     {"id": "s49", "name": "process_chunk_file_vectors", "anchor": "S49", "kind": "function"},
+#     {"id": "s50", "name": "write_vectors", "anchor": "S50", "kind": "function"},
+#     {"id": "s51", "name": "_handle_embedding_quarantine", "anchor": "S51", "kind": "function"},
+#     {"id": "s52", "name": "_validate_vectors_for_chunks", "anchor": "S52", "kind": "function"},
+#     {"id": "s53", "name": "_main_inner", "anchor": "S53", "kind": "function"},
+#     {"id": "s54", "name": "main", "anchor": "S54", "kind": "function"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -447,13 +213,23 @@ from DocsToKG.DocParsing.env import (
 )
 from DocsToKG.DocParsing.formats import (
     VECTOR_SCHEMA_VERSION,
-    BM25Vector as _BM25Vector,
-    DenseVector as _DenseVector,
-    SPLADEVector as _SPLADEVector,
-    VectorRow as _VectorRow,
     SchemaKind,
     ensure_chunk_schema,
     validate_schema_version,
+)
+from DocsToKG.DocParsing.formats import (
+    BM25Vector as _BM25Vector,
+)
+from DocsToKG.DocParsing.formats import (
+    DenseVector as _DenseVector,
+)
+from DocsToKG.DocParsing.formats import (
+    SPLADEVector as _SPLADEVector,
+)
+from DocsToKG.DocParsing.formats import (
+    VectorRow as _VectorRow,
+)
+from DocsToKG.DocParsing.formats import (
     validate_vector_row as _validate_vector_row,
 )
 from DocsToKG.DocParsing.io import (
@@ -1583,7 +1359,7 @@ def _ensure_pyarrow_vectors() -> tuple[Any, Any]:
             option="--format",
             message=(
                 "parquet vector output requires the optional dependency 'pyarrow'. "
-                'Install DocsToKG[docparse-parquet] or add pyarrow to the environment.'
+                "Install DocsToKG[docparse-parquet] or add pyarrow to the environment."
             ),
         ) from exc
     _PYARROW_MODULE = pa

@@ -420,9 +420,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         should_verify = bool(verify_hash and stored_hash)
         skip = False
         entry_format = (
-            str(manifest_entry.get("vector_format") or "jsonl").lower()
-            if manifest_entry
-            else None
+            str(manifest_entry.get("vector_format") or "jsonl").lower() if manifest_entry else None
         )
         format_mismatch = bool(manifest_entry) and entry_format != vector_format
         if should_verify:

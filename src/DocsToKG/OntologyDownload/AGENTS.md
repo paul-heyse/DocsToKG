@@ -362,6 +362,7 @@ flowchart LR
 - **Resolvers**: Implement `resolvers.Resolver` (or subclass `BaseResolver`), expose via the `docstokg.ontofetch.resolver` entry-point group, and keep polite headers, expected checksums, and target format hints in metadata. For tests, use `plugins.register_resolver`.
 - **Validators**: Provide a callable returning `ValidationResult`, register under `docstokg.ontofetch.validator`, and honour `_ValidatorBudget`/process pool guidance to avoid starvation; use `plugins.register_validator` when stubbing.
 - **Plugin observability**: `./.venv/bin/python -m DocsToKG.OntologyDownload.cli plugins --kind all --json` lists resolver/validator inventory, qualified import paths, and load issues sourced from the plugin registries.
+- **HTTP transport**: Reuse the shared `httpx.Client` via `DocsToKG.OntologyDownload.net.get_http_client`. Install custom transports (e.g., `httpx.MockTransport`) with `configure_http_client` or the `testing.use_mock_http_client` context manager; `reset_http_client` restores the default Hishel-backed client (`CACHE_DIR/http/ontology`) and event hooks that inject polite headers and audit redirects.
 - **Checksums**: Prefer `checksums.ExpectedChecksum` helpers when introducing new checksum sources (`expected_checksum`, `checksum_url`) so manifests and lockfiles stay consistent.
 
 ## Test Matrix & Quality Gates

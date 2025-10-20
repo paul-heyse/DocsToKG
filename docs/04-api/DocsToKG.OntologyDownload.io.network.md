@@ -227,9 +227,15 @@ None
 
 ## 3. Classes
 
-### `SessionPool`
+### `Shared HTTP client`
 
-Lightweight pool that reuses requests sessions per (service, host).
+OntologyDownload reuses a single :mod:`httpx` client created by
+``DocsToKG.OntologyDownload.net.get_http_client``. The client is wrapped in a
+Hishel disk cache (``CACHE_DIR/http/ontology``) and carries polite headers,
+redirect auditing, and rate-limit instrumentation. Call
+``configure_http_client`` to install a custom client or transport (for example,
+``httpx.MockTransport`` in tests); restore defaults with
+``reset_http_client()``.
 
 ### `DownloadResult`
 
@@ -253,9 +259,9 @@ Examples:
 
 Custom downloader supporting HEAD validation, conditional requests, resume, and caching.
 
-The downloader shares a :mod:`requests` session so it can issue a HEAD probe
-prior to streaming content, verifies Content-Type and Content-Length against
-expectations, and persists ETag/Last-Modified headers for cache-friendly
+The downloader reuses the shared :mod:`httpx` client so it can issue a HEAD
+probe prior to streaming content, verifies ``Content-Type`` and ``Content-Length``
+against expectations, and persists ETag/Last-Modified headers for cache-friendly
 revalidation.
 
 Attributes:

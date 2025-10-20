@@ -1248,7 +1248,7 @@ class ResolverPipeline:
     :attr:`ResolverConfig.max_concurrent_resolvers` is greater than one. All
     mutable shared state is protected by :class:`threading.Lock` instances and
     only read concurrently without mutation. Resolver execution retrieves
-    thread-local HTTP sessions via the supplied factory so each worker maintains
+    thread-local HTTPX clients via the supplied factory so each worker maintains
     its own connection pool without cross-thread sharing.
 
     Attributes:
@@ -1952,12 +1952,12 @@ class ResolverPipeline:
             Tuple of resolver results and the resolver wall time (ms).
         """
 
-        session = client_provider()
+        client = client_provider()
         results: List[ResolverResult] = []
         self._respect_rate_limit(resolver_name)
         start = _time.monotonic()
         try:
-            for result in resolver.iter_urls(session, self.config, artifact):
+            for result in resolver.iter_urls(client, self.config, artifact):
                 results.append(result)
         except Exception as exc:
             self.metrics.record_failure(resolver_name)

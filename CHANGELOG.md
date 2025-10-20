@@ -13,6 +13,7 @@ All notable changes to DocsToKG are documented in this file.
 - Download strategy helpers (`validate_classification`, `handle_resume_logic`,
   `cleanup_sidecar_files`, `build_download_outcome`) with comprehensive unit
   coverage to support artifact-specific logic.
+- Regression tests exercising the HTTPX/Hishel transport: cache-hit handling of 304 responses, `Retry-After` backoff accounting, streaming download atomicity, and shared robots cache reuse using `httpx.MockTransport` fixtures.
 
 ### Changed
 - DocParsing core modules are split into focused packages (`core.discovery`,
@@ -36,13 +37,14 @@ All notable changes to DocsToKG are documented in this file.
 - Content download outcomes now leave `reason` unset for fresh downloads, retain `conditional_not_modified` for genuine 304s, and tag voluntary skips with the dedicated `skip_large_download` code.
 - HTTP range resume is hard-disabled; resolver hints prefixed with `resume_` are stripped and telemetry annotates ignored requests via `resume_disabled=true`.
 - Manifest warm-up defaults to a lazy `ManifestUrlIndex`, with `--warm-manifest-cache` offered solely for small datasets.
-- Content download networking now delegates all HTTP retries to Tenacity, unifying retryable status handling, `Retry-After` honouring, attempt/time budgets, and test patch points via `TENACITY_SLEEP`.
+- Content download networking now consolidates on a shared HTTPX client wrapped in Hishel caching (`DocsToKG.ContentDownload.httpx_transport`), removing the legacy `ThreadLocalSessionFactory`/`create_session` helpers. Transport overrides use `configure_http_client()` and `purge_http_cache()`, Tenacity sleeps are patched via `DocsToKG.ContentDownload.networking.time.sleep`, and all retries operate on `httpx.Response` semantics.
 - `_validate_cached_artifact` short-circuits on matching size/mtime and only recomputes digests when `verify_cache_digest=True`, backed by an in-process LRU cache.
 
 ### Documentation
 - Migration notes outlining the removal of deprecated content download shims,
   new `ApiResolverBase` guidance for resolver authors, staging directory usage,
   and updated CLI flag documentation.
+- Updated content download runbooks to describe the HTTPX/Hishel transport, cache directory management (`purge_http_cache()`), telemetry fields emitted by HTTPX event hooks, and the deprecation of `create_session` / `ThreadLocalSessionFactory`.
 - CHANGELOG entry detailing the content download robustness refactor for downstream consumers.
 - Updated content download architecture, review, and API reference documents to
   describe the resolver modularisation, `DownloadRun` orchestration, and

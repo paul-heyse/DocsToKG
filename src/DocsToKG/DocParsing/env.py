@@ -53,11 +53,7 @@ def resolve_model_root(hf_home: Path | str | None = None) -> Path:
     env = os.getenv("DOCSTOKG_MODEL_ROOT")
     if env:
         return expand_path(env)
-    resolved_hf = (
-        expand_path(hf_home)
-        if hf_home is not None
-        else resolve_hf_home()
-    )
+    resolved_hf = expand_path(hf_home) if hf_home is not None else resolve_hf_home()
     cache_root = resolved_hf.parent if resolved_hf.name == "huggingface" else resolved_hf
     default_root = cache_root / "docs-to-kg" / "models"
     return expand_path(default_root)
@@ -110,9 +106,7 @@ def init_hf_env(
 
     resolved_hf = expand_path(hf_home) if hf_home is not None else resolve_hf_home()
     resolved_model_root = (
-        expand_path(model_root)
-        if model_root is not None
-        else resolve_model_root(resolved_hf)
+        expand_path(model_root) if model_root is not None else resolve_model_root(resolved_hf)
     )
 
     os.environ["HF_HOME"] = str(resolved_hf)
@@ -238,9 +232,7 @@ def ensure_qwen_environment(
         resolved_device = device
     else:
         resolved_device = (
-            os.getenv("DOCSTOKG_QWEN_DEVICE")
-            or os.getenv("VLLM_DEVICE")
-            or _detect_cuda_device()
+            os.getenv("DOCSTOKG_QWEN_DEVICE") or os.getenv("VLLM_DEVICE") or _detect_cuda_device()
         )
     os.environ["DOCSTOKG_QWEN_DEVICE"] = resolved_device
     os.environ["VLLM_DEVICE"] = resolved_device

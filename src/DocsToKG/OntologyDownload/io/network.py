@@ -18,7 +18,9 @@ This module manages resilient HTTP downloads: DNS caching, a shared HTTPX
 client with RFC-9111 caching, range resume, provenance logging, retry-after
 aware throttling, and security guards around redirects, content types, and
 host allowlists. It provides the streaming helpers consumed by resolvers and
-the planner when fetching ontology artefacts.
+the planner when fetching ontology artefacts. The legacy `requests` session
+pool has been retired—every code path now goes through the shared HTTPX +
+Hishel transport defined in `DocsToKG.OntologyDownload.net`.
 """
 
 from __future__ import annotations
@@ -435,7 +437,7 @@ def retry_with_backoff(
         before_sleep=_before_sleep,
     )
 
-    return retry_controller.call(func)
+    return retry_controller(func)
 
 
 def log_memory_usage(
@@ -730,6 +732,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self._reset_hashers()
         self._reuse_head_token = False
         self._assume_url_validated = url_already_validated
+        self._force_full_download = False
         self.client = client or get_http_client(http_config)
 
     def _reset_hashers(self) -> None:
@@ -1201,11 +1204,18 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
                 self._reset_hashers()
                 resume_position = part_path.stat().st_size if part_path.exists() else 0
+                print("DEBUG resume_position start", resume_position, "force", self._force_full_download)
+                force_full_download = self._force_full_download
+                if force_full_download:
+                    self._force_full_download = False
+                    resume_position = 0
                 original_resume_position = resume_position
-                want_range = original_resume_position > 0
                 request_headers = dict(base_headers)
-                if want_range:
+                if not force_full_download and original_resume_position > 0:
                     request_headers["Range"] = f"bytes={original_resume_position}-"
+                else:
+                    request_headers.pop("Range", None)
+                want_range = (not force_full_download) and original_resume_position > 0
 
                 if self.bucket is not None:
                     if self._reuse_head_token:
@@ -1294,6 +1304,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         raise http_error
 
                     if response.status_code == 416:
+                        print("DEBUG trigger 416")
                         self.logger.warning(
                             "range request rejected; retrying without resume",
                             extra={
@@ -1307,6 +1318,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         _clear_partial_files()
                         resume_position = 0
                         want_range = False
+                        self._force_full_download = True
                         raise requests.HTTPError(
                             f"HTTP error {response.status_code}", response=response
                         )
@@ -1337,6 +1349,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             range_honored = False
                             resume_position = 0
                             want_range = False
+                            self._force_full_download = True
                     if want_range and not range_honored:
                         self.logger.warning(
                             "range resume not honored; restarting from beginning",
@@ -1350,6 +1363,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         range_honored = False
                         resume_position = 0
                         want_range = False
+                        self._force_full_download = True
                     elif range_honored:
                         resume_position = original_resume_position
                     else:

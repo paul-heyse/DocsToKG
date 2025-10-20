@@ -375,10 +375,14 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
 
         def _handler(request: httpx.Request) -> httpx.Response:
             path = request.url.path or "/"
+            normalized_headers = {
+                "-".join(part.capitalize() for part in key.split("-")): value
+                for key, value in request.headers.items()
+            }
             record = RequestRecord(
                 method=request.method,
                 path=path,
-                headers={key: value for key, value in request.headers.items()},
+                headers=normalized_headers,
                 body=request.content or b"",
             )
             env._request_log.append(record)

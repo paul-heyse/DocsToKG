@@ -129,7 +129,7 @@ Return validator names appropriate for ``media_type``.
 Issue a polite planner probe using shared networking primitives.
 
 Call graph: :func:`plan_one`/ :func:`plan_all` → :func:`_populate_plan_metadata` /
-:func:`_fetch_last_modified` → :func:`planner_http_probe` → :func:`SESSION_POOL.lease`.
+:func:`_fetch_last_modified` → :func:`planner_http_probe` → :func:`DocsToKG.OntologyDownload.net.get_http_client`.
 
 ### `_populate_plan_metadata(planned, config, adapter)`
 

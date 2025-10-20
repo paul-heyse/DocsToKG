@@ -164,6 +164,15 @@ If any import fails: **do not install**. Go to Troubleshooting.
 - **`pip` tries to fetch**
   You forgot the guard rails. Ensure `PIP_REQUIRE_VIRTUALENV=1` and `PIP_NO_INDEX=1` are set. Never pass `-U/--upgrade`.
 
+- **Stale HTTP cache / unexpected 304 hits**
+  Call `DocsToKG.ContentDownload.httpx_transport.purge_http_cache()` (or delete `${DOCSTOKG_DATA_ROOT}/cache/http/ContentDownload`) and re-run. Cache keys are derived from `core.normalize_url`; normalize any direct calls before comparing.
+
+- **Telemetry shows `cache_hit=true` but payload missing**
+  Confirm the cached path still exists; `ConditionalRequestHelper` raises when metadata is incomplete. Recompute manifests with `--verify-cache-digest` to refresh SHA-256 and mtime fields.
+
+- **Legacy tests patch `create_session` / `ThreadLocalSessionFactory`**
+  Those shims now raise `RuntimeError`. Patch `DocsToKG.ContentDownload.httpx_transport.configure_http_client()` or `DocsToKG.ContentDownload.networking.time.sleep` instead.
+
 ---
 
 ## 6) “Absolutely no installs” policy (what you may do)
@@ -296,7 +305,7 @@ flowchart LR
 ```
 
 - `cli.main()` wires the frozen `ResolvedConfig` into `DownloadRun`, seeding resolver instances, telemetry factories, and configurable hooks (`download_candidate_func`, sink factories) for tests.
-- `DownloadRun.run()` stages the lifecycle in order: `setup_sinks()` → `setup_resolver_pipeline()` → `setup_work_provider()` → `setup_download_state()` → work execution (sequential or `ThreadPoolExecutor`). A `ThreadLocalSessionFactory` provides per-thread `requests.Session` objects and is closed during teardown, and sequential `--sleep` throttles are automatically disabled when `--workers > 1` unless callers opt in explicitly.
+- `DownloadRun.run()` stages the lifecycle in order: `setup_sinks()` → `setup_resolver_pipeline()` → `setup_work_provider()` → `setup_download_state()` → work execution (sequential or `ThreadPoolExecutor`). The shared HTTPX client from `DocsToKG.ContentDownload.httpx_transport` is reused across workers (tests may override via `configure_http_client()` / `reset_http_client_for_tests()`), and sequential `--sleep` throttles are automatically disabled when `--workers > 1` unless callers opt in explicitly.
 - `DownloadRun.setup_download_state()` hydrates resume metadata from JSONL/CSV manifests or SQLite caches, seeds `DownloadConfig` (robots cache, content-addressed toggle, digest verification, global dedupe sets), and registers cleanup callbacks on the exit stack.
 - `ResolverPipeline.run()` enforces resolver ordering, per-resolver spacing, domain token buckets, circuit breakers, global URL dedupe, and emits structured `AttemptRecord` telemetry while updating `ResolverMetrics`.
 - `download.process_one_work()` normalises work payloads, evaluates resume decisions, coordinates download strategies (PDF/HTML/XML), finalises artifacts atomically, and logs manifest + summary records via `RunTelemetry`.
@@ -374,8 +383,8 @@ resolver_circuit_breakers:
 
 ## Networking, Rate Limiting & Politeness
 
-- `networking.ThreadLocalSessionFactory` + `create_session()` maintain per-thread sessions with shared adapter pools, polite defaults, and consistent timeouts; call `close_all()` during teardown.
-- `request_with_retries()` delegates to a Tenacity controller that retries `{429, 500, 502, 503, 504}`, honours `Retry-After` headers (bounded by `retry_after_cap` and `backoff_max`), closes intermediate `requests.Response` objects before sleeping, and surfaces the final response when HTTP retries exhaust. Patch `DocsToKG.ContentDownload.networking.TENACITY_SLEEP` in tests to freeze pacing.
+- `DocsToKG.ContentDownload.httpx_transport` provisions a singleton HTTPX client wrapped in Hishel caching; `configure_http_client()` injects transports (e.g., `httpx.MockTransport`) and `purge_http_cache()` clears `${CACHE_DIR}/http/ContentDownload` for ops/testing.
+- `request_with_retries()` delegates to a Tenacity controller that retries `{429, 500, 502, 503, 504}`, honours `Retry-After` headers (bounded by `retry_after_cap` and `backoff_max`), closes intermediate `httpx.Response` objects before sleeping, and surfaces the final response when HTTP retries exhaust. Patch `DocsToKG.ContentDownload.networking.time.sleep` or use `configure_http_client()` in tests to freeze pacing.
 - Resolver/CLI knobs flow directly into the Tenacity policy: `backoff_factor` controls jitter amplitude, `backoff_max` bounds waits, `retry_after_cap` enforces ceilings, `respect_retry_after` toggles header parsing, and `max_retry_duration` halts retries early.
 - Token buckets/circuit breakers defined in `ResolverConfig` throttle host+resolver concurrency; host semaphores and `CircuitBreaker` instances (`resolver_circuit_breakers`, domain breakers) share telemetry and enforce cooldowns.
 - `download.RobotsCache` enforces robots.txt unless `--ignore-robots`; override only with explicit approval.
@@ -409,7 +418,7 @@ pytest -q tests/content_download/test_rate_control.py
 python -m DocsToKG.ContentDownload.cli --topic "vision" --year-start 2024 --year-end 2024 --max 5 --dry-run --manifest tmp/manifest.jsonl
 ```
 
-- High-signal suites: `tests/content_download/test_networking.py`, `test_download_execution.py`, `test_runner_download_run.py`, `tests/cli/test_cli_flows.py`.
+- High-signal suites: `tests/content_download/test_httpx_networking.py`, `test_download_execution.py`, `test_runner_download_run.py`, `tests/cli/test_cli_flows.py`.
 - Maintain golden fakes under `tests/content_download/fakes/` when altering manifest/telemetry fields.
 
 ## Reference Docs

@@ -293,8 +293,14 @@ None</p>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="sessionpool">
-<h3><code class="docutils literal notranslate"><span class="pre">SessionPool</span></code><a class="headerlink" href="#sessionpool" title="Link to this heading"></a></h3>
-<p>Lightweight pool that reuses requests sessions per (service, host).</p>
+<h3><code class="docutils literal notranslate"><span class="pre">Shared</span> <span class="pre">HTTP</span> <span class="pre">client</span></code><a class="headerlink" href="#shared-http-client" title="Link to this heading"></a></h3>
+<p>OntologyDownload reuses a single <code class="docutils literal notranslate"><span class="pre">httpx</span></code> client created by
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.net.get_http_client</span></code>. The client is wrapped in a
+Hishel disk cache (<code class="docutils literal notranslate"><span class="pre">CACHE_DIR/http/ontology</span></code>) and carries polite headers,
+redirect auditing, and rate-limit instrumentation. Call
+<code class="docutils literal notranslate"><span class="pre">configure_http_client</span></code> to install a custom client or transport (for example,
+<code class="docutils literal notranslate"><span class="pre">httpx.MockTransport</span></code> in tests); restore defaults with
+<code class="docutils literal notranslate"><span class="pre">reset_http_client()</span></code>.</p>
 </section>
 <section id="downloadresult">
 <h3><code class="docutils literal notranslate"><span class="pre">DownloadResult</span></code><a class="headerlink" href="#downloadresult" title="Link to this heading"></a></h3>
@@ -321,9 +327,9 @@ result.status
 <section id="streamingdownloader">
 <h3><code class="docutils literal notranslate"><span class="pre">StreamingDownloader</span></code><a class="headerlink" href="#streamingdownloader" title="Link to this heading"></a></h3>
 <p>Custom downloader supporting HEAD validation, conditional requests, resume, and caching.</p>
-<p>The downloader shares a :mod:<code class="docutils literal notranslate"><span class="pre">requests</span></code> session so it can issue a HEAD probe
-prior to streaming content, verifies Content-Type and Content-Length against
-expectations, and persists ETag/Last-Modified headers for cache-friendly
+<p>The downloader reuses the shared <span class="xref std std-mod">httpx</span> client so it can issue a HEAD
+probe prior to streaming content, verifies <code class="docutils literal notranslate"><span class="pre">Content-Type</span></code> and <code class="docutils literal notranslate"><span class="pre">Content-Length</span></code>
+against expectations, and persists ETag/Last-Modified headers for cache-friendly
 revalidation.</p>
 <p>Attributes:
 destination: Final location where the ontology will be stored.

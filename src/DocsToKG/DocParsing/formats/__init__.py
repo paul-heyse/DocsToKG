@@ -3,78 +3,24 @@
 #   "module": "DocsToKG.DocParsing.formats.__init__",
 #   "purpose": "Data models and validators for DocParsing artifact formats",
 #   "sections": [
-#     {
-#       "id": "schemakind",
-#       "name": "SchemaKind",
-#       "anchor": "class-schemakind",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "provenancemetadata",
-#       "name": "ProvenanceMetadata",
-#       "anchor": "class-provenancemetadata",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "chunkrow",
-#       "name": "ChunkRow",
-#       "anchor": "class-chunkrow",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "bm25vector",
-#       "name": "BM25Vector",
-#       "anchor": "class-bm25vector",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "spladevector",
-#       "name": "SPLADEVector",
-#       "anchor": "class-spladevector",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "densevector",
-#       "name": "DenseVector",
-#       "anchor": "class-densevector",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "vectorrow",
-#       "name": "VectorRow",
-#       "anchor": "class-vectorrow",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "validate-chunk-row",
-#       "name": "validate_chunk_row",
-#       "anchor": "function-validate-chunk-row",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "validate-vector-row",
-#       "name": "validate_vector_row",
-#       "anchor": "function-validate-vector-row",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "get-docling-version",
-#       "name": "get_docling_version",
-#       "anchor": "function-get-docling-version",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "captionplusannotationpictureserializer",
-#       "name": "CaptionPlusAnnotationPictureSerializer",
-#       "anchor": "class-captionplusannotationpictureserializer",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "richserializerprovider",
-#       "name": "RichSerializerProvider",
-#       "anchor": "class-richserializerprovider",
-#       "kind": "class"
-#     }
+#     {"id": "schema-kind", "name": "SchemaKind", "anchor": "SC", "kind": "class"},
+#     {"id": "coerce-kind", "name": "_coerce_kind", "anchor": "CK", "kind": "function"},
+#     {"id": "default-schema-version", "name": "get_default_schema_version", "anchor": "GD", "kind": "function"},
+#     {"id": "compatible-versions", "name": "get_compatible_versions", "anchor": "GV", "kind": "function"},
+#     {"id": "validate-schema-version", "name": "validate_schema_version", "anchor": "VS", "kind": "function"},
+#     {"id": "ensure-chunk-schema", "name": "ensure_chunk_schema", "anchor": "EC", "kind": "function"},
+#     {"id": "provenance-metadata", "name": "ProvenanceMetadata", "anchor": "PM", "kind": "class"},
+#     {"id": "chunk-row", "name": "ChunkRow", "anchor": "CR", "kind": "class"},
+#     {"id": "bm25-vector", "name": "BM25Vector", "anchor": "B2", "kind": "class"},
+#     {"id": "splade-vector", "name": "SPLADEVector", "anchor": "SV", "kind": "class"},
+#     {"id": "dense-vector", "name": "DenseVector", "anchor": "DV", "kind": "class"},
+#     {"id": "vector-row", "name": "VectorRow", "anchor": "VR", "kind": "class"},
+#     {"id": "validate-chunk-row", "name": "validate_chunk_row", "anchor": "VC", "kind": "function"},
+#     {"id": "pydantic-validate-vector-row", "name": "_pydantic_validate_vector_row", "anchor": "PV", "kind": "function"},
+#     {"id": "validate-vector-row", "name": "validate_vector_row", "anchor": "VV", "kind": "function"},
+#     {"id": "get-docling-version", "name": "get_docling_version", "anchor": "GDV", "kind": "function"},
+#     {"id": "caption-picture-serializer", "name": "CaptionPlusAnnotationPictureSerializer", "anchor": "CS", "kind": "class"},
+#     {"id": "rich-serializer-provider", "name": "RichSerializerProvider", "anchor": "RS", "kind": "class"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -106,9 +52,8 @@ Dependencies:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Tuple
-
 from enum import Enum
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from docling_core.transforms.chunker.hierarchical_chunker import (
     ChunkingDocSerializer,
@@ -232,6 +177,7 @@ def ensure_chunk_schema(
     )
     rec["schema_version"] = coerced
     return rec
+
 
 # --- Globals ---
 

@@ -188,7 +188,7 @@ None: Returns <code class="docutils literal notranslate"><span class="pre">None<
 <h3><code class="docutils literal notranslate"><span class="pre">planner_http_probe()</span></code><a class="headerlink" href="#planner-http-probe" title="Link to this heading"></a></h3>
 <p>Issue a polite planner probe using shared networking primitives.</p>
 <p>Call graph: :func:<code class="docutils literal notranslate"><span class="pre">plan_one</span></code>/ :func:<code class="docutils literal notranslate"><span class="pre">plan_all</span></code> → :func:<code class="docutils literal notranslate"><span class="pre">_populate_plan_metadata</span></code> /
-:func:<code class="docutils literal notranslate"><span class="pre">_fetch_last_modified</span></code> → :func:<code class="docutils literal notranslate"><span class="pre">planner_http_probe</span></code> → :func:<code class="docutils literal notranslate"><span class="pre">SESSION_POOL.lease</span></code>.</p>
+:func:<code class="docutils literal notranslate"><span class="pre">_fetch_last_modified</span></code> → :func:<code class="docutils literal notranslate"><span class="pre">planner_http_probe</span></code> → :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.net.get_http_client</span></code>.</p>
 </section>
 <section id="populate-plan-metadata-planned-config-adapter">
 <h3><code class="docutils literal notranslate"><span class="pre">_populate_plan_metadata(planned,</span> <span class="pre">config,</span> <span class="pre">adapter)</span></code><a class="headerlink" href="#populate-plan-metadata-planned-config-adapter" title="Link to this heading"></a></h3>

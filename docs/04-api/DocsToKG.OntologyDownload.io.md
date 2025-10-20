@@ -300,9 +300,14 @@ Token bucket used to enforce per-host and per-service rate limits.
 
 Token bucket backed by a filesystem state file for multi-process usage.
 
-### `SessionPool`
+### `Shared HTTP client`
 
-Lightweight pool that reuses requests sessions per (service, host).
+OntologyDownload reuses a singleton :mod:`httpx` client supplied by
+``DocsToKG.OntologyDownload.net``. The client is decorated with a Hishel cache
+under ``CACHE_DIR/http/ontology`` and participates in polite header injection,
+redirect auditing, and Retry-After aware throttling. Use
+``configure_http_client`` to inject a custom ``httpx.Client`` (for tests or
+advanced transports) and ``reset_http_client`` to restore defaults.
 
 ### `_BucketEntry`
 
@@ -334,9 +339,9 @@ Examples:
 
 Custom downloader supporting HEAD validation, conditional requests, resume, and caching.
 
-The downloader shares a :mod:`requests` session so it can issue a HEAD probe
-prior to streaming content, verifies Content-Type and Content-Length against
-expectations, and persists ETag/Last-Modified headers for cache-friendly
+The downloader reuses the shared :mod:`httpx` client so it can issue a HEAD
+probe prior to streaming content, verifies ``Content-Type`` and ``Content-Length``
+against expectations, and persists ETag/Last-Modified headers for cache-friendly
 revalidation.
 
 Attributes:

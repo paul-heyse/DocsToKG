@@ -286,9 +286,7 @@ def doctags(argv: Sequence[str] | None = None) -> int:
     logger = get_logger(__name__, level=parsed.log_level)
 
     raw_served_names = parsed.served_model_names
-    normalized_served_model_names = doctags_module._normalize_served_model_names(
-        raw_served_names
-    )
+    normalized_served_model_names = doctags_module._normalize_served_model_names(raw_served_names)
     has_served_name_overrides = raw_served_names is not None
     parsed.served_model_names = (
         normalized_served_model_names if has_served_name_overrides else raw_served_names
@@ -306,9 +304,7 @@ def doctags(argv: Sequence[str] | None = None) -> int:
     raw_served_model_names = parsed.served_model_names
     normalized_served_model_names: tuple[str, ...] | None = None
     if raw_served_model_names is not None:
-        coerced_served_model_names = StageConfigBase._coerce_str_tuple(
-            raw_served_model_names, None
-        )
+        coerced_served_model_names = StageConfigBase._coerce_str_tuple(raw_served_model_names, None)
         normalized_served_model_names = doctags_module._normalize_served_model_names(
             coerced_served_model_names
         )

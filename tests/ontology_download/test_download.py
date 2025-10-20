@@ -121,6 +121,80 @@ def test_get_redirect_to_disallowed_host(ontology_env, tmp_path):
     assert [record.method for record in ontology_env.requests] == ["HEAD", "GET"]
 
 
+def test_get_redirect_follows_validated_target(ontology_env, tmp_path):
+    """Allowed redirects should be followed and deliver the final payload."""
+
+    start_path = "fixtures/redirect-valid.owl"
+    final_path = "fixtures/redirect-valid-final.owl"
+    payload = b"<rdf>redirected</rdf>"
+
+    ontology_env.queue_response(
+        start_path,
+        ResponseSpec(
+            method="HEAD",
+            status=302,
+            headers={"Location": f"/{final_path}"},
+        ),
+    )
+    ontology_env.queue_response(
+        final_path,
+        ResponseSpec(
+            method="HEAD",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": str(len(payload)),
+            },
+        ),
+    )
+    ontology_env.queue_response(
+        start_path,
+        ResponseSpec(
+            method="GET",
+            status=302,
+            headers={"Location": f"/{final_path}"},
+        ),
+    )
+    ontology_env.queue_response(
+        final_path,
+        ResponseSpec(
+            method="GET",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": str(len(payload)),
+            },
+            body=payload,
+        ),
+    )
+
+    url = ontology_env.http_url(start_path)
+    destination = tmp_path / "redirect-valid.owl"
+    config = ontology_env.build_download_config()
+
+    result = network_mod.download_stream(
+        url=url,
+        destination=destination,
+        headers={},
+        previous_manifest=None,
+        http_config=config,
+        cache_dir=ontology_env.cache_dir,
+        logger=_logger(),
+        expected_media_type="application/rdf+xml",
+        service="test",
+    )
+
+    assert destination.read_bytes() == payload
+    assert result.status == "fresh"
+    methods_paths = [(record.method, record.path) for record in ontology_env.requests]
+    assert methods_paths == [
+        ("HEAD", "/" + start_path),
+        ("HEAD", "/" + final_path),
+        ("GET", "/" + start_path),
+        ("GET", "/" + final_path),
+    ]
+
+
 class _BucketSpy(TokenBucket):
     """Deterministic token bucket that records consumption without sleeping."""
 

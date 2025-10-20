@@ -178,21 +178,17 @@ def _fetch_checksum_from_url(
         bucket.consume()
         tail = b""
         total_bytes = 0
-        request = client.build_request(
+        extensions = {
+            "config": http_config,
+            "headers": polite_headers,
+        }
+        with client.stream(
             "GET",
             secure_url,
             headers=polite_headers,
             timeout=http_config.timeout_sec,
-        )
-        request.extensions["ontology_headers"] = {
-            "config": http_config,
-            "headers": polite_headers,
-        }
-        try:
-            response = client.send(request, stream=True)
-        except httpx.RequestError:
-            raise
-        with response:
+            extensions={"ontology_headers": extensions},
+        ) as response:
             response.raise_for_status()
             for chunk in response.iter_bytes(_CHECKSUM_STREAM_CHUNK_SIZE):
                 if not chunk:

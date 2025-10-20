@@ -10,7 +10,12 @@
 # }
 # === /NAVMAP ===
 
-"""Shared HTTPX + Hishel client used across OntologyDownload networking."""
+"""Shared HTTPX + Hishel client used across OntologyDownload networking.
+
+All HTTP operations (planner probes, checksum fetchers, streaming downloads)
+reuse this singleton client; the legacy `requests`-backed session pool has been
+removed in favour of HTTPX transports with Hishel disk caching.
+"""
 
 from __future__ import annotations
 
@@ -92,7 +97,7 @@ def _request_hook(request: httpx.Request) -> None:
     merged.update(polite)
     merged.update(extra_headers)
     for header, value in merged.items():
-        request.headers.setdefault(header, value)
+        request.headers[header] = value
 
     meta: MutableMapping[str, object] = request.extensions.setdefault("ontology_meta", {})  # type: ignore[assignment]
     meta["correlation_id"] = correlation_id or polite.get("X-Request-ID")
@@ -175,16 +180,34 @@ def _build_http_client(cache_root: Path, config: Optional[DownloadConfiguration]
         storage=FileStorage(base_path=cache_root),
         controller=_controller(),
     )
-    return httpx.Client(
-        http2=bool(getattr(cfg, "http2_enabled", True)),
-        transport=transport,
-        timeout=_timeout_for(cfg),
-        limits=_limits_for(cfg),
-        verify=ssl_context,
-        trust_env=True,
-        follow_redirects=False,
-        event_hooks={"request": [_request_hook], "response": [_response_hook]},
-    )
+    http2_enabled = bool(getattr(cfg, "http2_enabled", True))
+    try:
+        return httpx.Client(
+            http2=http2_enabled,
+            transport=transport,
+            timeout=_timeout_for(cfg),
+            limits=_limits_for(cfg),
+            verify=ssl_context,
+            trust_env=True,
+            follow_redirects=False,
+            event_hooks={"request": [_request_hook], "response": [_response_hook]},
+        )
+    except ImportError as exc:  # pragma: no cover - h2 optional in some environments
+        if http2_enabled:
+            LOGGER.warning(
+                "http2 support requested but 'h2' package not installed; falling back to HTTP/1.1"
+            )
+            return httpx.Client(
+                http2=False,
+                transport=transport,
+                timeout=_timeout_for(cfg),
+                limits=_limits_for(cfg),
+                verify=ssl_context,
+                trust_env=True,
+                follow_redirects=False,
+                event_hooks={"request": [_request_hook], "response": [_response_hook]},
+            )
+        raise
 
 
 def _close_client_unlocked() -> None:

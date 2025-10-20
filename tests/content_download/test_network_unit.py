@@ -58,7 +58,8 @@ from typing import Any, Callable, Dict, Tuple
 from unittest.mock import Mock, patch
 
 import pytest
-import requests
+
+import httpx
 
 try:
     from hypothesis import given
@@ -74,17 +75,14 @@ from DocsToKG.ContentDownload.networking import (
 )
 
 
-class _DummyResponse(requests.Response):
+class _DummyResponse:
     def __init__(self, status_code: int, headers: Dict[str, str]):
-        super().__init__()
         self.status_code = status_code
         self.headers = headers
         self.closed = False
-        self.raw = Mock()  # Mock the raw attribute to prevent AttributeError
 
     def close(self) -> None:  # noqa: D401
         self.closed = True
-        super().close()
 
 
 # --- Helper Functions ---
@@ -92,17 +90,17 @@ class _DummyResponse(requests.Response):
 
 def _session_for_response(
     response: _DummyResponse, *, method: str = "HEAD"
-) -> Tuple[Mock, Callable[[requests.Session, str, str], requests.Response]]:
-    session = Mock(spec=requests.Session)
+) -> Tuple[Mock, Callable[[httpx.Client, str, str], _DummyResponse]]:
+    session = Mock(spec=httpx.Client)
     session_request = Mock(return_value=response)
     setattr(session, "request", session_request)
 
     def _request_with_retries(
-        _session: requests.Session,
+        _session: httpx.Client,
         _method: str,
         url: str,
         **kwargs: Any,
-    ) -> requests.Response:
+    ) -> _DummyResponse:
         assert _method == method
         return response
 
@@ -148,7 +146,7 @@ def test_head_precheck_degrades_to_get(patcher):
             def __exit__(self, exc_type, exc, tb):
                 return None
 
-            def iter_content(self, chunk_size=1024):  # pragma: no cover - first chunk only
+            def iter_bytes(self, chunk_size=1024):  # pragma: no cover - first chunk only
                 yield b"%PDF"
 
             def close(self):

@@ -33,6 +33,13 @@ Below is a practical, end‑to‑end reference to **HTTPX** (sync & async HTTP c
 * **Top‑level helpers** (`httpx.get/post/...`) are great for quick calls, but **do not reuse connections**. Use a **Client** (sync) or **AsyncClient** (async) for agents or any nontrivial workload to get pooling, cookie persistence, and shared config. ([HTTPX][3])
 * Clients are **safe to share** across threads/tasks and should be long‑lived in your app/agent. ([HTTPX][4])
 
+### ContentDownload usage
+
+- `DocsToKG.ContentDownload.httpx_transport.get_http_client()` returns a singleton sync client configured with HTTP/2, pooled timeouts/limits, an `ssl.SSLContext` rooted in Certifi, and wrapped in a Hishel cache that persists under `${DOCSTOKG_DATA_ROOT}/cache/http/ContentDownload`.
+- `configure_http_client(proxy_mounts=None, transport=None, event_hooks=None)` lets tests/ops swap transports (e.g., `httpx.MockTransport`) or mount custom proxies without touching private module state. Always call `reset_http_client_for_tests()` after overriding in suites.
+- `purge_http_cache()` clears the on-disk cache and disposes of the current client — useful when cache collisions or stale 304s appear in telemetry.
+- All higher-level helpers (`networking.request_with_retries`, `download.stream_candidate_payload`, resolver JSON fetches, `RobotsCache._fetch`) call into this client, so instrumentation/event hooks added via `configure_http_client()` are visible across the pipeline.
+
 ---
 
 ## 3) The Client lifecycle (sync & async)

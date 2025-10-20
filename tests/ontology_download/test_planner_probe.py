@@ -92,3 +92,63 @@ def test_planner_probe_redirect_to_disallowed_scheme(ontology_env):
 
     methods_paths = [(record.method, record.path) for record in ontology_env.requests]
     assert methods_paths == [("HEAD", "/" + start_path)]
+
+
+def test_planner_probe_applies_retry_after_delay(monkeypatch, ontology_env):
+    """Retry-After headers should reduce token availability for subsequent attempts."""
+
+    recorded_delays = []
+
+    def _record_retry_after(*, http_config, service, host, delay):
+        recorded_delays.append((service, host, delay))
+
+    monkeypatch.setattr(
+        "DocsToKG.OntologyDownload.io.network.apply_retry_after",
+        _record_retry_after,
+    )
+
+    target_path = "fixtures/probe-retry-after.owl"
+    ontology_env.queue_response(
+        target_path,
+        ResponseSpec(
+            method="HEAD",
+            status=429,
+            headers={
+                "Retry-After": "3",
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": "123",
+            },
+        ),
+    )
+    ontology_env.queue_response(
+        target_path,
+        ResponseSpec(
+            method="HEAD",
+            status=200,
+            headers={
+                "Content-Type": "application/rdf+xml",
+                "Content-Length": "123",
+            },
+        ),
+    )
+
+    config = ontology_env.build_download_config()
+    url = ontology_env.http_url(target_path)
+
+    result = planner_http_probe(
+        url=url,
+        http_config=config,
+        logger=_logger(),
+        service="test",
+        context={"ontology_id": "retry-after"},
+    )
+
+    assert result is not None
+    assert result.status_code == 200
+    assert recorded_delays
+    service, host, delay = recorded_delays[0]
+    assert service == "test"
+    assert delay == pytest.approx(3.0)
+    assert host
+    methods = [record.method for record in ontology_env.requests]
+    assert methods == ["HEAD", "HEAD"]
