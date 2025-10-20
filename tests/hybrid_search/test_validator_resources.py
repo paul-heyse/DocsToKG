@@ -118,3 +118,8 @@ def test_request_for_query_respects_recall_first_flag():
 
     assert request.recall_first is True
     assert request.diagnostics is True
+
+    payload = {"query": "example", "diagnostics": False}
+    request = validator._request_for_query(payload)
+
+    assert request.diagnostics is False

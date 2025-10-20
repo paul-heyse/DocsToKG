@@ -508,7 +508,7 @@ class ResultShaper:
         ordered_chunks: Sequence[ChunkPayload],
         fused_scores: Mapping[str, float],
         request: HybridSearchRequest,
-        channel_scores: Mapping[str, Dict[str, float]],
+        channel_scores: Optional[Mapping[str, Dict[str, float]]] = None,
         *,
         precomputed_embeddings: Optional[np.ndarray] = None,
     ) -> List[HybridSearchResult]:
@@ -518,7 +518,8 @@ class ResultShaper:
             ordered_chunks: Chunks ordered by fused score.
             fused_scores: Combined score per vector identifier.
             request: Incoming hybrid search request.
-            channel_scores: Per-channel score maps for diagnostics emission.
+            channel_scores: Optional per-channel score maps for diagnostics
+                emission. Ignored when diagnostics are disabled on the request.
             precomputed_embeddings: Optional dense embeddings aligned with chunks.
 
         Returns:
@@ -526,6 +527,9 @@ class ResultShaper:
         """
         if not ordered_chunks:
             return []
+
+        include_diagnostics = bool(request.diagnostics)
+        score_lookup: Mapping[str, Dict[str, float]] = channel_scores or {}
 
         if precomputed_embeddings is not None:
             embeddings = np.ascontiguousarray(precomputed_embeddings, dtype=np.float32)
@@ -563,12 +567,18 @@ class ResultShaper:
                 break
             if byte_budget and bytes_used + chunk_bytes > byte_budget:
                 break
-            diagnostics = HybridSearchDiagnostics(
-                bm25_score=channel_scores.get("bm25", {}).get(chunk.vector_id),
-                splade_score=channel_scores.get("splade", {}).get(chunk.vector_id),
-                dense_score=channel_scores.get("dense", {}).get(chunk.vector_id),
-                fusion_weights=dict(self._channel_weights) if self._channel_weights else None,
-            )
+            diagnostics: Optional[HybridSearchDiagnostics]
+            if include_diagnostics:
+                diagnostics = HybridSearchDiagnostics(
+                    bm25_score=score_lookup.get("bm25", {}).get(chunk.vector_id),
+                    splade_score=score_lookup.get("splade", {}).get(chunk.vector_id),
+                    dense_score=score_lookup.get("dense", {}).get(chunk.vector_id),
+                    fusion_weights=(
+                        dict(self._channel_weights) if self._channel_weights else None
+                    ),
+                )
+            else:
+                diagnostics = None
             doc_buckets[chunk.doc_id] += 1
             results.append(
                 HybridSearchResult(
@@ -1114,11 +1124,15 @@ class HybridSearchService:
                 diversified_embeddings = None
 
             ordered_chunks = [candidate.chunk for candidate in diversified]
-            channel_score_map = {
-                "bm25": bm25.scores,
-                "splade": splade.scores,
-                "dense": dense.scores,
-            }
+            channel_score_map: Optional[Mapping[str, Dict[str, float]]]
+            if request.diagnostics:
+                channel_score_map = {
+                    "bm25": bm25.scores,
+                    "splade": splade.scores,
+                    "dense": dense.scores,
+                }
+            else:
+                channel_score_map = None
             shaper = ResultShaper(
                 self._opensearch,
                 config.fusion,
@@ -1821,31 +1835,34 @@ class HybridSearchAPI:
         except Exception as exc:  # pragma: no cover - defensive guard
             return HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)}
 
-        body = {
-            "results": [
-                {
-                    "doc_id": result.doc_id,
-                    "chunk_id": result.chunk_id,
-                    "namespace": result.namespace,
-                    "score": result.score,
-                    "fused_rank": result.fused_rank,
-                    "text": result.text,
-                    "highlights": list(result.highlights),
-                    "provenance_offsets": [list(offset) for offset in result.provenance_offsets],
-                    "metadata": dict(result.metadata),
-                    "diagnostics": {
-                        "bm25": result.diagnostics.bm25_score,
-                        "splade": result.diagnostics.splade_score,
-                        "dense": result.diagnostics.dense_score,
-                        "fusion_weights": (
-                            dict(result.diagnostics.fusion_weights)
-                            if result.diagnostics.fusion_weights is not None
-                            else None
-                        ),
-                    },
+        serialized_results: List[Dict[str, Any]] = []
+        for result in response.results:
+            item: Dict[str, Any] = {
+                "doc_id": result.doc_id,
+                "chunk_id": result.chunk_id,
+                "namespace": result.namespace,
+                "score": result.score,
+                "fused_rank": result.fused_rank,
+                "text": result.text,
+                "highlights": list(result.highlights),
+                "provenance_offsets": [list(offset) for offset in result.provenance_offsets],
+                "metadata": dict(result.metadata),
+            }
+            if result.diagnostics is not None:
+                item["diagnostics"] = {
+                    "bm25": result.diagnostics.bm25_score,
+                    "splade": result.diagnostics.splade_score,
+                    "dense": result.diagnostics.dense_score,
+                    "fusion_weights": (
+                        dict(result.diagnostics.fusion_weights)
+                        if result.diagnostics.fusion_weights is not None
+                        else None
+                    ),
                 }
-                for result in response.results
-            ],
+            serialized_results.append(item)
+
+        body = {
+            "results": serialized_results,
             "next_cursor": response.next_cursor,
             "total_candidates": response.total_candidates,
             "timings_ms": dict(response.timings_ms),
@@ -2425,7 +2442,7 @@ class HybridSearchValidator:
             page_size=page_size,
             cursor=None,
             diversification=bool(query.get("diversification", False)),
-            diagnostics=True,
+            diagnostics=bool(query.get("diagnostics", True)),
             recall_first=bool(query.get("recall_first", False)),
         )
 
