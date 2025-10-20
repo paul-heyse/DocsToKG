@@ -173,16 +173,27 @@ class DownloadRun:
     def close(self) -> None:
         """Release resources owned by the run instance."""
 
-        if self._ephemeral_stack is not None:
+        stack = self._ephemeral_stack
+        self._ephemeral_stack = None
+        if stack is not None:
             with contextlib.suppress(Exception):
-                self._ephemeral_stack.close()
-            self._ephemeral_stack = None
-        if self.state is not None:
+                stack.close()
+
+        state = self.state
+        if state is None:
+            return
+
+        self.state = None
+
+        resume_cleanup = state.resume_cleanup
+        state.resume_cleanup = None
+
+        with contextlib.suppress(Exception):
+            state.session_factory.close_all()
+
+        if resume_cleanup is not None:
             with contextlib.suppress(Exception):
-                self.state.session_factory.close_all()
-            if self.state.resume_cleanup is not None:
-                with contextlib.suppress(Exception):
-                    self.state.resume_cleanup()
+                resume_cleanup()
 
     def setup_sinks(self, stack: Optional[contextlib.ExitStack] = None) -> MultiSink:
         """Initialise telemetry sinks responsible for manifest and summary data."""
@@ -708,8 +719,6 @@ class DownloadRun:
             except Exception:
                 LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
         finally:
-            if state is not None:
-                state.session_factory.close_all()
             self.close()
 
         return RunResult(
