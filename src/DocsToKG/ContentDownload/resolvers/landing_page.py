@@ -18,9 +18,11 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable, Mapping
 
 import httpx
+
+from DocsToKG.ContentDownload.networking import BreakerOpenError
 
 from .base import (
     BeautifulSoup,
@@ -95,6 +97,18 @@ class LandingPageResolver(RegisteredResolver):
                     retry_after_cap=config.retry_after_cap,
                 )
                 resp.raise_for_status()
+            except BreakerOpenError as exc:
+                meta = {"url": landing, "error": str(exc)}
+                breaker_meta = getattr(exc, "breaker_meta", None)
+                if isinstance(breaker_meta, Mapping):
+                    meta["breaker"] = dict(breaker_meta)
+                yield ResolverResult(
+                    url=None,
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.BREAKER_OPEN,
+                    metadata=meta,
+                )
+                continue
             except httpx.TimeoutException as exc:
                 yield ResolverResult(
                     url=None,

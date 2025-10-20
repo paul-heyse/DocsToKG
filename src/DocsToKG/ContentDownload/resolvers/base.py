@@ -114,7 +114,7 @@ from urllib.parse import quote, urljoin, urlparse, urlsplit
 
 import httpx
 
-from DocsToKG.ContentDownload.networking import request_with_retries
+from DocsToKG.ContentDownload.networking import BreakerOpenError, request_with_retries
 from DocsToKG.ContentDownload.urls import canonical_for_index
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -242,6 +242,7 @@ class ResolverEventReason(Enum):
     NO_PMCID = "no-pmcid"
     RESOLVER_EXCEPTION = "resolver-exception"
     RATE_LIMIT = "rate-limit"
+    BREAKER_OPEN = "breaker-open"
     NOT_APPLICABLE = "not-applicable"
 
     @classmethod
@@ -356,6 +357,20 @@ class ApiResolverBase(RegisteredResolver, register=False):
                 timeout=timeout_value,
                 retry_after_cap=config.retry_after_cap,
                 **kwargs,
+            )
+        except BreakerOpenError as exc:
+            meta: Dict[str, Any] = {"url": url, "error": str(exc)}
+            breaker_meta = getattr(exc, "breaker_meta", None)
+            if isinstance(breaker_meta, Mapping):
+                meta["breaker"] = dict(breaker_meta)
+            return (
+                None,
+                ResolverResult(
+                    url=None,
+                    event=ResolverEvent.ERROR,
+                    event_reason=ResolverEventReason.BREAKER_OPEN,
+                    metadata=meta,
+                ),
             )
         except httpx.TimeoutException as exc:
             return (

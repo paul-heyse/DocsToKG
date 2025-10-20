@@ -90,6 +90,7 @@ and a monotonic clock delta to calculate durations independent of wall-clock ske
 from __future__ import annotations
 
 import json
+import logging
 import os
 import uuid
 import time
@@ -97,7 +98,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Protocol
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -127,6 +131,64 @@ class JsonlSink:
         # NOTE: Use your centralized file locks here if multiple writers exist.
         with self.path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
+
+
+class _FailsafeTelemetrySink:
+    """Wrap a sink and disable it after repeated failures."""
+
+    def __init__(
+        self,
+        inner: TelemetrySink,
+        *,
+        failure_threshold: int,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
+        if failure_threshold < 1:
+            raise ValueError("failure_threshold must be >= 1")
+        self._inner = inner
+        self._failure_threshold = failure_threshold
+        self._consecutive_failures = 0
+        self._failures_total = 0
+        self._disabled = False
+        self._logger = logger or LOGGER
+        self._sink_name = type(inner).__name__
+
+    @property
+    def disabled(self) -> bool:
+        return self._disabled
+
+    def emit(self, event: Mapping[str, Any]) -> None:
+        if self._disabled:
+            return
+        try:
+            self._inner.emit(event)
+            self._consecutive_failures = 0
+        except Exception:
+            self._consecutive_failures += 1
+            self._failures_total += 1
+            self._logger.warning(
+                "Telemetry sink %s emit failed (%d/%d)",
+                self._sink_name,
+                self._consecutive_failures,
+                self._failure_threshold,
+                exc_info=True,
+            )
+            if self._consecutive_failures >= self._failure_threshold:
+                self._disabled = True
+                self._logger.error(
+                    "Disabling telemetry sink %s after %d consecutive failures",
+                    self._sink_name,
+                    self._failure_threshold,
+                )
+
+    def metrics_snapshot(self) -> Dict[str, Any]:
+        return {
+            "sink": self._sink_name,
+            "failure_threshold": self._failure_threshold,
+            "consecutive_failures": self._consecutive_failures,
+            "failures_total": self._failures_total,
+            "disabled": self._disabled,
+        }
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -192,15 +254,17 @@ class AttemptContext:
     artifact_id: str
     attempt_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     start_wall: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    start_monotonic: float = field(default_factory=time.monotonic)
     original_url: str = ""
     canonical_url: str = ""
     publication_year: Optional[int] = None
-    candidate_count: int = 0
-    discovery_count: int = 0
+    monotonic: Callable[[], float] = field(default=time.monotonic, repr=False)
+    start_monotonic: float = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.start_monotonic = self.monotonic()
 
     def monotonic_ms_since_start(self) -> int:
-        return int((time.monotonic() - self.start_monotonic) * 1000)
+        return int((self.monotonic() - self.start_monotonic) * 1000)
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -256,6 +320,15 @@ class TelemetryWayback:
 
     # ── Envelope helpers ────────────────────────────────────────────────────────
 
+    def failover_metrics_snapshot(self) -> List[Dict[str, Any]]:
+        """Return telemetry sink failover metrics for wrapped sinks."""
+
+        metrics: List[Dict[str, Any]] = []
+        for sink in self.sinks:
+            if isinstance(sink, _FailsafeTelemetrySink):
+                metrics.append(sink.metrics_snapshot())
+        return metrics
+
     def _envelope(self, ctx: AttemptContext) -> Dict[str, Any]:
         return {
             "schema": self.schema_version,
@@ -292,9 +365,11 @@ class TelemetryWayback:
             run_id=self.run_id,
             work_id=work_id,
             artifact_id=artifact_id,
+            start_wall=self._now(),
             original_url=original_url,
             canonical_url=canonical_url,
             publication_year=publication_year,
+            monotonic=self._mono,
         )
         self._emit(
             ctx,
@@ -556,6 +631,8 @@ def create_telemetry_with_failsafe(
     sinks: Iterable[TelemetrySink],
     *,
     jsonl_fallback_path: Optional[Path] = None,
+    sink_failure_threshold: int = 3,
+    logger: Optional[logging.Logger] = None,
     **kwargs,
 ) -> TelemetryWayback:
     """
@@ -567,12 +644,22 @@ def create_telemetry_with_failsafe(
         run_id: Run identifier
         sinks: Primary sinks (typically SQLite)
         jsonl_fallback_path: Path for JSONL fallback sink
+        sink_failure_threshold: Number of consecutive failures before disabling a sink
+        logger: Optional logger override for failure reporting
         **kwargs: Additional arguments for TelemetryWayback
 
     Returns:
         TelemetryWayback instance with failsafe enabled
     """
-    sink_list = list(sinks)
+    wrapped_sinks = [
+        _FailsafeTelemetrySink(
+            sink,
+            failure_threshold=sink_failure_threshold,
+            logger=logger,
+        )
+        for sink in sinks
+    ]
+    sink_list: List[TelemetrySink] = list(wrapped_sinks)
 
     # Add JSONL fallback if specified
     if jsonl_fallback_path:

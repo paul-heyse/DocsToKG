@@ -20,9 +20,22 @@ from DocsToKG.ContentDownload.telemetry_wayback import (
     SkipReason,
     TelemetryWayback,
 )
+from DocsToKG.ContentDownload.telemetry_wayback_queries import rate_smoothing_p95
 from DocsToKG.ContentDownload.telemetry_wayback_sqlite import SQLiteSink, SQLiteTuning
 
 
+class MonotonicStub:
+    """Deterministic monotonic clock for tests."""
+
+    def __init__(self, start: float = 100.0, step: float = 1.0) -> None:
+        self.start = start
+        self.step = step
+        self.calls = 0
+
+    def __call__(self) -> float:
+        value = self.start + self.step * (self.calls // 2)
+        self.calls += 1
+        return value
 class CollectingSink:
     """Simple sink to collect emitted events for assertions."""
 
@@ -47,9 +60,14 @@ class TestTelemetryWayback:
         return []
 
     @pytest.fixture
-    def telemetry(self, run_id, sinks):
+    def monotonic_stub(self):
+        """Provide a deterministic monotonic clock stub."""
+        return MonotonicStub(start=200.0, step=1.5)
+
+    @pytest.fixture
+    def telemetry(self, run_id, sinks, monotonic_stub):
         """Create a TelemetryWayback instance."""
-        return TelemetryWayback(run_id, sinks)
+        return TelemetryWayback(run_id, sinks, monotonic_fn=monotonic_stub)
 
     def test_emit_attempt_start(self, telemetry):
         """Test starting an attempt."""
@@ -90,6 +108,43 @@ class TestTelemetryWayback:
 
         # Verify context was updated
         assert ctx.monotonic_ms_since_start() >= 0
+
+    def test_attempt_duration_uses_monotonic_stub(self, run_id):
+        """Durations should reflect the injected monotonic function."""
+
+        events = []
+
+        class CollectSink:
+            def emit(self, event):
+                events.append(event)
+
+        monotonic_stub = MonotonicStub(start=42.0, step=2.0)
+        telemetry = TelemetryWayback(
+            run_id,
+            [CollectSink()],
+            monotonic_fn=monotonic_stub,
+        )
+
+        ctx = telemetry.emit_attempt_start(
+            work_id="work-123",
+            artifact_id="artifact-456",
+            original_url="https://example.com/paper.pdf",
+            canonical_url="https://example.com/paper.pdf",
+        )
+
+        telemetry.emit_attempt_end(
+            ctx,
+            mode_selected=ModeSelected.PDF_DIRECT,
+            result=AttemptResult.EMITTED_PDF,
+            candidates_scanned=3,
+        )
+
+        assert len(events) == 2
+        start_event, end_event = events
+        assert start_event["monotonic_ms"] == 0
+        expected_ms = int(monotonic_stub.step * 1000)
+        assert end_event["total_duration_ms"] == expected_ms
+        assert end_event["monotonic_ms"] == expected_ms
 
     def test_emit_discovery_availability(self, telemetry):
         """Test emitting availability discovery."""
@@ -457,6 +512,18 @@ class TestJsonlSink:
 
 class TestSQLiteSink:
     """Test cases for SQLiteSink."""
+
+    def test_uses_deferred_isolation_level(self):
+        """SQLite sink should use an explicit deferred isolation level."""
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.sqlite"
+            sink = SQLiteSink(db_path)
+
+            try:
+                assert sink._conn.isolation_level == "DEFERRED"
+            finally:
+                sink.close()
 
     def test_emit_attempt_start(self):
         """Test emitting attempt start event."""
@@ -837,9 +904,78 @@ class TestAttemptContext:
 
     def test_monotonic_ms_since_start(self):
         """Test monotonic time calculation."""
-        ctx = AttemptContext(run_id="test-run", work_id="work-123", artifact_id="artifact-456")
+        mono = MonotonicStub(start=10.0, step=0.5)
+        ctx = AttemptContext(
+            run_id="test-run",
+            work_id="work-123",
+            artifact_id="artifact-456",
+            monotonic=mono,
+        )
 
+        # First call should be zero because the clock hasn't advanced.
+        assert ctx.monotonic_ms_since_start() == 0
+
+        # Next call should advance by the stubbed step (0.5s -> 500ms).
+        assert ctx.monotonic_ms_since_start() == int(mono.step * 1000)
         # Should be 0 or very small initially
         ms = ctx.monotonic_ms_since_start()
         assert ms >= 0
         assert ms < 100  # Should be very small for immediate call
+
+
+class TestWaybackQueryAggregations:
+    """Tests for analytics helpers that read the SQLite sink."""
+
+    def test_rate_smoothing_p95_filters_by_role(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "telemetry.sqlite3"
+        sink = SQLiteSink(db_path)
+
+        run_id = "run-role"
+        base_ts = datetime.now(timezone.utc).isoformat()
+
+        role_payloads = {
+            "metadata": ("attempt-meta", [100, 200, 300, 400, 500]),
+            "landing": ("attempt-landing", [1000, 2000, 3000, 4000, 5000]),
+        }
+
+        for role, (attempt_id, delays) in role_payloads.items():
+            sink.emit(
+                {
+                    "event_type": "wayback_attempt",
+                    "event": "start",
+                    "attempt_id": attempt_id,
+                    "run_id": run_id,
+                    "work_id": f"work-{role}",
+                    "artifact_id": f"artifact-{role}",
+                    "resolver": "wayback",
+                    "schema": "1",
+                    "original_url": "https://example.org/article",
+                    "canonical_url": "https://example.org/article",
+                    "publication_year": 2024,
+                    "ts": base_ts,
+                }
+            )
+
+            for idx, delay in enumerate(delays, start=1):
+                sink.emit(
+                    {
+                        "event_type": "wayback_discovery",
+                        "attempt_id": attempt_id,
+                        "ts": base_ts,
+                        "monotonic_ms": idx * 10,
+                        "stage": "availability",
+                        "query_url": f"https://example.org/query/{role}/{idx}",
+                        "rate_delay_ms": delay,
+                        "rate_limiter_role": role if role == "metadata" else role.upper(),
+                    }
+                )
+
+        sink.close()
+
+        metadata_p95 = rate_smoothing_p95(db_path, run_id, "metadata")
+        landing_p95 = rate_smoothing_p95(db_path, run_id, "landing")
+        unknown_p95 = rate_smoothing_p95(db_path, run_id, "artifact")
+
+        assert metadata_p95 == 500
+        assert landing_p95 == 5000
+        assert unknown_p95 is None
