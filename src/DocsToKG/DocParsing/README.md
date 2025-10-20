@@ -44,7 +44,7 @@ Scope boundary: Handles conversion, chunking, embedding, and telemetry; does not
   - Parquet vector export & validation: `pip install "DocsToKG[docparse-parquet]"` (installs `pyarrow`).
 - **Model caches**:
   - DocTags PDF model `granite-docling-258M` stored beneath `${DOCSTOKG_MODEL_ROOT}` (defaults to `~/.cache/docs-to-kg/models`).
-  - SPLADE/Qwen weights downloaded to `${DOCSTOKG_SPLADE_DIR}` / `${DOCSTOKG_QWEN_DIR}` (defaults resolved by `env.py`).
+- SPLADE/Qwen weights downloaded to `${DOCSTOKG_SPLADE_DIR}` / `${DOCSTOKG_QWEN_DIR}` (defaults resolved by `env.py`; legacy `${DOCSTOKG_QWEN_MODEL_DIR}` is still accepted and normalised).
 - **Data directories** (defaults derived from `${DOCSTOKG_DATA_ROOT}` or CLI `--data-root`):
   - `Data/PDFs`, `Data/HTML` – raw corpora.
   - `Data/DocTagsFiles` – `*.doctags.jsonl`.

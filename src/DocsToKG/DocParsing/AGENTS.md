@@ -257,7 +257,7 @@ Last updated: 2025-10-20
   - SPLADE sparse embeddings: `sentence-transformers`
   - Qwen dense embeddings: `vllm` + CUDA 12 libraries (`libcudart.so.12`, `libcublas.so.12`, `libopenblas.so.0`, `libjemalloc.so.2`, `libgomp.so.1`)
   - Parquet vector export/validation: `"DocsToKG[docparse-parquet]"` (installs `pyarrow`)
-- Model caches: DocTags `granite-docling-258M` under `${DOCSTOKG_MODEL_ROOT}`; SPLADE/Qwen weights under `${DOCSTOKG_SPLADE_DIR}` / `${DOCSTOKG_QWEN_DIR}`.
+- Model caches: DocTags `granite-docling-258M` under `${DOCSTOKG_MODEL_ROOT}`; SPLADE/Qwen weights under `${DOCSTOKG_SPLADE_DIR}` / `${DOCSTOKG_QWEN_DIR}` (legacy `${DOCSTOKG_QWEN_MODEL_DIR}` still honoured).
 - Data directories (defaults derived from `${DOCSTOKG_DATA_ROOT}` / `--data-root`):
   - `Data/PDFs`, `Data/HTML` inputs
   - `Data/DocTagsFiles`, `Data/ChunkedDocTagFiles`, `Data/Embeddings`
