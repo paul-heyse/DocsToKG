@@ -167,15 +167,23 @@ def ensure_splade_environment(
         or os.getenv("SPLADE_DEVICE")
         or _detect_cuda_device()
     )
-    os.environ.setdefault("DOCSTOKG_SPLADE_DEVICE", resolved_device)
-    os.environ.setdefault("SPLADE_DEVICE", resolved_device)
+    os.environ["DOCSTOKG_SPLADE_DEVICE"] = resolved_device
+    os.environ["SPLADE_DEVICE"] = resolved_device
 
     env_info: Dict[str, str] = {"device": resolved_device}
 
+    cache_path: Path | None = None
     if cache_dir is not None:
         cache_path = Path(cache_dir).expanduser().resolve()
-        os.environ.setdefault("DOCSTOKG_SPLADE_MODEL_DIR", str(cache_path))
-        env_info["model_dir"] = str(cache_path)
+    else:
+        existing_cache = os.getenv("DOCSTOKG_SPLADE_MODEL_DIR")
+        if existing_cache:
+            cache_path = Path(existing_cache).expanduser().resolve()
+
+    if cache_path is not None:
+        resolved_cache = str(cache_path)
+        os.environ["DOCSTOKG_SPLADE_MODEL_DIR"] = resolved_cache
+        env_info["model_dir"] = resolved_cache
 
     return env_info
 
@@ -191,18 +199,27 @@ def ensure_qwen_environment(
         or os.getenv("VLLM_DEVICE")
         or _detect_cuda_device()
     )
-    os.environ.setdefault("DOCSTOKG_QWEN_DEVICE", resolved_device)
-    os.environ.setdefault("VLLM_DEVICE", resolved_device)
+    os.environ["DOCSTOKG_QWEN_DEVICE"] = resolved_device
+    os.environ["VLLM_DEVICE"] = resolved_device
 
     resolved_dtype = dtype or os.getenv("DOCSTOKG_QWEN_DTYPE") or "bfloat16"
-    os.environ.setdefault("DOCSTOKG_QWEN_DTYPE", resolved_dtype)
+    resolved_dtype_str = str(resolved_dtype)
+    os.environ["DOCSTOKG_QWEN_DTYPE"] = resolved_dtype_str
 
-    env_info: Dict[str, str] = {"device": resolved_device, "dtype": str(resolved_dtype)}
+    env_info: Dict[str, str] = {"device": resolved_device, "dtype": resolved_dtype_str}
 
+    model_path: Path | None = None
     if model_dir is not None:
         model_path = Path(model_dir).expanduser().resolve()
-        os.environ.setdefault("DOCSTOKG_QWEN_MODEL_DIR", str(model_path))
-        env_info["model_dir"] = str(model_path)
+    else:
+        existing_model_dir = os.getenv("DOCSTOKG_QWEN_MODEL_DIR")
+        if existing_model_dir:
+            model_path = Path(existing_model_dir).expanduser().resolve()
+
+    if model_path is not None:
+        resolved_model_dir = str(model_path)
+        os.environ["DOCSTOKG_QWEN_MODEL_DIR"] = resolved_model_dir
+        env_info["model_dir"] = resolved_model_dir
 
     return env_info
 
