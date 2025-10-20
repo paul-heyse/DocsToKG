@@ -32,6 +32,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import tempfile
 import time
 from contextlib import contextmanager
@@ -1547,6 +1548,45 @@ def _mirror_to_cas_if_enabled(
     return cas_path
 
 
+def _cleanup_validation_failure_artifacts(
+    *,
+    destination: Path,
+    extraction_dir: Optional[Path],
+    cas_path: Optional[Path],
+    logger: logging.LoggerAdapter,
+) -> None:
+    """Remove artefacts created before a strict validation failure is raised."""
+
+    def _remove_path(path: Path, *, artifact: str) -> None:
+        try:
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+        except FileNotFoundError:
+            return
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "validation cleanup failed",
+                extra={
+                    "stage": "cleanup",
+                    "artifact": artifact,
+                    "path": str(path),
+                    "error": str(exc),
+                },
+            )
+
+    targets: List[Tuple[str, Optional[Path]]] = [
+        ("download", destination),
+        ("extraction", extraction_dir),
+        ("cas", cas_path),
+    ]
+    for artifact, path in targets:
+        if path is None:
+            continue
+        _remove_path(path, artifact=artifact)
+
+
 def _build_destination(
     spec: FetchSpec, plan: FetchPlan, config: ResolvedConfig
 ) -> Tuple[Path, str, Path]:
@@ -1897,6 +1937,7 @@ def fetch_one(
                 )
                 if cas_path:
                     artifacts.append(str(cas_path))
+                extraction_dir: Optional[Path] = None
                 if plan.media_type == "application/zip" or destination.suffix.lower() == ".zip":
                     extraction_dir = destination.parent / f"{destination.stem}_extracted"
                     try:
@@ -1936,6 +1977,12 @@ def fetch_one(
                     else:
                         adapter.error(
                             "validation failures detected", extra=log_payload
+                        )
+                        _cleanup_validation_failure_artifacts(
+                            destination=destination,
+                            extraction_dir=extraction_dir,
+                            cas_path=cas_path,
+                            logger=adapter,
                         )
                         raise OntologyDownloadError(
                             "Validation failed for "

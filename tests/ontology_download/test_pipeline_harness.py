@@ -133,6 +133,9 @@ def test_fetch_all_strict_mode_raises_on_validation_failure(ontology_env):
     assert "rdflib" in str(original)
     manifest_paths = list((ontology_env.ontology_dir / spec.id).rglob("manifest.json"))
     assert not manifest_paths
+    ontology_root = ontology_env.ontology_dir / spec.id
+    if ontology_root.exists():
+        assert not any(path.is_file() for path in ontology_root.rglob("*"))
 
 
 def test_fetch_all_lenient_mode_logs_validation_failure(ontology_env):

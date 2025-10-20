@@ -183,6 +183,15 @@ constraint (clamped between 1 and 8). A single ontology capped at `1` will keep
 the shared worker pool at that size even if other requests allow higher
 parallelism.
 
+### Strict validation mode
+
+Setting `defaults.continue_on_error: false` enables strict validation. When any
+validator reports a failure in this mode the planner now deletes the downloaded
+file, extracted archive directory (if one was created), and the associated
+content-addressable mirror before raising an error. Lenient mode retains these
+artefacts for troubleshooting, so operators who need to inspect intermediate
+outputs should temporarily flip strict mode off.
+
 Key environment variables and overrides:
 
 | Variable | Purpose | Default |
