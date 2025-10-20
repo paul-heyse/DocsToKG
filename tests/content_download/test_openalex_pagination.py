@@ -163,6 +163,72 @@ def test_provider_query_only_retries_failed_pages(tmp_path) -> None:
     assert works.paginate_calls == [{"per_page": 2, "n_max": 3}]
     assert works.pages_iterated == 2
     assert works.next_calls == works.pages_iterated + works.failures_triggered
+
+
+def test_provider_rejects_per_page_above_openalex_limit(tmp_path) -> None:
+    works = RecordingWorks(_sample_pages())
+
+    with pytest.raises(ValueError, match="per_page must be between 1 and 200"):
+        OpenAlexWorkProvider(
+            query=works,
+            artifact_factory=lambda work, *_: work["id"],
+            pdf_dir=tmp_path / "pdf",
+            html_dir=tmp_path / "html",
+            xml_dir=tmp_path / "xml",
+            per_page=500,
+        )
+
+
+def test_provider_allows_retry_max_delay_none(tmp_path) -> None:
+    works = RecordingWorks(_sample_pages())
+    captured_kwargs: Dict[str, object] = {}
+
+    def _iter_openalex(
+        query: RecordingWorks,
+        *,
+        per_page: int,
+        max_results: Optional[int],
+        retry_attempts: int,
+        retry_backoff: float,
+        retry_max_delay: Optional[float],
+        retry_after_cap: Optional[float],
+    ) -> Iterable[Dict[str, object]]:
+        captured_kwargs.update(
+            {
+                "query": query,
+                "per_page": per_page,
+                "max_results": max_results,
+                "retry_attempts": retry_attempts,
+                "retry_backoff": retry_backoff,
+                "retry_max_delay": retry_max_delay,
+                "retry_after_cap": retry_after_cap,
+            }
+        )
+        pager = query.paginate(per_page=per_page, n_max=max_results)
+        yield from pager
+
+    provider = OpenAlexWorkProvider(
+        query=works,
+        artifact_factory=lambda work, *_: work["id"],
+        pdf_dir=tmp_path / "pdf",
+        html_dir=tmp_path / "html",
+        xml_dir=tmp_path / "xml",
+        per_page=2,
+        max_results=3,
+        retry_max_delay=None,
+        iterate_openalex_func=_iter_openalex,
+    )
+
+    artifacts = list(provider.iter_artifacts())
+
+    assert artifacts == ["W1", "W2", "W3"]
+    assert captured_kwargs["query"] is works
+    assert captured_kwargs["retry_max_delay"] is None
+    assert captured_kwargs["per_page"] == 2
+    assert captured_kwargs["max_results"] == 3
+    assert works.paginate_calls == [{"per_page": 2, "n_max": 3}]
+
+
 @pytest.mark.parametrize("retry_after_format", ["numeric", "http-date"])
 def test_iterate_openalex_retries_with_retry_after_headers(
     monkeypatch: pytest.MonkeyPatch, retry_after_format: str
