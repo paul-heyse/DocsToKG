@@ -452,7 +452,13 @@ class HybridSearchConfigManager:
             import yaml  # type: ignore
         except ModuleNotFoundError as exc:  # pragma: no cover - exercised in tests
             raise ValueError("YAML configuration requires PyYAML dependency") from exc
-        data = yaml.safe_load(raw)
+
+        try:
+            data = yaml.safe_load(raw)
+        except yaml.YAMLError as exc:
+            raise ValueError(
+                f"Failed to parse YAML configuration at {self._path}: {exc}"
+            ) from exc
         if not isinstance(data, dict):
             raise ValueError("YAML configuration must define a mapping")
         return data

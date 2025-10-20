@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import textwrap
 
+import pytest
+
 from DocsToKG.HybridSearch.config import HybridSearchConfigManager
 
 
@@ -45,3 +47,17 @@ def test_hybrid_search_config_manager_loads_yaml(tmp_path):
     reloaded = manager.reload()
     assert reloaded.dense.nprobe == 16
     assert reloaded.fusion.channel_weights == config.fusion.channel_weights
+
+
+def test_hybrid_search_config_manager_invalid_yaml(tmp_path):
+    """Invalid YAML surfaces a ValueError with file path context."""
+
+    config_path = tmp_path / "hybrid_search.yaml"
+    config_path.write_text("chunking: [\n  - max_tokens: 512\n", encoding="utf-8")
+
+    with pytest.raises(ValueError) as excinfo:
+        HybridSearchConfigManager(config_path)
+
+    message = str(excinfo.value)
+    assert str(config_path) in message
+    assert "Failed to parse YAML configuration" in message
