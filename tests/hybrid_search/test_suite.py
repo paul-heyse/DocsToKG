@@ -292,7 +292,7 @@ from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Dict, List, Mapping, Sequence, Tuple
+from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import numpy as np
@@ -312,7 +312,7 @@ from DocsToKG.HybridSearch import (
     HybridSearchValidator,
     Observability,
 )
-from DocsToKG.HybridSearch.config import DenseIndexConfig, FusionConfig
+from DocsToKG.HybridSearch.config import DenseIndexConfig, FusionConfig, HybridSearchConfig
 from DocsToKG.HybridSearch.devtools.features import FeatureGenerator, tokenize
 from DocsToKG.HybridSearch.devtools.opensearch_simulator import (
     OpenSearchSchemaManager,
@@ -329,6 +329,7 @@ from DocsToKG.HybridSearch.service import (
 )
 from DocsToKG.HybridSearch.store import (
     ChunkRegistry,
+    FaissSearchResult,
     FaissVectorStore,
     ManagedFaissAdapter,
     cosine_against_corpus_gpu,
@@ -1045,6 +1046,98 @@ def test_verify_pagination_preserves_recall_first() -> None:
     assert not pagination.duplicate_detected
     assert len(service.requests) == 3
     assert all(call.recall_first for call in service.requests)
+
+
+# --- test_hybrid_search.py ---
+
+
+def test_execute_dense_uses_range_search_for_recall_first_without_score_floor() -> None:
+    request = HybridSearchRequest(
+        query="dense recall",
+        namespace="demo",
+        filters={},
+        page_size=2,
+        recall_first=True,
+    )
+    config = HybridSearchConfig()
+    query_features = ChunkFeatures(
+        bm25_terms={},
+        splade_weights={},
+        embedding=np.array([0.1, 0.2], dtype=np.float32),
+    )
+    chunk_features = ChunkFeatures(
+        bm25_terms={},
+        splade_weights={},
+        embedding=np.array([0.3, 0.4], dtype=np.float32),
+    )
+    chunk = ChunkPayload(
+        doc_id="doc-0",
+        chunk_id="chunk-0",
+        vector_id="vec-0",
+        namespace="demo",
+        text="dense chunk",
+        metadata={"tags": ["dense"]},
+        features=chunk_features,
+        token_count=10,
+        source_chunk_idxs=[0],
+        doc_items_refs=["doc:0"],
+    )
+
+    class RecordingRegistry:
+        def __init__(self, payload: ChunkPayload) -> None:
+            self._payloads = {payload.vector_id: payload}
+
+        def bulk_get(self, vector_ids: Sequence[str]) -> Sequence[ChunkPayload]:
+            return [
+                self._payloads[vector_id]
+                for vector_id in vector_ids
+                if vector_id in self._payloads
+            ]
+
+        def resolve_embedding(
+            self, vector_id: str, *, cache: Optional[Dict[str, np.ndarray]] = None
+        ) -> np.ndarray:
+            return self._payloads[vector_id].features.embedding
+
+    class RecordingDenseStore:
+        def __init__(self, hits: Sequence[FaissSearchResult]) -> None:
+            self._hits = list(hits)
+            self.range_calls: List[Tuple[np.ndarray, float, Optional[int]]] = []
+            self.search_batch_calls: List[Tuple[np.ndarray, int]] = []
+            self.adapter_stats = SimpleNamespace(nprobe=1, fp16_enabled=False)
+
+        def range_search(
+            self, query: np.ndarray, score_floor: float, limit: Optional[int] = None
+        ) -> Sequence[FaissSearchResult]:
+            self.range_calls.append((np.asarray(query), float(score_floor), limit))
+            return list(self._hits)
+
+        def search_batch(self, queries: np.ndarray, depth: int) -> List[List[FaissSearchResult]]:
+            self.search_batch_calls.append((np.asarray(queries), int(depth)))
+            return [self._hits[:depth]]
+
+    registry = RecordingRegistry(chunk)
+    store = RecordingDenseStore([FaissSearchResult(vector_id="vec-0", score=0.42)])
+    service = object.__new__(HybridSearchService)
+    service._dense_strategy = service_module.DenseSearchStrategy()  # type: ignore[attr-defined]
+    service._observability = Observability()  # type: ignore[attr-defined]
+    service._registry = registry  # type: ignore[attr-defined]
+
+    timings: Dict[str, float] = {}
+    result = service._execute_dense(
+        request=request,
+        filters={},
+        config=config,
+        query_features=query_features,
+        timings=timings,
+        store=store,
+    )
+
+    assert store.range_calls, "range_search should be invoked when recall_first is set"
+    assert not store.search_batch_calls
+    assert isinstance(result, service_module.ChannelResults)
+    assert [candidate.chunk.vector_id for candidate in result.candidates] == ["vec-0"]
+    assert timings["dense_ms"] >= 0.0
 
 
 # --- test_hybrid_search.py ---

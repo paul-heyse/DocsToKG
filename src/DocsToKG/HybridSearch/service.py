@@ -1489,7 +1489,7 @@ class HybridSearchService:
 
         score_floor = float(getattr(config.retrieval, "dense_score_floor", 0.0))
         use_score_floor = score_floor > 0.0
-        use_range = use_score_floor
+        use_range = bool(getattr(request, "recall_first", False)) or use_score_floor
         if use_range:
             hits = list(store.range_search(queries[0], score_floor, limit=None))
             self._observability.metrics.observe("faiss_search_batch_size", 1.0, channel="dense")
