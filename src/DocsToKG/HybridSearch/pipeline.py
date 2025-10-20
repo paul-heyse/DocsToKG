@@ -495,7 +495,8 @@ class ChunkIngestionPipeline:
             vector_cache_limit: Maximum number of unmatched vector artifacts that may
                 remain resident in memory while reconciling chunk/vector streams.
                 Defaults to ``10_000`` which bounds memory growth for misordered
-                artifacts.
+                artifacts. Non-positive values are coerced to ``0`` which causes the
+                guard to fail immediately on drift instead of disabling it.
             vector_cache_stats_hook: Optional callback invoked whenever the
                 unmatched vector cache changes size. Observability backends may use
                 this to surface drift in dashboards.
@@ -509,9 +510,16 @@ class ChunkIngestionPipeline:
         self._registry = registry
         self._metrics = IngestMetrics()
         self._observability = observability or Observability()
-        self._vector_cache_limit = int(vector_cache_limit)
-        if self._vector_cache_limit < 1:
+
+        configured_limit = int(vector_cache_limit)
+        if configured_limit <= 0:
+            self._observability.logger.warning(
+                "vector_cache_limit=%s is non-positive; drift will now fail immediately",
+                configured_limit,
+            )
             self._vector_cache_limit = 0
+        else:
+            self._vector_cache_limit = configured_limit
         self._vector_cache_stats_hook = vector_cache_stats_hook
         self._faiss.set_id_resolver(self._registry.resolve_faiss_id)
         attach = getattr(self._registry, "attach_dense_store", None)
@@ -770,7 +778,7 @@ class ChunkIngestionPipeline:
         def _maybe_track_cache() -> None:
             if self._vector_cache_stats_hook is not None:
                 self._vector_cache_stats_hook(len(vector_cache), document)
-            if self._vector_cache_limit and len(vector_cache) > self._vector_cache_limit:
+            if len(vector_cache) > self._vector_cache_limit:
                 raise IngestError(
                     "Vector cache grew beyond the configured safety limit; verify DocParsing "
                     "artifacts are ordered and sorted consistently by UUID before re-running ingestion."
