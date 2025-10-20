@@ -332,7 +332,56 @@ except Exception:  # pragma: no cover - dependency not present in test rig
 # --- Helpers ---
 
 
-def resolve_cuvs_state(requested: Optional[bool]) -> tuple[bool, bool, Optional[bool]]:
+def _build_gpu_index_probe_config(
+    *,
+    device: Optional[int] = None,
+    dims: Optional[int] = None,
+    use_fp16: Optional[bool] = None,
+) -> Optional[object]:
+    """Construct a GPU index config suitable for probing cuVS support."""
+
+    if not _FAISS_AVAILABLE:
+        return None
+    config_factory = getattr(faiss, "GpuIndexFlatConfig", None)
+    if config_factory is None:
+        return None
+    try:
+        config = config_factory()
+    except Exception:
+        return None
+
+    if device is not None and hasattr(config, "device"):
+        try:
+            config.device = int(device)
+        except Exception:
+            pass
+
+    if dims is not None:
+        for attr in ("d", "dims", "dim"):
+            if hasattr(config, attr):
+                try:
+                    setattr(config, attr, int(dims))
+                except Exception:
+                    continue
+                else:
+                    break
+
+    if use_fp16 is not None:
+        for attr in ("useFloat16", "useFloat16LookupTables"):
+            if hasattr(config, attr):
+                try:
+                    setattr(config, attr, bool(use_fp16))
+                except Exception:
+                    continue
+
+    return config
+
+
+def resolve_cuvs_state(
+    requested: Optional[bool],
+    *,
+    config: Optional[object] = None,
+) -> tuple[bool, bool, Optional[bool]]:
     """Determine whether cuVS kernels should be enabled for FAISS helpers."""
 
     if not _FAISS_AVAILABLE:
@@ -343,9 +392,18 @@ def resolve_cuvs_state(requested: Optional[bool]) -> tuple[bool, bool, Optional[
 
     reported_available: Optional[bool]
     should_use = getattr(faiss, "should_use_cuvs", None)
+    probe_config = config
+    if probe_config is None:
+        probe_config = _build_gpu_index_probe_config()
     if callable(should_use):
         try:
-            reported = should_use()
+            if probe_config is not None:
+                try:
+                    reported = should_use(probe_config)
+                except TypeError:
+                    reported = should_use()
+            else:
+                reported = should_use()
         except Exception:  # pragma: no cover - defensive best effort
             reported_available = None
         else:
@@ -2293,7 +2351,18 @@ class FaissVectorStore(DenseVectorStore):
             self._last_applied_cuvs = None
             return
         requested = getattr(self._config, "use_cuvs", None)
-        cuvs_enabled, _, _ = resolve_cuvs_state(requested)
+        probe_params = _build_distance_params(
+            use_fp16=bool(getattr(self._config, "flat_use_fp16", False)),
+            cuvs_enabled=None,
+        )
+        detection_config = probe_params
+        if detection_config is None:
+            detection_config = _build_gpu_index_probe_config(
+                device=getattr(self._config, "device", None),
+                dims=getattr(self, "_dim", None),
+                use_fp16=bool(getattr(self._config, "flat_use_fp16", False)),
+            )
+        cuvs_enabled, _, _ = resolve_cuvs_state(requested, config=detection_config)
         if not hasattr(faiss, "GpuParameterSpace"):
             self._last_applied_cuvs = cuvs_enabled if requested is not None else None
             return
@@ -2848,35 +2917,38 @@ def _auto_block_rows(
 def _build_distance_params(
     *,
     use_fp16: bool,
-    cuvs_enabled: bool,
+    cuvs_enabled: Optional[bool],
+    base: Optional[object] = None,
 ) -> Optional[object]:
-    """Construct a ``GpuDistanceParams`` instance when half precision is requested."""
+    """Construct or update a ``GpuDistanceParams`` instance for GPU distances."""
 
-    if not use_fp16:
+    if not use_fp16 and base is None:
         return None
 
-    params_factory = getattr(faiss, "GpuDistanceParams", None)
-    if params_factory is None:
-        return None
-
-    try:
-        params = params_factory()
-    except Exception:
-        return None
-
-    try:
-        dtype_constant = getattr(faiss, "DistanceDataType_F16", None)
-    except Exception:  # pragma: no cover - defensive guard for unexpected faiss builds
-        dtype_constant = None
-
-    if dtype_constant is not None:
+    params = base
+    if params is None:
+        params_factory = getattr(faiss, "GpuDistanceParams", None)
+        if params_factory is None:
+            return None
         try:
-            params.xType = dtype_constant
-            params.yType = dtype_constant
+            params = params_factory()
         except Exception:
-            pass
+            return None
 
-    if hasattr(params, "use_cuvs"):
+    if use_fp16:
+        try:
+            dtype_constant = getattr(faiss, "DistanceDataType_F16", None)
+        except Exception:  # pragma: no cover - defensive guard for unexpected faiss builds
+            dtype_constant = None
+
+        if dtype_constant is not None:
+            try:
+                params.xType = dtype_constant
+                params.yType = dtype_constant
+            except Exception:
+                pass
+
+    if cuvs_enabled is not None and hasattr(params, "use_cuvs"):
         try:
             params.use_cuvs = bool(cuvs_enabled)
         except Exception:
@@ -2966,10 +3038,33 @@ def cosine_topk_blockwise(
     faiss.normalize_L2(q)
     q_view = q.astype(np.float16, copy=False) if use_fp16 else q
 
-    cuvs_enabled, _, _ = resolve_cuvs_state(use_cuvs)
+    probe_params = _build_distance_params(
+        use_fp16=use_fp16,
+        cuvs_enabled=None,
+    )
+    if probe_params is not None and hasattr(probe_params, "metricType"):
+        try:
+            probe_params.metricType = faiss.METRIC_INNER_PRODUCT
+        except Exception:
+            pass
+    detection_config = probe_params
+    if detection_config is None:
+        detection_config = _build_gpu_index_probe_config(
+            device=device,
+            dims=C.shape[1],
+            use_fp16=use_fp16,
+        )
+        if detection_config is not None and hasattr(detection_config, "metricType"):
+            try:
+                detection_config.metricType = faiss.METRIC_INNER_PRODUCT
+            except Exception:
+                pass
+
+    cuvs_enabled, _, _ = resolve_cuvs_state(use_cuvs, config=detection_config)
     distance_params = _build_distance_params(
         use_fp16=use_fp16,
         cuvs_enabled=cuvs_enabled,
+        base=probe_params,
     )
 
     knn_runner = getattr(faiss, "knn_gpu", None)
