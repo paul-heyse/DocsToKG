@@ -2704,9 +2704,18 @@ class HybridSearchValidator:
         recalls: List[float] = []
 
         # Precompute matrix for brute-force recall estimates.
+        embedding_cache: Dict[str, np.ndarray] = {}
         vector_ids = [chunk.vector_id for chunk in all_chunks]
-        vector_matrix = self._registry.resolve_embeddings(vector_ids)
-        vector_lookup = {vector_id: vector_matrix[idx] for idx, vector_id in enumerate(vector_ids)}
+        vector_matrix = self._registry.resolve_embeddings(
+            vector_ids, cache=embedding_cache
+        )
+        vector_matrix = np.asarray(vector_matrix, dtype=np.float32)
+        if vector_matrix.ndim == 1:
+            vector_matrix = vector_matrix.reshape(1, -1)
+        vector_lookup = {
+            vector_id: embedding_cache.get(vector_id, vector_matrix[idx])
+            for idx, vector_id in enumerate(vector_ids)
+        }
         try:
             adapter_stats = self._ingestion.faiss_index.adapter_stats  # type: ignore[attr-defined]
         except AttributeError:
@@ -2727,13 +2736,14 @@ class HybridSearchValidator:
         gpu_resources = resources
         scratch_index = None
         using_gpu_ground_truth = False
-        vector_ids: List[str] = []
+        ordered_vector_ids: List[str] = list(vector_ids)
         normalized_cpu_vectors: Optional[List[np.ndarray]] = None
-        embedding_dim = int(
-            np.array(sampled_chunks[0].features.embedding, dtype=np.float32, copy=False)
-            .reshape(-1)
-            .shape[0]
-        )
+        embedding_dim = int(vector_matrix.shape[1]) if vector_matrix.size else 0
+        if embedding_dim <= 0:
+            embedding_dim = int(
+                getattr(getattr(self._ingestion.faiss_index, "config", object()), "dim", 0)
+                or getattr(self._ingestion.faiss_index, "dim", 0)
+            )
 
         if gpu_resources is None and faiss is not None and hasattr(faiss, "StandardGpuResources"):
             try:
@@ -2762,9 +2772,8 @@ class HybridSearchValidator:
         if scratch_index is not None:
             using_gpu_ground_truth = True
             try:
-                for chunk in all_chunks:
-                    vector_ids.append(chunk.vector_id)
-                    embedding = np.array(chunk.features.embedding, dtype=np.float32, copy=True)
+                for vector_id in ordered_vector_ids:
+                    embedding = np.array(vector_lookup[vector_id], dtype=np.float32, copy=True)
                     if embedding.ndim == 1:
                         embedding = embedding.reshape(1, -1)
                     faiss.normalize_L2(embedding)
@@ -2773,13 +2782,11 @@ class HybridSearchValidator:
                 scratch_index.reset()
                 scratch_index = None
                 using_gpu_ground_truth = False
-                vector_ids = []
 
         if not using_gpu_ground_truth:
             normalized_cpu_vectors = []
-            for chunk in all_chunks:
-                vector_ids.append(chunk.vector_id)
-                embedding = np.array(chunk.features.embedding, dtype=np.float32, copy=True)
+            for vector_id in ordered_vector_ids:
+                embedding = np.array(vector_lookup[vector_id], dtype=np.float32, copy=True)
                 flat_embedding = embedding.reshape(-1)
                 norm = float(np.linalg.norm(flat_embedding)) or 1.0
                 normalized = (flat_embedding / norm).astype(np.float32, copy=False)
@@ -2788,7 +2795,7 @@ class HybridSearchValidator:
         noise_rng = np.random.default_rng(2024)
 
         for chunk in sampled_chunks:
-            query_vec = vector_lookup[chunk.vector_id]
+            query_vec = np.array(vector_lookup[chunk.vector_id], dtype=np.float32, copy=True)
             hits = self._ingestion.faiss_index.search(query_vec, top_k)
             retrieved_ids = [hit.vector_id for hit in hits]
             if retrieved_ids and retrieved_ids[0] == chunk.vector_id:
@@ -2822,8 +2829,8 @@ class HybridSearchValidator:
                 )
                 top_indices = np.argpartition(scores, -top_k)[-top_k:]
                 top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
-            valid_indices = [idx for idx in top_indices if 0 <= idx < len(vector_ids)]
-            ground_truth_ids = [vector_ids[idx] for idx in valid_indices]
+            valid_indices = [idx for idx in top_indices if 0 <= idx < len(ordered_vector_ids)]
+            ground_truth_ids = [ordered_vector_ids[idx] for idx in valid_indices]
             overlap = len(set(retrieved_ids) & set(ground_truth_ids))
             recalls.append(overlap / min(top_k, len(ground_truth_ids)) if ground_truth_ids else 0.0)
 
@@ -2885,14 +2892,15 @@ class HybridSearchValidator:
         dense_ranks: List[int] = []
         rrf_ranks: List[int] = []
 
-        doc_to_embedding: Dict[str, np.ndarray] = {}
+        doc_to_embedding: Dict[Tuple[str, str], np.ndarray] = {}
         registry_chunks = self._registry.all()
         if registry_chunks:
             vectors = self._registry.resolve_embeddings(
                 [chunk.vector_id for chunk in registry_chunks]
             )
             for chunk, vector in zip(registry_chunks, vectors):
-                doc_to_embedding.setdefault(chunk.doc_id, vector)
+                key = (chunk.namespace, chunk.doc_id)
+                doc_to_embedding.setdefault(key, vector)
 
         for document_payload, query_payload in sampled_pairs:
             expected_doc_id = str(
@@ -2904,7 +2912,20 @@ class HybridSearchValidator:
                 filters["namespace"] = request.namespace
 
             features = feature_generator.compute_features(request.query)
-            dense_query_vector = doc_to_embedding.get(expected_doc_id, features.embedding)
+            namespace = request.namespace
+            if namespace is None:
+                document_namespace = document_payload.get("namespace")
+                namespace = (
+                    ""
+                    if document_namespace is None
+                    else str(document_namespace)
+                )
+            else:
+                namespace = str(namespace)
+            dense_query_vector = doc_to_embedding.get(
+                (namespace, expected_doc_id),
+                features.embedding,
+            )
 
             bm25_results, _ = self._opensearch.search_bm25(features.bm25_terms, filters, top_k=10)
             bm25_doc_ids = [chunk.doc_id for chunk, _ in bm25_results]
@@ -3391,6 +3412,23 @@ class HybridSearchValidator:
         results: List[Mapping[str, object]] = []
         chunks = list(self._registry.all())
         total_chunks = max(1, len(chunks))
+
+        # Derive a defensible clamp for calibration batch sizing. The FAISS GPU
+        # wheel comfortably serves ~8 MiB of query vectors per sweep, so clamp
+        # the batch size according to embedding dimensionality and registry
+        # cardinality. This prevents misconfiguration from issuing oversized
+        # batches that could exhaust device memory.
+        embedding_dim = getattr(self._ingestion.faiss_index, "_dim", 0)
+        safe_min_batch = 1
+        default_ceiling = 512
+        if isinstance(embedding_dim, int) and embedding_dim > 0:
+            bytes_per_vector = max(1, embedding_dim * 4)
+            approx_limit = (8 * 1024 * 1024) // bytes_per_vector
+            default_ceiling = max(safe_min_batch, min(512, approx_limit))
+        available_chunks = len(chunks)
+        safe_max_batch = min(default_ceiling, available_chunks) if available_chunks else default_ceiling
+        safe_max_batch = max(safe_min_batch, safe_max_batch)
+
         config_manager = getattr(self._service, "_config_manager", None)
         retrieval_cfg = None
         if config_manager is not None:
@@ -3402,7 +3440,7 @@ class HybridSearchValidator:
             else None
         )
         try:
-            batch_size = int(batch_size_raw) if batch_size_raw is not None else None
+            candidate_batch = int(batch_size_raw) if batch_size_raw is not None else None
         except (TypeError, ValueError):
             batch_size = None
         if batch_size is None or batch_size <= 0:

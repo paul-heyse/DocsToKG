@@ -292,7 +292,7 @@ from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import numpy as np
@@ -352,6 +352,7 @@ from DocsToKG.HybridSearch.types import (
     HybridSearchRequest,
     HybridSearchResponse,
     HybridSearchResult,
+    ValidationReport,
 )
 from tests.conftest import PatchManager
 
@@ -2987,6 +2988,96 @@ def test_service_close_flushes_dense_snapshot(tmp_path: Path, patcher: PatchMana
     assert len(calls) >= baseline + 1, "service.close() should flush a final snapshot"
 
 
+def test_scale_channel_relevance_uses_namespace_embeddings(
+    stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ingestion, _, registry, validator, feature_generator, _ = stack()
+
+    shared_doc_id = "shared-doc"
+    tenant_a = _write_document_artifacts(
+        tmp_path,
+        doc_id=shared_doc_id,
+        namespace="tenant-a",
+        text="alpha tenant a",
+        metadata={},
+        feature_generator=feature_generator,
+    )
+    tenant_b = _write_document_artifacts(
+        tmp_path,
+        doc_id=shared_doc_id,
+        namespace="tenant-b",
+        text="beta tenant b",
+        metadata={},
+        feature_generator=feature_generator,
+    )
+    ingestion.upsert_documents([tenant_a, tenant_b])
+
+    dataset = [
+        {
+            "document": {"doc_id": shared_doc_id, "namespace": "tenant-a"},
+            "queries": [
+                {
+                    "query": "alpha tenant a",
+                    "expected_doc_id": shared_doc_id,
+                    "namespace": "tenant-a",
+                }
+            ],
+        },
+        {
+            "document": {"doc_id": shared_doc_id, "namespace": "tenant-b"},
+            "queries": [
+                {
+                    "query": "beta tenant b",
+                    "expected_doc_id": shared_doc_id,
+                    "namespace": "tenant-b",
+                }
+            ],
+        },
+    ]
+
+    registry_chunks = registry.all()
+    vectors = registry.resolve_embeddings([chunk.vector_id for chunk in registry_chunks])
+    vectors_by_key = {
+        (chunk.namespace, chunk.doc_id): vector
+        for chunk, vector in zip(registry_chunks, vectors)
+    }
+
+    expected_order = [("tenant-a", shared_doc_id), ("tenant-b", shared_doc_id)]
+    observed_order: List[Tuple[str, str]] = []
+    original_search = validator._ingestion.faiss_index.search
+
+    def spy_search(vector: np.ndarray, top_k: int) -> Any:
+        expected_namespace, expected_doc = expected_order[len(observed_order)]
+        expected_vector = vectors_by_key[(expected_namespace, expected_doc)]
+        np.testing.assert_allclose(vector, expected_vector)
+        observed_order.append((expected_namespace, expected_doc))
+        return original_search(vector, top_k)
+
+    monkeypatch.setattr(validator._ingestion.faiss_index, "search", spy_search)
+
+    report = validator._scale_channel_relevance(
+        dataset,
+        thresholds={},
+        rng=random.Random(0),
+        query_sample_size=len(expected_order),
+    )
+
+    assert observed_order == expected_order
+    assert report.details["dense_hit_rate@10"] == pytest.approx(1.0)
+
+
 # --- test_hybrid_search_scale.py ---
 
 DATASET_PATH = Path("Data/HybridScaleFixture/dataset.jsonl")
@@ -3085,6 +3176,44 @@ def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -
 # --- test_hybrid_search_scale.py ---
 
 
+@pytest.fixture
+def scale_dense_metrics_report(
+    scale_stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FaissVectorStore,
+            OpenSearchSimulator,
+        ],
+    ],
+    scale_dataset: Sequence[Mapping[str, object]],
+) -> ValidationReport:
+    ingestion, _, _, validator, _, _ = scale_stack()
+    documents = [
+        DocumentInput(
+            doc_id=str(entry["document"]["doc_id"]),
+            namespace=str(entry["document"]["namespace"]),
+            chunk_path=Path(entry["document"]["chunk_file"]),
+            vector_path=Path(entry["document"]["vector_file"]),
+            metadata=dict(entry["document"].get("metadata", {})),
+        )
+        for entry in scale_dataset
+    ]
+    ingestion.upsert_documents(documents)
+    report = validator._scale_dense_metrics(  # pylint: disable=protected-access
+        service_module.DEFAULT_SCALE_THRESHOLDS,
+        random.Random(4242),
+    )
+    assert report.details.get("sampled_chunks", 0) > 0
+    return report
+
+
+# --- test_hybrid_search_scale.py ---
+
+
 @pytest.mark.real_vectors
 @pytest.mark.scale_vectors
 def test_hybrid_scale_suite(
@@ -3152,6 +3281,13 @@ def test_hybrid_scale_suite(
         delta_gib < 0.5
     ), f"scale_dense_metrics should not increase RSS by >=0.5 GiB (observed {delta_gib:.2f} GiB)"
     assert dense_report.details.get("sampled_chunks", 0) > 0
+
+
+@pytest.mark.real_vectors
+@pytest.mark.scale_vectors
+def test_scale_dense_metrics_fixture(scale_dense_metrics_report: ValidationReport) -> None:
+    assert scale_dense_metrics_report.name == "scale_dense_metrics"
+    assert scale_dense_metrics_report.details.get("sampled_chunks", 0) > 0
 
 
 # --- test_hybridsearch_gpu_only.py ---
