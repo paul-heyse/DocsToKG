@@ -54,6 +54,21 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
             except FileExistsError:
                 existing_pid, raw_pid = _read_lock_owner(lock_path)
 
+                if raw_pid == "":
+                    try:
+                        age = time.time() - lock_path.stat().st_mtime
+                    except FileNotFoundError:
+                        continue
+                    if age < 0.1:
+                        time.sleep(0.01)
+                        continue
+                    _evict_stale_lock(
+                        lock_path,
+                        reason="invalid-pid",
+                        raw_pid=raw_pid,
+                    )
+                    continue
+
                 if raw_pid is not None and existing_pid is None:
                     _evict_stale_lock(
                         lock_path,

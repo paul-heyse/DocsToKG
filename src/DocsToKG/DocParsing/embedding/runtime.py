@@ -1668,6 +1668,7 @@ def _prepare_vector_row_for_arrow(row: dict) -> dict:
         metadata = {}
 
     def _to_float_list(values: Any) -> list[float]:
+        """Return ``values`` coerced into a list of floats."""
         if not isinstance(values, (list, tuple)):
             return []
         return [float(value) for value in values]
@@ -1757,12 +1758,14 @@ class ParquetVectorWriter(VectorWriter):
     """Write vector rows to a temporary parquet file before atomic promotion."""
 
     def __init__(self, path: Path) -> None:
+        """Initialise a parquet writer targeting ``path``."""
         self.path = path
         self._tmp_path: Path | None = None
         self._writer = None
         self._writes = 0
 
     def __enter__(self) -> "ParquetVectorWriter":
+        """Create the underlying parquet writer and prepare a temp file."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         pa, pq = _ensure_pyarrow_vectors()
         schema = _vector_arrow_schema(pa)
@@ -1793,6 +1796,7 @@ class ParquetVectorWriter(VectorWriter):
         return False
 
     def write_rows(self, rows: Sequence[dict]) -> None:
+        """Append ``rows`` to the staged parquet file."""
         if not rows:
             return
         if self._writer is None or self._tmp_path is None:
@@ -2307,6 +2311,22 @@ def _validate_vectors_for_chunks(
             continue
 
         files_checked += 1
+        try:
+            input_hash = compute_content_hash(vector_path)
+        except Exception:
+            input_hash = ""
+        manifest_log_success(
+            stage=MANIFEST_STAGE,
+            doc_id=doc_id,
+            duration_s=0.0,
+            schema_version=VECTOR_SCHEMA_VERSION,
+            input_path=vector_path,
+            input_hash=input_hash,
+            output_path=vector_path,
+            status="validate-only",
+            vector_format=fmt_normalised,
+            vector_count=file_rows,
+        )
 
     if missing:
         sample_size = min(5, len(missing))
@@ -2386,13 +2406,18 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         data_vectors(bootstrap_root)
     except Exception as exc:
         logging.getLogger(__name__).debug("Failed to bootstrap data directories", exc_info=exc)
+    explicit_overrides: set[str]
     if args is None:
         namespace = parse_args_with_overrides(parser)
+        explicit_overrides = set(getattr(namespace, "_cli_explicit_overrides", ()) or ())
     elif isinstance(args, argparse.Namespace):
         namespace = args
         if getattr(namespace, "_cli_explicit_overrides", None) is None:
             keys = [name for name in vars(namespace) if not name.startswith("_")]
             annotate_cli_overrides(namespace, explicit=keys, defaults={})
+            explicit_overrides = set(keys)
+        else:
+            explicit_overrides = set(namespace._cli_explicit_overrides or ())
     elif isinstance(args, SimpleNamespace) or hasattr(args, "__dict__"):
         base = parse_args_with_overrides(parser, [])
         payload = {key: value for key, value in vars(args).items() if not key.startswith("_")}
@@ -2400,9 +2425,11 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
             setattr(base, key, value)
         defaults = getattr(base, "_cli_defaults", {})
         annotate_cli_overrides(base, explicit=payload.keys(), defaults=defaults)
+        explicit_overrides = set(payload.keys())
         namespace = base
     else:
         namespace = parse_args_with_overrides(parser, args)
+        explicit_overrides = set(getattr(namespace, "_cli_explicit_overrides", ()) or ())
 
     if getattr(namespace, "plan_only", False) and getattr(namespace, "validate_only", False):
         raise EmbeddingCLIValidationError(
@@ -2658,12 +2685,15 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         )
 
         if validate_only:
+            expected_dimension: int | None = int(cfg.qwen_dim)
+            if "qwen_dim" not in explicit_overrides:
+                expected_dimension = None
             files_checked, rows_validated = _validate_vectors_for_chunks(
                 chunks_dir,
                 out_dir,
                 logger,
                 data_root=resolved_root,
-                expected_dimension=int(cfg.qwen_dim),
+                expected_dimension=expected_dimension,
                 vector_format=vector_format,
             )
             logger.info(
