@@ -47,8 +47,14 @@ def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
     env = os.getenv("DOCSTOKG_MODEL_ROOT")
     if env:
         return expand_path(env)
-    base = hf_home if hf_home is not None else resolve_hf_home()
-    return expand_path(base)
+    resolved_hf = (
+        expand_path(hf_home)
+        if hf_home is not None
+        else resolve_hf_home()
+    )
+    cache_root = resolved_hf.parent
+    default_root = cache_root / "docs-to-kg" / "models"
+    return expand_path(default_root)
 
 
 def looks_like_filesystem_path(candidate: str) -> bool:
