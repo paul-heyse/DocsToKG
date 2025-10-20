@@ -197,6 +197,7 @@ sequenceDiagram
 - CLI flags: shared `--resume`, `--force`, `--log-level`; stage-specific `--min-tokens`, `--max-tokens`, `--shard-count/index`, `--batch-size-*`, `--tokenizer-model`, `--format`, etc. PDF DocTags runs additionally accept `--vllm-wait-timeout` (mirrored by `docparse all`) so operators can extend the readiness window for vLLM backends.
 - Environment overrides:
   - DocTags: `DOCSTOKG_DOCTAGS_*` family (`_INPUT`, `_OUTPUT`, `_MODEL`, `_WORKERS`, `_VLLM_WAIT_TIMEOUT`, etc.).
+  - Worker sizing: DocTags auto-sizes `--workers` to `max(1, min(12, cpu_count - 4))`, ensuring at least one process is scheduled even when `os.cpu_count()` reports very small values.
 - Chunking: `DOCSTOKG_CHUNK_*` toggles for tokenizer, shard count, and validation.
 - Embedding: `DOCSTOKG_EMBED_*` flags plus `DOCSTOKG_QWEN_DIR`, `DOCSTOKG_SPLADE_DIR` for model caches.
 - Vector format negotiation: `DOCSTOKG_EMBED_VECTOR_FORMAT` overrides the default (`jsonl`) for runs launched without an explicit `--format` CLI flag; set it to `parquet` to opt into columnar outputs globally.
