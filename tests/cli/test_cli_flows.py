@@ -138,7 +138,9 @@
 from __future__ import annotations
 
 import csv
+import io
 import json
+import logging
 import os
 import sqlite3
 from collections import defaultdict
@@ -374,6 +376,65 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, patcher, tmp_pat
     assert manifest["work_id"] in index_payload
     assert index_payload[manifest["work_id"]]["classification"] == "pdf"
     assert index_payload[manifest["work_id"]]["pdf_path"].endswith("out.pdf")
+
+
+def test_main_respects_log_level(patcher, tmp_path):
+    root_logger = logging.getLogger()
+    package_logger = logging.getLogger("DocsToKG.ContentDownload")
+    original_root_level = root_logger.level
+    original_package_level = package_logger.level
+    original_handlers = list(root_logger.handlers)
+    handler_stream = io.StringIO()
+    handler = logging.StreamHandler(handler_stream)
+    root_logger.addHandler(handler)
+    root_logger.setLevel(logging.WARNING)
+    run_calls: list[object] = []
+
+    class DummyRun:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def run(self):
+            run_calls.append(None)
+            return SimpleNamespace()
+
+    patcher.setattr("DocsToKG.ContentDownload.cli.bootstrap_run_environment", lambda *_: None)
+    patcher.setattr(
+        "DocsToKG.ContentDownload.cli.resolve_config", lambda *_, **__: SimpleNamespace()
+    )
+    patcher.setattr("DocsToKG.ContentDownload.cli.DownloadRun", DummyRun)
+    patcher.setattr("DocsToKG.ContentDownload.cli.emit_console_summary", lambda *_, **__: None)
+
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    argv = [
+        "--topic",
+        "logging",
+        "--year-start",
+        "2024",
+        "--year-end",
+        "2024",
+        "--out",
+        str(out_dir),
+        "--log-level",
+        "debug",
+    ]
+
+    try:
+        downloader.main(argv)
+        assert root_logger.level == logging.DEBUG
+        assert package_logger.level == logging.DEBUG
+        assert handler in root_logger.handlers
+        assert len(root_logger.handlers) == len(original_handlers) + 1
+        assert len(run_calls) == 1
+    finally:
+        if handler in root_logger.handlers:
+            root_logger.removeHandler(handler)
+        handler.close()
+        root_logger.setLevel(original_root_level)
+        package_logger.setLevel(original_package_level)
+        root_logger.handlers = list(original_handlers)
 
 
 def _run_cli_with_csv_logging(download_modules, patcher, tmp_path):

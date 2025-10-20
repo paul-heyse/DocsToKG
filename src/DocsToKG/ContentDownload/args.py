@@ -373,6 +373,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--log-level",
+        type=str.lower,
+        choices=["debug", "info", "warning", "error", "critical"],
+        default="info",
+        help="Logging verbosity for CLI output (default: INFO).",
+    )
+    parser.add_argument(
         "--log-csv",
         type=Path,
         default=None,
