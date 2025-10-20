@@ -182,9 +182,11 @@ def ensure_splade_environment(
 ) -> Dict[str, str]:
     """Bootstrap SPLADE defaults and persist the resolved environment settings.
 
-    When ``cache_dir`` is supplied the resolved path seeds both
+    When ``cache_dir`` is supplied the resolved path eagerly overrides both
     ``DOCSTOKG_SPLADE_DIR`` and the legacy ``DOCSTOKG_SPLADE_MODEL_DIR`` for
-    backwards compatibility.
+    backwards compatibility. If no override is provided any existing
+    environment configuration is preserved while missing variables are
+    populated to ensure consistent lookups.
     """
 
     resolved_device = (
@@ -201,14 +203,23 @@ def ensure_splade_environment(
     cache_path: Path | None = None
     if cache_dir is not None:
         cache_path = Path(cache_dir).expanduser().resolve()
-    else:
-        existing_cache = os.getenv("DOCSTOKG_SPLADE_MODEL_DIR")
-        if existing_cache:
-            cache_path = Path(existing_cache).expanduser().resolve()
-
-    if cache_path is not None:
         resolved_cache = str(cache_path)
+        os.environ["DOCSTOKG_SPLADE_DIR"] = resolved_cache
         os.environ["DOCSTOKG_SPLADE_MODEL_DIR"] = resolved_cache
+        env_info["model_dir"] = resolved_cache
+        return env_info
+
+    current_dir = os.getenv("DOCSTOKG_SPLADE_DIR")
+    legacy_dir = os.getenv("DOCSTOKG_SPLADE_MODEL_DIR")
+    selected_cache = current_dir or legacy_dir
+
+    if selected_cache:
+        cache_path = Path(selected_cache).expanduser().resolve()
+        resolved_cache = str(cache_path)
+        if current_dir is None:
+            os.environ["DOCSTOKG_SPLADE_DIR"] = resolved_cache
+        if legacy_dir is None:
+            os.environ["DOCSTOKG_SPLADE_MODEL_DIR"] = resolved_cache
         env_info["model_dir"] = resolved_cache
 
     return env_info
