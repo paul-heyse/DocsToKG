@@ -69,6 +69,7 @@ from .errors import (
     PolicyError,
     ResolverError,
     ValidationError,
+    RetryableValidationError,
     ValidationFailure,
 )
 from .io import (
@@ -1930,6 +1931,7 @@ def fetch_one(
                         "validators": failed_validators,
                         "strict": not active_config.defaults.continue_on_error,
                     }
+                    attempt_record["validators"] = list(failed_validators)
                     if active_config.defaults.continue_on_error:
                         adapter.warning(
                             "validation failures ignored", extra=log_payload
@@ -1938,6 +1940,10 @@ def fetch_one(
                         adapter.error(
                             "validation failures detected", extra=log_payload
                         )
+                        raise RetryableValidationError(
+                            "Validation failed for "
+                            f"'{effective_spec.id}' via {', '.join(failed_validators)}",
+                            validators=tuple(failed_validators),
                         raise ValidationFailure(
                             "Validation failed for "
                             f"'{effective_spec.id}' via {', '.join(failed_validators)}",
@@ -2068,14 +2074,14 @@ def fetch_one(
 
         try:
             return _execute_candidate()
-        except ValidationFailure as exc:
+        except ValidationError as exc:
             last_error = exc
-            attempt_record.update(
-                {"status": "failed", "error": str(exc), "stage": "validate"}
-            )
+            attempt_record.update({"status": "failed", "error": str(exc)})
+            validators = getattr(exc, "validators", None)
+            if validators:
+                attempt_record["validators"] = list(validators)
             resolver_attempts.append(dict(attempt_record))
-            log_method = adapter.warning if getattr(exc, "retryable", False) else adapter.error
-            log_method(
+            adapter.warning(
                 "validation attempt failed",
                 extra={
                     "stage": "validate",
@@ -2089,6 +2095,7 @@ def fetch_one(
                 adapter.info(
                     "trying fallback resolver",
                     extra={
+                        "stage": "download",
                         "stage": "validate",
                         "resolver": candidate.resolver,
                         "attempt": attempt_number,

@@ -9,7 +9,7 @@ access to specialised subclasses when finer-grained handling is required.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Sequence
 
 __all__ = [
     "OntologyDownloadError",
@@ -17,7 +17,7 @@ __all__ = [
     "ConfigurationError",
     "ResolverError",
     "ValidationError",
-    "ValidationFailure",
+    "RetryableValidationError",
     "PolicyError",
     "DownloadFailure",
     "UserConfigError",
@@ -45,6 +45,18 @@ class ValidationError(OntologyDownloadError):
     """Raised when ontology validation encounters unrecoverable issues."""
 
 
+class RetryableValidationError(ValidationError):
+    """Validation error that supports retry semantics for resolver fallbacks."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        validators: Optional[Sequence[str]] = None,
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.validators = tuple(validators or ())
 class ValidationFailure(ValidationError):
     """Raised when validation results should be treated as a failed attempt."""
 
