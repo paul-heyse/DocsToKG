@@ -836,8 +836,8 @@ class FaissVectorStore(DenseVectorStore):
         cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(requested_cuvs)
         if applied_cuvs is not None:
             cuvs_enabled = bool(applied_cuvs)
-            cuvs_available = bool(applied_cuvs)
-            cuvs_reported = bool(applied_cuvs)
+            if applied_cuvs:
+                cuvs_reported = True
         return AdapterStats(
             device=self.device,
             ntotal=self.ntotal,
