@@ -67,7 +67,9 @@ from DocsToKG.ContentDownload.download import RobotsCache, ensure_dir
 from DocsToKG.ContentDownload.pipeline import load_resolver_config
 from DocsToKG.ContentDownload.pyalex_shim import apply_mailto
 from DocsToKG.ContentDownload.resolvers import DEFAULT_RESOLVER_ORDER, default_resolvers
+from DocsToKG.ContentDownload.resolvers.wayback import WaybackResolver
 from DocsToKG.ContentDownload.telemetry import ManifestUrlIndex
+from DocsToKG.ContentDownload.telemetry_wayback_sqlite import SQLiteSink
 from DocsToKG.ContentDownload.ratelimit import (
     BackendConfig,
     RolePolicy,
@@ -1044,6 +1046,35 @@ def resolve_config(
     if args.log_format == "csv":
         csv_path = csv_path or manifest_path.with_suffix(".csv")
     sqlite_path = manifest_path.with_suffix(".sqlite3")
+
+    telemetry_dir = manifest_path.parent / "telemetry"
+    telemetry_spec = dict(getattr(config, "wayback_config", {}).get("telemetry", {}) or {})
+    sqlite_target = telemetry_spec.get("sqlite_path") or os.environ.get("WAYBACK_SQLITE_PATH")
+    if sqlite_target:
+        sqlite_target_path = Path(sqlite_target).expanduser().resolve(strict=False)
+    else:
+        sqlite_target_path = telemetry_dir / "wayback.sqlite"
+
+    jsonl_fallback_spec = telemetry_spec.get("jsonl_path") or os.environ.get("WAYBACK_JSONL_PATH")
+    if jsonl_fallback_spec:
+        jsonl_fallback_path = Path(jsonl_fallback_spec).expanduser().resolve(strict=False)
+    else:
+        jsonl_fallback_path = telemetry_dir / "wayback.jsonl"
+
+    telemetry_kwargs = dict(telemetry_spec.get("kwargs") or {})
+    wayback_sinks: List[Any] = []
+    if sqlite_target_path is not None:
+        wayback_sinks.append(SQLiteSink(sqlite_target_path))
+
+    for resolver in resolver_instances:
+        if isinstance(resolver, WaybackResolver):
+            resolver.configure_telemetry(
+                run_id=run_id,
+                sinks=wayback_sinks,
+                jsonl_fallback_path=jsonl_fallback_path,
+                telemetry_factory_kwargs=telemetry_kwargs,
+            )
+            break
 
     previous_url_index = ManifestUrlIndex(sqlite_path, eager=args.warm_manifest_cache)
     persistent_seen_urls: Set[str]

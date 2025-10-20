@@ -53,6 +53,7 @@ __all__ = (
     "tail_contains_html",
     "normalize_doi",
     "normalize_pmcid",
+    "normalize_url",
     "strip_prefix",
     "dedupe",
     "normalize_pmid",
@@ -727,6 +728,22 @@ def normalize_doi(doi: Optional[str]) -> Optional[str]:
     if lower.startswith("doi:"):
         value = value[len("doi:") :]
     return value.strip() or None
+
+
+def normalize_url(url: Optional[str]) -> Optional[str]:
+    """Return a canonicalised URL suitable for deduplication indices."""
+
+    if url is None:
+        return None
+    text = str(url).strip()
+    if not text:
+        return None
+    try:
+        canonical = canonical_for_index(text)
+    except Exception:
+        # ``url_normalize`` can raise when encountering malformed URLs.
+        return text
+    return canonical or text
 
 
 def normalize_pmcid(pmcid: Optional[str]) -> Optional[str]:

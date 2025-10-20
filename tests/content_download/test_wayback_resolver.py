@@ -11,6 +11,7 @@ from DocsToKG.ContentDownload.core import WorkArtifact
 from DocsToKG.ContentDownload.pipeline import ResolverConfig
 from DocsToKG.ContentDownload.resolvers.wayback import WaybackResolver
 from DocsToKG.ContentDownload.resolvers.base import ResolverEvent, ResolverEventReason
+from DocsToKG.ContentDownload.telemetry_wayback import CandidateDecision, SkipReason
 
 
 class TestWaybackResolver:
@@ -322,14 +323,20 @@ class TestWaybackResolver:
         ):
             mock_availability.return_value = (None, {"availability_checked": True})
             mock_cdx.return_value = []
-            mock_verify.return_value = False
+            mock_verify.return_value = (
+                False,
+                {
+                    "decision": CandidateDecision.SKIPPED_MIME,
+                    "skip_reason": SkipReason.NON_PDF,
+                },
+            )
 
-            url, metadata = resolver._discover_snapshots(
+            outcome = resolver._discover_snapshots(
                 client, config, original_url, canonical_url, publication_year, 2, 8, 4096, True
             )
 
-            assert url is None
-            assert metadata["discovery_method"] == "none"
+            assert outcome.url is None
+            assert outcome.metadata["discovery_method"] == "none"
 
     def test_verify_pdf_snapshot_valid_pdf(self, resolver, config):
         """Test PDF verification with valid PDF."""
@@ -344,9 +351,10 @@ class TestWaybackResolver:
             mock_response.status_code = 200
             mock_request.return_value = mock_response
 
-            result = resolver._verify_pdf_snapshot(client, config, url, 4096)
+            passed, info = resolver._verify_pdf_snapshot(client, config, url, 4096)
 
-            assert result is True
+            assert passed is True
+            assert info["skip_reason"] is None
 
     def test_verify_pdf_snapshot_invalid_content_type(self, resolver, config):
         """Test PDF verification with invalid content type."""
@@ -361,9 +369,10 @@ class TestWaybackResolver:
             mock_response.status_code = 200
             mock_request.return_value = mock_response
 
-            result = resolver._verify_pdf_snapshot(client, config, url, 4096)
+            passed, info = resolver._verify_pdf_snapshot(client, config, url, 4096)
 
-            assert result is False
+            assert passed is False
+            assert info["skip_reason"] == SkipReason.NON_PDF
 
     def test_verify_pdf_snapshot_too_small(self, resolver, config):
         """Test PDF verification with file too small."""
@@ -378,9 +387,10 @@ class TestWaybackResolver:
             mock_response.status_code = 200
             mock_request.return_value = mock_response
 
-            result = resolver._verify_pdf_snapshot(client, config, url, 4096)
+            passed, info = resolver._verify_pdf_snapshot(client, config, url, 4096)
 
-            assert result is False
+            assert passed is False
+            assert info["skip_reason"] == SkipReason.BELOW_MIN_SIZE
 
     @patch("bs4.BeautifulSoup")
     def test_parse_html_for_pdf_success(self, mock_beautifulsoup, resolver, config):
