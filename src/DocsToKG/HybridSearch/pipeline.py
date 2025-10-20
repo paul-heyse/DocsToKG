@@ -828,6 +828,42 @@ class ChunkIngestionPipeline:
             raise IngestError(
                 "Missing vector entries for chunk UUIDs: " + ", ".join(sorted(set(missing)))
             )
+
+        extra_vector_ids: List[str] = []
+        max_preview = 10
+        truncated = False
+        if vector_cache:
+            cache_ids = [str(vector_id) for vector_id in vector_cache.keys()]
+            if len(cache_ids) > max_preview:
+                extra_vector_ids.extend(sorted(cache_ids)[:max_preview])
+                truncated = True
+            else:
+                extra_vector_ids.extend(sorted(cache_ids))
+
+        missing_uuid_entries = False
+        for extra_entry in vector_iter:
+            extra_uuid = extra_entry.get("uuid") or extra_entry.get("UUID")
+            if extra_uuid:
+                if len(extra_vector_ids) < max_preview:
+                    extra_vector_ids.append(str(extra_uuid))
+                else:
+                    truncated = True
+            else:
+                missing_uuid_entries = True
+
+        if extra_vector_ids or missing_uuid_entries:
+            details = sorted(set(extra_vector_ids))
+            message = "Found vector entries without matching chunks"
+            if details:
+                preview = ", ".join(details[:max_preview])
+                if truncated or len(details) > max_preview:
+                    preview += ", ..."
+                message += f": {preview}"
+            if missing_uuid_entries and not details:
+                message += ": <missing UUID>"
+            elif missing_uuid_entries:
+                message += " (additional entries missing UUIDs)"
+            raise IngestError(message)
         return payloads
 
     def _delete_existing_for_doc(self, doc_id: str, namespace: str) -> None:
