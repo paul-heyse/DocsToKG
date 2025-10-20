@@ -1011,9 +1011,51 @@ class HybridSearchService:
                 timings,
                 dense_store,
             )
-            bm25 = f_bm25.result()
-            splade = f_splade.result()
-            dense = f_dense.result()
+            futures = {"bm25": f_bm25, "splade": f_splade, "dense": f_dense}
+            channel_results: Dict[str, ChannelResults] = {}
+            failed_channel: Optional[str] = None
+            try:
+                for channel_name in ("bm25", "splade", "dense"):
+                    failed_channel = channel_name
+                    channel_results[channel_name] = futures[channel_name].result()
+            except Exception as exc:
+                for name, future in futures.items():
+                    if name != failed_channel and not future.done():
+                        future.cancel()
+                namespace = request.namespace or "*"
+                error_message = str(exc)
+                error_details = (
+                    f"{type(exc).__name__}: {error_message}"
+                    if error_message
+                    else type(exc).__name__
+                )
+                self._observability.logger.exception(
+                    "hybrid-search-channel-error",
+                    extra={
+                        "event": {
+                            "channel": failed_channel,
+                            "namespace": namespace,
+                            "filters": filters,
+                            "query": request.query,
+                            "error": error_details,
+                        }
+                    },
+                )
+                if failed_channel:
+                    message = (
+                        "Hybrid search channel '"
+                        f"{failed_channel}' failed for namespace '{namespace}': "
+                        f"{error_details}"
+                    )
+                else:
+                    message = (
+                        "Hybrid search channel failed for namespace '"
+                        f"{namespace}': {error_details}"
+                    )
+                raise RequestValidationError(message) from exc
+            bm25 = channel_results["bm25"]
+            splade = channel_results["splade"]
+            dense = channel_results["dense"]
 
             embedding_cache: Dict[str, np.ndarray] = {}
             if dense.embeddings is not None:
