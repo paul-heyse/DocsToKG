@@ -926,7 +926,7 @@ def run_all(argv: Sequence[str] | None = None) -> int:
             extra[field_name] = value
     if plan_only:
         extra["plan_only"] = True
-    message = "docparse plan preview" if plan_only else "docparse all starting"
+    message = "docparse plan preview" if plan_only else "docparse plan"
     logger.info(message, extra={"extra_fields": extra})
 
     doctags_args, chunk_args, embed_args = _build_stage_args(args)
