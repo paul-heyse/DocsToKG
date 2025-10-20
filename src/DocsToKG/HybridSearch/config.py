@@ -314,7 +314,7 @@ class HybridSearchConfig:
     retrieval: RetrievalConfig = RetrievalConfig()
 
     @staticmethod
-    def from_dict(payload: Dict[str, Any]) -> "HybridSearchConfig":
+    def from_dict(payload: Mapping[str, Any]) -> "HybridSearchConfig":
         """Construct a config object from a dictionary payload.
 
         Args:
@@ -324,6 +324,11 @@ class HybridSearchConfig:
         Returns:
             Fully populated `HybridSearchConfig` instance.
         """
+        if not isinstance(payload, Mapping):
+            raise ValueError(
+                "HybridSearchConfig.from_dict expected a mapping payload, "
+                f"received {type(payload).__name__}"
+            )
         chunking = ChunkingConfig(**payload.get("chunking", {}))
         dense_payload = dict(payload.get("dense", {}))
         alias_pairs = (
