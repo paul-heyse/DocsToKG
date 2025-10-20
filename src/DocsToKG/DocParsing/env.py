@@ -47,7 +47,7 @@ def resolve_hf_home() -> Path:
     return expand_path(Path.home() / ".cache" / "huggingface")
 
 
-def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
+def resolve_model_root(hf_home: Path | str | None = None) -> Path:
     """Resolve the DocsToKG model root honouring ``DOCSTOKG_MODEL_ROOT``."""
 
     env = os.getenv("DOCSTOKG_MODEL_ROOT")
@@ -103,14 +103,16 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
 
 
 def init_hf_env(
-    hf_home: Optional[Path] = None,
-    model_root: Optional[Path] = None,
+    hf_home: Path | str | None = None,
+    model_root: Path | str | None = None,
 ) -> Tuple[Path, Path]:
     """Initialise Hugging Face and transformer cache environment variables."""
 
-    resolved_hf = expand_path(hf_home) if isinstance(hf_home, Path) else resolve_hf_home()
+    resolved_hf = expand_path(hf_home) if hf_home is not None else resolve_hf_home()
     resolved_model_root = (
-        expand_path(model_root) if isinstance(model_root, Path) else resolve_model_root(resolved_hf)
+        expand_path(model_root)
+        if model_root is not None
+        else resolve_model_root(resolved_hf)
     )
 
     os.environ["HF_HOME"] = str(resolved_hf)
@@ -139,7 +141,7 @@ def _detect_cuda_device() -> str:
 
 
 def ensure_model_environment(
-    hf_home: Optional[Path] = None, model_root: Optional[Path] = None
+    hf_home: Path | str | None = None, model_root: Path | str | None = None
 ) -> Tuple[Path, Path]:
     """Initialise and cache the HuggingFace/model-root environment settings."""
 

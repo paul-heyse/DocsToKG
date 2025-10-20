@@ -218,6 +218,28 @@ def test_init_hf_env_default_model_root():
         assert os.environ["DOCSTOKG_MODEL_ROOT"] == str(expected_model_root.resolve())
 
 
+def test_init_hf_env_accepts_string_overrides():
+    """String inputs for overrides are expanded prior to environment setup."""
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        hf_home = tmp_path / "hf-cache"
+        model_root = tmp_path / "models"
+        hf_home.mkdir()
+        model_root.mkdir()
+
+        with patch.dict(os.environ, {}, clear=True):
+            resolved_hf, resolved_model_root = init_hf_env(
+                hf_home=str(hf_home),
+                model_root=str(model_root),
+            )
+
+        assert resolved_hf == hf_home.resolve()
+        assert resolved_model_root == model_root.resolve()
+        assert os.environ["HF_HOME"] == str(hf_home.resolve())
+        assert os.environ["DOCSTOKG_MODEL_ROOT"] == str(model_root.resolve())
+
+
 def test_path_resolution_edge_cases():
     """Test edge cases in path resolution."""
     with tempfile.TemporaryDirectory() as tmpdir:
