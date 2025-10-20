@@ -1855,7 +1855,7 @@ class HybridSearchAPI:
     def _parse_request(self, payload: Mapping[str, Any]) -> HybridSearchRequest:
         query = str(payload["query"])
         namespace = payload.get("namespace")
-        filters = self._normalize_filters(payload.get("filters", {}))
+        filters = self._normalize_filters(payload.get("filters"))
         page_size = int(payload.get("page_size", payload.get("limit", 10)))
         cursor = payload.get("cursor")
         diversification = bool(payload.get("diversification", False))
@@ -1872,8 +1872,13 @@ class HybridSearchAPI:
             recall_first=recall_first,
         )
 
-    def _normalize_filters(self, payload: Mapping[str, Any]) -> MutableMapping[str, Any]:
+    def _normalize_filters(
+        self, payload: Optional[Mapping[str, Any]]
+    ) -> MutableMapping[str, Any]:
         normalized: MutableMapping[str, Any] = {}
+        if not payload:
+            return normalized
+
         for key, value in payload.items():
             if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
                 normalized[str(key)] = [str(item) for item in value]
