@@ -32,6 +32,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import tempfile
 import time
 from contextlib import contextmanager
@@ -1549,6 +1550,63 @@ def _mirror_to_cas_if_enabled(
     return cas_path
 
 
+def _cleanup_failed_validation_artifacts(
+    *,
+    destination: Path,
+    extraction_dir: Optional[Path],
+    cas_path: Optional[Path],
+    base_dir: Path,
+    logger: logging.LoggerAdapter,
+) -> None:
+    """Remove artefacts produced before a strict-mode validation failure."""
+
+    cleanup_targets: List[Tuple[Optional[Path], str, bool]] = [
+        (destination, "downloaded file", False),
+        (extraction_dir, "extracted archive", True),
+        (cas_path, "cas mirror", False),
+    ]
+
+    for path, description, is_directory in cleanup_targets:
+        if path is None:
+            continue
+        try:
+            exists = path.exists()
+        except OSError as exc:
+            logger.warning(
+                "cleanup skipped due to access error",
+                extra={"stage": "cleanup", "path": str(path), "error": str(exc)},
+            )
+            continue
+        if not exists:
+            continue
+        try:
+            if is_directory:
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            logger.warning(
+                "cleanup failed after validation error",
+                extra={
+                    "stage": "cleanup",
+                    "path": str(path),
+                    "error": str(exc),
+                    "resource": description,
+                },
+            )
+
+    try:
+        if base_dir.exists() and not any(entry.is_file() for entry in base_dir.rglob("*")):
+            shutil.rmtree(base_dir)
+    except OSError as exc:
+        logger.warning(
+            "cleanup failed for ontology workspace",
+            extra={"stage": "cleanup", "path": str(base_dir), "error": str(exc)},
+        )
+
+
 def _build_destination(
     spec: FetchSpec, plan: FetchPlan, config: ResolvedConfig
 ) -> Tuple[Path, str, Path]:
@@ -1899,6 +1957,7 @@ def fetch_one(
                 )
                 if cas_path:
                     artifacts.append(str(cas_path))
+                extraction_dir: Optional[Path] = None
                 if plan.media_type == "application/zip" or destination.suffix.lower() == ".zip":
                     extraction_dir = destination.parent / f"{destination.stem}_extracted"
                     try:
@@ -1940,6 +1999,14 @@ def fetch_one(
                         adapter.error(
                             "validation failures detected", extra=log_payload
                         )
+                        _cleanup_failed_validation_artifacts(
+                            destination=destination,
+                            extraction_dir=extraction_dir,
+                            cas_path=cas_path,
+                            base_dir=base_dir,
+                            logger=adapter,
+                        )
+                        raise OntologyDownloadError(
                         raise RetryableValidationError(
                             "Validation failed for "
                             f"'{effective_spec.id}' via {', '.join(failed_validators)}",

@@ -183,6 +183,15 @@ constraint (clamped between 1 and 8). A single ontology capped at `1` will keep
 the shared worker pool at that size even if other requests allow higher
 parallelism.
 
+### Strict validation mode
+
+Setting `defaults.continue_on_error: false` enables strict validation mode. When
+any validator reports a failure the downloader raises immediately **and**
+purges artefacts produced during the attempt (the downloaded file, extracted
+archives, and any CAS mirror entries) so the ontology version directory remains
+empty. Run in lenient mode (`continue_on_error: true`) when you need to inspect
+intermediate files from failing validators.
+
 Key environment variables and overrides:
 
 | Variable | Purpose | Default |
