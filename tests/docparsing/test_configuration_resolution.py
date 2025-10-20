@@ -95,21 +95,39 @@ def test_resolve_model_root():
 
         # Test without DOCSTOKG_MODEL_ROOT using default HF home fallback
         with patch.dict(os.environ, {}, clear=True):
-            expected = resolve_hf_home().parent / "docs-to-kg" / "models"
+            default_hf = resolve_hf_home()
+            default_cache_root = (
+                default_hf.parent if default_hf.name == "huggingface" else default_hf
+            )
+            expected = default_cache_root / "docs-to-kg" / "models"
             result = resolve_model_root()
             assert result == expected
 
         # Test fallback derived from a custom HF_HOME
-        custom_hf = tmp_path / "alt-cache" / "huggingface"
-        custom_hf.mkdir(parents=True, exist_ok=True)
+        huggingface_cache = tmp_path / "alt-cache" / "huggingface"
+        huggingface_cache.mkdir(parents=True, exist_ok=True)
+        generic_cache = tmp_path / "standalone-cache"
+        generic_cache.mkdir(parents=True, exist_ok=True)
 
-        with patch.dict(os.environ, {"HF_HOME": str(custom_hf)}):
-            expected = custom_hf.parent / "docs-to-kg" / "models"
+        with patch.dict(os.environ, {"HF_HOME": str(huggingface_cache)}):
+            expected = huggingface_cache.parent / "docs-to-kg" / "models"
             result = resolve_model_root()
             assert result == expected.resolve()
+            # The derived root should sit beside the huggingface cache directory.
+            assert result.parent == huggingface_cache.parent.resolve()
 
-        direct = resolve_model_root(hf_home=custom_hf)
-        assert direct == (custom_hf.parent / "docs-to-kg" / "models").resolve()
+        with patch.dict(os.environ, {"HF_HOME": str(generic_cache)}):
+            expected = generic_cache / "docs-to-kg" / "models"
+            result = resolve_model_root()
+            assert result == expected.resolve()
+            # The derived root should stay under the configured cache directory.
+            assert str(result).startswith(str(generic_cache.resolve()))
+
+        direct = resolve_model_root(hf_home=huggingface_cache)
+        assert direct == (huggingface_cache.parent / "docs-to-kg" / "models").resolve()
+
+        direct_generic = resolve_model_root(hf_home=generic_cache)
+        assert direct_generic == (generic_cache / "docs-to-kg" / "models").resolve()
 
 
 def test_resolve_pdf_model_path():

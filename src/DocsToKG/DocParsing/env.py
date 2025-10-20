@@ -58,7 +58,7 @@ def resolve_model_root(hf_home: Path | str | None = None) -> Path:
         if hf_home is not None
         else resolve_hf_home()
     )
-    cache_root = resolved_hf.parent
+    cache_root = resolved_hf.parent if resolved_hf.name == "huggingface" else resolved_hf
     default_root = cache_root / "docs-to-kg" / "models"
     return expand_path(default_root)
 
