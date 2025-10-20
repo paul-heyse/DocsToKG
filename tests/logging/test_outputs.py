@@ -76,6 +76,7 @@
 import csv
 import json
 import os
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List
@@ -98,6 +99,7 @@ from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
     MultiSink,
     RunTelemetry,
     RotatingJsonlSink,
+    SqliteSink,
 )
 from scripts.export_attempts_csv import export_attempts_jsonl_to_csv  # noqa: E402
 from tools.manifest_to_csv import convert_manifest_to_csv  # noqa: E402
@@ -134,6 +136,61 @@ def test_jsonl_sink_attempt_records_include_wall_time(tmp_path: Path) -> None:
     assert payload["resolver_name"] == "unpaywall"
     assert payload["resolver_wall_time_ms"] == 432.5
     assert payload["run_id"] == "run-1"
+    assert "breaker_host_state" in payload
+    assert payload["breaker_recorded"] is None
+
+
+def test_jsonl_sink_records_breaker_event(tmp_path: Path) -> None:
+    log_path = tmp_path / "attempts.jsonl"
+    sink = JsonlSink(log_path)
+    sink.log_breaker_event(
+        {
+            "event_type": "breaker_state_change",
+            "run_id": "run-breaker",
+            "host": "example.org",
+            "scope": "host",
+            "old": "closed",
+            "new": "open",
+        }
+    )
+    sink.close()
+
+    lines = log_path.read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 1
+    payload = json.loads(lines[0])
+    assert payload["record_type"] == "breaker_event"
+    assert payload["host"] == "example.org"
+    assert payload["event_type"] == "breaker_state_change"
+
+
+def test_sqlite_sink_records_breaker_event(tmp_path: Path) -> None:
+    db_path = tmp_path / "manifest.sqlite3"
+    sink = SqliteSink(db_path)
+    sink.log_breaker_event(
+        {
+            "event_type": "breaker_success",
+            "run_id": "run-breaker",
+            "host": "example.org",
+            "scope": "host",
+            "resolver": None,
+        }
+    )
+    sink.close()
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT event_type, host, payload FROM breaker_events"
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    event_type, host, payload_json = row
+    assert event_type == "breaker_success"
+    assert host == "example.org"
+    payload = json.loads(payload_json)
+    assert payload["run_id"] == "run-breaker"
 
 
 def test_multi_sink_synchronizes_timestamps(tmp_path: Path) -> None:
@@ -721,6 +778,7 @@ class _StubAttemptSink:
     def __init__(self) -> None:
         self.attempts: List[AttemptRecord] = []
         self.summaries: List[Dict[str, Any]] = []
+        self.breaker_events: List[Dict[str, Any]] = []
 
     def log_attempt(self, record: AttemptRecord, *, timestamp: str | None = None) -> None:
         self.attempts.append(record)
@@ -730,6 +788,9 @@ class _StubAttemptSink:
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
         self.summaries.append(summary.copy())
+
+    def log_breaker_event(self, event: Dict[str, Any]) -> None:
+        self.breaker_events.append(dict(event))
 
 
 def test_run_telemetry_tracks_rate_limiter_metrics() -> None:
@@ -787,6 +848,16 @@ def test_run_telemetry_tracks_rate_limiter_metrics() -> None:
         summary_payload["rate_limiter_attempts"]["example.org"]["metadata"]["blocked_total"]
         == 1
     )
+
+    telemetry.log_breaker_event(
+        {
+            "event_type": "breaker_open",
+            "run_id": "run-rl",
+            "host": "example.org",
+            "scope": "host",
+        }
+    )
+    assert sink.breaker_events[0]["event_type"] == "breaker_open"
 
 
 def test_run_telemetry_includes_lock_metrics(tmp_path: Path) -> None:

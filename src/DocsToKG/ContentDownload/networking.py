@@ -755,20 +755,15 @@ def request_with_retries(
         )
 
     # Update breaker based on response and collect state for telemetry
-    breaker_state_info = {}
+    breaker_state_info: Dict[str, Any] = {}
     if breaker_registry is not None and request_host:
         from DocsToKG.ContentDownload.breakers import RequestRole, is_failure_for_breaker
 
-        # Get current breaker state before updating
-        breaker_state_info["breaker_host_state"] = breaker_registry.current_state(request_host)
-        if resolver:
-            breaker_state_info["breaker_resolver_state"] = breaker_registry.current_state(
-                request_host, resolver=resolver
-            )
+        recorded: Optional[str] = None
 
         if isinstance(response, httpx.Response):
             status = response.status_code
-            retry_after_s = None
+            retry_after_s: Optional[float] = None
             if status in (429, 503):
                 retry_after_s = parse_retry_after_header(response)
 
@@ -784,14 +779,23 @@ def request_with_retries(
                     status=status,
                     retry_after_s=retry_after_s,
                 )
-                breaker_state_info["breaker_recorded"] = "failure"
+                recorded = "failure"
             else:
                 breaker_registry.on_success(request_host, role=role_enum, resolver=resolver)
-                breaker_state_info["breaker_recorded"] = "success"
+                recorded = "success"
         else:
-            # Non-HTTP response, treat as success
             breaker_registry.on_success(request_host, role=role_enum, resolver=resolver)
-            breaker_state_info["breaker_recorded"] = "success"
+            recorded = "success"
+
+        breaker_state_info["breaker_host_state"] = breaker_registry.current_state(request_host)
+        if resolver:
+            breaker_state_info["breaker_resolver_state"] = breaker_registry.current_state(
+                request_host, resolver=resolver
+            )
+        remaining = breaker_registry.cooldown_remaining_ms(request_host, resolver=resolver)
+        if remaining is not None:
+            breaker_state_info["breaker_open_remaining_ms"] = remaining
+        breaker_state_info["breaker_recorded"] = recorded or "none"
 
     # Store breaker state info in response extensions for telemetry
     if breaker_state_info and hasattr(response, "extensions"):

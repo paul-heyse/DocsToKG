@@ -95,6 +95,9 @@ class _RecordingSink:
     def log_summary(self, *args, **kwargs) -> None:  # noqa: D401
         self.logged.append({"type": "summary", "args": args, "kwargs": kwargs})
 
+    def log_breaker_event(self, *args, **kwargs) -> None:  # noqa: D401
+        self.logged.append({"type": "breaker", "args": args, "kwargs": kwargs})
+
     def close(self) -> None:  # noqa: D401
         self.closed = True
 

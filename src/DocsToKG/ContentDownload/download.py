@@ -1985,6 +1985,33 @@ def build_download_outcome(
     status_code = response.status_code if response is not None else None
     headers = response.headers if response is not None else httpx.Headers()
 
+    breaker_host_state: Optional[str] = None
+    breaker_resolver_state: Optional[str] = None
+    breaker_open_remaining_ms: Optional[int] = None
+    breaker_recorded: Optional[str] = None
+    if response is not None:
+        extensions = getattr(response, "extensions", None)
+        if isinstance(extensions, Mapping):
+            host_state_val = extensions.get("breaker_host_state")
+            if isinstance(host_state_val, str):
+                breaker_host_state = host_state_val
+            resolver_state_val = extensions.get("breaker_resolver_state")
+            if isinstance(resolver_state_val, str):
+                breaker_resolver_state = resolver_state_val
+            remaining_val = extensions.get("breaker_open_remaining_ms")
+            if isinstance(remaining_val, (int, float)):
+                breaker_open_remaining_ms = int(remaining_val)
+            recorded_val = extensions.get("breaker_recorded")
+            if isinstance(recorded_val, str):
+                breaker_recorded = recorded_val
+
+    breaker_kwargs = {
+        "breaker_host_state": breaker_host_state,
+        "breaker_resolver_state": breaker_resolver_state,
+        "breaker_open_remaining_ms": breaker_open_remaining_ms,
+        "breaker_recorded": breaker_recorded,
+    }
+
     canonical_value = canonical_url
     if canonical_value is None and response is not None:
         try:
@@ -2030,6 +2057,7 @@ def build_download_outcome(
                 canonical_url=canonical_value,
                 canonical_index=canonical_index_value,
                 original_url=original_value,
+                **breaker_kwargs,
             )
 
         if tail_contains_html(tail_bytes):
@@ -2052,6 +2080,7 @@ def build_download_outcome(
                 canonical_url=canonical_value,
                 canonical_index=canonical_index_value,
                 original_url=original_value,
+                **breaker_kwargs,
             )
 
         if not has_pdf_eof(dest_path, window_bytes=tail_check_bytes):
@@ -2074,6 +2103,7 @@ def build_download_outcome(
                 canonical_url=canonical_value,
                 canonical_index=canonical_index_value,
                 original_url=original_value,
+                **breaker_kwargs,
             )
 
     if isinstance(options, DownloadContext):
@@ -2101,6 +2131,7 @@ def build_download_outcome(
             canonical_url=canonical_value,
             canonical_index=canonical_index_value,
             original_url=original_value,
+            **breaker_kwargs,
         )
 
     try:
@@ -2140,6 +2171,16 @@ def build_download_outcome(
             if cleaned:
                 metadata["rate_limiter"] = cleaned
 
+    breaker_meta = {
+        "host_state": breaker_host_state,
+        "resolver_state": breaker_resolver_state,
+        "remaining_ms": breaker_open_remaining_ms,
+        "recorded": breaker_recorded,
+    }
+    breaker_cleaned = {k: v for k, v in breaker_meta.items() if v is not None}
+    if breaker_cleaned:
+        metadata["breaker"] = breaker_cleaned
+
     return DownloadOutcome(
         classification=classification_code,
         path=path_str,
@@ -2158,6 +2199,7 @@ def build_download_outcome(
         canonical_url=canonical_value,
         canonical_index=canonical_index_value,
         original_url=original_value,
+        **breaker_kwargs,
     )
 
 

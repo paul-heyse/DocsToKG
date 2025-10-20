@@ -97,7 +97,7 @@ from DocsToKG.ContentDownload.core import (
 from DocsToKG.ContentDownload.urls import canonical_for_index
 
 MANIFEST_SCHEMA_VERSION = 5
-SQLITE_SCHEMA_VERSION = 6
+SQLITE_SCHEMA_VERSION = 7
 CSV_HEADER_TOKENS = {"run_id", "work_id"}
 
 
@@ -550,6 +550,9 @@ class AttemptSink(Protocol):
             Exception: Implementations may propagate write failures.
         """
 
+    def log_breaker_event(self, event: Mapping[str, Any]) -> None:
+        """Record a circuit breaker telemetry event."""
+
     def close(self) -> None:
         """Release any resources held by the sink.
 
@@ -674,6 +677,18 @@ class RunTelemetry(AttemptSink):
         if lock_snapshot:
             summary.setdefault("lock_metrics", lock_snapshot)
         self._sink.log_summary(summary)
+
+    def log_breaker_event(self, event: Mapping[str, Any]) -> None:
+        """Forward breaker telemetry events to the underlying sink."""
+
+        payload = dict(event)
+        payload.setdefault("timestamp", _utc_timestamp())
+        self._sink.log_breaker_event(payload)
+
+    def emit(self, event: Mapping[str, Any]) -> None:
+        """Compatibility helper for :class:`NetworkBreakerListener`."""
+
+        self.log_breaker_event(event)
 
     def __enter__(self) -> "RunTelemetry":
         """Enter the context manager, delegating to the underlying sink if present."""
@@ -864,6 +879,10 @@ class JsonlSink:
                 "rate_limiter_backend": record.rate_limiter_backend,
                 "rate_limiter_role": record.rate_limiter_role,
                 "from_cache": record.from_cache,
+                "breaker_host_state": record.breaker_host_state,
+                "breaker_resolver_state": record.breaker_resolver_state,
+                "breaker_open_remaining_ms": record.breaker_open_remaining_ms,
+                "breaker_recorded": record.breaker_recorded,
             }
         )
 
@@ -908,6 +927,13 @@ class JsonlSink:
             summary: Mapping containing summary counters and metadata.
         """
         payload = {"record_type": "summary", "timestamp": _utc_timestamp(), **summary}
+        self._write(payload)
+
+    def log_breaker_event(self, event: Mapping[str, Any]) -> None:
+        """Append a breaker telemetry event to the JSONL log."""
+
+        payload = {"record_type": "breaker_event", **dict(event)}
+        payload.setdefault("timestamp", _utc_timestamp())
         self._write(payload)
 
     def close(self) -> None:
@@ -1084,6 +1110,11 @@ class CsvSink:
 
         return None
 
+    def log_breaker_event(self, event: Mapping[str, Any]) -> None:  # pragma: no cover
+        """Ignore breaker events for CSV sinks."""
+
+        return None
+
     def close(self) -> None:
         """Flush buffered data and close the CSV file handle."""
 
@@ -1123,6 +1154,12 @@ class MultiSink:
 
         for sink in self._sinks:
             sink.log_summary(summary)
+
+    def log_breaker_event(self, event: Mapping[str, Any]) -> None:
+        """Fan out breaker events to each sink."""
+
+        for sink in self._sinks:
+            sink.log_breaker_event(event)
 
     def close(self) -> None:
         """Close sinks while capturing the first raised exception."""
@@ -1164,6 +1201,11 @@ class ManifestIndexSink:
 
     def log_summary(self, summary: Dict[str, Any]) -> None:  # pragma: no cover - no-op
         """No-op because the manifest index only reacts to manifests."""
+
+        return None
+
+    def log_breaker_event(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - no-op
+        """Breaker events are ignored by the manifest index sink."""
 
         return None
 
@@ -1241,6 +1283,11 @@ class LastAttemptCsvSink:
 
     def log_summary(self, summary: Dict[str, Any]) -> None:  # pragma: no cover - no-op
         """No-op because the CSV sink only records manifest events."""
+
+        return None
+
+    def log_breaker_event(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - no-op
+        """Breaker events are ignored by the last-attempt CSV sink."""
 
         return None
 
@@ -1338,6 +1385,11 @@ class SummarySink:
         with self._lock:
             self._summary = dict(summary)
 
+    def log_breaker_event(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - no-op
+        """Breaker events are not persisted in the summary sink."""
+
+        return None
+
     def close(self) -> None:
         """Write the captured summary to disk exactly once."""
 
@@ -1411,6 +1463,10 @@ class SqliteSink:
                     "content_length",
                     "dry_run",
                     "retry_after",
+                    "breaker_host_state",
+                    "breaker_resolver_state",
+                    "breaker_open_remaining_ms",
+                    "breaker_recorded",
                 )
                 values = (
                     ts,
@@ -1441,6 +1497,10 @@ class SqliteSink:
                     record.content_length,
                     1 if record.dry_run else 0,
                     record.retry_after,
+                    getattr(record, "breaker_host_state", None),
+                    getattr(record, "breaker_resolver_state", None),
+                    getattr(record, "breaker_open_remaining_ms", None),
+                    getattr(record, "breaker_recorded", None),
                 )
                 placeholders = ", ".join(["?"] * len(columns))
                 self._conn.execute(
@@ -1543,6 +1603,36 @@ class SqliteSink:
                 )
                 self._conn.commit()
 
+    def log_breaker_event(self, event: Mapping[str, Any]) -> None:
+        """Persist circuit breaker telemetry events."""
+
+        timestamp = event.get("timestamp") or _utc_timestamp()
+        run_id = event.get("run_id")
+        event_type = event.get("event_type")
+        host = event.get("host")
+        scope = event.get("scope")
+        resolver = event.get("resolver")
+        payload = json.dumps(dict(event), sort_keys=True)
+
+        with locks.sqlite_lock(self._path):
+            with self._lock:
+                self._conn.execute(
+                    """
+                    INSERT INTO breaker_events (timestamp, run_id, event_type, host, scope, resolver, payload)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        timestamp,
+                        run_id,
+                        event_type,
+                        host,
+                        scope,
+                        resolver,
+                        payload,
+                    ),
+                )
+                self._conn.commit()
+
     def close(self) -> None:
         """Commit outstanding changes and dispose of the SQLite connection."""
         with locks.sqlite_lock(self._path):
@@ -1622,7 +1712,11 @@ class SqliteSink:
                 sha256 TEXT,
                 content_length INTEGER,
                 dry_run INTEGER,
-                retry_after REAL
+                retry_after REAL,
+                breaker_host_state TEXT,
+                breaker_resolver_state TEXT,
+                breaker_open_remaining_ms INTEGER,
+                breaker_recorded TEXT
             )
             """
         )
@@ -1665,6 +1759,20 @@ class SqliteSink:
             )
             """
         )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS breaker_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                run_id TEXT,
+                event_type TEXT,
+                host TEXT,
+                scope TEXT,
+                resolver TEXT,
+                payload TEXT
+            )
+            """
+        )
         if current_version < SQLITE_SCHEMA_VERSION:
             self._run_migrations(current_version)
         self._conn.execute(f"PRAGMA user_version={SQLITE_SCHEMA_VERSION}")
@@ -1700,6 +1808,26 @@ class SqliteSink:
                 self._populate_normalized_urls()
         if current_version < 6:
             self._drop_normalized_url_column()
+
+        if current_version < 7:
+            self._safe_add_column("attempts", "breaker_host_state", "TEXT")
+            self._safe_add_column("attempts", "breaker_resolver_state", "TEXT")
+            self._safe_add_column("attempts", "breaker_open_remaining_ms", "INTEGER")
+            self._safe_add_column("attempts", "breaker_recorded", "TEXT")
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS breaker_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT,
+                    run_id TEXT,
+                    event_type TEXT,
+                    host TEXT,
+                    scope TEXT,
+                    resolver TEXT,
+                    payload TEXT
+                )
+                """
+            )
 
     def _safe_add_column(self, table: str, column: str, declaration: str) -> None:
         try:

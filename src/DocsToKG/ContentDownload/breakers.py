@@ -119,7 +119,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional, Protocol, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Protocol, Sequence, Tuple
 import time
 import threading
 from collections import deque
@@ -402,14 +402,38 @@ class BreakerRegistry:
     # ── Query helpers (optional, useful for telemetry) ────────────────────────
 
     def current_state(self, host: str, *, resolver: Optional[str] = None) -> str:
-        """Return 'closed' | 'open' | 'half_open' for host (and optionally resolver)."""
+        """Return the pybreaker state for ``host`` or an optional ``resolver``."""
+
         host_key = host.lower()
         with self._lock:
-            h_state = self._state_name(self._get_or_create_host_breaker(host_key))
             if resolver:
-                r_state = self._state_name(self._get_or_create_resolver_breaker(resolver))
-                return f"host:{h_state},resolver:{r_state}"
-            return f"host:{h_state}"
+                return self._state_name(self._get_or_create_resolver_breaker(resolver))
+            return self._state_name(self._get_or_create_host_breaker(host_key))
+
+    def cooldown_remaining_ms(self, host: str, *, resolver: Optional[str] = None) -> Optional[int]:
+        """Return remaining cooldown in milliseconds for host/resolver if open."""
+
+        host_key = host.lower()
+        now = self._now()
+        remaining: List[int] = []
+
+        with self._lock:
+            until = self.cooldowns.get_until(host_key)
+            if until and until > now:
+                remaining.append(int(max(0.0, (until - now)) * 1000))
+
+            h_cb = self._host_breakers.get(host_key)
+            if h_cb and h_cb.current_state == pybreaker.STATE_OPEN:
+                remaining.append(self._remaining_cooldown_ms(h_cb, now))
+
+            if resolver:
+                r_cb = self._resolver_breakers.get(resolver)
+                if r_cb and r_cb.current_state == pybreaker.STATE_OPEN:
+                    remaining.append(self._remaining_cooldown_ms(r_cb, now))
+
+        if remaining:
+            return max(remaining)
+        return None
 
     # ── Internals ─────────────────────────────────────────────────────────────
 
