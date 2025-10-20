@@ -965,6 +965,53 @@ def request_with_retries(
             type(response).__name__,
         )
 
+    # Update breaker based on response and collect state for telemetry
+    breaker_state_info: Dict[str, Any] = {}
+    if breaker_registry is not None and request_host:
+        from DocsToKG.ContentDownload.breakers import RequestRole, is_failure_for_breaker
+
+        recorded: Optional[str] = None
+
+        if isinstance(response, httpx.Response):
+            status = response.status_code
+            retry_after_s: Optional[float] = None
+            if status in (429, 503):
+                retry_after_s = parse_retry_after_header(response)
+
+            is_failure = is_failure_for_breaker(
+                breaker_registry.config.classify, status=status, exception=None
+            )
+
+            if is_failure:
+                breaker_registry.on_failure(
+                    request_host,
+                    role=role_enum,
+                    resolver=resolver,
+                    status=status,
+                    retry_after_s=retry_after_s,
+                )
+                recorded = "failure"
+            else:
+                breaker_registry.on_success(request_host, role=role_enum, resolver=resolver)
+                recorded = "success"
+        else:
+            breaker_registry.on_success(request_host, role=role_enum, resolver=resolver)
+            recorded = "success"
+
+        breaker_state_info["breaker_host_state"] = breaker_registry.current_state(request_host)
+        if resolver:
+            breaker_state_info["breaker_resolver_state"] = breaker_registry.current_state(
+                request_host, resolver=resolver
+            )
+        remaining = breaker_registry.cooldown_remaining_ms(request_host, resolver=resolver)
+        if remaining is not None:
+            breaker_state_info["breaker_open_remaining_ms"] = remaining
+        breaker_state_info["breaker_recorded"] = recorded or "none"
+
+    # Store breaker state info in response extensions for telemetry
+    if breaker_state_info and hasattr(response, "extensions"):
+        response.extensions.update(breaker_state_info)
+
     if not isinstance(response, httpx.Response):
         LOGGER.debug(
             "Response object of type %s lacks status_code; treating as success for %s %s.",

@@ -100,6 +100,14 @@ def test_build_download_outcome_includes_rate_limiter_metadata():
         },
     )
     response = httpx.Response(200, request=request)
+    response.extensions.update(
+        {
+            "breaker_host_state": "closed",
+            "breaker_resolver_state": "closed",
+            "breaker_recorded": "success",
+            "breaker_open_remaining_ms": 0,
+        }
+    )
     outcome = build_download_outcome(
         artifact=artifact,
         classification=Classification.PDF,
@@ -125,6 +133,10 @@ def test_build_download_outcome_includes_rate_limiter_metadata():
     assert outcome.metadata["rate_limiter"]["backend"] == "memory"
     assert outcome.metadata["rate_limiter"]["mode"] == "wait"
     assert outcome.metadata["rate_limiter"]["role"] == "artifact"
+    assert outcome.breaker_host_state == "closed"
+    assert outcome.breaker_resolver_state == "closed"
+    assert outcome.breaker_recorded == "success"
+    assert outcome.metadata["breaker"]["host_state"] == "closed"
 
 
 def _clone_backend_config(manager) -> BackendConfig:

@@ -226,6 +226,32 @@ class TestNetworkingBreakerIntegration:
             call_args = mock_allow.call_args
             assert call_args[1]["role"] == RequestRole.ARTIFACT
 
+    @patch("DocsToKG.ContentDownload.networking.get_http_client")
+    def test_request_with_retries_populates_breaker_metadata(self, mock_get_client):
+        """Breaker metadata from networking should be attached to the response."""
+
+        response = httpx.Response(
+            200,
+            request=httpx.Request("GET", "https://example.com"),
+        )
+        mock_client = Mock()
+        mock_client.request.return_value = response
+        mock_get_client.return_value = mock_client
+
+        config = BreakerConfig()
+        registry = BreakerRegistry(config)
+        set_breaker_registry(registry)
+
+        try:
+            result = request_with_retries(None, "GET", "https://example.com", resolver="resolver-a")
+        finally:
+            set_breaker_registry(None)
+
+        assert result is response
+        assert response.extensions.get("breaker_recorded") == "success"
+        assert response.extensions.get("breaker_host_state") == "closed"
+        assert response.extensions.get("breaker_resolver_state") == "closed"
+
     def test_breaker_registry_global_functions(self):
         """Test global breaker registry functions."""
         # Initially no registry

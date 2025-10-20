@@ -1616,6 +1616,9 @@ class ListLogger:
     def log_summary(self, summary) -> None:  # pragma: no cover - simple test helper
         self.summaries.append(summary)
 
+    def log_breaker_event(self, event) -> None:  # pragma: no cover - simple test helper
+        return None
+
     def close(self) -> None:  # pragma: no cover - interface compliance
         return None
 
