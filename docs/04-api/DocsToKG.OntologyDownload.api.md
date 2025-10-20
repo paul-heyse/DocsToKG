@@ -38,6 +38,10 @@ Return plugin metadata including qualified path and version.
 
 Return metadata describing the ontology download subsystem.
 
+The ``"plugins"`` entry returns nested dictionaries for both the resolver and
+validator inventories, where each plugin maps to a dictionary containing its
+``qualified`` import path and ``version`` string.
+
 ### `cli_main(argv)`
 
 Entry point for the ontology downloader CLI.
