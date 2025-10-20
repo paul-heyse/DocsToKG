@@ -1,0 +1,19 @@
+{
+  "description": "Logging configuration.",
+  "properties": {
+    "json": {
+      "default": true,
+      "description": "Output JSON-formatted logs",
+      "title": "Json",
+      "type": "boolean"
+    },
+    "level": {
+      "default": "INFO",
+      "description": "Logging level (DEBUG, INFO, WARNING, ERROR)",
+      "title": "Level",
+      "type": "string"
+    }
+  },
+  "title": "LoggingSettings",
+  "type": "object"
+}

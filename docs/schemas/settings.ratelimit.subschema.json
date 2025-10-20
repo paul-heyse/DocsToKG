@@ -1,0 +1,48 @@
+{
+  "description": "Rate limiting configuration.",
+  "properties": {
+    "default": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Default rate limit (e.g., '10/second', '60/minute')",
+      "title": "Default"
+    },
+    "engine": {
+      "default": "pyrate",
+      "description": "Rate limit engine (currently only 'pyrate' supported)",
+      "title": "Engine",
+      "type": "string"
+    },
+    "per_service": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Per-service rate limits (e.g., {'ols': '4/second'})",
+      "title": "Per Service",
+      "type": "object"
+    },
+    "shared_dir": {
+      "anyOf": [
+        {
+          "format": "path",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Directory for shared SQLite token bucket state",
+      "title": "Shared Dir"
+    }
+  },
+  "title": "RateLimitSettings",
+  "type": "object"
+}

@@ -129,6 +129,7 @@ class TestTracingSettingsSourceCallable:
 
     def test_call_interface_records_all_fields(self):
         """__call__ should record all returned fields."""
+
         class CallableSource:
             def __call__(self):
                 return {"field1": "val1", "field2": "val2", "field3": "val3"}
@@ -192,6 +193,7 @@ class TestTracingSettingsSourceErrorHandling:
 
     def test_propagates_exceptions_from_source(self):
         """TracingSettingsSource should propagate source exceptions."""
+
         class FailingSource:
             def get_field_value(self, field, field_name):
                 raise ValueError("Source error")
@@ -216,6 +218,7 @@ class TestTracingSettingsSourceErrorHandling:
 
     def test_handles_empty_dict_in_callable(self):
         """__call__ should handle empty dict gracefully."""
+
         class EmptyCallableSource:
             def __call__(self):
                 return {}
@@ -278,7 +281,9 @@ class TestTracingSettingsSourceIntegration:
         # CLI layer provides http__timeout and security__allowed
         cli_source = MockSettingsSource({"http__timeout": 10, "security__allowed": "cli_hosts"})
         # Config layer provides security__allowed and db__path
-        config_source = MockSettingsSource({"security__allowed": "config_hosts", "db__path": "/data"})
+        config_source = MockSettingsSource(
+            {"security__allowed": "config_hosts", "db__path": "/data"}
+        )
         # Env layer provides only db__path
         env_source = MockSettingsSource({"db__path": "/env/data"})
 
@@ -302,6 +307,7 @@ class TestTracingSettingsSourceIntegration:
         assert fp["http__timeout"] == "cli"
         assert fp["security__allowed"] == "config"  # Last source wins (config called after cli)
         assert fp["db__path"] == "env"  # Env is last
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

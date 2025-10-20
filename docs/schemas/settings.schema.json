@@ -1,0 +1,590 @@
+{
+  "$defs": {
+    "CacheSettings": {
+      "description": "Hishel HTTP cache settings.",
+      "properties": {
+        "bypass": {
+          "default": false,
+          "description": "Force bypass cache (no revalidation)",
+          "title": "Bypass",
+          "type": "boolean"
+        },
+        "dir": {
+          "description": "Cache directory (auto-created if needed)",
+          "format": "path",
+          "title": "Dir",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Enable Hishel RFC-9111 cache",
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "title": "CacheSettings",
+      "type": "object"
+    },
+    "DuckDBSettings": {
+      "description": "DuckDB catalog configuration.",
+      "properties": {
+        "parquet_events": {
+          "default": false,
+          "description": "Store events as Parquet files",
+          "title": "Parquet Events",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "DuckDB file path",
+          "format": "path",
+          "title": "Path",
+          "type": "string"
+        },
+        "readonly": {
+          "default": false,
+          "description": "Open database read-only",
+          "title": "Readonly",
+          "type": "boolean"
+        },
+        "threads": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Query execution threads (auto-detect if None)",
+          "title": "Threads"
+        },
+        "wlock": {
+          "default": true,
+          "description": "Enable writer file-lock for serialization",
+          "title": "Wlock",
+          "type": "boolean"
+        }
+      },
+      "title": "DuckDBSettings",
+      "type": "object"
+    },
+    "ExtractionSettings": {
+      "description": "Archive extraction policy (safety, throughput, integrity).",
+      "properties": {
+        "casefold_collision_policy": {
+          "default": "reject",
+          "description": "Case collision policy (reject or allow)",
+          "title": "Casefold Collision Policy",
+          "type": "string"
+        },
+        "copy_buffer_max": {
+          "default": 1048576,
+          "description": "Max copy buffer bytes (1 MiB)",
+          "minimum": 65536,
+          "title": "Copy Buffer Max",
+          "type": "integer"
+        },
+        "copy_buffer_min": {
+          "default": 65536,
+          "description": "Min copy buffer bytes (64 KiB)",
+          "minimum": 1024,
+          "title": "Copy Buffer Min",
+          "type": "integer"
+        },
+        "duplicate_policy": {
+          "default": "reject",
+          "description": "Duplicate policy (reject, first_wins, last_wins)",
+          "title": "Duplicate Policy",
+          "type": "string"
+        },
+        "encapsulate": {
+          "default": true,
+          "description": "Extract in deterministic root",
+          "title": "Encapsulate",
+          "type": "boolean"
+        },
+        "encapsulation_name": {
+          "default": "sha256",
+          "description": "Encapsulation strategy (sha256 or basename)",
+          "title": "Encapsulation Name",
+          "type": "string"
+        },
+        "exclude_globs": {
+          "description": "Exclude patterns",
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclude Globs",
+          "type": "array"
+        },
+        "group_fsync": {
+          "default": 32,
+          "description": "fsync directory every N files",
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Group Fsync",
+          "type": "integer"
+        },
+        "hash_algorithms": {
+          "description": "Hash algorithms (e.g., sha256, sha1)",
+          "items": {
+            "type": "string"
+          },
+          "title": "Hash Algorithms",
+          "type": "array"
+        },
+        "hash_enable": {
+          "default": true,
+          "description": "Compute file digests",
+          "title": "Hash Enable",
+          "type": "boolean"
+        },
+        "include_globs": {
+          "description": "Include patterns (empty = all)",
+          "items": {
+            "type": "string"
+          },
+          "title": "Include Globs",
+          "type": "array"
+        },
+        "max_components_len": {
+          "default": 240,
+          "description": "Max bytes per path component",
+          "maximum": 4096,
+          "minimum": 1,
+          "title": "Max Components Len",
+          "type": "integer"
+        },
+        "max_depth": {
+          "default": 32,
+          "description": "Max path depth",
+          "maximum": 255,
+          "minimum": 1,
+          "title": "Max Depth",
+          "type": "integer"
+        },
+        "max_entries": {
+          "default": 50000,
+          "description": "Max extractable entries",
+          "maximum": 1000000,
+          "minimum": 1,
+          "title": "Max Entries",
+          "type": "integer"
+        },
+        "max_entry_ratio": {
+          "default": 100.0,
+          "description": "Per-entry ratio cap",
+          "maximum": 10000.0,
+          "minimum": 1.0,
+          "title": "Max Entry Ratio",
+          "type": "number"
+        },
+        "max_file_size_bytes": {
+          "default": 2147483648,
+          "description": "Per-file size cap (2GB default)",
+          "minimum": 1,
+          "title": "Max File Size Bytes",
+          "type": "integer"
+        },
+        "max_path_len": {
+          "default": 4096,
+          "description": "Max bytes per full path",
+          "maximum": 32768,
+          "minimum": 1,
+          "title": "Max Path Len",
+          "type": "integer"
+        },
+        "max_total_ratio": {
+          "default": 10.0,
+          "description": "Zip-bomb ratio (uncompressed/compressed)",
+          "maximum": 1000.0,
+          "minimum": 1.0,
+          "title": "Max Total Ratio",
+          "type": "number"
+        },
+        "max_wall_time_seconds": {
+          "default": 120,
+          "description": "Soft time budget per archive",
+          "maximum": 3600,
+          "minimum": 1,
+          "title": "Max Wall Time Seconds",
+          "type": "integer"
+        },
+        "overwrite": {
+          "default": "reject",
+          "description": "Overwrite policy (reject, replace, keep_existing)",
+          "title": "Overwrite",
+          "type": "string"
+        },
+        "preallocate": {
+          "default": true,
+          "description": "Preallocate files when size known",
+          "title": "Preallocate",
+          "type": "boolean"
+        },
+        "space_safety_margin": {
+          "default": 1.1,
+          "description": "Free-space headroom",
+          "maximum": 10.0,
+          "minimum": 1.0,
+          "title": "Space Safety Margin",
+          "type": "number"
+        },
+        "timestamps_mode": {
+          "default": "preserve",
+          "description": "Timestamp handling (preserve, normalize, source_date_epoch)",
+          "title": "Timestamps Mode",
+          "type": "string"
+        },
+        "timestamps_normalize_to": {
+          "default": "archive_mtime",
+          "description": "When normalizing: archive_mtime or now",
+          "title": "Timestamps Normalize To",
+          "type": "string"
+        },
+        "unicode_form": {
+          "default": "NFC",
+          "description": "Unicode normalization (NFC or NFD)",
+          "title": "Unicode Form",
+          "type": "string"
+        }
+      },
+      "title": "ExtractionSettings",
+      "type": "object"
+    },
+    "HttpSettings": {
+      "description": "HTTP client settings for HTTPX + Hishel integration.\n\nControls timeout, pool, HTTP/2, user agent, and proxy trust behavior.",
+      "properties": {
+        "http2": {
+          "default": true,
+          "description": "Enable HTTP/2 support",
+          "title": "Http2",
+          "type": "boolean"
+        },
+        "keepalive_expiry": {
+          "default": 30.0,
+          "description": "Idle connection expiry in seconds",
+          "maximum": 600.0,
+          "minimum": 0.0,
+          "title": "Keepalive Expiry",
+          "type": "number"
+        },
+        "pool_keepalive_max": {
+          "default": 20,
+          "description": "Keepalive pool size",
+          "maximum": 1024,
+          "minimum": 0,
+          "title": "Pool Keepalive Max",
+          "type": "integer"
+        },
+        "pool_max_connections": {
+          "default": 64,
+          "description": "Max concurrent connections",
+          "maximum": 1024,
+          "minimum": 1,
+          "title": "Pool Max Connections",
+          "type": "integer"
+        },
+        "timeout_connect": {
+          "default": 5.0,
+          "description": "Connect timeout in seconds",
+          "exclusiveMinimum": 0.0,
+          "maximum": 60.0,
+          "title": "Timeout Connect",
+          "type": "number"
+        },
+        "timeout_pool": {
+          "default": 5.0,
+          "description": "Acquire-from-pool timeout in seconds",
+          "exclusiveMinimum": 0.0,
+          "maximum": 60.0,
+          "title": "Timeout Pool",
+          "type": "number"
+        },
+        "timeout_read": {
+          "default": 30.0,
+          "description": "Read timeout in seconds",
+          "exclusiveMinimum": 0.0,
+          "maximum": 300.0,
+          "title": "Timeout Read",
+          "type": "number"
+        },
+        "timeout_write": {
+          "default": 30.0,
+          "description": "Write timeout in seconds",
+          "exclusiveMinimum": 0.0,
+          "maximum": 300.0,
+          "title": "Timeout Write",
+          "type": "number"
+        },
+        "trust_env": {
+          "default": true,
+          "description": "Honor HTTP(S)_PROXY and NO_PROXY environment variables",
+          "title": "Trust Env",
+          "type": "boolean"
+        },
+        "user_agent": {
+          "default": "DocsToKG/OntoFetch (+https://github.com/allenai/DocsToKG)",
+          "description": "User-Agent header value",
+          "title": "User Agent",
+          "type": "string"
+        }
+      },
+      "title": "HttpSettings",
+      "type": "object"
+    },
+    "LoggingSettings": {
+      "description": "Logging configuration.",
+      "properties": {
+        "json": {
+          "default": true,
+          "description": "Output JSON-formatted logs",
+          "title": "Json",
+          "type": "boolean"
+        },
+        "level": {
+          "default": "INFO",
+          "description": "Logging level (DEBUG, INFO, WARNING, ERROR)",
+          "title": "Level",
+          "type": "string"
+        }
+      },
+      "title": "LoggingSettings",
+      "type": "object"
+    },
+    "RateLimitSettings": {
+      "description": "Rate limiting configuration.",
+      "properties": {
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default rate limit (e.g., '10/second', '60/minute')",
+          "title": "Default"
+        },
+        "engine": {
+          "default": "pyrate",
+          "description": "Rate limit engine (currently only 'pyrate' supported)",
+          "title": "Engine",
+          "type": "string"
+        },
+        "per_service": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Per-service rate limits (e.g., {'ols': '4/second'})",
+          "title": "Per Service",
+          "type": "object"
+        },
+        "shared_dir": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Directory for shared SQLite token bucket state",
+          "title": "Shared Dir"
+        }
+      },
+      "title": "RateLimitSettings",
+      "type": "object"
+    },
+    "RetrySettings": {
+      "description": "HTTP retry settings for transient failures.",
+      "properties": {
+        "backoff_base": {
+          "default": 0.1,
+          "description": "Backoff start (seconds)",
+          "maximum": 10.0,
+          "minimum": 0.0,
+          "title": "Backoff Base",
+          "type": "number"
+        },
+        "backoff_max": {
+          "default": 2.0,
+          "description": "Backoff cap (seconds)",
+          "maximum": 60.0,
+          "minimum": 0.0,
+          "title": "Backoff Max",
+          "type": "number"
+        },
+        "connect_retries": {
+          "default": 2,
+          "description": "Number of connect retries",
+          "maximum": 20,
+          "minimum": 0,
+          "title": "Connect Retries",
+          "type": "integer"
+        }
+      },
+      "title": "RetrySettings",
+      "type": "object"
+    },
+    "SecuritySettings": {
+      "description": "URL security and DNS settings.",
+      "properties": {
+        "allow_plain_http": {
+          "default": false,
+          "description": "Allow plain HTTP (non-HTTPS) for allowlisted hosts",
+          "title": "Allow Plain Http",
+          "type": "boolean"
+        },
+        "allow_private_networks": {
+          "default": false,
+          "description": "Allow private/loopback addresses if allowlisted",
+          "title": "Allow Private Networks",
+          "type": "boolean"
+        },
+        "allowed_hosts": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Comma-separated allowed hosts (supports *.suffix, IP/CIDR, host:port)",
+          "title": "Allowed Hosts"
+        },
+        "allowed_ports": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Allowed ports; defaults to 80,443 if not specified",
+          "title": "Allowed Ports"
+        },
+        "strict_dns": {
+          "default": true,
+          "description": "Fail on DNS resolution errors",
+          "title": "Strict Dns",
+          "type": "boolean"
+        }
+      },
+      "title": "SecuritySettings",
+      "type": "object"
+    },
+    "StorageSettings": {
+      "description": "Local storage configuration.",
+      "properties": {
+        "latest_name": {
+          "default": "LATEST.json",
+          "description": "Latest marker filename",
+          "title": "Latest Name",
+          "type": "string"
+        },
+        "root": {
+          "description": "Blob storage root",
+          "format": "path",
+          "title": "Root",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional remote backend URL (fsspec)",
+          "title": "Url"
+        }
+      },
+      "title": "StorageSettings",
+      "type": "object"
+    },
+    "TelemetrySettings": {
+      "description": "Telemetry and observability settings.",
+      "properties": {
+        "emit_events": {
+          "default": true,
+          "description": "Emit telemetry events to logs and database",
+          "title": "Emit Events",
+          "type": "boolean"
+        },
+        "run_id": {
+          "description": "Unique run identifier for tracing and provenance",
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        }
+      },
+      "title": "TelemetrySettings",
+      "type": "object"
+    }
+  },
+  "description": "Root settings for OntologyDownload module.\n\nComposes all 10 domain models with environment variable support.\nUses pydantic-settings for .env file and environment variable integration.\n\nComposition:\n- Foundation (5 models): HTTP, Cache, Retry, Logging, Telemetry\n- Complex (5 models): Security, RateLimit, Extraction, Storage, DuckDB\n\nEnvironment Variable Prefix: ONTOFETCH_\nExample: ONTOFETCH_HTTP__TIMEOUT_READ=30\n\nSource Precedence (highest to lowest):\n1. CLI arguments (passed to constructor)\n2. .env.ontofetch file\n3. .env file\n4. Environment variables (ONTOFETCH_*)\n5. Defaults (baked-in)",
+  "properties": {
+    "cache": {
+      "$ref": "#/$defs/CacheSettings",
+      "description": "Cache settings (Hishel RFC-9111)"
+    },
+    "db": {
+      "$ref": "#/$defs/DuckDBSettings",
+      "description": "DuckDB catalog configuration"
+    },
+    "extraction": {
+      "$ref": "#/$defs/ExtractionSettings",
+      "description": "Archive extraction policies"
+    },
+    "http": {
+      "$ref": "#/$defs/HttpSettings",
+      "description": "HTTP client settings (HTTPX + Hishel)"
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingSettings",
+      "description": "Logging configuration"
+    },
+    "ratelimit": {
+      "$ref": "#/$defs/RateLimitSettings",
+      "description": "Rate limiting configuration"
+    },
+    "retry": {
+      "$ref": "#/$defs/RetrySettings",
+      "description": "Retry settings (exponential backoff)"
+    },
+    "security": {
+      "$ref": "#/$defs/SecuritySettings",
+      "description": "URL security and DNS settings"
+    },
+    "storage": {
+      "$ref": "#/$defs/StorageSettings",
+      "description": "Storage configuration"
+    },
+    "telemetry": {
+      "$ref": "#/$defs/TelemetrySettings",
+      "description": "Telemetry and observability"
+    }
+  },
+  "title": "OntologyDownloadSettings",
+  "type": "object"
+}

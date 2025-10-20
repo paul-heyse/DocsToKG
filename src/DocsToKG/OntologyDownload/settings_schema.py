@@ -34,9 +34,7 @@ class CanonicalJsonSchema(GenerateJsonSchema):
     - Documentation generation (consistent output)
     """
 
-    def generate(
-        self, schema: Any, mode: JsonSchemaMode = "validation"
-    ) -> Dict[str, Any]:
+    def generate(self, schema: Any, mode: JsonSchemaMode = "validation") -> Dict[str, Any]:
         """Generate schema with reproducible key ordering.
 
         Args:

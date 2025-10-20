@@ -1,0 +1,45 @@
+{
+  "description": "DuckDB catalog configuration.",
+  "properties": {
+    "parquet_events": {
+      "default": false,
+      "description": "Store events as Parquet files",
+      "title": "Parquet Events",
+      "type": "boolean"
+    },
+    "path": {
+      "description": "DuckDB file path",
+      "format": "path",
+      "title": "Path",
+      "type": "string"
+    },
+    "readonly": {
+      "default": false,
+      "description": "Open database read-only",
+      "title": "Readonly",
+      "type": "boolean"
+    },
+    "threads": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Query execution threads (auto-detect if None)",
+      "title": "Threads"
+    },
+    "wlock": {
+      "default": true,
+      "description": "Enable writer file-lock for serialization",
+      "title": "Wlock",
+      "type": "boolean"
+    }
+  },
+  "title": "DuckDBSettings",
+  "type": "object"
+}
