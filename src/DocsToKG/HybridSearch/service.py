@@ -885,8 +885,10 @@ class HybridSearchService:
         self._assert_managed_store(self._faiss)
         self._faiss_router.set_resolver(self._registry.resolve_faiss_id)
         self._dense_strategy = DenseSearchStrategy(cache_path=cache_path)
-        self._executor_lock = RLock()
         max_workers = int(config.retrieval.executor_max_workers or 3)
+        if max_workers < 1:
+            max_workers = 1
+        self._executor_lock = RLock()
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         self._executor_max_workers = max_workers
         schema_manager = None
@@ -930,7 +932,28 @@ class HybridSearchService:
             self._dense_strategy.persist()
         except Exception:
             self._observability.logger.exception("dense-strategy-persist-failed")
-        self._executor.shutdown(wait=False)
+        with self._executor_lock:
+            executor = self._executor
+        executor.shutdown(wait=False)
+
+    def _maybe_refresh_executor(self, retrieval_cfg: RetrievalConfig) -> ThreadPoolExecutor:
+        """Resize the executor pool when ``retrieval_cfg`` requests an update."""
+
+        desired = int(getattr(retrieval_cfg, "executor_max_workers", 0) or 3)
+        if desired < 1:
+            desired = 1
+        old_executor: Optional[ThreadPoolExecutor] = None
+        with self._executor_lock:
+            current = getattr(self, "_executor_max_workers", None)
+            if current == desired:
+                return self._executor
+            old_executor = self._executor
+            self._executor = ThreadPoolExecutor(max_workers=desired)
+            self._executor_max_workers = desired
+            new_executor = self._executor
+        if old_executor is not None:
+            old_executor.shutdown(wait=True)
+        return new_executor
 
     def _ensure_executor_capacity(self, config: HybridSearchConfig) -> None:
         """Rebuild the executor when ``executor_max_workers`` changes."""
@@ -964,7 +987,7 @@ class HybridSearchService:
             RequestValidationError: If ``request`` fails validation checks.
         """
         config = self._config_manager.get()
-        self._ensure_executor_capacity(config)
+        executor = self._maybe_refresh_executor(config.retrieval)
         self._validate_request(request)
         filters = dict(request.filters)
         if request.namespace:
@@ -1023,13 +1046,13 @@ class HybridSearchService:
                 },
             )
 
-            f_bm25 = self._executor.submit(
+            f_bm25 = executor.submit(
                 self._execute_bm25, request, filters, config, query_features, timings
             )
-            f_splade = self._executor.submit(
+            f_splade = executor.submit(
                 self._execute_splade, request, filters, config, query_features, timings
             )
-            f_dense = self._executor.submit(
+            f_dense = executor.submit(
                 self._execute_dense,
                 request,
                 filters,
