@@ -2949,7 +2949,7 @@ def cosine_topk_blockwise(
     if q.ndim == 1:
         q = q.reshape(1, -1)
     q = np.array(q, dtype=np.float32, copy=True, order="C")
-    C = np.ascontiguousarray(C, dtype=np.float32)
+    C = np.array(C, dtype=np.float32, copy=True, order="C")
 
     if q.shape[1] != C.shape[1]:
         raise ValueError("q and C must have same dimensionality")
@@ -2974,9 +2974,10 @@ def cosine_topk_blockwise(
     knn_runner = getattr(faiss, "knn_gpu", None)
     if knn_runner is not None:
         try:
-            corpus_copy = np.array(C, dtype=np.float32, copy=True, order="C")
-            faiss.normalize_L2(corpus_copy)
-            corpus_view = corpus_copy.astype(np.float16, copy=False) if use_fp16 else corpus_copy
+            for start in range(0, C.shape[0], block_rows):
+                block = C[start : min(C.shape[0], start + block_rows)]
+                faiss.normalize_L2(block)
+            corpus_view = C.astype(np.float16, copy=False) if use_fp16 else C
             row_bytes = np.dtype(np.float32).itemsize * C.shape[1]
             vector_limit = int(block_rows) * row_bytes
             query_rows = max(int(block_rows), q.shape[0])
