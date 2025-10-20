@@ -238,12 +238,17 @@ def ensure_qwen_environment(
     if model_dir is not None:
         model_path = Path(model_dir).expanduser().resolve()
     else:
-        existing_model_dir = os.getenv("DOCSTOKG_QWEN_MODEL_DIR")
+        existing_model_dir = os.getenv("DOCSTOKG_QWEN_DIR")
         if existing_model_dir:
             model_path = Path(existing_model_dir).expanduser().resolve()
+        else:
+            legacy_model_dir = os.getenv("DOCSTOKG_QWEN_MODEL_DIR")
+            if legacy_model_dir:
+                model_path = Path(legacy_model_dir).expanduser().resolve()
 
     if model_path is not None:
         resolved_model_dir = str(model_path)
+        os.environ["DOCSTOKG_QWEN_DIR"] = resolved_model_dir
         os.environ["DOCSTOKG_QWEN_MODEL_DIR"] = resolved_model_dir
         env_info["model_dir"] = resolved_model_dir
 
