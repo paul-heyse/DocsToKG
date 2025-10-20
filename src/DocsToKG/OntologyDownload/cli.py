@@ -419,7 +419,8 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-EXAMPLE_SOURCES_YAML = """# Example configuration for the ontology downloader\ndefaults:
+EXAMPLE_SOURCES_YAML = """# Example configuration for the ontology downloader
+defaults:
   accept_licenses: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"]
   normalize_to: ["ttl"]
   prefer_source: ["obo", "ols", "bioportal", "direct"]

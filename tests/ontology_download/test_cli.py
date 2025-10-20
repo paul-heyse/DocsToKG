@@ -2,13 +2,45 @@
 
 from __future__ import annotations
 
+import difflib
 import json
 import shutil
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from DocsToKG.OntologyDownload import cli as cli_module
 from DocsToKG.OntologyDownload.testing import TestingEnvironment
+
+
+def _normalized_lines(text: str) -> list[str]:
+    """Normalize whitespace for comparison while preserving line order."""
+
+    return [line.rstrip() for line in text.strip().splitlines()]
+
+
+def test_example_sources_yaml_matches_docs_examples_sources_yaml() -> None:
+    """``cli.EXAMPLE_SOURCES_YAML`` should stay in sync with the docs template."""
+
+    cli_lines = _normalized_lines(cli_module.EXAMPLE_SOURCES_YAML)
+    docs_lines = _normalized_lines(
+        Path("docs/examples/sources.yaml").read_text(encoding="utf-8")
+    )
+
+    if cli_lines != docs_lines:
+        diff = "\n".join(
+            difflib.unified_diff(
+                docs_lines,
+                cli_lines,
+                fromfile="docs/examples/sources.yaml",
+                tofile="cli.EXAMPLE_SOURCES_YAML",
+                lineterm="",
+            )
+        )
+        pytest.fail(
+            "Example sources YAML drift detected between CLI constant and docs." "\n" + diff
+        )
 
 
 def test_doctor_fix_reports_directory_creation_failure(capsys):
