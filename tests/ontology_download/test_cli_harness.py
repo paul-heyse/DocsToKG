@@ -13,7 +13,7 @@ import textwrap
 from pathlib import Path
 
 from DocsToKG.OntologyDownload import cli as cli_module
-from DocsToKG.OntologyDownload.testing import temporary_resolver
+from DocsToKG.OntologyDownload.testing import TestingEnvironment, temporary_resolver
 
 
 def _allowed_hosts_arg(ontology_env) -> str:
@@ -156,3 +156,39 @@ def test_cli_pull_accepts_tilde_spec_path(monkeypatch, ontology_env, tmp_path, c
     stdout = capsys.readouterr().out
     payload = json.loads(stdout)
     assert payload[0]["id"] == "hp"
+
+
+def test_cli_config_validate_expands_tilde_path(monkeypatch, tmp_path, capsys):
+    """`ontofetch config validate` should resolve ``~`` before loading configuration files."""
+
+    home_dir = tmp_path / "home"
+    home_dir.mkdir(parents=True, exist_ok=True)
+    config_path = home_dir / "custom.yaml"
+    config_payload = textwrap.dedent(
+        """
+        defaults:
+          normalize_to: [ttl]
+        ontologies:
+          - id: hp
+            resolver: obo
+            normalize_to: [ttl]
+        """
+    ).strip()
+    config_path.write_text(config_payload, encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home_dir))
+    tilde_spec = Path("~") / "custom.yaml"
+
+    with TestingEnvironment():
+        exit_code = cli_module.cli_main(
+            [
+                "config",
+                "validate",
+                "--spec",
+                str(tilde_spec),
+            ]
+        )
+
+    assert exit_code == 0
+    stdout = capsys.readouterr().out
+    assert "Configuration passed" in stdout
+    assert str(config_path) in stdout
