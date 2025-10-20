@@ -53,7 +53,7 @@
 #     },
 #     {
 #       "id": "circuitbreaker",
-#       "name": "CircuitBreaker",
+#       "name": "CircuitBreaker",  # Legacy - removed
 #       "anchor": "class-circuitbreaker",
 #       "kind": "class"
 #     },
@@ -78,7 +78,7 @@ Responsibilities
   cached artifacts without redownloading payloads unnecessarily.
 - Support streaming workflows by surfacing context managers when ``stream=True``
   so download helpers can iteratively write large payloads without buffering.
-- Surface failure-suppression primitives (:class:`CircuitBreaker`) used by the
+- Surface failure-suppression primitives (legacy CircuitBreaker removed) used by the
   pipeline, while deferring centralized rate limiting to
   :mod:`DocsToKG.ContentDownload.ratelimit`.
 - Expose diagnostic helpers such as :func:`head_precheck` (with GET fallback)
@@ -86,7 +86,7 @@ Responsibilities
 - ``request_with_retries`` – wraps HTTP verbs with Tenacity-backed retry,
   backoff, and logging.
 - ``ConditionalRequestHelper`` – produces ``If-None-Match``/``If-Modified-Since`` headers.
-- ``CircuitBreaker`` – stateful regulator shared across resolvers and download workers.
+- Legacy CircuitBreaker removed – now handled by pybreaker-based BreakerRegistry.
 
 Typical Usage
 -------------
@@ -143,19 +143,24 @@ __all__ = (
     "ConditionalRequestHelper",
     "ModifiedResult",
     "ContentPolicyViolation",
-    "CircuitBreaker",
+    # "CircuitBreaker",  # Legacy - removed
     "configure_http_client",
     "get_http_client",
     "purge_http_cache",
     "head_precheck",
     "parse_retry_after_header",
     "request_with_retries",
+    "set_breaker_registry",
+    "get_breaker_registry",
 )
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
 DEFAULT_RETRYABLE_STATUSES: Set[int] = {429, 500, 502, 503, 504}
 _TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
+
+# Global breaker registry (set by runner)
+_breaker_registry: Optional[Any] = None
 
 _DEPRECATED_ATTR_ERRORS: Dict[str, str] = {
     "ThreadLocalSessionFactory": (
@@ -175,6 +180,17 @@ def __getattr__(name: str) -> Any:
     if name in _DEPRECATED_ATTR_ERRORS:
         raise RuntimeError(_DEPRECATED_ATTR_ERRORS[name])
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def set_breaker_registry(registry: Any) -> None:
+    """Set the global breaker registry for use by request_with_retries."""
+    global _breaker_registry
+    _breaker_registry = registry
+
+
+def get_breaker_registry() -> Optional[Any]:
+    """Get the current breaker registry."""
+    return _breaker_registry
 
 
 def parse_retry_after_header(response: httpx.Response) -> Optional[float]:
@@ -550,6 +566,7 @@ def request_with_retries(
     content_policy: Optional[Mapping[str, Any]] = None,
     max_retry_duration: Optional[float] = None,
     backoff_max: Optional[float] = 60.0,
+    resolver: Optional[str] = None,
     **kwargs: Any,
 ) -> httpx.Response:
     """Execute an HTTP request using a Tenacity-backed retry controller."""
@@ -596,6 +613,31 @@ def request_with_retries(
         canonical_index = canonical_for_index(source_url)
     except Exception:
         canonical_index = request_url
+
+    # Breaker pre-flight check
+    breaker_registry = get_breaker_registry()
+    if breaker_registry is not None:
+        try:
+            # Determine host from canonicalized URL
+            parsed_request = urlparse(request_url)
+            request_host = (parsed_request.hostname or parsed_request.netloc or "").lower()
+
+            if request_host:
+                # Import here to avoid circular imports
+                from DocsToKG.ContentDownload.breakers import RequestRole, BreakerOpenError
+
+                # Map role string to RequestRole enum
+                role_enum = RequestRole.METADATA
+                if role_token == "landing":
+                    role_enum = RequestRole.LANDING
+                elif role_token == "artifact":
+                    role_enum = RequestRole.ARTIFACT
+
+                breaker_registry.allow(request_host, role=role_enum, resolver=resolver)
+        except BreakerOpenError as e:
+            # Don't retry breaker open errors
+            LOGGER.debug("Breaker open for %s %s: %s", method, request_url, e)
+            raise
 
     if retry_after_cap is not None:
         retry_after_cap = float(retry_after_cap)
@@ -678,6 +720,18 @@ def request_with_retries(
     except RetryError as exc:  # pragma: no cover - defensive safety net
         last_attempt = exc.last_attempt
         if last_attempt.failed:
+            # Update breaker on final failure
+            if breaker_registry is not None and request_host:
+                from DocsToKG.ContentDownload.breakers import RequestRole, is_failure_for_breaker
+
+                exception = last_attempt.exception()
+                is_failure = is_failure_for_breaker(
+                    breaker_registry.config.classify, status=None, exception=exception
+                )
+                if is_failure:
+                    breaker_registry.on_failure(
+                        request_host, role=role_enum, resolver=resolver, exception=exception
+                    )
             raise last_attempt.exception()
         response = last_attempt.result()
 
@@ -699,6 +753,49 @@ def request_with_retries(
             "Response object %s lacks headers for content policy evaluation.",
             type(response).__name__,
         )
+
+    # Update breaker based on response and collect state for telemetry
+    breaker_state_info = {}
+    if breaker_registry is not None and request_host:
+        from DocsToKG.ContentDownload.breakers import RequestRole, is_failure_for_breaker
+
+        # Get current breaker state before updating
+        breaker_state_info["breaker_host_state"] = breaker_registry.current_state(request_host)
+        if resolver:
+            breaker_state_info["breaker_resolver_state"] = breaker_registry.current_state(
+                request_host, resolver=resolver
+            )
+
+        if isinstance(response, httpx.Response):
+            status = response.status_code
+            retry_after_s = None
+            if status in (429, 503):
+                retry_after_s = parse_retry_after_header(response)
+
+            is_failure = is_failure_for_breaker(
+                breaker_registry.config.classify, status=status, exception=None
+            )
+
+            if is_failure:
+                breaker_registry.on_failure(
+                    request_host,
+                    role=role_enum,
+                    resolver=resolver,
+                    status=status,
+                    retry_after_s=retry_after_s,
+                )
+                breaker_state_info["breaker_recorded"] = "failure"
+            else:
+                breaker_registry.on_success(request_host, role=role_enum, resolver=resolver)
+                breaker_state_info["breaker_recorded"] = "success"
+        else:
+            # Non-HTTP response, treat as success
+            breaker_registry.on_success(request_host, role=role_enum, resolver=resolver)
+            breaker_state_info["breaker_recorded"] = "success"
+
+    # Store breaker state info in response extensions for telemetry
+    if breaker_state_info and hasattr(response, "extensions"):
+        response.extensions.update(breaker_state_info)
 
     if not isinstance(response, httpx.Response):
         LOGGER.debug(
@@ -1030,59 +1127,7 @@ class ConditionalRequestHelper:
         )
 
 
-class CircuitBreaker:
-    """Circuit breaker that opens after repeated failures for a cooldown period."""
-
-    def __init__(
-        self,
-        *,
-        failure_threshold: int = 5,
-        cooldown_seconds: float = 60.0,
-        name: str = "circuit",
-    ) -> None:
-        if failure_threshold < 1:
-            raise ValueError("failure_threshold must be >= 1")
-        if cooldown_seconds < 0:
-            raise ValueError("cooldown_seconds must be >= 0")
-        self.failure_threshold = failure_threshold
-        self.cooldown_seconds = float(cooldown_seconds)
-        self.name = name
-        self._lock = threading.Lock()
-        self._failures = 0
-        self._open_until: float = 0.0
-
-    def allow(self, *, now: Optional[float] = None) -> bool:
-        """Return ``True`` when the breaker permits a new attempt."""
-
-        ts = now if now is not None else time.monotonic()
-        with self._lock:
-            return ts >= self._open_until
-
-    def record_success(self) -> None:
-        """Reset the breaker following a successful attempt."""
-
-        with self._lock:
-            self._failures = 0
-            self._open_until = 0.0
-
-    def record_failure(self, *, retry_after: Optional[float] = None) -> None:
-        """Record a failure and open the breaker if the threshold is reached."""
-
-        with self._lock:
-            self._failures += 1
-            if self._failures < self.failure_threshold:
-                return
-            cooldown = retry_after if retry_after is not None else self.cooldown_seconds
-            self._open_until = time.monotonic() + max(cooldown, 0.0)
-            self._failures = 0
-
-    def cooldown_remaining(self, *, now: Optional[float] = None) -> float:
-        """Return seconds remaining until the breaker closes."""
-
-        ts = now if now is not None else time.monotonic()
-        with self._lock:
-            remaining = self._open_until - ts
-            return remaining if remaining > 0 else 0.0
+# Legacy CircuitBreaker class removed - now handled by pybreaker-based BreakerRegistry
 
 
 __all__ = [
@@ -1090,7 +1135,7 @@ __all__ = [
     "ConditionalRequestHelper",
     "ModifiedResult",
     "ContentPolicyViolation",
-    "CircuitBreaker",
+    # "CircuitBreaker",  # Legacy - now handled by pybreaker-based BreakerRegistry
     "configure_http_client",
     "get_http_client",
     "purge_http_cache",

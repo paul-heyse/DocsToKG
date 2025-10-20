@@ -197,16 +197,7 @@ def get_actionable_error_message(
             "Failed to establish connection",
             "Check network connectivity, DNS resolution, or firewall rules",
         )
-    elif reason_code == "resolver_breaker_open":
-        return (
-            "Resolver circuit breaker is open",
-            "Resolver has failed repeatedly. Wait for cooldown period or check resolver configuration.",
-        )
-    elif reason_code == "domain_breaker_open":
-        return (
-            "Domain circuit breaker is open",
-            "Domain has failed repeatedly. Wait for cooldown period or check domain connectivity.",
-        )
+    # Legacy breaker error handling removed - now handled by pybreaker-based BreakerRegistry
     elif reason_code == "pdf_too_small":
         return (
             "Downloaded PDF is too small (likely corrupt)",

@@ -47,7 +47,7 @@ def test_jsonl_resume_lookup_handles_large_manifest(tmp_path) -> None:
         sample_entry = next(iter(entries.values()))
         assert sample_entry["classification"] == "pdf"
         assert sample_entry["schema_version"] == MANIFEST_SCHEMA_VERSION
-        assert sample_entry.get("normalized_url") is not None
+        assert sample_entry.get("canonical_url") == sample_entry["url"]
     finally:
         tracemalloc.stop()
         if lookup is not None:

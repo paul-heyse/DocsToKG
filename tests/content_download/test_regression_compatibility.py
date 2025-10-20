@@ -93,7 +93,6 @@ def _seed_sqlite_resume(sqlite_path: Path) -> None:
                 url TEXT,
                 canonical_url TEXT,
                 original_url TEXT,
-                normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
                 classification TEXT,
@@ -121,7 +120,6 @@ def _seed_sqlite_resume(sqlite_path: Path) -> None:
             "url",
             "canonical_url",
             "original_url",
-            "normalized_url",
             "path",
             "path_mtime_ns",
             "classification",
@@ -144,8 +142,6 @@ def _seed_sqlite_resume(sqlite_path: Path) -> None:
             "SQLite Resume",
             2024,
             "openalex",
-            "https://example.org/W-SQLITE.pdf",
-            "https://example.org/w-sqlite.pdf",
             "https://example.org/W-SQLITE.pdf",
             "https://example.org/w-sqlite.pdf",
             "/data/stored.pdf",
@@ -231,7 +227,6 @@ def test_manifest_entry_schema_backward_compatible(tmp_path: Path):
         "url",
         "canonical_url",
         "original_url",
-        "normalized_url",
         "path",
         "path_mtime_ns",
         "classification",
@@ -336,7 +331,6 @@ def test_load_previous_manifest_upgrades_default_scheme(tmp_path: Path) -> None:
         "url": "example.org/article.pdf",
         "canonical_url": None,
         "original_url": "example.org/article.pdf",
-        "normalized_url": None,
         "path": "pdfs/article.pdf",
         "classification": "pdf",
         "content_type": "application/pdf",
@@ -360,7 +354,6 @@ def test_load_previous_manifest_upgrades_default_scheme(tmp_path: Path) -> None:
     record = resume_entries["https://example.org/article.pdf"]
     assert record["canonical_url"] == "https://example.org/article.pdf"
     assert record["original_url"] == "example.org/article.pdf"
-    assert record["normalized_url"] == "https://example.org/article.pdf"
 
 
 def test_load_previous_manifest_retains_nondefault_port(tmp_path: Path) -> None:
@@ -377,7 +370,6 @@ def test_load_previous_manifest_retains_nondefault_port(tmp_path: Path) -> None:
         "url": "https://example.org:80/resource.pdf",
         "canonical_url": None,
         "original_url": "https://example.org:80/resource.pdf",
-        "normalized_url": None,
         "path": "pdfs/resource.pdf",
         "classification": "pdf",
         "content_type": "application/pdf",
@@ -401,7 +393,7 @@ def test_load_previous_manifest_retains_nondefault_port(tmp_path: Path) -> None:
     record = resume_entries["https://example.org:80/resource.pdf"]
     assert record["canonical_url"] == "https://example.org:80/resource.pdf"
     assert record["original_url"] == "https://example.org:80/resource.pdf"
-    assert record["normalized_url"] == "https://example.org:80/resource.pdf"
+    assert record["canonical_url"] == "https://example.org:80/resource.pdf"
 
 
 def test_load_previous_manifest_uses_sqlite_fallback(tmp_path: Path) -> None:

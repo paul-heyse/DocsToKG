@@ -50,6 +50,7 @@ import contextlib
 import inspect
 import json
 import logging
+import os
 import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
@@ -93,6 +94,7 @@ from DocsToKG.ContentDownload.networking import (
     DEFAULT_RETRYABLE_STATUSES,
     RetryAfterJitterWait,
     request_with_retries,
+    set_breaker_registry,
 )
 from DocsToKG.ContentDownload.telemetry import (
     AttemptSink,
@@ -442,6 +444,7 @@ class DownloadRun:
         self,
         http_client: Optional[httpx.Client] = None,
         robots_cache: Optional[RobotsCache] = None,
+        breaker_registry: Optional[Any] = None,
     ) -> DownloadRunState:
         """Initialise download options and counters for the run."""
 
@@ -486,6 +489,11 @@ class DownloadRun:
         if retry_after_cap is not None:
             options.extra["retry_after_cap"] = retry_after_cap
         options.previous_lookup = resume_lookup
+
+        # Set global breaker registry for networking layer
+        if breaker_registry is not None:
+            set_breaker_registry(breaker_registry)
+
         client = http_client or get_http_client()
         state = DownloadRunState(
             http_client=client,
@@ -537,9 +545,9 @@ class DownloadRun:
         resume_completed: Set[str]
         cleanup_callback: Optional[Callable[[], None]] = None
 
-        def _build_json_lookup() -> (
-            Tuple[Mapping[str, Dict[str, Any]], Set[str], Optional[Callable[[], None]]]
-        ):
+        def _build_json_lookup() -> Tuple[
+            Mapping[str, Dict[str, Any]], Set[str], Optional[Callable[[], None]]
+        ]:
             json_lookup = JsonlResumeLookup(resume_path)
             completed_ids = set(json_lookup.completed_work_ids)
             return json_lookup, completed_ids, getattr(json_lookup, "close", None)
@@ -692,8 +700,7 @@ class DownloadRun:
         state: Optional[DownloadRunState] = None
 
         policy_snapshot = {
-            host: serialize_policy(policy)
-            for host, policy in self.resolved.rate_policies.items()
+            host: serialize_policy(policy) for host, policy in self.resolved.rate_policies.items()
         }
         LOGGER.info(
             "Rate limiter configured with backend=%s options=%s policies=%s",
@@ -709,7 +716,57 @@ class DownloadRun:
                 provider = self.setup_work_provider()
 
                 http_client = get_http_client()
-                state = self.setup_download_state(http_client, self.resolved.robots_checker)
+
+                # Initialize breaker registry
+                breaker_registry = None
+                try:
+                    from DocsToKG.ContentDownload.breakers import BreakerRegistry, BreakerConfig
+                    from DocsToKG.ContentDownload.breakers_loader import load_breaker_config
+                    from DocsToKG.ContentDownload.networking_breaker_listener import (
+                        NetworkBreakerListener,
+                        BreakerListenerConfig,
+                    )
+
+                    # Load breaker configuration
+                    breaker_config = load_breaker_config(
+                        yaml_path=getattr(self.args, "breaker_config_path", None),
+                        env=os.environ,
+                        cli_host_overrides=getattr(self.args, "breaker_host_overrides", None),
+                        cli_role_overrides=getattr(self.args, "breaker_role_overrides", None),
+                        cli_resolver_overrides=getattr(
+                            self.args, "breaker_resolver_overrides", None
+                        ),
+                        cli_defaults_override=getattr(self.args, "breaker_defaults_override", None),
+                        cli_classify_override=getattr(self.args, "breaker_classify_override", None),
+                        cli_rolling_override=getattr(self.args, "breaker_rolling_override", None),
+                    )
+
+                    # Create listener factory
+                    def listener_factory(host: str, scope: str, resolver: Optional[str]):
+                        if self.attempt_logger is not None:
+                            return NetworkBreakerListener(
+                                self.attempt_logger,
+                                BreakerListenerConfig(
+                                    run_id=self.resolved.run_id,
+                                    host=host,
+                                    scope=scope,
+                                    resolver=resolver,
+                                ),
+                            )
+                        return None
+
+                    breaker_registry = BreakerRegistry(
+                        breaker_config, listener_factory=listener_factory
+                    )
+                except ImportError:
+                    # pybreaker not available, continue without breakers
+                    LOGGER.debug("pybreaker not available, circuit breakers disabled")
+                except Exception as e:
+                    LOGGER.warning("Failed to initialize circuit breakers: %s", e)
+
+                state = self.setup_download_state(
+                    http_client, self.resolved.robots_checker, breaker_registry
+                )
 
                 if self.args.workers == 1:
                     client = state.http_client
@@ -882,14 +939,8 @@ def iterate_openalex(
 
     max_retries = max(0, int(retry_attempts))
     backoff_factor = max(0.0, float(retry_backoff))
-    backoff_cap = (
-        None
-        if retry_max_delay is None
-        else max(0.0, float(retry_max_delay))
-    )
-    retry_after_limit = (
-        None if retry_after_cap is None else max(0.0, float(retry_after_cap))
-    )
+    backoff_cap = None if retry_max_delay is None else max(0.0, float(retry_max_delay))
+    retry_after_limit = None if retry_after_cap is None else max(0.0, float(retry_after_cap))
 
     pager = query.paginate(
         per_page=per_page, n_max=max_results if max_results is not None else None
@@ -906,9 +957,7 @@ def iterate_openalex(
             retry_after_cap=retry_after_limit,
         )
 
-    fallback_wait = wait_random_exponential(
-        multiplier=backoff_factor, max=backoff_cap
-    )
+    fallback_wait = wait_random_exponential(multiplier=backoff_factor, max=backoff_cap)
     wait_strategy = RetryAfterJitterWait(
         respect_retry_after=True,
         retry_after_cap=retry_after_limit,

@@ -1370,7 +1370,8 @@ def test_cli_resume_from_external_csv_discovers_adjacent_sqlite(
                 publication_year INTEGER,
                 resolver TEXT,
                 url TEXT,
-                normalized_url TEXT,
+                canonical_url TEXT,
+                original_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
                 classification TEXT,
@@ -1391,10 +1392,10 @@ def test_cli_resume_from_external_csv_discovers_adjacent_sqlite(
             """
             INSERT INTO manifests (
                 timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                resolver, url, canonical_url, original_url, path, path_mtime_ns, classification,
                 content_type, reason, reason_detail, html_paths, sha256,
                 content_length, etag, last_modified, extracted_text_path, dry_run
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "2025-03-10T00:00:00Z",
@@ -1552,7 +1553,8 @@ def test_cli_resume_from_sqlite_when_manifest_missing(download_modules, patcher,
                 publication_year INTEGER,
                 resolver TEXT,
                 url TEXT,
-                normalized_url TEXT,
+                canonical_url TEXT,
+                original_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
                 classification TEXT,
@@ -1573,10 +1575,10 @@ def test_cli_resume_from_sqlite_when_manifest_missing(download_modules, patcher,
             """
             INSERT INTO manifests (
                 timestamp, run_id, schema_version, work_id, title, publication_year,
-                resolver, url, normalized_url, path, path_mtime_ns, classification,
+                resolver, url, canonical_url, original_url, path, path_mtime_ns, classification,
                 content_type, reason, reason_detail, html_paths, sha256,
                 content_length, etag, last_modified, extracted_text_path, dry_run
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "2025-01-01T00:00:00Z",

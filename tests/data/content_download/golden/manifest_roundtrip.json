@@ -5,7 +5,6 @@
     "content_type": "application/pdf",
     "canonical_url": "https://pub.example/paper.pdf",
     "original_url": "https://pub.example/paper.pdf",
-    "normalized_url": "https://pub.example/paper.pdf",
     "dry_run": false,
     "etag": "\"etag\"",
     "extracted_text_path": "/tmp/paper.txt",
@@ -20,7 +19,7 @@
     "record_type": "manifest",
     "resolver": "contract-resolver",
     "run_id": "run-contract",
-    "schema_version": 4,
+    "schema_version": 5,
     "sha256": "deadbeefcafebabe",
     "timestamp": "2025-01-01T00:00:00Z",
     "title": "Contract Test Work",
@@ -49,13 +48,12 @@
         "record_type": "manifest",
         "resolver": "contract-resolver",
         "run_id": "run-contract",
-        "schema_version": 4,
+        "schema_version": 5,
         "sha256": "deadbeefcafebabe",
         "timestamp": "2025-01-01T00:00:00Z",
         "title": "Contract Test Work",
         "url": "https://pub.example/paper.pdf",
         "work_id": "W-contract",
-        "normalized_url": "https://pub.example/paper.pdf",
         "mtime_ns": null
       }
     }

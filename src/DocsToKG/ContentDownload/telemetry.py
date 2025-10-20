@@ -1640,7 +1640,6 @@ class SqliteSink:
                 url TEXT,
                 canonical_url TEXT,
                 original_url TEXT,
-                normalized_url TEXT,
                 path TEXT,
                 path_mtime_ns INTEGER,
                 classification TEXT,
@@ -1684,18 +1683,87 @@ class SqliteSink:
             self._safe_add_column("manifests", "reason_detail", "TEXT")
             self._migrate_summary_table()
         if current_version < 4:
-            self._safe_add_column("manifests", "normalized_url", "TEXT")
-            self._populate_normalized_urls()
+            if not self._column_exists("manifests", "normalized_url"):
+                self._safe_add_column("manifests", "normalized_url", "TEXT")
+            if self._column_exists("manifests", "normalized_url"):
+                self._populate_normalized_urls()
         if current_version < 5:
-            self._safe_add_column("manifests", "canonical_url", "TEXT")
-            self._safe_add_column("manifests", "original_url", "TEXT")
-            self._safe_add_column("attempts", "canonical_url", "TEXT")
-            self._safe_add_column("attempts", "original_url", "TEXT")
-            self._populate_normalized_urls()
+            if not self._column_exists("manifests", "canonical_url"):
+                self._safe_add_column("manifests", "canonical_url", "TEXT")
+            if not self._column_exists("manifests", "original_url"):
+                self._safe_add_column("manifests", "original_url", "TEXT")
+            if not self._column_exists("attempts", "canonical_url"):
+                self._safe_add_column("attempts", "canonical_url", "TEXT")
+            if not self._column_exists("attempts", "original_url"):
+                self._safe_add_column("attempts", "original_url", "TEXT")
+            if self._column_exists("manifests", "normalized_url"):
+                self._populate_normalized_urls()
+        if current_version < 6:
+            self._drop_normalized_url_column()
 
     def _safe_add_column(self, table: str, column: str, declaration: str) -> None:
         try:
             self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+        except sqlite3.OperationalError:
+            pass
+
+    def _column_exists(self, table: str, column: str) -> bool:
+        try:
+            cursor = self._conn.execute(f"PRAGMA table_info({table})")
+        except sqlite3.OperationalError:
+            return False
+        return any(len(row) > 1 and row[1] == column for row in cursor)
+
+    def _drop_normalized_url_column(self) -> None:
+        if not self._column_exists("manifests", "normalized_url"):
+            return
+        try:
+            self._conn.execute("ALTER TABLE manifests RENAME TO manifests_v5")
+            self._conn.execute(
+                """
+                CREATE TABLE manifests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT,
+                    run_id TEXT,
+                    schema_version INTEGER,
+                    work_id TEXT,
+                    title TEXT,
+                    publication_year INTEGER,
+                    resolver TEXT,
+                    url TEXT,
+                    canonical_url TEXT,
+                    original_url TEXT,
+                    path TEXT,
+                    path_mtime_ns INTEGER,
+                    classification TEXT,
+                    content_type TEXT,
+                    reason TEXT,
+                    reason_detail TEXT,
+                    html_paths TEXT,
+                    sha256 TEXT,
+                    content_length INTEGER,
+                    etag TEXT,
+                    last_modified TEXT,
+                    extracted_text_path TEXT,
+                    dry_run INTEGER
+                )
+                """
+            )
+            self._conn.execute(
+                """
+                INSERT INTO manifests (
+                    id, timestamp, run_id, schema_version, work_id, title, publication_year, resolver, url,
+                    canonical_url, original_url, path, path_mtime_ns, classification, content_type, reason,
+                    reason_detail, html_paths, sha256, content_length, etag, last_modified, extracted_text_path, dry_run
+                )
+                SELECT
+                    id, timestamp, run_id, schema_version, work_id, title, publication_year, resolver, url,
+                    canonical_url, original_url, path, path_mtime_ns, classification, content_type, reason,
+                    reason_detail, html_paths, sha256, content_length, etag, last_modified, extracted_text_path, dry_run
+                FROM manifests_v5
+                """
+            )
+            self._conn.execute("DROP TABLE manifests_v5")
         except sqlite3.OperationalError:
             pass
 
@@ -1723,6 +1791,8 @@ class SqliteSink:
         self._conn.execute("ALTER TABLE summaries_new RENAME TO summaries")
 
     def _populate_normalized_urls(self) -> None:
+        if not self._column_exists("manifests", "normalized_url"):
+            return
         try:
             rows = list(
                 self._conn.execute(
@@ -1849,10 +1919,10 @@ def _iter_resume_rows_from_sqlite(
         try:
             cursor = conn.execute(
                 (
-                    "SELECT run_id, work_id, url, normalized_url, canonical_url, original_url, schema_version, "
+                    "SELECT run_id, work_id, url, canonical_url, original_url, schema_version, "
                     "classification, reason, reason_detail, path, path_mtime_ns, sha256, "
                     "content_length, etag, last_modified "
-                    "FROM manifests ORDER BY work_id, normalized_url"
+                    "FROM manifests ORDER BY work_id, canonical_url"
                 )
             )
         except sqlite3.OperationalError:
@@ -1872,8 +1942,8 @@ def _load_resume_from_sqlite(sqlite_path: Path) -> Tuple[Dict[str, Dict[str, Any
 
     lookup: Dict[str, Dict[str, Any]] = {}
     completed: Set[str] = set()
-    for work_id, normalized, entry, is_pdf_like in _iter_resume_rows_from_sqlite(sqlite_path):
-        lookup.setdefault(work_id, {})[normalized] = entry
+    for work_id, canonical, entry, is_pdf_like in _iter_resume_rows_from_sqlite(sqlite_path):
+        lookup.setdefault(work_id, {})[canonical] = entry
         if is_pdf_like:
             completed.add(work_id)
 
@@ -2180,9 +2250,9 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
                 """
                 CREATE TABLE IF NOT EXISTS entries (
                     work_id TEXT NOT NULL,
-                    normalized_url TEXT NOT NULL,
+                    canonical_url TEXT NOT NULL,
                     entry_json TEXT NOT NULL,
-                    PRIMARY KEY (work_id, normalized_url)
+                    PRIMARY KEY (work_id, canonical_url)
                 )
                 """
             )
@@ -2193,15 +2263,15 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
     def _populate_from_jsonl(self) -> None:
         completed: Set[str] = set()
         cursor = self._conn.cursor()
-        for work_id, normalized, entry, is_pdf_like in iter_previous_manifest_entries(
+        for work_id, canonical, entry, is_pdf_like in iter_previous_manifest_entries(
             self._path,
             allow_sqlite_fallback=False,
             buffer_entries=False,
         ):
             payload = json.dumps(entry, ensure_ascii=False, separators=(",", ":"))
             cursor.execute(
-                "INSERT OR REPLACE INTO entries (work_id, normalized_url, entry_json) VALUES (?, ?, ?)",
-                (work_id, normalized, payload),
+                "INSERT OR REPLACE INTO entries (work_id, canonical_url, entry_json) VALUES (?, ?, ?)",
+                (work_id, canonical, payload),
             )
             if is_pdf_like:
                 completed.add(work_id)
@@ -2242,7 +2312,7 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
             else:
                 try:
                     cursor = self._conn.execute(
-                        "SELECT normalized_url, entry_json FROM entries WHERE work_id = ?",
+                        "SELECT canonical_url, entry_json FROM entries WHERE work_id = ?",
                         (lookup_key,),
                     )
                 except sqlite3.OperationalError:
@@ -2253,14 +2323,14 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
             self._missing.add(lookup_key)
             raise KeyError(lookup_key)
         entries: Dict[str, Dict[str, Any]] = {}
-        for normalized_url, entry_json in rows:
-            if not normalized_url:
+        for canonical_url, entry_json in rows:
+            if not canonical_url:
                 continue
             try:
                 entry = json.loads(entry_json)
             except json.JSONDecodeError:
                 continue
-            entries[str(normalized_url)] = entry
+            entries[str(canonical_url)] = entry
         if not entries:
             self._missing.add(lookup_key)
             raise KeyError(lookup_key)
@@ -2347,19 +2417,19 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
             return
         try:
             cursor = self._conn.execute(
-                "SELECT work_id, normalized_url, entry_json FROM entries ORDER BY work_id"
+                "SELECT work_id, canonical_url, entry_json FROM entries ORDER BY work_id"
             )
         except sqlite3.OperationalError:
             return
-        for work_id, normalized_url, entry_json in cursor:
-            if not work_id or not normalized_url:
+        for work_id, canonical_url, entry_json in cursor:
+            if not work_id or not canonical_url:
                 continue
             try:
                 entry = json.loads(entry_json)
             except json.JSONDecodeError:
                 continue
             work_key = str(work_id)
-            url_key = str(normalized_url)
+            url_key = str(canonical_url)
             per_work = self._cache.setdefault(work_key, {})
             per_work[url_key] = entry
 
@@ -2474,9 +2544,9 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
             try:
                 cursor = self._conn.execute(
                     (
-                        "SELECT run_id, work_id, url, normalized_url, canonical_url, original_url, schema_version, classification, "
+                        "SELECT run_id, work_id, url, canonical_url, original_url, schema_version, classification, "
                         "reason, reason_detail, path, path_mtime_ns, sha256, content_length, etag, last_modified "
-                        "FROM manifests WHERE work_id = ? ORDER BY normalized_url"
+                        "FROM manifests WHERE work_id = ? ORDER BY canonical_url"
                     ),
                     (work_id,),
                 )
@@ -2493,8 +2563,8 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
             parsed = _manifest_entry_from_sqlite_row(*row)
             if parsed is None:
                 continue
-            _, normalized, entry, _ = parsed
-            entries[normalized] = entry
+            _, canonical_key, entry, _ = parsed
+            entries[canonical_key] = entry
         return entries if entries else None
 
     def _fetch_work_entries_unlocked(self, work_id: str) -> Optional[Dict[str, Any]]:
@@ -2504,9 +2574,9 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
         try:
             cursor = self._conn.execute(
                 (
-                    "SELECT run_id, work_id, url, normalized_url, canonical_url, original_url, schema_version, classification, "
+                    "SELECT run_id, work_id, url, canonical_url, original_url, schema_version, classification, "
                     "reason, reason_detail, path, path_mtime_ns, sha256, content_length, etag, last_modified "
-                    "FROM manifests WHERE work_id = ? ORDER BY normalized_url"
+                    "FROM manifests WHERE work_id = ? ORDER BY canonical_url"
                 ),
                 (work_id,),
             )
@@ -2523,8 +2593,8 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
             parsed = _manifest_entry_from_sqlite_row(*row)
             if parsed is None:
                 continue
-            _, normalized, entry, _ = parsed
-            entries[normalized] = entry
+            _, canonical_key, entry, _ = parsed
+            entries[canonical_key] = entry
         return entries if entries else None
 
     def _preload_all_entries_unlocked(self) -> None:

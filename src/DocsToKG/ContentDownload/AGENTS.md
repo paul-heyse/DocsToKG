@@ -358,10 +358,8 @@ domain_content_rules:
   arxiv.org:
     allowed_types:
       - application/pdf
-resolver_circuit_breakers:
-  unpaywall:
-    failure_threshold: 6
-    cooldown_seconds: 90
+# Legacy resolver_circuit_breakers removed - now handled by pybreaker-based BreakerRegistry
+# See breaker configuration in src/DocsToKG/ContentDownload/breakers_loader.py
 ```
 
 - Unknown keys raise `ValueError`; extend `ResolverConfig` before adding new options.

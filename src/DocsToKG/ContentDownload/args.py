@@ -292,6 +292,55 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Bypass the centralized rate limiter (pilot fallback; disables quota enforcement).",
     )
+
+    # Circuit breaker arguments
+    breaker_group = parser.add_argument_group("Circuit breakers")
+    breaker_group.add_argument(
+        "--breaker",
+        dest="breaker_host_overrides",
+        action="append",
+        default=[],
+        help="Host-specific breaker settings: HOST=fail_max:5,reset:60,retry_after_cap:900",
+    )
+    breaker_group.add_argument(
+        "--breaker-role",
+        dest="breaker_role_overrides",
+        action="append",
+        default=[],
+        help="Role-specific breaker settings: HOST:ROLE=fail_max:4,reset:45,trial_calls:2",
+    )
+    breaker_group.add_argument(
+        "--breaker-resolver",
+        dest="breaker_resolver_overrides",
+        action="append",
+        default=[],
+        help="Resolver-specific breaker settings: NAME=fail_max:4,reset:45",
+    )
+    breaker_group.add_argument(
+        "--breaker-defaults",
+        dest="breaker_defaults_override",
+        type=str,
+        help="Default breaker settings: fail_max:5,reset:60,retry_after_cap:900",
+    )
+    breaker_group.add_argument(
+        "--breaker-classify",
+        dest="breaker_classify_override",
+        type=str,
+        help="Failure classification: failure=429,500,... neutral=401,403,...",
+    )
+    breaker_group.add_argument(
+        "--breaker-rolling",
+        dest="breaker_rolling_override",
+        type=str,
+        help="Rolling window settings: enabled:true,window:30,thresh:6,cooldown:60",
+    )
+    breaker_group.add_argument(
+        "--breaker-config",
+        dest="breaker_config_path",
+        type=Path,
+        help="Path to breaker configuration YAML file",
+    )
+
     parser.add_argument(
         "--log-rotate",
         type=_parse_size,
@@ -421,9 +470,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     wayback_group.add_argument(
         "--wayback-html-parse",
+        dest="wayback_html_parse",
         action="store_true",
-        default=True,
-        help="Enable HTML parsing to find PDF links in archived pages (default: True).",
+        help="Enable HTML parsing to find PDF links in archived pages.",
     )
     wayback_group.add_argument(
         "--no-wayback-html-parse",
@@ -431,6 +480,19 @@ def build_parser() -> argparse.ArgumentParser:
         dest="wayback_html_parse",
         help="Disable HTML parsing for Wayback resolver.",
     )
+    wayback_group.add_argument(
+        "--wayback-availability",
+        dest="wayback_availability_first",
+        action="store_true",
+        help="Attempt the availability API before querying CDX (default behaviour).",
+    )
+    wayback_group.add_argument(
+        "--no-wayback-availability",
+        dest="wayback_availability_first",
+        action="store_false",
+        help="Skip availability API lookups and rely on CDX snapshots only.",
+    )
+    wayback_group.set_defaults(wayback_html_parse=True, wayback_availability_first=True)
     resolver_group.add_argument(
         "--retry-after-cap",
         type=float,

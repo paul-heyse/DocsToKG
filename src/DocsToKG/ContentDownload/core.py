@@ -464,8 +464,8 @@ class ReasonCode(Enum):
     LIST_ONLY = "list_only"
     MAX_ATTEMPTS_REACHED = "max_attempts_reached"
     RATE_LIMITED = "rate_limited"
-    RESOLVER_BREAKER_OPEN = "resolver_breaker_open"
-    DOMAIN_BREAKER_OPEN = "domain_breaker_open"
+    # RESOLVER_BREAKER_OPEN = "resolver_breaker_open"  # Legacy - removed
+    # DOMAIN_BREAKER_OPEN = "domain_breaker_open"  # Legacy - removed
     DOMAIN_DISALLOWED_MIME = "domain_disallowed_mime"
     SKIP_LARGE_DOWNLOAD = "skip_large_download"
     WORKER_EXCEPTION = "worker_exception"
@@ -790,5 +790,3 @@ def slugify(text: str, keep: int = 80) -> str:
     text = re.sub(r"[^\w\s]+", "", text or "")
     text = re.sub(r"\s+", "_", text.strip())
     return text[:keep] or "untitled"
-
-
