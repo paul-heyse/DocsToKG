@@ -143,6 +143,18 @@ from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional,
 import numpy as np
 
 try:  # pragma: no cover - optional dependency during doc builds
+    from .store import _ensure_cuvs_loader_path
+except ImportError:  # pragma: no cover - doc builds may skip GPU dependencies
+    _ensure_cuvs_loader_path = None  # type: ignore[assignment]
+else:  # pragma: no cover - exercised when GPU wheel present
+    try:
+        if _ensure_cuvs_loader_path is not None:
+            _ensure_cuvs_loader_path()
+    except Exception:
+        # Defer to downstream FAISS import handling so doc builds remain resilient.
+        pass
+
+try:  # pragma: no cover - optional dependency during doc builds
     import faiss  # type: ignore
 except ImportError:  # pragma: no cover
     faiss = None  # type: ignore
