@@ -225,12 +225,19 @@ _COSINE_TOPK_AUTO_MEM_FRACTION = 0.5
 
 
 _CUVS_LIBRARIES_LOADED = False
+_CUVS_LIB_HANDLES: list[ctypes.CDLL] = []
 
 
 def _ensure_cuvs_loader_path() -> None:
-    """Preload cuVS shared objects so extension modules resolve correctly."""
+    """Preload cuVS shared objects so extension modules resolve correctly.
 
-    global _CUVS_LIBRARIES_LOADED
+    Regression note: ``mode=ctypes.RTLD_GLOBAL`` is required so the cuVS
+    extension modules (``cuvs.*``) can discover RAFT/RMM symbols without
+    manual ``LD_LIBRARY_PATH`` hacks. Dropping the global load reintroduces the
+    import failures we fixed here.
+    """
+
+    global _CUVS_LIBRARIES_LOADED, _CUVS_LIB_HANDLES
     if _CUVS_LIBRARIES_LOADED:
         return
 
@@ -268,7 +275,8 @@ def _ensure_cuvs_loader_path() -> None:
         if not path.exists():
             continue
         try:
-            ctypes.CDLL(str(path))
+            handle = ctypes.CDLL(str(path), mode=ctypes.RTLD_GLOBAL)
+            _CUVS_LIB_HANDLES.append(handle)
             loaded_any = True
             parent = str(path.parent)
             if parent not in search_dirs:
