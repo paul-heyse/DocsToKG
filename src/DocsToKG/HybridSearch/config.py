@@ -258,6 +258,7 @@ class RetrievalConfig:
         dense_overfetch_factor: Multiplier applied to oversampled dense requests (1.5 default)
         dense_oversample: Query-time oversample multiplier for dense retrieval (2.0 default)
         dense_score_floor: Minimum similarity score required for dense results before fusion (0.0 default)
+        dense_calibration_batch_size: Optional batch size for validator dense calibration sweeps
         bm25_scoring: \"compat\" for legacy dot-product, \"true\" for Okapi BM25
         bm25_k1: Okapi BM25 k1 parameter (used when bm25_scoring == \"true\")
         bm25_b: Okapi BM25 b parameter (used when bm25_scoring == \"true\")
@@ -279,6 +280,8 @@ class RetrievalConfig:
     dense_oversample: float = 2.0
     # Minimum dense similarity threshold used prior to fusion (0 disables thresholding)
     dense_score_floor: float = 0.0
+    # Optional batch size for dense calibration sweeps (None disables batching)
+    dense_calibration_batch_size: Optional[int] = None
     # BM25 scoring mode (compat: legacy dot product, true: Okapi BM25)
     bm25_scoring: Literal["compat", "true"] = "compat"
     # Okapi BM25 hyperparameters (only used when bm25_scoring == "true")
