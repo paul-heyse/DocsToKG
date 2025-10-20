@@ -926,6 +926,7 @@ class HybridSearchService:
         if request.namespace:
             filters["namespace"] = request.namespace
         cursor_fingerprint = self._cursor_fingerprint(request, filters)
+        recall_first = bool(getattr(request, "recall_first", False))
 
         with self._observability.trace("hybrid_search", namespace=request.namespace or "*"):
             timings: Dict[str, float] = {}
@@ -1146,9 +1147,18 @@ class HybridSearchService:
                 "hybrid_search_timings_total_ms", timings["total_ms"]
             )
             paged_results = self._slice_from_cursor(
-                shaped, request.cursor, request.page_size, cursor_fingerprint
+                shaped,
+                request.cursor,
+                request.page_size,
+                cursor_fingerprint,
+                recall_first,
             )
-            next_cursor = self._build_cursor(paged_results, request.page_size, cursor_fingerprint)
+            next_cursor = self._build_cursor(
+                paged_results,
+                request.page_size,
+                cursor_fingerprint,
+                recall_first,
+            )
             page_results = paged_results[: request.page_size]
             self._observability.logger.info(
                 "hybrid-search",
@@ -1235,6 +1245,7 @@ class HybridSearchService:
         cursor: Optional[str],
         page_size: int,
         fingerprint: str,
+        recall_first: bool,
     ) -> List[HybridSearchResult]:
         if not cursor:
             return list(results)
@@ -1249,6 +1260,9 @@ class HybridSearchService:
                     raise RequestValidationError("Cursor page size mismatch")
                 if payload.get("f") != fingerprint:
                     raise RequestValidationError("Cursor fingerprint mismatch")
+                stored_recall = payload.get("r")
+                if stored_recall is not None and bool(stored_recall) != bool(recall_first):
+                    raise RequestValidationError("Cursor recall-first mismatch")
                 anchor = payload.get("a") or {}
                 vector_id = anchor.get("id") or anchor.get("vector_id")
                 score = anchor.get("score")
@@ -1276,6 +1290,7 @@ class HybridSearchService:
         results: Sequence[HybridSearchResult],
         page_size: int,
         fingerprint: str,
+        recall_first: bool,
     ) -> Optional[str]:
         if len(results) <= page_size:
             return None
@@ -1289,6 +1304,7 @@ class HybridSearchService:
             "p": int(page_size),
             "f": fingerprint,
             "a": anchor,
+            "r": bool(recall_first),
         }
         blob = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
         encoded = base64.urlsafe_b64encode(blob).decode("ascii").rstrip("=")
@@ -1726,6 +1742,7 @@ class HybridSearchService:
             "ns": request.namespace or "",
             "filters": self._normalize_signature_value(filters),
             "div": bool(getattr(request, "diversification", False)),
+            "recall_first": bool(getattr(request, "recall_first", False)),
         }
         raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
         return hashlib.blake2s(raw, digest_size=12).hexdigest()
