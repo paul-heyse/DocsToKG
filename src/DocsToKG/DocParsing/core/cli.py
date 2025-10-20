@@ -903,6 +903,7 @@ def run_all(argv: Sequence[str] | None = None) -> int:
     )
 
     args = parser.parse_args([] if argv is None else list(argv))
+    plan_only = bool(args.plan)
     logger = get_logger(__name__, level=args.log_level)
 
     extra: Dict[str, Any] = {
@@ -923,7 +924,10 @@ def run_all(argv: Sequence[str] | None = None) -> int:
         value = getattr(args, field_name, None)
         if value is not None:
             extra[field_name] = value
-    logger.info("docparse all starting", extra={"extra_fields": extra})
+    if plan_only:
+        extra["plan_only"] = True
+    message = "docparse plan preview" if plan_only else "docparse all starting"
+    logger.info(message, extra={"extra_fields": extra})
 
     doctags_args, chunk_args, embed_args = _build_stage_args(args)
 
