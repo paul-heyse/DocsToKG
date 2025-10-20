@@ -336,7 +336,7 @@ class HybridSearchResult:
         text: Retrieved text content from the chunk
         highlights: Highlighted terms or phrases in the result
         provenance_offsets: Character offsets for result provenance
-        diagnostics: Per-method scoring information
+        diagnostics: Optional per-method scoring information
         metadata: Additional result metadata and context
 
     Examples:
@@ -360,7 +360,7 @@ class HybridSearchResult:
     text: str
     highlights: Sequence[str]
     provenance_offsets: Sequence[Tuple[int, int]]
-    diagnostics: HybridSearchDiagnostics
+    diagnostics: Optional[HybridSearchDiagnostics]
     metadata: Mapping[str, Any]
 
 

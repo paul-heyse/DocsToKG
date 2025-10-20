@@ -55,6 +55,9 @@ from urllib.parse import ParseResult, urljoin, urlparse, urlunparse
 import pooch
 import requests
 
+from tenacity import Retrying, retry_if_exception, stop_after_attempt
+from tenacity.wait import wait_base
+
 from ..cancellation import CancellationToken
 from ..errors import ConfigError, DownloadFailure, OntologyDownloadError, PolicyError
 from ..settings import DownloadConfiguration
@@ -447,20 +450,19 @@ def retry_with_backoff(
     if max_attempts < 1:
         raise ValueError("max_attempts must be at least 1")
 
-    attempt = 0
-    while True:
-        attempt += 1
-        try:
-            return func()
-        except KeyboardInterrupt:
-            raise
-        except SystemExit:
-            raise
-        except Exception as exc:  # pragma: no cover - behaviour verified via callers
-            if attempt >= max_attempts or not retryable(exc):
-                raise
-            delay = backoff_base * (2 ** (attempt - 1))
-            if retry_after is not None:
+    class _BackoffWait(wait_base):
+        def __call__(self, retry_state) -> float:  # type: ignore[override]
+            outcome = retry_state.outcome
+            exc: Optional[Exception]
+            if outcome is None or not outcome.failed:
+                exc = None
+            else:
+                exc = outcome.exception()
+
+            attempt_number = max(retry_state.attempt_number, 1)
+            delay = backoff_base * (2 ** (attempt_number - 1))
+
+            if retry_after is not None and exc is not None:
                 try:
                     hint = retry_after(exc)
                 except Exception:  # pragma: no cover - defensive against callbacks
@@ -468,14 +470,42 @@ def retry_with_backoff(
                 else:
                     if hint is not None:
                         delay = max(hint, 0.0)
+
             if jitter > 0:
                 delay += random.uniform(0.0, jitter)
-            if callback is not None:
-                try:
-                    callback(attempt, exc, delay)
-                except Exception:  # pragma: no cover - defensive against callbacks
-                    pass
-            sleep(max(delay, 0.0))
+
+            delay = max(delay, 0.0)
+            setattr(retry_state.retry_object, "_ontology_retry_delay", delay)
+            setattr(retry_state.retry_object, "_ontology_retry_exception", exc)
+            return delay
+
+    def _before_sleep(retry_state) -> None:
+        if callback is None:
+            return
+
+        delay = getattr(retry_state.retry_object, "_ontology_retry_delay", 0.0)
+        exc = getattr(retry_state.retry_object, "_ontology_retry_exception", None)
+        if exc is None and retry_state.outcome and retry_state.outcome.failed:
+            exc = retry_state.outcome.exception()
+
+        if exc is None:
+            return
+
+        try:
+            callback(retry_state.attempt_number, exc, delay)
+        except Exception:  # pragma: no cover - defensive against callbacks
+            pass
+
+    retry_controller = Retrying(
+        retry=retry_if_exception(lambda exc: retryable(exc)),
+        wait=_BackoffWait(),
+        stop=stop_after_attempt(max_attempts),
+        sleep=sleep,
+        reraise=True,
+        before_sleep=_before_sleep,
+    )
+
+    return retry_controller.call(func)
 
 
 def log_memory_usage(

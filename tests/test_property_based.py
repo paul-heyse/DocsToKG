@@ -82,10 +82,26 @@ def test_request_with_retries_backoff_sequence(status_codes: List[int]) -> None:
     session = Mock(spec=requests.Session)
     session.request.side_effect = responses
 
+    class _SequenceWait:
+        def __init__(self, values: List[float]) -> None:
+            self._values = list(values)
+            self._index = 0
+            self._last = self._values[-1] if self._values else 0.0
+
+        def __call__(self, retry_state) -> float:  # pragma: no cover - exercised via Tenacity
+            if self._index < len(self._values):
+                value = self._values[self._index]
+                self._last = value
+                self._index += 1
+                return value
+            return self._last
+
+    delays = [0.2 * (idx + 1) for idx in range(len(status_codes))]
+
     with (
         patch(
-            "DocsToKG.ContentDownload.networking.random.uniform",
-            side_effect=lambda a, b: a,
+            "DocsToKG.ContentDownload.networking.wait_random_exponential",
+            side_effect=lambda *args, **kwargs: _SequenceWait(delays),
         ),
         patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP") as mock_sleep,
     ):
@@ -99,9 +115,8 @@ def test_request_with_retries_backoff_sequence(status_codes: List[int]) -> None:
         )
 
     assert result.status_code == 200
-    expected_delays = [0.2 * (2**idx) / 2 for idx in range(len(status_codes))]
     observed_delays = [entry.args[0] for entry in mock_sleep.call_args_list]
-    assert observed_delays == expected_delays
+    assert observed_delays == delays[: len(observed_delays)]
 
 
 @given(st.lists(st.text(max_size=10)))
