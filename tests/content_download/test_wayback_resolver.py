@@ -290,7 +290,7 @@ class TestWaybackResolver:
         assert len(results) == 1
         assert results[0].is_event is True
         assert results[0].event == ResolverEvent.SKIPPED
-        assert results[0].event_reason == ResolverEventReason.NO_FAILED_URLS
+        assert results[0].event_reason == ResolverEventReason.NO_WAYBACK_SNAPSHOT
         assert results[0].metadata["reason"] == "no_snapshot"
 
     @patch("DocsToKG.ContentDownload.resolvers.wayback.request_with_retries")
