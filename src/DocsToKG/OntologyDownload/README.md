@@ -139,49 +139,49 @@ Example `configs/sources.yaml` aligned with the current schema:
 
 ```yaml
 defaults:
-  normalize_to: [ttl]
-  prefer_source: [obo, ols, bioportal, direct]
-  continue_on_error: true
-  enable_cas_mirror: false
-  planner:
-    probing_enabled: true
+  accept_licenses: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"]
+  normalize_to: ["ttl"]
+  prefer_source: ["obo", "ols", "bioportal", "direct"]
   http:
     max_retries: 5
     timeout_sec: 30
-    download_timeout_sec: 600
+    download_timeout_sec: 300
     backoff_factor: 0.5
     per_host_rate_limit: "4/second"
-    concurrent_downloads: 2
-    concurrent_plans: 8
     rate_limits:
-      bioportal: "2/second"
-      ols: "4/second"
+      ols: "5/second"
+      bioportal: "1/second"
+    validate_media_type: true
   validation:
-    max_concurrent_validators: 2
-    parser_timeout_sec: 120
-    use_process_pool: false
-    process_pool_validators: [rdflib, owlready2]
+    parser_timeout_sec: 60
+    max_memory_mb: 2048
+    skip_reasoning_if_size_mb: 500
   logging:
-    level: INFO
+    level: "INFO"
     retention_days: 30
     max_log_size_mb: 100
+  continue_on_error: true
 ontologies:
   - id: hp
     resolver: obo
     target_formats: [owl, obo]
-    extras:
-      acronym: HP
   - id: efo
     resolver: ols
+  - id: ncit
+    resolver: bioportal
     extras:
-      ontology_id: EFO
+      acronym: NCIT
+  - id: eurovoc
+    resolver: skos
+    extras:
+      url: https://op.europa.eu/o/opportal-service/euvoc-download-handler?cellarURI=http%3A%2F%2Fpublications.europa.eu%2Fresource%2Fauthority%2Feurovoc
 ```
 
-Validator concurrency is pooled across all requests: the scheduler inspects every
-`ValidationRequest` and applies the tightest `max_concurrent_validators`
-constraint (clamped between 1 and 8). A single ontology capped at `1` will keep
-the shared worker pool at that size even if other requests allow higher
-parallelism.
+Validator concurrency is pooled across all requests whenever
+`validation.max_concurrent_validators` is configured: the scheduler inspects
+every `ValidationRequest` and applies the tightest constraint (clamped between 1
+and 8). A single ontology capped at `1` will keep the shared worker pool at that
+size even if other requests allow higher parallelism.
 
 ### Strict validation mode
 
