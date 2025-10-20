@@ -977,7 +977,12 @@ class HybridSearchService:
                 else bool(getattr(getattr(dense_store, "config", object()), "flat_use_fp16", False))
             )
             cuvs_requested = getattr(config.dense, "use_cuvs", None)
-            cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(cuvs_requested)
+            if adapter_stats is not None:
+                cuvs_enabled = bool(adapter_stats.cuvs_enabled)
+                cuvs_available = bool(adapter_stats.cuvs_available)
+                cuvs_reported = adapter_stats.cuvs_reported
+            else:
+                cuvs_enabled, cuvs_available, cuvs_reported = resolve_cuvs_state(cuvs_requested)
             self._observability.metrics.set_gauge(
                 "faiss_cuvs_enabled", 1.0 if cuvs_enabled else 0.0, channel="dense"
             )
