@@ -1515,7 +1515,11 @@ def _handle_validate(args, config: ResolvedConfig) -> dict:
         max_log_size_mb=logging_config.max_log_size_mb,
     )
     results = run_validators(requests, logger)
-    manifest["validation"] = {name: result.to_dict() for name, result in results.items()}
+    existing_validation = dict(manifest.get("validation", {}))
+    existing_validation.update(
+        {name: result.to_dict() for name, result in results.items()}
+    )
+    manifest["validation"] = existing_validation
     write_json_atomic(manifest_path, manifest)
     return manifest["validation"]
 
