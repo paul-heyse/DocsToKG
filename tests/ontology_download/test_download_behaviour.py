@@ -22,7 +22,7 @@ import pytest
 from DocsToKG.OntologyDownload.cancellation import CancellationToken
 from DocsToKG.OntologyDownload.errors import ConfigError, DownloadFailure
 from DocsToKG.OntologyDownload.io import filesystem as fs_mod
-from DocsToKG.OntologyDownload.io import network as network_mod
+from DocsToKG.OntologyDownload.io import network as network_mod, get_http_client
 from DocsToKG.OntologyDownload.testing import ResponseSpec
 
 
@@ -166,18 +166,9 @@ def test_head_get_connections_remain_bounded(ontology_env, tmp_path):
     assert methods.count("HEAD") == 4
     assert methods.count("GET") == 4
 
-    parsed = urlparse(url)
-    pool = getattr(network_mod.SESSION_POOL, "_pool")
-    lock = getattr(network_mod.SESSION_POOL, "_lock")
-    max_per_key = getattr(network_mod.SESSION_POOL, "_max_per_key")
-    normalize = getattr(network_mod.SESSION_POOL, "_normalize")
-
-    with lock:
-        pool_snapshot = {key: list(stack) for key, stack in pool.items()}
-
-    assert all(len(stack) <= max_per_key for stack in pool_snapshot.values())
-    normalized_key = normalize("obo", parsed.hostname)
-    assert len(pool_snapshot.get(normalized_key, [])) <= max_per_key
+    client_a = get_http_client()
+    client_b = get_http_client()
+    assert client_a is client_b
 
 
 def test_preliminary_head_check_handles_malformed_content_length(ontology_env, tmp_path):
@@ -216,12 +207,7 @@ def test_preliminary_head_check_handles_malformed_content_length(ontology_env, t
         origin_host=parsed_url.hostname,
     )
 
-    with network_mod.SESSION_POOL.lease(
-        service="obo",
-        host=parsed_url.hostname,
-        http_config=config,
-    ) as session:
-        content_type, content_length = downloader._preliminary_head_check(url, session)
+    content_type, content_length = downloader._preliminary_head_check(url)
 
     assert content_type == "application/rdf+xml"
     assert content_length is None
@@ -313,17 +299,12 @@ def test_preliminary_head_check_cancels_retry_sleep(ontology_env, tmp_path):
         sleep_calls.append(duration)
         token.cancel()
 
-    with network_mod.SESSION_POOL.lease(
-        service="obo",
-        host=parsed_url.hostname,
-        http_config=config,
-    ) as session, mock.patch(
+    with mock.patch(
         "DocsToKG.OntologyDownload.io.network.time.sleep", side_effect=fake_sleep
     ):
         with pytest.raises(DownloadFailure):
             downloader._preliminary_head_check(
                 url,
-                session,
                 headers=request_headers,
                 remaining_budget=remaining_budget,
                 timeout_callback=timeout_callback,
@@ -428,12 +409,7 @@ def test_download_stream_retries_consume_bucket(ontology_env, tmp_path):
         origin_host=parsed_url.hostname,
     )
 
-    with network_mod.SESSION_POOL.lease(
-        service="obo",
-        host=parsed_url.hostname,
-        http_config=config,
-    ) as session:
-        content_type, content_length = downloader._preliminary_head_check(url, session)
+    content_type, content_length = downloader._preliminary_head_check(url)
 
     assert content_type == "application/rdf+xml"
     assert content_length is None

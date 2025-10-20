@@ -169,6 +169,7 @@ import importlib.util
 import inspect
 import logging
 import os
+import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass, replace
@@ -3136,6 +3137,7 @@ class ChunkRegistry:
     """Durable mapping of vector identifiers to chunk payloads."""
 
     def __init__(self) -> None:
+        self._lock = threading.RLock()
         self._chunks: Dict[str, ChunkPayload] = {}
         self._bridge: Dict[int, str] = {}
         self._embedding_store: Optional[DenseVectorStore] = None
@@ -3149,8 +3151,8 @@ class ChunkRegistry:
 
     def attach_dense_store(self, store: DenseVectorStore) -> None:
         """Attach a dense store used to reconstruct embeddings on demand."""
-
-        self._embedding_store = store
+        with self._lock:
+            self._embedding_store = store
 
     def upsert(self, chunks: Sequence[ChunkPayload]) -> None:
         """Insert or update registry entries for ``chunks``.
@@ -3160,86 +3162,90 @@ class ChunkRegistry:
         materialisation to FAISS.
         """
 
-        for chunk in chunks:
-            existing = self._chunks.get(chunk.vector_id)
-            if existing is not None:
-                self._remove_from_index(chunk.vector_id, chunk=existing)
-            chunk.features.embedding = EmbeddingProxy(chunk.vector_id)
-            self._chunks[chunk.vector_id] = chunk
-            self._bridge[self.to_faiss_id(chunk.vector_id)] = chunk.vector_id
-            namespace_index = self._doc_namespace_index.setdefault(chunk.doc_id, {})
-            namespace_index.setdefault(chunk.namespace, set()).add(chunk.vector_id)
+        with self._lock:
+            for chunk in chunks:
+                existing = self._chunks.get(chunk.vector_id)
+                if existing is not None:
+                    self._remove_from_index(chunk.vector_id, chunk=existing)
+                chunk.features.embedding = EmbeddingProxy(chunk.vector_id)
+                self._chunks[chunk.vector_id] = chunk
+                self._bridge[self.to_faiss_id(chunk.vector_id)] = chunk.vector_id
+                namespace_index = self._doc_namespace_index.setdefault(chunk.doc_id, {})
+                namespace_index.setdefault(chunk.namespace, set()).add(chunk.vector_id)
 
     def delete(self, vector_ids: Sequence[str]) -> None:
         """Remove registry entries for the supplied vector identifiers."""
-
-        for vector_id in vector_ids:
-            chunk = self._chunks.pop(vector_id, None)
-            self._bridge.pop(self.to_faiss_id(vector_id), None)
-            self._remove_from_index(vector_id, chunk=chunk)
+        with self._lock:
+            for vector_id in vector_ids:
+                chunk = self._chunks.pop(vector_id, None)
+                self._bridge.pop(self.to_faiss_id(vector_id), None)
+                self._remove_from_index(vector_id, chunk=chunk)
 
     def _remove_from_index(self, vector_id: str, *, chunk: Optional[ChunkPayload] = None) -> None:
-        if chunk is None:
-            chunk = self._chunks.get(vector_id)
-        if chunk is None:
-            return
-        namespace_index = self._doc_namespace_index.get(chunk.doc_id)
-        if not namespace_index:
-            return
-        vector_set = namespace_index.get(chunk.namespace)
-        if not vector_set:
-            return
-        vector_set.discard(vector_id)
-        if not vector_set:
-            namespace_index.pop(chunk.namespace, None)
-        if not namespace_index:
-            self._doc_namespace_index.pop(chunk.doc_id, None)
+        with self._lock:
+            if chunk is None:
+                chunk = self._chunks.get(vector_id)
+            if chunk is None:
+                return
+            namespace_index = self._doc_namespace_index.get(chunk.doc_id)
+            if not namespace_index:
+                return
+            vector_set = namespace_index.get(chunk.namespace)
+            if not vector_set:
+                return
+            vector_set.discard(vector_id)
+            if not vector_set:
+                namespace_index.pop(chunk.namespace, None)
+            if not namespace_index:
+                self._doc_namespace_index.pop(chunk.doc_id, None)
 
     def vector_ids_for(self, doc_id: str, namespace: str) -> Iterator[str]:
         """Yield vector identifiers for a document/namespace pair."""
-
-        namespace_index = self._doc_namespace_index.get(doc_id)
-        if not namespace_index:
-            return iter(())
-        vector_set = namespace_index.get(namespace)
-        if not vector_set:
-            return iter(())
-        return iter(tuple(vector_set))
+        with self._lock:
+            namespace_index = self._doc_namespace_index.get(doc_id)
+            if not namespace_index:
+                return iter(())
+            vector_set = namespace_index.get(namespace)
+            if not vector_set:
+                return iter(())
+            snapshot = tuple(vector_set)
+        return iter(snapshot)
 
     def get(self, vector_id: str) -> Optional[ChunkPayload]:
         """Return the chunk payload for ``vector_id`` when available."""
-
-        return self._chunks.get(vector_id)
+        with self._lock:
+            return self._chunks.get(vector_id)
 
     def bulk_get(self, vector_ids: Sequence[str]) -> List[ChunkPayload]:
         """Return chunk payloads for identifiers present in the registry."""
-
-        return [self._chunks[vid] for vid in vector_ids if vid in self._chunks]
+        with self._lock:
+            return [self._chunks[vid] for vid in vector_ids if vid in self._chunks]
 
     def resolve_faiss_id(self, internal_id: int) -> Optional[str]:
         """Translate a FAISS integer id back to the original vector identifier."""
-
-        return self._bridge.get(internal_id)
+        with self._lock:
+            return self._bridge.get(internal_id)
 
     def all(self) -> List[ChunkPayload]:
         """Return all cached chunk payloads."""
-
-        return list(self._chunks.values())
+        with self._lock:
+            return list(self._chunks.values())
 
     def iter_all(self) -> Iterator[ChunkPayload]:
         """Yield chunk payloads without materialising the full list."""
-
-        return iter(self._chunks.values())
+        with self._lock:
+            snapshot = tuple(self._chunks.values())
+        return iter(snapshot)
 
     def count(self) -> int:
         """Return the number of chunks tracked by the registry."""
-
-        return len(self._chunks)
+        with self._lock:
+            return len(self._chunks)
 
     def vector_ids(self) -> List[str]:
         """Return all vector identifiers in insertion order."""
-
-        return list(self._chunks.keys())
+        with self._lock:
+            return list(self._chunks.keys())
 
     def resolve_embeddings(
         self,
@@ -3249,11 +3255,12 @@ class ChunkRegistry:
         dtype: np.dtype = np.float32,
     ) -> np.ndarray:
         """Resolve embeddings for ``vector_ids`` using attached dense storage."""
-
-        if not vector_ids:
-            dim = getattr(self._embedding_store, "dim", 0) if self._embedding_store else 0
-            return np.empty((0, dim), dtype=dtype)
-        if self._embedding_store is None:
+        with self._lock:
+            embedding_store = self._embedding_store
+            if not vector_ids:
+                dim = getattr(embedding_store, "dim", 0) if embedding_store else 0
+                return np.empty((0, dim), dtype=dtype)
+        if embedding_store is None:
             raise RuntimeError(
                 "ChunkRegistry requires an attached dense store to resolve embeddings"
             )
@@ -3276,7 +3283,7 @@ class ChunkRegistry:
             missing_positions = list(range(len(vector_ids)))
 
         if missing:
-            reconstructed = self._embedding_store.reconstruct_batch(missing)
+            reconstructed = embedding_store.reconstruct_batch(missing)
             if reconstructed.shape[0] != len(missing):  # pragma: no cover - defensive guard
                 raise RuntimeError(
                     "Dense store returned mismatched reconstruction rows "

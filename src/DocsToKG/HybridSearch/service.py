@@ -2988,7 +2988,10 @@ class HybridSearchValidator:
                 details={"error": "no queries available"},
             )
 
-        chunk_lookup = {(chunk.doc_id, chunk.chunk_id): chunk for chunk in self._registry.all()}
+        chunk_lookup = {
+            (chunk.namespace, chunk.doc_id, chunk.chunk_id): chunk
+            for chunk in self._registry.all()
+        }
 
         redundancy_reductions: List[float] = []
         rrf_cosines: List[float] = []
@@ -3004,7 +3007,9 @@ class HybridSearchValidator:
             baseline_request = self._request_for_query(query_payload, page_size=10)
             baseline_response = self._service.search(baseline_request)
             baseline_doc_ids = [result.doc_id for result in baseline_response.results[:10]]
-            baseline_vectors = self._embeddings_for_results(baseline_response.results, chunk_lookup)
+            baseline_vectors = self._embeddings_for_results(
+                baseline_response.results, chunk_lookup
+            )
             baseline_cos = self._average_pairwise_cos(baseline_vectors)
             rrf_cosines.append(baseline_cos)
             if expected_doc_id in baseline_doc_ids:
@@ -3129,7 +3134,10 @@ class HybridSearchValidator:
         config = self._service._config_manager.get()
         max_per_doc = config.fusion.max_chunks_per_doc
         dedupe_threshold = config.fusion.cosine_dedupe_threshold
-        chunk_lookup = {(chunk.doc_id, chunk.chunk_id): chunk for chunk in self._registry.all()}
+        chunk_lookup = {
+            (chunk.namespace, chunk.doc_id, chunk.chunk_id): chunk
+            for chunk in self._registry.all()
+        }
         device = int(config.dense.device)
 
         doc_limit_violations = 0
@@ -3145,7 +3153,7 @@ class HybridSearchValidator:
 
             for result in response.results:
                 doc_counts[result.doc_id] = doc_counts.get(result.doc_id, 0) + 1
-                chunk = chunk_lookup.get((result.doc_id, result.chunk_id))
+                chunk = chunk_lookup.get((result.namespace, result.doc_id, result.chunk_id))
                 if chunk is not None:
                     embeddings.append(
                         self._registry.resolve_embedding(chunk.vector_id, cache=embedding_cache)
@@ -3431,14 +3439,14 @@ class HybridSearchValidator:
     def _embeddings_for_results(
         self,
         results: Sequence[HybridSearchResult],
-        chunk_lookup: Mapping[tuple[str, str], ChunkPayload],
+        chunk_lookup: Mapping[tuple[str, str, str], ChunkPayload],
         limit: int = 10,
     ) -> List[np.ndarray]:
         """Retrieve embeddings for the top-N results using a chunk lookup.
 
         Args:
             results: Search results from which embeddings are needed.
-            chunk_lookup: Mapping from (doc_id, chunk_id) to stored payloads.
+            chunk_lookup: Mapping from (namespace, doc_id, chunk_id) to stored payloads.
             limit: Maximum number of results to consider.
 
         Returns:
@@ -3447,7 +3455,7 @@ class HybridSearchValidator:
         embeddings: List[np.ndarray] = []
         cache: Dict[str, np.ndarray] = {}
         for result in results[:limit]:
-            chunk = chunk_lookup.get((result.doc_id, result.chunk_id))
+            chunk = chunk_lookup.get((result.namespace, result.doc_id, result.chunk_id))
             if chunk is None:
                 continue
             embeddings.append(self._registry.resolve_embedding(chunk.vector_id, cache=cache))

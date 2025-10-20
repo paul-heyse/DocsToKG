@@ -30,16 +30,16 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Optional, Tuple, Type
 from urllib.parse import urlparse
 
-import requests
+import httpx
 
 from .errors import ConfigError, OntologyDownloadError
 from .io import (
-    SESSION_POOL,
     get_bucket,
     is_retryable_error,
     retry_with_backoff,
     validate_url_security,
 )
+from .net import get_http_client
 from .settings import DownloadConfiguration
 
 ErrorType = Type[Exception]
@@ -172,58 +172,60 @@ def _fetch_checksum_from_url(
     polite_headers = http_config.polite_http_headers()
     max_bytes = http_config.max_checksum_bytes()
 
+    client = get_http_client(http_config)
+
     def _fetch_once() -> str:
         bucket.consume()
         tail = b""
         total_bytes = 0
-        with SESSION_POOL.lease(
-            service=None,
-            host=host,
-            http_config=http_config,
-        ) as session:
-            try:
-                response = session.get(
-                    secure_url,
-                    timeout=http_config.timeout_sec,
-                    stream=True,
-                    headers=polite_headers,
-                )
-            except requests.RequestException:
-                raise
-            with response:
-                response.raise_for_status()
-                for chunk in response.iter_content(_CHECKSUM_STREAM_CHUNK_SIZE):
-                    if not chunk:
-                        continue
-                    total_bytes += len(chunk)
-                    if total_bytes > max_bytes:
-                        logger.error(
-                            "checksum response exceeded limit",
-                            extra={
-                                "stage": "download",
-                                "checksum_url": secure_url,
-                                "algorithm": algorithm,
-                                "received_bytes": total_bytes,
-                                "limit_bytes": max_bytes,
-                            },
-                        )
-                        raise OntologyDownloadError(
-                            f"Checksum response from {secure_url} exceeded {max_bytes} bytes"
-                        )
-                    buffer = tail + chunk
-                    match = _DIGEST_PATTERN.search(buffer.decode("utf-8", errors="ignore"))
-                    if match:
-                        digest = match.group(1).lower()
-                        logger.info(
-                            "fetched checksum",
-                            extra={
-                                "stage": "download",
-                                "checksum_url": secure_url,
-                                "algorithm": algorithm,
-                            },
-                        )
-                        return digest
-                    tail = buffer[-_CHECKSUM_STREAM_TAIL_BYTES:]
+        request = client.build_request(
+            "GET",
+            secure_url,
+            headers=polite_headers,
+            timeout=http_config.timeout_sec,
+        )
+        request.extensions["ontology_headers"] = {
+            "config": http_config,
+            "headers": polite_headers,
+        }
+        try:
+            response = client.send(request, stream=True)
+        except httpx.RequestError:
+            raise
+        with response:
+            response.raise_for_status()
+            for chunk in response.iter_bytes(_CHECKSUM_STREAM_CHUNK_SIZE):
+                if not chunk:
+                    continue
+                total_bytes += len(chunk)
+                if total_bytes > max_bytes:
+                    logger.error(
+                        "checksum response exceeded limit",
+                        extra={
+                            "stage": "download",
+                            "checksum_url": secure_url,
+                            "algorithm": algorithm,
+                            "received_bytes": total_bytes,
+                            "limit_bytes": max_bytes,
+                        },
+                    )
+                    raise OntologyDownloadError(
+                        f"Checksum response from {secure_url} exceeded {max_bytes} bytes"
+                    )
+                buffer = tail + chunk
+                match = _DIGEST_PATTERN.search(buffer.decode("utf-8", errors="ignore"))
+                if match:
+                    digest = match.group(1).lower()
+                    logger.info(
+                        "fetched checksum",
+                        extra={
+                            "stage": "download",
+                            "checksum_url": secure_url,
+                            "algorithm": algorithm,
+                        },
+                    )
+                    return digest
+                tail = buffer[-_CHECKSUM_STREAM_TAIL_BYTES:]
         raise OntologyDownloadError(f"Unable to parse checksum from {secure_url}")
 
     def _on_retry(attempt: int, exc: Exception, delay: float) -> None:
@@ -249,7 +251,7 @@ def _fetch_checksum_from_url(
         )
     except OntologyDownloadError:
         raise
-    except requests.RequestException as exc:  # pragma: no cover - exercised via retry logic
+    except httpx.RequestError as exc:  # pragma: no cover - exercised via retry logic
         raise OntologyDownloadError(f"Failed to fetch checksum from {secure_url}: {exc}") from exc
 
 

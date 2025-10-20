@@ -206,6 +206,59 @@ def test_calibration_batches_queries_and_preserves_accuracy():
     validator = HybridSearchValidator(
         ingestion=ingestion,
         service=service,
+@pytest.fixture
+def duplicate_namespace_registry() -> tuple[SimpleNamespace, list[ChunkPayload], dict[str, np.ndarray]]:
+    research_embedding = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    support_embedding = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
+    chunks = [
+        ChunkPayload(
+            doc_id="doc-1",
+            chunk_id="0",
+            vector_id="vec-research",
+            namespace="research",
+            text="research chunk",
+            metadata={},
+            features=ChunkFeatures({}, {}, research_embedding),
+            token_count=3,
+            source_chunk_idxs=(0,),
+            doc_items_refs=("doc:0",),
+        ),
+        ChunkPayload(
+            doc_id="doc-1",
+            chunk_id="0",
+            vector_id="vec-support",
+            namespace="support",
+            text="support chunk",
+            metadata={},
+            features=ChunkFeatures({}, {}, support_embedding),
+            token_count=3,
+            source_chunk_idxs=(0,),
+            doc_items_refs=("doc:0",),
+        ),
+    ]
+
+    embeddings = {
+        "vec-research": research_embedding,
+        "vec-support": support_embedding,
+    }
+
+    class _Registry(SimpleNamespace):
+        def all(self):  # type: ignore[override]
+            return chunks
+
+        def resolve_embedding(self, vector_id: str, *, cache=None, dtype=np.float32):
+            return embeddings[vector_id]
+
+    return _Registry(), chunks, embeddings
+
+
+def test_embeddings_for_results_respect_namespace(duplicate_namespace_registry):
+    registry, _chunks, embeddings = duplicate_namespace_registry
+
+    validator = HybridSearchValidator(
+        ingestion=SimpleNamespace(),
+        service=SimpleNamespace(),
         registry=registry,
         opensearch=SimpleNamespace(),
     )
@@ -224,3 +277,40 @@ def test_calibration_batches_queries_and_preserves_accuracy():
         expected_topks.extend([max(1, oversample * 3)] * batches_per_sweep)
     assert [entry["top_k"] for entry in index.calls] == expected_topks
     assert report.passed is False
+    chunk_lookup = {
+        (chunk.namespace, chunk.doc_id, chunk.chunk_id): chunk for chunk in registry.all()
+    }
+
+    results = [
+        HybridSearchResult(
+            doc_id="doc-1",
+            chunk_id="0",
+            namespace="research",
+            vector_id="vec-research",
+            score=1.0,
+            fused_rank=0,
+            text="research chunk",
+            highlights=(),
+            provenance_offsets=(),
+            diagnostics=None,
+            metadata={},
+        ),
+        HybridSearchResult(
+            doc_id="doc-1",
+            chunk_id="0",
+            namespace="support",
+            vector_id="vec-support",
+            score=1.0,
+            fused_rank=1,
+            text="support chunk",
+            highlights=(),
+            provenance_offsets=(),
+            diagnostics=None,
+            metadata={},
+        ),
+    ]
+
+    resolved = validator._embeddings_for_results(results, chunk_lookup, limit=2)
+
+    assert np.array_equal(resolved[0], embeddings["vec-research"])
+    assert np.array_equal(resolved[1], embeddings["vec-support"])

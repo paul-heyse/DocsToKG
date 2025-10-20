@@ -55,6 +55,7 @@ from urllib.parse import urlparse, urlsplit
 from urllib.robotparser import RobotFileParser
 
 import httpx
+import requests
 
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
@@ -736,7 +737,13 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                     )
                 )
 
-            with response_cm as response:
+            response_context: contextlib.AbstractContextManager[httpx.Response]
+            if hasattr(response_cm, "__enter__") and hasattr(response_cm, "__exit__"):
+                response_context = response_cm  # type: ignore[assignment]
+            else:
+                response_context = contextlib.nullcontext(response_cm)
+
+            with response_context as response:
                 elapsed_ms = (time.monotonic() - start_request) * 1000.0
                 status_code = response.status_code or 0
                 if status_code >= 400:
@@ -994,7 +1001,22 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                 hasher = hashlib.sha256() if not dry_run else None
                 byte_count = 0
                 chunk_size = int(ctx.chunk_size or (1 << 15))
-                content_iter = response.iter_content(chunk_size=chunk_size)
+                iter_bytes_fn = getattr(response, "iter_bytes", None)
+                if callable(iter_bytes_fn):
+                    content_iter = iter_bytes_fn(chunk_size=chunk_size)
+                else:
+                    iter_content_fn = getattr(response, "iter_content", None)
+                    if callable(iter_content_fn):
+                        content_iter = iter_content_fn(chunk_size=chunk_size)
+                    else:
+                        body = getattr(response, "content", b"")
+                        if isinstance(body, bytes):
+                            if not body:
+                                content_iter = iter(())
+                            else:
+                                content_iter = iter([body])
+                        else:
+                            content_iter = iter(body or [])
                 sniff_buffer = bytearray()
                 prefetched: List[bytes] = []
                 detected: Classification = Classification.UNKNOWN
@@ -1178,7 +1200,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                         hasher=hasher,
                         keep_partial_on_error=True,
                     )
-                except (httpx.HTTPError, AttributeError) as exc:
+                except (httpx.HTTPError, requests.exceptions.ChunkedEncodingError, AttributeError) as exc:
                     LOGGER.warning(
                         "Streaming download failed for %s: %s",
                         url,

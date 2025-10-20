@@ -54,7 +54,25 @@ __all__ = [
     "TestingEnvironment",
     "temporary_resolver",
     "temporary_validator",
+    "use_mock_http_client",
 ]
+
+
+@contextlib.contextmanager
+def use_mock_http_client(transport: "httpx.BaseTransport", **client_kwargs):
+    """Temporarily install an HTTPX client backed by ``transport``."""
+
+    import httpx
+
+    from ..net import configure_http_client, reset_http_client
+
+    client = httpx.Client(transport=transport, **client_kwargs)
+    configure_http_client(client=client)
+    try:
+        yield client
+    finally:
+        reset_http_client()
+        client.close()
 
 
 @dataclass
@@ -269,8 +287,9 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         # lookups re-evaluate against the patched or real resolver.
         from ..io import network as network_mod  # Local import to avoid cycles
         from ..io import rate_limit as rate_mod
+        from ..net import reset_http_client
 
-        network_mod.SESSION_POOL.clear()
+        reset_http_client()
         rate_mod.reset()
         network_mod.clear_dns_stubs()
         self._bucket_state.clear()

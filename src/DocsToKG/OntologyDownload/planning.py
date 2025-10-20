@@ -56,7 +56,7 @@ except ImportError:  # pragma: no cover - non-windows
 
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 
-import requests
+import httpx
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 from requests.structures import CaseInsensitiveDict
@@ -75,7 +75,6 @@ from .errors import (
 from .io import (
     RDF_MIME_ALIASES,
     RDF_MIME_FORMAT_LABELS,
-    SESSION_POOL,
     apply_retry_after,
     download_stream,
     extract_archive_safe,
@@ -87,6 +86,7 @@ from .io import (
     validate_url_security,
 )
 from .io.network import _extract_correlation_id, _parse_retry_after, request_with_redirect_audit
+from .net import get_http_client
 from .logging_utils import setup_logging
 from .migrations import migrate_manifest
 from .resolvers import (
@@ -910,7 +910,7 @@ def planner_http_probe(
     """Issue a polite planner probe using shared networking primitives.
 
     Call graph: :func:`plan_one`/ :func:`plan_all` → :func:`_populate_plan_metadata` /
-    :func:`_fetch_last_modified` → :func:`planner_http_probe` → :func:`SESSION_POOL.lease`.
+    :func:`_fetch_last_modified` → :func:`planner_http_probe` → :func:`get_http_client`.
     """
 
     primary_method = (method or "HEAD").upper()
@@ -944,83 +944,87 @@ def planner_http_probe(
     )
 
     delay_attr = "_retry_after_delay"
+    client = get_http_client(http_config)
 
-    with SESSION_POOL.lease(
-        service=service,
-        host=host,
-        http_config=http_config,
-    ) as session:
-
-        def _issue(
-            current_method: str,
-        ) -> Tuple[int, bool, CaseInsensitiveDict[str], str]:
-            def _perform_once() -> Tuple[int, bool, CaseInsensitiveDict[str], str]:
-                bucket.consume()
-                with request_with_redirect_audit(
-                    session=session,
-                    method=current_method,
-                    url=url,
-                    headers=merged_headers,
-                    timeout=timeout,
-                    stream=current_method != "HEAD",
-                    http_config=http_config,
-                    assume_url_validated=True,
-                ) as response:
-                    status_code = response.status_code
-                    if status_code in {429, 503}:
-                        retry_after_header = response.headers.get("Retry-After")
-                        retry_delay = _parse_retry_after(retry_after_header)
-                        if retry_delay is not None:
-                            apply_retry_after(
-                                http_config=http_config,
-                                service=service,
-                                host=host,
-                                delay=retry_delay,
-                            )
-                        http_error = requests.HTTPError(
-                            f"HTTP error {status_code}", response=response
+    def _issue(
+        current_method: str,
+    ) -> Tuple[int, bool, CaseInsensitiveDict[str], str]:
+        def _perform_once() -> Tuple[int, bool, CaseInsensitiveDict[str], str]:
+            bucket.consume()
+            extensions = {
+                "config": http_config,
+                "headers": merged_headers,
+                "correlation_id": correlation_id,
+            }
+            with request_with_redirect_audit(
+                client=client,
+                method=current_method,
+                url=url,
+                headers=merged_headers,
+                timeout=timeout,
+                stream=current_method != "HEAD",
+                http_config=http_config,
+                assume_url_validated=True,
+                extensions=extensions,
+            ) as response:
+                status_code = response.status_code
+                if status_code in {429, 503}:
+                    retry_after_header = response.headers.get("Retry-After")
+                    retry_delay = _parse_retry_after(retry_after_header)
+                    if retry_delay is not None:
+                        apply_retry_after(
+                            http_config=http_config,
+                            service=service,
+                            host=host,
+                            delay=retry_delay,
                         )
-                        setattr(http_error, delay_attr, retry_delay)
-                        raise http_error
+                    http_error = httpx.HTTPStatusError(
+                        f"HTTP error {status_code}",
+                        request=response.request,
+                        response=response,
+                    )
+                    setattr(http_error, delay_attr, retry_delay)
+                    raise http_error
 
-                    final_url = getattr(response, "validated_url", response.url)
-                    headers_map = CaseInsensitiveDict(response.headers)
-                    return status_code, response.ok, headers_map, final_url
+                final_url = getattr(response, "validated_url", str(response.url))
+                headers_map = CaseInsensitiveDict(response.headers.items())
+                ok = 200 <= status_code < 400
+                return status_code, ok, headers_map, final_url
 
-            def _on_retry(attempt: int, exc: Exception, delay: float) -> None:
-                retry_extra = dict(base_extra)
-                retry_extra.update(
-                    {
-                        "method": current_method,
-                        "attempt": attempt,
-                        "retry_delay_sec": round(delay, 2),
-                        "error": str(exc),
-                        "event": "planner_probe_retry",
-                    }
-                )
-                _log_with_extra(logger, logging.WARNING, "planner probe retrying", retry_extra)
-
-            return retry_with_backoff(
-                _perform_once,
-                retryable=is_retryable_error,
-                max_attempts=max(1, http_config.max_retries),
-                backoff_base=http_config.backoff_factor,
-                jitter=http_config.backoff_factor,
-                callback=_on_retry,
-                retry_after=lambda exc: getattr(exc, delay_attr, None),
+        def _on_retry(attempt: int, exc: Exception, delay: float) -> None:
+            retry_extra = dict(base_extra)
+            retry_extra.update(
+                {
+                    "method": current_method,
+                    "attempt": attempt,
+                    "retry_delay_sec": round(delay, 2),
+                    "error": str(exc),
+                    "event": "planner_probe_retry",
+                }
             )
+            _log_with_extra(logger, logging.WARNING, "planner probe retrying", retry_extra)
 
-        try:
-            status_code, ok, headers_map, resolved_url = _issue(primary_method)
-        except Exception as exc:  # pragma: no cover - exercised via tests
-            failure_extra = dict(base_extra)
-            failure_extra.update(
-                {"method": primary_method, "error": str(exc), "event": "planner_probe_failed"}
-            )
-            _log_with_extra(logger, logging.WARNING, "planner probe failed", failure_extra)
-            if isinstance(exc, (PolicyError, ConfigError)):
-                raise
-            return None
+        return retry_with_backoff(
+            _perform_once,
+            retryable=is_retryable_error,
+            max_attempts=max(1, http_config.max_retries),
+            backoff_base=http_config.backoff_factor,
+            jitter=http_config.backoff_factor,
+            callback=_on_retry,
+            retry_after=lambda exc: getattr(exc, delay_attr, None),
+        )
+
+    try:
+        status_code, ok, headers_map, resolved_url = _issue(primary_method)
+    except Exception as exc:  # pragma: no cover - exercised via tests
+        failure_extra = dict(base_extra)
+        failure_extra.update(
+            {"method": primary_method, "error": str(exc), "event": "planner_probe_failed"}
+        )
+        _log_with_extra(logger, logging.WARNING, "planner probe failed", failure_extra)
+        if isinstance(exc, (PolicyError, ConfigError)):
+            raise
+        return None
 
         method_used = primary_method
 

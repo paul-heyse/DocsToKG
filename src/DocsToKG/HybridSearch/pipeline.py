@@ -982,7 +982,7 @@ class ChunkIngestionPipeline:
 
         return None
 
-    def _delete_existing_for_doc(self, doc_id: str, namespace: str) -> None:
+    def _delete_existing_for_doc(self, doc_id: str, namespace: str) -> Tuple[str, ...]:
         """Remove previously ingested chunks for a document/namespace pair.
 
         Args:
