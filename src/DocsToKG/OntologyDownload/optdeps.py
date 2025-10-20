@@ -20,6 +20,7 @@ __all__ = [
     "get_rdflib",
     "get_pronto",
     "get_owlready2",
+    "graph_factory",
 ]
 
 _BASE_IMPORT = _settings._import_module
@@ -88,16 +89,19 @@ def get_pystow() -> Any:
 
 
 def get_rdflib() -> Any:
-    """Return an ``rdflib`` module or stub ``Graph`` implementation for testing.
+    """Return an ``rdflib``-compatible module, real or stub."""
 
-    Returns:
-        Any: Real ``rdflib`` module or a stub with a ``Graph`` attribute.
-    """
+    return _call_with_override(_settings.get_rdflib, "get_rdflib")
 
-    module = _call_with_override(_settings.get_rdflib, "get_rdflib")
-    if getattr(module, "_ontofetch_stub", False):
-        return module.Graph()
-    return module
+
+def graph_factory() -> Callable[[], Any]:
+    """Return the ``Graph`` constructor from the active rdflib module."""
+
+    module = get_rdflib()
+    graph_cls = getattr(module, "Graph", None)
+    if graph_cls is None:
+        raise AttributeError("rdflib module does not expose a Graph constructor")
+    return graph_cls
 
 
 def get_pronto() -> Any:
