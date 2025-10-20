@@ -28,8 +28,12 @@ def test_get_rdflib_stub_handles_parse_and_serialize(tmp_path: Path) -> None:
     """Stub rdflib should expose parse/serialize helpers for tests."""
 
     with patch.object(optdeps, "_import_module", side_effect=ImportError):
-        graph = optdeps.get_rdflib()
+        module = optdeps.get_rdflib()
+        graph_cls = optdeps.graph_factory()
 
+    assert graph_cls is module.Graph
+
+    graph = graph_cls()
     source = tmp_path / "example.ttl"
     source.write_text("@prefix ex: <http://example.org/> . ex:a ex:b ex:c .\n")
     parsed = graph.parse(source)

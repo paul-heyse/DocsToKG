@@ -186,6 +186,7 @@ pytest.importorskip("pydantic_settings")
 
 import DocsToKG.OntologyDownload.plugins as plugins_mod
 import DocsToKG.OntologyDownload.validation as validation_mod
+from DocsToKG.OntologyDownload import optdeps
 from DocsToKG.OntologyDownload.settings import DefaultsConfig, ResolvedConfig
 from DocsToKG.OntologyDownload.validation import (
     ValidationRequest,
@@ -327,6 +328,23 @@ def test_validate_rdflib_success(ttl_file, tmp_path, config):
     expected_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     assert data["normalized_sha256"] == expected_hash
     assert result.details["normalized_sha256"] == expected_hash
+
+
+def test_validate_rdflib_with_stub(ttl_file, tmp_path, config):
+    """Validation should succeed when rdflib falls back to the stub implementation."""
+
+    with patch.object(optdeps, "_import_module", side_effect=ImportError):
+        rdflib_stub = optdeps.get_rdflib()
+
+    request = make_request(ttl_file, tmp_path / "stub", config)
+    with patch.object(validation_mod, "rdflib", rdflib_stub):
+        result = validation_mod.validate_rdflib(request, _noop_logger())
+
+    assert result.ok
+    normalized = request.normalized_dir / f"{ttl_file.stem}.ttl"
+    assert normalized.exists()
+    payload = json.loads((request.validation_dir / "rdflib_parse.json").read_text())
+    assert payload["ok"]
 
 
 def test_normalize_streaming_deterministic(tmp_path):
