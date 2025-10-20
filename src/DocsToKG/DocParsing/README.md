@@ -209,11 +209,28 @@ sequenceDiagram
 - **Operational impact:** Switching digest algorithms changes manifest `input_hash` values and chunk UUIDs. Set `DOCSTOKG_HASH_ALG=sha1` temporarily when resuming runs generated with the previous default, then revert to SHA-256 once caught up.
 
 ## Data contracts & schemas
-- Schemas: `formats.CHUNK_ROW_SCHEMA`, `formats.VECTOR_ROW_SCHEMA`, DocTags manifest rows emitted via `telemetry.ManifestEntry`.
-- Manifests stored under `Data/Manifests/docparse.*.manifest.jsonl` (DocTags, chunking, embeddings).
-- Chunk output: JSONL lines with `ChunkPayload`, `ProvenanceMetadata`, token spans; embeddings output: JSONL with dense vector (float32 list) + sparse weights.
-- Manifest rows follow the pattern `{"doc_id": "...", "input_hash": "...", "status": "success|skip|error", "attempts": [...], "extras": {...}}`. Resume decisions compare the stored `input_hash` with the recomputed hash before skipping work.
-- `telemetry.StageTelemetry` acquires advisory locks from `core.concurrency.acquire_lock` before appending JSON lines, guaranteeing atomic writes even with concurrent processes.
+- Schemas: Pydantic models in `formats.ChunkRow` / `formats.VectorRow` and manifest payloads coordinated through `telemetry.ManifestEntry`.
+- Manifests: append-only JSONL files at `Data/Manifests/docparse.*.manifest.jsonl` for each stage (`doctags`, `chunk`, `embeddings`) with companion attempt logs at `Data/Manifests/docparse.*.attempts.jsonl` resolved by [`io.resolve_manifest_path`](io.py) / [`io.resolve_attempts_path`](io.py).
+- Status taxonomy: all manifest and attempt entries record `status="success|skip|failure"` (no `error` state). Attempts include timing, byte counts, and optional reasons via [`telemetry.Attempt`](telemetry.py); manifests merge metadata from [`telemetry.StageTelemetry`](telemetry.py) and enforce the same status enum.
+- Example manifest row (with metadata merged by `StageTelemetry.write_manifest_entry`):
+  ```json
+  {
+    "run_id": "2025-10-19T09:30:12Z",
+    "file_id": "doc-001",
+    "doc_id": "doc-001",
+    "stage": "chunk",
+    "tokens": 3842,
+    "status": "success",
+    "schema_version": "v3",
+    "duration_s": 1.284,
+    "input_hash": "sha256:1e9c...",
+    "hash_alg": "sha256",
+    "chunk_count": 12,
+    "output_path": "Data/ChunkedDocTagFiles/doc-001.chunk.jsonl"
+  }
+  ```
+- Resume contract: [`core.manifest.ResumeController`](core/manifest.py) compares `status` and `input_hash` to decide whether to skip work, so metadata fields supplied by `StageTelemetry` (for example, `vector_format` in embedding runs) must stay in sync with their corresponding writers.
+- `telemetry.StageTelemetry` acquires advisory locks via [`core.concurrency.acquire_lock`](core/concurrency.py) before appending JSON lines, guaranteeing atomic writes even with concurrent processes.
 
 ## Interactions with other packages
 - Upstream: consumes raw documents, optional DocTags produced by external systems.
@@ -222,7 +239,7 @@ sequenceDiagram
 
 ## Observability
 - Logs: `logging.py` emits structured records (JSON + console) that include `stage`, `doc_id`, elapsed durations, and correlation IDs. Output paths default to stdout plus `${DOCSTOKG_DATA_ROOT}/Logs/docparse-*.jsonl`; override using CLI `--log-level` or `DOCSTOKG_LOG_DIR`.
-- Telemetry: `telemetry.TelemetrySink` writes attempt + manifest JSON lines (`docparse.*.manifest.jsonl`) using advisory locks, ensuring atomic appends even with concurrent workers. Manifest rows now capture `vector_format` for success, skip, and validate-only entries so parquet adoption can be audited downstream.
+- Telemetry: `telemetry.TelemetrySink` writes attempt + manifest JSON lines (`docparse.*.attempts.jsonl` / `docparse.*.manifest.jsonl`) using advisory locks, ensuring atomic appends even with concurrent workers. Manifest rows now capture `vector_format` for success, skip, and validate-only entries so parquet adoption can be audited downstream.
 - Metrics: `logging.telemetry_scope` and `telemetry.StageTelemetry` expose counters and histograms suitable for ingestion by dashboard jobs (see `tests/docparsing/test_chunk_manifest_resume.py` for usage).
 - SLO tracking: maintain ≥99.5 % manifest success across stages and keep embedding validation (`--validate-only`) under 2.2 s P50 per document based on synthetic benchmark fixtures.
 - Health checks: prefer `docparse chunk --validate-only` / `docparse embed --validate-only` when validating environments—these commands read existing JSONL artifacts without mutating outputs.
