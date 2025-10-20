@@ -71,7 +71,7 @@ test -x .venv/bin/python || { echo "ERROR: .venv is missing — STOP"; exit 1; }
 ## Core capabilities
 - **Planning & execution** – `planning.plan_all`/`fetch_all` turn `FetchSpec` inputs into `PlannedFetch`/`Manifest` objects, coordinate workers with `CancellationTokenGroup`, enforce `validate_url_security`, and persist manifests/lockfiles that capture fingerprints, normalized hashes, and streaming checksum fields.
 - **Resolver catalog & plugins** – `resolvers.py` ships first-party resolvers (OBO, OLS, BioPortal, Ontobee, SKOS, LOV, XBRL, direct), normalises licences, injects polite headers, enforces token-bucket budgets, and extends via the `docstokg.ontofetch.resolver` entry-point registry.
-- **Download runtime** – `io.network.StreamingDownloader` reuses the shared `httpx.Client` exposed via `DocsToKG.OntologyDownload.net`, layering RFC-9111 caching (Hishel), redirect auditing, resume support, Retry-After aware rate limiting via `io.rate_limit`, and HTTP allowlist enforcement (`validate_url_security`) that honours documentation networks while blocking private ranges by default.
+- **Download runtime** – `io.network.download_stream` streams bytes directly from the shared `httpx.Client` exposed via `DocsToKG.OntologyDownload.net`, layering RFC-9111 caching (Hishel), redirect auditing, resume support, Retry-After aware rate limiting via `io.rate_limit`, and HTTP allowlist enforcement (`validate_url_security`) that honours documentation networks while blocking private ranges by default. The helper emits structured progress telemetry and honours conditional headers (ETag/Last-Modified) to short-circuit downloads when cached artefacts are still valid.
 - **Filesystem & storage** – `io.filesystem` sanitises filenames, enforces archive expansion limits, generates correlation IDs, masks secrets, and cooperates with storage backends (local or fsspec) including optional CAS mirroring.
 - **Checksum enforcement** – `checksums.py` parses `expected_checksum`/`checksum_url` extras, streams remote manifests, and returns `ExpectedChecksum` objects embedded throughout manifests and download results.
 - **Validation pipeline** – `validation.run_validators` orchestrates rdflib/pronto/owlready2/ROBOT/Arelle validators with `_ValidatorBudget`, optional process pools, disk-backed normalisation, and plugin registries cached via `load_validator_plugins`, emitting `RetryableValidationError` when fallback resolvers should be attempted.
@@ -125,7 +125,7 @@ sequenceDiagram
 ### Pipeline walkthrough
 1. **Configuration resolution** – `settings.get_default_config()` merges baked-in defaults, `ONTOFETCH_*` overrides, YAML specs, and CLI flags into a `ResolvedConfig`, selecting storage backends and planner settings (`planner.probing_enabled`, `enable_cas_mirror`) before any network traffic.
 2. **Plan synthesis** – `planning.plan_all` expands each `FetchSpec` into `PlannedFetch` objects, loads resolver plugins, honours `--allowed-hosts`/policy checks, executes optional metadata probes, and writes lockfiles unless `--no-lock` is requested.
-3. **Streaming download** – `io.network.StreamingDownloader` draws on the shared HTTPX client (`get_http_client`) so every HEAD/GET honours the same cache, timeout, and retry configuration, coordinates per-host/service token buckets, audits redirects, resumes partial transfers, and verifies checksum metadata via `checksums.ExpectedChecksum`.
+3. **Streaming download** – `io.network.download_stream` draws on the shared HTTPX client (`get_http_client`) so every request honours the same cache, timeout, and retry configuration, coordinates per-host/service token buckets, audits redirects, resumes partial transfers, verifies checksum metadata via `checksums.ExpectedChecksum`, and automatically marks artefacts as `cached` when conditional requests return HTTP 304 or hashes match previous manifests.
 4. **Staging & extraction** – `settings.STORAGE` prepares version directories, mirrors CAS artefacts when enabled, and `io.filesystem` sanitises filenames, enforces archive expansion thresholds, and masks secrets in diagnostic payloads.
 5. **Validation & budget enforcement** – `validation.run_validators` hydrates validator plugins, applies `_ValidatorBudget` semaphores and optional process pools, streams large normalisation jobs to disk, and persists validator JSON alongside outputs.
 6. **Manifest emission** – `manifests.results_to_dict` and `_write_manifest` assemble schema 1.0 manifests capturing resolver attempts, fingerprints, streaming hashes, and validator outcomes; optional lockfiles and plan baselines are updated in tandem.
@@ -156,6 +156,7 @@ defaults:
     download_timeout_sec: 300
     backoff_factor: 0.5
     per_host_rate_limit: "4/second"
+    rate_limiter: "pyrate"
     rate_limits:
       ols: "5/second"
       bioportal: "1/second"
@@ -185,6 +186,13 @@ ontologies:
       url: https://op.europa.eu/o/opportal-service/euvoc-download-handler?cellarURI=http%3A%2F%2Fpublications.europa.eu%2Fresource%2Fauthority%2Feurovoc
 ```
 
+The `defaults.http.rate_limiter` flag selects the throttling backend. Use the
+default (`"pyrate"`) to route all requests through the pyrate-limiter manager,
+which persists shared quotas in SQLite when `shared_rate_limit_dir` is set, or
+switch to `"legacy"` to temporarily fall back to the legacy token bucket while
+rolling out changes. `ONTOFETCH_RATE_LIMITER` exposes the same toggle for
+environment-based overrides.
+
 Validator concurrency is pooled across all requests whenever
 `validation.max_concurrent_validators` is configured: the scheduler inspects
 every `ValidationRequest` and applies the tightest constraint (clamped between 1
@@ -208,6 +216,7 @@ Key environment variables and overrides:
 | `ONTOFETCH_LOG_DIR` | Redirect JSONL/rotated logs produced by `logging_utils`. | `${PYSTOW_HOME}/ontology-fetcher/logs` |
 | `ONTOFETCH_STORAGE_URL` | Switch storage backend to fsspec (e.g., `file:///mnt/shared`, `s3://bucket/prefix`). | Local filesystem under `LOCAL_ONTOLOGY_DIR` |
 | `ONTOFETCH_SHARED_RATE_LIMIT_DIR` | Directory for cross-process token buckets. | `${CACHE_DIR}/rate-limits` |
+| `ONTOFETCH_RATE_LIMITER` | Selects the limiter backend (`pyrate` or `legacy`). | `pyrate` |
 | `ONTOFETCH_MAX_RETRIES`, `ONTOFETCH_TIMEOUT_SEC`, `ONTOFETCH_DOWNLOAD_TIMEOUT_SEC`, `ONTOFETCH_PER_HOST_RATE_LIMIT`, `ONTOFETCH_BACKOFF_FACTOR`, `ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB`, `ONTOFETCH_LOG_LEVEL` | Override download/logging configuration fields without editing YAML. | Values from `defaults.http` / `defaults.logging` |
 | Resolver credentials (e.g., `BIOPORTAL_API_KEY`, `EUROPE_PMC_API_KEY`) | Injected into resolver extras via `settings.get_env_overrides`. | Required per resolver |
 

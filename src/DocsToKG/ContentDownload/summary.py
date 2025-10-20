@@ -123,3 +123,21 @@ def emit_console_summary(result: RunResult, *, dry_run: bool) -> None:
         for resolver_name, items in error_reasons.items():
             formatted = ", ".join(f"{entry['reason']} ({entry['count']})" for entry in items)
             print(f"    {resolver_name}: {formatted}")
+
+    limiter_summary = summary.get("rate_limiter", {})
+    if limiter_summary:
+        backend = limiter_summary.get("backend")
+        print("Rate limiter:")
+        if backend:
+            print(f"  backend: {backend}")
+        metrics = limiter_summary.get("metrics", {})
+        for host, roles in metrics.items():
+            for role, stats in roles.items():
+                acquire = stats.get("acquire_total", 0)
+                blocked = stats.get("blocked_total", 0)
+                avg_wait = stats.get("wait_ms_avg", 0.0)
+                max_wait = stats.get("wait_ms_max", 0.0)
+                print(
+                    f"  {host}.{role}: acquire={acquire} blocked={blocked} "
+                    f"avg_wait={avg_wait:.1f}ms max_wait={max_wait:.1f}ms"
+                )

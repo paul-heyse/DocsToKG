@@ -1,0 +1,17 @@
+                                                                                
+ Usage: docparse manifest [OPTIONS]                                             
+                                                                                
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --stage            STAGE    Manifest stage to inspect (repeatable).          │
+│                             Supported stages: doctags-html, doctags-pdf,     │
+│                             chunks, embeddings.                              │
+│ --data-root        PATH     DocsToKG data root override used when resolving  │
+│                             manifests.                                       │
+│ --tail             INTEGER  Print the last N manifest entries.               │
+│                             [default: 0]                                     │
+│ --summarize                 Print per-stage status and duration summary.     │
+│ --raw                       Output tail entries as JSON instead of           │
+│                             human-readable text.                             │
+│ --help                      Show this message and exit.                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+

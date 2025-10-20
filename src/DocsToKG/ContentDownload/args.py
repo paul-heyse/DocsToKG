@@ -934,6 +934,57 @@ def resolve_config(
     except argparse.ArgumentTypeError as exc:
         parser.error(str(exc))
 
+    legacy_notice_emitted = False
+
+    if getattr(args, "domain_min_interval", None):
+        for domain, interval in args.domain_min_interval:
+            if interval > 0:
+                interval_ms = int(math.ceil(interval * Duration.SECOND))
+                rate_override_specs.append((domain, "artifact", [Rate(1, interval_ms)]))
+                legacy_notice_emitted = True
+        args.domain_min_interval = []
+
+    if getattr(args, "domain_token_bucket", None):
+        for domain, spec in args.domain_token_bucket:
+            rate = max(spec.get("rate_per_second", 0.0), 0.0)
+            capacity = max(spec.get("capacity", 0.0), 0.0)
+            rates: List[Rate] = []
+            if rate > 0:
+                rates.append(Rate(int(math.ceil(rate)), Duration.SECOND))
+            if capacity > rate and capacity > 0:
+                rates.append(Rate(int(math.ceil(capacity)), Duration.MINUTE))
+            if rates:
+                rate_override_specs.append((domain, "artifact", rates))
+                legacy_notice_emitted = True
+        args.domain_token_bucket = []
+
+    if getattr(config, "domain_min_interval_s", None):
+        for domain, interval in list(config.domain_min_interval_s.items()):
+            if interval > 0:
+                interval_ms = int(math.ceil(interval * Duration.SECOND))
+                rate_override_specs.append((domain, "artifact", [Rate(1, interval_ms)]))
+                legacy_notice_emitted = True
+        config.domain_min_interval_s = {}
+
+    if getattr(config, "domain_token_buckets", None):
+        for domain, spec in list(config.domain_token_buckets.items()):
+            rate = max(spec.get("rate_per_second", 0.0), 0.0)
+            capacity = max(spec.get("capacity", 0.0), 0.0)
+            rates: List[Rate] = []
+            if rate > 0:
+                rates.append(Rate(int(math.ceil(rate)), Duration.SECOND))
+            if capacity > rate and capacity > 0:
+                rates.append(Rate(int(math.ceil(capacity)), Duration.MINUTE))
+            if rates:
+                rate_override_specs.append((domain, "artifact", rates))
+                legacy_notice_emitted = True
+        config.domain_token_buckets = {}
+
+    if legacy_notice_emitted:
+        LOGGER.warning(
+            "Legacy domain throttling options detected; converted to centralized rate limiter policies."
+        )
+
     for host, role, rates in rate_override_specs:
         policy = _ensure_policy(host)
         targets = ROLE_ORDER if role is None else (role,)

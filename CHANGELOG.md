@@ -34,6 +34,7 @@ All notable changes to DocsToKG are documented in this file.
   telemetry for retries/fallbacks, support an opt-out flag
   (`defaults.planner.probing_enabled` / `--no-planner-probes`), and coordinate
   ontology index writes via an ontology-scoped lock with wait-time logging.
+- Ontology download networking now streams directly from HTTPX via `io.network.download_stream`, removing the legacy `StreamingDownloader` and `pooch` dependency. Conditional requests honour ETag/Last-Modified validators, cached artefacts short-circuit with `status="cached"`, and tests exercise progress telemetry using `httpx.MockTransport`.
 - Content download outcomes now leave `reason` unset for fresh downloads, retain `conditional_not_modified` for genuine 304s, and tag voluntary skips with the dedicated `skip_large_download` code.
 - HTTP range resume is hard-disabled; resolver hints prefixed with `resume_` are stripped and telemetry annotates ignored requests via `resume_disabled=true`.
 - Manifest warm-up defaults to a lazy `ManifestUrlIndex`, with `--warm-manifest-cache` offered solely for small datasets.

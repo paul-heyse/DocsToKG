@@ -86,6 +86,7 @@ class WaybackResolver(RegisteredResolver):
                     client,
                     "get",
                     "https://archive.org/wayback/available",
+                    role="metadata",
                     params={"url": original},
                     timeout=config.get_timeout(self.name),
                     headers=config.polite_headers,

@@ -352,7 +352,29 @@ async def guarded_call(user_id: str):
 ## 15) Version awareness
 
 * **Current (3.9.x)** adds MultiprocessBucket, delay tuning, lock simplifications; 3.5+ introduced Postgres; 3.8 added SQLite file lock; 3.0 brought the major API overhaul. ([Pyrate Limiter][2])
-* Project is MIT‑licensed and actively maintained; PyPI and conda‑forge packages available. ([PyPI][4])
+* Project is MIT-licensed and actively maintained; PyPI and conda-forge packages available. ([PyPI][4])
+
+## 16) DocsToKG OntologyDownload integration
+
+* `DocsToKG.OntologyDownload` now defaults to a pyrate-limiter manager. Each
+  limiter key is normalised as `"{service or '_'}:{host or 'default'}"` and
+  backed by `Rate` objects parsed from `per_host_rate_limit` and
+  `rate_limits[...]` strings.
+* The configuration flag `defaults.http.rate_limiter` (or
+  `ONTOFETCH_RATE_LIMITER`) toggles between the new manager (`"pyrate"`) and the
+  legacy token bucket (`"legacy"`). Use the legacy mode only when rolling back a
+  deployment or bisecting regressions.
+* When `defaults.http.shared_rate_limit_dir` is provided, the limiter manager
+  persists counters in `<shared_rate_limit_dir>/ratelimit.sqlite` via
+  `SQLiteBucket.init_from_file(..., use_file_lock=True)`. Otherwise an
+  `InMemoryBucket` keeps per-process quotas.
+* `apply_retry_after` now returns the parsed delay (seconds) without mutating
+  limiter state; callers sleep for that duration before the next `consume()`.
+  Legacy mode retains the previous behaviour so downstream extensions continue
+  to function.
+* Tests can continue to inject custom throttles through
+  `DownloadConfiguration.set_bucket_provider(...)`; the manager respects custom
+  providers regardless of the selected mode.
 
 ---
 

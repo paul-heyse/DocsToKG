@@ -102,7 +102,7 @@ Responsibilities
   :class:`ResolverConfig`, :class:`AttemptRecord`, :class:`DownloadOutcome`,
   :class:`PipelineResult`, and :class:`ResolverMetrics`.
 - Coordinate threaded resolver execution via :class:`ResolverPipeline`,
-  including concurrency controls, per-domain token buckets, circuit breakers,
+  including centralized rate limiting, circuit breakers,
   and retry logic wired into :mod:`DocsToKG.ContentDownload.networking`.
 - Track manifest/bookkeeping state (URL dedupe, cache verification, latency
   counters) so downstream modules can persist consistent telemetry snapshots.
@@ -140,7 +140,7 @@ from collections import Counter, defaultdict
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from threading import BoundedSemaphore, Lock
+from threading import Lock
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -170,11 +170,7 @@ from DocsToKG.ContentDownload.core import (
     normalize_reason,
     normalize_url,
 )
-from DocsToKG.ContentDownload.networking import (
-    CircuitBreaker,
-    TokenBucket,
-    head_precheck,
-)
+from DocsToKG.ContentDownload.networking import CircuitBreaker, head_precheck
 from DocsToKG.ContentDownload.resolvers import (
     DEFAULT_RESOLVER_ORDER,
     DEFAULT_RESOLVER_TOGGLES,
@@ -1298,14 +1294,8 @@ class ResolverPipeline:
         self._global_seen_urls: set[str] = set(initial_seen_urls or ())
         self._global_manifest_index = global_manifest_index or {}
         self._global_lock = threading.Lock()
-        self._last_host_hit: Dict[str, float] = {}
-        self._host_lock = threading.Lock()
-        self._host_buckets: Dict[str, TokenBucket] = {}
-        self._host_bucket_lock = threading.Lock()
         self._host_breakers: Dict[str, CircuitBreaker] = {}
         self._host_breaker_lock = threading.Lock()
-        self._host_semaphores: Dict[str, BoundedSemaphore] = {}
-        self._host_semaphore_lock = threading.Lock()
         self._resolver_breakers: Dict[str, CircuitBreaker] = {}
         circuit_breakers = getattr(self.config, "resolver_circuit_breakers", {}) or {}
         for name, spec in circuit_breakers.items():
@@ -1406,94 +1396,6 @@ class ResolverPipeline:
             self._last_invocation[resolver_name] = now + wait
         if wait > 0:
             _time.sleep(wait)
-
-    def _respect_domain_limit(self, url: str) -> float:
-        """Enforce per-domain throttling when configured.
-
-        Args:
-            url: Candidate URL whose host may be throttled.
-
-        Returns:
-            Total seconds slept enforcing the domain policies.
-        """
-
-        if not url:
-            return 0.0
-        host = urlsplit(url).netloc.lower()
-        if not host:
-            return 0.0
-
-        waited = 0.0
-        bucket = self._ensure_host_bucket(host)
-        if bucket is not None:
-            wait_seconds = bucket.acquire()
-            if wait_seconds > 0:
-                _time.sleep(wait_seconds)
-                waited += wait_seconds
-
-        interval_map = self.config.domain_min_interval_s
-        if not interval_map:
-            return waited
-        interval = interval_map.get(host)
-        if not interval:
-            return waited
-
-        now = _time.monotonic()
-        wait = 0.0
-        with self._host_lock:
-            last = self._last_host_hit.get(host)
-            if last is None:
-                self._last_host_hit[host] = now if now > 0.0 else 1e-9
-                return waited
-            elapsed = now - last
-            if elapsed >= interval:
-                self._last_host_hit[host] = now
-                return waited
-            wait = interval - elapsed
-
-        if wait > 0:
-            jitter = random.random() * 0.05
-            sleep_for = wait + jitter
-            _time.sleep(sleep_for)
-            waited += sleep_for
-            with self._host_lock:
-                self._last_host_hit[host] = _time.monotonic()
-
-        return waited
-
-    def _ensure_host_bucket(self, host: str) -> Optional[TokenBucket]:
-        spec = self.config.domain_token_buckets.get(host)
-        if not spec:
-            return None
-        with self._host_bucket_lock:
-            bucket = self._host_buckets.get(host)
-            if bucket is None:
-                bucket = TokenBucket(
-                    rate_per_second=float(spec["rate_per_second"]),
-                    capacity=float(spec["capacity"]),
-                )
-                self._host_buckets[host] = bucket
-            return bucket
-
-    def _acquire_host_slot(self, host: str) -> Optional[Callable[[], None]]:
-        limit = self.config.max_concurrent_per_host
-        if limit <= 0:
-            return None
-        host_key = host.lower()
-        with self._host_semaphore_lock:
-            semaphore = self._host_semaphores.get(host_key)
-            if semaphore is None:
-                semaphore = BoundedSemaphore(limit)
-                self._host_semaphores[host_key] = semaphore
-        semaphore.acquire()
-
-        def _release() -> None:
-            try:
-                semaphore.release()
-            except ValueError:  # pragma: no cover - defensive
-                pass
-
-        return _release
 
     def _get_existing_host_breaker(self, host: str) -> Optional[CircuitBreaker]:
         with self._host_breaker_lock:
@@ -2153,66 +2055,60 @@ class ResolverPipeline:
                 return None
             head_precheck_passed = True
 
-        release_host_slot: Optional[Callable[[], None]] = None
-        try:
-            state.attempt_counter += 1
-            host_value = (parsed_url.netloc or "").lower()
-            if host_value:
-                allowed, remaining = self._host_breaker_allows(host_value)
-                if not allowed:
-                    detail = f"cooldown-{remaining:.1f}s"
-                    self._emit_attempt(
-                        AttemptRecord(
-                            run_id=self._run_id,
-                            work_id=artifact.work_id,
-                            resolver_name=resolver_name,
-                            resolver_order=order_index,
-                            url=url,
-                            status=Classification.SKIPPED,
-                            http_status=None,
-                            content_type=None,
-                            elapsed_ms=None,
-                            reason=ReasonCode.DOMAIN_BREAKER_OPEN,
-                            reason_detail=detail,
-                            metadata=result.metadata,
-                            dry_run=state.dry_run,
-                            resolver_wall_time_ms=resolver_wall_time_ms,
-                            retry_after=remaining if remaining > 0 else None,
-                        )
+        state.attempt_counter += 1
+        host_value = (parsed_url.netloc or "").lower()
+        if host_value:
+            allowed, remaining = self._host_breaker_allows(host_value)
+            if not allowed:
+                detail = f"cooldown-{remaining:.1f}s"
+                self._emit_attempt(
+                    AttemptRecord(
+                        run_id=self._run_id,
+                        work_id=artifact.work_id,
+                        resolver_name=resolver_name,
+                        resolver_order=order_index,
+                        url=url,
+                        status=Classification.SKIPPED,
+                        http_status=None,
+                        content_type=None,
+                        elapsed_ms=None,
+                        reason=ReasonCode.DOMAIN_BREAKER_OPEN,
+                        reason_detail=detail,
+                        metadata=result.metadata,
+                        dry_run=state.dry_run,
+                        resolver_wall_time_ms=resolver_wall_time_ms,
+                        retry_after=remaining if remaining > 0 else None,
                     )
-                    self._record_skip(resolver_name, "domain-breaker-open", detail)
-                    state.last_reason = ReasonCode.DOMAIN_BREAKER_OPEN
-                    state.last_reason_detail = detail
-                    return None
-                release_host_slot = self._acquire_host_slot(host_value)
-            domain_wait = self._respect_domain_limit(url)
-            kwargs: Dict[str, Any] = {}
-            if self._download_accepts_head_flag:
-                kwargs["head_precheck_passed"] = head_precheck_passed
-
-            if self._download_accepts_context:
-                outcome = self.download_func(
-                    client,
-                    artifact,
-                    url,
-                    result.referer,
-                    self.config.get_timeout(resolver_name),
-                    download_context,
-                    **kwargs,
                 )
-            else:
-                outcome = self.download_func(
-                    client,
-                    artifact,
-                    url,
-                    result.referer,
-                    self.config.get_timeout(resolver_name),
-                    **kwargs,
-                )
+                self._record_skip(resolver_name, "domain-breaker-open", detail)
+                state.last_reason = ReasonCode.DOMAIN_BREAKER_OPEN
+                state.last_reason_detail = detail
+                return None
+        kwargs: Dict[str, Any] = {}
+        if self._download_accepts_head_flag:
+            kwargs["head_precheck_passed"] = head_precheck_passed
 
-            retry_after_hint = outcome.retry_after
-            if retry_after_hint is None and domain_wait > 0:
-                retry_after_hint = domain_wait
+        if self._download_accepts_context:
+            outcome = self.download_func(
+                client,
+                artifact,
+                url,
+                result.referer,
+                self.config.get_timeout(resolver_name),
+                download_context,
+                **kwargs,
+            )
+        else:
+            outcome = self.download_func(
+                client,
+                artifact,
+                url,
+                result.referer,
+                self.config.get_timeout(resolver_name),
+                **kwargs,
+            )
+
+        retry_after_hint = outcome.retry_after
 
             metadata_payload: Dict[str, Any] = {}
             resolver_metadata = getattr(result, "metadata", None)
@@ -2289,6 +2185,3 @@ class ResolverPipeline:
 
             self._jitter_sleep()
             return None
-        finally:
-            if release_host_slot:
-                release_host_slot()

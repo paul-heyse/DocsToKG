@@ -1,0 +1,38 @@
+                                                                                
+ Usage: docparse token-profiles [OPTIONS]                                       
+                                                                                
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --data-root          PATH                        DocsToKG data root          │
+│                                                  override. Defaults to       │
+│                                                  auto-detection or           │
+│                                                  $DOCSTOKG_DATA_ROOT.        │
+│ --config             PATH                        Optional path to            │
+│                                                  JSON/YAML/TOML config.      │
+│ --doctags-dir        PATH                        Directory containing        │
+│                                                  DocTags files.              │
+│ --sample-size        INTEGER                     Number of DocTags files to  │
+│                                                  sample (<=0 means all).     │
+│                                                  [default: 20]               │
+│ --max-chars          INTEGER                     Trim samples to this many   │
+│                                                  characters (<=0 keeps full  │
+│                                                  text).                      │
+│                                                  [default: 4000]             │
+│ --baseline           TEXT                        Tokenizer treated as        │
+│                                                  baseline for ratios.        │
+│                                                  [default:                   │
+│                                                  Qwen/Qwen3-Embedding-4B]    │
+│ --tokenizer          NAME                        Additional tokenizer        │
+│                                                  identifier to profile       │
+│                                                  (repeatable).               │
+│ --window-min         INTEGER                     Reference min tokens scaled │
+│                                                  by observed ratios.         │
+│                                                  [default: 256]              │
+│ --window-max         INTEGER                     Reference max tokens scaled │
+│                                                  by observed ratios.         │
+│                                                  [default: 512]              │
+│ --log-level          [CRITICAL|ERROR|WARNING|IN  Logging verbosity for       │
+│                      FO|DEBUG]                   structured output.          │
+│                                                  [default: INFO]             │
+│ --help                                           Show this message and exit. │
+╰──────────────────────────────────────────────────────────────────────────────╯
+

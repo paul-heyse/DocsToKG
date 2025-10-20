@@ -52,7 +52,7 @@
   - Build requests via `client.build_request(...)`, pass polite headers through `ontology_headers`, and call `client.send()`.
   - Replace direct status/headers access with `response.status_code` / `response.headers`.
   - Ensure retry/backoff uses `httpx.HTTPStatusError` and `response.next_request` is not relied on (redirects handled in audit helper).
-- [ ] 3.3 Audit the entire package (`rg "SESSION_POOL"`) and migrate remaining references, including `checksums`, `planning`, any CLI utilities, documentation strings, and tests. Remove stale imports and comments referencing `SessionPool`.
+- [x] 3.3 Audit the entire package (`rg "SESSION_POOL"`) and migrate remaining references, including `checksums`, `planning`, any CLI utilities, documentation strings, and tests. Remove stale imports and comments referencing `SessionPool`.
 - [x] 3.4 Update `DocsToKG.OntologyDownload.testing.reset_state()` (and similar fixtures) to call `reset_http_client()` so each test gets a fresh client/transport/cache state.
 
 ## 4. Configuration & injection bridges
@@ -68,20 +68,20 @@
 - [x] 5.1 Update all tests referencing `SESSION_POOL`:
   - `tests/ontology_download/test_download_behaviour.py` should assert `net.get_http_client()` reuse by inspecting transport call counts instead of pool size.
   - Replace `requests` monkeypatches with `httpx.MockTransport` that returns deterministic responses (including redirect and 304 cases).
-- [ ] 5.2 Add focused unit tests for `net.py` covering:
+- [x] 5.2 Add focused unit tests for `net.py` covering:
   - Client singleton behaviour (`configure_http_client` swap + restore).
   - Timeouts/limits derived from `DownloadConfiguration`.
   - Polite header injection via `request.extensions`.
   - Cache directory creation and that repeated GET triggers a Hishel cache hit.
-- [ ] 5.3 Extend download behaviour tests to include:
+- [x] 5.3 Extend download behaviour tests to include:
   - A scenario where the manifest contains `etag`/`last_modified` and the server returns 304, asserting `DownloadResult.status == "cached"` and no new bytes are written.
   - A scenario using redirects to confirm `request_with_redirect_audit` blocks disallowed redirects and only follows validated targets.
-- [ ] 5.4 Update retry/backoff tests so `is_retryable_error` responds to `httpx` exceptions (connect/read/timeouts) and that planner probes still propagate `Retry-After` delays into the token bucket registry.
-- [ ] 5.5 Execute `pytest tests/ontology_download -q` and capture results in the rollout notes; document any new fixtures (`use_mock_http_client`) required by test modules.
+- [x] 5.4 Update retry/backoff tests so `is_retryable_error` responds to `httpx` exceptions (connect/read/timeouts) and that planner probes still propagate `Retry-After` delays into the token bucket registry.
+- [x] 5.5 Execute `pytest tests/ontology_download -q` and capture results in the rollout notes; document any new fixtures (`use_mock_http_client`) required by test modules.
 
 ## 6. Documentation & developer guidance
-- [ ] 6.1 Refresh `src/DocsToKG/OntologyDownload/README.md` and `AGENTS.md`:
+- [x] 6.1 Refresh `src/DocsToKG/OntologyDownload/README.md` and `AGENTS.md`:
   - Replace mentions of `SessionPool` with references to `DocsToKG.OntologyDownload.net`.
   - Document how to configure custom transports and how Hishel manages the cache directory.
-- [ ] 6.2 Update library briefs (`LibraryDocumentation/httpx.md`, `LibraryDocumentation/hishel.md`) to include a “DocsToKG integration” section describing the new helper APIs, cache layout, and redirect policy.
-- [ ] 6.3 Review NAVMAP headers and docstrings in `io/network.py` and `net.py` to ensure they explain the HTTPX + Hishel architecture, explicitly noting that `requests` is no longer part of the stack.
+- [x] 6.2 Update library briefs (`LibraryDocumentation/httpx.md`, `LibraryDocumentation/hishel.md`) to include a “DocsToKG integration” section describing the new helper APIs, cache layout, and redirect policy.
+- [x] 6.3 Review NAVMAP headers and docstrings in `io/network.py` and `net.py` to ensure they explain the HTTPX + Hishel architecture, explicitly noting that `requests` is no longer part of the stack.

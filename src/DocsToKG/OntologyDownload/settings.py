@@ -173,7 +173,12 @@ class ValidationConfig(BaseModel):
 
 
 class DownloadConfiguration(BaseModel):
-    """HTTP download, retry, and politeness settings for resolvers."""
+    """HTTP download, retry, and politeness settings for resolvers.
+
+    The configuration now drives the HTTPX-based streaming pipeline (`io.network.download_stream`):
+    * `perform_head_precheck` toggles the optional HEAD probe before issuing the GET.
+    * `progress_log_percent_step` / `progress_log_bytes_threshold` control progress telemetry cadence.
+    """
 
     _session_factory: Optional[Callable[[], Any]] = PrivateAttr(default=None)
     _bucket_provider: Optional[

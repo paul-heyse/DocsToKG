@@ -274,6 +274,8 @@ class LimiterManager:
         }
         self._backend_config = backend_config or BackendConfig()
         self._cache = LimiterCache()
+        self._metrics_lock = threading.Lock()
+        self._metrics: Dict[str, Dict[str, Dict[str, Any]]] = {}
 
     @property
     def backend(self) -> BackendConfig:
@@ -288,10 +290,12 @@ class LimiterManager:
             )
         self._backend_config = backend_config
         self._cache.clear()
+        self.reset_metrics()
 
     def configure_policies(self, policies: Mapping[str, RolePolicy]) -> None:
         self._policies = {host.lower(): policy for host, policy in policies.items()}
         self._cache.clear()
+        self.reset_metrics()
 
     def policies(self) -> Mapping[str, RolePolicy]:
         return MappingProxyType(self._policies)
@@ -356,6 +360,7 @@ class LimiterManager:
         except BucketFullException as exc:
             waited = int((time.perf_counter() - start) * 1000)
             wait_ms = self._estimate_wait_ms(limiter, exc.item)
+            self._record_block_metric(host, role_config.role, wait_ms, "bucket-full")
             raise self._build_error(
                 host=host,
                 role=role_config.role,
@@ -367,6 +372,7 @@ class LimiterManager:
             ) from exc
         except LimiterDelayException as exc:
             waited = int((time.perf_counter() - start) * 1000)
+            self._record_block_metric(host, role_config.role, exc.actual_delay, "delay-exceeded")
             raise self._build_error(
                 host=host,
                 role=role_config.role,
@@ -379,13 +385,15 @@ class LimiterManager:
             ) from exc
 
         waited_ms = int((time.perf_counter() - start) * 1000)
-        return AcquisitionResult(
+        result = AcquisitionResult(
             host=host,
             role=role_config.role,
             wait_ms=waited_ms,
             backend=entry.backend,
             mode=role_config.mode,
         )
+        self._record_acquire_metric(host, result.role, result.wait_ms)
+        return result
 
     def _estimate_wait_ms(self, limiter: Limiter, item) -> Optional[int]:
         try:
@@ -437,6 +445,72 @@ class LimiterManager:
             domain=host,
             details={"reason": reason, "max_delay_ms": max_delay_ms},
         )
+
+    def _stats_entry(self, host: str, role: RoleName) -> Dict[str, Any]:
+        host_key = host.lower()
+        role_key = role.lower()
+        role_map = self._metrics.setdefault(host_key, {})
+        entry = role_map.get(role_key)
+        if entry is None:
+            entry = {
+                "acquire_total": 0,
+                "wait_ms_total": 0.0,
+                "wait_ms_count": 0,
+                "wait_ms_max": 0.0,
+                "blocked_total": 0,
+                "blocking_reasons": {},
+            }
+            role_map[role_key] = entry
+        return entry
+
+    def _record_acquire_metric(self, host: str, role: RoleName, wait_ms: int) -> None:
+        with self._metrics_lock:
+            entry = self._stats_entry(host, role)
+            entry["acquire_total"] += 1
+            entry["wait_ms_total"] += float(wait_ms)
+            entry["wait_ms_count"] += 1
+            if float(wait_ms) > entry["wait_ms_max"]:
+                entry["wait_ms_max"] = float(wait_ms)
+
+    def _record_block_metric(
+        self, host: str, role: RoleName, wait_ms: Optional[int], reason: str
+    ) -> None:
+        with self._metrics_lock:
+            entry = self._stats_entry(host, role)
+            entry["blocked_total"] += 1
+            if wait_ms is not None:
+                entry["wait_ms_total"] += float(wait_ms)
+                entry["wait_ms_count"] += 1
+                if float(wait_ms) > entry["wait_ms_max"]:
+                    entry["wait_ms_max"] = float(wait_ms)
+            reasons = entry.setdefault("blocking_reasons", {})
+            reasons[reason] = reasons.get(reason, 0) + 1
+
+    def metrics_snapshot(self) -> Dict[str, Any]:
+        with self._metrics_lock:
+            snapshot: Dict[str, Any] = {}
+            for host, roles in self._metrics.items():
+                role_view: Dict[str, Any] = {}
+                for role, stats in roles.items():
+                    wait_count = stats.get("wait_ms_count", 0)
+                    role_view[role] = {
+                        "acquire_total": int(stats.get("acquire_total", 0)),
+                        "blocked_total": int(stats.get("blocked_total", 0)),
+                        "wait_ms_max": float(stats.get("wait_ms_max", 0.0)),
+                        "wait_ms_avg": (
+                            float(stats.get("wait_ms_total", 0.0)) / wait_count
+                            if wait_count
+                            else 0.0
+                        ),
+                        "wait_ms_count": wait_count,
+                        "blocking_reasons": dict(stats.get("blocking_reasons", {})),
+                    }
+                snapshot[host] = role_view
+            return snapshot
+
+    def reset_metrics(self) -> None:
+        with self._metrics_lock:
+            self._metrics.clear()
 
 
 def validate_policies(policies: Mapping[str, RolePolicy]) -> None:
@@ -578,6 +652,26 @@ def clone_policies(policies: Mapping[str, RolePolicy]) -> Dict[str, RolePolicy]:
     """Deep copy host policies for mutation."""
 
     return {host: clone_role_policy(policy) for host, policy in policies.items()}
+
+
+def serialize_policy(policy: RolePolicy) -> Dict[str, Any]:
+    """Return a JSON-serializable view of ``policy``."""
+
+    serialized: Dict[str, Any] = {}
+    for role in ROLE_ORDER:
+        rates = policy.rates.get(role)
+        if not rates:
+            continue
+        serialized[role] = {
+            "rates": [
+                {"limit": rate.limit, "interval_ms": int(rate.interval)} for rate in rates
+            ],
+            "mode": policy.mode.get(role, "wait"),
+            "max_delay_ms": int(policy.max_delay_ms.get(role, 0)),
+            "count_head": bool(policy.count_head.get(role, False)),
+            "weight": int(policy.weight.get(role, 1)),
+        }
+    return serialized
 
 
 _GLOBAL_MANAGER = LimiterManager(

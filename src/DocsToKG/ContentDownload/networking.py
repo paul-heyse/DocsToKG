@@ -84,16 +84,15 @@ Responsibilities
   cached artifacts without redownloading payloads unnecessarily.
 - Support streaming workflows by surfacing context managers when ``stream=True``
   so download helpers can iteratively write large payloads without buffering.
-- Offer rate-limit and failure-suppression primitives
-  (:class:`TokenBucket`, :class:`CircuitBreaker`) that the pipeline threads
-  rely on to avoid overwhelming upstream services.
+- Surface failure-suppression primitives (:class:`CircuitBreaker`) used by the
+  pipeline, while deferring centralized rate limiting to
+  :mod:`DocsToKG.ContentDownload.ratelimit`.
 - Expose diagnostic helpers such as :func:`head_precheck` (with GET fallback)
   and :func:`parse_retry_after_header` to keep request policy decisions
 - ``request_with_retries`` – wraps HTTP verbs with Tenacity-backed retry,
   backoff, and logging.
 - ``ConditionalRequestHelper`` – produces ``If-None-Match``/``If-Modified-Since`` headers.
-- ``TokenBucket`` and ``CircuitBreaker`` – stateful regulators shared across
-  resolvers and download workers.
+- ``CircuitBreaker`` – stateful regulator shared across resolvers and download workers.
 
 Typical Usage
 -------------
@@ -703,6 +702,7 @@ def head_precheck(
             client,
             "HEAD",
             url,
+            role=DEFAULT_ROLE,
             max_retries=1,
             timeout=min(timeout, 5.0),
             allow_redirects=True,
@@ -759,6 +759,7 @@ def _head_precheck_via_get(
             client,
             "GET",
             url,
+            role=DEFAULT_ROLE,
             max_retries=1,
             stream=True,
             timeout=min(timeout, 5.0),
@@ -1042,72 +1043,12 @@ class CircuitBreaker:
             return remaining if remaining > 0 else 0.0
 
 
-class TokenBucket:
-    """Thread-safe token bucket for per-host rate limiting."""
-
-    def __init__(
-        self,
-        *,
-        rate_per_second: float,
-        capacity: float,
-        clock: Callable[[], float] = time.monotonic,
-    ) -> None:
-        if rate_per_second <= 0:
-            raise ValueError("rate_per_second must be > 0")
-        if capacity <= 0:
-            raise ValueError("capacity must be > 0")
-        self.rate_per_second = float(rate_per_second)
-        self.capacity = float(capacity)
-        self.clock = clock
-        self._tokens = capacity
-        self._lock = threading.Lock()
-        self._last = clock()
-
-    def _refill_locked(self, now: float) -> None:
-        elapsed = max(now - self._last, 0.0)
-        if elapsed <= 0:
-            return
-        self._tokens = min(self.capacity, self._tokens + elapsed * self.rate_per_second)
-        self._last = now
-
-    def acquire(self, tokens: float = 1.0, *, now: Optional[float] = None) -> float:
-        """Consume tokens and return wait seconds required before proceeding."""
-
-        if tokens <= 0:
-            return 0.0
-        ts = now if now is not None else self.clock()
-        with self._lock:
-            self._refill_locked(ts)
-            if self._tokens >= tokens:
-                self._tokens -= tokens
-                return 0.0
-            deficit = tokens - self._tokens
-            wait = deficit / self.rate_per_second
-            self._tokens = 0.0
-            self._last = ts
-            return wait
-
-    def offer(self, tokens: float = 1.0, *, now: Optional[float] = None) -> bool:
-        """Attempt to consume tokens without blocking; return ``True`` if granted."""
-
-        if tokens <= 0:
-            return True
-        ts = now if now is not None else self.clock()
-        with self._lock:
-            self._refill_locked(ts)
-            if self._tokens >= tokens:
-                self._tokens -= tokens
-                return True
-            return False
-
-
 __all__ = [
     "CachedResult",
     "ConditionalRequestHelper",
     "ModifiedResult",
     "ContentPolicyViolation",
     "CircuitBreaker",
-    "TokenBucket",
     "configure_http_client",
     "get_http_client",
     "purge_http_cache",

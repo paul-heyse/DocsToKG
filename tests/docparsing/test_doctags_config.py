@@ -24,10 +24,6 @@ def test_doctags_cfg_rejects_out_of_range_gpu_memory(tmp_path, value):
     message = str(excinfo.value)
     assert "gpu_memory_utilization must be between 0.0 and 1.0 (inclusive)" in message
     assert f"received {float(value)}" in message
-"""Unit tests for DocTags configuration defaults."""
-
-from __future__ import annotations
-
 import importlib
 import logging
 import os

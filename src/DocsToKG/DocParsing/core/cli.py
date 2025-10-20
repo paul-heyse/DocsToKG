@@ -396,6 +396,7 @@ def _build_doctags_cli_args(
     verify_hash: bool,
     overwrite: bool,
 ) -> List[str]:
+    """Compose CLI argv for the DocTags subcommand based on Typer inputs."""
     argv: List[str] = []
     normalized_mode = mode.lower()
     normalized_log_level = log_level.upper()
@@ -439,6 +440,7 @@ def _build_chunk_cli_args(
     force: bool,
     verify_hash: bool,
 ) -> List[str]:
+    """Compose CLI argv for the chunk subcommand based on Typer inputs."""
     argv: List[str] = []
     normalized_log_level = log_level.upper()
 
@@ -498,6 +500,7 @@ def _build_embed_cli_args(
     force: bool,
     verify_hash: bool,
 ) -> List[str]:
+    """Compose CLI argv for the embed subcommand based on Typer inputs."""
     argv: List[str] = []
     normalized_log_level = log_level.upper()
 
@@ -547,6 +550,7 @@ def _build_token_profiles_cli_args(
     window_max: int,
     log_level: str,
 ) -> List[str]:
+    """Compose CLI argv for the token-profiles subcommand."""
     argv: List[str] = []
     normalized_log_level = log_level.upper()
 
@@ -570,6 +574,7 @@ def _build_manifest_cli_args(
     summarize: bool,
     raw: bool,
 ) -> List[str]:
+    """Compose CLI argv for the manifest subcommand."""
     argv: List[str] = []
     for stage in stages:
         if stage:
@@ -608,6 +613,7 @@ def _build_run_all_cli_args(
     embed_no_cache: bool,
     plan_only: bool,
 ) -> List[str]:
+    """Compose CLI argv for the all/plan subcommands."""
     argv: List[str] = []
     normalized_log_level = log_level.upper()
     normalized_mode = mode.lower()
@@ -1477,9 +1483,30 @@ def _doctags_cli(
             help="Overwrite existing DocTags files (HTML mode only).",
         ),
     ] = False,
+    pdf: Annotated[
+        bool,
+        typer.Option(
+            "--pdf",
+            help="Alias for --mode pdf.",
+            hidden=True,
+        ),
+    ] = False,
+    html: Annotated[
+        bool,
+        typer.Option(
+            "--html",
+            help="Alias for --mode html.",
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
+    """Typer command implementation for `docparse doctags`."""
+    if pdf and html:
+        raise typer.BadParameter("Cannot combine --pdf and --html aliases.")
+    effective_mode = "pdf" if pdf else "html" if html else mode
+
     argv = _build_doctags_cli_args(
-        mode,
+        effective_mode,
         log_level,
         data_root,
         input_dir,
@@ -1649,6 +1676,7 @@ def _chunk_cli(
         ),
     ] = False,
 ) -> None:
+    """Typer command implementation for `docparse chunk`."""
     argv = _build_chunk_cli_args(
         data_root,
         config,
@@ -1883,6 +1911,7 @@ def _embed_cli(
         ),
     ] = False,
 ) -> None:
+    """Typer command implementation for `docparse embed`."""
     argv = _build_embed_cli_args(
         data_root,
         config,
@@ -2000,6 +2029,7 @@ def _token_profiles_cli(
         ),
     ] = "INFO",
 ) -> None:
+    """Typer command implementation for `docparse token-profiles`."""
     argv = _build_token_profiles_cli_args(
         data_root,
         config,
@@ -2052,6 +2082,7 @@ def _manifest_cli(
         ),
     ] = False,
 ) -> None:
+    """Typer command implementation for `docparse manifest`."""
     argv = _build_manifest_cli_args(stages or [], data_root, tail, summarize, raw)
     exit_code = manifest(argv)
     raise typer.Exit(code=exit_code)
@@ -2200,6 +2231,7 @@ def _plan_cli(
         ),
     ] = False,
 ) -> None:
+    """Typer command implementation for `docparse plan`."""
     argv = _build_run_all_cli_args(
         data_root,
         log_level,
@@ -2382,6 +2414,7 @@ def _all_cli(
         ),
     ] = False,
 ) -> None:
+    """Typer command implementation for `docparse all`."""
     argv = _build_run_all_cli_args(
         data_root,
         log_level,
@@ -2417,13 +2450,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Entry point used by `python -m DocsToKG.DocParsing.core.cli`."""
 
     args = [] if argv is None else list(argv)
-    try:
-        app(args=args, prog_name="docparse", standalone_mode=False)
-    except typer.Exit as exc:
-        return exc.exit_code
-    except SystemExit as exc:  # pragma: no cover - defensive
-        code = exc.code if isinstance(exc.code, int) else int(exc.code or 0)
-        return code
+    app(args=args, prog_name="docparse")
     return 0
 
 

@@ -89,6 +89,7 @@ class LandingPageResolver(RegisteredResolver):
                     client,
                     "get",
                     landing,
+                    role="landing",
                     headers=config.polite_headers,
                     timeout=config.get_timeout(self.name),
                     retry_after_cap=config.retry_after_cap,

@@ -1,0 +1,79 @@
+                                                                                
+ Usage: docparse plan [OPTIONS]                                                 
+                                                                                
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --data-root                   PATH                    DocsToKG data root     │
+│                                                       override passed to all │
+│                                                       stages.                │
+│ --log-level                   [CRITICAL|ERROR|WARNIN  Logging verbosity      │
+│                               G|INFO|DEBUG]           applied to all stages. │
+│                                                       [default: INFO]        │
+│ --resume                                              Resume each stage by   │
+│                                                       skipping outputs with  │
+│                                                       matching manifests.    │
+│ --force                                               Force regeneration in  │
+│                                                       each stage even when   │
+│                                                       outputs exist.         │
+│ --mode                        [auto|html|pdf]         DocTags conversion     │
+│                                                       mode.                  │
+│                                                       [default: auto]        │
+│ --doctags-in-dir              PATH                    Override DocTags input │
+│                                                       directory.             │
+│ --doctags-out-dir             PATH                    Override DocTags       │
+│                                                       output directory.      │
+│ --overwrite                                           Allow rewriting        │
+│                                                       DocTags outputs (HTML  │
+│                                                       mode only).            │
+│ --vllm-wait-timeout           INTEGER                 Seconds to wait for    │
+│                                                       vLLM readiness during  │
+│                                                       the DocTags stage.     │
+│ --chunk-out-dir               PATH                    Output directory       │
+│                                                       override for chunk     │
+│                                                       JSONL files.           │
+│ --chunk-workers               INTEGER                 Worker processes for   │
+│                                                       the chunk stage.       │
+│ --chunk-min-tokens            INTEGER                 Minimum tokens per     │
+│                                                       chunk passed to the    │
+│                                                       chunk stage.           │
+│ --chunk-max-tokens            INTEGER                 Maximum tokens per     │
+│                                                       chunk passed to the    │
+│                                                       chunk stage.           │
+│ --structural-markers          PATH                    Structural marker      │
+│                                                       configuration          │
+│                                                       forwarded to the chunk │
+│                                                       stage.                 │
+│ --chunk-shard-count           INTEGER                 Total number of shards │
+│                                                       for the chunk stage.   │
+│ --chunk-shard-index           INTEGER                 Zero-based shard index │
+│                                                       for the chunk stage.   │
+│ --embed-out-dir               PATH                    Output directory       │
+│                                                       override for embedding │
+│                                                       JSONL files.           │
+│ --embed-offline                                       Run the embedding      │
+│                                                       stage with             │
+│                                                       TRANSFORMERS_OFFLINE=… │
+│ --embed-validate-only                                 Skip embedding         │
+│                                                       generation and only    │
+│                                                       validate existing      │
+│                                                       vectors.               │
+│ --sparsity-warn-thres…        FLOAT                   Override SPLADE        │
+│                                                       sparsity warning       │
+│                                                       threshold for the      │
+│                                                       embed stage.           │
+│ --embed-shard-count           INTEGER                 Total number of shards │
+│                                                       for the embed stage    │
+│                                                       (defaults to chunk     │
+│                                                       shard count).          │
+│ --embed-shard-index           INTEGER                 Zero-based shard index │
+│                                                       for the embed stage    │
+│                                                       (defaults to chunk     │
+│                                                       shard index).          │
+│ --embed-format                [jsonl|parquet]         Vector output format   │
+│                                                       for the embed stage.   │
+│ --embed-no-cache                                      Disable Qwen cache     │
+│                                                       reuse during the embed │
+│                                                       stage.                 │
+│ --help                                                Show this message and  │
+│                                                       exit.                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+

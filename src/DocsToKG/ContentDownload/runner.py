@@ -66,6 +66,10 @@ from DocsToKG.ContentDownload.download import (
     process_one_work,
 )
 from DocsToKG.ContentDownload.httpx_transport import get_http_client
+from DocsToKG.ContentDownload.ratelimit import (
+    get_rate_limiter_manager,
+    serialize_policy,
+)
 from DocsToKG.ContentDownload.pipeline import (
     DownloadOutcome,
     ResolverMetrics,
@@ -577,6 +581,17 @@ class DownloadRun:
         summary_record: Dict[str, Any] = {}
         state: Optional[DownloadRunState] = None
 
+        policy_snapshot = {
+            host: serialize_policy(policy)
+            for host, policy in self.resolved.rate_policies.items()
+        }
+        LOGGER.info(
+            "Rate limiter configured with backend=%s options=%s policies=%s",
+            self.resolved.rate_backend.backend,
+            dict(self.resolved.rate_backend.options),
+            json.dumps(policy_snapshot, sort_keys=True),
+        )
+
         try:
             with contextlib.ExitStack() as stack:
                 self.setup_sinks(stack)
@@ -679,6 +694,16 @@ class DownloadRun:
 
                 metrics = self.metrics or ResolverMetrics()
                 summary = metrics.summary()
+                limiter_manager = get_rate_limiter_manager()
+                summary["rate_limiter"] = {
+                    "backend": self.resolved.rate_backend.backend,
+                    "backend_options": dict(self.resolved.rate_backend.options),
+                    "policies": {
+                        host: serialize_policy(policy)
+                        for host, policy in self.resolved.rate_policies.items()
+                    },
+                    "metrics": limiter_manager.metrics_snapshot(),
+                }
                 summary_record = build_summary_record(
                     run_id=self.resolved.run_id,
                     processed=state.processed if state else 0,

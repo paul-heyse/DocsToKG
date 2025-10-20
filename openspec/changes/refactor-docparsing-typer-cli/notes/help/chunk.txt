@@ -1,0 +1,75 @@
+                                                                                
+ Usage: docparse chunk [OPTIONS]                                                
+                                                                                
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --data-root                   PATH                   DocsToKG data root      │
+│                                                      override used when      │
+│                                                      resolving inputs.       │
+│ --config                      PATH                   Path to stage config    │
+│                                                      file (JSON/YAML/TOML).  │
+│ --profile                     [cpu-small|gpu-defaul  Preset for              │
+│                               t|gpu-max|bert-compat  workers/token           │
+│                               ]                      windows/tokenizer       │
+│                                                      (cpu-small,             │
+│                                                      gpu-default, gpu-max,   │
+│                                                      bert-compat).           │
+│ --in-dir                      PATH                   DocTags input directory │
+│                                                      (defaults to            │
+│                                                      data_root/DocTagsFiles… │
+│ --out-dir                     PATH                   Chunk output directory  │
+│                                                      (defaults to            │
+│                                                      data_root/ChunkedDocTa… │
+│ --min-tokens                  INTEGER                Minimum tokens per      │
+│                                                      chunk passed to the     │
+│                                                      chunk stage.            │
+│                                                      [default: 256]          │
+│ --max-tokens                  INTEGER                Maximum tokens per      │
+│                                                      chunk passed to the     │
+│                                                      chunk stage.            │
+│                                                      [default: 512]          │
+│ --log-level                   [CRITICAL|ERROR|WARNI  Logging verbosity for   │
+│                               NG|INFO|DEBUG]         console output.         │
+│                                                      [default: INFO]         │
+│ --tokenizer-model             TEXT                   Tokenizer identifier    │
+│                                                      used to compute token   │
+│                                                      windows (defaults to    │
+│                                                      profile/default).       │
+│ --soft-barrier-margin         INTEGER                Token margin to retain  │
+│                                                      around soft barriers.   │
+│                                                      [default: 64]           │
+│ --structural-markers,…        PATH                   Optional path to        │
+│                                                      structural marker       │
+│                                                      overrides JSON.         │
+│ --serializer-provider         TEXT                   Serializer              │
+│                                                      implementation to       │
+│                                                      persist chunk outputs   │
+│                                                      (default provider).     │
+│ --workers                     INTEGER                Worker processes for    │
+│                                                      the chunk stage.        │
+│                                                      [default: 1]            │
+│ --shard-count                 INTEGER                Total number of shards  │
+│                                                      for the chunk stage.    │
+│                                                      [default: 1]            │
+│ --shard-index                 INTEGER                Zero-based shard index  │
+│                                                      for the chunk stage.    │
+│                                                      [default: 0]            │
+│ --validate-only                                      Validate existing       │
+│                                                      outputs and exit.       │
+│ --inject-anchors                                     Inject anchor metadata  │
+│                                                      into outputs.           │
+│ --resume                                             Skip DocTags whose      │
+│                                                      chunk outputs already   │
+│                                                      exist with matching     │
+│                                                      hash.                   │
+│ --force                                              Force reprocessing even │
+│                                                      when resume criteria    │
+│                                                      are satisfied.          │
+│ --verify-hash                                        Recompute input hashes  │
+│                                                      before skipping resumed │
+│                                                      items. This validates   │
+│                                                      manifest entries at the │
+│                                                      cost of additional I/O. │
+│ --help                                               Show this message and   │
+│                                                      exit.                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+

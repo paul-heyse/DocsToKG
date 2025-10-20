@@ -51,10 +51,10 @@ def resolve_model_root(hf_home: Path | str | None = None) -> Path:
     """Resolve the DocsToKG model root honouring ``DOCSTOKG_MODEL_ROOT``."""
 
     env = os.getenv("DOCSTOKG_MODEL_ROOT")
-    if env:
+    if env and hf_home is None:
         return expand_path(env)
     resolved_hf = expand_path(hf_home) if hf_home is not None else resolve_hf_home()
-    cache_root = resolved_hf.parent if resolved_hf.name == "huggingface" else resolved_hf
+    cache_root = resolved_hf.parent
     default_root = cache_root / "docs-to-kg" / "models"
     return expand_path(default_root)
 
@@ -94,6 +94,14 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
         if looks_like_filesystem_path(env_model):
             return str(expand_path(env_model))
         return env_model
+    model_root_env = os.getenv("DOCSTOKG_MODEL_ROOT")
+    if model_root_env:
+        model_root_path = expand_path(model_root_env)
+        return str(model_root_path / PDF_MODEL_SUBDIR)
+    hf_home_env = os.getenv("HF_HOME")
+    if hf_home_env:
+        hf_home_path = expand_path(hf_home_env)
+        return str(hf_home_path / PDF_MODEL_SUBDIR)
     model_root = resolve_model_root()
     return str(expand_path(model_root / PDF_MODEL_SUBDIR))
 

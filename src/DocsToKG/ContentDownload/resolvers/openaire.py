@@ -87,6 +87,7 @@ class OpenAireResolver(RegisteredResolver):
                 client,
                 "get",
                 "https://api.openaire.eu/search/publications",
+                role="metadata",
                 params={"doi": doi},
                 headers=config.polite_headers,
                 timeout=config.get_timeout(self.name),

@@ -70,6 +70,7 @@ class PmcResolver(RegisteredResolver):
                 client,
                 "get",
                 "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/",
+                role="metadata",
                 params={
                     "ids": ",".join(identifiers),
                     "format": "json",
@@ -157,6 +158,7 @@ class PmcResolver(RegisteredResolver):
                     client,
                     "get",
                     oa_url,
+                    role="metadata",
                     timeout=config.get_timeout(self.name),
                     headers=config.polite_headers,
                     retry_after_cap=config.retry_after_cap,

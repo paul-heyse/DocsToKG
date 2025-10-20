@@ -201,6 +201,7 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         ] = {}
         self._env_overrides: Dict[str, Optional[str]] = {}
         self._registered = False
+        self.rate_limiter_mode: str = "pyrate"
 
     # --- Context manager protocol -------------------------------------------------
 
@@ -468,6 +469,10 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
 
         config = DownloadConfiguration()
         config.set_bucket_provider(self._bucket_provider)
+        try:
+            config.rate_limiter = self.rate_limiter_mode  # type: ignore[assignment]
+        except ValueError:
+            config.rate_limiter = "pyrate"
         if self._http_host:
             allowed = [self._http_host]
             if self._http_port is not None:
@@ -563,6 +568,11 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
             bucket = legacy_cls(rate_per_sec=10.0, capacity=10.0)
             self._bucket_state[key] = bucket
         return bucket
+
+    def use_legacy_rate_limiter(self) -> None:
+        """Force subsequent configs to use the legacy token bucket implementation."""
+
+        self.rate_limiter_mode = "legacy"
 
 
 class _StorageShim(_StorageBackend):

@@ -12,7 +12,9 @@ import pytest
 
 from DocsToKG.OntologyDownload.errors import DownloadFailure, PolicyError
 from DocsToKG.OntologyDownload.io import network as network_mod
+from DocsToKG.OntologyDownload.settings import DownloadConfiguration
 from DocsToKG.OntologyDownload.testing import ResponseSpec
+from tests.conftest import PatchManager
 
 
 def _logger() -> logging.Logger:
@@ -406,3 +408,94 @@ def test_stream_timeout_removes_partial_files(ontology_env, tmp_path):
     destination_part = destination.parent / (destination.name + ".part")
     assert not destination_part.exists()
     assert not list(ontology_env.cache_dir.rglob("*.part"))
+
+def test_retry_after_triggers_sleep(tmp_path):
+    import httpx
+    from contextlib import contextmanager
+
+    delays: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        delays.append(seconds)
+
+    original_retry = network_mod.retry_with_backoff
+
+    def wrapped_retry(*args, **kwargs):
+        kwargs.setdefault("sleep", fake_sleep)
+        return original_retry(*args, **kwargs)
+
+    patcher = PatchManager()
+    patcher.setattr(network_mod, "retry_with_backoff", wrapped_retry)
+
+    url = "https://example.org/retry-after"
+    head_response = httpx.Response(
+        200,
+        headers={
+            "Content-Type": "application/rdf+xml",
+            "Content-Length": "5",
+        },
+        request=httpx.Request("HEAD", url),
+    )
+    retry_head = httpx.Response(
+        200,
+        headers={
+            "Content-Type": "application/rdf+xml",
+            "Content-Length": "5",
+        },
+        request=httpx.Request("HEAD", url),
+    )
+    first_get = httpx.Response(
+        429,
+        headers={
+            "Retry-After": "0.2",
+            "Content-Type": "application/rdf+xml",
+            "Content-Length": "5",
+        },
+        request=httpx.Request("GET", url),
+    )
+    second_get = httpx.Response(
+        200,
+        headers={
+            "Content-Type": "application/rdf+xml",
+            "Content-Length": "5",
+        },
+        content=b"hello",
+        request=httpx.Request("GET", url),
+    )
+
+    responses = iter([head_response, first_get, retry_head, second_get])
+
+    @contextmanager
+    def fake_request_with_redirect_audit(**_kwargs):
+        yield next(responses)
+
+    patcher.setattr(network_mod, "request_with_redirect_audit", fake_request_with_redirect_audit)
+
+    bucket = _BucketSpy()
+    config = DownloadConfiguration()
+    config.allowed_hosts = ["example.org"]
+    config.set_bucket_provider(lambda service, http_config, host: bucket)
+
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    destination = tmp_path / "retry-after.owl"
+
+    try:
+        result = network_mod.download_stream(
+            url=url,
+            destination=destination,
+            headers={},
+            previous_manifest=None,
+            http_config=config,
+            cache_dir=cache_dir,
+            logger=_logger(),
+            expected_media_type="application/rdf+xml",
+            service="test",
+        )
+    finally:
+        patcher.close()
+
+    assert result.status == "fresh"
+    assert delays, "Expected retry logic to invoke sleep callback"
+    assert delays[0] >= 0.2
+    assert len(bucket.calls) >= 3

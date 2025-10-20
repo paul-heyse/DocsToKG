@@ -1243,7 +1243,7 @@ def iter_rows_in_batches(
     *,
     start: Optional[int] = None,
     end: Optional[int] = None,
-    skip_invalid: bool = False,
+    skip_invalid: bool = True,
     max_errors: int = 10,
 ) -> Iterator[List[dict]]:
     """Iterate over JSONL rows in batches to reduce memory usage.
@@ -1254,7 +1254,7 @@ def iter_rows_in_batches(
         start: Optional byte offset where iteration should begin.
         end: Optional byte offset bounding the slice (exclusive).
         skip_invalid: When ``True`` malformed rows are skipped up to
-            ``max_errors`` occurrences.
+            ``max_errors`` occurrences (enabled by default).
         max_errors: Maximum tolerated malformed rows when ``skip_invalid`` is
             enabled.
 
