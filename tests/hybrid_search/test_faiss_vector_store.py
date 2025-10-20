@@ -69,7 +69,7 @@ def test_resolve_cuvs_state_overrides_requested_when_probe_false(
     """A `False` cuVS probe must disable cuVS even when requested."""
 
     patcher.setattr(store_module, "_FAISS_AVAILABLE", True, raising=False)
-    stub_faiss = SimpleNamespace(knn_gpu=object(), should_use_cuvs=lambda: False)
+    stub_faiss = SimpleNamespace(knn_gpu=object(), should_use_cuvs=lambda *_args, **_kwargs: False)
     patcher.setattr(store_module, "faiss", stub_faiss, raising=False)
 
     enabled, available, reported = store_module.resolve_cuvs_state(requested=True)
@@ -105,7 +105,7 @@ def test_apply_use_cuvs_parameter_never_sets_true_when_probe_false(
 
     stub_faiss = SimpleNamespace(
         knn_gpu=object(),
-        should_use_cuvs=lambda: False,
+        should_use_cuvs=lambda *_args, **_kwargs: False,
         GpuParameterSpace=RecordingGpuParameterSpace,
     )
     patcher.setattr(store_module, "faiss", stub_faiss, raising=False)
