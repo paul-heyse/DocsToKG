@@ -155,7 +155,7 @@ class WaybackResolver(RegisteredResolver):
                     yield ResolverResult(
                         url=None,
                         event=ResolverEvent.SKIPPED,
-                        event_reason=ResolverEventReason.NO_FAILED_URLS,
+                        event_reason=ResolverEventReason.NO_WAYBACK_SNAPSHOT,
                         metadata={
                             "original": original_url,
                             "canonical": canonical_url,
