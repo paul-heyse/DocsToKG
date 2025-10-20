@@ -5,6 +5,7 @@ This module tests the performance optimizations and new features
 added to the Wayback telemetry system.
 """
 
+import logging
 import os
 import sqlite3
 import tempfile
@@ -20,6 +21,7 @@ from DocsToKG.ContentDownload.telemetry_wayback import (
     CandidateDecision,
     DiscoveryStage,
     ModeSelected,
+    SkipReason,
     TelemetryWayback,
     create_telemetry_with_failsafe,
 )
@@ -639,3 +641,129 @@ class TestFailsafeDualSink:
             with jsonl_path.open() as f:
                 lines = f.readlines()
                 assert len(lines) == 2  # start and end events
+
+    def test_failsafe_disables_primary_sink_after_threshold(self, caplog):
+        """Primary sink failures trigger disablement while fallback continues."""
+
+        class FlakySink:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def emit(self, event):
+                self.calls += 1
+                raise RuntimeError("boom")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            jsonl_path = Path(tmpdir) / "fallback.jsonl"
+            flaky = FlakySink()
+            caplog.set_level(logging.WARNING)
+
+            tele = create_telemetry_with_failsafe(
+                "test-run",
+                [flaky],
+                jsonl_fallback_path=jsonl_path,
+                sink_failure_threshold=2,
+            )
+
+            ctx = tele.emit_attempt_start(
+                work_id="work-1",
+                artifact_id="artifact-1",
+                original_url="https://example.com/1",
+                canonical_url="https://example.com/1",
+            )
+            tele.emit_skip(ctx, reason=SkipReason.NO_SNAPSHOT)
+            tele.emit_attempt_end(
+                ctx,
+                mode_selected=ModeSelected.NONE,
+                result=AttemptResult.SKIPPED_NO_SNAPSHOT,
+                candidates_scanned=0,
+            )
+
+            # The flaky sink should only be invoked until it is disabled.
+            assert flaky.calls == 2
+
+            with jsonl_path.open() as f:
+                lines = f.readlines()
+                assert len(lines) == 3
+
+            disable_records = [
+                record
+                for record in caplog.records
+                if "Disabling telemetry sink" in record.message
+            ]
+            assert disable_records
+
+            metrics = tele.failover_metrics_snapshot()
+            assert metrics
+            assert metrics[0]["disabled"] is True
+            assert metrics[0]["failures_total"] == 2
+
+    def test_failsafe_resets_after_successful_emit(self, caplog):
+        """Successful emits reset failure counters to avoid premature disablement."""
+
+        class FlakyOnceSink:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def emit(self, event):
+                self.calls += 1
+                if self.calls == 1:
+                    raise RuntimeError("boom once")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            jsonl_path = Path(tmpdir) / "fallback.jsonl"
+            flaky = FlakyOnceSink()
+            caplog.set_level(logging.WARNING)
+
+            tele = create_telemetry_with_failsafe(
+                "test-run",
+                [flaky],
+                jsonl_fallback_path=jsonl_path,
+                sink_failure_threshold=2,
+            )
+
+            ctx1 = tele.emit_attempt_start(
+                work_id="work-1",
+                artifact_id="artifact-1",
+                original_url="https://example.com/1",
+                canonical_url="https://example.com/1",
+            )
+            tele.emit_attempt_end(
+                ctx1,
+                mode_selected=ModeSelected.PDF_DIRECT,
+                result=AttemptResult.EMITTED_PDF,
+                candidates_scanned=1,
+            )
+
+            ctx2 = tele.emit_attempt_start(
+                work_id="work-2",
+                artifact_id="artifact-2",
+                original_url="https://example.com/2",
+                canonical_url="https://example.com/2",
+            )
+            tele.emit_attempt_end(
+                ctx2,
+                mode_selected=ModeSelected.PDF_DIRECT,
+                result=AttemptResult.EMITTED_PDF,
+                candidates_scanned=1,
+            )
+
+            # All events should be forwarded after the initial failure.
+            assert flaky.calls == 4
+
+            with jsonl_path.open() as f:
+                lines = f.readlines()
+                assert len(lines) == 4
+
+            disable_records = [
+                record
+                for record in caplog.records
+                if "Disabling telemetry sink" in record.message
+            ]
+            assert not disable_records
+
+            metrics = tele.failover_metrics_snapshot()
+            assert metrics
+            assert metrics[0]["disabled"] is False
+            assert metrics[0]["failures_total"] == 1
+            assert metrics[0]["consecutive_failures"] == 0
