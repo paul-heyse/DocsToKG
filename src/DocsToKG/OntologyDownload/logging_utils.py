@@ -99,15 +99,16 @@ def setup_logging(
     """Configure ontology downloader logging with rotation and JSON sidecars."""
 
     if log_dir is not None:
-        resolved_dir = log_dir
+        resolved_dir = Path(log_dir).expanduser().resolve(strict=False)
     else:
         env_value = os.environ.get("ONTOFETCH_LOG_DIR")
         env_path: Optional[Path] = None
         if env_value is not None:
             stripped = env_value.strip()
             if stripped:
-                env_path = Path(stripped)
-        resolved_dir = env_path or LOG_DIR
+                env_path = Path(stripped).expanduser().resolve(strict=False)
+        fallback_dir: Path = LOG_DIR
+        resolved_dir = (env_path or fallback_dir).expanduser().resolve(strict=False)
     resolved_dir.mkdir(parents=True, exist_ok=True)
     _cleanup_logs(resolved_dir, retention_days)
 
