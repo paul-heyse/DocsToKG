@@ -70,7 +70,12 @@ def looks_like_filesystem_path(candidate: str) -> bool:
 
 
 def resolve_pdf_model_path(cli_value: str | None = None) -> str:
-    """Determine PDF model path using CLI and environment precedence."""
+    """Determine PDF model path using CLI and environment precedence.
+
+    Values that resemble filesystem paths are expanded to absolute paths while
+    other identifiers (for example Hugging Face repository IDs) are returned
+    verbatim so remote downloads continue to function.
+    """
 
     if cli_value:
         if looks_like_filesystem_path(cli_value):
@@ -78,7 +83,9 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
         return cli_value
     env_model = os.getenv("DOCLING_PDF_MODEL")
     if env_model:
-        return str(expand_path(env_model))
+        if looks_like_filesystem_path(env_model):
+            return str(expand_path(env_model))
+        return env_model
     model_root = resolve_model_root()
     return str(expand_path(model_root / PDF_MODEL_SUBDIR))
 
