@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import inspect
 import threading
 import time
+import tracemalloc
+import uuid
 from collections import defaultdict, deque
+from contextlib import closing
 from typing import Dict, Iterable, Tuple
 
 import numpy as np
@@ -114,3 +118,43 @@ def test_chunk_registry_thread_safe_access() -> None:
         expected = expected_scopes.get((doc, namespace), set())
         actual = set(registry.vector_ids_for(doc, namespace))
         assert actual == expected
+
+
+def test_iter_all_streams_without_full_copy() -> None:
+    registry = ChunkRegistry()
+    total = 4096
+    for _ in range(total):
+        chunk = _make_chunk("doc", "ns", str(uuid.uuid4()))
+        registry.upsert([chunk])
+
+    source_lines, start_line = inspect.getsourcelines(ChunkRegistry.iter_all)
+    # ``getsourcelines`` returns (list[str], start_line)
+    iter_all_start = start_line
+    iter_all_end = start_line + len(source_lines)
+
+    tracemalloc.start()
+    try:
+        before = tracemalloc.take_snapshot()
+        count = 0
+        with closing(registry.iter_all()) as iterator:
+            for count, _ in enumerate(iterator, start=1):
+                pass
+        after = tracemalloc.take_snapshot()
+    finally:
+        tracemalloc.stop()
+
+    assert count == total
+
+    iter_all_allocated = 0
+    for stat in after.compare_to(before, "lineno"):
+        frame = stat.traceback[0]
+        if not frame.filename.endswith("store.py"):
+            continue
+        if frame.lineno < iter_all_start or frame.lineno >= iter_all_end:
+            continue
+        if stat.size_diff > 0:
+            iter_all_allocated += stat.size_diff
+
+    assert (
+        iter_all_allocated < 4096
+    ), f"iter_all allocated {iter_all_allocated} bytes, expected streaming behaviour"

@@ -112,7 +112,7 @@ import logging
 import re
 import time
 from collections import defaultdict, deque
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
@@ -756,16 +756,16 @@ class ChunkIngestionPipeline:
 
         reservoir: List[ChunkPayload] = []
         # Reservoir sampling over existing registry entries
-        iterator = self._registry.iter_all()
         i = 0
-        for item in iterator:
-            if i < target:
-                reservoir.append(item)
-            else:
-                j = int(TRAINING_SAMPLE_RNG.integers(0, i + 1))
-                if j < target:
-                    reservoir[j] = item
-            i += 1
+        with closing(self._registry.iter_all()) as iterator:
+            for item in iterator:
+                if i < target:
+                    reservoir.append(item)
+                else:
+                    j = int(TRAINING_SAMPLE_RNG.integers(0, i + 1))
+                    if j < target:
+                        reservoir[j] = item
+                i += 1
         # Stream over new chunks as well
         for item in new_chunks:
             if i < target:
