@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Iterable
 
 import requests as _requests
 
-from . import base as resolver_base
+from DocsToKG.ContentDownload.networking import request_with_retries
 from .base import (
     RegisteredResolver,
     ResolverEvent,
@@ -35,14 +35,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 LOGGER = logging.getLogger(__name__)
-
-
-def request_with_retries(*args, **kwargs):
-    """Proxy to :func:`resolvers.base.request_with_retries` for patchability."""
-
-    return resolver_base.request_with_retries(*args, **kwargs)
-
-
 class WaybackResolver(RegisteredResolver):
     """Fallback resolver that queries the Internet Archive Wayback Machine."""
 

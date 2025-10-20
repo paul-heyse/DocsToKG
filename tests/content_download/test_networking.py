@@ -602,6 +602,7 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 import requests
+from tenacity import RetryCallState
 
 from tests.content_download import stubs as content_stubs
 
@@ -1799,14 +1800,14 @@ def _download(
         handler.statuses = [429, 429, 200]
         url = f"http://127.0.0.1:{server.server_address[1]}/rate-limited.pdf"
 
-        patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: a)
+        patcher.setattr("DocsToKG.ContentDownload.networking.wait_random_exponential", lambda *args, **kwargs: _FixedWait([0.375, 0.75]))
 
         sleep_durations: list[float] = []
 
         def _capture_sleep(delay: float) -> None:
             sleep_durations.append(delay)
 
-        patcher.setattr("DocsToKG.ContentDownload.networking.time.sleep", _capture_sleep)
+        patcher.setattr("DocsToKG.ContentDownload.networking.TENACITY_SLEEP", _capture_sleep)
 
         _, session, _, outcome = _download(url, tmp_path)
         try:
@@ -1839,6 +1840,19 @@ def _download(
         response.headers = headers or {}
         return response
 
+
+    class _FixedWait:
+        def __init__(self, values: Iterable[float]):
+            self._values = iter(values)
+            self._last = 0.0
+
+        def __call__(self, retry_state: RetryCallState) -> float:
+            try:
+                self._last = next(self._values)
+            except StopIteration:
+                pass
+            return self._last
+
     # --- test_http_retry.py ---
 
     def test_successful_request_no_retries():
@@ -1855,10 +1869,14 @@ def _download(
 
     # --- test_http_retry.py ---
 
-    @patch("DocsToKG.ContentDownload.networking.random.uniform", side_effect=lambda a, b: a)
-    @patch("DocsToKG.ContentDownload.networking.time.sleep")
-    def test_transient_503_with_exponential_backoff(mock_sleep: Mock, _: Mock) -> None:
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
+    def test_transient_503_with_exponential_backoff(mock_sleep: Mock, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify exponential backoff timing for transient 503 errors."""
+
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.networking.wait_random_exponential",
+            lambda *args, **kwargs: _FixedWait([0.25, 0.5]),
+        )
 
         session = Mock(spec=requests.Session)
         response_503 = _mock_response(503, headers={})
@@ -1876,23 +1894,100 @@ def _download(
         assert result is response_200
         assert session.request.call_count == 3
         assert mock_sleep.call_args_list == [call(0.25), call(0.5)]
+        response_503.close.assert_called()
+        response_200.close.assert_not_called()
 
-    def test_equal_jitter_delay_bounds(patcher) -> None:
-        """Ensure equal jitter stays within the expected range for each attempt."""
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
+    def test_respect_retry_after_false_uses_fallback(
+        mock_sleep: Mock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Disabling Retry-After uses the exponential fallback duration."""
 
-        from DocsToKG.ContentDownload.networking import _calculate_equal_jitter_delay
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.networking.wait_random_exponential",
+            lambda *args, **kwargs: _FixedWait([0.75]),
+        )
 
-        patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: a)
-        lower = _calculate_equal_jitter_delay(2, backoff_factor=0.8, backoff_max=10.0)
-        assert lower == pytest.approx(0.8 * (2**2) / 2)
+        with patch("DocsToKG.ContentDownload.networking.parse_retry_after_header") as mock_parse:
+            session = Mock(spec=requests.Session)
+            retry_response = _mock_response(503, headers={"Retry-After": "120"})
+            success_response = _mock_response(200)
+            session.request.side_effect = [retry_response, success_response]
 
-        patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b)
-        upper = _calculate_equal_jitter_delay(2, backoff_factor=0.8, backoff_max=10.0)
-        assert upper == pytest.approx(0.8 * (2**2))
+            result = request_with_retries(
+                session,
+                "GET",
+                "https://example.org/no-retry-after",
+                respect_retry_after=False,
+                max_retries=1,
+            )
 
-        patcher.setattr("DocsToKG.ContentDownload.networking.random.uniform", lambda a, b: b)
-        capped = _calculate_equal_jitter_delay(4, backoff_factor=1.0, backoff_max=3.0)
-        assert capped == pytest.approx(3.0)
+        assert result is success_response
+        assert mock_sleep.call_args_list == [call(0.75)]
+        mock_parse.assert_not_called()
+        retry_response.close.assert_called_once()
+        success_response.close.assert_not_called()
+
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
+    def test_max_retry_duration_returns_last_response(
+        mock_sleep: Mock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Tenacity stops when the retry duration budget is exhausted."""
+
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.networking.wait_random_exponential",
+            lambda *args, **kwargs: _FixedWait([0.4, 0.4]),
+        )
+
+        session = Mock(spec=requests.Session)
+        first = _mock_response(503)
+        second = _mock_response(503)
+        session.request.side_effect = [first, second]
+
+        result = request_with_retries(
+            session,
+            "GET",
+            "https://example.org/max-duration",
+            max_retries=5,
+            max_retry_duration=0.5,
+        )
+
+        assert result is second
+        assert mock_sleep.call_args_list == [call(0.4)]
+        first.close.assert_called_once()
+        second.close.assert_not_called()
+
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
+    def test_streaming_response_stays_open_after_retries(
+        mock_sleep: Mock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Final streaming responses remain open for caller context managers."""
+
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.networking.wait_random_exponential",
+            lambda *args, **kwargs: _FixedWait([0.2]),
+        )
+
+        session = Mock(spec=requests.Session)
+        retry_response = _mock_response(503)
+        streaming_response = _mock_response(200)
+        session.request.side_effect = [retry_response, streaming_response]
+
+        result = request_with_retries(
+            session,
+            "GET",
+            "https://example.org/stream",
+            stream=True,
+            max_retries=1,
+        )
+
+        assert result is streaming_response
+        assert mock_sleep.call_args_list == [call(0.2)]
+        retry_response.close.assert_called_once()
+        streaming_response.close.assert_not_called()
+
+
+
 
     # --- test_http_retry.py ---
 
@@ -1939,14 +2034,20 @@ def _download(
 
     # --- test_http_retry.py ---
 
-    @patch("DocsToKG.ContentDownload.networking.random.uniform", side_effect=lambda a, b: a)
-    @patch("DocsToKG.ContentDownload.networking.time.sleep")
-    def test_retry_after_header_overrides_backoff(mock_sleep: Mock, _: Mock) -> None:
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
+    def test_retry_after_header_overrides_backoff(
+        mock_sleep: Mock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         session = Mock(spec=requests.Session)
         retry_headers = {"Retry-After": "10"}
         response_retry = _mock_response(429, headers=retry_headers)
         response_success = _mock_response(200)
         session.request.side_effect = [response_retry, response_success]
+
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.networking.wait_random_exponential",
+            lambda *args, **kwargs: _FixedWait([0.5]),
+        )
 
         result = request_with_retries(
             session,
@@ -1959,13 +2060,19 @@ def _download(
         assert result is response_success
         assert mock_sleep.call_args_list == [call(10.0)]
 
-    @patch("DocsToKG.ContentDownload.networking.random.uniform", side_effect=lambda a, b: a)
-    @patch("DocsToKG.ContentDownload.networking.time.sleep")
-    def test_retry_after_cap_limits_sleep(mock_sleep: Mock, _: Mock) -> None:
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
+    def test_retry_after_cap_limits_sleep(
+        mock_sleep: Mock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         session = Mock(spec=requests.Session)
         response_retry = _mock_response(429, headers={"Retry-After": "120"})
         response_success = _mock_response(200)
         session.request.side_effect = [response_retry, response_success]
+
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.networking.wait_random_exponential",
+            lambda *args, **kwargs: _FixedWait([5.0]),
+        )
 
         result = request_with_retries(
             session,
@@ -1979,9 +2086,9 @@ def _download(
         assert result is response_success
         assert mock_sleep.call_args_list == [call(30.0)]
 
-    # --- test_http_retry.py ---
+        # --- test_http_retry.py ---
 
-    @patch("DocsToKG.ContentDownload.networking.time.sleep")
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
     def test_request_exception_raises_after_retries(mock_sleep: Mock) -> None:
         session = Mock(spec=requests.Session)
         error = requests.RequestException("boom")
@@ -1995,7 +2102,7 @@ def _download(
 
     # --- test_http_retry.py ---
 
-    @patch("DocsToKG.ContentDownload.networking.time.sleep")
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
     def test_timeout_retry_handling(mock_sleep: Mock) -> None:
         session = Mock(spec=requests.Session)
         session.request.side_effect = [requests.Timeout("slow"), _mock_response(200)]
@@ -2007,7 +2114,7 @@ def _download(
 
     # --- test_http_retry.py ---
 
-    @patch("DocsToKG.ContentDownload.networking.time.sleep")
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
     def test_connection_error_retry_handling(mock_sleep: Mock) -> None:
         session = Mock(spec=requests.Session)
         session.request.side_effect = [requests.ConnectionError("down"), _mock_response(200)]
@@ -2019,7 +2126,7 @@ def _download(
 
     # --- test_http_retry.py ---
 
-    @patch("DocsToKG.ContentDownload.networking.time.sleep")
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
     def test_timeout_raises_after_exhaustion(mock_sleep: Mock) -> None:
         """Ensure timeout retries raise after exhausting the retry budget."""
 
@@ -2034,7 +2141,7 @@ def _download(
 
     # --- test_http_retry.py ---
 
-    @patch("DocsToKG.ContentDownload.networking.time.sleep")
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
     def test_connection_error_raises_after_exhaustion(mock_sleep: Mock) -> None:
         """Ensure connection errors propagate when retries are exhausted."""
 
@@ -2146,7 +2253,7 @@ def _download(
 
     # --- test_http_retry.py ---
 
-    @patch("DocsToKG.ContentDownload.networking.time.sleep")
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
     def test_retry_after_header_prefers_longer_delay(mock_sleep: Mock) -> None:
         """Verify Retry-After header longer than backoff takes precedence."""
 
@@ -2154,7 +2261,7 @@ def _download(
 
         retry_response = requests.Response()
         retry_response.status_code = 429
-        retry_response.headers = {"Retry-After": "4"}
+        retry_response.headers = {"Retry-After": "60"}
 
         success_response = requests.Response()
         success_response.status_code = 200
@@ -2167,17 +2274,19 @@ def _download(
             "GET",
             "https://example.org/with-retry-after",
             backoff_factor=0.1,
+            backoff_max=120.0,
+            retry_after_cap=30.0,
             max_retries=2,
         )
 
         assert result.status_code == 200
         mock_sleep.assert_called_once()
         sleep_arg = mock_sleep.call_args[0][0]
-        assert pytest.approx(sleep_arg, rel=0.01) == 4.0
+        assert pytest.approx(sleep_arg, rel=0.01) == 30.0
 
     # --- test_http_retry.py ---
 
-    @patch("DocsToKG.ContentDownload.networking.time.sleep")
+    @patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP")
     @patch("DocsToKG.ContentDownload.networking.parse_retry_after_header")
     def test_respect_retry_after_false_skips_header(mock_parse: Mock, mock_sleep: Mock) -> None:
         """Ensure disabling respect_retry_after bypasses header parsing."""

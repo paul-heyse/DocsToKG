@@ -24,8 +24,7 @@ from typing import TYPE_CHECKING, Iterable, List
 import requests as _requests
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi, normalize_pmcid
-
-from . import base as resolver_base
+from DocsToKG.ContentDownload.networking import request_with_retries
 from .base import (
     RegisteredResolver,
     ResolverEvent,
@@ -40,14 +39,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 LOGGER = logging.getLogger(__name__)
-
-
-def request_with_retries(*args, **kwargs):
-    """Proxy to :func:`resolvers.base.request_with_retries` for patchability."""
-
-    return resolver_base.request_with_retries(*args, **kwargs)
-
-
 class PmcResolver(RegisteredResolver):
     """Resolve PubMed Central articles via identifiers and lookups."""
 

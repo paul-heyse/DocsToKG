@@ -263,7 +263,14 @@ def test_download_candidate_retries_and_cleans_partial(
         def __exit__(self, exc_type, exc, tb) -> bool:
             return False
 
-    patcher.setattr(downloader, "request_with_retries", lambda *args, **kwargs: OkResponse())
+    request_calls: List[Tuple[str, bool]] = []
+
+    def _request_with_retries(session, method, url, **kwargs):
+        request_calls.append((method.upper(), bool(kwargs.get("stream"))))
+        return OkResponse()
+
+    patcher.setattr(downloader, "request_with_retries", _request_with_retries, raising=False)
+    patcher.setattr(download_impl, "request_with_retries", _request_with_retries)
 
     call_state = {"count": 0}
 
@@ -306,6 +313,7 @@ def test_download_candidate_retries_and_cleans_partial(
     assert Path(outcome.path or "").exists()
     assert not Path(str(outcome.path) + ".part").exists()
     assert progress
+    assert request_calls == [("GET", True), ("GET", True)]
 
 
 def test_cleanup_sidecar_files_retains_partial_for_resume(

@@ -36,6 +36,7 @@ All notable changes to DocsToKG are documented in this file.
 - Content download outcomes now leave `reason` unset for fresh downloads, retain `conditional_not_modified` for genuine 304s, and tag voluntary skips with the dedicated `skip_large_download` code.
 - HTTP range resume is hard-disabled; resolver hints prefixed with `resume_` are stripped and telemetry annotates ignored requests via `resume_disabled=true`.
 - Manifest warm-up defaults to a lazy `ManifestUrlIndex`, with `--warm-manifest-cache` offered solely for small datasets.
+- Content download networking now delegates all HTTP retries to Tenacity, unifying retryable status handling, `Retry-After` honouring, attempt/time budgets, and test patch points via `TENACITY_SLEEP`.
 - `_validate_cached_artifact` short-circuits on matching size/mtime and only recomputes digests when `verify_cache_digest=True`, backed by an in-process LRU cache.
 
 ### Documentation

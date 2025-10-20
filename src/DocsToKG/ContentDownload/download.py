@@ -1698,6 +1698,9 @@ class RobotsCache:
                 timeout=min(timeout, 5.0),
                 allow_redirects=True,
                 max_retries=1,
+                max_retry_duration=min(timeout, 5.0),
+                backoff_max=min(timeout, 5.0),
+                retry_after_cap=min(timeout, 5.0),
             ) as response:
                 if response.status_code and response.status_code >= 400:
                     parser.parse([])
@@ -1705,6 +1708,7 @@ class RobotsCache:
                     body = response.text or ""
                     parser.parse(body.splitlines())
         except Exception:
+            # Robots failures degrade to an empty policy so downloads continue.
             parser.parse([])
         return parser
 

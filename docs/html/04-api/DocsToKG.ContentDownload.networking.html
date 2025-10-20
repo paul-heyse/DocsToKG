@@ -91,8 +91,7 @@ aligned.</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">create_session</span></code>: Configure <code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> instances with pooled
 adapters and optional header injection.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code>: Execute resilient HTTP calls with jittered,
-exponential backoff while honouring <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> directives.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code>: Execute resilient HTTP calls via a Tenacity controller that honours <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> directives, jittered exponential backoff, and retry budgets.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">ConditionalRequestHelper</span></code>: Build and validate conditional request headers
 for polite revalidation workflows.</p></li>
 </ul>
@@ -189,40 +188,41 @@ True</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_enforce_content_policy(response,</span> <span class="pre">content_policy)</span></code><a class="headerlink" href="#enforce-content-policy-response-content-policy" title="Link to this heading"></a></h3>
 <p>Raise ContentPolicyViolation when response headers violate policy.</p>
 </section>
-<section id="calculate-equal-jitter-delay-attempt">
-<h3><code class="docutils literal notranslate"><span class="pre">_calculate_equal_jitter_delay(attempt)</span></code><a class="headerlink" href="#calculate-equal-jitter-delay-attempt" title="Link to this heading"></a></h3>
-<p>Return an exponential backoff delay using equal jitter.</p>
-</section>
 <section id="request-with-retries-session-method-url">
 <h3><code class="docutils literal notranslate"><span class="pre">request_with_retries(session,</span> <span class="pre">method,</span> <span class="pre">url)</span></code><a class="headerlink" href="#request-with-retries-session-method-url" title="Link to this heading"></a></h3>
-<p>Execute an HTTP request with exponential backoff and retry handling.</p>
+<p>Execute an HTTP request using a Tenacity-backed retry controller.</p>
 <p>Args:
 session: Session used to execute the outbound request.
 method: HTTP method such as <code class="docutils literal notranslate"><span class="pre">&quot;GET&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;HEAD&quot;</span></code>.
 url: Fully qualified URL for the request.
-max_retries: Maximum number of retry attempts before returning the final response or
-raising an exception. Defaults to <code class="docutils literal notranslate"><span class="pre">3</span></code>.
+max_retries: Maximum number of retry attempts before returning the final response.
 retry_statuses: HTTP status codes that should trigger a retry. Defaults to
 <code class="docutils literal notranslate"><span class="pre">{429,</span> <span class="pre">500,</span> <span class="pre">502,</span> <span class="pre">503,</span> <span class="pre">504}</span></code>.
-backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to <code class="docutils literal notranslate"><span class="pre">0.75</span></code>.
+backoff_factor: Base multiplier for the Tenacity jitter strategy. Defaults to <code class="docutils literal notranslate"><span class="pre">0.75</span></code>.
 respect_retry_after: Whether to parse and obey <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> headers. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.
 retry_after_cap: Optional ceiling applied to parsed <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> values in seconds. When provided,
 the helper honours the lesser of the header value and this cap while still respecting <code class="docutils literal notranslate"><span class="pre">backoff_max</span></code>.
 content_policy: Optional mapping describing allowed MIME types for the target host.
-max_retry_duration: Maximum total time to spend on retries in seconds. If exceeded, raises
-immediately. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code> (no limit).
+max_retry_duration: Maximum total time to spend on retries in seconds. When exceeded, the helper returns
+the final response after logging a warning. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code> (no limit).
 backoff_max: Maximum delay between retries in seconds. Prevents excessive wait times.
 Defaults to <code class="docutils literal notranslate"><span class="pre">60.0</span></code> seconds.
-**kwargs: Additional keyword arguments forwarded directly to :meth:<code class="docutils literal notranslate"><span class="pre">requests.Session.request</span></code>.
-Note: If <code class="docutils literal notranslate"><span class="pre">timeout</span></code> is provided as a single float, it will be converted to a tuple
-(connect_timeout, read_timeout) with read_timeout = timeout * 2 for better error handling.</p>
+<strong>kwargs: Additional keyword arguments forwarded directly to :meth:<code class="docutils literal notranslate"><span class="pre">requests.Session.request</span></code>.</p>
 <p>Returns:
-requests.Response: Successful response object. Callers are responsible for closing the
+requests.Response: Successful (or exhausted) response object. Callers are responsible for closing the
 response when streaming content.</p>
 <p>Raises:
 ValueError: If <code class="docutils literal notranslate"><span class="pre">max_retries</span></code> or <code class="docutils literal notranslate"><span class="pre">backoff_factor</span></code> are invalid or <code class="docutils literal notranslate"><span class="pre">url</span></code>/<code class="docutils literal notranslate"><span class="pre">method</span></code> are empty.
-requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.
-TimeoutError: If <code class="docutils literal notranslate"><span class="pre">max_retry_duration</span></code> is exceeded.</p>
+requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.</p>
+<p>Notes:
+The Tenacity controller wires <code class="docutils literal notranslate"><span class="pre">RetryAfterJitterWait</span></code> to prefer
+<code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> delays before falling back to
+<code class="docutils literal notranslate"><span class="pre">tenacity.wait_random_exponential</span></code>. Intermediate responses are
+closed via <code class="docutils literal notranslate"><span class="pre">_before_sleep_close_response</span></code>, cumulative sleep time is
+tracked on the controller (<code class="docutils literal notranslate"><span class="pre">_docs_retry_sleep</span></code>), and tests may patch
+<code class="docutils literal notranslate"><span class="pre">TENACITY_SLEEP</span></code> to short-circuit waits. Exhausted HTTP retries return
+the final <code class="docutils literal notranslate"><span class="pre">requests.Response</span></code>, whereas exhausted exception retries raise
+the underlying <code class="docutils literal notranslate"><span class="pre">requests.RequestException</span></code>.</p>
 </section>
 <section id="head-precheck-session-url-timeout">
 <h3><code class="docutils literal notranslate"><span class="pre">head_precheck(session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-session-url-timeout" title="Link to this heading"></a></h3>

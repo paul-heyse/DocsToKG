@@ -111,8 +111,10 @@ Responsibilities
   consistent timeout, adapter, and header defaults via
   :func:`create_session` and :class:`ThreadLocalSessionFactory`.
 - Implement resilient request execution through
-  :func:`request_with_retries`, combining exponential backoff, equal jitter,
-  CLI-provided retry ceilings (``retry_after_cap``), and content-type
+  :func:`request_with_retries`, delegating to a Tenacity controller that
+  combines exponential backoff with jitter, honours ``Retry-After``
+  directives, enforces CLI-provided retry ceilings
+  (``retry_after_cap``/``max_retry_duration``), and performs content-type
   enforcement.
 - Provide conditional request tooling (:class:`ConditionalRequestHelper`,
   :class:`CachedResult`, :class:`ModifiedResult`) so resolvers can revalidate
@@ -128,7 +130,8 @@ Key Components
 --------------
 - ``ThreadLocalSessionFactory`` – manages per-thread session reuse.
 - ``create_session`` / ``get_thread_session`` – standardise session creation.
-- ``request_with_retries`` – wraps HTTP verbs with retry, backoff, and logging.
+- ``request_with_retries`` – wraps HTTP verbs with Tenacity-backed retry,
+  backoff, and logging.
 - ``ConditionalRequestHelper`` – produces ``If-None-Match``/``If-Modified-Since`` headers.
 - ``TokenBucket`` and ``CircuitBreaker`` – stateful regulators shared across
   resolvers and download workers.
@@ -152,7 +155,6 @@ from __future__ import annotations
 import contextlib
 import logging
 import math
-import random
 import threading
 import time
 from dataclasses import dataclass
@@ -163,6 +165,18 @@ from typing import Any, Callable, Dict, Mapping, MutableMapping, Optional, Set, 
 
 import requests
 from requests.adapters import HTTPAdapter
+from tenacity import (
+    RetryCallState,
+    RetryError,
+    Retrying,
+    before_sleep_log,
+    retry_if_exception_type,
+    retry_if_result,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_random_exponential,
+)
+from tenacity.wait import wait_base
 
 # --- Globals ---
 
@@ -182,6 +196,10 @@ __all__ = (
 )
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
+
+TENACITY_SLEEP = time.sleep  # Patchable in tests
+DEFAULT_RETRYABLE_STATUSES: Set[int] = {429, 500, 502, 503, 504}
+_TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
 
 
 # --- Public Functions ---
@@ -453,27 +471,228 @@ def _enforce_content_policy(
             )
 
 
-def _calculate_equal_jitter_delay(
-    attempt: int,
+class RetryAfterJitterWait(wait_base):
+    """Tenacity wait strategy that honours ``Retry-After`` headers."""
+
+    def __init__(
+        self,
+        *,
+        respect_retry_after: bool,
+        retry_after_cap: Optional[float],
+        backoff_max: float,
+        retry_statuses: Set[int],
+        fallback_wait: wait_base,
+    ) -> None:
+        self._respect_retry_after = respect_retry_after
+        self._retry_after_cap = retry_after_cap
+        self._backoff_max = float(max(backoff_max, 0.0))
+        self._retry_statuses = set(retry_statuses)
+        self._fallback_wait = fallback_wait
+
+    def _compute_retry_after(self, response: requests.Response) -> Optional[float]:
+        if not self._respect_retry_after:
+            return None
+
+        status = getattr(response, "status_code", None)
+        if status not in self._retry_statuses or status not in {429, 503}:
+            return None
+
+        retry_after = parse_retry_after_header(response)
+        if retry_after is None:
+            return None
+
+        if self._retry_after_cap is not None:
+            retry_after = min(retry_after, self._retry_after_cap)
+
+        return min(retry_after, self._backoff_max) if self._backoff_max else retry_after
+
+    def __call__(self, retry_state: RetryCallState) -> float:
+        fallback_delay = float(self._fallback_wait(retry_state))
+
+        outcome = retry_state.outcome
+        if outcome is None or outcome.failed:
+            return max(0.0, fallback_delay)
+
+        response = outcome.result()
+        if not isinstance(response, requests.Response):
+            return max(0.0, fallback_delay)
+
+        status = getattr(response, "status_code", None)
+        if status not in self._retry_statuses:
+            return max(0.0, fallback_delay)
+
+        retry_after_delay = self._compute_retry_after(response)
+        if retry_after_delay is None:
+            return max(0.0, fallback_delay)
+
+        return max(0.0, retry_after_delay)
+
+
+def _close_response_safely(response: Optional[requests.Response]) -> None:
+    if response is None:
+        return
+    with contextlib.suppress(Exception):
+        response.close()
+
+
+def _before_sleep_close_response(retry_state: RetryCallState) -> None:
+    """Close prior responses and log Tenacity retry metadata."""
+
+    metadata = getattr(retry_state.retry_object, "_docs_retry_meta", {})
+    method = metadata.get("method", "")
+    url = metadata.get("url", "")
+    max_attempts = metadata.get("max_attempts")
+
+    delay = 0.0
+    if retry_state.next_action is not None and retry_state.next_action.sleep is not None:
+        delay = float(retry_state.next_action.sleep)
+
+    sleep_accumulator = getattr(retry_state.retry_object, "_docs_retry_sleep", 0.0)
+    setattr(retry_state.retry_object, "_docs_retry_sleep", sleep_accumulator + max(delay, 0.0))
+
+    outcome = retry_state.outcome
+    if outcome is None:
+        LOGGER.debug(
+            "Retrying %s %s with unknown outcome (attempt %s, delay %.2fs)",
+            method,
+            url,
+            retry_state.attempt_number,
+            delay,
+        )
+        return
+
+    if outcome.failed:
+        exc = outcome.exception()
+        LOGGER.debug(
+            "Retrying %s %s after exception %s (attempt %s%s, delay %.2fs)",
+            method,
+            url,
+            exc,
+            retry_state.attempt_number,
+            f"/{max_attempts}" if max_attempts else "",
+            delay,
+        )
+        return
+
+    response = outcome.result()
+    status = getattr(response, "status_code", "?")
+    LOGGER.debug(
+        "Retrying %s %s after HTTP %s (attempt %s%s, delay %.2fs)",
+        method,
+        url,
+        status,
+        retry_state.attempt_number,
+        f"/{max_attempts}" if max_attempts else "",
+        delay,
+    )
+    _close_response_safely(response)
+
+
+def _before_sleep_handler(retry_state: RetryCallState) -> None:
+    _before_sleep_close_response(retry_state)
+    _TENACITY_BEFORE_SLEEP_LOG(retry_state)
+
+
+def _is_retryable_response(response: Any, retry_statuses: Set[int]) -> bool:
+    if not isinstance(response, requests.Response):
+        return False
+    status_code = getattr(response, "status_code", None)
+    return bool(status_code in retry_statuses)
+
+
+def _build_retrying_controller(
     *,
+    method: str,
+    url: str,
+    max_retries: int,
+    retry_statuses: Set[int],
     backoff_factor: float,
     backoff_max: float,
-) -> float:
-    """Return an exponential backoff delay using equal jitter."""
+    respect_retry_after: bool,
+    retry_after_cap: Optional[float],
+    max_retry_duration: Optional[float],
+) -> Retrying:
+    fallback_wait = wait_random_exponential(multiplier=backoff_factor, max=backoff_max)
+    wait_strategy = RetryAfterJitterWait(
+        respect_retry_after=respect_retry_after,
+        retry_after_cap=retry_after_cap,
+        backoff_max=backoff_max,
+        retry_statuses=retry_statuses,
+        fallback_wait=fallback_wait,
+    )
 
-    if backoff_factor <= 0:
-        return 0.0
+    retry_condition = retry_if_exception_type(
+        (requests.Timeout, requests.ConnectionError, requests.RequestException)
+    ) | retry_if_result(lambda result: _is_retryable_response(result, retry_statuses))
 
-    base_delay = backoff_factor * (2**attempt)
-    if base_delay <= 0:
-        return 0.0
+    stop_strategy = stop_after_attempt(max_retries + 1)
+    if max_retry_duration is not None and max_retry_duration > 0:
+        stop_strategy = stop_strategy | stop_after_delay(max_retry_duration)
 
-    capped_base = min(base_delay, backoff_max)
-    if capped_base <= 0:
-        return 0.0
+    def _retry_error_callback(retry_state: RetryCallState) -> Any:
+        outcome = retry_state.outcome
+        metadata = getattr(retry_state.retry_object, "_docs_retry_meta", {})
+        method_name = metadata.get("method", "")
+        target_url = metadata.get("url", "")
+        attempts = retry_state.attempt_number
+        duration_cap = metadata.get("max_retry_duration")
 
-    half = capped_base / 2.0
-    return half + random.uniform(0.0, half)
+        if outcome is None:
+            raise RetryError(retry_state=retry_state)
+
+        if outcome.failed:
+            raise RetryError(retry_state=retry_state)
+
+        response = outcome.result()
+        status = getattr(response, "status_code", None)
+
+        if duration_cap:
+            if retry_state.seconds_since_start is not None and retry_state.seconds_since_start >= duration_cap:
+                LOGGER.warning(
+                    "Exceeded max retry duration %.1fs for %s %s; returning final response",
+                    duration_cap,
+                    method_name,
+                    target_url,
+                )
+            else:
+                LOGGER.warning(
+                    "Retry budget exhausted for %s %s after %s attempts; returning final response (status=%s)",
+                    method_name,
+                    target_url,
+                    attempts,
+                    status,
+                )
+        else:
+            LOGGER.warning(
+                "Retry budget exhausted for %s %s after %s attempts; returning final response (status=%s)",
+                method_name,
+                target_url,
+                attempts,
+                status,
+            )
+        return response
+
+    retrying = Retrying(
+        retry=retry_condition,
+        wait=wait_strategy,
+        stop=stop_strategy,
+        sleep=TENACITY_SLEEP,
+        reraise=True,
+        before_sleep=_before_sleep_handler,
+        retry_error_callback=_retry_error_callback,
+    )
+
+    retrying._docs_retry_meta = {
+        "method": method,
+        "url": url,
+        "max_attempts": max_retries + 1,
+        "max_retry_duration": max_retry_duration,
+        "retry_statuses": retry_statuses,
+    }
+    retrying._docs_retry_sleep = 0.0
+
+    return retrying
+
 
 
 def request_with_retries(
@@ -491,74 +710,69 @@ def request_with_retries(
     backoff_max: float = 60.0,
     **kwargs: Any,
 ) -> requests.Response:
-    """Execute an HTTP request with exponential backoff and retry handling.
+    """Execute an HTTP request using a Tenacity-backed retry controller.
 
-    Args:
-        session: Session used to execute the outbound request.
-        method: HTTP method such as ``"GET"`` or ``"HEAD"``.
-        url: Fully qualified URL for the request.
-        max_retries: Maximum number of retry attempts before returning the final response or
-            raising an exception. Defaults to ``3``.
-        retry_statuses: HTTP status codes that should trigger a retry. Defaults to
-            ``{429, 500, 502, 503, 504}``.
-        backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to ``0.75``.
-        respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
-        retry_after_cap: Optional ceiling applied to parsed ``Retry-After`` values in seconds. When provided,
-            the helper honours the lesser of the header value and this cap while still respecting ``backoff_max``.
-        content_policy: Optional mapping describing allowed MIME types for the target host.
-        max_retry_duration: Maximum total time to spend on retries in seconds. If exceeded, raises
-            immediately. Defaults to ``None`` (no limit).
-        backoff_max: Maximum delay between retries in seconds. Prevents excessive wait times.
-            Defaults to ``60.0`` seconds.
-        **kwargs: Additional keyword arguments forwarded directly to :meth:`requests.Session.request`.
-            Note: If ``timeout`` is provided as a single float, it will be converted to a tuple
-            (connect_timeout, read_timeout) with read_timeout = timeout * 2 for better error handling.
-
-    Returns:
-        requests.Response: Successful response object. Callers are responsible for closing the
-        response when streaming content.
-
-    Raises:
-        ValueError: If ``max_retries`` or ``backoff_factor`` are invalid or ``url``/``method`` are empty.
-        requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.
-        TimeoutError: If ``max_retry_duration`` is exceeded.
+    The helper validates inputs, coerces timeout values, and delegates retry
+    behaviour to :class:`tenacity.Retrying`. Retry decisions cover both
+    ``requests`` exceptions and retryable HTTP statuses while respecting
+    ``Retry-After`` headers, attempt budgets, and deadline ceilings.
     """
 
-    if max_retries < 0:
-        raise ValueError(f"max_retries must be non-negative, got {max_retries}")
-    if backoff_factor < 0:
-        raise ValueError(f"backoff_factor must be non-negative, got {backoff_factor}")
+    if session is None:
+        raise ValueError("session must be provided")
     if not method:
-        raise ValueError("method must be a non-empty string")
-    if not isinstance(url, str) or not url:
-        raise ValueError("url must be a non-empty string")
+        raise ValueError("HTTP method must be provided")
+    if not url:
+        raise ValueError("URL must be provided")
+    if max_retries < 0:
+        raise ValueError("max_retries must be non-negative")
+    if backoff_factor < 0:
+        raise ValueError("backoff_factor must be non-negative")
+    if backoff_max < 0:
+        raise ValueError("backoff_max must be non-negative")
+    if retry_after_cap is not None and retry_after_cap < 0:
+        raise ValueError("retry_after_cap must be non-negative when provided")
     if max_retry_duration is not None and max_retry_duration <= 0:
-        raise ValueError(f"max_retry_duration must be positive, got {max_retry_duration}")
-    if backoff_max <= 0:
-        raise ValueError(f"backoff_max must be positive, got {backoff_max}")
-    if retry_after_cap is not None and retry_after_cap <= 0:
-        raise ValueError(f"retry_after_cap must be positive when provided, got {retry_after_cap}")
+        raise ValueError("max_retry_duration must be positive when provided")
 
-    # Optimize timeout handling: separate connect and read timeouts
-    if "timeout" in kwargs:
-        timeout_val = kwargs["timeout"]
-        if isinstance(timeout_val, (int, float)) and not isinstance(timeout_val, bool):
-            # Convert single timeout to (connect, read) tuple for better granularity
-            # Read timeout is typically longer than connect timeout
-            kwargs["timeout"] = (float(timeout_val), float(timeout_val) * 2.0)
+    if retry_after_cap is not None:
+        retry_after_cap = float(retry_after_cap)
+    if max_retry_duration is not None:
+        max_retry_duration = float(max_retry_duration)
 
-    retry_start_time = time.monotonic() if max_retry_duration else None
+    backoff_factor = float(backoff_factor)
+    backoff_max = float(backoff_max)
 
-    if retry_statuses is None:
-        retry_statuses = {429, 500, 502, 503, 504}
-    else:
-        retry_statuses = set(retry_statuses)
+    retry_statuses = (
+        set(retry_statuses)
+        if retry_statuses is not None
+        else set(DEFAULT_RETRYABLE_STATUSES)
+    )
+
+    timeout = kwargs.get("timeout")
+    if isinstance(timeout, (int, float)):
+        timeout_value = float(timeout)
+        if timeout_value <= 0:
+            raise ValueError("timeout must be positive when provided as a float")
+        kwargs["timeout"] = (timeout_value, timeout_value * 2)
+    elif isinstance(timeout, tuple) and len(timeout) == 2:
+        connect_timeout, read_timeout = timeout
+        if connect_timeout is not None and connect_timeout <= 0:
+            raise ValueError("connect timeout must be positive")
+        if read_timeout is not None and read_timeout <= 0:
+            raise ValueError("read timeout must be positive")
+    elif timeout is not None:
+        raise TypeError(
+            "timeout must be a float/int or a (connect, read) tuple when provided"
+        )
 
     request_method = getattr(session, "request", None)
     fallback_method = getattr(session, method.lower(), None)
 
     if not callable(request_method) and not callable(fallback_method):
-        raise AttributeError(f"Session object of type {type(session)!r} lacks callable 'request'.")
+        raise AttributeError(
+            f"Session object of type {type(session)!r} lacks callable 'request'."
+        )
 
     def request_func(
         *,
@@ -566,175 +780,61 @@ def request_with_retries(
         url: str,
         **call_kwargs: Any,
     ) -> requests.Response:
-        """Invoke the appropriate request callable on the provided session."""
-
         if callable(request_method):
             return request_method(method=method, url=url, **call_kwargs)
         if callable(fallback_method):
             return fallback_method(url, **call_kwargs)
-        # pragma: no cover - defensive fall-back
         raise AttributeError(
             f"Session object of type {type(session)!r} lacks usable HTTP callables."
         )
 
-    last_exception: Optional[Exception] = None
-    response: Optional[requests.Response] = None
-
-    def _close_response() -> None:
-        nonlocal response
-        if response is not None:
-            with contextlib.suppress(Exception):
-                response.close()
-            response = None
-
-    for attempt in range(max_retries + 1):
-        try:
-            response = request_func(method=method, url=url, **kwargs)
-            status_code = getattr(response, "status_code", None)
-            if status_code is None:
-                LOGGER.debug(
-                    "Response object of type %s lacks status_code; treating as success for %s %s.",
-                    type(response).__name__,
-                    method,
-                    url,
-                )
-                _enforce_content_policy(response, content_policy, method=method, url=url)
-                return response
-            retry_after_delay: Optional[float] = None
-            if respect_retry_after and status_code in {429, 503}:
-                retry_after_delay = parse_retry_after_header(response)
-
-            if status_code not in retry_statuses:
-                _enforce_content_policy(response, content_policy, method=method, url=url)
-                return response
-
-            if attempt >= max_retries:
-                LOGGER.warning(
-                    "Received status %s for %s %s after %s attempts; returning response",
-                    status_code,
-                    method,
-                    url,
-                    attempt + 1,
-                )
-                _enforce_content_policy(response, content_policy, method=method, url=url)
-                return response
-
-            # Check if we've exceeded max retry duration
-            if retry_start_time and max_retry_duration:
-                elapsed = time.monotonic() - retry_start_time
-                if elapsed >= max_retry_duration:
-                    LOGGER.warning(
-                        "Exceeded max retry duration %.1fs for %s %s; aborting retries",
-                        max_retry_duration,
-                        method,
-                        url,
-                    )
-                    _enforce_content_policy(response, content_policy, method=method, url=url)
-                    return response
-
-            delay = _calculate_equal_jitter_delay(
-                attempt,
-                backoff_factor=backoff_factor,
-                backoff_max=backoff_max,
-            )
-
-            if retry_after_delay is not None:
-                if retry_after_cap is not None:
-                    retry_after_delay = min(retry_after_delay, retry_after_cap)
-                if retry_after_delay > delay:
-                    delay = min(retry_after_delay, backoff_max)
-
-            LOGGER.debug(
-                "Retrying %s %s after HTTP %s (attempt %s/%s, delay %.2fs)",
-                method,
-                url,
-                status_code,
-                attempt + 1,
-                max_retries + 1,
-                delay,
-            )
-            _close_response()
-            time.sleep(delay)
-
-        except requests.Timeout as exc:
-            last_exception = exc
-            _close_response()
-            LOGGER.debug(
-                "Request %s %s timed out (attempt %s/%s): %s",
-                method,
-                url,
-                attempt + 1,
-                max_retries + 1,
-                exc,
-            )
-            if attempt >= max_retries:
-                LOGGER.warning(
-                    "Exhausted %s retries for %s %s due to timeouts", max_retries, method, url
-                )
-                raise
-
-            delay = _calculate_equal_jitter_delay(
-                attempt,
-                backoff_factor=backoff_factor,
-                backoff_max=backoff_max,
-            )
-            time.sleep(delay)
-
-        except requests.ConnectionError as exc:
-            last_exception = exc
-            _close_response()
-            LOGGER.debug(
-                "Request %s %s encountered connection error (attempt %s/%s): %s",
-                method,
-                url,
-                attempt + 1,
-                max_retries + 1,
-                exc,
-            )
-            if attempt >= max_retries:
-                LOGGER.warning(
-                    "Exhausted %s retries for %s %s due to connection errors",
-                    max_retries,
-                    method,
-                    url,
-                )
-                raise
-
-            delay = _calculate_equal_jitter_delay(
-                attempt,
-                backoff_factor=backoff_factor,
-                backoff_max=backoff_max,
-            )
-            time.sleep(delay)
-
-        except requests.RequestException as exc:
-            last_exception = exc
-            _close_response()
-            LOGGER.debug(
-                "Request %s %s failed (attempt %s/%s): %s",
-                method,
-                url,
-                attempt + 1,
-                max_retries + 1,
-                exc,
-            )
-            if attempt >= max_retries:
-                LOGGER.warning("Exhausted %s retries for %s %s: %s", max_retries, method, url, exc)
-                raise
-
-            delay = _calculate_equal_jitter_delay(
-                attempt,
-                backoff_factor=backoff_factor,
-                backoff_max=backoff_max,
-            )
-            time.sleep(delay)
-
-    if last_exception is not None:  # pragma: no cover - defensive safety net
-        raise last_exception
-
-    raise requests.RequestException(  # pragma: no cover - defensive safety net
-        f"Exhausted {max_retries} retries for {method} {url}"
+    controller = _build_retrying_controller(
+        method=method,
+        url=url,
+        max_retries=max_retries,
+        retry_statuses=retry_statuses,
+        backoff_factor=backoff_factor,
+        backoff_max=backoff_max,
+        respect_retry_after=respect_retry_after,
+        retry_after_cap=retry_after_cap,
+        max_retry_duration=max_retry_duration,
     )
+
+    try:
+        response = controller.call(
+            request_func,
+            method=method,
+            url=url,
+            **kwargs,
+        )
+    except RetryError as exc:  # pragma: no cover - defensive safety net
+        last_attempt = exc.last_attempt
+        if last_attempt.failed:
+            raise last_attempt.exception()
+        response = last_attempt.result()
+
+    attempts = controller.statistics.get("attempt_number", 1)
+    total_sleep = getattr(controller, "_docs_retry_sleep", 0.0)
+
+    LOGGER.debug(
+        "Completed %s %s after %s attempt(s) with %.2fs cumulative sleep",
+        method,
+        url,
+        attempts,
+        total_sleep,
+    )
+
+    if not isinstance(response, requests.Response):
+        LOGGER.debug(
+            "Response object of type %s lacks status_code; treating as success for %s %s.",
+            type(response).__name__,
+            method,
+            url,
+        )
+        return response
+
+    _enforce_content_policy(response, content_policy, method=method, url=url)
+    return response
 
 
 def head_precheck(
@@ -773,6 +873,9 @@ def head_precheck(
             timeout=min(timeout, 5.0),
             allow_redirects=True,
             content_policy=content_policy,
+            max_retry_duration=min(timeout, 5.0),
+            backoff_max=min(timeout, 5.0),
+            retry_after_cap=min(timeout, 5.0),
         )
     except ContentPolicyViolation:
         return False
@@ -822,10 +925,14 @@ def _head_precheck_via_get(
             session,
             "GET",
             url,
+            max_retries=1,
             stream=True,
             timeout=min(timeout, 5.0),
             allow_redirects=True,
             content_policy=content_policy,
+            max_retry_duration=min(timeout, 5.0),
+            backoff_max=min(timeout, 5.0),
+            retry_after_cap=min(timeout, 5.0),
         ) as response:
             # Consume at most one chunk to avoid downloading the entire body.
             try:

@@ -87,7 +87,7 @@ def test_request_with_retries_backoff_sequence(status_codes: List[int]) -> None:
             "DocsToKG.ContentDownload.networking.random.uniform",
             side_effect=lambda a, b: a,
         ),
-        patch("DocsToKG.ContentDownload.networking.time.sleep") as mock_sleep,
+        patch("DocsToKG.ContentDownload.networking.TENACITY_SLEEP") as mock_sleep,
     ):
         result = request_with_retries(
             session,
