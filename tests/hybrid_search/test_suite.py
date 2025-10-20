@@ -319,7 +319,7 @@ from DocsToKG.HybridSearch.devtools.opensearch_simulator import (
     OpenSearchSchemaManager,
     OpenSearchSimulator,
 )
-from DocsToKG.HybridSearch.pipeline import IngestError
+from DocsToKG.HybridSearch.pipeline import IngestError, RetryableIngestError
 from DocsToKG.HybridSearch.service import (
     ResultShaper,
     build_stats_snapshot,
@@ -907,8 +907,53 @@ def test_ingest_missing_vector_raises(
         "\n".join(json.dumps(entry) for entry in vector_entries) + "\n", encoding="utf-8"
     )
 
-    with pytest.raises(IngestError):
+    with pytest.raises(IngestError) as excinfo:
         ingestion.upsert_documents([doc])
+
+    assert not isinstance(excinfo.value, RetryableIngestError)
+
+
+# --- test_hybrid_search.py ---
+
+
+@pytest.mark.parametrize("vector_format", ["jsonl", "parquet"])
+def test_ingest_retryable_errors_propagate(
+    stack: Callable[
+        ...,
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
+    tmp_path: Path,
+    vector_format: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ingestion, _, _, _, feature_generator, _ = stack()
+    doc = _write_document_artifacts(
+        tmp_path / "docs",
+        doc_id="doc-transient",
+        namespace="research",
+        text="Chunk raising retryable error",
+        metadata={},
+        feature_generator=feature_generator,
+        vector_format=vector_format,
+    )
+    error = RetryableIngestError("transient failure")
+
+    def raise_retryable(*_: object, **__: object) -> None:
+        raise error
+
+    monkeypatch.setattr(ingestion, "_commit_batch", raise_retryable)
+
+    with pytest.raises(RetryableIngestError) as excinfo:
+        ingestion.upsert_documents([doc])
+
+    assert excinfo.value is error
 
 
 # --- test_hybrid_search.py ---

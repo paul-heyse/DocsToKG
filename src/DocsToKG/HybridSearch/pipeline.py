@@ -589,6 +589,10 @@ class ChunkIngestionPipeline:
                 namespaces.update(batch.namespaces)
                 if vector_ids is not None and batch.vector_ids:
                     vector_ids.extend(batch.vector_ids)
+        except RetryableIngestError:
+            raise
+        except IngestError:
+            raise
         except Exception as exc:  # pragma: no cover - defensive guard
             self._observability.logger.exception(
                 "chunk-ingest-error", extra={"event": {"error": str(exc)}}
