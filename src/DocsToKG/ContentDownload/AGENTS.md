@@ -165,7 +165,7 @@ If any import fails: **do not install**. Go to Troubleshooting.
   You forgot the guard rails. Ensure `PIP_REQUIRE_VIRTUALENV=1` and `PIP_NO_INDEX=1` are set. Never pass `-U/--upgrade`.
 
 - **Stale HTTP cache / unexpected 304 hits**
-  Call `DocsToKG.ContentDownload.httpx_transport.purge_http_cache()` (or delete `${DOCSTOKG_DATA_ROOT}/cache/http/ContentDownload`) and re-run. Cache keys are derived from `core.normalize_url`; normalize any direct calls before comparing.
+  Call `DocsToKG.ContentDownload.httpx_transport.purge_http_cache()` (or delete `${DOCSTOKG_DATA_ROOT}/cache/http/ContentDownload`) and re-run. Cache keys are derived from `urls.canonical_for_index`; normalize any direct calls before comparing.
 
 - **Telemetry shows `cache_hit=true` but payload missing**
   Confirm the cached path still exists; `ConditionalRequestHelper` raises when metadata is incomplete. Recompute manifests with `--verify-cache-digest` to refresh SHA-256 and mtime fields.

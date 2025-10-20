@@ -96,8 +96,8 @@ from DocsToKG.ContentDownload.core import (
 )
 from DocsToKG.ContentDownload.urls import canonical_for_index
 
-MANIFEST_SCHEMA_VERSION = 4
-SQLITE_SCHEMA_VERSION = 5
+MANIFEST_SCHEMA_VERSION = 5
+SQLITE_SCHEMA_VERSION = 6
 CSV_HEADER_TOKENS = {"run_id", "work_id"}
 
 
@@ -198,7 +198,6 @@ class ManifestEntry:
     reason: Optional[str]
     canonical_url: Optional[str] = None
     original_url: Optional[str] = None
-    normalized_url: Optional[str] = None
     reason_detail: Optional[str] = None
     html_paths: List[str] = field(default_factory=list)
     sha256: Optional[str] = None
@@ -262,9 +261,7 @@ class ManifestEntry:
             canonical_value = _canonical_key_or_fallback(base_original)
         if canonical_value is None and self.url:
             canonical_value = _canonical_key_or_fallback(self.url)
-        normalized_value = self.normalized_url or canonical_value
         object.__setattr__(self, "canonical_url", canonical_value)
-        object.__setattr__(self, "normalized_url", normalized_value)
         if base_original is None and self.url is not None:
             base_original = self.url
         object.__setattr__(self, "original_url", base_original)
@@ -332,10 +329,10 @@ class ManifestUrlIndex:
         return True
 
     def items(self) -> Iterable[Tuple[str, Dict[str, Any]]]:
-        """Iterate over cached manifest entries keyed by normalized URL.
+        """Iterate over cached manifest entries keyed by canonical URL.
 
         Returns:
-            Iterable of ``(normalized_url, metadata)`` pairs from the cache.
+            Iterable of ``(canonical_url, metadata)`` pairs from the cache.
         """
         self._ensure_loaded()
         return self._cache.items()
@@ -344,17 +341,17 @@ class ManifestUrlIndex:
         """Stream manifest entries whose artifact paths still exist on disk."""
 
         if self._loaded_all or not self._path or not self._path.exists():
-            for normalized, meta in self._cache.items():
+            for canonical, meta in self._cache.items():
                 path_value = meta.get("path")
                 if path_value and Path(path_value).exists():
-                    yield normalized, meta
+                    yield canonical, meta
             return
 
         conn = sqlite3.connect(self._path)
         try:
             try:
                 cursor = conn.execute(
-                    "SELECT url, canonical_url, original_url, normalized_url, path, sha256, classification, etag, last_modified, content_length, path_mtime_ns "
+                    "SELECT url, canonical_url, original_url, path, sha256, classification, etag, last_modified, content_length, path_mtime_ns "
                     "FROM manifests ORDER BY timestamp DESC"
                 )
             except sqlite3.OperationalError:
@@ -365,7 +362,6 @@ class ManifestUrlIndex:
                 url,
                 stored_canonical,
                 stored_original,
-                normalized_url,
                 stored_path,
                 sha256,
                 classification,
@@ -376,10 +372,9 @@ class ManifestUrlIndex:
             ) in cursor:
                 if not url:
                     continue
-                original_value = stored_original or url
-                canonical_value = stored_canonical or normalized_url
-                if not canonical_value:
-                    canonical_value = _canonical_key_or_fallback(original_value or url)
+                original_value = (stored_original or url) or ""
+                original_value = str(original_value).strip()
+                canonical_value = stored_canonical or _canonical_key_or_fallback(original_value) or _canonical_key_or_fallback(url)
                 if not canonical_value or canonical_value in seen:
                     continue
                 if not stored_path:
@@ -394,7 +389,6 @@ class ManifestUrlIndex:
                     "url": url,
                     "canonical_url": canonical_value,
                     "original_url": original_value or url,
-                    "normalized_url": canonical_value,
                     "path": resolved_path,
                     "sha256": sha256,
                     "classification": classification,
@@ -441,10 +435,10 @@ class ManifestUrlIndex:
             try:
                 cursor = conn.execute(
                     (
-                        "SELECT url, canonical_url, original_url, normalized_url, path, sha256, classification, etag, last_modified, content_length, path_mtime_ns "
-                        "FROM manifests WHERE canonical_url = ? OR normalized_url = ? ORDER BY timestamp DESC LIMIT 1"
+                        "SELECT url, canonical_url, original_url, path, sha256, classification, etag, last_modified, content_length, path_mtime_ns "
+                        "FROM manifests WHERE canonical_url = ? OR url = ? OR original_url = ? ORDER BY timestamp DESC LIMIT 1"
                     ),
-                    (canonical, canonical),
+                    (canonical, canonical, canonical),
                 )
             except sqlite3.OperationalError:
                 return None
@@ -457,7 +451,6 @@ class ManifestUrlIndex:
             url,
             stored_canonical,
             stored_original,
-            normalized_url,
             stored_path,
             sha256,
             classification,
@@ -466,16 +459,21 @@ class ManifestUrlIndex:
             content_length,
             path_mtime_ns,
         ) = row
-        original_value = stored_original or url
-        canonical_value = stored_canonical or normalized_url
-        if not canonical_value:
-            canonical_value = _canonical_key_or_fallback(original_value or url)
+        original_value = (stored_original or url) or ""
+        original_value = str(original_value).strip()
+        if not original_value:
+            original_value = str(url).strip()
+        canonical_value = (
+            stored_canonical
+            or _canonical_key_or_fallback(original_value)
+            or _canonical_key_or_fallback(url)
+            or canonical
+        )
         base_dir = self._path.parent if self._path else None
         return {
             "url": url,
             "canonical_url": canonical_value,
             "original_url": original_value or url,
-            "normalized_url": canonical_value,
             "path": normalize_manifest_path(stored_path, base=base_dir),
             "sha256": sha256,
             "classification": classification,
@@ -888,7 +886,6 @@ class JsonlSink:
                 "url": entry.url,
                 "canonical_url": entry.canonical_url,
                 "original_url": entry.original_url,
-                "normalized_url": entry.normalized_url,
                 "path": entry.path,
                 "classification": str(entry.classification),
                 "content_type": entry.content_type,
@@ -1475,7 +1472,6 @@ class SqliteSink:
                     "url",
                     "canonical_url",
                     "original_url",
-                    "normalized_url",
                     "path",
                     "path_mtime_ns",
                     "classification",
@@ -1501,7 +1497,6 @@ class SqliteSink:
                     entry.url,
                     entry.canonical_url,
                     entry.original_url or entry.url,
-                    entry.normalized_url,
                     entry.path,
                     entry.path_mtime_ns,
                     entry.classification,
@@ -1757,7 +1752,6 @@ def _manifest_entry_from_sqlite_row(
     run_id: Any,
     work_id: Any,
     url: Any,
-    normalized_url: Any,
     canonical_url: Any,
     original_url: Any,
     schema_version: Any,
@@ -1776,10 +1770,9 @@ def _manifest_entry_from_sqlite_row(
     if not work_id or not url:
         return None
 
-    url_text = str(url)
-    canonical_value = canonical_url or normalized_url
-    normalized = normalized_url or canonical_value or _canonical_key_or_fallback(url_text) or url_text.strip()
-    canonical_value = canonical_value or normalized
+    url_text = str(url).strip()
+    original_text = str(original_url).strip() if original_url else None
+    canonical_value = canonical_url or _canonical_key_or_fallback(original_text or url_text) or url_text
     try:
         schema_version_int = int(schema_version)
     except (TypeError, ValueError):
@@ -1823,8 +1816,7 @@ def _manifest_entry_from_sqlite_row(
         "work_id": work_id,
         "url": url,
         "canonical_url": canonical_value,
-        "original_url": original_url,
-        "normalized_url": normalized,
+        "original_url": original_text or url,
         "classification": classification_value or str(classification or ""),
         "reason": reason_value,
         "reason_detail": reason_detail,
@@ -1837,7 +1829,7 @@ def _manifest_entry_from_sqlite_row(
         "last_modified": last_modified,
     }
 
-    return str(work_id), normalized, entry, completed
+    return str(work_id), canonical_value, entry, completed
 
 
 def _iter_resume_rows_from_sqlite(
@@ -2063,10 +2055,9 @@ def iter_previous_manifest_entries(
                     if not original_value:
                         raise ValueError("Manifest entries must include a non-empty original_url.")
                     canonical_value = data.get("canonical_url") or _canonical_key_or_fallback(original_value) or original_value
-                    normalized_value = data.get("normalized_url") or canonical_value
+                    normalized_value = data.pop("normalized_url", None)
                     data["original_url"] = original_value
                     data["canonical_url"] = canonical_value
-                    data["normalized_url"] = normalized_value
 
                     content_length = data.get("content_length")
                     if isinstance(content_length, str):
@@ -2101,8 +2092,9 @@ def iter_previous_manifest_entries(
                         if detail == "":
                             data["reason_detail"] = None
 
-                    normalized = data["normalized_url"]
-                    record = (str(work_id), normalized, data, completed)
+                    record_key = normalized_value or canonical_value
+                    record_key = record_key or _canonical_key_or_fallback(original_value) or canonical_value
+                    record = (str(work_id), record_key, data, completed)
                     if buffered is not None:
                         buffered.append(record)
                     else:
@@ -2604,7 +2596,7 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
     try:
         try:
             cursor = conn.execute(
-                "SELECT url, normalized_url, canonical_url, original_url, path, sha256, classification, etag, last_modified, content_length, path_mtime_ns "
+                "SELECT url, canonical_url, original_url, path, sha256, classification, etag, last_modified, content_length, path_mtime_ns "
                 "FROM manifests ORDER BY timestamp"
             )
         except sqlite3.OperationalError:
@@ -2613,7 +2605,6 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
         base_dir = path.parent
         for (
             url,
-            normalized_url,
             canonical_url,
             original_url,
             stored_path,
@@ -2629,13 +2620,12 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
             url_text = str(url).strip()
             if not url_text:
                 continue
-            canonical_value = canonical_url or normalized_url or _canonical_key_or_fallback(url_text) or url_text
+            canonical_value = canonical_url or _canonical_key_or_fallback(original_url or url_text) or _canonical_key_or_fallback(url_text) or url_text
             normalized_path = normalize_manifest_path(stored_path, base=base_dir)
             mapping[canonical_value] = {
                 "url": url,
                 "canonical_url": canonical_value,
                 "original_url": original_url or url,
-                "normalized_url": canonical_value,
                 "path": normalized_path,
                 "sha256": sha256,
                 "classification": classification,
@@ -2737,7 +2727,6 @@ def build_manifest_entry(
         url=url,
         canonical_url=canonical_hint,
         original_url=original_hint,
-        normalized_url=canonical_hint,
         path=normalized_path,
         path_mtime_ns=path_mtime_ns,
         classification=classification,

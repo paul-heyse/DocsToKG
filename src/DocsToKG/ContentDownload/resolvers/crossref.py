@@ -21,7 +21,8 @@ from urllib.parse import quote
 
 import httpx
 
-from DocsToKG.ContentDownload.core import normalize_doi, normalize_url
+from DocsToKG.ContentDownload.core import normalize_doi
+from DocsToKG.ContentDownload.urls import canonical_for_index
 
 from .base import ApiResolverBase, ResolverEvent, ResolverEventReason, ResolverResult
 
@@ -112,7 +113,10 @@ class CrossrefResolver(ApiResolverBase):
 
         seen: Set[str] = set()
         for url, meta in pdf_candidates:
-            normalized = normalize_url(url)
+            try:
+                normalized = canonical_for_index(url)
+            except Exception:
+                normalized = url
             if normalized in seen:
                 continue
             seen.add(normalized)
