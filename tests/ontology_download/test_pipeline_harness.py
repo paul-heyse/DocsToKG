@@ -13,11 +13,13 @@ import threading
 import time
 from contextlib import ExitStack
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from DocsToKG.OntologyDownload import api as core
 from DocsToKG.OntologyDownload.cancellation import CancellationTokenGroup
+from DocsToKG.OntologyDownload import settings as settings_mod
 from DocsToKG.OntologyDownload.planning import (
     BatchFetchError,
     BatchPlanningError,
@@ -137,6 +139,79 @@ def test_fetch_all_strict_mode_raises_on_validation_failure(ontology_env):
     assert not ontology_root.exists() or not any(ontology_root.iterdir())
 
 
+def test_fetch_all_strict_mode_validation_failure_uses_fallback(ontology_env):
+    """Strict mode should try fallback resolvers when validation fails."""
+
+    primary_url = ontology_env.register_fixture(
+        "validation-primary.owl",
+        "validation primary content\n",
+        media_type="application/rdf+xml",
+        repeats=3,
+    )
+    fallback_url = ontology_env.register_fixture(
+        "validation-fallback.owl",
+        "validation fallback content\n",
+        media_type="application/rdf+xml",
+        repeats=3,
+    )
+    primary_name = "bioregistry"
+    fallback_name = "obo"
+    primary_resolver = ontology_env.static_resolver(
+        name=primary_name,
+        fixture_url=primary_url,
+        filename="validation.owl",
+        media_type="application/rdf+xml",
+        service="test",
+    )
+    fallback_resolver = ontology_env.static_resolver(
+        name=fallback_name,
+        fixture_url=fallback_url,
+        filename="validation.owl",
+        media_type="application/rdf+xml",
+        service="test",
+    )
+    spec = FetchSpec(
+        id="validation-fallback", resolver=primary_name, extras={}, target_formats=("owl",)
+    )
+
+    config = _resolved_config(ontology_env)
+    config.defaults.continue_on_error = False
+
+    validator_names = ("rdflib", "pronto", "owlready2", "robot", "arelle")
+
+    def _conditional_validator(request, logger):  # type: ignore[override]
+        text = request.file_path.read_text()
+        ok = "primary" not in text
+        return ValidationResult(
+            ok=ok,
+            details={"content": text.strip(), "validator": "rdflib"},
+            output_files=[],
+        )
+
+    def _passing_validator(request, logger):  # type: ignore[override]
+        return ValidationResult(ok=True, details={}, output_files=[])
+
+    with ExitStack() as stack:
+        stack.enter_context(temporary_resolver(primary_name, primary_resolver))
+        stack.enter_context(temporary_resolver(fallback_name, fallback_resolver))
+        config.defaults.prefer_source = [fallback_name]
+        for name in validator_names:
+            validator = _conditional_validator if name == "rdflib" else _passing_validator
+            stack.enter_context(temporary_validator(name, validator))
+        results = fetch_all([spec], config=config, logger=_logger(), force=True)
+
+    assert len(results) == 1
+    result = results[0]
+    assert result.spec.resolver == fallback_name
+    manifest_payload = json.loads(result.manifest_path.read_text())
+    attempts = manifest_payload["resolver_attempts"]
+    assert [entry["resolver"] for entry in attempts] == [primary_name, fallback_name]
+    assert attempts[0]["status"] == "failed"
+    assert "Validation failed" in attempts[0]["error"]
+    assert attempts[1]["status"] == "success"
+    assert manifest_payload["resolver"] == fallback_name
+
+
 def test_fetch_all_lenient_mode_logs_validation_failure(ontology_env):
     """Lenient mode should record validator failures while continuing."""
 
@@ -173,6 +248,64 @@ def test_fetch_all_lenient_mode_logs_validation_failure(ontology_env):
     rdflib_result = manifest_payload["validation"]["rdflib"]
     assert rdflib_result["ok"] is False
     assert rdflib_result["details"]["reason"] == "lenient"
+
+
+def test_fetch_all_retries_after_validation_failure(ontology_env):
+    """Strict mode should fall back to the next resolver when validation fails."""
+
+    primary_name, primary_resolver = _static_resolver_for(
+        ontology_env, name="validation-primary", filename="primary.owl"
+    )
+    fallback_name, fallback_resolver = _static_resolver_for(
+        ontology_env, name="validation-fallback", filename="fallback.owl"
+    )
+
+    spec = FetchSpec(
+        id="validation-fallback",
+        resolver=primary_name,
+        extras={},
+        target_formats=("owl",),
+    )
+
+    config = _resolved_config(ontology_env)
+    config.defaults.continue_on_error = False
+    config.defaults.resolver_fallback_enabled = True
+
+    validator_names = ("rdflib", "pronto", "owlready2", "robot", "arelle")
+    state = {"rdflib_runs": 0}
+
+    def _flaky_validator(request, logger):  # type: ignore[override]
+        if request.name == "rdflib":
+            state["rdflib_runs"] += 1
+            if state["rdflib_runs"] == 1:
+                return ValidationResult(
+                    ok=False,
+                    details={"reason": "primary failure"},
+                    output_files=[],
+                )
+        return ValidationResult(ok=True, details={}, output_files=[])
+
+    with ExitStack() as stack:
+        stack.enter_context(temporary_resolver(primary_name, primary_resolver))
+        stack.enter_context(temporary_resolver(fallback_name, fallback_resolver))
+        patched_resolvers = set(settings_mod._VALID_RESOLVERS) | {primary_name, fallback_name}
+        stack.enter_context(patch.object(settings_mod, "_VALID_RESOLVERS", patched_resolvers))
+        config.defaults.prefer_source = (fallback_name,)
+        for name in validator_names:
+            stack.enter_context(temporary_validator(name, _flaky_validator))
+        results = fetch_all([spec], config=config, logger=_logger(), force=True)
+
+    assert len(results) == 1
+    result = results[0]
+    assert result.spec.resolver == fallback_name
+
+    manifest_payload = json.loads(result.manifest_path.read_text())
+    attempts = manifest_payload["resolver_attempts"]
+    assert [attempt["resolver"] for attempt in attempts] == [primary_name, fallback_name]
+    assert attempts[0]["status"] == "failed"
+    assert attempts[0]["validators"] == ["rdflib"]
+    assert attempts[1]["status"] == "success"
+    assert manifest_payload["resolver"] == fallback_name
 
 
 def test_fetch_all_second_run_uses_cache(ontology_env):

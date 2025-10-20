@@ -31,6 +31,7 @@ import heapq
 import json
 import logging
 import multiprocessing
+from multiprocessing.managers import SyncManager
 import os
 import platform
 import re
@@ -82,6 +83,8 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from .plugins import ValidatorPlugin
 
 _VALIDATOR_SEMAPHORE_CACHE: Dict[int, BoundedSemaphore] = {}
+_VALIDATOR_BUDGET_MANAGER: Optional[SyncManager] = None
+_VALIDATOR_BUDGET_MANAGER_LOCK = RLock()
 _VALIDATOR_LOAD_LOCK = RLock()
 _VALIDATOR_REGISTRY_CACHE: Optional[MutableMapping[str, "ValidatorPlugin"]] = None
 
@@ -97,15 +100,28 @@ def _current_memory_mb() -> float:
         return 0.0
 
 
-class _ValidatorBudget:
-    """Cross-process concurrency budget backed by a multiprocessing semaphore."""
+def _ensure_validator_budget_manager() -> SyncManager:
+    """Return a lazily constructed manager for validator budgets."""
+
+    global _VALIDATOR_BUDGET_MANAGER  # noqa: PLW0603
+
+    with _VALIDATOR_BUDGET_MANAGER_LOCK:
+        manager = _VALIDATOR_BUDGET_MANAGER
+        if manager is None:
+            ctx = multiprocessing.get_context()
+            manager = ctx.Manager()  # type: ignore[assignment]
+            _VALIDATOR_BUDGET_MANAGER = manager
+        return manager
+
+
+class _SharedValidatorBudget:
+    """Budget handle that can be transported across process boundaries."""
 
     __slots__ = ("_limit", "_semaphore")
 
-    def __init__(self, limit: int):
-        ctx = multiprocessing.get_context()
+    def __init__(self, limit: int, semaphore: Any):
         self._limit = limit
-        self._semaphore = ctx.BoundedSemaphore(limit)
+        self._semaphore = semaphore
 
     @property
     def limit(self) -> int:
@@ -125,6 +141,23 @@ class _ValidatorBudget:
         """Release a previously acquired budget slot."""
 
         self._semaphore.release()
+
+
+class _ValidatorBudget(_SharedValidatorBudget):
+    """Cross-process concurrency budget backed by a manager semaphore."""
+
+    __slots__ = ("_shared",)
+
+    def __init__(self, limit: int):
+        manager = _ensure_validator_budget_manager()
+        semaphore = manager.BoundedSemaphore(limit)
+        super().__init__(limit, semaphore)
+        self._shared = _SharedValidatorBudget(limit, semaphore)
+
+    def share(self) -> _SharedValidatorBudget:
+        """Return a handle safe to pass to worker processes."""
+
+        return self._shared
 
 
 def _acquire_validator_slot(config: ResolvedConfig) -> BoundedSemaphore:
@@ -1149,7 +1182,7 @@ def _run_validator_task(
     request: ValidationRequest,
     logger: logging.Logger,
     *,
-    budget: Optional[_ValidatorBudget] = None,
+    budget: Optional[_SharedValidatorBudget] = None,
     use_semaphore: bool = True,
 ) -> ValidationResult:
     """Execute a single validator with exception guards."""
@@ -1224,7 +1257,7 @@ def _run_validator_task(
 def _run_validator_in_process(
     name: str,
     request: ValidationRequest,
-    budget: Optional[_ValidatorBudget] = None,
+    budget: Optional[_SharedValidatorBudget] = None,
 ) -> ValidationResult:
     """Execute a validator inside a worker process."""
 
@@ -1283,6 +1316,7 @@ def run_validators(
     max_workers = _determine_max_workers()
     results: Dict[str, ValidationResult] = {}
     budget = _ValidatorBudget(max_workers)
+    shared_budget = budget.share()
 
     process_enabled = False
     process_validator_names: set[str] = set()
@@ -1340,7 +1374,7 @@ def run_validators(
                     _run_validator_in_process,
                     request.name,
                     request,
-                    budget,
+                    shared_budget,
                 )
                 futures[future] = request
 

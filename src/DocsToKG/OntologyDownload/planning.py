@@ -70,6 +70,8 @@ from .errors import (
     PolicyError,
     ResolverError,
     ValidationError,
+    RetryableValidationError,
+    ValidationFailure,
 )
 from .io import (
     RDF_MIME_ALIASES,
@@ -1988,6 +1990,7 @@ def fetch_one(
                         "validators": failed_validators,
                         "strict": not active_config.defaults.continue_on_error,
                     }
+                    attempt_record["validators"] = list(failed_validators)
                     if active_config.defaults.continue_on_error:
                         adapter.warning(
                             "validation failures ignored", extra=log_payload
@@ -2004,8 +2007,14 @@ def fetch_one(
                             logger=adapter,
                         )
                         raise OntologyDownloadError(
+                        raise RetryableValidationError(
                             "Validation failed for "
-                            f"'{effective_spec.id}' via {', '.join(failed_validators)}"
+                            f"'{effective_spec.id}' via {', '.join(failed_validators)}",
+                            validators=tuple(failed_validators),
+                        raise ValidationFailure(
+                            "Validation failed for "
+                            f"'{effective_spec.id}' via {', '.join(failed_validators)}",
+                            retryable=True,
                         )
 
                 normalized_hash = None
@@ -2132,6 +2141,37 @@ def fetch_one(
 
         try:
             return _execute_candidate()
+        except ValidationError as exc:
+            last_error = exc
+            attempt_record.update({"status": "failed", "error": str(exc)})
+            validators = getattr(exc, "validators", None)
+            if validators:
+                attempt_record["validators"] = list(validators)
+            resolver_attempts.append(dict(attempt_record))
+            adapter.warning(
+                "validation attempt failed",
+                extra={
+                    "stage": "validate",
+                    "resolver": candidate.resolver,
+                    "attempt": attempt_number,
+                    "error": str(exc),
+                },
+            )
+            retryable = getattr(exc, "retryable", False)
+            if retryable:
+                adapter.info(
+                    "trying fallback resolver",
+                    extra={
+                        "stage": "download",
+                        "stage": "validate",
+                        "resolver": candidate.resolver,
+                        "attempt": attempt_number,
+                    },
+                )
+                continue
+            raise OntologyDownloadError(
+                f"Validation failed for '{pending_spec.id}': {exc}"
+            ) from exc
         except (ConfigError, DownloadFailure) as exc:
             attempt_record.update({"status": "failed", "error": str(exc)})
             resolver_attempts.append(dict(attempt_record))

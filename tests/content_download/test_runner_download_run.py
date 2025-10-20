@@ -1642,6 +1642,102 @@ def test_run_parallel_workers_aggregates_state(patcher, tmp_path):
     download_run.close()
 
 
+def test_run_resume_cleanup_called_once_on_success(patcher, tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+
+    call_count = 0
+    load_calls = 0
+
+    resolved.args.resume_from = resolved.manifest_path
+
+    def _load_resume_state(self, resume_path):
+        nonlocal load_calls
+        load_calls += 1
+
+        def _cleanup():
+            nonlocal call_count
+            call_count += 1
+
+        return {}, set(), _cleanup
+
+    class _EmptyProvider:
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            return iter(())
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = _EmptyProvider()
+        self.provider = provider
+        return provider
+
+    patcher.setattr(DownloadRun, "_load_resume_state", _load_resume_state)
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+
+    download_run = DownloadRun(resolved)
+    result = download_run.run()
+
+    assert result.processed == 0
+    assert load_calls == 1
+    assert call_count == 1
+    assert download_run.state is None
+
+    download_run.close()
+    download_run.close()
+
+    assert call_count == 1
+
+
+def test_run_resume_cleanup_called_once_on_exception(patcher, tmp_path):
+    resolved = make_resolved_config(tmp_path, csv=False)
+    bootstrap_run_environment(resolved)
+
+    call_count = 0
+    load_calls = 0
+
+    resolved.args.resume_from = resolved.manifest_path
+    resolved.args.workers = 2
+
+    def _load_resume_state(self, resume_path):
+        nonlocal load_calls
+        load_calls += 1
+
+        def _cleanup():
+            nonlocal call_count
+            call_count += 1
+
+        return {}, set(), _cleanup
+
+    class _EmptyProvider:
+        def iter_artifacts(self) -> Iterable[WorkArtifact]:
+            return iter(())
+
+    def fake_setup_work_provider(self: DownloadRun) -> WorkProvider:
+        provider = _EmptyProvider()
+        self.provider = provider
+        return provider
+
+    def failing_worker_pool(self: DownloadRun):
+        raise RuntimeError("fail-worker-pool")
+
+    patcher.setattr(DownloadRun, "_load_resume_state", _load_resume_state)
+    patcher.setattr(DownloadRun, "setup_work_provider", fake_setup_work_provider)
+    patcher.setattr(DownloadRun, "setup_worker_pool", failing_worker_pool)
+
+    download_run = DownloadRun(resolved)
+
+    with pytest.raises(RuntimeError):
+        download_run.run()
+
+    assert load_calls == 1
+    assert call_count == 1
+    assert download_run.state is None
+
+    download_run.close()
+    download_run.close()
+
+    assert call_count == 1
+
+
 def test_run_auto_resume_uses_manifest_path_when_resume_flag_absent(patcher, tmp_path):
     resolved = make_resolved_config(tmp_path, csv=False)
     bootstrap_run_environment(resolved)

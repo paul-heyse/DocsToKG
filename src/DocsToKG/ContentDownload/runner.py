@@ -173,16 +173,27 @@ class DownloadRun:
     def close(self) -> None:
         """Release resources owned by the run instance."""
 
-        if self._ephemeral_stack is not None:
+        stack = self._ephemeral_stack
+        self._ephemeral_stack = None
+        if stack is not None:
             with contextlib.suppress(Exception):
-                self._ephemeral_stack.close()
-            self._ephemeral_stack = None
-        if self.state is not None:
+                stack.close()
+
+        state = self.state
+        if state is None:
+            return
+
+        self.state = None
+
+        resume_cleanup = state.resume_cleanup
+        state.resume_cleanup = None
+
+        with contextlib.suppress(Exception):
+            state.session_factory.close_all()
+
+        if resume_cleanup is not None:
             with contextlib.suppress(Exception):
-                self.state.session_factory.close_all()
-            if self.state.resume_cleanup is not None:
-                with contextlib.suppress(Exception):
-                    self.state.resume_cleanup()
+                resume_cleanup()
 
     def setup_sinks(self, stack: Optional[contextlib.ExitStack] = None) -> MultiSink:
         """Initialise telemetry sinks responsible for manifest and summary data."""
@@ -622,6 +633,22 @@ class DownloadRun:
                             Future[Dict[str, Any]],
                             Dict[str, int],
                         ] = {}
+                        raw_sleep = getattr(self.args, "sleep", 0.0)
+                        sleep_interval = float(raw_sleep or 0.0)
+                        if sleep_interval < 0.0:
+                            sleep_interval = 0.0
+                        last_submit_at: Optional[float] = None
+
+                        def _wait_for_submit_slot() -> None:
+                            nonlocal last_submit_at
+                            if sleep_interval <= 0.0:
+                                return
+                            if last_submit_at is None:
+                                return
+                            target_time = last_submit_at + sleep_interval
+                            now = time.monotonic()
+                            if now < target_time:
+                                time.sleep(target_time - now)
 
                         def _submit(work_item: WorkArtifact) -> Future[Dict[str, Any]]:
                             thread_info: Dict[str, int] = {}
@@ -670,7 +697,10 @@ class DownloadRun:
                                 for completed_future in done:
                                     _handle_future(completed_future)
                                 in_flight = list(pending)
-                            in_flight.append(_submit(artifact))
+                            _wait_for_submit_slot()
+                            future = _submit(artifact)
+                            last_submit_at = time.monotonic()
+                            in_flight.append(future)
 
                         if in_flight:
                             for future in as_completed(list(in_flight)):
@@ -708,8 +738,6 @@ class DownloadRun:
             except Exception:
                 LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
         finally:
-            if state is not None:
-                state.session_factory.close_all()
             self.close()
 
         return RunResult(
