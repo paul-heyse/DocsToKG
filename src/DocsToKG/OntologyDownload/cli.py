@@ -46,16 +46,12 @@ from typing import Dict, List, Optional, Sequence, Union
 
 import requests
 import yaml
+from pydantic import ValidationError as PydanticValidationError
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
 from .api import _collect_plugin_details
-from .errors import (
-    ConfigError,
-    ConfigurationError,
-    OntologyDownloadError,
-    UnsupportedPythonError,
-)
+from .errors import ConfigError, ConfigurationError, OntologyDownloadError, UnsupportedPythonError
 from .formatters import (
     PLAN_TABLE_HEADERS,
     format_plan_rows,
@@ -1176,15 +1172,20 @@ def _doctor_report() -> Dict[str, object]:
             result.update({"ok": False, "detail": str(exc)})
         network[name] = result
 
-    rate_limits: Dict[str, object] = {
-        "effective": ResolvedConfig.from_defaults().defaults.http.rate_limits,
-    }
+    rate_limits: Dict[str, object] = {}
+    rate_limit_errors: List[str] = []
+    try:
+        defaults = ResolvedConfig.from_defaults()
+    except (PydanticValidationError, ValueError) as exc:
+        rate_limit_errors.append(f"Failed to load default rate limits: {exc}")
+    else:
+        rate_limits["effective"] = defaults.defaults.http.rate_limits
     config_path = CONFIG_DIR / "sources.yaml"
     if config_path.exists():
         try:
             raw = yaml.safe_load(config_path.read_text()) or {}
         except Exception as exc:  # pragma: no cover - YAML errors depend on file contents
-            rate_limits["error"] = f"Failed to parse {config_path}: {exc}"  # type: ignore[assignment]
+            rate_limit_errors.append(f"Failed to parse {config_path}: {exc}")
         else:
             http_section = raw.get("defaults", {}).get("http") if isinstance(raw, dict) else None
             configured = http_section.get("rate_limits") if isinstance(http_section, dict) else None
@@ -1205,6 +1206,12 @@ def _doctor_report() -> Dict[str, object]:
                     rate_limits["configured"] = valid
                 if invalid:
                     rate_limits["invalid"] = invalid
+
+    if rate_limit_errors:
+        message = "; ".join(error.strip() for error in rate_limit_errors)
+        rate_limits["error"] = message
+        if len(rate_limit_errors) > 1:
+            rate_limits["errors"] = rate_limit_errors
 
     schema_report: Dict[str, object] = {"version": MANIFEST_SCHEMA_VERSION}
     try:
@@ -1291,12 +1298,19 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
     from DocsToKG.OntologyDownload.settings import LOG_DIR as runtime_log_dir
 
     if runtime_log_dir.exists():
-        retention_days = ResolvedConfig.from_defaults().defaults.logging.retention_days
         try:
-            rotations = _cleanup_logs(runtime_log_dir, retention_days)
-            actions.extend(rotations)
-        except OSError as exc:
-            actions.append(f"Failed to rotate logs in {runtime_log_dir}: {exc}")
+            retention_days = ResolvedConfig.from_defaults().defaults.logging.retention_days
+        except (PydanticValidationError, ValueError) as exc:
+            actions.append(
+                "Skipped log rotation: failed to load default configuration "
+                f"values ({str(exc).strip()})"
+            )
+        else:
+            try:
+                rotations = _cleanup_logs(runtime_log_dir, retention_days)
+                actions.extend(rotations)
+            except OSError as exc:
+                actions.append(f"Failed to rotate logs in {runtime_log_dir}: {exc}")
 
     placeholders = {
         CONFIG_DIR / "bioportal_api_key.txt": "Add your BioPortal API key here\n",
@@ -1390,7 +1404,11 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
         print("  Invalid rate limits detected:")
         for service, value in rate_limits["invalid"].items():
             print(f"    * {service}: '{value}' (expected <number>/<unit>)")
-    if rate_limits.get("error"):
+    errors = rate_limits.get("errors")
+    if errors:
+        for message in errors:
+            print(f"Rate limit check error: {message}")
+    elif rate_limits.get("error"):
         print(f"Rate limit check error: {rate_limits['error']}")
 
     schema = report.get("manifest_schema", {})
@@ -1707,20 +1725,29 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(arg_list)
     try:
-        base_config = get_default_config(copy=True)
-        base_config.defaults.logging.level = args.log_level
-        logging_config = base_config.defaults.logging
-        logger = setup_logging(
-            level=logging_config.level,
-            retention_days=logging_config.retention_days,
-            max_log_size_mb=logging_config.max_log_size_mb,
-        )
+        try:
+            base_config = get_default_config(copy=True)
+        except (PydanticValidationError, ValueError):
+            if args.command != "doctor":
+                raise
+            base_config = None
+            logger = setup_logging(level=args.log_level)
+        else:
+            base_config.defaults.logging.level = args.log_level
+            logging_config = base_config.defaults.logging
+            logger = setup_logging(
+                level=logging_config.level,
+                retention_days=logging_config.retention_days,
+                max_log_size_mb=logging_config.max_log_size_mb,
+            )
+
         if getattr(args, "json", False):
             for handler in logger.handlers:
                 if isinstance(handler, logging.StreamHandler) and not isinstance(
                     handler, logging.FileHandler
                 ):
                     handler.setStream(sys.stderr)
+
         if args.command == "pull":
             if getattr(args, "dry_run", False):
                 plans = _handle_pull(args, base_config, dry_run=True, logger=logger)
@@ -1854,6 +1881,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                         print(f"  - {action}")
         else:  # pragma: no cover - argparse should prevent unknown commands
             parser.error(f"Unsupported command: {args.command}")
+
         return 0
     except BatchPlanningError as exc:
         _emit_batch_failure(exc, args)
