@@ -44,13 +44,6 @@
 #     {"id": "s38", "name": "iter_chunk_files", "anchor": "S38", "kind": "function"},
 #     {"id": "s39", "name": "_iter_chunks_or_empty", "anchor": "S39", "kind": "function"},
 #     {"id": "s40", "name": "_ensure_pyarrow_vectors", "anchor": "S40", "kind": "function"},
-#     {"id": "s41", "name": "_vector_arrow_schema", "anchor": "S41", "kind": "function"},
-#     {"id": "s42", "name": "_prepare_vector_row_for_arrow", "anchor": "S42", "kind": "function"},
-#     {"id": "s43", "name": "_rows_to_arrow_table", "anchor": "S43", "kind": "function"},
-#     {"id": "s44", "name": "VectorWriter", "anchor": "S44", "kind": "class"},
-#     {"id": "s45", "name": "JsonlVectorWriter", "anchor": "S45", "kind": "class"},
-#     {"id": "s46", "name": "ParquetVectorWriter", "anchor": "S46", "kind": "class"},
-#     {"id": "s47", "name": "create_vector_writer", "anchor": "S47", "kind": "function"},
 #     {"id": "s48", "name": "_iter_vector_rows", "anchor": "S48", "kind": "function"},
 #     {"id": "s49", "name": "process_chunk_file_vectors", "anchor": "S49", "kind": "function"},
 #     {"id": "s50", "name": "write_vectors", "anchor": "S50", "kind": "function"},
@@ -1080,79 +1073,6 @@ def iter_rows_in_batches(
         buf.append(record)
         if len(buf) >= batch_size:
             yield buf
-            buf = []
-    if buf:
-        yield buf
-
-
-def iter_rows_in_batches_with_hash(
-    path: Path,
-    batch_size: int,
-    *,
-    content_hasher: StreamingContentHasher,
-) -> Iterator[List[dict]]:
-    """Iterate JSONL rows while incrementally updating ``content_hasher``."""
-
-    if batch_size <= 0:
-        raise ValueError("batch_size must be a positive integer")
-
-    buf: List[dict] = []
-    with path.open("r", encoding="utf-8", errors="replace") as handle:
-        for line_no, raw_line in enumerate(handle, start=1):
-            content_hasher.update(raw_line)
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:  # pragma: no cover - malformed rows
-                raise ValueError(f"Invalid JSON in {path}:{line_no}: {exc}") from exc
-            buf.append(record)
-            if len(buf) >= batch_size:
-                yield buf
-                buf = []
-    if buf:
-        yield buf
-
-
-def _validate_chunk_file_schema(path: Path) -> None:
-    """Stream chunk file rows and assert schema compatibility."""
-
-    for index, row in enumerate(iter_jsonl(path), start=1):
-        version = row.get("schema_version")
-        if not version:
-            continue
-        validate_schema_version(str(version), SchemaKind.CHUNK, context=f"{path}:{index}")
-
-
-def iter_chunk_files(directory: Path) -> Iterator[Path]:
-    """Deprecated shim that forwards to :func:`iter_chunks`.
-
-    Args:
-        directory: Directory to scan for chunk artifacts.
-
-    Returns:
-        Iterator over chunk files.
-    """
-
-    yield from iter_chunks(directory)
-
-
-def _iter_chunks_or_empty(directory: Path) -> Iterable[ChunkDiscovery]:
-    """Return chunk entries for ``directory`` or an empty iterable when missing."""
-
-    chunk_iter = iter_chunks(directory)
-    if chunk_iter is None:
-        return ()
-    return chunk_iter
-
-
-_PYARROW_MODULE: Any | None = None
-_PYARROW_PARQUET: Any | None = None
-_PYARROW_VECTOR_SCHEMA = None
-
-
-def _ensure_pyarrow_vectors() -> tuple[Any, Any]:
     """Return ``(pyarrow, pyarrow.parquet)`` or raise a CLI validation error."""
 
     global _PYARROW_MODULE, _PYARROW_PARQUET
@@ -1173,59 +1093,6 @@ def _ensure_pyarrow_vectors() -> tuple[Any, Any]:
     _PYARROW_PARQUET = pq
     return pa, pq
 
-
-def _vector_arrow_schema(pa_module: Any):
-    """Return (and cache) the Arrow schema used for parquet vector rows."""
-
-    global _PYARROW_VECTOR_SCHEMA
-    if _PYARROW_VECTOR_SCHEMA is not None:
-        return _PYARROW_VECTOR_SCHEMA
-
-    pa = pa_module
-    string_list = pa.list_(pa.string())
-    float_list = pa.list_(pa.float32())
-
-    _PYARROW_VECTOR_SCHEMA = pa.schema(
-        [
-            pa.field("UUID", pa.string(), nullable=False),
-            pa.field(
-                "BM25",
-                pa.struct(
-                    [
-                        pa.field("terms", string_list, nullable=True),
-                        pa.field("weights", float_list, nullable=True),
-                        pa.field("avgdl", pa.float64(), nullable=True),
-                        pa.field("N", pa.int64(), nullable=True),
-                    ]
-                ),
-                nullable=False,
-            ),
-            pa.field(
-                "SPLADEv3",
-                pa.struct(
-                    [
-                        pa.field("tokens", string_list, nullable=True),
-                        pa.field("weights", float_list, nullable=True),
-                    ]
-                ),
-                nullable=False,
-            ),
-            pa.field(
-                "Qwen3-4B",
-                pa.struct(
-                    [
-                        pa.field("model_id", pa.string(), nullable=False),
-                        pa.field("vector", float_list, nullable=False),
-                        pa.field("dimension", pa.int32(), nullable=True),
-                    ]
-                ),
-                nullable=False,
-            ),
-            pa.field("model_metadata", pa.string(), nullable=True),
-            pa.field("schema_version", pa.string(), nullable=False),
-        ]
-    )
-    return _PYARROW_VECTOR_SCHEMA
 
 
 def _prepare_vector_row_for_arrow(row: dict) -> dict:
@@ -1280,119 +1147,6 @@ def _rows_to_arrow_table(rows: Sequence[dict]) -> Any:
     return pa.Table.from_pylist(prepared, schema=schema)
 
 
-class VectorWriter:
-    """Abstract base class for vector writers."""
-
-    path: Path
-
-    def write_rows(self, rows: Sequence[dict]) -> None:  # pragma: no cover - interface
-        """Persist a batch of vector rows to the underlying storage medium."""
-        raise NotImplementedError
-
-
-class JsonlVectorWriter(VectorWriter):
-    """Context manager that writes vector rows to JSONL atomically."""
-
-    def __init__(self, path: Path) -> None:
-        """Initialise the writer with the destination ``path``."""
-        self.path = path
-        self._context = None
-        self._handle = None
-        self._writes = 0
-
-    def __enter__(self) -> "JsonlVectorWriter":
-        """Open the underlying atomic writer and return ``self`` for chaining."""
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._context = atomic_write(self.path)
-        self._handle = self._context.__enter__()
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> bool:
-        """Close the atomic writer context, propagating exceptions."""
-        if self._context is None:
-            return False
-        return self._context.__exit__(exc_type, exc, tb)
-
-    def write_rows(self, rows: Sequence[dict]) -> None:
-        """Append ``rows`` to the active JSONL artifact created by ``__enter__``."""
-        if self._handle is None:
-            raise RuntimeError("JsonlVectorWriter not initialised; call __enter__ first.")
-        crash_after = getattr(sys.modules[__name__], "_crash_after_write", None)
-        for row in rows:
-            self._writes += 1
-            if isinstance(crash_after, int) and self._writes > crash_after:
-                raise RuntimeError("Simulated crash")
-            self._handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-
-class ParquetVectorWriter(VectorWriter):
-    """Write vector rows to a temporary parquet file before atomic promotion."""
-
-    def __init__(self, path: Path) -> None:
-        """Initialise a parquet writer targeting ``path``."""
-        self.path = path
-        self._tmp_path: Path | None = None
-        self._writer = None
-        self._writes = 0
-
-    def __enter__(self) -> "ParquetVectorWriter":
-        """Create the underlying parquet writer and prepare a temp file."""
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        pa, pq = _ensure_pyarrow_vectors()
-        schema = _vector_arrow_schema(pa)
-        self._tmp_path = self.path.with_name(f"{self.path.name}.tmp.{uuid.uuid4().hex}")
-        self._writer = pq.ParquetWriter(self._tmp_path.as_posix(), schema=schema)
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> bool:
-        """Close the parquet writer and promote the temporary file atomically."""
-
-        try:
-            if self._writer is not None:
-                self._writer.close()
-        finally:
-            self._writer = None
-        if exc_type is not None:
-            if self._tmp_path is not None:
-                self._tmp_path.unlink(missing_ok=True)
-            return False
-        if self._tmp_path is None:
-            return False
-        try:
-            with self._tmp_path.open("rb") as handle:
-                os.fsync(handle.fileno())
-            self._tmp_path.replace(self.path)
-        finally:
-            self._tmp_path = None
-        return False
-
-    def write_rows(self, rows: Sequence[dict]) -> None:
-        """Append ``rows`` to the staged parquet file."""
-        if not rows:
-            return
-        if self._writer is None or self._tmp_path is None:
-            raise RuntimeError("ParquetVectorWriter not initialised; call __enter__ first.")
-        crash_after = getattr(sys.modules[__name__], "_crash_after_write", None)
-        for _ in rows:
-            self._writes += 1
-            if isinstance(crash_after, int) and self._writes > crash_after:
-                raise RuntimeError("Simulated crash")
-        table = _rows_to_arrow_table(rows)
-        self._writer.write_table(table)
-
-
-def create_vector_writer(path: Path, fmt: str) -> VectorWriter:
-    """Factory returning the appropriate vector writer for ``fmt``."""
-
-    fmt_normalized = fmt.lower()
-    if fmt_normalized == "jsonl":
-        return JsonlVectorWriter(path)
-    if fmt_normalized == "parquet":
-        return ParquetVectorWriter(path)
-    raise ValueError(f"Unsupported vector format: {fmt}")
-
-
-def _iter_vector_rows(path: Path, fmt: str, *, batch_size: int = 4096) -> Iterator[List[dict]]:
     """Yield batches of vector rows for ``path`` respecting the selected format."""
 
     fmt_normalized = str(fmt or "jsonl").lower()

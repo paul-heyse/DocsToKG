@@ -89,6 +89,7 @@ from DocsToKG.ContentDownload.errors import (
 )
 from DocsToKG.ContentDownload.httpx_transport import get_http_client
 from DocsToKG.ContentDownload.networking import (
+    BreakerOpenError,
     CachedResult,
     ConditionalRequestHelper,
     ContentPolicyViolation,
@@ -643,6 +644,33 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                     content_policy=content_policy,
                     original_url=plan.original_url,
                     origin_host=plan.origin_host,
+                )
+            except BreakerOpenError as exc:
+                elapsed_ms = (time.monotonic() - start_request) * 1000.0
+                breaker_meta = getattr(exc, "breaker_meta", None)
+                metadata: Dict[str, Any] = {}
+                if isinstance(breaker_meta, Mapping):
+                    metadata["breaker"] = dict(breaker_meta)
+                return DownloadStreamResult(
+                    outcome=DownloadOutcome(
+                        classification=Classification.SKIPPED,
+                        path=None,
+                        http_status=None,
+                        content_type=None,
+                        elapsed_ms=elapsed_ms,
+                        reason=ReasonCode.BREAKER_OPEN,
+                        reason_detail="breaker-open",
+                        sha256=None,
+                        content_length=None,
+                        etag=None,
+                        last_modified=None,
+                        extracted_text_path=None,
+                        retry_after=None,
+                        metadata=metadata if metadata else {},
+                        canonical_url=plan.canonical_url,
+                        canonical_index=plan.canonical_index,
+                        original_url=plan.original_url,
+                    )
                 )
             except ContentPolicyViolation as exc:
                 elapsed_ms = (time.monotonic() - start_request) * 1000.0
@@ -1985,6 +2013,33 @@ def build_download_outcome(
     status_code = response.status_code if response is not None else None
     headers = response.headers if response is not None else httpx.Headers()
 
+    breaker_host_state: Optional[str] = None
+    breaker_resolver_state: Optional[str] = None
+    breaker_open_remaining_ms: Optional[int] = None
+    breaker_recorded: Optional[str] = None
+    if response is not None:
+        extensions = getattr(response, "extensions", None)
+        if isinstance(extensions, Mapping):
+            host_state_val = extensions.get("breaker_host_state")
+            if isinstance(host_state_val, str):
+                breaker_host_state = host_state_val
+            resolver_state_val = extensions.get("breaker_resolver_state")
+            if isinstance(resolver_state_val, str):
+                breaker_resolver_state = resolver_state_val
+            remaining_val = extensions.get("breaker_open_remaining_ms")
+            if isinstance(remaining_val, (int, float)):
+                breaker_open_remaining_ms = int(remaining_val)
+            recorded_val = extensions.get("breaker_recorded")
+            if isinstance(recorded_val, str):
+                breaker_recorded = recorded_val
+
+    breaker_kwargs = {
+        "breaker_host_state": breaker_host_state,
+        "breaker_resolver_state": breaker_resolver_state,
+        "breaker_open_remaining_ms": breaker_open_remaining_ms,
+        "breaker_recorded": breaker_recorded,
+    }
+
     canonical_value = canonical_url
     if canonical_value is None and response is not None:
         try:
@@ -2030,6 +2085,7 @@ def build_download_outcome(
                 canonical_url=canonical_value,
                 canonical_index=canonical_index_value,
                 original_url=original_value,
+                **breaker_kwargs,
             )
 
         if tail_contains_html(tail_bytes):
@@ -2052,6 +2108,7 @@ def build_download_outcome(
                 canonical_url=canonical_value,
                 canonical_index=canonical_index_value,
                 original_url=original_value,
+                **breaker_kwargs,
             )
 
         if not has_pdf_eof(dest_path, window_bytes=tail_check_bytes):
@@ -2074,6 +2131,7 @@ def build_download_outcome(
                 canonical_url=canonical_value,
                 canonical_index=canonical_index_value,
                 original_url=original_value,
+                **breaker_kwargs,
             )
 
     if isinstance(options, DownloadContext):
@@ -2101,6 +2159,7 @@ def build_download_outcome(
             canonical_url=canonical_value,
             canonical_index=canonical_index_value,
             original_url=original_value,
+            **breaker_kwargs,
         )
 
     try:
@@ -2139,6 +2198,38 @@ def build_download_outcome(
             cleaned = {k: v for k, v in rl_snapshot.items() if v is not None}
             if cleaned:
                 metadata["rate_limiter"] = cleaned
+            breaker_snapshot = req_meta.get("breaker")
+            if isinstance(breaker_snapshot, Mapping):
+                metadata["breaker"] = dict(breaker_snapshot)
+
+    breaker_host_state: Optional[str] = None
+    breaker_resolver_state: Optional[str] = None
+    breaker_recorded: Optional[str] = None
+    breaker_remaining_ms: Optional[int] = None
+    breaker_snapshot = metadata.get("breaker")
+    if isinstance(breaker_snapshot, Mapping):
+        host_state_value = breaker_snapshot.get("host_state") or breaker_snapshot.get("host")
+        if isinstance(host_state_value, str):
+            breaker_host_state = host_state_value
+        resolver_state_value = breaker_snapshot.get("resolver_state") or breaker_snapshot.get("resolver")
+        if isinstance(resolver_state_value, str):
+            breaker_resolver_state = resolver_state_value
+        recorded_value = breaker_snapshot.get("recorded")
+        if isinstance(recorded_value, str):
+            breaker_recorded = recorded_value
+        remaining_value = breaker_snapshot.get("cooldown_remaining_ms")
+        if isinstance(remaining_value, (int, float)):
+            breaker_remaining_ms = int(remaining_value)
+
+    breaker_meta = {
+        "host_state": breaker_host_state,
+        "resolver_state": breaker_resolver_state,
+        "remaining_ms": breaker_open_remaining_ms,
+        "recorded": breaker_recorded,
+    }
+    breaker_cleaned = {k: v for k, v in breaker_meta.items() if v is not None}
+    if breaker_cleaned:
+        metadata["breaker"] = breaker_cleaned
 
     return DownloadOutcome(
         classification=classification_code,
@@ -2158,6 +2249,7 @@ def build_download_outcome(
         canonical_url=canonical_value,
         canonical_index=canonical_index_value,
         original_url=original_value,
+        **breaker_kwargs,
     )
 
 

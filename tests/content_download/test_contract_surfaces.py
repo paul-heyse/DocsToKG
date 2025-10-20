@@ -55,6 +55,9 @@ class _CaptureLogger:
     def log_summary(self, summary: Dict[str, Any]) -> None:  # noqa: D401
         return None
 
+    def log_breaker_event(self, event: Dict[str, Any]) -> None:  # noqa: D401
+        return None
+
     def close(self) -> None:  # noqa: D401
         return None
 

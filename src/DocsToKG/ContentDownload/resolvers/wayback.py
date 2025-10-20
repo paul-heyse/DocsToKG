@@ -56,12 +56,12 @@ import itertools
 import logging
 from contextlib import contextmanager
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
 import httpx
 
-from DocsToKG.ContentDownload.networking import request_with_retries
+from DocsToKG.ContentDownload.networking import BreakerOpenError, request_with_retries
 from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 
 from .base import (
@@ -457,6 +457,11 @@ class WaybackResolver(RegisteredResolver):
                 metadata["pdf_discovery_method"] = "anchor"
                 return canonical_for_request(pdf_url, role="artifact"), metadata
 
+        except BreakerOpenError as exc:
+            metadata["breaker_error"] = str(exc)
+            breaker_meta = getattr(exc, "breaker_meta", None)
+            if isinstance(breaker_meta, Mapping):
+                metadata["breaker"] = dict(breaker_meta)
         except Exception as exc:
             LOGGER.debug("HTML parsing failed for %s: %s", html_url, exc)
             metadata["html_parse_error"] = str(exc)
@@ -529,6 +534,12 @@ class WaybackResolver(RegisteredResolver):
             metadata.setdefault("pdf_signature", True)
             return True, metadata
 
+        except BreakerOpenError as exc:
+            metadata["breaker_error"] = str(exc)
+            breaker_meta = getattr(exc, "breaker_meta", None)
+            if isinstance(breaker_meta, Mapping):
+                metadata["breaker"] = dict(breaker_meta)
+            return False, metadata
         except Exception as exc:
             LOGGER.debug("PDF verification failed for %s: %s", url, exc)
             metadata["verification_error"] = str(exc)

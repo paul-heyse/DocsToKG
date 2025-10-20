@@ -37,7 +37,7 @@ import libarchive
 
 from ..errors import ConfigError
 from ..settings import get_default_config
-from .extraction_constraints import PreScanValidator
+from .extraction_constraints import ExtractionGuardian, PreScanValidator
 from .extraction_policy import ExtractionPolicy, safe_defaults
 from .extraction_telemetry import (
     ExtractionErrorCode,
@@ -325,7 +325,6 @@ def extract_archive_safe(
         raise ConfigError(f"Invalid extraction policy: {'; '.join(errors)}")
 
     destination.mkdir(parents=True, exist_ok=True)
-    limit_bytes = _resolve_max_uncompressed_bytes(max_uncompressed_bytes)
 
     # Initialize telemetry
     metrics = ExtractionMetrics()
@@ -354,9 +353,12 @@ def extract_archive_safe(
         # Phase 1: Pre-scan validation without writing
         entries_to_extract: List[tuple[str, Path, bool]] = []  # (orig_name, validated_path, is_dir)
         total_uncompressed = 0
-        
+
         # Initialize Phase 2 validator for comprehensive security checks
         prescan_validator = PreScanValidator(policy)
+
+        # Initialize Phase 3-4 guardian for disk space and permissions
+        guardian = ExtractionGuardian(policy)
 
         with libarchive.file_reader(str(archive_path)) as archive:
             for entry in archive:
@@ -417,27 +419,12 @@ def extract_archive_safe(
         telemetry.entries_allowed = metrics.entries_allowed
         telemetry.bytes_declared = total_uncompressed
 
-        # Compression ratio check (using on-disk archive size)
-        compressed_size = archive_path.stat().st_size
-        _check_compression_ratio(
-            total_uncompressed=total_uncompressed,
-            compressed_size=compressed_size,
-            archive=archive_path,
-            logger=logger,
-            archive_type="Archive",
-        )
+        # Phase 3: Verify disk space before extraction (Phase 3-4)
+        guardian.verify_space_available(total_uncompressed, extract_root)
 
-        # Uncompressed size ceiling check
-        _enforce_uncompressed_ceiling(
-            total_uncompressed=total_uncompressed,
-            limit_bytes=limit_bytes,
-            archive=archive_path,
-            logger=logger,
-            archive_type="Archive",
-        )
-
-        # Phase 2: Extract (only if pre-scan passed)
+        # Phase 4: Extract (only if pre-scan passed)
         extracted_files: List[Path] = []
+        extracted_dirs: List[Path] = []
 
         with libarchive.file_reader(str(archive_path)) as archive:
             for entry, (orig_pathname, validated_path, is_dir) in zip(
@@ -447,6 +434,7 @@ def extract_archive_safe(
 
                 if is_dir:
                     target_path.mkdir(parents=True, exist_ok=True)
+                    extracted_dirs.append(target_path)
                 else:
                     # Ensure parent directory exists
                     target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -464,6 +452,12 @@ def extract_archive_safe(
         metrics.entries_extracted = len(extracted_files)
         metrics.finalize()
         telemetry.duration_ms = metrics.duration_ms
+
+        # Phase 4: Apply default permissions and finalize (Phase 3-4)
+        guardian.finalize_extraction(
+            extracted_files=extracted_files,
+            extracted_dirs=extracted_dirs,
+        )
 
         if logger:
             logger.info(

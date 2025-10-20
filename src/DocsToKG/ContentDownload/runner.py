@@ -92,7 +92,9 @@ from DocsToKG.ContentDownload.summary import RunResult, build_summary_record
 from DocsToKG.ContentDownload.networking import (
     DEFAULT_RETRYABLE_STATUSES,
     RetryAfterJitterWait,
+    configure_breaker_registry,
     request_with_retries,
+    reset_breaker_registry,
     set_breaker_registry,
 )
 from DocsToKG.ContentDownload.telemetry import (
@@ -494,6 +496,8 @@ class DownloadRun:
             from DocsToKG.ContentDownload.networking import set_breaker_registry
 
             set_breaker_registry(breaker_registry)
+        else:
+            reset_breaker_registry()
 
         if self.pipeline is not None:
             # Legacy pipeline breaker registry call removed - now handled by networking layer
@@ -725,7 +729,7 @@ class DownloadRun:
                 # Initialize breaker registry
                 breaker_registry = None
                 try:
-                    from DocsToKG.ContentDownload.breakers import BreakerRegistry, BreakerConfig
+                    from DocsToKG.ContentDownload.breakers_loader import load_breaker_config
                     from DocsToKG.ContentDownload.networking_breaker_listener import (
                         NetworkBreakerListener,
                         BreakerListenerConfig,
@@ -752,6 +756,7 @@ class DownloadRun:
                             )
                         return None
 
+<<<<<<< HEAD
                     try:
                         breaker_registry = BreakerRegistry(
                             breaker_config_obj, listener_factory=listener_factory
@@ -762,6 +767,16 @@ class DownloadRun:
                         set_breaker_registry(breaker_registry)
                     except Exception as e:
                         LOGGER.warning("Failed to initialize circuit breakers: %s", e)
+=======
+                    breaker_registry = configure_breaker_registry(
+                        breaker_config, listener_factory=listener_factory
+                    )
+                except ImportError:
+                    # pybreaker not available, continue without breakers
+                    LOGGER.debug("pybreaker not available, circuit breakers disabled")
+                except Exception as e:
+                    LOGGER.warning("Failed to initialize circuit breakers: %s", e)
+>>>>>>> 189d6fdb953631209634e5b45865d81689068ee6
 
                 state = self.setup_download_state(
                     http_client, self.resolved.robots_checker, breaker_registry

@@ -11,8 +11,11 @@ from ..errors import DownloadFailure
 from ..net import configure_http_client, get_http_client, reset_http_client
 from .extraction_constraints import (
     CaseCollisionDetector,
+    ExtractionGuardian,
     PreScanValidator,
+    apply_default_permissions,
     normalize_path_unicode,
+    validate_disk_space,
     validate_entry_compression_ratio,
     validate_entry_count,
     validate_entry_type,
@@ -52,6 +55,48 @@ from .network import (
     validate_url_security,
 )
 from .rate_limit import RateLimiterHandle, apply_retry_after, get_bucket, reset
+from .extraction_throughput import (
+    CPUGuard,
+    HashingPipeline,
+    atomic_rename_and_fsync,
+    compute_adaptive_buffer_size,
+    create_temp_path,
+    preallocate_file,
+    should_extract_entry,
+)
+from .extraction_integrity import (
+    DuplicateDetector,
+    DuplicateEntry,
+    IntegrityCheckResult,
+    IntegrityVerifier,
+    ManifestEntry,
+    ProvenanceManifest,
+    TimestampPolicy,
+    apply_mtime,
+    compute_target_mtime,
+    get_sort_key,
+    normalize_pathname,
+    validate_format_allowed,
+)
+from .extraction_observability import (
+    ExtractionErrorHelper,
+    ExtractionEventEmitter,
+    ExtractionRunContext,
+    ExtractMetrics,
+    ExtractionError,
+    ERROR_CODES,
+    LibarchiveInfo,
+    PreScanMetrics,
+)
+from .extraction_extensibility import (
+    ArchiveProbe,
+    EntryMeta,
+    IdempotenceHandler,
+    IdempotenceStats,
+    PortabilityChecker,
+    PolicyBuilder,
+    WINDOWS_RESERVED_NAMES,
+)
 
 __all__ = [
     "extract_archive_safe",
@@ -96,4 +141,46 @@ __all__ = [
     "validate_file_size",
     "validate_path_constraints",
     "validate_streaming_file_size",
+    # New Phase 3-4 constraints
+    "ExtractionGuardian",
+    "validate_disk_space",
+    "apply_default_permissions",
+    # New throughput optimizations (Phase 3-4)
+    "compute_adaptive_buffer_size",
+    "preallocate_file",
+    "create_temp_path",
+    "atomic_rename_and_fsync",
+    "HashingPipeline",
+    "should_extract_entry",
+    "CPUGuard",
+    # New correctness & integrity (Phase 3-4)
+    "IntegrityVerifier",
+    "IntegrityCheckResult",
+    "TimestampPolicy",
+    "compute_target_mtime",
+    "apply_mtime",
+    "normalize_pathname",
+    "validate_format_allowed",
+    "get_sort_key",
+    "DuplicateDetector",
+    "DuplicateEntry",
+    "ProvenanceManifest",
+    "ManifestEntry",
+    # New observability (Phase 4)
+    "ExtractionErrorHelper",
+    "ExtractionEventEmitter",
+    "ExtractionRunContext",
+    "ExtractMetrics",
+    "PreScanMetrics",
+    "ExtractionError",
+    "ERROR_CODES",
+    "LibarchiveInfo",
+    # New extensibility (Phase 4)
+    "ArchiveProbe",
+    "EntryMeta",
+    "IdempotenceHandler",
+    "IdempotenceStats",
+    "PortabilityChecker",
+    "PolicyBuilder",
+    "WINDOWS_RESERVED_NAMES",
 ]

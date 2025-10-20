@@ -234,7 +234,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MethodType
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 import httpx
 import pytest
@@ -271,6 +271,9 @@ class RecordingLogger:
 
     def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
         self.log(record)
+
+    def log_breaker_event(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - helper stub
+        return None
 
 
 # --- test_bounded_concurrency.py ---
@@ -522,6 +525,9 @@ class _NullLogger:
     def log(self, record):  # pragma: no cover - no-op sink
         pass
 
+    def log_breaker_event(self, event):  # pragma: no cover - no-op
+        return None
+
 
 # --- test_parallel_execution.py ---
 
@@ -552,6 +558,9 @@ class _MemoryLogger:
     def log_attempt(self, record, *, timestamp=None):
         del timestamp
         self.log(record)
+
+    def log_breaker_event(self, event):  # pragma: no cover - no-op
+        return None
 
 
 # --- test_parallel_execution.py ---

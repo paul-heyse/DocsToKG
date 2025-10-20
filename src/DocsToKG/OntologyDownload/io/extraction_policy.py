@@ -161,25 +161,74 @@ class ExtractionPolicy:
     # PHASE 4: Permissions & Space
     # ========================================================================
 
-    preserve_permissions: bool = False
-    """Preserve file modes from archive (default: False).
-
-    When False, setuid/setgid/sticky bits are stripped; dir_mode and
-    file_mode are applied instead.
-    When True, archive modes are preserved (except setuid/setgid).
-    """
-
-    dir_mode: int = 0o755
-    """Default directory mode when not preserving (default: 0o755)."""
-
-    file_mode: int = 0o644
-    """Default file mode when not preserving (default: 0o644)."""
-
+    # Phase 3-4: Throughput & I/O Efficiency (Optimization Phase)
+    # Space & I/O budgeting
     check_disk_space: bool = True
-    """Check disk space before extraction (default: True).
+    space_safety_margin: float = 1.10  # 10% headroom
 
-    Verifies `statfs(destination).f_bavail >= total_uncompressed * 1.1`.
-    """
+    # File preallocation
+    preallocate: bool = True
+    preallocate_strategy: str = "full"  # "full" | "none"
+
+    # Adaptive buffer sizing
+    copy_buffer_min: int = 64 * 1024  # 64 KiB
+    copy_buffer_max: int = 1024 * 1024  # 1 MiB
+
+    # Atomic writes & fsync discipline
+    atomic: bool = True
+    group_fsync: int = 32  # fsync parent directory every N files
+
+    # Inline hashing
+    hash_enable: bool = True
+    hash_algorithms: list[str] = None  # Default: ["sha256"]
+    hash_mode: str = "inline"  # "inline" | "parallel"
+    hash_parallel_threads: int = 2
+
+    # Selective extraction (include/exclude patterns)
+    include_globs: list[str] = None  # None = include all
+    exclude_globs: list[str] = None  # None = exclude none
+    report_skipped: bool = True
+
+    # CPU guard (wall-time limit)
+    max_wall_time_seconds: int = 120
+    cpu_guard_action: str = "abort"  # "abort" | "warn"
+
+    # Permissions enforcement (Phase 4)
+    preserve_permissions: bool = False
+    file_mode: int = 0o644
+    dir_mode: int = 0o755
+
+    # ========================================================================
+    # Phase 3-4: Correctness & Integrity (Optimization Phase - Part 3)
+    # ========================================================================
+
+    # CRC/Integrity verification
+    integrity_verify: bool = True
+    integrity_fail_on_mismatch: bool = True
+
+    # Timestamp policy
+    timestamp_mode: str = "preserve"  # "preserve" | "normalize" | "source_date_epoch"
+    timestamp_normalize_to: str = "archive_mtime"  # "archive_mtime" | "now"
+    timestamp_preserve_dir_mtime: bool = False
+
+    # Unicode normalization
+    unicode_normalize: str = "NFC"  # "NFC" | "NFD"
+    unicode_on_decode_error: str = "reject"  # "reject" | "replace"
+
+    # Format allow-list
+    allowed_formats: list[str] = None  # None = default allow-list
+    allowed_filters: list[str] = None  # None = default allow-list
+
+    # Entry ordering
+    order_mode: str = "header"  # "header" | "path_asc"
+
+    # Duplicate entry policy
+    duplicate_policy: str = "reject"  # "reject" | "first_wins" | "last_wins"
+
+    # Provenance manifest
+    manifest_emit: bool = True
+    manifest_filename: str = ".extract.audit.json"
+    manifest_include_digest: bool = True
 
     # ========================================================================
     # VALIDATION METHODS
