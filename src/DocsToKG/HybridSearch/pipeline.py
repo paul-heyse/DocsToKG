@@ -774,20 +774,12 @@ class ChunkIngestionPipeline:
         reservoir: List[ChunkPayload] = []
         # Reservoir sampling over existing registry entries
         i = 0
-        for item in iterator:
-            if i < target:
-                reservoir.append(item)
-            else:
-                j = int(rng.integers(0, i + 1))
-                if j < target:
-                    reservoir[j] = item
-            i += 1
         with closing(self._registry.iter_all()) as iterator:
             for item in iterator:
                 if i < target:
                     reservoir.append(item)
                 else:
-                    j = int(TRAINING_SAMPLE_RNG.integers(0, i + 1))
+                    j = int(rng.integers(0, i + 1))
                     if j < target:
                         reservoir[j] = item
                 i += 1
