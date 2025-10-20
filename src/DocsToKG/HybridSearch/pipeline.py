@@ -659,14 +659,49 @@ class ChunkIngestionPipeline:
             )
 
         count = len(batch)
+        vector_ids = [chunk.vector_id for chunk in batch]
+        faiss_added = False
+        lexical_upserted = False
+
         with self._observability.trace("ingest_dual_write", count=str(count)):
-            self._prepare_faiss(batch)
-            self._faiss.add(
-                [chunk.features.embedding for chunk in batch],
-                [chunk.vector_id for chunk in batch],
-            )
-            self._opensearch.bulk_upsert(batch)
-            self._registry.upsert(batch)
+            try:
+                self._prepare_faiss(batch)
+                self._faiss.add(
+                    [chunk.features.embedding for chunk in batch],
+                    vector_ids,
+                )
+                faiss_added = True
+                self._opensearch.bulk_upsert(batch)
+                lexical_upserted = True
+                self._registry.upsert(batch)
+            except Exception:
+                if lexical_upserted:
+                    try:
+                        self._opensearch.bulk_delete(vector_ids)
+                    except Exception:
+                        self._observability.logger.exception(
+                            "chunk-ingest-rollback-lexical-error",
+                            extra={
+                                "event": {
+                                    "vector_ids": vector_ids,
+                                    "stage": "lexical",
+                                }
+                            },
+                        )
+                if faiss_added:
+                    try:
+                        self._faiss.remove(vector_ids)
+                    except Exception:
+                        self._observability.logger.exception(
+                            "chunk-ingest-rollback-faiss-error",
+                            extra={
+                                "event": {
+                                    "vector_ids": vector_ids,
+                                    "stage": "faiss",
+                                }
+                            },
+                        )
+                raise
 
         self._metrics.chunks_upserted += count
         self._observability.metrics.increment("ingest_chunks", count)
@@ -677,8 +712,8 @@ class ChunkIngestionPipeline:
             extra={"event": {"count": count, "namespaces": list(namespaces)}},
         )
 
-        vector_ids = (
-            tuple(chunk.vector_id for chunk in batch)
+        vector_ids_result = (
+            tuple(vector_ids)
             if collect_vector_ids
             else None
         )
@@ -686,7 +721,7 @@ class ChunkIngestionPipeline:
         return BatchCommitResult(
             chunk_count=count,
             namespaces=namespaces,
-            vector_ids=vector_ids,
+            vector_ids=vector_ids_result,
         )
 
     def _prepare_faiss(self, new_chunks: Sequence[ChunkPayload]) -> None:
