@@ -272,6 +272,18 @@ class TestJsonlSink:
 class TestSQLiteSink:
     """Test cases for SQLiteSink."""
 
+    def test_uses_deferred_isolation_level(self):
+        """SQLite sink should use an explicit deferred isolation level."""
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.sqlite"
+            sink = SQLiteSink(db_path)
+
+            try:
+                assert sink._conn.isolation_level == "DEFERRED"
+            finally:
+                sink.close()
+
     def test_emit_attempt_start(self):
         """Test emitting attempt start event."""
         with tempfile.TemporaryDirectory() as tmpdir:
