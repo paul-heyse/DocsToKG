@@ -24,6 +24,7 @@ from DocsToKG.DocParsing.cli_errors import (
     DoctagsCLIValidationError,
     format_cli_error,
 )
+from DocsToKG.DocParsing.config import StageConfigBase
 from DocsToKG.DocParsing.env import (
     data_doctags,
     data_html,
@@ -301,6 +302,17 @@ def doctags(argv: Sequence[str] | None = None) -> int:
 
     parsed.in_dir = input_dir
     parsed.out_dir = output_dir
+
+    raw_served_model_names = parsed.served_model_names
+    normalized_served_model_names: tuple[str, ...] | None = None
+    if raw_served_model_names is not None:
+        coerced_served_model_names = StageConfigBase._coerce_str_tuple(
+            raw_served_model_names, None
+        )
+        normalized_served_model_names = doctags_module._normalize_served_model_names(
+            coerced_served_model_names
+        )
+    parsed.served_model_names = normalized_served_model_names
 
     logger.info(
         "Unified DocTags conversion",

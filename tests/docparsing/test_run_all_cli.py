@@ -180,3 +180,54 @@ def test_doctags_forwards_vllm_wait_timeout(patcher: PatchManager, tmp_path: Pat
     assert exit_code == 0
     assert "namespace" in captured
     assert captured["namespace"].vllm_wait_timeout == timeout_s
+
+
+def test_doctags_normalizes_served_model_names(
+    patcher: PatchManager, tmp_path: Path
+) -> None:
+    """DocTags CLI normalises served model aliases before invoking the PDF stage."""
+
+    module = _reload_core_cli()
+
+    from DocsToKG.DocParsing import doctags as doctags_module
+
+    captured: Dict[str, argparse.Namespace] = {}
+
+    def fake_pdf_main(args: argparse.Namespace) -> int:
+        captured["namespace"] = args
+        return 0
+
+    patcher.setattr(doctags_module, "pdf_main", fake_pdf_main)
+
+    data_root = tmp_path / "Data"
+    pdf_dir = data_root / "PDFs"
+    out_dir = data_root / "DocTagsFiles"
+
+    out_dir.mkdir(parents=True)
+    pdf_dir.mkdir(parents=True)
+
+    exit_code = module.doctags(
+        [
+            "--mode",
+            "pdf",
+            "--data-root",
+            str(data_root),
+            "--in-dir",
+            str(pdf_dir),
+            "--out-dir",
+            str(out_dir),
+            "--served-model-name",
+            "granite-docling-258m",
+            "granite-docling-258m",
+            "--served-model-name",
+            "granite-docling-258m",
+            "granite-docling-34m",
+        ]
+    )
+
+    assert exit_code == 0
+    assert "namespace" in captured
+    assert captured["namespace"].served_model_names == (
+        "granite-docling-258m",
+        "granite-docling-34m",
+    )
