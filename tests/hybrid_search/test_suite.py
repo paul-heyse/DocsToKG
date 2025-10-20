@@ -2339,18 +2339,22 @@ def test_real_fixture_ingest_and_search(
 
     for entry in real_dataset:
         for query in entry.get("queries", []):
+            diagnostics_enabled = bool(query.get("diagnostics", True))
             request = HybridSearchRequest(
                 query=str(query["query"]),
                 namespace=query.get("namespace"),
                 filters={},
                 page_size=10,
-                diagnostics=True,
+                diagnostics=diagnostics_enabled,
             )
             response = service.search(request)
             assert response.results, f"Expected results for query {query['query']}"
             top_ids = [result.doc_id for result in response.results[:10]]
             assert query["expected_doc_id"] in top_ids
-            assert response.results[0].diagnostics is not None
+            if diagnostics_enabled:
+                assert response.results[0].diagnostics is not None
+            else:
+                assert response.results[0].diagnostics is None
 
 
 # --- test_hybrid_search_real_vectors.py ---
@@ -2461,6 +2465,18 @@ def test_real_fixture_api_roundtrip(
     assert status == HTTPStatus.OK
     assert body["results"], "Expected API to return results"
     assert body["results"][0]["doc_id"] == query["expected_doc_id"]
+
+    status, body = api.post_hybrid_search(
+        {
+            "query": query["query"],
+            "namespace": query["namespace"],
+            "page_size": 3,
+            "diagnostics": False,
+        }
+    )
+    assert status == HTTPStatus.OK
+    assert body["results"], "Expected API to return results when diagnostics disabled"
+    assert "diagnostics" not in body["results"][0]
 
 
 # --- test_hybrid_search_real_vectors.py ---
