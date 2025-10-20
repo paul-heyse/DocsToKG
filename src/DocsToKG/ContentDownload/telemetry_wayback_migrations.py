@@ -44,7 +44,8 @@ class Migration:
 def migration_add_run_metrics_table(conn: sqlite3.Connection) -> None:
     """Migration: Add wayback_run_metrics roll-up table."""
     c = conn.cursor()
-    c.execute("""
+    c.execute(
+        """
     CREATE TABLE IF NOT EXISTS wayback_run_metrics (
         run_id TEXT PRIMARY KEY,
         attempts INTEGER DEFAULT 0,
@@ -57,7 +58,8 @@ def migration_add_run_metrics_table(conn: sqlite3.Connection) -> None:
         created_at TEXT,
         updated_at TEXT
     );
-    """)
+    """
+    )
     conn.commit()
 
 
@@ -95,7 +97,9 @@ MIGRATIONS: Dict[str, Migration] = {
         lambda conn: (
             migration_add_run_metrics_table(conn),
             migration_add_composite_indexes(conn),
-        )[1],  # Execute both, return None
+        )[
+            1
+        ],  # Execute both, return None
     ),
 }
 

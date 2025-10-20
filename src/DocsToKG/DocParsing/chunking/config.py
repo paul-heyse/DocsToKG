@@ -87,41 +87,6 @@ class ChunkerCfg(StageConfigBase):
         "inject_anchors": StageConfigBase._coerce_bool,
     }
 
-    @classmethod
-    def from_env(cls, defaults: Optional[Dict[str, Any]] = None) -> "ChunkerCfg":
-        """Instantiate configuration derived solely from environment variables."""
-
-        cfg = cls(**(defaults or {}))
-        cfg.apply_env()
-        if cfg.data_root is None:
-            fallback_root = os.getenv("DOCSTOKG_DATA_ROOT")
-            if fallback_root:
-                cfg.data_root = StageConfigBase._coerce_optional_path(fallback_root, None)
-        cfg.finalize()
-        return cfg
-
-    @classmethod
-    def from_args(
-        cls,
-        args: object,
-        defaults: Optional[Dict[str, Any]] = None,
-    ) -> "ChunkerCfg":
-        """Create a configuration by layering env vars, config files, and CLI args."""
-
-        cfg = cls.from_env(defaults=defaults)
-        config_path = getattr(args, "config", None)
-        if config_path:
-            try:
-                cfg.update_from_file(Path(config_path))
-            except ConfigLoadError as exc:
-                raise ChunkingCLIValidationError(
-                    option="--config",
-                    message=str(exc),
-                ) from exc
-        cfg.apply_args(args)
-        cfg.finalize()
-        return cfg
-
     def finalize(self) -> None:
         """Normalise paths and derived values after merging all sources."""
 

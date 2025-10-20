@@ -734,9 +734,7 @@ class DownloadRun:
                         NetworkBreakerListener,
                         BreakerListenerConfig,
                     )
-                except ImportError:
-                    LOGGER.debug("pybreaker not available, circuit breakers disabled")
-                else:
+
                     breaker_config_obj = getattr(
                         self.resolved.resolver_config, "breaker_config", None
                     )
@@ -756,27 +754,39 @@ class DownloadRun:
                             )
                         return None
 
-<<<<<<< HEAD
-                    try:
-                        breaker_registry = BreakerRegistry(
-                            breaker_config_obj, listener_factory=listener_factory
-                        )
-                        # Register breaker registry with networking layer
-                        from DocsToKG.ContentDownload.networking import set_breaker_registry
-
-                        set_breaker_registry(breaker_registry)
-                    except Exception as e:
-                        LOGGER.warning("Failed to initialize circuit breakers: %s", e)
-=======
                     breaker_registry = configure_breaker_registry(
                         breaker_config, listener_factory=listener_factory
                     )
                 except ImportError:
-                    # pybreaker not available, continue without breakers
                     LOGGER.debug("pybreaker not available, circuit breakers disabled")
                 except Exception as e:
                     LOGGER.warning("Failed to initialize circuit breakers: %s", e)
->>>>>>> 189d6fdb953631209634e5b45865d81689068ee6
+
+                    try:
+                        breaker_config_obj = getattr(
+                            self.resolved.resolver_config, "breaker_config", None
+                        )
+                        if not isinstance(breaker_config_obj, BreakerConfig):
+                            breaker_config_obj = BreakerConfig()
+
+                        def listener_factory(host: str, scope: str, resolver: Optional[str]):
+                            if self.attempt_logger is not None:
+                                return NetworkBreakerListener(
+                                    self.attempt_logger,
+                                    BreakerListenerConfig(
+                                        run_id=self.resolved.run_id,
+                                        host=host,
+                                        scope=scope,
+                                        resolver=resolver,
+                                    ),
+                                )
+                            return None
+
+                        breaker_registry = configure_breaker_registry(
+                            breaker_config, listener_factory=listener_factory
+                        )
+                    except Exception as e:
+                        LOGGER.warning("Failed to initialize circuit breakers: %s", e)
 
                 state = self.setup_download_state(
                     http_client, self.resolved.robots_checker, breaker_registry

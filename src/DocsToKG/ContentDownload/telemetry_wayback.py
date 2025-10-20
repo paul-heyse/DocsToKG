@@ -558,9 +558,9 @@ class TelemetryWayback:
                 "revalidated": revalidated,
                 "html_bytes": html_bytes,
                 "pdf_link_found": pdf_link_found,
-                "pdf_discovery_method": pdf_discovery_method.value
-                if pdf_discovery_method
-                else None,
+                "pdf_discovery_method": (
+                    pdf_discovery_method.value if pdf_discovery_method else None
+                ),
                 "discovered_pdf_url": discovered_pdf_url,
             },
         )

@@ -154,7 +154,9 @@ def _lock_mode() -> int:
         # Accept decimal or octal strings (e.g., "0o600")
         return int(raw, 0)
     except ValueError:
-        LOGGER.warning("Invalid %s value '%s'; defaulting to %s", _LOCK_MODE_ENV, raw, _DEFAULT_LOCK_MODE)
+        LOGGER.warning(
+            "Invalid %s value '%s'; defaulting to %s", _LOCK_MODE_ENV, raw, _DEFAULT_LOCK_MODE
+        )
         return _DEFAULT_LOCK_MODE
 
 
@@ -265,7 +267,9 @@ class _LockContext:
 
 
 @contextlib.contextmanager
-def _category_lock(category: str, target: Path, *, timeout: Optional[float] = None) -> Iterator[None]:
+def _category_lock(
+    category: str, target: Path, *, timeout: Optional[float] = None
+) -> Iterator[None]:
     resolved_target = Path(target).expanduser().resolve(strict=False)
     lock_file = _lock_file_for(category, resolved_target)
     lock_cls = _select_lock_class()

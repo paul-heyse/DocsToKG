@@ -34,11 +34,11 @@ Typical Usage:
     from DocsToKG.ContentDownload.networking_breaker_listener import (
         NetworkBreakerListener, BreakerListenerConfig
     )
-    
+
     listener = NetworkBreakerListener(telemetry_sink, BreakerListenerConfig(
         run_id="run-123", host="api.crossref.org", scope="host"
     ))
-    
+
     # Attach to pybreaker instance
     breaker = pybreaker.CircuitBreaker(listeners=[listener])
 """
@@ -57,15 +57,17 @@ except ImportError:  # pragma: no cover
 
 class BreakerTelemetrySink(Protocol):
     """Protocol for emitting breaker telemetry events."""
+
     def emit(self, event: Mapping[str, Any]) -> None: ...
 
 
 @dataclass
 class BreakerListenerConfig:
     """Configuration for a breaker listener."""
+
     run_id: str
-    host: str                   # breaker key (host)
-    scope: str = "host"         # "host" | "resolver"
+    host: str  # breaker key (host)
+    scope: str = "host"  # "host" | "resolver"
     resolver: Optional[str] = None
 
 
@@ -94,15 +96,26 @@ class NetworkBreakerListener(pybreaker.CircuitBreakerListener):  # type: ignore[
 
     # Called when the protected call succeeds
     def success(self, cb):
-        self._emit("success", state=str(cb.current_state), fail_counter=getattr(cb, "fail_counter", None))
+        self._emit(
+            "success", state=str(cb.current_state), fail_counter=getattr(cb, "fail_counter", None)
+        )
 
     # Called when the protected call fails (exception raised by the call)
     def failure(self, cb, exc):
-        self._emit("failure", state=str(cb.current_state), exc_type=type(exc).__name__, msg=str(exc)[:300],
-                   fail_counter=getattr(cb, "fail_counter", None))
+        self._emit(
+            "failure",
+            state=str(cb.current_state),
+            exc_type=type(exc).__name__,
+            msg=str(exc)[:300],
+            fail_counter=getattr(cb, "fail_counter", None),
+        )
 
     # Called when circuit breaker state changes
     def state_change(self, cb, old_state, new_state):
         # States are classes; stringify for logs
-        self._emit("state_change", old=str(old_state), new=str(new_state),
-                   reset_timeout_s=getattr(cb, "reset_timeout", None))
+        self._emit(
+            "state_change",
+            old=str(old_state),
+            new=str(new_state),
+            reset_timeout_s=getattr(cb, "reset_timeout", None),
+        )

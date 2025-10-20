@@ -56,6 +56,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 from pyalex import Topics, Works
+from pyrate_limiter import Duration, Rate
 
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
@@ -66,9 +67,9 @@ from DocsToKG.ContentDownload.core import (
 from DocsToKG.ContentDownload.download import RobotsCache, ensure_dir
 from DocsToKG.ContentDownload.pipeline import load_resolver_config
 from DocsToKG.ContentDownload.pyalex_shim import apply_mailto
-from DocsToKG.ContentDownload.resolvers import DEFAULT_RESOLVER_ORDER, default_resolvers
-from DocsToKG.ContentDownload.telemetry import ManifestUrlIndex
 from DocsToKG.ContentDownload.ratelimit import (
+    DEFAULT_ROLE,
+    ROLE_ORDER,
     BackendConfig,
     RolePolicy,
     clone_policies,
@@ -76,11 +77,10 @@ from DocsToKG.ContentDownload.ratelimit import (
     configure_rate_limits,
     get_rate_limiter_manager,
     validate_policies,
-    DEFAULT_ROLE,
-    ROLE_ORDER,
 )
+from DocsToKG.ContentDownload.resolvers import DEFAULT_RESOLVER_ORDER, default_resolvers
+from DocsToKG.ContentDownload.telemetry import ManifestUrlIndex
 from DocsToKG.ContentDownload.urls import configure_url_policy, parse_param_allowlist_spec
-from pyrate_limiter import Duration, Rate
 
 __all__ = [
     "ResolvedConfig",
@@ -1202,9 +1202,9 @@ def resolve_config(
             base_backend = manager.backend
             backend_config = BackendConfig(
                 backend=base_backend.backend,
-                options=dict(base_backend.options)
-                if isinstance(base_backend.options, Mapping)
-                else {},
+                options=(
+                    dict(base_backend.options) if isinstance(base_backend.options, Mapping) else {}
+                ),
             )
 
         try:

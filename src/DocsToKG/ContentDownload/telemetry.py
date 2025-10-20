@@ -374,7 +374,11 @@ class ManifestUrlIndex:
                     continue
                 original_value = (stored_original or url) or ""
                 original_value = str(original_value).strip()
-                canonical_value = stored_canonical or _canonical_key_or_fallback(original_value) or _canonical_key_or_fallback(url)
+                canonical_value = (
+                    stored_canonical
+                    or _canonical_key_or_fallback(original_value)
+                    or _canonical_key_or_fallback(url)
+                )
                 if not canonical_value or canonical_value in seen:
                     continue
                 if not stored_path:
@@ -797,8 +801,12 @@ class RunTelemetry(AttemptSink):
         if detail_token is None and outcome is not None:
             detail_token = normalize_reason(getattr(outcome, "reason_detail", None))
 
-        canonical_hint = result.canonical_url or (getattr(outcome, "canonical_url", None) if outcome else None)
-        original_hint = result.original_url or (getattr(outcome, "original_url", None) if outcome else None)
+        canonical_hint = result.canonical_url or (
+            getattr(outcome, "canonical_url", None) if outcome else None
+        )
+        original_hint = result.original_url or (
+            getattr(outcome, "original_url", None) if outcome else None
+        )
 
         return self.record_manifest(
             artifact,
@@ -1590,12 +1598,12 @@ class SqliteSink:
         with locks.sqlite_lock(self._path):
             with self._lock:
                 self._conn.execute(
-                """
+                    """
                 INSERT INTO summaries (run_id, timestamp, payload)
                 VALUES (?, ?, ?)
                 ON CONFLICT(run_id) DO UPDATE SET timestamp=excluded.timestamp, payload=excluded.payload
                 """,
-                (run_id, _utc_timestamp(), payload),
+                    (run_id, _utc_timestamp(), payload),
                 )
                 self._conn.commit()
 
@@ -1933,7 +1941,9 @@ class SqliteSink:
             original_value = str(original_value).strip()
             if not original_value:
                 continue
-            normalized = stored_normalized or _canonical_key_or_fallback(original_value) or original_value
+            normalized = (
+                stored_normalized or _canonical_key_or_fallback(original_value) or original_value
+            )
             canonical_value = stored_canonical or normalized
             self._conn.execute(
                 "UPDATE manifests SET normalized_url = ?, canonical_url = ?, original_url = ? WHERE id = ?",
@@ -1966,7 +1976,9 @@ def _manifest_entry_from_sqlite_row(
 
     url_text = str(url).strip()
     original_text = str(original_url).strip() if original_url else None
-    canonical_value = canonical_url or _canonical_key_or_fallback(original_text or url_text) or url_text
+    canonical_value = (
+        canonical_url or _canonical_key_or_fallback(original_text or url_text) or url_text
+    )
     try:
         schema_version_int = int(schema_version)
     except (TypeError, ValueError):
@@ -2248,7 +2260,11 @@ def iter_previous_manifest_entries(
                     original_value = str(original_value).strip()
                     if not original_value:
                         raise ValueError("Manifest entries must include a non-empty original_url.")
-                    canonical_value = data.get("canonical_url") or _canonical_key_or_fallback(original_value) or original_value
+                    canonical_value = (
+                        data.get("canonical_url")
+                        or _canonical_key_or_fallback(original_value)
+                        or original_value
+                    )
                     legacy_normalized = data.pop("normalized_url", None)
                     data["original_url"] = original_value
                     data["canonical_url"] = canonical_value
@@ -2287,7 +2303,11 @@ def iter_previous_manifest_entries(
                             data["reason_detail"] = None
 
                     canonical_key = legacy_normalized or canonical_value
-                    canonical_key = canonical_key or _canonical_key_or_fallback(original_value) or canonical_value
+                    canonical_key = (
+                        canonical_key
+                        or _canonical_key_or_fallback(original_value)
+                        or canonical_value
+                    )
                     record = (str(work_id), canonical_key, data, completed)
                     if buffered is not None:
                         buffered.append(record)
@@ -2814,7 +2834,12 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
             url_text = str(url).strip()
             if not url_text:
                 continue
-            canonical_value = canonical_url or _canonical_key_or_fallback(original_url or url_text) or _canonical_key_or_fallback(url_text) or url_text
+            canonical_value = (
+                canonical_url
+                or _canonical_key_or_fallback(original_url or url_text)
+                or _canonical_key_or_fallback(url_text)
+                or url_text
+            )
             normalized_path = normalize_manifest_path(stored_path, base=base_dir)
             mapping[canonical_value] = {
                 "url": url,

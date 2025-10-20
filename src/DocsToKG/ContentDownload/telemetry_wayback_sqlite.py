@@ -585,19 +585,22 @@ class SQLiteSink:
         c = self._conn.cursor()
 
         # Meta schema version (simple flag)
-        c.execute("""
+        c.execute(
+            """
         CREATE TABLE IF NOT EXISTS _meta (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
-        """)
+        """
+        )
         c.execute(
             "INSERT OR IGNORE INTO _meta(key, value) VALUES ('wayback_schema_version', ?);",
             (self.schema_version,),
         )
 
         # Attempts (start & end merge here via upsert)
-        c.execute("""
+        c.execute(
+            """
         CREATE TABLE IF NOT EXISTS wayback_attempts (
             attempt_id TEXT PRIMARY KEY,
             run_id TEXT NOT NULL,
@@ -615,10 +618,12 @@ class SQLiteSink:
             total_duration_ms INTEGER,
             candidates_scanned INTEGER
         );
-        """)
+        """
+        )
 
         # Discovery (Availability & CDX)
-        c.execute("""
+        c.execute(
+            """
         CREATE TABLE IF NOT EXISTS wayback_discoveries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             attempt_id TEXT NOT NULL,
@@ -641,7 +646,8 @@ class SQLiteSink:
             rate_limiter_role TEXT,
             FOREIGN KEY(attempt_id) REFERENCES wayback_attempts(attempt_id) ON DELETE CASCADE
         );
-        """)
+        """
+        )
 
         self._ensure_column_exists(
             c,
@@ -651,7 +657,8 @@ class SQLiteSink:
         )
 
         # Candidates evaluated
-        c.execute("""
+        c.execute(
+            """
         CREATE TABLE IF NOT EXISTS wayback_candidates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             attempt_id TEXT NOT NULL,
@@ -666,10 +673,12 @@ class SQLiteSink:
             distance_to_pub_year INTEGER,
             FOREIGN KEY(attempt_id) REFERENCES wayback_attempts(attempt_id) ON DELETE CASCADE
         );
-        """)
+        """
+        )
 
         # HTML parse events
-        c.execute("""
+        c.execute(
+            """
         CREATE TABLE IF NOT EXISTS wayback_html_parses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             attempt_id TEXT NOT NULL,
@@ -685,10 +694,12 @@ class SQLiteSink:
             discovered_pdf_url TEXT,
             FOREIGN KEY(attempt_id) REFERENCES wayback_attempts(attempt_id) ON DELETE CASCADE
         );
-        """)
+        """
+        )
 
         # Archived PDF verification
-        c.execute("""
+        c.execute(
+            """
         CREATE TABLE IF NOT EXISTS wayback_pdf_checks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             attempt_id TEXT NOT NULL,
@@ -703,10 +714,12 @@ class SQLiteSink:
             decision TEXT NOT NULL,     -- CandidateDecision
             FOREIGN KEY(attempt_id) REFERENCES wayback_attempts(attempt_id) ON DELETE CASCADE
         );
-        """)
+        """
+        )
 
         # Emits (success)
-        c.execute("""
+        c.execute(
+            """
         CREATE TABLE IF NOT EXISTS wayback_emits (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             attempt_id TEXT NOT NULL,
@@ -718,10 +731,12 @@ class SQLiteSink:
             http_ct_expected TEXT NOT NULL,
             FOREIGN KEY(attempt_id) REFERENCES wayback_attempts(attempt_id) ON DELETE CASCADE
         );
-        """)
+        """
+        )
 
         # Skips (terminal non-success)
-        c.execute("""
+        c.execute(
+            """
         CREATE TABLE IF NOT EXISTS wayback_skips (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             attempt_id TEXT NOT NULL,
@@ -731,7 +746,8 @@ class SQLiteSink:
             details TEXT,
             FOREIGN KEY(attempt_id) REFERENCES wayback_attempts(attempt_id) ON DELETE CASCADE
         );
-        """)
+        """
+        )
 
         # Basic indexes
         c.execute(
@@ -781,7 +797,8 @@ class SQLiteSink:
             pass
 
         # Roll-up table for fast dashboards (fast query of run-level metrics)
-        c.execute("""
+        c.execute(
+            """
         CREATE TABLE IF NOT EXISTS wayback_run_metrics (
             run_id TEXT PRIMARY KEY,
             attempts INTEGER DEFAULT 0,
@@ -794,7 +811,8 @@ class SQLiteSink:
             created_at TEXT,
             updated_at TEXT
         );
-        """)
+        """
+        )
 
     def _ensure_column_exists(
         self, cur: sqlite3.Cursor, *, table: str, column: str, ddl: str

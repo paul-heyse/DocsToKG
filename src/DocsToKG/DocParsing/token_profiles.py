@@ -88,35 +88,6 @@ class TokenProfilesCfg(StageConfigBase):
         "window_max": StageConfigBase._coerce_int,
     }
 
-    @classmethod
-    def from_env(cls, defaults: Optional[Dict[str, Any]] = None) -> "TokenProfilesCfg":
-        """Instantiate configuration using environment overlays."""
-
-        cfg = cls(**(defaults or {}))
-        cfg.apply_env()
-        if cfg.data_root is None:
-            fallback_root = os.getenv("DOCSTOKG_DATA_ROOT")
-            if fallback_root:
-                cfg.data_root = StageConfigBase._coerce_optional_path(fallback_root, None)
-        cfg.finalize()
-        return cfg
-
-    @classmethod
-    def from_args(
-        cls,
-        args: argparse.Namespace,
-        defaults: Optional[Dict[str, Any]] = None,
-    ) -> "TokenProfilesCfg":
-        """Layer CLI arguments, config files, and env vars into a configuration."""
-
-        cfg = cls.from_env(defaults=defaults)
-        config_path = getattr(args, "config", None)
-        if config_path:
-            cfg.update_from_file(Path(config_path))
-        cfg.apply_args(args)
-        cfg.finalize()
-        return cfg
-
     def finalize(self) -> None:
         """Normalise derived attributes after overlays are applied."""
 
@@ -141,8 +112,6 @@ class TokenProfilesCfg(StageConfigBase):
             self.window_min = 0
         if self.window_max < 0:
             self.window_max = 0
-
-    from_sources = from_args
 
     def tokenizer_ids(self) -> List[str]:
         """Return the ordered tokenizer identifiers to profile."""

@@ -246,41 +246,6 @@ class EmbedCfg(StageConfigBase):
         "lexical_local_bm25_b": StageConfigBase._coerce_float,
     }
 
-    @classmethod
-    def from_env(cls, defaults: Optional[Dict[str, Any]] = None) -> "EmbedCfg":
-        """Construct configuration from environment variables."""
-
-        cfg = cls(**(defaults or {}))
-        cfg.apply_env()
-        if cfg.data_root is None:
-            fallback_root = os.getenv("DOCSTOKG_DATA_ROOT")
-            if fallback_root:
-                cfg.data_root = StageConfigBase._coerce_optional_path(fallback_root, None)
-        cfg.finalize()
-        return cfg
-
-    @classmethod
-    def from_args(
-        cls,
-        args: object,
-        defaults: Optional[Dict[str, Any]] = None,
-    ) -> "EmbedCfg":
-        """Merge CLI arguments, configuration files, and environment variables."""
-
-        cfg = cls.from_env(defaults=defaults)
-        config_path = getattr(args, "config", None)
-        if config_path:
-            try:
-                cfg.update_from_file(Path(config_path))
-            except ConfigLoadError as exc:
-                raise EmbeddingCLIValidationError(
-                    option="--config",
-                    message=str(exc),
-                ) from exc
-        cfg.apply_args(args)
-        cfg.finalize()
-        return cfg
-
     def finalize(self) -> None:
         """Normalise paths and casing after all sources have been applied."""
 
@@ -416,10 +381,7 @@ class EmbedCfg(StageConfigBase):
             )
         if self.sparse_splade_st_batch_size is None:
             self.sparse_splade_st_batch_size = self.batch_size_splade
-        if (
-            self.sparse_splade_st_batch_size is not None
-            and self.sparse_splade_st_batch_size < 1
-        ):
+        if self.sparse_splade_st_batch_size is not None and self.sparse_splade_st_batch_size < 1:
             raise EmbeddingCLIValidationError(
                 option="sparse.splade_st.batch_size",
                 message="must be >= 1 when provided",
@@ -462,9 +424,7 @@ class EmbedCfg(StageConfigBase):
 
         deprecation_warnings = []
         if self.is_overridden("bm25_k1") and not self.is_overridden("lexical_local_bm25_k1"):
-            deprecation_warnings.append(
-                "--bm25-k1 is deprecated; use --lexical-local-bm25-k1"
-            )
+            deprecation_warnings.append("--bm25-k1 is deprecated; use --lexical-local-bm25-k1")
         if self.is_overridden("bm25_b") and not self.is_overridden("lexical_local_bm25_b"):
             deprecation_warnings.append("--bm25-b is deprecated; use --lexical-local-bm25-b")
         if self.is_overridden("batch_size_qwen") and not self.is_overridden(
@@ -488,15 +448,9 @@ class EmbedCfg(StageConfigBase):
         if self.is_overridden("qwen_quant") and not self.is_overridden(
             "dense_qwen_vllm_quantization"
         ):
-            deprecation_warnings.append(
-                "--qwen-quant is deprecated; use --dense-qwen-quantization"
-            )
-        if self.is_overridden("qwen_dim") and not self.is_overridden(
-            "dense_qwen_vllm_dimension"
-        ):
-            deprecation_warnings.append(
-                "--qwen-dim is deprecated; use --dense-qwen-dimension"
-            )
+            deprecation_warnings.append("--qwen-quant is deprecated; use --dense-qwen-quantization")
+        if self.is_overridden("qwen_dim") and not self.is_overridden("dense_qwen_vllm_dimension"):
+            deprecation_warnings.append("--qwen-dim is deprecated; use --dense-qwen-dimension")
 
         for message in deprecation_warnings:
             print(f"[docparse embed] {message}", file=sys.stderr)
@@ -522,9 +476,7 @@ class EmbedCfg(StageConfigBase):
                     if key:
                         merged[key] = val
                 else:
-                    raise ValueError(
-                        "telemetry tags supplied via CLI must use KEY=VALUE format"
-                    )
+                    raise ValueError("telemetry tags supplied via CLI must use KEY=VALUE format")
             return merged
         if isinstance(value, str):
             text = value.strip()

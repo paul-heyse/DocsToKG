@@ -846,44 +846,6 @@ class DoctagsCfg(StageConfigBase):
         "html_sanitizer": StageConfigBase._coerce_str,
     }
 
-    @classmethod
-    def from_env(
-        cls,
-        *,
-        mode: str = "pdf",
-        defaults: Optional[Dict[str, Any]] = None,
-    ) -> "DoctagsCfg":
-        """Build a configuration exclusively from environment variables."""
-
-        base_kwargs = dict(defaults or {})
-        base_kwargs.setdefault("mode", mode)
-        cfg = cls(**base_kwargs)
-        cfg.apply_env()
-        if cfg.data_root is None:
-            fallback_root = os.getenv("DOCSTOKG_DATA_ROOT")
-            if fallback_root:
-                cfg.data_root = StageConfigBase._coerce_optional_path(fallback_root, None)
-        cfg.finalize()
-        return cfg
-
-    @classmethod
-    def from_args(
-        cls,
-        args: argparse.Namespace,
-        *,
-        mode: str = "pdf",
-        defaults: Optional[Dict[str, Any]] = None,
-    ) -> "DoctagsCfg":
-        """Create a configuration by merging env vars, optional config files, and CLI arguments."""
-
-        cfg = cls.from_env(mode=mode, defaults=defaults)
-        config_path = getattr(args, "config", None)
-        if config_path:
-            cfg.update_from_file(Path(config_path))
-        cfg.apply_args(args)
-        cfg.finalize()
-        return cfg
-
     def finalize(self) -> None:
         """Normalise derived fields after configuration sources are applied."""
         if self.data_root is not None:
@@ -943,7 +905,6 @@ class DoctagsCfg(StageConfigBase):
             )
         self.gpu_memory_utilization = utilization
 
-    from_sources = from_args
 
 
 PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
