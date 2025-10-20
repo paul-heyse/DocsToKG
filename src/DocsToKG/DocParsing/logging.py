@@ -69,7 +69,7 @@ def get_logger(
         handler = logging.StreamHandler()
         handler.setFormatter(JSONFormatter())
         logger.addHandler(handler)
-        logger.propagate = False
+    logger.propagate = True
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
     adapter = getattr(logger, "_docparse_adapter", None)
     if not isinstance(adapter, StructuredLogger):

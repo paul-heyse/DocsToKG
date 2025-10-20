@@ -147,6 +147,16 @@ and throttled attempts (labelled by reason and whether the refresh was forced),
 while the gauge `faiss_snapshot_age_seconds` surfaces the age of the cached CPU
 replica for dashboards and alerts.
 
+#### Ingestion workflow validation
+
+The hybrid ingestion pipeline now enforces a strict 1:1 mapping between chunk
+JSONL records and vector artifacts (JSONL or Parquet). After processing all
+chunk entries the loader drains any remaining vector UUIDs and raises
+`IngestError` when extra vectors remain. If you encounter
+`Found vector entries without matching chunks`, regenerate the DocParsing
+artifacts so both files describe the same UUID set and ordering before
+restarting ingestion.
+
 ### Ontology Download CLI
 
 ```bash

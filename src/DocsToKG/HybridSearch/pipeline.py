@@ -109,6 +109,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from collections import defaultdict, deque
 from contextlib import contextmanager
@@ -608,7 +609,9 @@ class ChunkIngestionPipeline:
                     loaded = self._load_precomputed_chunks(document)
                 if not loaded:
                     continue
-                self._delete_existing_for_doc(document.doc_id, document.namespace)
+                staged_deletions = self._delete_existing_for_doc(
+                    document.doc_id, document.namespace
+                )
                 batch = self._commit_batch(
                     loaded, collect_vector_ids=collect_vector_ids
                 )
@@ -616,6 +619,8 @@ class ChunkIngestionPipeline:
                 namespaces.update(batch.namespaces)
                 if vector_ids is not None and batch.vector_ids:
                     vector_ids.extend(batch.vector_ids)
+                if staged_deletions:
+                    self.delete_chunks(staged_deletions)
         except RetryableIngestError:
             raise
         except IngestError:
@@ -667,14 +672,49 @@ class ChunkIngestionPipeline:
             )
 
         count = len(batch)
+        vector_ids = [chunk.vector_id for chunk in batch]
+        faiss_added = False
+        lexical_upserted = False
+
         with self._observability.trace("ingest_dual_write", count=str(count)):
-            self._prepare_faiss(batch)
-            self._faiss.add(
-                [chunk.features.embedding for chunk in batch],
-                [chunk.vector_id for chunk in batch],
-            )
-            self._opensearch.bulk_upsert(batch)
-            self._registry.upsert(batch)
+            try:
+                self._prepare_faiss(batch)
+                self._faiss.add(
+                    [chunk.features.embedding for chunk in batch],
+                    vector_ids,
+                )
+                faiss_added = True
+                self._opensearch.bulk_upsert(batch)
+                lexical_upserted = True
+                self._registry.upsert(batch)
+            except Exception:
+                if lexical_upserted:
+                    try:
+                        self._opensearch.bulk_delete(vector_ids)
+                    except Exception:
+                        self._observability.logger.exception(
+                            "chunk-ingest-rollback-lexical-error",
+                            extra={
+                                "event": {
+                                    "vector_ids": vector_ids,
+                                    "stage": "lexical",
+                                }
+                            },
+                        )
+                if faiss_added:
+                    try:
+                        self._faiss.remove(vector_ids)
+                    except Exception:
+                        self._observability.logger.exception(
+                            "chunk-ingest-rollback-faiss-error",
+                            extra={
+                                "event": {
+                                    "vector_ids": vector_ids,
+                                    "stage": "faiss",
+                                }
+                            },
+                        )
+                raise
 
         self._metrics.chunks_upserted += count
         self._observability.metrics.increment("ingest_chunks", count)
@@ -685,8 +725,8 @@ class ChunkIngestionPipeline:
             extra={"event": {"count": count, "namespaces": list(namespaces)}},
         )
 
-        vector_ids = (
-            tuple(chunk.vector_id for chunk in batch)
+        vector_ids_result = (
+            tuple(vector_ids)
             if collect_vector_ids
             else None
         )
@@ -694,7 +734,7 @@ class ChunkIngestionPipeline:
         return BatchCommitResult(
             chunk_count=count,
             namespaces=namespaces,
-            vector_ids=vector_ids,
+            vector_ids=vector_ids_result,
         )
 
     def _prepare_faiss(self, new_chunks: Sequence[ChunkPayload]) -> None:
@@ -786,6 +826,7 @@ class ChunkIngestionPipeline:
 
         def _pop_vector(vector_id: str) -> Optional[Mapping[str, object]]:
             cached = vector_cache.pop(vector_id, None)
+            _maybe_track_cache()
             if cached is not None:
                 return cached
             for entry in vector_iter:
@@ -803,6 +844,7 @@ class ChunkIngestionPipeline:
         for entry in chunk_entries:
             vector_id = str(entry.get("uuid") or entry.get("UUID"))
             vector_payload = vector_cache.pop(vector_id, None)
+            _maybe_track_cache()
             if vector_payload is None:
                 vector_payload = _pop_vector(vector_id)
             if vector_payload is None:
@@ -817,26 +859,140 @@ class ChunkIngestionPipeline:
                     "source_path": entry.get("source_path"),
                 }
             )
+            text = str(entry.get("text", ""))
             payloads.append(
                 ChunkPayload(
                     doc_id=document.doc_id,
                     chunk_id=str(entry.get("chunk_id")),
                     vector_id=vector_id,
                     namespace=document.namespace,
-                    text=str(entry.get("text", "")),
+                    text=text,
                     metadata=metadata,
                     features=features,
                     token_count=int(entry.get("num_tokens", 0)),
                     source_chunk_idxs=tuple(int(idx) for idx in entry.get("source_chunk_idxs", [])),
                     doc_items_refs=tuple(str(ref) for ref in entry.get("doc_items_refs", [])),
-                    char_offset=(0, len(str(entry.get("text", "")))),
+                    char_offset=self._resolve_char_offset(entry, text),
                 )
             )
         if missing:
             raise IngestError(
                 "Missing vector entries for chunk UUIDs: " + ", ".join(sorted(set(missing)))
             )
+
+        extra_vector_ids: List[str] = []
+        max_preview = 10
+        truncated = False
+        if vector_cache:
+            cache_ids = [str(vector_id) for vector_id in vector_cache.keys()]
+            if len(cache_ids) > max_preview:
+                extra_vector_ids.extend(sorted(cache_ids)[:max_preview])
+                truncated = True
+            else:
+                extra_vector_ids.extend(sorted(cache_ids))
+
+        missing_uuid_entries = False
+        for extra_entry in vector_iter:
+            extra_uuid = extra_entry.get("uuid") or extra_entry.get("UUID")
+            if extra_uuid:
+                if len(extra_vector_ids) < max_preview:
+                    extra_vector_ids.append(str(extra_uuid))
+                else:
+                    truncated = True
+            else:
+                missing_uuid_entries = True
+
+        if extra_vector_ids or missing_uuid_entries:
+            details = sorted(set(extra_vector_ids))
+            message = "Found vector entries without matching chunks"
+            if details:
+                preview = ", ".join(details[:max_preview])
+                if truncated or len(details) > max_preview:
+                    preview += ", ..."
+                message += f": {preview}"
+            if missing_uuid_entries and not details:
+                message += ": <missing UUID>"
+            elif missing_uuid_entries:
+                message += " (additional entries missing UUIDs)"
+            raise IngestError(message)
         return payloads
+
+    def _resolve_char_offset(
+        self, entry: Mapping[str, object], text: str
+    ) -> Tuple[int, int]:
+        """Determine the character span for ``entry`` if metadata is present."""
+
+        span_fields = (
+            "char_offset",
+            "char_offsets",
+            "char_range",
+            "char_ranges",
+            "text_char_range",
+            "text_char_offsets",
+        )
+        for field in span_fields:
+            if field in entry:
+                span = self._normalise_char_span(entry[field])
+                if span is not None:
+                    return span
+        return (0, len(text))
+
+    @staticmethod
+    def _normalise_char_span(span: object) -> Optional[Tuple[int, int]]:
+        """Normalise heterogeneous span payloads into a ``(start, end)`` tuple."""
+
+        def _coerce(value: object) -> Optional[int]:
+            if isinstance(value, bool):
+                return None
+            try:
+                result = int(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return None
+            if result < 0:
+                return None
+            return result
+
+        if isinstance(span, (list, tuple)):
+            if len(span) >= 2:
+                start = _coerce(span[0])
+                end = _coerce(span[1])
+                if start is not None and end is not None and end >= start:
+                    return (start, end)
+            return None
+
+        if isinstance(span, Mapping):
+            start: Optional[int] = None
+            for key in ("start", "begin", "offset", "char_start"):
+                if key in span:
+                    start = _coerce(span.get(key))
+                if start is not None:
+                    break
+            end: Optional[int] = None
+            for key in ("end", "stop", "finish", "char_end"):
+                if key in span:
+                    end = _coerce(span.get(key))
+                if end is not None:
+                    break
+            if start is not None and end is not None and end >= start:
+                return (start, end)
+            if start is not None and "length" in span:
+                length = _coerce(span.get("length"))
+                if length is not None:
+                    end = start + length
+                    if end >= start:
+                        return (start, end)
+            return None
+
+        if isinstance(span, str):
+            matches = re.findall(r"-?\d+", span)
+            if len(matches) >= 2:
+                start = _coerce(matches[0])
+                end = _coerce(matches[1])
+                if start is not None and end is not None and end >= start:
+                    return (start, end)
+            return None
+
+        return None
 
     def _delete_existing_for_doc(self, doc_id: str, namespace: str) -> None:
         """Remove previously ingested chunks for a document/namespace pair.
@@ -846,11 +1002,9 @@ class ChunkIngestionPipeline:
             namespace: Namespace to scope the deletion.
 
         Returns:
-            None
+            Tuple of vector identifiers currently associated with the document.
         """
-        existing_vector_ids = tuple(self._registry.vector_ids_for(doc_id, namespace))
-        if existing_vector_ids:
-            self.delete_chunks(existing_vector_ids)
+        return tuple(self._registry.vector_ids_for(doc_id, namespace))
 
     def _features_from_vector(self, payload: Mapping[str, object]) -> ChunkFeatures:
         """Convert stored vector payload into ChunkFeatures.
