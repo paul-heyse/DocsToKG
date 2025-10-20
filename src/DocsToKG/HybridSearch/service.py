@@ -866,6 +866,7 @@ class HybridSearchService:
             None
         """
         self._config_manager = config_manager
+        config = self._config_manager.get()
         self._feature_generator = feature_generator
         self._opensearch = opensearch
         self._registry = registry
@@ -884,7 +885,8 @@ class HybridSearchService:
         self._assert_managed_store(self._faiss)
         self._faiss_router.set_resolver(self._registry.resolve_faiss_id)
         self._dense_strategy = DenseSearchStrategy(cache_path=cache_path)
-        self._executor = ThreadPoolExecutor(max_workers=3)
+        max_workers = config.retrieval.executor_max_workers or 3
+        self._executor = ThreadPoolExecutor(max_workers=max_workers)
         schema_manager = None
         for attr in ("schema_manager", "schema", "_schema"):
             candidate = getattr(self._opensearch, attr, None)
