@@ -576,8 +576,13 @@ class DoctagsCfg(StageConfigBase):
             raise ValueError("workers must be >= 1")
         if self.port <= 0:
             raise ValueError("port must be a positive integer")
-        if self.gpu_memory_utilization < 0:
-            raise ValueError("gpu_memory_utilization must be non-negative")
+        utilization = float(self.gpu_memory_utilization)
+        if not 0.0 <= utilization <= 1.0:
+            raise ValueError(
+                "gpu_memory_utilization must be between 0.0 and 1.0 (inclusive); "
+                f"received {utilization}"
+            )
+        self.gpu_memory_utilization = utilization
 
     from_sources = from_args
 
@@ -681,7 +686,7 @@ PDF_CLI_OPTIONS: Tuple[CLIOption, ...] = (
         {
             "type": float,
             "default": DEFAULT_GPU_MEMORY_UTILIZATION,
-            "help": "Fraction of GPU memory the vLLM server may allocate",
+            "help": "Fraction of GPU memory the vLLM server may allocate (0.0-1.0)",
         },
     ),
     CLIOption(
