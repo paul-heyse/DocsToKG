@@ -3411,7 +3411,17 @@ class HybridSearchValidator:
         oversamples = [1, 2, 3]
         results: List[Mapping[str, object]] = []
         chunks = list(self._registry.all())
-        total_chunks = max(1, len(chunks))
+        if not chunks:
+            return ValidationReport(
+                name="calibration_sweep",
+                passed=True,
+                details={
+                    "dense": [],
+                    "note": "Skipped calibration because no chunks are registered.",
+                },
+            )
+
+        total_chunks = len(chunks)
         config_manager = getattr(self._service, "_config_manager", None)
         retrieval_cfg = None
         if config_manager is not None:
