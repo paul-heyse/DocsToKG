@@ -1543,6 +1543,65 @@ def test_verify_pagination_enforces_page_limit() -> None:
     assert service.requests[-1].cursor == "cursor-2"
 
 
+def test_verify_pagination_uses_fusion_pool_limit() -> None:
+    responses = []
+    for idx in range(3):
+        next_cursor = f"cursor-{idx + 1}" if idx < 2 else None
+        responses.append(
+            HybridSearchResponse(
+                results=[
+                    HybridSearchResult(
+                        doc_id=f"doc-{idx}",
+                        chunk_id=f"chunk-{idx}",
+                        vector_id=f"vec-{idx}",
+                        namespace="test",
+                        score=1.0,
+                        fused_rank=idx,
+                        text=f"page {idx}",
+                        highlights=(),
+                        provenance_offsets=(),
+                        diagnostics=HybridSearchDiagnostics(),
+                        metadata={},
+                    )
+                ],
+                next_cursor=next_cursor,
+                total_candidates=1,
+                timings_ms={},
+            )
+        )
+
+    class RecordingService:
+        def __init__(self, pages: Sequence[HybridSearchResponse]) -> None:
+            self._pages = list(pages)
+            self._index = 0
+            self.requests: list[HybridSearchRequest] = []
+
+        def search(self, search_request: HybridSearchRequest) -> HybridSearchResponse:
+            self.requests.append(search_request)
+            page = self._pages[self._index]
+            self._index += 1
+            return page
+
+    service = RecordingService(responses)
+    service._config_manager = SimpleNamespace(  # type: ignore[attr-defined]
+        get=lambda: SimpleNamespace(fusion=SimpleNamespace(mmr_pool_size=4))
+    )
+
+    request = HybridSearchRequest(
+        query="recall",
+        namespace="demo",
+        filters={},
+        page_size=2,
+    )
+
+    pagination = verify_pagination(service, request)
+
+    assert pagination.cursor_chain == ["cursor-1"]
+    assert pagination.termination_reason == "max_pages_reached"
+    assert not pagination.duplicate_detected
+    assert len(service.requests) == 2
+
+
 def test_recall_first_dense_signature_isolated(
     stack: Callable[
         ...,
