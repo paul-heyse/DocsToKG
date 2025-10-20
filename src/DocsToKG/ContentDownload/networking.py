@@ -107,11 +107,22 @@ import logging
 import math
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Mapping, Optional, Set, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Set,
+    Union,
+    cast,
+)
 from urllib.parse import urlparse
 
 import httpx
@@ -136,6 +147,25 @@ from DocsToKG.ContentDownload.httpx_transport import (
 from DocsToKG.ContentDownload.ratelimit import DEFAULT_ROLE
 from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 
+try:  # pragma: no cover - optional when pybreaker missing in envs
+    from DocsToKG.ContentDownload.breakers import (
+        BreakerOpenError,
+        RequestRole,
+        is_failure_for_breaker,
+    )
+except Exception:  # pragma: no cover - pybreaker absent, keep networking importable
+    BreakerOpenError = None  # type: ignore[assignment]
+    RequestRole = None  # type: ignore[assignment]
+    is_failure_for_breaker = None  # type: ignore[assignment]
+
+if TYPE_CHECKING:  # pragma: no cover - typing-only imports
+    from DocsToKG.ContentDownload.breakers import (
+        BreakerConfig,
+        BreakerListenerFactory,
+        BreakerRegistry,
+        CooldownStore,
+    )
+
 # --- Globals ---
 
 __all__ = (
@@ -144,14 +174,17 @@ __all__ = (
     "ModifiedResult",
     "ContentPolicyViolation",
     # "CircuitBreaker",  # Legacy - removed
+    "BreakerOpenError",
+    "configure_breaker_registry",
     "configure_http_client",
     "get_http_client",
+    "get_breaker_registry",
     "purge_http_cache",
+    "reset_breaker_registry",
     "head_precheck",
     "parse_retry_after_header",
     "request_with_retries",
     "set_breaker_registry",
-    "get_breaker_registry",
 )
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
@@ -159,8 +192,16 @@ LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 DEFAULT_RETRYABLE_STATUSES: Set[int] = {429, 500, 502, 503, 504}
 _TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
 
-# Global breaker registry (set by runner)
-_breaker_registry: Optional[Any] = None
+# Global breaker registry (singleton managed here)
+_BREAKER_LOCK = threading.RLock()
+_breaker_registry: Optional["BreakerRegistry"] = None
+
+# Exceptions considered breaker failures by default
+DEFAULT_BREAKER_FAILURE_EXCEPTIONS = (
+    httpx.TimeoutException,
+    httpx.TransportError,
+    httpx.ProtocolError,
+)
 
 _DEPRECATED_ATTR_ERRORS: Dict[str, str] = {
     "ThreadLocalSessionFactory": (
@@ -182,15 +223,50 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-def set_breaker_registry(registry: Any) -> None:
-    """Set the global breaker registry for use by request_with_retries."""
+def configure_breaker_registry(
+    config: "BreakerConfig",
+    *,
+    cooldown_store: Optional["CooldownStore"] = None,
+    listener_factory: Optional["BreakerListenerFactory"] = None,
+) -> "BreakerRegistry":
+    """Create and register the process-wide breaker registry."""
+
+    from DocsToKG.ContentDownload.breakers import BreakerRegistry  # Local import to avoid cycles
+
+    classify = config.classify
+    if not classify.failure_exceptions:
+        classify = replace(classify, failure_exceptions=DEFAULT_BREAKER_FAILURE_EXCEPTIONS)
+        config = replace(config, classify=classify)
+
+    registry = BreakerRegistry(
+        config,
+        cooldown_store=cooldown_store,
+        listener_factory=listener_factory,
+    )
+
+    set_breaker_registry(registry)
+    return registry
+
+
+def set_breaker_registry(registry: Optional["BreakerRegistry"]) -> None:
+    """Inject an already-created breaker registry (primarily for tests)."""
+
     global _breaker_registry
-    _breaker_registry = registry
+    with _BREAKER_LOCK:
+        _breaker_registry = registry
 
 
-def get_breaker_registry() -> Optional[Any]:
-    """Get the current breaker registry."""
-    return _breaker_registry
+def reset_breaker_registry() -> None:
+    """Clear the global breaker registry (used in teardown paths)."""
+
+    set_breaker_registry(None)
+
+
+def get_breaker_registry() -> Optional["BreakerRegistry"]:
+    """Return the currently configured breaker registry, if any."""
+
+    with _BREAKER_LOCK:
+        return _breaker_registry
 
 
 def parse_retry_after_header(response: httpx.Response) -> Optional[float]:
@@ -614,30 +690,34 @@ def request_with_retries(
     except Exception:
         canonical_index = request_url
 
-    # Breaker pre-flight check
     breaker_registry = get_breaker_registry()
-    if breaker_registry is not None:
-        try:
-            # Determine host from canonicalized URL
-            parsed_request = urlparse(request_url)
-            request_host = (parsed_request.hostname or parsed_request.netloc or "").lower()
+    breaker_meta: Dict[str, Any] = {}
+    breaker_enabled = (
+        breaker_registry is not None
+        and RequestRole is not None
+        and BreakerOpenError is not None
+        and is_failure_for_breaker is not None
+    )
 
-            if request_host:
-                # Import here to avoid circular imports
-                from DocsToKG.ContentDownload.breakers import RequestRole, BreakerOpenError
+    parsed_request = urlparse(request_url)
+    request_host = (parsed_request.hostname or parsed_request.netloc or "").lower()
 
-                # Map role string to RequestRole enum
-                role_enum = RequestRole.METADATA
-                if role_token == "landing":
-                    role_enum = RequestRole.LANDING
-                elif role_token == "artifact":
-                    role_enum = RequestRole.ARTIFACT
+    role_enum: Optional[RequestRole] = None
+    if breaker_enabled:
+        assert RequestRole is not None  # for type checkers
+        role_enum = RequestRole.METADATA
+        if role_token == "landing":
+            role_enum = RequestRole.LANDING
+        elif role_token == "artifact":
+            role_enum = RequestRole.ARTIFACT
 
-                breaker_registry.allow(request_host, role=role_enum, resolver=resolver)
-        except BreakerOpenError as e:
-            # Don't retry breaker open errors
-            LOGGER.debug("Breaker open for %s %s: %s", method, request_url, e)
-            raise
+    if breaker_enabled:
+        if role_enum is not None and hasattr(role_enum, "value"):
+            breaker_meta["role"] = role_enum.value
+        elif role_token:
+            breaker_meta["role"] = role_token
+        if resolver:
+            breaker_meta["resolver"] = resolver
 
     if retry_after_cap is not None:
         retry_after_cap = float(retry_after_cap)
@@ -693,10 +773,153 @@ def request_with_retries(
     extensions.setdefault("docs_canonical_index", canonical_index)
     kwargs["extensions"] = extensions
 
+    network_meta_raw = extensions.get("docs_network_meta")
+    if isinstance(network_meta_raw, MutableMapping):
+        network_meta = network_meta_raw
+    else:
+        network_meta = {}
+        extensions["docs_network_meta"] = network_meta
+
+    def _apply_breaker_meta() -> None:
+        if breaker_meta:
+            network_meta["breaker"] = dict(breaker_meta)
+
+    def _snapshot_breaker_state(*, recorded: Optional[str] = None, retry_after: Optional[float] = None) -> None:
+        if recorded is not None:
+            breaker_meta["recorded"] = recorded
+        if retry_after is not None:
+            breaker_meta["retry_after_s"] = retry_after
+
+        if not breaker_enabled or not request_host or breaker_registry is None:
+            _apply_breaker_meta()
+            return
+
+        try:
+            host_state_snapshot = breaker_registry.current_state(request_host)
+        except Exception:  # pragma: no cover - defensive
+            host_state_snapshot = None
+
+        host_state_value: Optional[str]
+        resolver_state_value: Optional[str]
+        if isinstance(host_state_snapshot, Mapping):
+            host_state_value = cast(Optional[str], host_state_snapshot.get("host"))
+            resolver_state_value = cast(Optional[str], host_state_snapshot.get("resolver"))
+        else:
+            host_state_value = cast(Optional[str], host_state_snapshot)
+            resolver_state_value = None
+
+        if host_state_value:
+            breaker_meta["host_state"] = host_state_value
+
+        if resolver:
+            if resolver_state_value:
+                breaker_meta["resolver_state"] = resolver_state_value
+            else:
+                try:
+                    resolver_snapshot = breaker_registry.current_state(request_host, resolver=resolver)
+                except Exception:  # pragma: no cover - defensive
+                    resolver_snapshot = None
+                if isinstance(resolver_snapshot, Mapping):
+                    resolver_value = cast(Optional[str], resolver_snapshot.get("resolver"))
+                else:
+                    resolver_value = cast(Optional[str], resolver_snapshot)
+                if resolver_value:
+                    breaker_meta["resolver_state"] = resolver_value
+
+        _apply_breaker_meta()
+
     def request_func(*, method: str, url: str, **call_kwargs: Any) -> httpx.Response:
-        if stream_enabled:
-            return http_client.stream(method=method, url=url, **call_kwargs)
-        return http_client.request(method=method, url=url, **call_kwargs)
+        if breaker_enabled and request_host and breaker_registry is not None:
+            try:
+                breaker_registry.allow(
+                    request_host,
+                    role=role_enum or RequestRole.METADATA if RequestRole is not None else None,
+                    resolver=resolver,
+                )
+            except Exception as exc:
+                if BreakerOpenError is not None and isinstance(exc, BreakerOpenError):
+                    LOGGER.debug("Breaker open for %s %s: %s", method, request_url, exc)
+                    breaker_meta["error"] = str(exc)
+                    _snapshot_breaker_state(recorded="blocked")
+                    if not hasattr(exc, "breaker_meta"):
+                        setattr(exc, "breaker_meta", dict(breaker_meta))
+                raise
+
+        try:
+            if stream_enabled:
+                response = http_client.stream(method=method, url=url, **call_kwargs)
+            else:
+                response = http_client.request(method=method, url=url, **call_kwargs)
+        except Exception as exc:
+            if breaker_enabled and request_host and breaker_registry is not None:
+                should_count = bool(
+                    is_failure_for_breaker
+                    and role_enum is not None
+                    and is_failure_for_breaker(
+                        breaker_registry.config.classify,
+                        status=None,
+                        exception=exc,
+                    )
+                )
+                if should_count:
+                    breaker_registry.on_failure(
+                        request_host,
+                        role=role_enum or RequestRole.METADATA,
+                        resolver=resolver,
+                        exception=exc,
+                    )
+                    breaker_meta["exception_type"] = type(exc).__name__
+                    _snapshot_breaker_state(recorded="failure")
+                else:
+                    _apply_breaker_meta()
+            raise
+
+        if not isinstance(response, httpx.Response):
+            _apply_breaker_meta()
+            return response
+
+        from_cache = bool(response.extensions.get("from_cache"))
+        if breaker_enabled and request_host and breaker_registry is not None and not from_cache:
+            status = getattr(response, "status_code", None)
+            retry_after_s = None
+            if status in (429, 503):
+                retry_after_s = parse_retry_after_header(response)
+
+            should_count = bool(
+                is_failure_for_breaker
+                and role_enum is not None
+                and is_failure_for_breaker(
+                    breaker_registry.config.classify,
+                    status=status,
+                    exception=None,
+                )
+            )
+
+            if should_count:
+                breaker_registry.on_failure(
+                    request_host,
+                    role=role_enum or RequestRole.METADATA,
+                    resolver=resolver,
+                    status=status,
+                    retry_after_s=retry_after_s,
+                )
+                _snapshot_breaker_state(recorded="failure", retry_after=retry_after_s)
+            else:
+                breaker_registry.on_success(
+                    request_host,
+                    role=role_enum or RequestRole.METADATA,
+                    resolver=resolver,
+                )
+                _snapshot_breaker_state(recorded="success")
+        elif from_cache:
+            _snapshot_breaker_state(recorded="cache-hit")
+        else:
+            _apply_breaker_meta()
+
+        if breaker_meta and hasattr(response, "extensions"):
+            response.extensions.setdefault("breaker", dict(breaker_meta))
+
+        return response
 
     controller = _build_retrying_controller(
         method=method,
@@ -720,18 +943,6 @@ def request_with_retries(
     except RetryError as exc:  # pragma: no cover - defensive safety net
         last_attempt = exc.last_attempt
         if last_attempt.failed:
-            # Update breaker on final failure
-            if breaker_registry is not None and request_host:
-                from DocsToKG.ContentDownload.breakers import RequestRole, is_failure_for_breaker
-
-                exception = last_attempt.exception()
-                is_failure = is_failure_for_breaker(
-                    breaker_registry.config.classify, status=None, exception=exception
-                )
-                if is_failure:
-                    breaker_registry.on_failure(
-                        request_host, role=role_enum, resolver=resolver, exception=exception
-                    )
             raise last_attempt.exception()
         response = last_attempt.result()
 
@@ -753,49 +964,6 @@ def request_with_retries(
             "Response object %s lacks headers for content policy evaluation.",
             type(response).__name__,
         )
-
-    # Update breaker based on response and collect state for telemetry
-    breaker_state_info = {}
-    if breaker_registry is not None and request_host:
-        from DocsToKG.ContentDownload.breakers import RequestRole, is_failure_for_breaker
-
-        # Get current breaker state before updating
-        breaker_state_info["breaker_host_state"] = breaker_registry.current_state(request_host)
-        if resolver:
-            breaker_state_info["breaker_resolver_state"] = breaker_registry.current_state(
-                request_host, resolver=resolver
-            )
-
-        if isinstance(response, httpx.Response):
-            status = response.status_code
-            retry_after_s = None
-            if status in (429, 503):
-                retry_after_s = parse_retry_after_header(response)
-
-            is_failure = is_failure_for_breaker(
-                breaker_registry.config.classify, status=status, exception=None
-            )
-
-            if is_failure:
-                breaker_registry.on_failure(
-                    request_host,
-                    role=role_enum,
-                    resolver=resolver,
-                    status=status,
-                    retry_after_s=retry_after_s,
-                )
-                breaker_state_info["breaker_recorded"] = "failure"
-            else:
-                breaker_registry.on_success(request_host, role=role_enum, resolver=resolver)
-                breaker_state_info["breaker_recorded"] = "success"
-        else:
-            # Non-HTTP response, treat as success
-            breaker_registry.on_success(request_host, role=role_enum, resolver=resolver)
-            breaker_state_info["breaker_recorded"] = "success"
-
-    # Store breaker state info in response extensions for telemetry
-    if breaker_state_info and hasattr(response, "extensions"):
-        response.extensions.update(breaker_state_info)
 
     if not isinstance(response, httpx.Response):
         LOGGER.debug(
