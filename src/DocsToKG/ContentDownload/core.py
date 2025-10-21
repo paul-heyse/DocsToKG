@@ -310,7 +310,7 @@ class DownloadContext:
         return field in self.provided_fields
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize the context to a mapping for legacy integrations."""
+        """Serialize the context to a mapping."""
 
         payload: Dict[str, Any] = {
             "resolver_order": list(self.resolver_order),
@@ -420,15 +420,6 @@ class Classification(Enum):
         text = str(value).strip().lower()
         if not text:
             return cls.UNKNOWN
-
-        legacy_map = {
-            "pdf_unknown": cls.PDF,
-            "pdf_corrupt": cls.MISS,
-            "request_error": cls.HTTP_ERROR,
-            "exists": cls.CACHED,
-        }
-        if text in legacy_map:
-            return legacy_map[text]
 
         for member in cls:
             if member.value == text:
