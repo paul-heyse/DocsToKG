@@ -23,12 +23,14 @@ import httpx
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 
 from .base import ApiResolverBase, ResolverEvent, ResolverEventReason, ResolverResult
+from .registry_v2 import register_v2
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
     from DocsToKG.ContentDownload.pipeline import ResolverConfig
 
 
+@register_v2("doaj")
 class DoajResolver(ApiResolverBase):
     """Resolve Open Access links using the DOAJ API."""
 

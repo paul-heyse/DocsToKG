@@ -23,12 +23,14 @@ import httpx
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 
 from .base import ApiResolverBase, ResolverEvent, ResolverEventReason, ResolverResult
+from .registry_v2 import register_v2
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
     from DocsToKG.ContentDownload.pipeline import ResolverConfig
 
 
+@register_v2("osf")
 class OsfResolver(ApiResolverBase):
     """Resolve artefacts hosted on the Open Science Framework."""
 

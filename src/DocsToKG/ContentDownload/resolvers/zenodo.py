@@ -24,6 +24,7 @@ import httpx
 from DocsToKG.ContentDownload.core import normalize_doi
 
 from .base import ApiResolverBase, ResolverEvent, ResolverEventReason, ResolverResult
+from .registry_v2 import register_v2
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
@@ -33,6 +34,7 @@ if TYPE_CHECKING:  # pragma: no cover
 LOGGER = logging.getLogger(__name__)
 
 
+@register_v2("zenodo")
 class ZenodoResolver(ApiResolverBase):
     """Resolve Zenodo records into downloadable open-access PDF URLs."""
 

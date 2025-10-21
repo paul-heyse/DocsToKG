@@ -23,12 +23,14 @@ import httpx
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 
 from .base import ApiResolverBase, ResolverEvent, ResolverEventReason, ResolverResult
+from .registry_v2 import register_v2
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
     from DocsToKG.ContentDownload.pipeline import ResolverConfig
 
 
+@register_v2("hal")
 class HalResolver(ApiResolverBase):
     """Resolve publications from the HAL open archive."""
 

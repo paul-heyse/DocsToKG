@@ -2413,6 +2413,7 @@ if TYPE_CHECKING:
 
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")  # ensure CPU-only HTML conversions
 
+
 def _html_stage_worker(item: WorkItem) -> ItemOutcome:
     """Worker entrypoint that proxies to :func:`html_convert_one`."""
 
@@ -2535,7 +2536,6 @@ def _make_html_stage_hooks(
                 )
 
     return StageHooks(before_stage=before_stage, after_item=after_item)
-
 
 
 _CONVERTER: "DocumentConverter | None" = None

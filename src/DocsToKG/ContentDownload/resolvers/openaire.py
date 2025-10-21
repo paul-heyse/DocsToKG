@@ -33,6 +33,7 @@ from .base import (
     _collect_candidate_urls,
     request_with_retries,
 )
+from .registry_v2 import register_v2
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
@@ -42,6 +43,7 @@ if TYPE_CHECKING:  # pragma: no cover
 LOGGER = logging.getLogger(__name__)
 
 
+@register_v2("openaire")
 class OpenAireResolver(RegisteredResolver):
     """Resolve URLs using the OpenAIRE API."""
 

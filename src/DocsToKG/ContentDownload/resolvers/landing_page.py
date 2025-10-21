@@ -24,7 +24,6 @@ import httpx
 
 from DocsToKG.ContentDownload.networking import BreakerOpenError
 from DocsToKG.ContentDownload.robots import RobotsCache
-from DocsToKG.ContentDownload.telemetry_helpers import emit_http_event
 
 from .base import (
     BeautifulSoup,
@@ -38,6 +37,7 @@ from .base import (
     find_pdf_via_meta,
     request_with_retries,
 )
+from .registry_v2 import register_v2
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
@@ -47,6 +47,7 @@ if TYPE_CHECKING:  # pragma: no cover
 LOGGER = logging.getLogger(__name__)
 
 
+@register_v2("landing_page")
 class LandingPageResolver(RegisteredResolver):
     """Attempt to scrape landing pages for PDF links when metadata fails."""
 
