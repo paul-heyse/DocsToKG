@@ -1757,6 +1757,22 @@ def fetch_one(
     )
     adapter.info("planning fetch", extra={"stage": "plan"})
 
+    # Gate 1: Validate configuration
+    try:
+        from DocsToKG.OntologyDownload.policy.gates import config_gate
+
+        config_result = config_gate(active_config)
+        if not config_result.passed:
+            raise ConfigError(
+                f"Configuration validation failed: {config_result.error_code}"
+            )
+    except Exception as e:
+        adapter.error(
+            "config gate rejected",
+            extra={"stage": "plan", "error": str(e), "event": "config_gate_rejected"},
+        )
+        raise
+
     primary, candidates = _resolve_plan_with_fallback(
         spec, active_config, adapter, cancellation_token=cancellation_token
     )

@@ -112,9 +112,7 @@ class ResourceMonitor:
         }
         return self.metrics
 
-    def assert_no_leak(
-        self, threshold_mb: float = 10.0, threshold_fds: int = 5
-    ) -> None:
+    def assert_no_leak(self, threshold_mb: float = 10.0, threshold_fds: int = 5) -> None:
         """Assert no resource leak (memory growth or FD leaks)."""
         if not self.metrics:
             raise RuntimeError("No metrics collected")
@@ -122,12 +120,10 @@ class ResourceMonitor:
         rss_delta = self.metrics["rss_delta_mb"]
         fd_delta = self.metrics["fd_delta"]
 
-        assert (
-            rss_delta < threshold_mb
-        ), f"Memory leak: {rss_delta:.2f}MB > {threshold_mb:.2f}MB threshold"
-        assert (
-            fd_delta < threshold_fds
-        ), f"FD leak: {fd_delta} > {threshold_fds} threshold"
+        assert rss_delta < threshold_mb, (
+            f"Memory leak: {rss_delta:.2f}MB > {threshold_mb:.2f}MB threshold"
+        )
+        assert fd_delta < threshold_fds, f"FD leak: {fd_delta} > {threshold_fds} threshold"
 
 
 # === Standard Budgets (from Optimization 10 spec) ===
