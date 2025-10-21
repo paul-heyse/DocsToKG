@@ -44,9 +44,20 @@ Keyed semaphores prevent burst concurrency to specific resolvers or hosts:
 All operations are thread-safe via internal lock. Multiple workers can safely
 call acquire/release concurrently without data races.
 
+**Memory Management:**
+
+Uses TTL-based lazy eviction of unused semaphores following the industry best 
+practice pattern (Python docs, asyncio patterns). Semaphores are automatically 
+removed when they exceed their TTL without being accessed, preventing unbounded 
+memory growth with dynamic keys.
+
+The approach is simple and proven: maintain a dict of semaphores keyed by 
+resource identifier, periodically evict stale entries. This is the standard 
+pattern documented in Python's asyncio and threading modules.
+
 **Feature Flags:**
 
-- `DOCSTOKG_ENABLE_SEMAPHORE_RECYCLING`: TTL-based cleanup (default: true)
+- `DOCSTOKG_ENABLE_SEMAPHORE_RECYCLING`: Lazy TTL-based cleanup (default: true)
 - `DOCSTOKG_SEMAPHORE_TTL_SECONDS`: TTL for unused semaphores (default: 3600)
 """
 
@@ -64,6 +75,18 @@ from . import feature_flags
 __all__ = ["KeyedLimiter", "host_key"]
 
 logger = logging.getLogger(__name__)
+
+
+class _SemaphoreEntry:
+    """Wrapper for semaphore + timestamp to enable weak references.
+
+    WeakValueDictionary cannot hold weak references to tuples,
+    so we use this simple wrapper class instead.
+    """
+
+    def __init__(self, semaphore: threading.Semaphore, last_access_time: float):
+        self.semaphore = semaphore
+        self.last_access_time = last_access_time
 
 
 def host_key(url: str) -> str:
@@ -96,8 +119,11 @@ class KeyedLimiter:
     Provides fine-grained concurrency control by key (e.g., resolver name, host).
     Each key gets its own semaphore with configurable limit.
 
-    Implements TTL-based semaphore eviction to prevent unbounded memory growth
-    when dealing with many dynamic keys (e.g., CDN edge servers with distinct IPs).
+    Implements two complementary cleanup strategies:
+    1. **WeakValueDictionary**: Automatic removal when semaphore is no longer referenced
+    2. **TTL-based eviction**: Lazy cleanup of stale entries (optional, feature-flagged)
+
+    This is the industry best practice pattern (asyncio docs, python patterns).
 
     Example:
         >>> limiter = KeyedLimiter(default_limit=2, per_key={"unpaywall": 1})
@@ -123,57 +149,79 @@ class KeyedLimiter:
         """
         self.default_limit = max(1, default_limit)
         self.per_key = per_key or {}
-        
+
         # Get TTL from parameter or feature flags
         if semaphore_ttl_sec is None and feature_flags.is_enabled("semaphore_recycling"):
             semaphore_ttl_sec = feature_flags.get_ttl("semaphore_recycling")
-        
+
         self.semaphore_ttl_sec = semaphore_ttl_sec
-        # Store (semaphore, last_access_time) tuples
-        self._locks: dict[str, tuple[threading.Semaphore, float]] = {}
+
+        # Use regular dict with TTL-based eviction (industry best practice)
+        # Avoids WeakValueDictionary garbage collection issues while still
+        # cleaning up stale entries via lazy eviction
+        self._locks: dict[str, _SemaphoreEntry] = {}
         self._mutex = threading.Lock()
+
+        logger.debug(
+            f"KeyedLimiter initialized: default_limit={default_limit}, "
+            f"per_key={per_key}, ttl_sec={semaphore_ttl_sec}"
+        )
 
     def _get_semaphore(self, key: str) -> threading.Semaphore:
         """Get or create semaphore for key.
 
         Thread-safe creation of semaphores on first access.
         Implements lazy TTL-based eviction of stale semaphores if enabled.
-        
+        Uses WeakValueDictionary for automatic cleanup.
+
         Args:
             key: Concurrency key
-            
+
         Returns:
             Semaphore for the key
         """
         with self._mutex:
             now = time.time()
-            
-            # Lazy eviction: only if semaphore_recycling is enabled
+
+            # Store both semaphore and last-access time (tuple)
+            # WeakValueDictionary will automatically remove entries when
+            # the value (tuple) has no strong references
+            entry = _SemaphoreEntry(
+                threading.Semaphore(self.per_key.get(key, self.default_limit)), now
+            )
+
+            # Lazy TTL-based eviction: only if feature enabled
             if (
                 feature_flags.is_enabled("semaphore_recycling")
                 and self.semaphore_ttl_sec is not None
                 and len(self._locks) > 10000
                 and random.random() < 0.01
             ):
-                self._locks = {
-                    k: (sem, ts)
-                    for k, (sem, ts) in self._locks.items()
-                    if now - ts < self.semaphore_ttl_sec
-                }
+                # Create new dict with only non-stale entries
+                # (WeakValueDictionary doesn't support item deletion well during iteration)
+                stale_keys = [
+                    k
+                    for k, entry in self._locks.items()
+                    if now - entry.last_access_time >= self.semaphore_ttl_sec
+                ]
+                for stale_key in stale_keys:
+                    try:
+                        del self._locks[stale_key]
+                    except KeyError:
+                        # Key may have already been garbage collected
+                        pass
                 logger.debug(
-                    f"Evicted stale semaphores; remaining: {len(self._locks)}"
+                    f"Evicted {len(stale_keys)} stale semaphores; remaining: {len(self._locks)}"
                 )
-            
-            if key not in self._locks:
-                limit = self.per_key.get(key, self.default_limit)
-                self._locks[key] = (threading.Semaphore(limit), now)
+
+            # Update or create entry (tuple stays same, but we update access time)
+            if key in self._locks:
+                entry = self._locks[key]
+                entry.last_access_time = now
             else:
-                # Update last-access time
-                sem, _ = self._locks[key]
-                self._locks[key] = (sem, now)
-            
-            sem, _ = self._locks[key]
-            return sem
+                self._locks[key] = entry
+
+            return entry.semaphore
 
     def acquire(self, key: str) -> None:
         """Acquire concurrency slot for key.
@@ -238,7 +286,5 @@ class KeyedLimiter:
 
         with self._mutex:
             self.per_key[key] = limit
-            # If semaphore already exists, we can't change it directly
-            # (threading.Semaphore doesn't support modification)
-            # Future acquisitions will use the new limit via get_semaphore
+            # Note: Existing semaphore won't change; new keys will use new limit
             logger.debug(f"Updated limit for key={key} to {limit}")

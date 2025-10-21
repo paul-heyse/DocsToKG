@@ -232,7 +232,7 @@ class Orchestrator:
         while not self._stop.is_set():
             try:
                 free_slots = self._jobs_queue.maxsize - self._jobs_queue.qsize()
-                
+
                 # Calculate batch size based on feature flag
                 if batching_enabled:
                     max_batch = feature_flags.get_batch_size()  # default 10
@@ -240,7 +240,7 @@ class Orchestrator:
                 else:
                     # No batching: lease 1 job at a time
                     batch_size = 1 if free_slots > 0 else 0
-                
+
                 if batch_size > 0:
                     # Lease jobs (batched or single)
                     jobs = self.queue.lease(
@@ -297,7 +297,7 @@ class Orchestrator:
                     # Fallback: minimal heartbeat with hardcoded extension
                     self.queue.heartbeat(self.worker_id)
                     logger.debug(f"Heartbeat sent (sync disabled) for {self.worker_id}")
-                
+
                 time.sleep(self.config.heartbeat_seconds)
 
             except Exception as e:
