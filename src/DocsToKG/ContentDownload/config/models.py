@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import ClassVar, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ============================================================================
 # Shared Policy Models
@@ -95,6 +95,13 @@ class RateLimitPolicy(BaseModel):
         if v <= 0:
             raise ValueError("Must be > 0")
         return v
+
+    @model_validator(mode="after")
+    def validate_capacity_vs_burst(self) -> RateLimitPolicy:
+        """Ensure capacity is greater than or equal to burst."""
+        if self.capacity < self.burst:
+            raise ValueError("Capacity must be >= burst")
+        return self
 
 
 class RobotsPolicy(BaseModel):
@@ -220,6 +227,15 @@ class HttpClientConfig(BaseModel):
         if v < 0:
             raise ValueError("Backoff values must be >= 0")
         return v
+
+    @model_validator(mode="after")
+    def validate_read_timeout_vs_write_timeout(self) -> HttpClientConfig:
+        """Ensure timeout_read_s is at least as large as timeout_write_s."""
+        read_timeout = self.timeout_read_s
+        write_timeout = self.timeout_write_s
+        if read_timeout is not None and write_timeout is not None and read_timeout < write_timeout:
+            raise ValueError("timeout_read_s must be >= timeout_write_s")
+        return self
 
 
 class TelemetryConfig(BaseModel):
@@ -351,6 +367,15 @@ class HishelConfig(BaseModel):
             if not (100 <= status < 600):
                 raise ValueError(f"Invalid HTTP status code: {status} (must be 100-599)")
         return v
+
+    @model_validator(mode="after")
+    def validate_s3_backend_bucket(self) -> HishelConfig:
+        """Ensure S3 backend has required bucket configuration."""
+        backend = self.backend
+        s3_bucket = self.s3_bucket
+        if backend == "s3" and not s3_bucket:
+            raise ValueError("S3 backend requires s3_bucket to be non-empty")
+        return self
 
 
 # ============================================================================
@@ -612,6 +637,15 @@ class OrchestratorConfig(BaseModel):
     def validate_heartbeat_vs_ttl(cls, v: int) -> int:
         """Validate heartbeat and TTL values."""
         return v
+
+    @model_validator(mode="after")
+    def validate_lease_ttl_vs_heartbeat(self) -> OrchestratorConfig:
+        """Ensure lease_ttl_seconds is greater than heartbeat_seconds."""
+        lease_ttl = self.lease_ttl_seconds
+        heartbeat = self.heartbeat_seconds
+        if lease_ttl is not None and heartbeat is not None and lease_ttl <= heartbeat:
+            raise ValueError("lease_ttl_seconds must be greater than heartbeat_seconds")
+        return self
 
 
 # ============================================================================

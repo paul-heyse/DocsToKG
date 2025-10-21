@@ -61,12 +61,8 @@ class TestCatalogConfigFileLoading:
 
     def test_load_json_config(self) -> None:
         """Load configuration from JSON file."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
-            json.dump(
-                {"connection_url": "postgresql://localhost/test", "pool_size": 20}, f
-            )
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"connection_url": "postgresql://localhost/test", "pool_size": 20}, f)
             f.flush()
 
             config = CatalogConfig("enterprise", config_file=f.name).load()
@@ -139,9 +135,7 @@ class TestCatalogConfigPrecedence:
         os.environ["CATALOG_ENTERPRISE_POOL_SIZE"] = "50"
 
         try:
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".json", delete=False
-            ) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
                 json.dump({"pool_size": 30}, f)
                 f.flush()
 
@@ -163,9 +157,7 @@ class TestCatalogConfigPrecedence:
 
     def test_config_precedence_dict_over_file(self) -> None:
         """Programmatic config overrides file."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"pool_size": 15}, f)
             f.flush()
 

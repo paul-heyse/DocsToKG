@@ -83,6 +83,7 @@ try:
         validation_boundary,
         set_latest_boundary,
     )
+
     CATALOG_AVAILABLE = True
 except ImportError:  # pragma: no cover
     CATALOG_AVAILABLE = False
@@ -149,6 +150,7 @@ try:
         close_database,
         PlanRow,
     )
+
     PLAN_CACHING_AVAILABLE = True
 except ImportError:  # pragma: no cover
     PLAN_CACHING_AVAILABLE = False
@@ -1787,18 +1789,18 @@ def _resolve_plan_with_fallback(
 # ============================================================================
 
 
-def _get_duckdb_conn(active_config: 'ResolvedConfig') -> Optional['duckdb.DuckDBPyConnection']:
+def _get_duckdb_conn(active_config: "ResolvedConfig") -> Optional["duckdb.DuckDBPyConnection"]:
     """Get or create DuckDB writer connection from config."""
     if not CATALOG_AVAILABLE or duckdb is None:
         return None
     try:
         from DocsToKG.OntologyDownload.catalog.connection import get_writer, DuckDBConfig
-        
+
         db_cfg = DuckDBConfig(
             path=active_config.defaults.db.path,
             threads=active_config.defaults.db.threads,
             readonly=False,
-            writer_lock=active_config.defaults.db.writer_lock
+            writer_lock=active_config.defaults.db.writer_lock,
         )
         return get_writer(db_cfg)
     except Exception:
@@ -1806,22 +1808,21 @@ def _get_duckdb_conn(active_config: 'ResolvedConfig') -> Optional['duckdb.DuckDB
 
 
 def _safe_record_boundary(
-    adapter: logging.LoggerAdapter,
-    boundary_name: str,
-    boundary_fn,
-    *args,
-    **kwargs
+    adapter: logging.LoggerAdapter, boundary_name: str, boundary_fn, *args, **kwargs
 ) -> Tuple[bool, Optional[Any]]:
     """Safely call a boundary context manager with error handling.
-    
+
     Returns: (success: bool, result: Any)
     """
     try:
         with boundary_fn(*args, **kwargs) as result:
-            adapter.info(f"{boundary_name} recorded in catalog", extra={
-                "stage": "catalog",
-                "boundary": boundary_name,
-            })
+            adapter.info(
+                f"{boundary_name} recorded in catalog",
+                extra={
+                    "stage": "catalog",
+                    "boundary": boundary_name,
+                },
+            )
             return True, result
     except Exception as e:
         adapter.warning(
@@ -1830,8 +1831,8 @@ def _safe_record_boundary(
                 "stage": "catalog",
                 "boundary": boundary_name,
                 "error": str(e),
-                "severity": "non-critical"
-            }
+                "severity": "non-critical",
+            },
         )
         return False, None
 
@@ -1990,10 +1991,14 @@ def fetch_one(
                         if conn is not None:
                             # Compute relative path from storage root
                             try:
-                                fs_relpath = str(destination.relative_to(STORAGE.base_path() or destination.parent))
+                                fs_relpath = str(
+                                    destination.relative_to(
+                                        STORAGE.base_path() or destination.parent
+                                    )
+                                )
                             except (ValueError, AttributeError):
                                 fs_relpath = destination.name
-                            
+
                             success, _ = _safe_record_boundary(
                                 adapter,
                                 "download",
@@ -2003,11 +2008,10 @@ def fetch_one(
                                 version_id=version,
                                 fs_relpath=fs_relpath,
                                 size=result.content_length or 0,
-                                etag=result.etag
+                                etag=result.etag,
                             )
                 except Exception as e:
                     adapter.debug(f"Skipping download boundary: {e}")
-
 
                 if expected_checksum:
                     attempt_record["expected_checksum"] = expected_checksum.to_mapping()
@@ -2080,32 +2084,43 @@ def fetch_one(
                                         app = conn.appender("extracted_files")
                                         for extracted_path in extracted_paths:
                                             try:
-                                                rel_path = extracted_path.relative_to(extraction_dir)
+                                                rel_path = extracted_path.relative_to(
+                                                    extraction_dir
+                                                )
                                             except ValueError:
                                                 rel_path = extracted_path.name
-                                            
+
                                             if extracted_path.exists():
                                                 st = extracted_path.stat()
                                                 file_id = f"{result.sha256}:{rel_path}"
-                                                app.append([
-                                                    file_id,
-                                                    result.sha256,
-                                                    version,
-                                                    str(rel_path),
-                                                    extracted_path.suffix.lower() or "unknown",
-                                                    st.st_size,
-                                                    datetime.fromtimestamp(st.st_mtime).isoformat(),
-                                                    None
-                                                ])
+                                                app.append(
+                                                    [
+                                                        file_id,
+                                                        result.sha256,
+                                                        version,
+                                                        str(rel_path),
+                                                        extracted_path.suffix.lower() or "unknown",
+                                                        st.st_size,
+                                                        datetime.fromtimestamp(
+                                                            st.st_mtime
+                                                        ).isoformat(),
+                                                        None,
+                                                    ]
+                                                )
                                                 ex_result.files_inserted += 1
                                                 ex_result.total_size += st.st_size
-                                        
+
                                         app.close()
-                                        ex_result.audit_path = extraction_dir / "extraction_audit.json"
-                                        adapter.info("extraction recorded in catalog", extra={
-                                            "stage": "catalog",
-                                            "files": ex_result.files_inserted
-                                        })
+                                        ex_result.audit_path = (
+                                            extraction_dir / "extraction_audit.json"
+                                        )
+                                        adapter.info(
+                                            "extraction recorded in catalog",
+                                            extra={
+                                                "stage": "catalog",
+                                                "files": ex_result.files_inserted,
+                                            },
+                                        )
                         except Exception as e:
                             adapter.debug(f"Skipping extraction boundary: {e}")
 
@@ -2132,18 +2147,26 @@ def fetch_one(
                         conn = _get_duckdb_conn(active_config)
                         if conn is not None:
                             # Record validations for each extracted file and validator
-                            files_for_validation = extracted_paths if (extraction_dir and extraction_dir.exists()) else [destination]
+                            files_for_validation = (
+                                extracted_paths
+                                if (extraction_dir and extraction_dir.exists())
+                                else [destination]
+                            )
                             for extracted_path in files_for_validation:
                                 try:
                                     file_id = f"{result.sha256}:{extracted_path.relative_to(extraction_dir) if extraction_dir else extracted_path.name}"
                                 except (ValueError, AttributeError):
                                     file_id = f"{result.sha256}:{extracted_path.name}"
-                                
+
                                 for validator_name, validation_result in validation_results.items():
                                     try:
-                                        status = "pass" if getattr(validation_result, "ok", False) else "fail"
+                                        status = (
+                                            "pass"
+                                            if getattr(validation_result, "ok", False)
+                                            else "fail"
+                                        )
                                         details = getattr(validation_result, "details", None)
-                                        
+
                                         success, _ = _safe_record_boundary(
                                             adapter,
                                             f"validation({validator_name})",
@@ -2152,10 +2175,12 @@ def fetch_one(
                                             file_id=file_id,
                                             validator=validator_name,
                                             status=status,
-                                            details=details if isinstance(details, dict) else None
+                                            details=details if isinstance(details, dict) else None,
                                         )
                                     except Exception as e:
-                                        adapter.debug(f"Skipping validation boundary for {validator_name}: {e}")
+                                        adapter.debug(
+                                            f"Skipping validation boundary for {validator_name}: {e}"
+                                        )
                 except Exception as e:
                     adapter.debug(f"Skipping validation boundary: {e}")
 
@@ -2293,7 +2318,7 @@ def fetch_one(
                             latest_json_path = base_dir.parent / "LATEST.json"
                             latest_temp_path = latest_json_path.with_suffix(".json.tmp")
                             latest_temp_path.parent.mkdir(parents=True, exist_ok=True)
-                            
+
                             latest_data = {
                                 "version": version,
                                 "downloaded_at": datetime.now(timezone.utc).isoformat(),
@@ -2301,17 +2326,17 @@ def fetch_one(
                                 "resolver": effective_spec.resolver,
                                 "correlation_id": correlation,
                             }
-                            
+
                             with open(latest_temp_path, "w") as f:
                                 json.dump(latest_data, f, indent=2)
-                            
+
                             success, _ = _safe_record_boundary(
                                 adapter,
                                 "set_latest",
                                 set_latest_boundary,
                                 conn,
                                 version_id=version,
-                                latest_json_path=latest_json_path
+                                latest_json_path=latest_json_path,
                             )
                 except Exception as e:
                     adapter.debug(f"Skipping set_latest boundary: {e}")
@@ -2413,6 +2438,337 @@ def fetch_one(
     raise OntologyDownloadError(f"Download failed for '{spec.id}': {last_error}") from last_error
 
 
+def _planned_fetch_to_dict(planned: PlannedFetch) -> Dict[str, Any]:
+    """Convert a PlannedFetch to a dictionary for database storage.
+
+    Args:
+        planned: PlannedFetch object to serialize.
+
+    Returns:
+        Dictionary representation suitable for JSON serialization.
+    """
+    return {
+        "spec": {
+            "id": planned.spec.id,
+            "resolver": planned.spec.resolver,
+            "extras": planned.spec.extras,
+            "target_formats": list(planned.spec.target_formats)
+            if planned.spec.target_formats
+            else [],
+        },
+        "resolver": planned.resolver,
+        "plan": {
+            "url": planned.plan.url,
+            "headers": dict(planned.plan.headers),
+            "filename_hint": planned.plan.filename_hint,
+            "version": planned.plan.version,
+            "license": planned.plan.license,
+            "media_type": planned.plan.media_type,
+            "content_length": planned.plan.content_length,
+            "last_modified": planned.plan.last_modified,
+        },
+        "candidates": [
+            {
+                "resolver": c.resolver,
+                "plan": {
+                    "url": c.plan.url,
+                    "headers": dict(c.plan.headers),
+                    "filename_hint": c.plan.filename_hint,
+                    "version": c.plan.version,
+                    "license": c.plan.license,
+                    "media_type": c.plan.media_type,
+                    "content_length": c.plan.content_length,
+                    "last_modified": c.plan.last_modified,
+                },
+            }
+            for c in planned.candidates
+        ],
+        "metadata": planned.metadata or {},
+        "last_modified": planned.last_modified,
+        "size": planned.size,
+    }
+
+
+def _dict_to_planned_fetch(data: Dict[str, Any], spec: FetchSpec) -> Optional[PlannedFetch]:
+    """Reconstruct a PlannedFetch from a stored dictionary.
+
+    Args:
+        data: Dictionary loaded from database.
+        spec: Original FetchSpec for reference.
+
+    Returns:
+        PlannedFetch if reconstruction succeeds, else None.
+    """
+    try:
+        if not isinstance(data, dict):
+            return None
+
+        plan_data = data.get("plan", {})
+        primary_plan = FetchPlan(
+            url=plan_data.get("url", ""),
+            headers=dict(plan_data.get("headers", {})),
+            filename_hint=plan_data.get("filename_hint", ""),
+            version=plan_data.get("version"),
+            license=plan_data.get("license"),
+            media_type=plan_data.get("media_type"),
+            content_length=plan_data.get("content_length"),
+            last_modified=plan_data.get("last_modified"),
+        )
+
+        candidates = []
+        for c_data in data.get("candidates", []):
+            c_plan_data = c_data.get("plan", {})
+            c_plan = FetchPlan(
+                url=c_plan_data.get("url", ""),
+                headers=dict(c_plan_data.get("headers", {})),
+                filename_hint=c_plan_data.get("filename_hint", ""),
+                version=c_plan_data.get("version"),
+                license=c_plan_data.get("license"),
+                media_type=c_plan_data.get("media_type"),
+                content_length=c_plan_data.get("content_length"),
+                last_modified=c_plan_data.get("last_modified"),
+            )
+            candidates.append(ResolverCandidate(resolver=c_data.get("resolver", ""), plan=c_plan))
+
+        return PlannedFetch(
+            spec=spec,
+            resolver=data.get("resolver", ""),
+            plan=primary_plan,
+            candidates=tuple(candidates),
+            metadata=data.get("metadata", {}),
+            last_modified=data.get("last_modified"),
+            size=data.get("size"),
+        )
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return None
+
+
+def _get_cached_plan(spec: FetchSpec, use_cache: bool = True) -> Optional[PlannedFetch]:
+    """Retrieve a cached plan for an ontology specification from the database.
+
+    Args:
+        spec: FetchSpec to look up.
+        use_cache: If False, always return None (skip cache lookup).
+
+    Returns:
+        Cached PlannedFetch if available and use_cache is True, else None.
+    """
+    if not use_cache or not PLAN_CACHING_AVAILABLE or not get_database:
+        return None
+
+    try:
+        db = get_database()
+        plan_row = db.get_current_plan(spec.id)
+        if plan_row and plan_row.plan_json:
+            plan_data = (
+                json.loads(plan_row.plan_json)
+                if isinstance(plan_row.plan_json, str)
+                else plan_row.plan_json
+            )
+            planned = _dict_to_planned_fetch(plan_data, spec)
+            if planned:
+                logger.debug(
+                    f"Using cached plan for '{spec.id}' from database",
+                    extra={"ontology_id": spec.id, "cached_at": plan_row.cached_at},
+                )
+                return planned
+    except Exception as exc:  # pragma: no cover
+        logger.warning(
+            f"Failed to retrieve cached plan for '{spec.id}': {exc}",
+            extra={"ontology_id": spec.id, "error": str(exc)},
+        )
+    finally:
+        if PLAN_CACHING_AVAILABLE and close_database:
+            close_database()
+
+    return None
+
+
+def _save_plan_to_db(spec: FetchSpec, planned: PlannedFetch) -> bool:
+    """Save a PlannedFetch to the database for future caching.
+
+    Args:
+        spec: FetchSpec for the ontology.
+        planned: PlannedFetch to cache.
+
+    Returns:
+        True if save succeeds, False otherwise.
+    """
+    if not PLAN_CACHING_AVAILABLE or not get_database:
+        return False
+
+    try:
+        db = get_database()
+        plan_dict = _planned_fetch_to_dict(planned)
+        db.upsert_plan(
+            ontology_id=spec.id,
+            resolver=planned.resolver,
+            plan_json=plan_dict,
+            is_current=True,
+        )
+        logger.debug(
+            f"Saved plan for '{spec.id}' to database",
+            extra={"ontology_id": spec.id},
+        )
+        return True
+    except Exception as exc:  # pragma: no cover
+        logger.warning(
+            f"Failed to save plan for '{spec.id}' to database: {exc}",
+            extra={"ontology_id": spec.id, "error": str(exc)},
+        )
+        return False
+    finally:
+        if PLAN_CACHING_AVAILABLE and close_database:
+            close_database()
+
+
+def _compare_plans(
+    older_plan: Optional[PlannedFetch],
+    newer_plan: PlannedFetch,
+) -> Dict[str, Any]:
+    """Compare two plan versions and return a diff.
+
+    Args:
+        older_plan: Previous plan (can be None if this is the first plan).
+        newer_plan: Current plan.
+
+    Returns:
+        Dictionary containing diff statistics and details.
+    """
+    diff = {
+        "older": older_plan is not None,
+        "added": [],
+        "removed": [],
+        "modified": [],
+        "unchanged": 0,
+    }
+
+    if older_plan is None:
+        diff["added"].append(
+            {
+                "resolver": newer_plan.resolver,
+                "url": newer_plan.plan.url,
+                "version": newer_plan.plan.version,
+            }
+        )
+        return diff
+
+    # Compare primary resolver and URL
+    if older_plan.resolver != newer_plan.resolver:
+        diff["modified"].append(
+            {
+                "field": "resolver",
+                "old": older_plan.resolver,
+                "new": newer_plan.resolver,
+            }
+        )
+
+    if older_plan.plan.url != newer_plan.plan.url:
+        diff["modified"].append(
+            {
+                "field": "url",
+                "old": older_plan.plan.url,
+                "new": newer_plan.plan.url,
+            }
+        )
+
+    if older_plan.plan.version != newer_plan.plan.version:
+        diff["modified"].append(
+            {
+                "field": "version",
+                "old": older_plan.plan.version,
+                "new": newer_plan.plan.version,
+            }
+        )
+
+    if older_plan.plan.license != newer_plan.plan.license:
+        diff["modified"].append(
+            {
+                "field": "license",
+                "old": older_plan.plan.license,
+                "new": newer_plan.plan.license,
+            }
+        )
+
+    if older_plan.plan.media_type != newer_plan.plan.media_type:
+        diff["modified"].append(
+            {
+                "field": "media_type",
+                "old": older_plan.plan.media_type,
+                "new": newer_plan.plan.media_type,
+            }
+        )
+
+    if older_plan.size != newer_plan.size:
+        diff["modified"].append(
+            {
+                "field": "size_bytes",
+                "old": older_plan.size,
+                "new": newer_plan.size,
+            }
+        )
+
+    # If no differences, mark as unchanged
+    if not diff["modified"]:
+        diff["unchanged"] = 1
+
+    return diff
+
+
+def _save_plan_diff_to_db(
+    ontology_id: str,
+    older_plan: Optional[PlannedFetch],
+    newer_plan: PlannedFetch,
+) -> bool:
+    """Save a plan diff to the database for historical comparison.
+
+    Args:
+        ontology_id: ID of the ontology.
+        older_plan: Previous plan (can be None).
+        newer_plan: Current plan.
+
+    Returns:
+        True if save succeeds, False otherwise.
+    """
+    if not PLAN_CACHING_AVAILABLE or not get_database:
+        return False
+
+    try:
+        db = get_database()
+        diff_data = _compare_plans(older_plan, newer_plan)
+
+        # Only save if there are actual changes
+        if diff_data.get("modified") or diff_data.get("added") or diff_data.get("removed"):
+            db.insert_plan_diff(
+                ontology_id=ontology_id,
+                older_plan_id=None,  # TODO: implement versioning for older plans
+                newer_plan_id=None,  # TODO: implement versioning for newer plans
+                added_count=len(diff_data.get("added", [])),
+                removed_count=len(diff_data.get("removed", [])),
+                modified_count=len(diff_data.get("modified", [])),
+                diff_json=diff_data,
+            )
+            logger.debug(
+                f"Saved plan diff for '{ontology_id}' to database",
+                extra={
+                    "ontology_id": ontology_id,
+                    "modified_count": len(diff_data.get("modified", [])),
+                },
+            )
+            return True
+    except Exception as exc:  # pragma: no cover
+        logger.warning(
+            f"Failed to save plan diff for '{ontology_id}' to database: {exc}",
+            extra={"ontology_id": ontology_id, "error": str(exc)},
+        )
+        return False
+    finally:
+        if PLAN_CACHING_AVAILABLE and close_database:
+            close_database()
+
+    return False
+
+
 def plan_one(
     spec: FetchSpec,
     *,
@@ -2420,6 +2776,7 @@ def plan_one(
     correlation_id: Optional[str] = None,
     logger: Optional[logging.Logger] = None,
     cancellation_token: Optional[CancellationToken] = None,
+    use_cache: bool = True,
 ) -> PlannedFetch:
     """Return a resolver plan for a single ontology without performing downloads.
 
@@ -2429,6 +2786,7 @@ def plan_one(
         correlation_id: Correlation identifier reused for logging context.
         logger: Logger instance used to emit resolver telemetry.
         cancellation_token: Optional token for cooperative cancellation.
+        use_cache: If True, attempt to retrieve cached plan from database.
 
     Returns:
         PlannedFetch containing the normalized spec, resolver name, and plan.
@@ -2451,6 +2809,20 @@ def plan_one(
         log, extra={"correlation_id": correlation, "ontology_id": spec.id}
     )
     adapter.info("planning fetch", extra={"stage": "plan"})
+
+    # Attempt to retrieve cached plan from database
+    if use_cache:
+        cached_plan = _get_cached_plan(spec, use_cache=True)
+        if cached_plan is not None:
+            adapter.info(
+                "using cached plan from database",
+                extra={
+                    "stage": "plan",
+                    "cached": True,
+                    "resolver": cached_plan.resolver,
+                },
+            )
+            return cached_plan
 
     primary, candidates = _resolve_plan_with_fallback(
         spec, active_config, adapter, cancellation_token=cancellation_token
@@ -2478,7 +2850,13 @@ def plan_one(
     )
     if expected_checksum:
         planned.metadata["expected_checksum"] = expected_checksum.to_mapping()
-    return _populate_plan_metadata(planned, active_config, adapter)
+    final_planned = _populate_plan_metadata(planned, active_config, adapter)
+
+    # Save plan to database for future caching
+    if use_cache:
+        _save_plan_to_db(spec, final_planned)
+
+    return final_planned
 
 
 def plan_all(
@@ -2489,6 +2867,7 @@ def plan_all(
     since: Optional[datetime] = None,
     total: Optional[int] = None,
     cancellation_token_group: Optional[CancellationTokenGroup] = None,
+    use_cache: bool = True,
 ) -> List[PlannedFetch]:
     """Return resolver plans for a collection of ontologies.
 
@@ -2500,6 +2879,7 @@ def plan_all(
         total: Optional total number of specifications, used for progress metadata when
             the iterable cannot be sized cheaply.
         cancellation_token_group: Optional group of cancellation tokens for cooperative cancellation.
+        use_cache: If True, attempt to use cached plans from database for each spec.
 
     Returns:
         List of PlannedFetch entries describing each ontology plan.
@@ -2566,6 +2946,7 @@ def plan_all(
             correlation_id=correlation,
             logger=log,
             cancellation_token=token,
+            use_cache=use_cache,
         )
         futures[future] = (index, spec)
         if token is not None:

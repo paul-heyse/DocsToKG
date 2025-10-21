@@ -223,6 +223,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Enable or disable planner metadata HTTP probes (default: enabled).",
     )
+    plan_cmd.add_argument(
+        "--use-cache",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Use cached plans from database when available (default: enabled). Set --no-use-cache to disable.",
+    )
     plan_cmd.add_argument("--json", action="store_true", help="Emit plan details as JSON")
     plan_cmd.add_argument(
         "--lock-output",
@@ -255,22 +261,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Only include ontologies modified on or after YYYY-MM-DD",
     )
     plan_diff.add_argument(
-        "--baseline",
-        type=Path,
-        default=DEFAULT_PLAN_BASELINE,
-        help=f"Baseline plan JSON file (default: {DEFAULT_PLAN_BASELINE})",
-    )
-    plan_diff.add_argument(
-        "--update-baseline",
-        action="store_true",
-        help="Write the current plan to the baseline file after computing the diff",
-    )
-    plan_diff.add_argument(
-        "--use-manifest",
-        action="store_true",
-        help="Compare planned metadata against the latest stored manifests",
-    )
-    plan_diff.add_argument(
         "--concurrent-plans",
         type=_parse_positive_int,
         help="Override maximum concurrent resolver planning workers",
@@ -290,6 +280,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=None,
         help="Enable or disable planner metadata HTTP probes (default: enabled).",
+    )
+    plan_diff.add_argument(
+        "--use-cache",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Use cached plans from database when available (default: enabled). Set --no-use-cache to disable.",
     )
     plan_diff.add_argument("--json", action="store_true", help="Emit plan diff as JSON")
     plan_diff.add_argument(
@@ -895,7 +891,8 @@ def _handle_plan(
 
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config)
-    plans = plan_all(specs, config=config, since=since, logger=logger)
+    use_cache = getattr(args, "use_cache", True)
+    plans = plan_all(specs, config=config, since=since, logger=logger, use_cache=use_cache)
     if not getattr(args, "no_lock", False):
         lock_path = getattr(args, "lock_output", DEFAULT_LOCKFILE_PATH)
         write_lockfile(plans, lock_path)
@@ -907,6 +904,7 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
 
     use_manifest = bool(getattr(args, "use_manifest", False))
     update_baseline = bool(getattr(args, "update_baseline", False))
+    use_cache = getattr(args, "use_cache", True)
     if use_manifest:
         baseline_payload: List[dict] = []
         baseline_path = None
@@ -927,7 +925,7 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
 
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config, allow_empty=True)
-    plans = plan_all(specs, config=config, since=since)
+    plans = plan_all(specs, config=config, since=since, use_cache=use_cache)
     current_payload = [plan_to_dict(plan) for plan in plans]
     lock_written: Optional[str] = None
     if not getattr(args, "no_lock", False):

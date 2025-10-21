@@ -51,10 +51,10 @@ def show(
     ),
 ) -> None:
     """Display effective configuration with source attribution.
-    
+
     Shows all settings with their current values and sources (cli, env, config, default).
     By default, redacts sensitive values for security.
-    
+
     Example:
         $ ontofetch settings show
         $ ontofetch settings show --format json
@@ -63,10 +63,10 @@ def show(
     try:
         settings = get_default_config()
         fingerprint = get_source_fingerprint()
-        
+
         # Build output data
         output_data = []
-        
+
         for domain_name in [
             "http",
             "cache",
@@ -81,11 +81,11 @@ def show(
         ]:
             domain_model = getattr(settings, domain_name)
             domain_dict = domain_model.model_dump()
-            
+
             for field_name, value in domain_dict.items():
                 full_field_name = f"{domain_name}__{field_name}"
                 source = fingerprint.get(full_field_name, "default")
-                
+
                 # Redact sensitive fields
                 display_value = value
                 if not no_redact and any(
@@ -93,20 +93,23 @@ def show(
                     for sensitive in ["password", "token", "key", "secret", "auth"]
                 ):
                     display_value = "***REDACTED***"
-                
-                output_data.append({
-                    "field": full_field_name,
-                    "value": display_value,
-                    "source": source,
-                    "type": type(value).__name__,
-                })
-        
+
+                output_data.append(
+                    {
+                        "field": full_field_name,
+                        "value": display_value,
+                        "source": source,
+                        "type": type(value).__name__,
+                    }
+                )
+
         # Format output
         if format_output == "json":
             typer.echo(json.dumps(output_data, indent=2, default=str))
         elif format_output == "yaml":
             try:
                 import yaml
+
                 typer.echo(yaml.dump(output_data, default_flow_style=False))
             except ImportError:
                 typer.echo(
@@ -118,14 +121,14 @@ def show(
             try:
                 from rich.table import Table
                 from rich.console import Console
-                
+
                 console = Console()
                 table = Table(title="OntologyDownloadSettings - Effective Configuration")
                 table.add_column("Field", style="cyan")
                 table.add_column("Value", style="green")
                 table.add_column("Source", style="yellow")
                 table.add_column("Type", style="magenta")
-                
+
                 for item in output_data:
                     table.add_row(
                         item["field"],
@@ -133,7 +136,7 @@ def show(
                         item["source"],
                         item["type"],
                     )
-                
+
                 console.print(table)
             except ImportError:
                 typer.echo(
@@ -141,7 +144,7 @@ def show(
                     err=True,
                 )
                 raise typer.Exit(2)
-                
+
     except Exception as e:
         typer.echo(f"Error displaying settings: {e}", err=True)
         raise typer.Exit(1)
@@ -163,13 +166,13 @@ def schema(
     ),
 ) -> None:
     """Generate JSON schemas for settings.
-    
+
     Creates:
     - settings.schema.json (top-level OntologyDownloadSettings)
     - settings.{domain}.subschema.json (for each of 10 domain models)
-    
+
     Schemas are deterministic (sorted keys) and suitable for CI drift detection.
-    
+
     Example:
         $ ontofetch settings schema
         $ ontofetch settings schema --out /tmp/schemas/
@@ -179,19 +182,20 @@ def schema(
         if out is None:
             # Use default docs/schemas/
             import os
+
             cwd = Path.cwd()
             out = cwd / "docs" / "schemas"
         else:
             out = out.resolve()
-        
+
         # Write schemas
         schema_dir, count = write_schemas_to_disk(out)
-        
+
         typer.echo(
             f"✅ Generated {count} schema files in {schema_dir}",
             err=False,
         )
-        
+
         # Show summary
         summary = get_schema_summary()
         typer.echo(
@@ -206,7 +210,7 @@ def schema(
             f"   • Total properties: {summary['total_properties']}",
             err=False,
         )
-        
+
     except Exception as e:
         typer.echo(f"Error generating schemas: {e}", err=True)
         raise typer.Exit(1)
@@ -226,25 +230,25 @@ def validate(
     ),
 ) -> None:
     """Validate configuration file against schema.
-    
+
     Loads YAML or JSON config file and validates it against
     the OntologyDownloadSettings JSON schema. Provides detailed
     error messages if validation fails.
-    
+
     Example:
         $ ontofetch settings validate config.yaml
         $ ontofetch settings validate /etc/ontofetch/settings.json --format json
     """
     try:
         config_path = file.resolve()
-        
+
         if not config_path.exists():
             typer.echo(f"Error: File not found: {config_path}", err=True)
             raise typer.Exit(3)
-        
+
         # Validate
         is_valid, errors = validate_config_file(config_path)
-        
+
         if is_valid:
             if format_output == "json":
                 typer.echo(
@@ -273,7 +277,7 @@ def validate(
                 for error in errors:
                     typer.echo(f"   • {error}", err=True)
             raise typer.Exit(2)
-            
+
     except typer.Exit:
         raise
     except Exception as e:

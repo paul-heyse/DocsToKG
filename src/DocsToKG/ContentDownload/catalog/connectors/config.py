@@ -143,11 +143,10 @@ class CatalogConfig:
             if config_path.suffix in [".yaml", ".yml"]:
                 try:
                     import yaml  # type: ignore[import-untyped]
+
                     return yaml.safe_load(content) or {}
                 except ImportError:
-                    logger.error(
-                        "PyYAML not installed. Install with: pip install pyyaml"
-                    )
+                    logger.error("PyYAML not installed. Install with: pip install pyyaml")
                     raise
 
             logger.warning(f"Unsupported config file format: {config_path.suffix}")
@@ -231,9 +230,7 @@ class CatalogConfig:
         # Connection URL should be PostgreSQL
         conn_url = self._config.get("connection_url", "")
         if conn_url and not conn_url.startswith("postgresql://"):
-            logger.warning(
-                f"Connection URL does not appear to be PostgreSQL: {conn_url[:30]}..."
-            )
+            logger.warning(f"Connection URL does not appear to be PostgreSQL: {conn_url[:30]}...")
 
     def _validate_enterprise(self) -> None:
         """Validate enterprise provider configuration."""
@@ -242,9 +239,7 @@ class CatalogConfig:
         if conn_url and not (
             conn_url.startswith("postgresql://") or conn_url.startswith("postgres://")
         ):
-            logger.warning(
-                f"Connection URL does not appear to be PostgreSQL: {conn_url[:30]}..."
-            )
+            logger.warning(f"Connection URL does not appear to be PostgreSQL: {conn_url[:30]}...")
 
         # Pool size should be reasonable
         pool_size = self._config.get("pool_size", 10)
