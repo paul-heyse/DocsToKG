@@ -62,6 +62,7 @@ ReasonCode = Literal[
     "too-large",
     "unexpected-ct",
     "size-mismatch",
+    "download-error",
 ]
 
 

@@ -99,7 +99,7 @@ def stream_candidate_payload(
     """
     if not session:
         raise DownloadError(
-            "conn-error",  # type: ignore
+            "conn-error",
             "No HTTP session provided",
         )
 
@@ -115,13 +115,13 @@ def stream_candidate_payload(
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
-            status="http-head",  # type: ignore
+            status="http-head",
             http_status=head.status_code,
             elapsed_ms=elapsed_ms,
         )
     except Exception as e:  # pylint: disable=broad-except
         raise DownloadError(
-            "conn-error",  # type: ignore
+            "conn-error",
             f"HEAD request failed: {e}",
         ) from e
 
@@ -137,21 +137,21 @@ def stream_candidate_payload(
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
-            status="http-get",  # type: ignore
+            status="http-get",
             http_status=resp.status_code,
             content_type=content_type,
             elapsed_ms=elapsed_ms,
         )
     except Exception as e:  # pylint: disable=broad-except
         raise DownloadError(
-            "conn-error",  # type: ignore
+            "conn-error",
             f"GET request failed: {e}",
         ) from e
 
     # Validate content-type if expected
     if plan.expected_mime and not content_type.startswith(plan.expected_mime):
         raise SkipDownload(
-            "unexpected-ct",  # type: ignore
+            "unexpected-ct",
             f"Expected {plan.expected_mime}, got {content_type}",
         )
 
@@ -172,7 +172,7 @@ def stream_candidate_payload(
                 # Check size limit
                 if max_bytes and bytes_written > max_bytes:
                     raise DownloadError(
-                        "too-large",  # type: ignore
+                        "too-large",
                         f"Payload exceeded {max_bytes} bytes",
                     )
 
@@ -181,7 +181,7 @@ def stream_candidate_payload(
         raise
     except Exception as e:  # pylint: disable=broad-except
         raise DownloadError(
-            "download-error",  # type: ignore
+            "download-error",
             f"Write to temp file failed: {e}",
         ) from e
 
@@ -191,7 +191,7 @@ def stream_candidate_payload(
         run_id=run_id,
         resolver_name=plan.resolver_name,
         url=url,
-        status="http-200",  # type: ignore
+        status="http-200",
         http_status=resp.status_code,
         bytes_written=bytes_written,
         content_type=content_type,
@@ -237,7 +237,7 @@ def finalize_candidate_download(
         os.replace(stream.path_tmp, final_path)
     except Exception as e:  # pylint: disable=broad-except
         raise DownloadError(
-            "download-error",  # type: ignore
+            "download-error",
             f"Failed to finalize: {e}",
         ) from e
 
@@ -246,7 +246,7 @@ def finalize_candidate_download(
         telemetry,
         run_id=run_id,
         resolver_name=plan.resolver_name,
-        status="http-200",  # type: ignore
+        status="http-200",
         bytes_written=stream.bytes_written,
         final_path=final_path,
     )
