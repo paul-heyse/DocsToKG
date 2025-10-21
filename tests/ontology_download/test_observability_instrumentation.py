@@ -50,7 +50,9 @@ from DocsToKG.OntologyDownload.catalog.observability_instrumentation import (
 @pytest.fixture
 def mock_emit():
     """Mock the emit_event function."""
-    with patch("DocsToKG.OntologyDownload.catalog.observability_instrumentation.emit_event") as mock:
+    with patch(
+        "DocsToKG.OntologyDownload.catalog.observability_instrumentation.emit_event"
+    ) as mock:
         yield mock
 
 
@@ -343,4 +345,3 @@ class TestEventIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

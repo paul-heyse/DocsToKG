@@ -7,8 +7,10 @@ Tests the full stack for:
 - Bootstrap orchestration
 """
 
+import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -240,11 +242,20 @@ class TestPerResolverHttpClient(unittest.TestCase):
 class TestBootstrapOrchestration(unittest.TestCase):
     """Test bootstrap orchestration."""
 
+    def setUp(self):
+        """Create temporary directory for telemetry paths."""
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_path = Path(self.temp_dir.name)
+
+    def tearDown(self):
+        """Cleanup temporary directory."""
+        self.temp_dir.cleanup()
+
     def test_bootstrap_with_no_artifacts(self):
         """Bootstrap validates wiring without artifacts."""
         config = BootstrapConfig(
             http=HttpConfig(),
-            telemetry_paths=None,
+            telemetry_paths={"csv": self.temp_path / "attempts.csv"},
             resolver_registry={},
         )
 
@@ -258,7 +269,7 @@ class TestBootstrapOrchestration(unittest.TestCase):
         """Bootstrap generates run_id if not provided."""
         config = BootstrapConfig(
             http=HttpConfig(),
-            telemetry_paths=None,
+            telemetry_paths={"csv": self.temp_path / "attempts.csv"},
             resolver_registry={},
         )
 
@@ -271,7 +282,7 @@ class TestBootstrapOrchestration(unittest.TestCase):
         """Bootstrap generates unique run_id each time."""
         config = BootstrapConfig(
             http=HttpConfig(),
-            telemetry_paths=None,
+            telemetry_paths={"csv": self.temp_path / "attempts.csv"},
             resolver_registry={},
         )
 
@@ -294,7 +305,7 @@ class TestBootstrapOrchestration(unittest.TestCase):
 
         config = BootstrapConfig(
             http=HttpConfig(),
-            telemetry_paths=None,
+            telemetry_paths={"csv": self.temp_path / "attempts.csv"},
             resolver_registry={"test": mock_resolver},
         )
 
