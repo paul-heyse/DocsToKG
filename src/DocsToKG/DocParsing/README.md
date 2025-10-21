@@ -240,7 +240,7 @@ sequenceDiagram
   }
   ```
 - Resume contract: [`core.manifest.ResumeController`](core/manifest.py) compares `status` and `input_hash` to decide whether to skip work, so metadata fields supplied by `StageTelemetry` (for example, `vector_format` in embedding runs) must stay in sync with their corresponding writers.
-- `telemetry.StageTelemetry` writes through a shared `FileLock` helper (wrapping [`core.concurrency.acquire_lock`](core/concurrency.py)) before appending JSON lines, guaranteeing atomic writes even with concurrent processes.
+- `telemetry.StageTelemetry` writes through a lock-aware writer (default `DEFAULT_JSONL_WRITER` from `io.py`) before appending JSON lines, guaranteeing atomic writes even with concurrent processes.
 
 ## Interactions with other packages
 - Upstream: consumes raw documents, optional DocTags produced by external systems.
@@ -285,7 +285,7 @@ direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # optional
 - Danger zone:
   - `rm -rf Data/DocTagsFiles` or manually editing manifests may break resume; use CLI `--force` and allow pipeline to rebuild artifacts.
   - Embedding vectors use Parquet exclusively; no format selection needed.
-  - Terminating vLLM/Qwen worker processes manually can leave stale lock files; use CLI cancel/resume flags to let the shared `FileLock` helper (via `concurrency.acquire_lock`) release resources cleanly.
+  - Terminating vLLM/Qwen worker processes manually can leave stale lock files; use CLI cancel/resume flags to let the manifest writer release resources cleanly.
 
 ## FAQ
 - Q: How do I resume after a failure?
