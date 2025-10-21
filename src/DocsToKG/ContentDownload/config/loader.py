@@ -63,7 +63,7 @@ def _read_file(path: str) -> Dict[str, Any]:
     if suffix in (".yaml", ".yml"):
         if yaml is None:
             raise RuntimeError(
-                "YAML config requested but PyYAML not installed. " "Install: pip install pyyaml"
+                "YAML config requested but PyYAML not installed. Install: pip install pyyaml"
             )
         try:
             return yaml.safe_load(text) or {}

@@ -23,6 +23,8 @@ from typing import TYPE_CHECKING, Iterable, Mapping
 import httpx
 
 from DocsToKG.ContentDownload.networking import BreakerOpenError
+from DocsToKG.ContentDownload.robots import RobotsCache
+from DocsToKG.ContentDownload.telemetry_helpers import emit_http_event
 
 from .base import (
     BeautifulSoup,
@@ -46,9 +48,14 @@ LOGGER = logging.getLogger(__name__)
 
 
 class LandingPageResolver(RegisteredResolver):
-    """Attempt to scrape landing pages when explicit PDFs are unavailable."""
+    """Attempt to scrape landing pages for PDF links when metadata fails."""
 
     name = "landing_page"
+    
+    def __init__(self) -> None:
+        """Initialize resolver with robots cache."""
+        super().__init__()
+        self._robots_cache = RobotsCache(ttl_sec=3600)
 
     def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
         """Return ``True`` when landing page URLs are available to scrape.
@@ -85,7 +92,34 @@ class LandingPageResolver(RegisteredResolver):
                 event_reason=ResolverEventReason.NO_BEAUTIFULSOUP,
             )
             return
+        
+        # Get robots configuration from pipeline (default: enabled)
+        robots_enabled = True
+        if hasattr(config, "extra") and isinstance(config.extra, Mapping):
+            robots_enabled = config.extra.get("robots_enabled", True)
+        
+        # Get user-agent for robots check
+        user_agent = "DocsToKG/ContentDownload"
+        if config.polite_headers and isinstance(config.polite_headers, Mapping):
+            user_agent = config.polite_headers.get("User-Agent", user_agent)
+        
         for landing in artifact.landing_urls:
+            # Phase 3: Check robots.txt before landing page fetch (if enabled)
+            if robots_enabled:
+                try:
+                    allowed = self._robots_cache.is_allowed(client, landing, user_agent)
+                    if not allowed:
+                        yield ResolverResult(
+                            url=None,
+                            event=ResolverEvent.SKIPPED,
+                            event_reason=ResolverEventReason.ROBOTS_DISALLOWED,
+                            metadata={"landing": landing},
+                        )
+                        continue
+                except Exception:
+                    # Fail-open: if robots check fails, continue anyway
+                    pass
+            
             try:
                 resp = request_with_retries(
                     client,

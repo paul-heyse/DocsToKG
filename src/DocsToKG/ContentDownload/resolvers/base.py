@@ -247,6 +247,7 @@ class ResolverEventReason(Enum):
     RESOLVER_EXCEPTION = "resolver-exception"
     RATE_LIMIT = "rate-limit"
     BREAKER_OPEN = "breaker-open"
+    ROBOTS_DISALLOWED = "robots-disallowed"
     NOT_APPLICABLE = "not-applicable"
 
     @classmethod

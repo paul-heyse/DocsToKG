@@ -291,6 +291,24 @@ def doctags(
     policy: Annotated[
         Optional[str], typer.Option("--policy", help="Execution policy (io|cpu|gpu)")
     ] = None,
+    retries: Annotated[
+        Optional[int], typer.Option("--retries", help="Max retries per failed item")
+    ] = None,
+    retry_backoff_s: Annotated[
+        Optional[float],
+        typer.Option("--retry-backoff-s", help="Retry backoff in seconds (exponential)"),
+    ] = None,
+    timeout_s: Annotated[
+        Optional[float],
+        typer.Option("--timeout-s", help="Per-item timeout in seconds (0=unlimited)"),
+    ] = None,
+    error_budget: Annotated[
+        Optional[int], typer.Option("--error-budget", help="Max errors before stop (0=unlimited)")
+    ] = None,
+    max_queue: Annotated[
+        Optional[int],
+        typer.Option("--max-queue", help="Max queued items for backpressure (0=unlimited)"),
+    ] = None,
 ) -> None:
     """
     Convert PDF/HTML documents to DocTags.
@@ -320,6 +338,16 @@ def doctags(
             app_ctx.settings.runner.workers = workers
         if policy:
             app_ctx.settings.runner.policy = policy
+        if retries:
+            app_ctx.settings.runner.retries = retries
+        if retry_backoff_s:
+            app_ctx.settings.runner.retry_backoff_s = retry_backoff_s
+        if timeout_s:
+            app_ctx.settings.runner.timeout_s = timeout_s
+        if error_budget:
+            app_ctx.settings.runner.error_budget = error_budget
+        if max_queue:
+            app_ctx.settings.runner.max_queue = max_queue
 
         # Determine effective mode for routing
         effective_mode = mode or (
@@ -383,6 +411,24 @@ def chunk(
     policy: Annotated[
         Optional[str], typer.Option("--policy", help="Execution policy (io|cpu|gpu)")
     ] = None,
+    retries: Annotated[
+        Optional[int], typer.Option("--retries", help="Max retries per failed item")
+    ] = None,
+    retry_backoff_s: Annotated[
+        Optional[float],
+        typer.Option("--retry-backoff-s", help="Retry backoff in seconds (exponential)"),
+    ] = None,
+    timeout_s: Annotated[
+        Optional[float],
+        typer.Option("--timeout-s", help="Per-item timeout in seconds (0=unlimited)"),
+    ] = None,
+    error_budget: Annotated[
+        Optional[int], typer.Option("--error-budget", help="Max errors before stop (0=unlimited)")
+    ] = None,
+    max_queue: Annotated[
+        Optional[int],
+        typer.Option("--max-queue", help="Max queued items for backpressure (0=unlimited)"),
+    ] = None,
 ) -> None:
     """
     Chunk DocTags into token-aware units.
@@ -414,6 +460,16 @@ def chunk(
             app_ctx.settings.runner.workers = workers
         if policy:
             app_ctx.settings.runner.policy = policy
+        if retries:
+            app_ctx.settings.runner.retries = retries
+        if retry_backoff_s:
+            app_ctx.settings.runner.retry_backoff_s = retry_backoff_s
+        if timeout_s:
+            app_ctx.settings.runner.timeout_s = timeout_s
+        if error_budget:
+            app_ctx.settings.runner.error_budget = error_budget
+        if max_queue:
+            app_ctx.settings.runner.max_queue = max_queue
 
         typer.echo(
             f"[dim]📋 Profile: {app_ctx.profile or 'none'} | Hash: {app_ctx.cfg_hashes['chunk'][:8]}...[/dim]"
@@ -465,6 +521,24 @@ def embed(
     policy: Annotated[
         Optional[str], typer.Option("--policy", help="Execution policy (io|cpu|gpu)")
     ] = None,
+    retries: Annotated[
+        Optional[int], typer.Option("--retries", help="Max retries per failed item")
+    ] = None,
+    retry_backoff_s: Annotated[
+        Optional[float],
+        typer.Option("--retry-backoff-s", help="Retry backoff in seconds (exponential)"),
+    ] = None,
+    timeout_s: Annotated[
+        Optional[float],
+        typer.Option("--timeout-s", help="Per-item timeout in seconds (0=unlimited)"),
+    ] = None,
+    error_budget: Annotated[
+        Optional[int], typer.Option("--error-budget", help="Max errors before stop (0=unlimited)")
+    ] = None,
+    max_queue: Annotated[
+        Optional[int],
+        typer.Option("--max-queue", help="Max queued items for backpressure (0=unlimited)"),
+    ] = None,
 ) -> None:
     """
     Generate embeddings for chunks.
@@ -494,6 +568,16 @@ def embed(
             app_ctx.settings.runner.workers = workers
         if policy:
             app_ctx.settings.runner.policy = policy
+        if retries:
+            app_ctx.settings.runner.retries = retries
+        if retry_backoff_s:
+            app_ctx.settings.runner.retry_backoff_s = retry_backoff_s
+        if timeout_s:
+            app_ctx.settings.runner.timeout_s = timeout_s
+        if error_budget:
+            app_ctx.settings.runner.error_budget = error_budget
+        if max_queue:
+            app_ctx.settings.runner.max_queue = max_queue
 
         typer.echo(
             f"[dim]📋 Profile: {app_ctx.profile or 'none'} | Hash: {app_ctx.cfg_hashes['embed'][:8]}...[/dim]"
