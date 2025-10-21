@@ -30,6 +30,7 @@ from .base import (
     ResolverResult,
     _fetch_semantic_scholar_data,
 )
+from .registry_v2 import register_v2
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
@@ -39,6 +40,7 @@ if TYPE_CHECKING:  # pragma: no cover
 LOGGER = logging.getLogger(__name__)
 
 
+@register_v2("semantic_scholar")
 class SemanticScholarResolver(RegisteredResolver):
     """Resolve PDFs via the Semantic Scholar Graph API."""
 

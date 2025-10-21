@@ -1,52 +1,29 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.ContentDownload.resolvers",
-#   "purpose": "Resolver registry and concrete resolver exports",
+#   "purpose": "Resolver registry and resolver exports",
 #   "sections": [
 #     {
-#       "id": "default-resolvers",
-#       "name": "default_resolvers",
-#       "anchor": "function-default-resolvers",
-#       "kind": "function"
+#       "id": "registered-resolvers",
+#       "name": "Registered Resolvers",
+#       "anchor": "section-registered-resolvers",
+#       "kind": "section"
 #     }
 #   ]
 # }
 # === /NAVMAP ===
-"""Resolver package providing registry helpers and concrete implementations."""
+"""Resolver package with registry and concrete implementations.
+
+All resolver classes are automatically registered via import-time side effects.
+Access via registry_v2.get_registry() or registry_v2.build_resolvers().
+"""
 
 from __future__ import annotations
 
-from typing import List
-
-from .base import (
-    DEFAULT_RESOLVER_ORDER,
-    DEFAULT_RESOLVER_TOGGLES,
-    ApiResolverBase,
-    BeautifulSoup,
-    RegisteredResolver,
-    Resolver,
-    ResolverEvent,
-    ResolverEventReason,
-    ResolverRegistry,
-    ResolverResult,
-    XMLParsedAsHTMLWarning,
-    _absolute_url,
-    _collect_candidate_urls,
-    _fetch_semantic_scholar_data,
-    _fetch_unpaywall_data,
-    find_pdf_via_anchor,
-    find_pdf_via_link,
-    find_pdf_via_meta,
-)
-
-
-def default_resolvers() -> List[Resolver]:
-    """Instantiate the default resolver stack in priority order."""
-
-    return ResolverRegistry.create_default()
-
-
-# Import concrete resolvers for registration side effects.
+# ============================================================================
+# Import concrete resolvers for registration side effects
+# ============================================================================
+# These imports trigger @register_v2 decorators and populate the registry
 from .arxiv import ArxivResolver  # noqa: E402,F401
 from .core import CoreResolver  # noqa: E402,F401
 from .crossref import CrossrefResolver  # noqa: E402,F401
@@ -59,19 +36,27 @@ from .openaire import OpenAireResolver  # noqa: E402,F401
 from .openalex import OpenAlexResolver  # noqa: E402,F401
 from .osf import OsfResolver  # noqa: E402,F401
 from .pmc import PmcResolver  # noqa: E402,F401
+
+# ============================================================================
+# Registry API (modern system)
+# ============================================================================
+from .registry_v2 import (
+    ResolverProtocol,
+    build_resolvers,
+    get_registry,
+    get_resolver_class,
+    register_v2,
+)
 from .semantic_scholar import SemanticScholarResolver  # noqa: E402,F401
 from .unpaywall import UnpaywallResolver  # noqa: E402,F401
 from .wayback import WaybackResolver  # noqa: E402,F401
 from .zenodo import ZenodoResolver  # noqa: E402,F401
 
 __all__ = [
-    "ApiResolverBase",
+    # Concrete resolvers
     "ArxivResolver",
-    "BeautifulSoup",
     "CoreResolver",
     "CrossrefResolver",
-    "DEFAULT_RESOLVER_ORDER",
-    "DEFAULT_RESOLVER_TOGGLES",
     "DoajResolver",
     "EuropePmcResolver",
     "FigshareResolver",
@@ -81,23 +66,14 @@ __all__ = [
     "OpenAlexResolver",
     "OsfResolver",
     "PmcResolver",
-    "Resolver",
-    "ResolverEvent",
-    "ResolverEventReason",
-    "ResolverRegistry",
-    "ResolverResult",
-    "RegisteredResolver",
     "SemanticScholarResolver",
     "UnpaywallResolver",
     "WaybackResolver",
-    "XMLParsedAsHTMLWarning",
     "ZenodoResolver",
-    "_absolute_url",
-    "_collect_candidate_urls",
-    "_fetch_semantic_scholar_data",
-    "_fetch_unpaywall_data",
-    "default_resolvers",
-    "find_pdf_via_anchor",
-    "find_pdf_via_link",
-    "find_pdf_via_meta",
+    # Registry API
+    "ResolverProtocol",
+    "build_resolvers",
+    "get_registry",
+    "get_resolver_class",
+    "register_v2",
 ]

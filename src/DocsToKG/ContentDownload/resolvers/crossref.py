@@ -25,12 +25,14 @@ from DocsToKG.ContentDownload.core import normalize_doi
 from DocsToKG.ContentDownload.urls import canonical_for_index
 
 from .base import ApiResolverBase, ResolverEvent, ResolverEventReason, ResolverResult
+from .registry_v2 import register_v2
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
     from DocsToKG.ContentDownload.pipeline import ResolverConfig
 
 
+@register_v2("crossref")
 class CrossrefResolver(ApiResolverBase):
     """Resolve candidate URLs from the Crossref metadata API."""
 

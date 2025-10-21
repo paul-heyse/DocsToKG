@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Iterable
 from DocsToKG.ContentDownload.core import strip_prefix
 
 from .base import RegisteredResolver, ResolverEvent, ResolverEventReason, ResolverResult
+from .registry_v2 import register_v2
 
 if TYPE_CHECKING:  # pragma: no cover
     import httpx
@@ -29,6 +30,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.pipeline import ResolverConfig
 
 
+@register_v2("arxiv")
 class ArxivResolver(RegisteredResolver):
     """Resolve arXiv preprints using arXiv identifier lookups."""
 

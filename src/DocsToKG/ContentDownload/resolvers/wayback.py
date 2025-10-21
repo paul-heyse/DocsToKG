@@ -55,9 +55,7 @@ from __future__ import annotations
 import itertools
 import logging
 from contextlib import contextmanager
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple
-from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -73,6 +71,7 @@ from .base import (
     find_pdf_via_link,
     find_pdf_via_meta,
 )
+from .registry_v2 import register_v2
 
 try:  # pragma: no cover - optional dependency
     from waybackpy import WaybackMachineAvailabilityAPI, WaybackMachineCDXServerAPI
@@ -111,6 +110,7 @@ class _HTTPXResponseAdapter:
         self._response.close()
 
 
+@register_v2("wayback")
 class WaybackResolver(RegisteredResolver):
     """Fallback resolver that queries the Internet Archive Wayback Machine."""
 

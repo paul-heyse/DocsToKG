@@ -24,12 +24,14 @@ from DocsToKG.ContentDownload.core import dedupe
 from DocsToKG.ContentDownload.urls import canonical_for_index
 
 from .base import RegisteredResolver, ResolverEvent, ResolverEventReason, ResolverResult
+from .registry_v2 import register_v2
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
     from DocsToKG.ContentDownload.pipeline import ResolverConfig
 
 
+@register_v2("openalex")
 class OpenAlexResolver(RegisteredResolver):
     """Resolve OpenAlex work metadata into candidate download URLs."""
 

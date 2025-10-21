@@ -31,6 +31,7 @@ from .base import (
     ResolverResult,
     _fetch_unpaywall_data,
 )
+from .registry_v2 import register_v2
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
@@ -40,6 +41,7 @@ if TYPE_CHECKING:  # pragma: no cover
 LOGGER = logging.getLogger(__name__)
 
 
+@register_v2("unpaywall")
 class UnpaywallResolver(RegisteredResolver):
     """Resolve PDFs via the Unpaywall API."""
 

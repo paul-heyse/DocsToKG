@@ -1,15 +1,4 @@
-"""
-Modern ContentDownload CLI with Pydantic v2 Config
-
-Uses Typer for clean, composable command structure with Pydantic v2 config.
-Subcommands: run, print-config, validate-config, explain
-
-Environment: $DTKG_CONFIG or --config for file path
-             $DTKG_* environment variables for config overrides
-             CLI flags for additional overrides
-"""
-
-from __future__ import annotations
+"""Typer-based CLI for ContentDownload with Pydantic v2 configuration."""
 
 import json
 import logging
@@ -18,7 +7,6 @@ from typing import Optional
 
 import typer
 from rich.console import Console
-from rich.json import JSON as RichJSON
 from rich.panel import Panel
 from rich.table import Table
 
@@ -32,23 +20,20 @@ from DocsToKG.ContentDownload.resolvers.registry_v2 import (
     get_registry,
 )
 
-_LOGGER = logging.getLogger(__name__)
 console = Console()
-
-app = typer.Typer(help="ContentDownload — Resolver-driven artifact acquisition")
-
+app = typer.Typer(help="DocsToKG ContentDownload")
 
 # ============================================================================
-# Utilities
+# Setup
 # ============================================================================
 
 
-def _setup_logging(verbose: bool = False) -> None:
-    """Configure logging."""
+def _setup_logging(verbose: bool) -> None:
+    """Setup logging based on verbosity."""
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
         level=level,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
 
@@ -63,7 +48,7 @@ def run(
         None,
         "--config",
         "-c",
-        help="Path to config file (YAML/JSON)",
+        help="Path to config file",
         envvar="DTKG_CONFIG",
     ),
     resolver_order: Optional[str] = typer.Option(
@@ -130,16 +115,11 @@ def print_config(
         else:
             data = cfg.model_dump(mode="json")
             console.print(
-                Panel(
-                    RichJSON.from_data(data),
-                    title="Effective Config",
-                )
+                Panel(json.dumps(data, indent=2), title="ContentDownload Config", expand=False)
             )
 
-        console.print(f"[green]Config hash: {cfg.config_hash()}[/green]")
-
     except Exception as e:
-        console.print(f"[red]✗ Config error: {e}[/red]")
+        console.print(f"[red]✗ Error: {e}[/red]")
         raise typer.Exit(code=1)
 
 
@@ -150,9 +130,9 @@ def validate_config(
     """Validate a config file."""
     try:
         validate_config_file(config)
-        console.print(f"[green]✓ {config} is valid[/green]")
+        console.print("[green]✓ Config valid[/green]")
     except Exception as e:
-        console.print(f"[red]✗ Invalid config: {e}[/red]")
+        console.print(f"[red]✗ Invalid: {e}[/red]")
         raise typer.Exit(code=1)
 
 
@@ -173,16 +153,24 @@ def explain(
 
         table = Table(title="Resolver Configuration")
         table.add_column("Order", style="cyan")
-        table.add_column("Resolver", style="magenta")
-        table.add_column("Status", style="green")
-        table.add_column("Registered", style="yellow")
+        table.add_column("Name", style="green")
+        table.add_column("Enabled", style="yellow")
+        table.add_column("Status", style="magenta")
 
         for idx, resolver_name in enumerate(cfg.resolvers.order, 1):
-            resolver_cfg = getattr(cfg.resolvers, resolver_name)
-            status = "✓ Enabled" if resolver_cfg.enabled else "✗ Disabled"
-            registered = "✓" if resolver_name in registry else "✗"
+            resolver_cfg = getattr(cfg.resolvers, resolver_name, None)
+            if resolver_cfg is None:
+                continue
 
-            table.add_row(str(idx), resolver_name, status, registered)
+            in_registry = resolver_name in registry
+            status = "[green]✓ Registered[/green]" if in_registry else "[red]✗ Missing[/red]"
+
+            table.add_row(
+                str(idx),
+                resolver_name,
+                "[green]Yes[/green]" if resolver_cfg.enabled else "[red]No[/red]",
+                status,
+            )
 
         console.print(table)
 
@@ -206,9 +194,11 @@ def schema(
 
         if output:
             output.write_text(json.dumps(schema_data, indent=2))
-            console.print(f"[green]✓ Schema saved to {output}[/green]")
+            console.print(f"[green]✓ Schema written to {output}[/green]")
         else:
-            console.print(Panel(RichJSON.from_data(schema_data), title="Schema"))
+            console.print(
+                Panel(json.dumps(schema_data, indent=2), title="JSON Schema", expand=False)
+            )
 
     except Exception as e:
         console.print(f"[red]✗ Error: {e}[/red]")
@@ -216,7 +206,7 @@ def schema(
 
 
 def main() -> None:
-    """Entry point for ContentDownload CLI."""
+    """Entry point for CLI."""
     app()
 
 
