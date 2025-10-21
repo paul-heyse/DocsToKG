@@ -449,6 +449,10 @@ class ExtractionSettings(BaseModel):
         """
         errors: list[str] = []
         
+        # Check encapsulation_name
+        if self.encapsulation_name not in ("sha256", "basename"):
+            errors.append(f"encapsulation_name must be 'sha256' or 'basename', got '{self.encapsulation_name}'")
+        
         # Check max_depth
         if self.max_depth < 1:
             errors.append(f"max_depth must be >= 1, got {self.max_depth}")
