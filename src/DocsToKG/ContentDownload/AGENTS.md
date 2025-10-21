@@ -1568,6 +1568,7 @@ conn.commit()
 **Q: High operation replay rate (>10%)**
 
 A: Indicates frequent retries. Check if:
+
 - Timeouts are too short (↑ `--openalex-retry-backoff`).
 - Rate limiter is blocking (↑ `--rate` or switch to distributed backend).
 - Network is unstable (check resolver metrics for 5xx/timeout spikes).
@@ -1583,6 +1584,7 @@ A: Crash recovery is failing. Check:
 **Q: Telemetry database locked**
 
 A: Multiple processes trying to write simultaneously. Ensure:
+
 - Only one `DownloadRun` per manifest database.
 - Rate limiter backend is `sqlite` only for single-process runs; use `multiprocess` or `redis` for `--workers > 1`.
 - If locked, wait for processes to finish, then: `rm -f manifest.sqlite3-wal manifest.sqlite3-shm`.

@@ -39,23 +39,6 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
-# CLI RESULT TYPES (TYP)
-# ============================================================================
-
-
-class CLIResult:
-    """Base class for CLI command results."""
-
-    def to_json(self) -> str:
-        """Convert to JSON string."""
-        raise NotImplementedError
-
-    def to_table(self) -> str:
-        """Convert to table string."""
-        raise NotImplementedError
-
-
-# ============================================================================
 # LATEST REPORT COMMAND (LATEST)
 # ============================================================================
 

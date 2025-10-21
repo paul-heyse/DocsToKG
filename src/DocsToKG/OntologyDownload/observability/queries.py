@@ -10,13 +10,12 @@ Pre-built SQL queries for DuckDB that answer common operational questions:
 
 from typing import Optional
 
-
 # ============================================================================
 # SLO Queries (Performance)
 # ============================================================================
 
 QUERY_SLO_NETWORK_LATENCY = """
-SELECT 
+SELECT
     service,
     COUNT(*) as request_count,
     PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY payload.elapsed_ms) as p50_ms,
@@ -31,7 +30,7 @@ ORDER BY p95_ms DESC
 """
 
 QUERY_CACHE_HIT_RATIO = """
-SELECT 
+SELECT
     service,
     COUNT(*) as total_requests,
     SUM(CASE WHEN payload.cache IN ('hit', 'revalidated') THEN 1 ELSE 0 END) as cached_requests,
@@ -48,7 +47,7 @@ ORDER BY hit_ratio_percent DESC
 # ============================================================================
 
 QUERY_RATE_LIMIT_PRESSURE = """
-SELECT 
+SELECT
     SUBSTR(payload.key, 1, 40) as key,
     COUNT(*) as acquire_count,
     SUM(CASE WHEN payload.allowed = false THEN 1 ELSE 0 END) as blocked_count,
@@ -63,7 +62,7 @@ LIMIT 10
 """
 
 QUERY_RATE_LIMIT_COOLDOWNS = """
-SELECT 
+SELECT
     SUBSTR(payload.key, 1, 40) as key,
     payload.status_code,
     COUNT(*) as cooldown_count,
@@ -81,7 +80,7 @@ ORDER BY cooldown_count DESC
 # ============================================================================
 
 QUERY_POLICY_GATE_REJECTIONS = """
-SELECT 
+SELECT
     payload.error_code,
     COUNT(*) as rejection_count,
     ROUND(AVG(payload.elapsed_ms), 2) as avg_gate_ms,
@@ -93,7 +92,7 @@ ORDER BY rejection_count DESC
 """
 
 QUERY_SAFETY_HEATMAP = """
-SELECT 
+SELECT
     ts::DATE as date,
     type,
     COUNT(*) as error_count
@@ -110,7 +109,7 @@ LIMIT 50
 # ============================================================================
 
 QUERY_ZIP_BOMB_SENTINEL = """
-SELECT 
+SELECT
     ts,
     service,
     payload.entries_total,
@@ -125,7 +124,7 @@ LIMIT 20
 """
 
 QUERY_EXTRACTION_STATS = """
-SELECT 
+SELECT
     DATE(ts) as date,
     COUNT(*) as extraction_count,
     SUM(payload.entries_total) as total_entries,
@@ -142,12 +141,13 @@ ORDER BY date DESC
 # Query Functions
 # ============================================================================
 
+
 def get_slo_query(metric: str = "network") -> Optional[str]:
     """Get SLO query by metric name.
-    
+
     Args:
         metric: 'network' for latency, 'cache' for hit ratio
-    
+
     Returns:
         SQL query string or None
     """
@@ -160,10 +160,10 @@ def get_slo_query(metric: str = "network") -> Optional[str]:
 
 def get_rate_limit_query(metric: str = "pressure") -> Optional[str]:
     """Get rate limiting query by metric name.
-    
+
     Args:
         metric: 'pressure' for blocked keys, 'cooldowns' for 429s
-    
+
     Returns:
         SQL query string or None
     """
@@ -176,10 +176,10 @@ def get_rate_limit_query(metric: str = "pressure") -> Optional[str]:
 
 def get_safety_query(metric: str = "rejections") -> Optional[str]:
     """Get safety/policy query by metric name.
-    
+
     Args:
         metric: 'rejections' for error codes, 'heatmap' for timeline
-    
+
     Returns:
         SQL query string or None
     """
@@ -192,10 +192,10 @@ def get_safety_query(metric: str = "rejections") -> Optional[str]:
 
 def get_extraction_query(metric: str = "bombs") -> Optional[str]:
     """Get extraction query by metric name.
-    
+
     Args:
         metric: 'bombs' for zip bomb detection, 'stats' for summary
-    
+
     Returns:
         SQL query string or None
     """

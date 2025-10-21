@@ -136,23 +136,24 @@ def compute_latest_summary(
         zip(
             format_stats.select("format").to_series().to_list(),
             format_stats.select("count").to_series().to_list(),
+            strict=True,
         )
     )
     bytes_by_format = dict(
         zip(
             format_stats.select("format").to_series().to_list(),
             format_stats.select("total_size").to_series().to_list(),
+            strict=True,
         )
     )
 
     # Top N largest files
-    top_files_df = (
-        files_collected.sort("size", descending=True).limit(top_n).select(["relpath", "size"])
-    )
+    top_files_df = files_collected.sort("size", descending=True).head(top_n)
     top_files = list(
         zip(
             top_files_df.select("relpath").to_series().to_list(),
             top_files_df.select("size").to_series().to_list(),
+            strict=True,
         )
     )
 
@@ -169,6 +170,7 @@ def compute_latest_summary(
             zip(
                 status_counts.select("status").to_series().to_list(),
                 status_counts.select("count").to_series().to_list(),
+                strict=True,
             )
         )
 
