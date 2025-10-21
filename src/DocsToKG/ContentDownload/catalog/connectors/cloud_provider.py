@@ -15,7 +15,6 @@ Features:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import threading
 import time
@@ -60,13 +59,9 @@ class CloudProvider:
 
             try:
                 if not self.connection_url:
-                    raise ProviderConfigError(
-                        "connection_url is required for cloud provider"
-                    )
+                    raise ProviderConfigError("connection_url is required for cloud provider")
                 if not self.s3_bucket:
-                    raise ProviderConfigError(
-                        "s3_bucket is required for cloud provider"
-                    )
+                    raise ProviderConfigError("s3_bucket is required for cloud provider")
 
                 # Initialize database (RDS via SQLAlchemy)
                 self._init_database()
@@ -83,18 +78,15 @@ class CloudProvider:
                         self.engine.dispose()
                     except Exception:
                         pass
-                raise ProviderConnectionError(
-                    f"Failed to initialize cloud provider: {e}"
-                ) from e
+                raise ProviderConnectionError(f"Failed to initialize cloud provider: {e}") from e
 
     def _init_database(self) -> None:
         """Initialize RDS connection pool."""
         try:
-            from sqlalchemy import create_engine, pool as sqlalchemy_pool
+            from sqlalchemy import create_engine
+            from sqlalchemy import pool as sqlalchemy_pool
         except ImportError as e:
-            raise ProviderConnectionError(
-                f"SQLAlchemy not installed: {e}"
-            ) from e
+            raise ProviderConnectionError(f"SQLAlchemy not installed: {e}") from e
 
         self.engine = create_engine(
             self.connection_url,  # type: ignore[arg-type]
@@ -178,21 +170,13 @@ class CloudProvider:
             )
 
             # Create lookup indexes
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_documents_sha ON documents(sha256)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_documents_ct ON documents(content_type)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_documents_run ON documents(run_id)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_sha ON documents(sha256)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_ct ON documents(content_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_run ON documents(run_id)")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_documents_artifact ON documents(artifact_id)"
             )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_documents_resolver ON documents(resolver)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_resolver ON documents(resolver)")
 
             # Create variants table
             conn.execute(
@@ -217,9 +201,7 @@ class CloudProvider:
                 ON variants(document_id, variant)
                 """
             )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_variants_sha ON variants(sha256)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_variants_sha ON variants(sha256)")
 
     def register_or_get(
         self,
@@ -427,9 +409,7 @@ class CloudProvider:
                     result = conn.execute("SELECT COUNT(*) FROM documents")
                     total_records = result.scalar() or 0
 
-                    result = conn.execute(
-                        "SELECT SUM(bytes) FROM documents WHERE bytes > 0"
-                    )
+                    result = conn.execute("SELECT SUM(bytes) FROM documents WHERE bytes > 0")
                     total_bytes = result.scalar() or 0
 
                     result = conn.execute(
@@ -439,9 +419,7 @@ class CloudProvider:
 
                     duplicates = len(self.find_duplicates())
 
-                    result = conn.execute(
-                        "SELECT DISTINCT resolver FROM documents"
-                    )
+                    result = conn.execute("SELECT DISTINCT resolver FROM documents")
                     resolvers = [row[0] for row in result.fetchall()]
 
                     result = conn.execute(

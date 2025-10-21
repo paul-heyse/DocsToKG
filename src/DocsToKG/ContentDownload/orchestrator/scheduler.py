@@ -41,6 +41,12 @@ This module provides the Orchestrator class that:
 
     # Graceful shutdown
     orch.stop()
+
+**Feature Flags:**
+
+- `DOCSTOKG_ENABLE_HEARTBEAT_SYNC`: Config-aware heartbeat TTL (default: true)
+- `DOCSTOKG_ENABLE_JOB_BATCHING`: Batch lease requests (default: true)
+- `DOCSTOKG_JOB_BATCH_SIZE`: Max jobs per batch (default: 10)
 """
 
 from __future__ import annotations
@@ -51,6 +57,8 @@ import time
 import uuid
 from queue import Empty, Queue
 from typing import TYPE_CHECKING, Any, Optional
+
+from . import feature_flags
 
 if TYPE_CHECKING:
     from DocsToKG.ContentDownload.orchestrator.queue import WorkQueue
@@ -215,20 +223,26 @@ class Orchestrator:
     def _dispatcher_loop(self) -> None:
         """Lease jobs and feed worker queue.
 
-        Implements job batching to reduce database contention:
-        instead of leasing 1 job per iteration, batches lease requests
-        based on available worker slots.
+        Implements optional job batching to reduce database contention.
+        Can be disabled via DOCSTOKG_ENABLE_JOB_BATCHING feature flag.
         """
         logger.debug("Dispatcher loop started")
+        batching_enabled = feature_flags.is_enabled("job_batching")
 
         while not self._stop.is_set():
             try:
-                # Calculate batch size: min(10, available_worker_slots)
                 free_slots = self._jobs_queue.maxsize - self._jobs_queue.qsize()
-                batch_size = min(10, max(1, free_slots))
-
+                
+                # Calculate batch size based on feature flag
+                if batching_enabled:
+                    max_batch = feature_flags.get_batch_size()  # default 10
+                    batch_size = min(max_batch, max(1, free_slots))
+                else:
+                    # No batching: lease 1 job at a time
+                    batch_size = 1 if free_slots > 0 else 0
+                
                 if batch_size > 0:
-                    # Batch lease jobs (reduces DB contention from 1 tx/job to ~1 tx/batch)
+                    # Lease jobs (batched or single)
                     jobs = self.queue.lease(
                         self.worker_id,
                         limit=batch_size,
@@ -239,7 +253,10 @@ class Orchestrator:
                         self._jobs_queue.put(job, block=False)
 
                     if jobs:
-                        logger.debug(f"Leased {len(jobs)} jobs (batch_size={batch_size})")
+                        if batching_enabled:
+                            logger.debug(f"Leased {len(jobs)} jobs (batch_size={batch_size})")
+                        else:
+                            logger.debug(f"Leased {len(jobs)} jobs (batching disabled)")
                     else:
                         # Backoff if no jobs available
                         time.sleep(0.05)
@@ -247,7 +264,7 @@ class Orchestrator:
                     # No free slots, backoff
                     time.sleep(0.1)
 
-                # Emit metrics (less frequently to avoid spam)
+                # Emit metrics
                 stats = self.queue.stats()
                 logger.debug(f"Queue stats: {stats}")
 
@@ -264,16 +281,23 @@ class Orchestrator:
         """Extend leases for active workers.
 
         Sends periodic heartbeats to extend job leases, preventing
-        crashed workers' jobs from being reclaimed. Uses config.lease_ttl_seconds
-        to ensure heartbeat duration matches the configured TTL.
+        crashed workers' jobs from being reclaimed. Can be disabled
+        via DOCSTOKG_ENABLE_HEARTBEAT_SYNC feature flag.
         """
         logger.debug("Heartbeat loop started")
+        heartbeat_sync_enabled = feature_flags.is_enabled("heartbeat_sync")
 
         while not self._stop.is_set():
             try:
-                # Pass lease_ttl_seconds to heartbeat (critical for config sync)
-                self.queue.heartbeat(self.worker_id, self.config.lease_ttl_seconds)
-                logger.debug(f"Heartbeat sent for {self.worker_id}")
+                if heartbeat_sync_enabled:
+                    # Pass lease_ttl_seconds for config-aware heartbeat (OPTIMIZATION #2)
+                    self.queue.heartbeat(self.worker_id, self.config.lease_ttl_seconds)
+                    logger.debug(f"Heartbeat sent with TTL sync for {self.worker_id}")
+                else:
+                    # Fallback: minimal heartbeat with hardcoded extension
+                    self.queue.heartbeat(self.worker_id)
+                    logger.debug(f"Heartbeat sent (sync disabled) for {self.worker_id}")
+                
                 time.sleep(self.config.heartbeat_seconds)
 
             except Exception as e:

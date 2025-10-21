@@ -48,26 +48,10 @@ The queue implements a job state machine:
     # Monitor
     stats = queue.stats()  # {"queued": 10, "in_progress": 2, ...}
 
-**Schema:**
+**Feature Flags:**
 
-    CREATE TABLE jobs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      artifact_id TEXT NOT NULL UNIQUE,
-      artifact_json TEXT NOT NULL,
-      state TEXT NOT NULL DEFAULT 'queued',
-      attempts INTEGER NOT NULL DEFAULT 0,
-      last_error TEXT,
-      resolver_hint TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      lease_expires_at TEXT,
-      worker_id TEXT
-    );
-
-**Thread Safety:**
-
-WAL mode allows concurrent readers; writers serialize via SQLite locking.
-Multiple threads can safely call these methods on the same WorkQueue instance.
+- `DOCSTOKG_ENABLE_CONNECTION_POOLING`: Per-thread connection keep-alive (default: true)
+- `DOCSTOKG_ENABLE_STATS_OPTIMIZATION`: Single GROUP BY query (default: true)
 """
 
 from __future__ import annotations
@@ -81,6 +65,7 @@ from pathlib import Path
 from typing import Any, Mapping, Optional
 
 from ..orchestrator.models import JobState
+from . import feature_flags
 
 __all__ = ["WorkQueue"]
 
@@ -146,12 +131,21 @@ class WorkQueue:
         """Get thread-local database connection.
 
         Implements per-thread connection pooling to reduce overhead
-        of creating new connections on every operation.
+        of creating new connections on every operation. Can be disabled
+        via DOCSTOKG_ENABLE_CONNECTION_POOLING feature flag.
 
         Returns:
             SQLite connection for current thread
         """
-        # Check if thread-local connection exists and is still valid
+        # Check if connection pooling is enabled
+        if not feature_flags.is_enabled("connection_pooling"):
+            # Fallback: create new connection (no pooling)
+            conn = sqlite3.connect(self.path, timeout=10.0)
+            conn.execute("PRAGMA foreign_keys=ON")
+            conn.row_factory = sqlite3.Row
+            return conn
+
+        # Connection pooling enabled: use thread-local storage
         if not hasattr(self._local, "conn") or self._local.conn is None:
             # Lazy create connection for this thread
             conn = sqlite3.connect(self.path, timeout=10.0)

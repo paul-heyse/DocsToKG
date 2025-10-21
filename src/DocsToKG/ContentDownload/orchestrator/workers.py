@@ -42,8 +42,7 @@ import json
 import logging
 import random
 import threading
-import time
-from typing import TYPE_CHECKING, Any, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Mapping
 
 if TYPE_CHECKING:
     from DocsToKG.ContentDownload.orchestrator.limits import KeyedLimiter

@@ -20,7 +20,6 @@ import pytest
 
 from DocsToKG.ContentDownload.catalog.connectors import (
     CatalogConnector,
-    ProviderConfigError,
     ProviderConnectionError,
 )
 
@@ -37,9 +36,7 @@ class TestCloudProvider:
     def test_cloud_provider_requires_s3_bucket(self) -> None:
         """Cloud provider requires s3_bucket."""
         with pytest.raises(ProviderConnectionError, match="s3_bucket is required"):
-            connector = CatalogConnector(
-                "cloud", {"connection_url": "postgresql://localhost/test"}
-            )
+            connector = CatalogConnector("cloud", {"connection_url": "postgresql://localhost/test"})
             connector.open()
 
     def test_cloud_provider_configuration(self) -> None:
@@ -192,9 +189,7 @@ class TestCloudProviderIntegration:
         rds_url = os.getenv("DOCSTOKG_TEST_RDS_URL")
         s3_bucket = os.getenv("DOCSTOKG_TEST_S3_BUCKET", "test-catalog")
 
-        with CatalogConnector(
-            "cloud", {"connection_url": rds_url, "s3_bucket": s3_bucket}
-        ) as cat:
+        with CatalogConnector("cloud", {"connection_url": rds_url, "s3_bucket": s3_bucket}) as cat:
             # Register records
             cat.register_or_get(
                 artifact_id="cloud:query:001",
@@ -223,9 +218,7 @@ class TestCloudProviderIntegration:
         rds_url = os.getenv("DOCSTOKG_TEST_RDS_URL")
         s3_bucket = os.getenv("DOCSTOKG_TEST_S3_BUCKET", "test-catalog")
 
-        with CatalogConnector(
-            "cloud", {"connection_url": rds_url, "s3_bucket": s3_bucket}
-        ) as cat:
+        with CatalogConnector("cloud", {"connection_url": rds_url, "s3_bucket": s3_bucket}) as cat:
             # Register some records
             for i in range(3):
                 cat.register_or_get(

@@ -18,7 +18,10 @@ import os
 
 import pytest
 
-from DocsToKG.ContentDownload.catalog.connectors import CatalogConnector, ProviderConfigError, ProviderConnectionError
+from DocsToKG.ContentDownload.catalog.connectors import (
+    CatalogConnector,
+    ProviderConnectionError,
+)
 
 
 class TestEnterpriseProvider:
@@ -48,16 +51,16 @@ class TestEnterpriseProvider:
             "max_overflow": 30,
         }
         connector = CatalogConnector("enterprise", config)
-        
+
         # Verify config was accepted
         assert connector.provider_type == "enterprise"
         # Note: actual connection would fail without Postgres
 
     def test_enterprise_provider_name(self) -> None:
         """Enterprise provider returns correct name."""
-        connector = CatalogConnector("enterprise", {
-            "connection_url": "postgresql://localhost/test"
-        })
+        connector = CatalogConnector(
+            "enterprise", {"connection_url": "postgresql://localhost/test"}
+        )
         # provider.name() would return "enterprise" if initialized
         # We can't test fully without Postgres, but we can verify the config
 
@@ -81,9 +84,9 @@ class TestEnterpriseProvider:
 
     def test_enterprise_provider_health_check_offline(self) -> None:
         """Health check reports unhealthy when offline."""
-        connector = CatalogConnector("enterprise", {
-            "connection_url": "postgresql://invalid:invalid@localhost:1/test"
-        })
+        connector = CatalogConnector(
+            "enterprise", {"connection_url": "postgresql://invalid:invalid@localhost:1/test"}
+        )
         # Would attempt to connect and fail
         pytest.skip("Requires running Postgres instance")
 
@@ -99,18 +102,16 @@ class TestEnterpriseProvider:
 
     def test_enterprise_provider_not_opened_raises_error(self) -> None:
         """Operations on unopened provider raise error."""
-        connector = CatalogConnector("enterprise", {
-            "connection_url": "postgresql://localhost/test"
-        })
+        connector = CatalogConnector(
+            "enterprise", {"connection_url": "postgresql://localhost/test"}
+        )
         with pytest.raises(RuntimeError, match="Connector not opened"):
             connector.register_or_get("test:001", "http://example.com", "test")
 
     def test_enterprise_provider_sqlalchemy_import(self) -> None:
         """Provider handles missing SQLAlchemy gracefully."""
         # This tests the import handling logic
-        config = {
-            "connection_url": "postgresql://localhost/test"
-        }
+        config = {"connection_url": "postgresql://localhost/test"}
         connector = CatalogConnector("enterprise", config)
         # If SQLAlchemy is installed (which it should be in the project),
         # this would proceed to connect (which would fail without Postgres)
@@ -122,15 +123,13 @@ class TestEnterpriseProviderIntegration:
 
     @pytest.mark.skipif(
         not os.getenv("DOCSTOKG_TEST_POSTGRES_URL"),
-        reason="Requires DOCSTOKG_TEST_POSTGRES_URL env var"
+        reason="Requires DOCSTOKG_TEST_POSTGRES_URL env var",
     )
     def test_enterprise_provider_full_lifecycle(self) -> None:
         """Full lifecycle test with real Postgres."""
         postgres_url = os.getenv("DOCSTOKG_TEST_POSTGRES_URL")
-        
-        with CatalogConnector("enterprise", {
-            "connection_url": postgres_url
-        }) as cat:
+
+        with CatalogConnector("enterprise", {"connection_url": postgres_url}) as cat:
             # Register record
             record = cat.register_or_get(
                 artifact_id="test:001",
@@ -139,25 +138,23 @@ class TestEnterpriseProviderIntegration:
                 bytes=100,
                 storage_uri="file:///tmp/test.pdf",
             )
-            
+
             assert record.id > 0
             assert record.artifact_id == "test:001"
-            
+
             # Verify health
             health = cat.health_check()
             assert health.status.value == "healthy"
 
     @pytest.mark.skipif(
         not os.getenv("DOCSTOKG_TEST_POSTGRES_URL"),
-        reason="Requires DOCSTOKG_TEST_POSTGRES_URL env var"
+        reason="Requires DOCSTOKG_TEST_POSTGRES_URL env var",
     )
     def test_enterprise_provider_idempotent_register(self) -> None:
         """Idempotent registration works with Postgres."""
         postgres_url = os.getenv("DOCSTOKG_TEST_POSTGRES_URL")
-        
-        with CatalogConnector("enterprise", {
-            "connection_url": postgres_url
-        }) as cat:
+
+        with CatalogConnector("enterprise", {"connection_url": postgres_url}) as cat:
             record1 = cat.register_or_get(
                 artifact_id="test:002",
                 source_url="http://example.com/2",
@@ -165,7 +162,7 @@ class TestEnterpriseProviderIntegration:
                 bytes=200,
                 storage_uri="file:///tmp/test2.pdf",
             )
-            
+
             record2 = cat.register_or_get(
                 artifact_id="test:002",
                 source_url="http://example.com/2",
@@ -173,20 +170,18 @@ class TestEnterpriseProviderIntegration:
                 bytes=200,
                 storage_uri="file:///tmp/test2.pdf",
             )
-            
+
             assert record1.id == record2.id
 
     @pytest.mark.skipif(
         not os.getenv("DOCSTOKG_TEST_POSTGRES_URL"),
-        reason="Requires DOCSTOKG_TEST_POSTGRES_URL env var"
+        reason="Requires DOCSTOKG_TEST_POSTGRES_URL env var",
     )
     def test_enterprise_provider_queries(self) -> None:
         """Query operations work with Postgres."""
         postgres_url = os.getenv("DOCSTOKG_TEST_POSTGRES_URL")
-        
-        with CatalogConnector("enterprise", {
-            "connection_url": postgres_url
-        }) as cat:
+
+        with CatalogConnector("enterprise", {"connection_url": postgres_url}) as cat:
             # Register records
             cat.register_or_get(
                 artifact_id="query:001",
@@ -196,12 +191,12 @@ class TestEnterpriseProviderIntegration:
                 bytes=100,
                 storage_uri="file:///tmp/q1.pdf",
             )
-            
+
             # Query by artifact
             records = cat.get_by_artifact("query:001")
             assert len(records) >= 1
             assert records[0].artifact_id == "query:001"
-            
+
             # Query by SHA
             sha_records = cat.get_by_sha256("abc123")
             assert len(sha_records) >= 1

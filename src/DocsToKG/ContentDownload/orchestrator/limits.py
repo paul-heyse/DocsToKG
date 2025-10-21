@@ -43,6 +43,11 @@ Keyed semaphores prevent burst concurrency to specific resolvers or hosts:
 
 All operations are thread-safe via internal lock. Multiple workers can safely
 call acquire/release concurrently without data races.
+
+**Feature Flags:**
+
+- `DOCSTOKG_ENABLE_SEMAPHORE_RECYCLING`: TTL-based cleanup (default: true)
+- `DOCSTOKG_SEMAPHORE_TTL_SECONDS`: TTL for unused semaphores (default: 3600)
 """
 
 from __future__ import annotations
@@ -54,6 +59,8 @@ import time
 from typing import Optional
 from urllib.parse import urlsplit
 
+from . import feature_flags
+
 __all__ = ["KeyedLimiter", "host_key"]
 
 logger = logging.getLogger(__name__)
@@ -61,13 +68,13 @@ logger = logging.getLogger(__name__)
 
 def host_key(url: str) -> str:
     """Extract normalized host from URL for keying.
-    
+
     Returns the hostname with port if present.
     Handles punycode (IDN) domains.
-    
+
     Args:
         url: Full URL (e.g., "https://api.example.com:8080/path")
-    
+
     Returns:
         Host key (e.g., "api.example.com:8080")
     """
@@ -79,8 +86,7 @@ def host_key(url: str) -> str:
             return url
         return host
     except Exception as e:
-        logger.warning(
-f"Failed to extract host key from {url}: {e}")
+        logger.warning(f"Failed to extract host key from {url}: {e}")
         return url  # Fallback to full URL
 
 
@@ -89,7 +95,7 @@ class KeyedLimiter:
 
     Provides fine-grained concurrency control by key (e.g., resolver name, host).
     Each key gets its own semaphore with configurable limit.
-    
+
     Implements TTL-based semaphore eviction to prevent unbounded memory growth
     when dealing with many dynamic keys (e.g., CDN edge servers with distinct IPs).
 
@@ -104,18 +110,24 @@ class KeyedLimiter:
         self,
         default_limit: int,
         per_key: Optional[dict[str, int]] = None,
-        semaphore_ttl_sec: Optional[int] = 3600,
+        semaphore_ttl_sec: Optional[int] = None,
     ) -> None:
         """Initialize keyed limiter.
 
         Args:
             default_limit: Default concurrency limit for unknown keys
             per_key: Optional per-key overrides (e.g., {"unpaywall": 1, "crossref": 2})
-            semaphore_ttl_sec: TTL for unused semaphores (default 3600s = 1 hour).
+            semaphore_ttl_sec: TTL for unused semaphores (default from feature flags).
                               Set to None to disable TTL-based eviction.
+                              If not provided, reads from DOCSTOKG_SEMAPHORE_TTL_SECONDS.
         """
         self.default_limit = max(1, default_limit)
         self.per_key = per_key or {}
+        
+        # Get TTL from parameter or feature flags
+        if semaphore_ttl_sec is None and feature_flags.is_enabled("semaphore_recycling"):
+            semaphore_ttl_sec = feature_flags.get_ttl("semaphore_recycling")
+        
         self.semaphore_ttl_sec = semaphore_ttl_sec
         # Store (semaphore, last_access_time) tuples
         self._locks: dict[str, tuple[threading.Semaphore, float]] = {}
@@ -125,7 +137,7 @@ class KeyedLimiter:
         """Get or create semaphore for key.
 
         Thread-safe creation of semaphores on first access.
-        Implements lazy TTL-based eviction of stale semaphores.
+        Implements lazy TTL-based eviction of stale semaphores if enabled.
         
         Args:
             key: Concurrency key
@@ -136,9 +148,10 @@ class KeyedLimiter:
         with self._mutex:
             now = time.time()
             
-            # Lazy eviction: clear stale entries every ~100 accesses (1% probability)
+            # Lazy eviction: only if semaphore_recycling is enabled
             if (
-                self.semaphore_ttl_sec is not None
+                feature_flags.is_enabled("semaphore_recycling")
+                and self.semaphore_ttl_sec is not None
                 and len(self._locks) > 10000
                 and random.random() < 0.01
             ):
