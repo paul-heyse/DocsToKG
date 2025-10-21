@@ -77,6 +77,10 @@ class CatalogStore:
         """Return catalog statistics."""
         raise NotImplementedError
     
+    def get_all_records(self) -> List[DocumentRecord]:
+        """Get all records in the catalog."""
+        raise NotImplementedError
+    
     def close(self) -> None:
         """Close the store connection."""
         raise NotImplementedError
@@ -289,6 +293,19 @@ class SQLiteCatalog(CatalogStore):
                 "unique_artifacts": unique_artifacts,
                 "total_bytes": total_bytes,
             }
+    
+    def get_all_records(self) -> List[DocumentRecord]:
+        """Get all records in the catalog."""
+        with self._lock:
+            cursor = self.conn.execute(
+                """
+                SELECT id, artifact_id, source_url, resolver, content_type, bytes,
+                       sha256, storage_uri, created_at, updated_at, run_id
+                FROM documents
+                ORDER BY created_at DESC
+                """
+            )
+            return [self._row_to_record(row) for row in cursor.fetchall()]
     
     def close(self) -> None:
         """Close the database connection."""
