@@ -40,6 +40,9 @@ except ImportError as exc:  # pragma: no cover
         "duckdb is required for catalog boundaries. Ensure .venv is initialized."
     ) from exc
 
+from ..policy.errors import PolicyReject
+from ..policy.gates import db_boundary_gate
+
 logger = logging.getLogger(__name__)
 
 
@@ -206,6 +209,22 @@ def extraction_boundary(
         yield result
 
         if result.files_inserted > 0:
+            # GATE 5: DB Transaction Boundaries (No Torn Writes)
+            try:
+                db_result = db_boundary_gate(
+                    operation="pre_commit",
+                    tables_affected=["extracted_files", "manifests"],
+                    fs_success=True,
+                )
+                if isinstance(db_result, PolicyReject):
+                    logger.error(f"db_boundary gate rejected: {db_result.error_code}")
+                    conn.rollback()
+                    raise Exception(f"Transaction boundary violation: {db_result.error_code}")
+            except Exception as exc:
+                if "Transaction boundary violation" in str(exc):
+                    raise
+                logger.warning(f"db_boundary gate error: {exc}, proceeding cautiously")
+
             conn.commit()
             logger.info(
                 f"Extraction boundary: inserted {result.files_inserted} files "

@@ -1174,6 +1174,32 @@ def _populate_plan_metadata(
 
     planned.plan.url = secure_url
 
+    # GATE 2: URL Security Gate
+    try:
+        from DocsToKG.OntologyDownload.policy.gates import url_gate
+        from DocsToKG.OntologyDownload.policy.errors import PolicyReject
+
+        url_result = url_gate(
+            secure_url,
+            allowed_hosts=getattr(http_config, 'allowed_hosts', None),
+            allowed_ports=getattr(http_config, 'allowed_ports', None),
+        )
+        if isinstance(url_result, PolicyReject):
+            _log_with_extra(
+                adapter,
+                logging.ERROR,
+                "url gate rejected",
+                {
+                    "stage": "plan",
+                    "url": secure_url,
+                    "error_code": url_result.error_code,
+                    "event": "url_gate_rejected",
+                },
+            )
+            raise PolicyError(f"URL policy violation: {url_result.error_code}")
+    except PolicyError:
+        raise
+
     probing_enabled = True if planner_defaults is None else planner_defaults.probing_enabled
     if not probing_enabled:
         _log_with_extra(

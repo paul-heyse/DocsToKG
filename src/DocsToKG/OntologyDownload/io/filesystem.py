@@ -38,6 +38,8 @@ from typing import Dict, List, Optional
 import libarchive
 
 from ..errors import ConfigError
+from ..policy.errors import PolicyReject
+from ..policy.gates import extraction_gate, filesystem_gate
 from ..settings import get_default_config
 from .extraction_constraints import ExtractionGuardian, PreScanValidator
 from .extraction_policy import ExtractionPolicy, safe_defaults
@@ -94,8 +96,6 @@ def _write_audit_manifest(
         metrics: Extraction metrics with duration and counts
     """
     try:
-        import libarchive as la
-
         # Compute archive SHA256
         archive_sha256 = hashlib.sha256()
         with open(archive_path, "rb") as f:
@@ -300,6 +300,19 @@ def _validate_member_path(member_name: str) -> Path:
         raise ConfigError(f"Empty path detected in archive: {member_name}")
     if any(part in {"", ".", ".."} for part in relative.parts):
         raise ConfigError(f"Unsafe path detected in archive: {member_name}")
+
+    # GATE 4: Filesystem Security (Path Traversal Prevention)
+    try:
+        fs_result = filesystem_gate(
+            root_path="/",
+            entry_paths=[member_name],
+            allow_symlinks=False,
+        )
+        if isinstance(fs_result, PolicyReject):
+            raise ConfigError(f"Filesystem policy violation: {fs_result.error_code}")
+    except ConfigError:
+        raise
+
     return Path(*relative.parts)
 
 
@@ -481,6 +494,35 @@ def extract_archive_safe(
 
         # Initialize Phase 3-4 guardian for disk space and permissions
         guardian = ExtractionGuardian(policy)
+
+        # GATE 3: Extraction Policy (Pre-Scan Validation)
+        # Peek into archive to get total counts before extraction
+        try:
+            # Do a quick scan to get archive stats
+            entries_total = 0
+            bytes_declared = 0
+            with libarchive.file_reader(str(archive_path)) as archive:
+                for entry in archive:
+                    entries_total += 1
+                    if entry.size and entry.size > 0:
+                        bytes_declared += entry.size
+
+            # Invoke extraction gate with pre-scan data
+            extraction_result = extraction_gate(
+                entries_total=entries_total,
+                bytes_declared=bytes_declared,
+                max_total_ratio=_MAX_COMPRESSION_RATIO,
+            )
+            if isinstance(extraction_result, PolicyReject):
+                log = logger or logging.getLogger(__name__)
+                log.error(f"extraction gate rejected: {extraction_result.error_code}")
+                raise ConfigError(f"Archive policy violation: {extraction_result.error_code}")
+
+            if logger:
+                logger.debug(f"extraction gate passed ({extraction_result.elapsed_ms:.2f}ms)", extra={"stage": "extract"})
+
+        except ConfigError:
+            raise
 
         with libarchive.file_reader(str(archive_path)) as archive:
             for entry in archive:
