@@ -1181,8 +1181,8 @@ def _populate_plan_metadata(
 
         url_result = url_gate(
             secure_url,
-            allowed_hosts=getattr(http_config, 'allowed_hosts', None),
-            allowed_ports=getattr(http_config, 'allowed_ports', None),
+            allowed_hosts=getattr(http_config, "allowed_hosts", None),
+            allowed_ports=getattr(http_config, "allowed_ports", None),
         )
         if isinstance(url_result, PolicyReject):
             _log_with_extra(

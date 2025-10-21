@@ -519,7 +519,10 @@ def extract_archive_safe(
                 raise ConfigError(f"Archive policy violation: {extraction_result.error_code}")
 
             if logger:
-                logger.debug(f"extraction gate passed ({extraction_result.elapsed_ms:.2f}ms)", extra={"stage": "extract"})
+                logger.debug(
+                    f"extraction gate passed ({extraction_result.elapsed_ms:.2f}ms)",
+                    extra={"stage": "extract"},
+                )
 
         except ConfigError:
             raise

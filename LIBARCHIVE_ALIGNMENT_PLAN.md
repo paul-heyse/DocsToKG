@@ -1,7 +1,7 @@
 # LibArchive Implementation Alignment Plan
 
-**Status:** GAP ANALYSIS & RECONCILIATION PLAN  
-**Date:** 2025-10-21  
+**Status:** GAP ANALYSIS & RECONCILIATION PLAN
+**Date:** 2025-10-21
 **Scope:** Reconcile current `OntologyDownload` extraction implementation with premised architecture
 
 ---
@@ -84,7 +84,7 @@ The current implementation has **extensively deployed libarchive** and establish
    - **Specification:** Per-entry compression ratio check (`max_entry_ratio`)
    - **Current:** Commented as "libarchive entry doesn't directly expose this"
    - **Impact:** Per-entry bomb ratio check cannot be validated
-   - **Action:** 
+   - **Action:**
      - For ZIP: Use `libarchive.entry.compressed_size` if available
      - For TAR: Per-entry ratio not applicable; skip or document limitation
      - Add comment explaining this limitation
@@ -115,16 +115,17 @@ The current implementation has **extensively deployed libarchive** and establish
 **Deliverables:**
 
 1. **Update `AGENTS.md` Section: Extraction**
+
    ```markdown
    ### Extraction Architecture (libarchive-based)
-   
+
    **Design Principles:**
    - Two-phase pipeline: Pre-scan (validation without writes) → Extract (conditional writes)
    - Settings-driven behavior via ExtractionPolicy dataclass
    - Observable telemetry with run_id and config_hash on all events
    - Deterministic audit JSON for provenance and compliance
    - Atomic write discipline: temp → fsync → rename → dirfsync
-   
+
    **Current Implementation Details:**
    - Uses libarchive-c bindings (system libarchive required)
    - PreScanValidator enforces 10+ policies (path, type, format, bomb, size, etc.)
@@ -154,14 +155,16 @@ The current implementation has **extensively deployed libarchive** and establish
 
 1. **Per-Entry Compression Ratio (ZIP only)**
    - **File:** `src/DocsToKG/OntologyDownload/io/extraction_constraints.py`
-   - **Action:** 
+   - **Action:**
      - In `PreScanValidator.validate_entry()`, if format is ZIP:
+
        ```python
        if hasattr(entry, 'compressed_size') and entry.compressed_size:
            ratio = uncompressed_size / entry.compressed_size
            if ratio > self.policy.max_entry_ratio:
                raise ConfigError(error_message(ExtractionErrorCode.ENTRY_RATIO, ...))
        ```
+
      - For TAR: Document that per-entry ratio is not available
      - Add test: `test_extract_security.py::test_zip_per_entry_ratio_bomb`
 
@@ -170,16 +173,19 @@ The current implementation has **extensively deployed libarchive** and establish
    - **Action:**
      - Add field: `deterministic_order: Literal["header", "path_asc"] = "header"`
      - In `filesystem.py::extract_archive_safe()`:
+
        ```python
        if policy.deterministic_order == "path_asc":
            entries_to_extract.sort(key=lambda x: x[1])  # Sort by validated_path
        ```
+
      - Add test: `test_extract_formats.py::test_deterministic_ordering_modes`
 
 3. **Audit Manifest: Full Policy Snapshot**
    - **File:** `src/DocsToKG/OntologyDownload/io/filesystem.py::_write_audit_manifest()`
    - **Action:**
      - Include full policy dict (not just hash):
+
        ```json
        {
          "policy": {
@@ -222,7 +228,7 @@ The current implementation has **extensively deployed libarchive** and establish
 
 1. **Verify `test_extract_windows_mac.py`**
    - Reserved names: `CON`, `PRN`, `AUX`, `NUL`, `COM1`-`9`, `LPT1`-`9`
-   - Trailing dot/space: `file.`, `file `, `dir.`
+   - Trailing dot/space: `file.`, `file`, `dir.`
    - Test both rejection and audit trail
 
 2. **Verify `test_extract_formats.py`**
@@ -316,6 +322,7 @@ The current implementation has **extensively deployed libarchive** and establish
 ## Conclusion
 
 **Current implementation is PRODUCTION-READY and closely aligned with the specification.** The gaps identified are:
+
 - Minor (documentation, field additions)
 - Low-risk (backward-compatible)
 - Non-blocking (current extraction works safely)

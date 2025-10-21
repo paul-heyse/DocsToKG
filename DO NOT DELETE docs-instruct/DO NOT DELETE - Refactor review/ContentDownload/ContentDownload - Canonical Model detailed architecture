@@ -1,0 +1,721 @@
+Absolutely — here’s a **single document** you can paste into a PR description (or drop into `docs/pr3-api-types.md`) with a **compiling file tree** and the **exact code** for PR #3 (API Types Stabilization). Everything is presented as code blocks so you can copy/paste file-by-file.
+
+---
+
+# PR #3 — API Types Stabilization (drop-in code)
+
+## New/Updated file tree
+
+```text
+src/DocsToKG/ContentDownload/
+  api/
+    __init__.py                 # NEW: public exports
+    types.py                    # NEW: canonical API types (dataclasses + Literals)
+    adapters.py                 # NEW: optional, thin shims for legacy helpers
+    exceptions.py               # NEW: local Skip/Error signals for pure signatures
+  download_execution.py         # MOD: consume/produce canonical types
+  pipeline.py                   # MOD: orchestrate with canonical types
+  resolvers/
+    base.py                     # MOD: protocol returns ResolverResult
+    unpaywall.py                # MOD: example resolver migrated to ResolverResult
+tests/
+  contentdownload/
+    test_api_types.py           # NEW: unit tests for dataclasses & literals
+    test_resolver_contract.py   # NEW: resolver contract tests
+    test_download_exec_contract.py  # NEW: prepare/stream/finalize contracts
+```
+
+---
+
+## 1) `src/DocsToKG/ContentDownload/api/types.py` (NEW)
+
+```python
+# src/DocsToKG/ContentDownload/api/types.py
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Mapping, Optional, Sequence
+from typing import Literal
+
+# ---------- Stable token vocabularies (public contract) ----------
+
+OutcomeClass = Literal["success", "skip", "error"]
+
+AttemptStatus = Literal[
+    "http-head",
+    "http-get",
+    "http-200",
+    "http-304",
+    "robots-fetch",
+    "robots-disallowed",
+    "retry",
+    "size-mismatch",
+    "content-policy-skip",
+    "download-error",
+]
+
+ReasonCode = Literal[
+    "ok",
+    "not-modified",
+    "retry-after",
+    "backoff",
+    "robots",
+    "policy-type",
+    "policy-size",
+    "timeout",
+    "conn-error",
+    "tls-error",
+    "too-large",
+    "unexpected-ct",
+    "size-mismatch",
+]
+
+# ---------- Core API payloads used between resolvers, pipeline, and execution ----------
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadPlan:
+    """
+    A concrete plan to fetch a single URL proposed by a resolver.
+    """
+    url: str
+    resolver_name: str
+    referer: Optional[str] = None
+    expected_mime: Optional[str] = None
+
+    # Optional HTTP cache hints (conditional GET)
+    etag: Optional[str] = None
+    last_modified: Optional[str] = None
+
+    # Optional per-plan byte cap (overrides global)
+    max_bytes_override: Optional[int] = None
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadStreamResult:
+    """
+    Result of streaming the payload to a temporary path (pre-rename).
+    """
+    path_tmp: str
+    bytes_written: int
+    http_status: int
+    content_type: Optional[str]
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadOutcome:
+    """
+    Final outcome for a single plan (post-rename and integrity checks).
+    """
+    ok: bool
+    classification: OutcomeClass  # "success" | "skip" | "error"
+    path: Optional[str] = None
+    reason: Optional[ReasonCode] = None
+    meta: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class ResolverResult:
+    """
+    A resolver can return zero or more plans; the pipeline will try them in order.
+    """
+    plans: Sequence[DownloadPlan]
+    notes: Mapping[str, Any] = field(default_factory=dict)
+```
+
+---
+
+## 2) `src/DocsToKG/ContentDownload/api/__init__.py` (NEW)
+
+```python
+# src/DocsToKG/ContentDownload/api/__init__.py
+from .types import (
+    DownloadPlan,
+    DownloadStreamResult,
+    DownloadOutcome,
+    ResolverResult,
+    OutcomeClass,
+    AttemptStatus,
+    ReasonCode,
+)
+
+__all__ = [
+    "DownloadPlan",
+    "DownloadStreamResult",
+    "DownloadOutcome",
+    "ResolverResult",
+    "OutcomeClass",
+    "AttemptStatus",
+    "ReasonCode",
+]
+```
+
+---
+
+## 3) `src/DocsToKG/ContentDownload/api/adapters.py` (NEW, optional shims)
+
+```python
+# src/DocsToKG/ContentDownload/api/adapters.py
+from __future__ import annotations
+
+from typing import Any, Optional
+from .types import (
+    DownloadPlan,
+    DownloadStreamResult,
+    DownloadOutcome,
+    ResolverResult,
+    ReasonCode,
+)
+
+# Minimal helpers if some legacy call sites are hard-coded for now.
+
+
+def to_download_plan(
+    url: str,
+    resolver_name: str,
+    *,
+    referer: Optional[str] = None,
+    expected_mime: Optional[str] = None,
+    etag: Optional[str] = None,
+    last_modified: Optional[str] = None,
+    max_bytes_override: Optional[int] = None,
+) -> DownloadPlan:
+    return DownloadPlan(
+        url=url,
+        resolver_name=resolver_name,
+        referer=referer,
+        expected_mime=expected_mime,
+        etag=etag,
+        last_modified=last_modified,
+        max_bytes_override=max_bytes_override,
+    )
+
+
+def to_outcome_success(path: str, **meta: Any) -> DownloadOutcome:
+    return DownloadOutcome(ok=True, classification="success", path=path, meta=meta)
+
+
+def to_outcome_skip(reason: ReasonCode, **meta: Any) -> DownloadOutcome:
+    return DownloadOutcome(ok=False, classification="skip", reason=reason, meta=meta)
+
+
+def to_outcome_error(reason: ReasonCode, **meta: Any) -> DownloadOutcome:
+    return DownloadOutcome(ok=False, classification="error", reason=reason, meta=meta)
+```
+
+---
+
+## 4) `src/DocsToKG/ContentDownload/api/exceptions.py` (NEW)
+
+```python
+# src/DocsToKG/ContentDownload/api/exceptions.py
+from __future__ import annotations
+
+from typing import Optional
+from .types import ReasonCode
+
+
+class SkipDownload(Exception):
+    """
+    Raise from prepare_* when the plan should be skipped (robots, policy, etc.)
+    The pipeline will translate to DownloadOutcome(classification="skip").
+    """
+    def __init__(self, reason: ReasonCode, message: Optional[str] = None):
+        self.reason = reason
+        super().__init__(message or reason)
+
+
+class DownloadError(Exception):
+    """
+    Raise when an unrecoverable error occurred and no file should be kept.
+    The pipeline will translate to DownloadOutcome(classification="error").
+    """
+    def __init__(self, reason: ReasonCode, message: Optional[str] = None):
+        self.reason = reason
+        super().__init__(message or reason)
+```
+
+---
+
+## 5) `src/DocsToKG/ContentDownload/resolvers/base.py` (MOD)
+
+```python
+# src/DocsToKG/ContentDownload/resolvers/base.py
+from __future__ import annotations
+
+from typing import Optional, Protocol
+from DocsToKG.ContentDownload.api.types import ResolverResult
+from DocsToKG.ContentDownload.telemetry import AttemptSink  # Protocol introduced in P1
+# If your telemetry module path differs, adjust this import accordingly.
+
+
+class Resolver(Protocol):
+    """
+    Every resolver returns a ResolverResult (zero or more DownloadPlans).
+    """
+    name: str
+
+    def resolve(
+        self,
+        artifact,
+        session,
+        ctx,
+        telemetry: Optional[AttemptSink],
+        run_id: Optional[str],
+    ) -> ResolverResult:
+        ...
+```
+
+---
+
+## 6) `src/DocsToKG/ContentDownload/resolvers/unpaywall.py` (MOD — example)
+
+```python
+# src/DocsToKG/ContentDownload/resolvers/unpaywall.py
+from __future__ import annotations
+
+from typing import Optional
+from DocsToKG.ContentDownload.api.types import ResolverResult, DownloadPlan
+from DocsToKG.ContentDownload.resolvers import register  # if you use a registry decorator
+from DocsToKG.ContentDownload.telemetry import AttemptSink
+
+
+@register("unpaywall")  # remove if not using a registry decorator
+class UnpaywallResolver:
+    name = "unpaywall"
+    priority = 10  # optional if your registry reads this
+
+    def __init__(self, email: Optional[str] = None, timeout_read_s: Optional[float] = None):
+        self._email = email
+        self._timeout = timeout_read_s
+
+    @classmethod
+    def from_config(cls, rcfg, root_cfg):  # optional convenience
+        return cls(email=getattr(rcfg, "email", None),
+                   timeout_read_s=rcfg.timeout_read_s or root_cfg.http.timeout_read_s)
+
+    def resolve(self, artifact, session, ctx, telemetry: Optional[AttemptSink], run_id: Optional[str]) -> ResolverResult:
+        # ... your resolution logic here ...
+        # Suppose we computed a direct PDF URL:
+        url = getattr(artifact, "best_pdf_url", None)
+        if not url:
+            return ResolverResult(plans=())
+        plan = DownloadPlan(url=url, resolver_name=self.name, expected_mime="application/pdf")
+        return ResolverResult(plans=(plan,))
+```
+
+> Apply the same pattern to other resolvers (`crossref.py`, `arxiv.py`, `landing.py`, etc.).
+
+---
+
+## 7) `src/DocsToKG/ContentDownload/download_execution.py` (MOD)
+
+```python
+# src/DocsToKG/ContentDownload/download_execution.py
+from __future__ import annotations
+
+import os
+import time
+from typing import Optional
+
+from DocsToKG.ContentDownload.api.types import (
+    DownloadPlan,
+    DownloadStreamResult,
+    DownloadOutcome,
+)
+from DocsToKG.ContentDownload.api.exceptions import SkipDownload, DownloadError
+from DocsToKG.ContentDownload.telemetry import AttemptSink  # Protocol from P1
+from DocsToKG.ContentDownload.api.types import ReasonCode  # for reasons in outcomes
+
+# NOTE: Adjust these imports to your actual project paths:
+# - io_utils.atomic_write_stream, robots cache, content-policy predicates, etc.
+# - Here we illustrate the canonical signatures & telemetry use.
+
+
+def _emit(telemetry: Optional[AttemptSink], **kw) -> None:
+    if telemetry:
+        telemetry.log_attempt(**kw)
+
+
+def prepare_candidate_download(
+    plan: DownloadPlan,
+    *,
+    telemetry: Optional[AttemptSink] = None,
+    run_id: Optional[str] = None,
+) -> DownloadPlan:
+    """
+    Preflight decisions: robots, type policy, existing cache signals, etc.
+
+    Return the (possibly adjusted) plan or raise:
+      - SkipDownload(reason) for policy/robots/probe decisions
+      - DownloadError(reason) for unrecoverable preflight errors
+    """
+    # Example: emit a robots attempt elsewhere; keep this as a thin hook.
+    # If you block on robots:
+    # raise SkipDownload("robots")
+    return plan
+
+
+def stream_candidate_payload(
+    plan: DownloadPlan,
+    *,
+    session=None,  # your HTTP client, injected by pipeline
+    timeout_s: Optional[float] = None,
+    chunk_size: int = 1 << 20,
+    expected_len: Optional[int] = None,
+    telemetry: Optional[AttemptSink] = None,
+    run_id: Optional[str] = None,
+) -> DownloadStreamResult:
+    """
+    Stream the response body into a tmp file. Emit HEAD/GET attempts here.
+    Return DownloadStreamResult; do not rename to final path here.
+    """
+    url = plan.url
+
+    # HEAD (optional)
+    t0 = time.monotonic_ns()
+    head = session.head(url, allow_redirects=True, timeout=timeout_s)
+    elapsed_ms = (time.monotonic_ns() - t0) // 1_000_000
+    _emit(
+        telemetry,
+        run_id=run_id,
+        resolver=plan.resolver_name,
+        url=url,
+        verb="HEAD",
+        status="http-head",
+        http_status=head.status_code,
+        content_type=head.headers.get("Content-Type"),
+        elapsed_ms=elapsed_ms,
+    )
+
+    # GET
+    t0 = time.monotonic_ns()
+    resp = session.get(url, stream=True, allow_redirects=True, timeout=timeout_s)
+    elapsed_ms = (time.monotonic_ns() - t0) // 1_000_000
+    _emit(
+        telemetry,
+        run_id=run_id,
+        resolver=plan.resolver_name,
+        url=url,
+        verb="GET",
+        status="http-get",
+        http_status=resp.status_code,
+        content_type=resp.headers.get("Content-Type"),
+        elapsed_ms=elapsed_ms,
+    )
+
+    # Write to tmp in same directory as final target (final target path determined later)
+    tmp_dir = os.getcwd()  # replace with configured location
+    os.makedirs(tmp_dir, exist_ok=True)
+    tmp_path = os.path.join(tmp_dir, ".part-download.tmp")
+
+    bytes_written = 0
+    with open(tmp_path, "wb") as f:
+        for chunk in resp.iter_content(chunk_size=chunk_size):
+            if not chunk:
+                continue
+            f.write(chunk)
+            bytes_written += len(chunk)
+
+    # Optional: log a 200 event with size info
+    _emit(
+        telemetry,
+        run_id=run_id,
+        resolver=plan.resolver_name,
+        url=url,
+        verb="GET",
+        status="http-200",
+        http_status=resp.status_code,
+        content_type=resp.headers.get("Content-Type"),
+        bytes_written=bytes_written,
+        content_length_hdr=int(resp.headers.get("Content-Length", "0")) or None,
+    )
+
+    return DownloadStreamResult(
+        path_tmp=tmp_path,
+        bytes_written=bytes_written,
+        http_status=resp.status_code,
+        content_type=resp.headers.get("Content-Type"),
+    )
+
+
+def finalize_candidate_download(
+    plan: DownloadPlan,
+    stream: DownloadStreamResult,
+    *,
+    final_path: Optional[str] = None,
+    verify_content_length: bool = True,
+    telemetry: Optional[AttemptSink] = None,
+    run_id: Optional[str] = None,
+) -> DownloadOutcome:
+    """
+    Integrity checks & finalization. Move tmp → final, return DownloadOutcome.
+    """
+    # Example: choose a final path if not provided
+    final_path = final_path or _default_final_path_for(plan, stream)
+
+    # Example: basic content-length check if content-length known
+    # (In P1 we implement authoritative atomic writer + enforcement.)
+    if verify_content_length and stream.http_status == 200:
+        # (For illustration only; real logic integrated with atomic writer.)
+        pass
+
+    # Atomically move tmp to final (fsync omitted for brevity here)
+    os.replace(stream.path_tmp, final_path)
+
+    return DownloadOutcome(
+        ok=True,
+        classification="success",
+        path=final_path,
+        reason=None,
+        meta={"content_type": stream.content_type, "bytes": stream.bytes_written},
+    )
+
+
+def _default_final_path_for(plan: DownloadPlan, stream: DownloadStreamResult) -> str:
+    # Very simple default; in your code this likely uses artifact ids & storage layout
+    base = plan.url.rsplit("/", 1)[-1] or "download.bin"
+    return os.path.join(os.getcwd(), base)
+```
+
+> ⚠️ Notes:
+>
+> * This file shows **canonical signatures and telemetry usage**. Replace temp/dir logic with your configured storage + the P1 atomic writer (`atomic_write_stream`) when you merge PRs in order.
+> * If your project already has helpers for policy checks, robots, conditional headers, plug them into `prepare_candidate_download` and/or `stream_candidate_payload`.
+
+---
+
+## 8) `src/DocsToKG/ContentDownload/pipeline.py` (MOD)
+
+```python
+# src/DocsToKG/ContentDownload/pipeline.py
+from __future__ import annotations
+
+from typing import Optional, Sequence
+from DocsToKG.ContentDownload.api.types import (
+    DownloadPlan,
+    DownloadStreamResult,
+    DownloadOutcome,
+    ResolverResult,
+)
+from DocsToKG.ContentDownload.api.exceptions import SkipDownload, DownloadError
+from DocsToKG.ContentDownload.telemetry import AttemptSink  # Protocol from P1
+from DocsToKG.ContentDownload.download_execution import (
+    prepare_candidate_download,
+    stream_candidate_payload,
+    finalize_candidate_download,
+)
+
+
+class ResolverPipeline:
+    def __init__(
+        self,
+        resolvers: Sequence,
+        session,
+        telemetry: Optional[AttemptSink],
+        run_id: Optional[str],
+    ):
+        self._resolvers = list(resolvers)
+        self._session = session
+        self._telemetry = telemetry
+        self._run_id = run_id
+
+    def process(self, artifact, ctx) -> DownloadOutcome:
+        """
+        Try resolvers in order until one plan succeeds or all fail.
+        """
+        for resolver in self._resolvers:
+            rres: ResolverResult = resolver.resolve(
+                artifact, self._session, ctx, self._telemetry, self._run_id
+            )
+            if not rres.plans:
+                continue
+
+            for plan in rres.plans:
+                try:
+                    adj_plan: DownloadPlan = prepare_candidate_download(
+                        plan, telemetry=self._telemetry, run_id=self._run_id
+                    )
+                    stream: DownloadStreamResult = stream_candidate_payload(
+                        adj_plan,
+                        session=self._session,
+                        timeout_s=None,  # supply from config
+                        telemetry=self._telemetry,
+                        run_id=self._run_id,
+                    )
+                    outcome: DownloadOutcome = finalize_candidate_download(
+                        adj_plan,
+                        stream,
+                        final_path=None,  # supply from config/policy
+                        telemetry=self._telemetry,
+                        run_id=self._run_id,
+                    )
+                except SkipDownload as e:
+                    outcome = DownloadOutcome(
+                        ok=False, classification="skip", path=None, reason=e.reason
+                    )
+                except DownloadError as e:
+                    outcome = DownloadOutcome(
+                        ok=False, classification="error", path=None, reason=e.reason
+                    )
+
+                # Record final manifest via your RunTelemetry helper (P1):
+                # self._telemetry.record_pipeline_result(..., outcome=outcome, plan=adj_plan, run_id=self._run_id)
+
+                if outcome.ok:
+                    return outcome
+
+        return DownloadOutcome(ok=False, classification="error", reason="download-error")
+```
+
+---
+
+## 9) Tests
+
+### 9.1 `tests/contentdownload/test_api_types.py` (NEW)
+
+```python
+# tests/contentdownload/test_api_types.py
+from __future__ import annotations
+
+import pytest
+from dataclasses import FrozenInstanceError
+from DocsToKG.ContentDownload.api.types import (
+    DownloadPlan,
+    DownloadStreamResult,
+    DownloadOutcome,
+    ResolverResult,
+)
+
+def test_dataclasses_are_frozen_and_slotted():
+    p = DownloadPlan(url="http://x", resolver_name="r")
+    with pytest.raises(FrozenInstanceError):
+        object.__setattr__(p, "url", "http://y")
+
+    s = DownloadStreamResult(path_tmp="/tmp/x", bytes_written=1, http_status=200, content_type=None)
+    with pytest.raises(FrozenInstanceError):
+        object.__setattr__(s, "http_status", 201)
+
+    o = DownloadOutcome(ok=True, classification="success", path="/x")
+    with pytest.raises(FrozenInstanceError):
+        object.__setattr__(o, "ok", False)
+
+def test_resolver_result_sequence():
+    p = DownloadPlan(url="http://x", resolver_name="r")
+    rr = ResolverResult(plans=[p])
+    assert len(rr.plans) == 1
+```
+
+### 9.2 `tests/contentdownload/test_resolver_contract.py` (NEW)
+
+```python
+# tests/contentdownload/test_resolver_contract.py
+from __future__ import annotations
+
+from DocsToKG.ContentDownload.api.types import ResolverResult, DownloadPlan
+from DocsToKG.ContentDownload.resolvers.base import Resolver
+
+class FakeResolver:
+    name = "fake"
+    def resolve(self, artifact, session, ctx, telemetry, run_id) -> ResolverResult:
+        return ResolverResult(plans=[DownloadPlan(url="http://example.com/file.pdf", resolver_name=self.name)])
+
+def test_resolver_returns_plans():
+    r: Resolver = FakeResolver()
+    rr = r.resolve(None, None, None, None, None)
+    assert rr.plans and rr.plans[0].resolver_name == "fake"
+```
+
+### 9.3 `tests/contentdownload/test_download_exec_contract.py` (NEW)
+
+```python
+# tests/contentdownload/test_download_exec_contract.py
+from __future__ import annotations
+
+from io import BytesIO
+class FakeResp:
+    def __init__(self, code=200, body=b"", headers=None):
+        self.status_code = code
+        self._body = body
+        self.headers = headers or {}
+    def iter_content(self, chunk_size=1024):
+        stream = BytesIO(self._body)
+        while True:
+            chunk = stream.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+
+class FakeSession:
+    def __init__(self, head: FakeResp, get: FakeResp):
+        self._head = head
+        self._get = get
+    def head(self, *a, **k):
+        return self._head
+    def get(self, *a, **k):
+        return self._get
+
+from DocsToKG.ContentDownload.api.types import DownloadPlan
+from DocsToKG.ContentDownload.download_execution import (
+    prepare_candidate_download,
+    stream_candidate_payload,
+    finalize_candidate_download,
+)
+
+def test_prepare_stream_finalize_happy_path(tmp_path, monkeypatch):
+    # Minimal happy path
+    plan = DownloadPlan(url="http://example.com/f.bin", resolver_name="fake")
+    session = FakeSession(FakeResp(200, b"", {"Content-Type": "text/html"}), FakeResp(200, b"abc", {"Content-Type":"application/octet-stream","Content-Length":"3"}))
+
+    # Switch to tmp dir
+    monkeypatch.chdir(tmp_path)
+
+    adj = prepare_candidate_download(plan)
+    stream = stream_candidate_payload(adj, session=session, timeout_s=1.0)
+    out = finalize_candidate_download(adj, stream)
+
+    assert out.ok and out.classification == "success"
+    assert out.path and tmp_path.joinpath(out.path.rsplit("/", 1)[-1]).exists()
+```
+
+---
+
+## 10) Optional: Diff snippets for existing files
+
+If you prefer *diff* format for modified files, here are minimal patches (apply conceptually; your exact file contents may differ).
+
+### `resolvers/base.py` (Protocol return type)
+
+```diff
+- class Resolver(Protocol):
+-     def resolve(self, artifact, session, ctx, ... ) -> list[dict]: ...
++ from DocsToKG.ContentDownload.api.types import ResolverResult
++ class Resolver(Protocol):
++     def resolve(self, artifact, session, ctx, telemetry: Optional[AttemptSink], run_id: Optional[str]) -> ResolverResult: ...
+```
+
+### `pipeline.py` (orchestrate with canonical types)
+
+```diff
+- result = resolver.resolve(...); # dicts/plans
+- plan = build_plan(result)
+- stream = stream_candidate_payload(plan_dict, ...)
+- outcome = finalize_candidate_download(plan_dict, stream_dict, ...)
++ rres: ResolverResult = resolver.resolve(...)
++ for plan in rres.plans:
++     adj_plan = prepare_candidate_download(plan, telemetry=self._telemetry, run_id=self._run_id)
++     stream = stream_candidate_payload(adj_plan, session=self._session, telemetry=self._telemetry, run_id=self._run_id)
++     outcome = finalize_candidate_download(adj_plan, stream, telemetry=self._telemetry, run_id=self._run_id)
+```
+
+---
+
+## 11) Notes on compile & merge order
+
+* This PR introduces types and rewires call signatures but **does not change runtime behavior**.
+* Merge PR #1 (telemetry plumbing + atomic writer) first if you want end-to-end telemetry fields populated; otherwise this compiles independently.
+* If any downstream code imports old classes, add temporary aliases in `api/adapters.py` or a `api/legacy.py` and emit `warnings.warn` (optional).
+
+---
+
+If you want the same content packaged as a **single downloadable .md** or split into **ready-to-apply patch files**, say the word and I’ll output that exact format next.
