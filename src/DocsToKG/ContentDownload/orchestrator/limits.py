@@ -46,13 +46,13 @@ call acquire/release concurrently without data races.
 
 **Memory Management:**
 
-Uses TTL-based lazy eviction of unused semaphores following the industry best 
-practice pattern (Python docs, asyncio patterns). Semaphores are automatically 
-removed when they exceed their TTL without being accessed, preventing unbounded 
+Uses TTL-based lazy eviction of unused semaphores following the industry best
+practice pattern (Python docs, asyncio patterns). Semaphores are automatically
+removed when they exceed their TTL without being accessed, preventing unbounded
 memory growth with dynamic keys.
 
-The approach is simple and proven: maintain a dict of semaphores keyed by 
-resource identifier, periodically evict stale entries. This is the standard 
+The approach is simple and proven: maintain a dict of semaphores keyed by
+resource identifier, periodically evict stale entries. This is the standard
 pattern documented in Python's asyncio and threading modules.
 
 **Feature Flags:**
