@@ -15,7 +15,6 @@ Example:
     ...     app()
 """
 
-import sys
 from pathlib import Path
 from typing import Optional
 
@@ -23,8 +22,67 @@ import typer
 from rich.console import Console
 
 from DocsToKG.OntologyDownload import __version__
-from DocsToKG.OntologyDownload.settings import get_settings
 from DocsToKG.OntologyDownload.cli_settings_commands import settings_app
+from DocsToKG.OntologyDownload.settings import get_settings
+
+# CLI argument normalization constants and functions
+_DEFAULT_SUBCOMMAND = "pull"
+_KNOWN_SUBCOMMANDS = {
+    "pull",
+    "plan",
+    "plan-diff",
+    "show",
+    "validate",
+    "init",
+    "config",
+    "doctor",
+    "prune",
+    "plugins",
+}
+_GLOBAL_OPTIONS_WITH_VALUES = {"--log-level"}
+
+
+def _normalize_plan_args(args):
+    """Inject the default subcommand when callers omit it.
+
+    Args:
+        args: Original CLI argument vector supplied to :func:`cli_main`.
+
+    Returns:
+        Updated argument list with the default subcommand inserted before the
+        first positional argument when no explicit subcommand is present.
+    """
+    from typing import List
+
+    normalized: List[str] = list(args)
+    if not normalized:
+        return normalized
+
+    index = 0
+    while index < len(normalized):
+        token = normalized[index]
+        if token == "--":
+            index += 1
+            break
+        if token.startswith("-"):
+            option_name = token.split("=", 1)[0]
+            if option_name in _GLOBAL_OPTIONS_WITH_VALUES:
+                if "=" in token:
+                    index += 1
+                else:
+                    index += 2
+            else:
+                index += 1
+            continue
+        break
+
+    if index >= len(normalized):
+        return normalized
+
+    if normalized[index] not in _KNOWN_SUBCOMMANDS:
+        normalized.insert(index, _DEFAULT_SUBCOMMAND)
+
+    return normalized
 
 
 # Global console for output
@@ -245,4 +303,5 @@ __all__ = [
     "CliContext",
     "get_context",
     "main",
+    "_normalize_plan_args",
 ]

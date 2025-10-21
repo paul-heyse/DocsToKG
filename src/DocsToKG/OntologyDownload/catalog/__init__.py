@@ -4,6 +4,7 @@ Core modules:
 - migrations: Idempotent schema runner
 - queries: Type-safe query façades with DTOs
 - boundaries: Transactional context managers (FS↔DB choreography)
+- doctor: Health checks and drift detection
 """
 
 from __future__ import annotations
@@ -24,4 +25,10 @@ __all__ = [
     "extraction_boundary",
     "validation_boundary",
     "set_latest_boundary",
+    "DoctorIssue",
+    "DoctorReport",
+    "HealthCheckResult",
+    "quick_health_check",
+    "detect_db_fs_drifts",
+    "generate_doctor_report",
 ]

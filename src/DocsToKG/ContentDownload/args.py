@@ -483,6 +483,50 @@ def build_parser() -> argparse.ArgumentParser:
         help="Default timeout (seconds) for resolver HTTP requests.",
     )
 
+    # Idempotency & resiliency options
+    idempotency_group = parser.add_argument_group("Idempotency & resiliency")
+    idempotency_group.add_argument(
+        "--enable-idempotency",
+        action="store_true",
+        help="Enable idempotency tracking for crash recovery and multi-worker coordination.",
+    )
+    idempotency_group.add_argument(
+        "--fallback-total-timeout-ms",
+        type=int,
+        default=None,
+        metavar="MS",
+        help="Total timeout for fallback resolution (default: 120000ms).",
+    )
+    idempotency_group.add_argument(
+        "--fallback-max-attempts",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Maximum total attempts across all fallback sources (default: 20).",
+    )
+    idempotency_group.add_argument(
+        "--fallback-max-concurrent",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Maximum concurrent fallback attempts (default: 3).",
+    )
+    idempotency_group.add_argument(
+        "--fallback-tier",
+        action="append",
+        default=[],
+        metavar="TIER[:OPTION=VALUE,…]",
+        help=(
+            "Configure fallback tier (e.g., --fallback-tier direct_oa:parallel=2 "
+            "or --fallback-tier archive:parallel=1)."
+        ),
+    )
+    idempotency_group.add_argument(
+        "--disable-wayback-fallback",
+        action="store_true",
+        help="Disable Wayback Machine as a fallback source (use --wayback to control Wayback resolver instead).",
+    )
+
     # Wayback-specific options
     wayback_group = parser.add_argument_group("Wayback Machine settings")
     wayback_group.add_argument(
@@ -1074,6 +1118,11 @@ def resolve_config(
 
     if args.mailto:
         apply_mailto(args.mailto)
+
+    # Enable idempotency system if CLI flag is set
+    if getattr(args, "enable_idempotency", False):
+        os.environ["DOCSTOKG_ENABLE_IDEMPOTENCY"] = "true"
+        LOGGER.info("Idempotency tracking enabled via --enable-idempotency flag")
 
     allowlist_global: Optional[Tuple[str, ...]] = None
     allowlist_per_domain: Optional[Dict[str, Tuple[str, ...]]] = None

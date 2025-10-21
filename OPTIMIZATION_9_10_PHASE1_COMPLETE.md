@@ -28,6 +28,7 @@ All changes are **backward compatible** and require **no invasive modifications*
 ### 1. Global Determinism Configuration (`tests/conftest.py`)
 
 **What was added:**
+
 - `_configure_determinism()` function that initializes:
   - PYTHONHASHSEED=42 (disable hash randomization)
   - TZ=UTC (timezone consistency)
@@ -44,6 +45,7 @@ All changes are **backward compatible** and require **no invasive modifications*
 ### 2. Test Markers & Strata (`tests/conftest.py`)
 
 **What was added:**
+
 - `@pytest.mark.unit`: Pure unit tests, no I/O, <50ms
 - `@pytest.mark.component`: Single subsystem, <500ms
 - `@pytest.mark.e2e`: End-to-end pipeline, <5s
@@ -60,7 +62,7 @@ All changes are **backward compatible** and require **no invasive modifications*
 
 **New file:** 300+ LOC with 5 core fixtures + 1 context manager
 
-#### Fixtures implemented:
+#### Fixtures implemented
 
 | Fixture | Purpose | Scope | Example |
 |---------|---------|-------|---------|
@@ -80,6 +82,7 @@ All changes are **backward compatible** and require **no invasive modifications*
 **New file:** ~70 lines of configuration
 
 **Sections:**
+
 - Test discovery patterns (python_files, python_classes, python_functions)
 - Marker definitions (complementing pytest_configure)
 - Output and reporting options
@@ -87,6 +90,7 @@ All changes are **backward compatible** and require **no invasive modifications*
 - Hypothesis configuration
 
 **Coverage targets:**
+
 - unit tests: 95%
 - component tests: 85%
 - e2e tests: 70%
@@ -120,6 +124,7 @@ All changes are **backward compatible** and require **no invasive modifications*
    - deeply_nested.zip: 100+ levels
 
 **CorpusRegistry class methods:**
+
 - `.all()`: All archives
 - `.by_category(cat)`: Filter by category
 - `.adversarial()`: Adversarial archives
@@ -131,6 +136,7 @@ All changes are **backward compatible** and require **no invasive modifications*
 **New file:** 10 unit tests validating fixtures
 
 **Tests:**
+
 1. `test_deterministic_env_basic`: Metadata validation
 2. `test_deterministic_env_clears_proxies`: Proxy cleanup
 3. `test_seed_state_reproducibility`: Deterministic sequences
@@ -166,6 +172,7 @@ All changes are **backward compatible** and require **no invasive modifications*
 ### For Existing Tests
 
 **No changes required.** Tests automatically benefit from:
+
 1. Deterministic seeds (random behavior reproducible)
 2. Frozen environment (no proxy leakage)
 3. New markers available for categorization
@@ -210,6 +217,7 @@ def test_url_normalization(hypothesis_settings):
 The following optimizations are planned for Phase 2:
 
 ### Optimization 9 Phase 2: Core Fixtures
+
 - HTTP mocking fixtures (HTTPX MockTransport)
 - DuckDB catalog fixtures with migrations
 - Rate limiter registry reset fixtures
@@ -217,18 +225,21 @@ The following optimizations are planned for Phase 2:
 - Polars pipeline test fixtures
 
 ### Optimization 9 Phase 3: Property Testing
+
 - Hypothesis strategies for URL gates
 - Path traversal and collision detection strategies
 - Extraction ratio edge cases
 - Cross-platform path handling
 
 ### Optimization 9 Phase 4: Golden & Snapshot Testing
+
 - CLI help snapshots
 - Delta output canonicalization
 - Audit JSON comparison
 - Flake tracking infrastructure
 
 ### Optimization 10 Phase 1: Micro-Benchmarks
+
 - pytest-benchmark harnesses
 - Baseline management per CI runner class
 - Regression detection in PR CI
@@ -241,7 +252,7 @@ The following optimizations are planned for Phase 2:
 | File | Status | Lines | Purpose |
 |------|--------|-------|---------|
 | tests/conftest.py | Modified | +75 | Determinism + markers |
-| tests/fixtures/__init__.py | Modified | +10 | Package docs |
+| tests/fixtures/**init**.py | Modified | +10 | Package docs |
 | tests/fixtures/determinism.py | **NEW** | 320 | Core determinism fixtures |
 | pytest.ini | **NEW** | 70 | Test configuration |
 | tests/ontology_download/fixtures/test_corpus_manifest.py | **NEW** | 250 | Archive registry |
@@ -252,12 +263,14 @@ The following optimizations are planned for Phase 2:
 
 ## Running the Tests
 
-### Quick validation (Phase 1):
+### Quick validation (Phase 1)
+
 ```bash
 ./.venv/bin/pytest tests/test_determinism_fixtures.py -v
 ```
 
-### Run all tests with new markers:
+### Run all tests with new markers
+
 ```bash
 # Unit tests only (fast CI lane)
 ./.venv/bin/pytest -m unit
@@ -275,7 +288,8 @@ The following optimizations are planned for Phase 2:
 ./.venv/bin/pytest
 ```
 
-### Generate coverage report:
+### Generate coverage report
+
 ```bash
 ./.venv/bin/pytest --cov=DocsToKG --cov-report=html
 open htmlcov/index.html

@@ -58,7 +58,7 @@ PROJECT STATUS: 100/100 for Phase 1 | 90/100 Overall (Phases 1,4 complete)
 │      Returns: 16-char hex string or "unknown" on error                        │
 │      Safety: No raw URLs stored, deterministic hashing                        │
 │                                                                                 │
-│  2️⃣  _extract_from_cache(response) -> Optional[int]                            │
+│  2️⃣_extract_from_cache(response) -> Optional[int]                            │
 │      Purpose: Extract cache hit status from response extensions               │
 │      Sources: response.extensions["from_cache"] or cache_status              │
 │      Returns: 1 (hit), 0 (miss), None (unknown)                              │
@@ -76,7 +76,7 @@ PROJECT STATUS: 100/100 for Phase 1 | 90/100 Overall (Phases 1,4 complete)
 │      Returns: Integer seconds, handles float format, None on error           │
 │      Safety: Graceful parsing with try/except                                │
 │                                                                                 │
-│  6️⃣  _extract_rate_delay(network_meta) -> Optional[int]                        │
+│  6️⃣_extract_rate_delay(network_meta) -> Optional[int]                        │
 │      Purpose: Extract rate limiter wait time from docs_network_meta          │
 │      Source: network_meta["rate_limiter"]["wait_ms"]                         │
 │      Returns: Integer milliseconds, None if missing                          │
@@ -86,7 +86,7 @@ PROJECT STATUS: 100/100 for Phase 1 | 90/100 Overall (Phases 1,4 complete)
 │      Mapping: "half_open" → "half_open", "OPEN" → "open", else → "closed"   │
 │      Safety: Checks for "half" before "open" (substring match order)         │
 │                                                                                 │
-│  8️⃣  _extract_breaker_recorded(breaker_state_info) -> Optional[str]            │
+│  8️⃣_extract_breaker_recorded(breaker_state_info) -> Optional[str]            │
 │      Purpose: Extract breaker recorded outcome (success/failure/none)         │
 │      Returns: Validated outcome string or None                               │
 │      Safety: Only returns known values                                        │
@@ -106,13 +106,13 @@ PROJECT STATUS: 100/100 for Phase 1 | 90/100 Overall (Phases 1,4 complete)
 │  status            INTEGER   httpx.Response          response.status_code     │
 │  url_hash          TEXT      httpx.Request           _compute_url_hash()      │
 │  from_cache        INTEGER   Hishel/extensions       _extract_from_cache()    │
-│  revalidated       INTEGER   HTTP 304 status         _extract_revalidated()   │
-│  stale             INTEGER   Hishel SWrV flag        _extract_stale()         │
+│  revalidated       INTEGER   HTTP 304 status_extract_revalidated()   │
+│  stale             INTEGER   Hishel SWrV flag_extract_stale()         │
 │  retry_count       INTEGER   Tenacity controller     attempts - 1             │
 │  retry_after_s     INTEGER   Retry-After header      _extract_retry_after()   │
-│  rate_delay_ms     INTEGER   docs_network_meta       _extract_rate_delay()    │
-│  breaker_state     TEXT      BreakerRegistry         _extract_breaker_state()  │
-│  breaker_recorded  TEXT      BreakerRegistry         _extract_breaker_recorded()│
+│  rate_delay_ms     INTEGER   docs_network_meta_extract_rate_delay()    │
+│  breaker_state     TEXT      BreakerRegistry_extract_breaker_state()  │
+│  breaker_recorded  TEXT      BreakerRegistry_extract_breaker_recorded()│
 │  elapsed_ms        INTEGER   wall clock              time.time() delta        │
 │  error             TEXT      Exception               None (caught gracefully) │
 │                                                                                 │
@@ -127,7 +127,7 @@ PROJECT STATUS: 100/100 for Phase 1 | 90/100 Overall (Phases 1,4 complete)
 │                                  telemetry=run_telemetry, run_id="run-123")  │
 │                                                                                 │
 │  2. Helpers extract metadata from response extensions, headers, etc.         │
-│     - _compute_url_hash() → "a1b2c3d4e5f67890"                             │
+│     -_compute_url_hash() → "a1b2c3d4e5f67890"                             │
 │     - _extract_from_cache(response) → 1 or 0 or None                        │
 │     - etc.                                                                    │
 │                                                                                 │
@@ -145,7 +145,7 @@ PROJECT STATUS: 100/100 for Phase 1 | 90/100 Overall (Phases 1,4 complete)
 │         elapsed_ms=245,                   # Total time                     │
 │         ...                                # 7 more fields                  │
 │     )                                                                        │
-│     ```                                                                       │
+│```                                                                       │
 │                                                                                 │
 │  4. Errors in telemetry emission are caught and logged silently:             │
 │     - No broken requests due to telemetry issues                            │
